@@ -29,8 +29,8 @@ borobiya/
 │
 ├── packages/
 │   ├── shared/               # Zod schemas + TS types — single source of truth
-│   ├── server/               # Fastify API + Socket.IO + PostGIS
-│   └── client/               # Vue + Vuetify + Tailwind + MapLibre + Ionic
+│   ├── server/               # Fastify API skeleton; DB/Socket.IO later
+│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse; MapLibre/native later
 │
 ├── map-server/               # Independent vector tile + routing + geocoding
 │   ├── tiles/                # (gitignored) *.pmtiles / *.mbtiles lives here
@@ -178,11 +178,10 @@ packages/server/
 │   │   └── geo.ts            # ST_Distance helpers
 │   └── types/
 │       └── fastify.d.ts      # augment FastifyRequest.user
-├── drizzle.config.ts / prisma/schema.prisma
+├── drizzle.config.ts / prisma/schema.prisma  # planned with database setup
 ├── tsconfig.json
-├── vitest.config.ts
 ├── README.md
-└── Dockerfile
+└── Dockerfile                # planned with container orchestration
 ```
 
 **Naming:**
@@ -193,82 +192,41 @@ packages/server/
 
 ---
 
-## 5. `packages/client` — Vue + Ionic
+## 5. `packages/client` — Vue + Vuetify
 
 ```text
 packages/client/
-├── package.json              # name: "@borobiya/client"
-├── src/
-│   ├── main.ts
-│   ├── App.vue
-│   ├── router/
-│   │   └── index.ts          # prefix-based guards (_auth/_public/_user/_admin)
-│   ├── stores/               # Pinia
-│   │   ├── auth.ts
-│   │   ├── theme.ts          # dark/light + map style
-│   │   ├── map.ts
-│   │   ├── location.ts
-│   │   ├── sos.ts
-│   │   └── index.ts
-│   ├── composables/
-│   │   ├── useAuth.ts
-│   │   ├── useMap.ts         # MapLibre init + setStyle + fitBounds
-│   │   ├── useGeolocation.ts # VueUse + Capacitor Geolocation
-│   │   ├── useSocket.ts
-│   │   ├── useNavigation.ts  # pitch/bearing per profile
-│   │   └── usePriorityDevice.ts
-│   ├── views/
-│   │   ├── _auth/
-│   │   │   ├── Login.vue
-│   │   │   ├── Register.vue
-│   │   │   ├── ForgotPassword.vue
-│   │   │   └── CompleteSecurityQuestions.vue
-│   │   ├── _public/
-│   │   │   ├── Landing.vue
-│   │   │   └── Health.vue
-│   │   ├── _user/
-│   │   │   ├── Dashboard.vue
-│   │   │   ├── Map.vue
-│   │   │   ├── LocationShares.vue
-│   │   │   ├── SosHistory.vue
-│   │   │   ├── Settings.vue
-│   │   │   └── Devices.vue
-│   │   └── _admin/
-│   │       ├── Dashboard.vue
-│   │       ├── Users.vue
-│   │       ├── Categories.vue
-│   │       ├── Incidents.vue
-│   │       └── Dispatch.vue
-│   ├── components/
-│   │   ├── common/           # AppBar, BottomSheet, ThemeToggle
-│   │   ├── map/              # MapCanvas.vue, MarkerCluster.vue, RoutePolyline.vue
-│   │   ├── sos/              # SosButton.vue, SosForm.vue, ProposalCard.vue, MissionTimeline.vue
-│   │   └── location/         # ShareDialog.vue, PriorityDeviceModal.vue, TimeSlider.vue
-│   ├── lib/
-│   │   ├── api.ts            # axios/bun fetch wrapper + Zod parse + refresh retry
-│   │   ├── socket.ts         # socket.io-client singleton
-│   │   └── mapStyles.ts      # light/dark import
-│   ├── assets/
-│   │   ├── icons/            # SVG only (vector)
-│   │   └── sprites/
-│   ├── styles/
-│   │   ├── tailwind.css
-│   │   └── vuetify-theme.ts
-│   └── generated/            # (gitignored) zopia output → zod.ts
+├── package.json              # name: "@borobiya/client"; Vue 3, Vuetify, Tailwind, Pinia, VueUse
+├── README.md
+├── index.html                # Persian-first RTL document shell
+├── vite.config.ts            # Vue/Vuetify/Tailwind, @ alias, same-origin API/map proxies
+├── tsconfig.json
 ├── public/
 │   └── favicon.svg
-├── index.html
-├── vite.config.ts            # vue + vuetify + tailwind + @ path alias + proxy to :3000/:8000
-├── capacitor.config.ts
-├── tsconfig.json
-├── tailwind.config.js
-└── ionic.config.json
+└── src/
+    ├── main.ts               # Vue + Pinia + router + Vuetify bootstrap
+    ├── App.vue               # shared application shell
+    ├── env.d.ts
+    ├── router/
+    │   ├── index.ts          # 17 namespaced placeholder views; auth guards later
+    │   └── index.test.ts
+    ├── stores/
+    │   └── index.ts          # Pinia instance
+    ├── composables/
+    │   └── useSystemTheme.ts # VueUse starting point
+    ├── plugins/
+    │   └── vuetify.ts        # Persian locale, RTL, base light/dark palettes
+    ├── styles/
+    │   └── tailwind.css      # Tailwind utilities + app shell styling
+    └── views/
+        ├── PlaceholderPage.vue
+        ├── _auth/PlaceholderView.vue
+        ├── _public/PlaceholderView.vue
+        ├── _user/PlaceholderView.vue
+        └── _admin/PlaceholderView.vue
 ```
 
-**Ionic specifics:**
-- `capacitor.config.ts` points to `dist/` after `vite build`.
-- Plugins: `@capacitor/geolocation`, `@capacitor/camera`, `@capacitor/preferences` (for tokens).
-- Android folder at `android/` after `npx cap add android` — gitignored initially, committed after first build.
+MapLibre, API/auth stores, feature components, Capacitor, and Android packaging remain future work.
 
 ---
 
@@ -330,6 +288,7 @@ MAP_SERVER_URL=http://localhost:8000
 MAP_REGION=tehran
 MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=development
+API_PROXY_TARGET=http://127.0.0.1:3000
 VITE_API_URL=/api
 VITE_MAP_URL=/map
 ```

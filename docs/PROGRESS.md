@@ -4,14 +4,14 @@
 
 ---
 
-## Overall: 13% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 16% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline and first four implementation tasks are complete. Shared schemas, route contracts, and a validated Fastify server skeleton now exist; domain handlers, persistence, the client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first five implementation tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton, and a Persian-first Vue client shell with namespaced route placeholders now exist; domain handlers, persistence, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 57% | 🟡 T1.0.1–T1.0.4 complete; T1.0.5–T1.0.7 pending |
+| Monorepo scaffold | 71% | 🟡 T1.0.1–T1.0.5 complete; T1.0.6–T1.0.7 pending |
 | Auth & Users | 0% | ⬜ Schemas and route descriptors exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
@@ -24,11 +24,11 @@ The documentation baseline and first four implementation tasks are complete. Sha
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 13%
+### Phase 1 — Foundation (Auth & Map) — 16%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 57% | T1.0.1–T1.0.4 root config, shared Zod schemas, km-api descriptors, and Fastify shell done; domain handlers and data wiring remain |
+| Monorepo + Contracts | 71% | T1.0.1–T1.0.5 root config, shared contracts, Fastify shell, and Vue/Vuetify client scaffold done; OpenAPI and root orchestration remain |
 | Auth system | 0% | Schemas and route contracts exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
@@ -81,6 +81,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-18 — Vue client foundation (T1.0.5)
+
+- Added the `@borobiya/client` Vue 3/Vite workspace with Vuetify, Tailwind CSS 4, Pinia, VueUse, Vue Router, Persian locale, and RTL shell styling.
+- Added 17 route placeholders across `/_auth`, `/_public`, `/_user`, and `/_admin`, a responsive shared shell, and a minimal route-map test suite.
+- Configured Vite to bind to `0.0.0.0`, allow the Arena preview host, and proxy same-origin `/api` and `/map` requests server-side; backend targets are not exposed to browser code.
+- Validation: frozen-lockfile install, 2 client tests, client typecheck, and production build passed. Feature views, auth guards, MapLibre, Capacitor, and root `bun run dev` remain future work.
 
 ### 2026-10-18 — Fastify server foundation (T1.0.4)
 

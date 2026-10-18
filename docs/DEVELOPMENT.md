@@ -9,7 +9,7 @@
 | Requirement | Version | Docker path | Windows path |
 |-------------|---------|-------------|--------------|
 | Bun | 1.4.3+ (project pin: 1.4.3) | Container image `oven/bun:1.4.3` | `powershell -c "irm bun.sh/install.ps1|iex"` |
-| Node.js fallback | 20+ | Not needed if Bun image | If Bun fails, use Node 20 |
+| Node.js fallback | Server: 20+; client Vite: `^20.19.0 || >=22.12.0` | Not needed if Bun image | Vite requires Node 20.19+ or 22.12+ |
 | PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Install `postgresql-16` + `postgis` extension |
 | Git | 2.40+ | host | host |
 | Docker + Compose | 25+ | host | optional (WSL2) |
@@ -131,16 +131,13 @@ Or run client in Docker via `docker-compose.override.yml` that adds `client` ser
 ```bash
 cd borobiya
 bun install
-bun run db:setup      # create db + migrate + seed (wraps above)
-bun run map:dev        # starts local Martin binary with data/maps/tehran.pmtiles
-# In another terminal
-bun run dev            # concurrently: api:3000 + client:5173
+# After copying .env.example to .env and replacing the JWT placeholders:
+bun --filter @borobiya/server dev
+# In another terminal:
+bun --filter @borobiya/client dev
 ```
 
-`map:dev` details: runs `map-server/scripts/martin-local.sh` which:
-
-- Checks `data/maps/tehran.pmtiles` exists (downloads sample ~100MB if missing — warn user).
-- Starts `bin/martin.exe --config map-server/martin-config.yaml` on `:8000`.
+Root `bun run dev`, database setup, migrations/seeds, and the local Map Server scripts are planned for later foundation tasks; they are not wired yet.
 
 ### 3.3 Windows Caveats
 
@@ -161,6 +158,7 @@ DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
 JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
 JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+API_PROXY_TARGET=http://127.0.0.1:3000
 
 # Global rate limit: 100 requests per minute; auth/SOS routes apply stricter limits.
 RATE_LIMIT_WINDOW_MS=60000
@@ -198,20 +196,24 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 | Command | Where | What |
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
-| `bun run dev` | root | Concurrent `server` + `client` dev |
+| `bun run dev` | root | Concurrent API + client (root orchestration planned for T1.0.7) |
 | `bun --filter @borobiya/server dev` | root | Fastify API skeleton (`bun --watch`) |
 | `bun --filter @borobiya/server test` | root | Server environment and Fastify inject tests |
 | `bun --filter @borobiya/server typecheck` | root | Strict server TypeScript check |
-| `bun --filter @borobiya/client dev` | root | Vite HMR only (added in T1.0.5) |
-| `bun run build` | root | Build all |
-| `bun run lint` | root | ESLint + `vue-tsc --noEmit` + `tsc --noEmit` |
+| `bun --filter @borobiya/client dev` | root | Vite on `0.0.0.0:5173`, with same-origin `/api` and `/map` proxies |
+| `bun --filter @borobiya/client test` | root | Client route-map tests |
+| `bun --filter @borobiya/client typecheck` | root | Vue SFC and TypeScript check |
+| `bun --filter @borobiya/client build` | root | Typecheck and production Vite build |
+| `bun --filter @borobiya/client preview` | root | Preview the production build |
+| `bun run build` | root | Build all (root orchestration planned for T1.0.7) |
+| `bun run lint` | root | ESLint + `vue-tsc` + `tsc` (root lint script planned) |
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
-| `bun run db:setup` | server | Create DB + migrate + seed |
-| `bun run db:migrate` | server | Run migrations |
-| `bun run db:seed` | server | Seed questions + reasons + admin |
-| `bun run map:dev` | root | Local Martin dev server |
-| `bun run map:update --region=iran` | map-server | Full pipeline (see MAP_SERVER.md §4) |
-| `bunx zopia --input http://localhost:3000/docs/json --output packages/client/src/generated/zod.ts` | client | Codegen shared types |
+| `bun run db:setup` | server | Planned with database/migration tasks; not wired yet |
+| `bun run db:migrate` | server | Planned with database/migration tasks; not wired yet |
+| `bun run db:seed` | server | Planned with database/seed tasks; not wired yet |
+| `bun run map:dev` | root | Planned; local Martin scripts are not wired yet |
+| `bun run map:update --region=iran` | map-server | Planned; see MAP_SERVER.md §4 |
+| `bunx zopia --input http://localhost:3000/docs/json --output packages/client/src/generated/zod.ts` | client | Planned with T1.0.6 OpenAPI/codegen wiring |
 
 ---
 
@@ -245,13 +247,18 @@ bun --filter @borobiya/shared typecheck
 # Fastify server skeleton
 bun --filter @borobiya/server test
 bun --filter @borobiya/server typecheck
-bun --filter @borobiya/server dev
+
+# Vue client scaffold
+bun --filter @borobiya/client test
+bun --filter @borobiya/client typecheck
+bun --filter @borobiya/client build
 ```
 
 - Shared-contract tests use Vitest and cover the documented Zod invariants and route descriptors.
 - Server tests use `fastify.inject()`; no network listener or database is needed.
-- Before starting the server, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, host/port, and rate-limit values; no database connection is opened yet.
-- Frontend tests will use `@vue/test-utils` + Vitest for stores.
+- Client tests verify namespaced routes and placeholder registration; feature/component tests will be added with those features.
+- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, host/port, and rate-limit values; no database connection is opened yet.
+- The Vite browser client uses same-origin `/api` and `/map` paths; its server-side dev proxy reads backend targets from the root `.env`.
 
 ---
 
@@ -263,8 +270,8 @@ bun --filter @borobiya/server dev
 | `relation "users" does not exist` | Run `bun run db:migrate` |
 | Map blank, 404 tiles | `map-server` down — `docker compose logs map-server`, check `map-data` volume has `.pmtiles` |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |
-| `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/complete-security-questions` |
-| Vite HMR slow | `bun --filter client dev -- --host 0.0.0.0` |
+| `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/_user/complete-security-questions` |
+| Vite HMR slow | `bun --filter @borobiya/client dev` (already binds to `0.0.0.0`) |
 | Port conflicts 3000/5173/8000 | Change in `.env` + `vite.config.ts` proxy |
 
 ---

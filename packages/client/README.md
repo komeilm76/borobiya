@@ -1,0 +1,12 @@
+# `@borobiya/client`
+
+Vue 3 + Vite client shell using Vuetify, Tailwind CSS, Pinia, VueUse, and Vue Router. The application is Persian-first and RTL, with placeholder routes under `/_auth`, `/_public`, `/_user`, and `/_admin`. The Vite toolchain requires Node `^20.19.0 || >=22.12.0` (Bun 1.4.3 is the repository-pinned runner).
+
+```bash
+bun --filter @borobiya/client dev
+bun --filter @borobiya/client test
+bun --filter @borobiya/client typecheck
+bun --filter @borobiya/client build
+```
+
+The browser uses same-origin `/api` and `/map` paths. Vite proxies those paths to `API_PROXY_TARGET` and `MAP_SERVER_URL` from the repository-root `.env`; these backend targets are read only by the dev server and are not exposed to browser code. Authentication guards, feature views, MapLibre, and Capacitor integration are future work.

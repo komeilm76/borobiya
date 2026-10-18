@@ -41,9 +41,9 @@ gantt
 **Goal:** User can register/login, recover password via 5Q, see offline vector map with dark/light toggle. Infra: monorepo + Docker + Postgres + Swagger.
 
 ### M1.1 Monorepo & Shared Contract
-- [ ] Init `packages/shared` with all Zod schemas
-- [ ] Init `packages/server` Fastify skeleton + `@borobiya/shared`
-- [ ] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse
+- [x] Init `packages/shared` with all Zod schemas — completed 2026-10-18
+- [x] Init `packages/server` Fastify skeleton + `@borobiya/shared` — completed 2026-10-18
+- [x] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse — completed 2026-10-18
 - [ ] Root `docker-compose.yml`, `.env.example`, `tsconfig` strict
 - [ ] OpenAPI at `/docs` + `/docs/json` via `fastify-swagger`
 - [ ] Zopia wired: `bunx zopia --input /docs/json --output generated/`
