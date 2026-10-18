@@ -235,15 +235,16 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 ## 8. Testing
 
 ```bash
-bun test                    # all
-bun --filter server test    # api
-bun --filter client test    # composables, stores
-bun --filter shared test    # zod schemas
+# Available now: shared API contracts
+bun --filter @borobiya/shared test
+bun --filter @borobiya/shared typecheck
+
+# Server/client test scripts will be added with those workspaces.
 ```
 
-- Zod tests: register invalid (duplicate Q, weak pass) should fail; login rate-limit triggers.
-- API tests: `fastify.inject()` — no HTTP server needed.
-- Frontend: `@vue/test-utils` + `vitest` for stores.
+- Shared-contract tests use Vitest and cover the documented Zod invariants.
+- API tests will use `fastify.inject()` — no HTTP server needed.
+- Frontend tests will use `@vue/test-utils` + Vitest for stores.
 
 ---
 

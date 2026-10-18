@@ -4,15 +4,15 @@
 
 ---
 
-## Overall: 6% — Phase 1 Foundation started (2026-10-18)
+## Overall: 8% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline is complete. The first implementation task, **T1.0.1 (root workspace configuration)**, is complete; application packages and runtime features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first two implementation tasks are complete. The shared contract package now exists; the API server, client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 14% | 🟡 T1.0.1 complete; T1.0.2–T1.0.7 pending |
-| Auth & Users | 0% | ⬜ Not started |
+| Monorepo scaffold | 29% | 🟡 T1.0.1 and T1.0.2 complete; T1.0.3–T1.0.7 pending |
+| Auth & Users | 0% | ⬜ Contracts exist; auth flows are not implemented |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -24,12 +24,12 @@ The documentation baseline is complete. The first implementation task, **T1.0.1 
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 4%
+### Phase 1 — Foundation (Auth & Map) — 7%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 14% | T1.0.1 root config done; shared schemas, API descriptors, packages and runtime wiring remain |
-| Auth system | 0% | — |
+| Monorepo + Contracts | 29% | T1.0.1 root config and T1.0.2 shared Zod contracts done; km-api descriptors and runtime wiring remain |
+| Auth system | 0% | Schemas exist; endpoints, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -73,7 +73,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 | # | Issue | Impact | Owner | Status |
 |---|-------|--------|-------|--------|
-| 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 was invoked through `npm exec` for version and empty-workspace install checks | Environment | 🟡 Validation limitation |
+| 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
 | 3 | ORM choice (Drizzle vs Prisma) not decided | Blocks DB migrations | TBD | 🔵 Open — ADR needed |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
@@ -82,11 +82,18 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-18 — Shared contracts (T1.0.2)
+
+- Added the private `@borobiya/shared` workspace package with Zod schemas for auth, users, location, SOS, admin, search, common responses, and enums; exported inferred types and package subpaths.
+- Added 19 tests across five files covering password/question invariants, location sharing rules, coordinate and query parsing, SOS bounds, dispatch recipients, admin inputs, cancellation reasons, and the public schema barrel.
+- Added TypeScript 5 and Vitest development tooling plus `bun.lock`; pinned compatible package ranges for the documented Node 20+ fallback.
+- Validation: `bun install --frozen-lockfile`, all 19 Vitest tests, package TypeScript typecheck, and a package self-reference import smoke test passed with Bun 1.4.3 invoked through `npm exec`.
+
 ### 2026-10-18 — Phase 1 kickoff (T1.0.1)
 
 - Added the private Bun workspace manifest, strict shared TypeScript configuration, secret/data-aware `.gitignore`, and documented `.env.example`.
 - Aligned the active development guide with the explicit global rate limit (100 requests/minute) and same-origin browser proxy paths (`/api`, `/map`); corrected the TypeScript workspace alias example.
-- Marked T1.0.1 complete. Monorepo + Contracts is 14%; no auth, map, or feature code is claimed complete.
+- Marked T1.0.1 complete. Monorepo + Contracts was 14%; no auth, map, or feature code was claimed complete.
 - Validation: Node config/environment assertions, TypeScript 5 inherited-config check, Git ignore checks, `git diff --check`, and Bun 1.4.3 empty-workspace install dry-run passed. Docker/Compose runtime checks remain unavailable.
 
 ### 2025-10-18 — Docs Bootstrap

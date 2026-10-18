@@ -73,7 +73,11 @@ borobiya/
     "db:setup": "bun --filter server db:setup",
     "cap:sync": "bun --filter client build && npx cap copy android"
   },
-  "packageManager": "bun@1.4.3"
+  "packageManager": "bun@1.4.3",
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
 }
 ```
 
@@ -83,20 +87,20 @@ Alternative: use `pnpm`/`npm` workspaces — but Bun is mandated, so `bun worksp
 
 ## 3. `packages/shared` — Contract Package
 
-**Purpose:** No runtime dependency — only Zod schemas + inferred types + km-api route descriptors.
+**Purpose:** One lightweight runtime dependency (`zod`) for shared schemas and inferred types; no Fastify, Vue, or database imports. The `km-api` route descriptors are added in T1.0.3.
 
 ```text
 packages/shared/
-├── package.json              # name: "@borobiya/shared"
+├── package.json              # name: "@borobiya/shared"; Zod runtime dependency; test/typecheck scripts
 ├── src/
 │   ├── schemas/
 │   │   ├── auth.ts           # loginSchema, registerSchema, forgotSchemas, completeSecurityQuestionsSchema
 │   │   ├── user.ts           # userProfileSchema, devicesSchema
 │   │   ├── location.ts       # shareSchema, historyShareSchema, locationUpdateSchema
-│   │   ├── sos.ts            # sosRequestSchema, dispatchSchema, missionStatusSchema, cancellationSchemas
-│   │   ├── admin.ts          # createUserSchema, toggleActiveSchema, categorySchemas, incidentTypeSchemas
-│   │   ├── search.ts         # userSearchSchema, geocodeSchemas
-│   │   ├── common.ts         # paginationSchema, idSchema, errorSchema
+│   │   ├── sos.ts            # sosRequestSchema, dispatchSchema, missionStatusUpdateSchema, cancellationSchemas
+│   │   ├── admin.ts          # user status, category, incident type, and cancellation-reason schemas
+│   │   ├── search.ts         # userSearchSchema, geocodeQuerySchema, reverseGeocodeQuerySchema
+│   │   ├── common.ts         # paginationQuerySchema, idSchema, errorSchema
 │   │   └── index.ts          # barrel export
 │   ├── api/
 │   │   ├── auth.routes.ts    # km-api definitions (method, url, schema, meta)

@@ -223,6 +223,8 @@ GET /geocode?q=Azadi+Square&limit=5&bbox=51.0,35.5,51.7,35.9
 GET /reverse?lat=35.70&lon=51.40
 ```
 
+The shared client contract defaults geocoding to 5 results and allows `limit` from 1 to 20. Bounding boxes use `west,south,east,north` order. Reverse-geocode coordinates are validated against WGS84 latitude/longitude ranges.
+
 Response:
 
 ```json

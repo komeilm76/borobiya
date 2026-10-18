@@ -162,9 +162,11 @@ POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ### 5.2 User Search
 
 ```
-GET /_user/users/search?q=&category=&incidentType=&minRating=&sort=distance&lat=&lon=&page=&limit=
+GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=distance&lat=&lon=&page=&limit=
 → { items: [{ id, username, category, avgRating, isOnline, distance }], total, page, limit }
 ```
+
+`online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting may use the authenticated user's last known location.
 
 ### 5.3 Location Sharing
 
