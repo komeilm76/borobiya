@@ -51,7 +51,7 @@ gantt
 
 ### M1.2 Auth System
 - [x] Initial `users`, `security_questions`, `user_security_answers`, and `user_sessions` schema/migration — T1.1.1–T1.1.2 completed 2026-10-18
-- [ ] `security_questions` seed (15) + `cancellation_reasons` seed
+- [x] `cancellation_reasons` table/migration + 15 security-question seeds, 11 cancellation reasons, and Argon2id bootstrap admin — T1.1.3 completed 2026-10-18
 - [ ] `POST /_auth/register` — 5 unique Q validation (zod superRefine)
 - [ ] `POST /_auth/login` — username+password only, argon2id, rate-limit 5/15m
 - [ ] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
@@ -136,7 +136,7 @@ gantt
 - [ ] Live location for all 3 (requester+rescuer+admin) on map
 
 ### M3.6 Cancellation (Critical)
-- [ ] `cancellation_reasons` seed (requester 5 + rescuer 6 keys)
+- [x] `cancellation_reasons` seed (requester 5 + rescuer 6 keys) — completed with T1.1.3 on 2026-10-18
 - [ ] `POST /_user/sos/requests/:id/cancel` (requester, needs reason)
 - [ ] `POST /_user/missions/:id/cancel` (rescuer, hard path, rate-limit 3/h, flag >2/day)
 - [ ] `mission:cancelled-by-rescuer` urgent → admin red flash + “NEEDS REPLACEMENT” + re-dispatch

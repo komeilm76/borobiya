@@ -19,10 +19,12 @@
 - Compare via `argon2.verify()` — timing-safe.
 
 ```ts
-import * as argon2 from "argon2";
-const hash = await argon2.hash(password, { type: argon2.argon2id });
-const ok = await argon2.verify(hash, password);
+import { hashPassword, verifyPassword } from "../packages/server/src/security/password";
+const hash = await hashPassword(password);
+const ok = await verifyPassword(hash, password);
 ```
+
+The database seed hashes the local bootstrap admin credential with the same Argon2id helper. The `admin` / `admin123` fallback is accepted only when `NODE_ENV` is `development` or `test`; change it before exposing the service. Other environments require a unique `ADMIN_SEED_PASSWORD`, reject the fallback, and never overwrite an existing admin password.
 
 ### 1.3 Security Answers (5 Questions)
 
@@ -30,7 +32,7 @@ const ok = await argon2.verify(hash, password);
 - **Hash** same as passwords (argon2id) — store only `answerHash`.
 - **5 unique `questionId`** — validate `new Set(ids).size===5 && ids.length===5` via `zod.superRefine` + DB unique.
 - Table: `user_security_answers (id, userId, questionId, answerHash)` with `UNIQUE(userId, questionId)`.
-- Seed `security_questions` with 15–20 entries (e.g., “What was your first pet’s name?”). IDs are UUIDs, text is public.
+- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded, and the future auth flow must persist only their Argon2id hashes.
 
 ### 1.4 Forgot Password Invariants
 

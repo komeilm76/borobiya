@@ -6,13 +6,13 @@
 
 ## Overall: 17% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline, first seven foundation tasks, and the initial Drizzle schema/migration tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist; only the health handler is live, while domain handlers, API database integration, seeds, map assets, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, and the initial Drizzle schema/migration/seed tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist; only the health handler is live, while domain handlers, API database integration, map assets, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 0% | ⬜ Initial schema/migration exist; API handlers, DB integration, security enforcement, and UI remain |
+| Auth & Users | 0% | ⬜ Schema, migrations, and seed foundation exist; API handlers, runtime DB integration, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -29,7 +29,7 @@ The documentation baseline, first seven foundation tasks, and the initial Drizzl
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 0% | Initial schema/migration exist; handlers, API DB integration, security enforcement, and UI remain |
+| Auth system | 0% | Schema, migrations, and bootstrap seed exist; handlers, API DB integration, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -75,12 +75,19 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 |---|-------|--------|-------|--------|
 | 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | API database connection and seed workflow are not implemented yet | Auth handlers cannot persist data; security-question/reason seeds are pending | TBD | 🟡 Next: T1.1.3 seed |
+| 3 | Fastify does not yet use the database client | Auth handlers cannot persist data; migration and seed commands are explicit developer operations only | TBD | 🟡 Next: T1.1.4 user fields, then auth handlers |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
+
+### 2026-10-18 — Initial reference-data and admin seed (T1.1.3)
+
+- Added a migration for `cancellation_reasons` and a seed command that inserts 15 Persian security questions, the documented 5 requester + 6 rescuer reasons, and an Argon2id-hashed bootstrap admin.
+- Seed operations are idempotent; an existing admin password is never overwritten. The `admin` / `admin123` fallback is allowed only when `NODE_ENV` is `development` or `test`; other environments require a unique `ADMIN_SEED_PASSWORD`.
+- The reasons share the key `other`; uniqueness is scoped to `(type, key)` to permit both documented reason lists.
+- Validation: frozen-lockfile install; 44 workspace tests; all three typechecks; client production build; Argon2id hash/verify; migration/journal/snapshot assertions; `db:migrate --help`; and repeat `db:generate` with no schema changes all passed. The seed could not be run against PostgreSQL in this environment.
 
 ### 2026-10-18 — Initial auth-table migration (T1.1.2)
 

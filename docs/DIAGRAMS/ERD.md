@@ -198,11 +198,12 @@ CREATE TABLE mission_status_history (
 CREATE TABLE cancellation_reasons (
   id UUID PRIMARY KEY,
   type TEXT NOT NULL CHECK (type IN ('requester','rescuer')),
-  key TEXT UNIQUE NOT NULL,
+  key TEXT NOT NULL,
   label TEXT NOT NULL,
   label_fa TEXT,
   requires_custom_text BOOLEAN NOT NULL DEFAULT false,
-  is_active BOOLEAN NOT NULL DEFAULT true
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  UNIQUE(type, key)
 );
 
 CREATE TABLE mission_ratings (

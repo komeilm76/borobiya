@@ -270,7 +270,7 @@ GET   /_admin/cancellation-reasons
 POST  /_admin/cancellation-reasons { type:"requester"|"rescuer", key, label, labelFa, requiresCustomText, isActive }
 ```
 
-Seeded by the separate data-seed task T1.1.3 (see SECURITY.md §10); these rows are not part of the initial auth-table migration.
+Populated by T1.1.3; the table is introduced in a follow-up migration rather than the initial auth-table migration (see SECURITY.md for the reason list).
 
 ---
 

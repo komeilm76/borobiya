@@ -22,7 +22,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 - [x] **T1.1.1** Decide ORM: Drizzle + Postgres.js (document in ARCHITECTURE ADR) + initial account/security/session schema — completed 2026-10-18
 - [x] **T1.1.2** Migration: `users`, `security_questions`, `user_security_answers`, `user_sessions` (see ERD) — completed 2026-10-18
-- [ ] **T1.1.3** Seed: 15 security questions + cancellation_reasons + default `admin / admin123` (must change)
+- [x] **T1.1.3** Add/migrate and seed 15 security questions + 11 scoped cancellation reasons + Argon2id bootstrap admin (`admin / admin123`, local only; must change) — completed 2026-10-18
 - [ ] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users`
 
 ### 1.2 Auth (`_auth`, `_admin` user creation)
@@ -140,7 +140,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 ### 3.6 Cancellation & Re-dispatch (Critical)
 
-- [ ] **T3.6.1** Seed `cancellation_reasons` (requester 5 + rescuer 6 keys, see spec §11.7C)
+- [x] **T3.6.1** Seed `cancellation_reasons` (requester 5 + rescuer 6 keys, see spec §11.7C) — completed with T1.1.3 on 2026-10-18
 - [ ] **T3.6.2** Requester: `POST /_user/sos/requests/:id/cancel` {cancellationReasonId, customReason?} — must pick reason before accept
 - [ ] **T3.6.3** Rescuer: `POST /_user/missions/:id/cancel` {cancellationReasonId, customReason?} — hidden behind “More→Unable to continue”, confirm, rate-limit 3/h, flag >2/day
 - [ ] **T3.6.4** Server: set `missions.status=cancelled_by_*`, `rescuer.isOnMission=false`, emit `mission:cancelled-by-requester/rescuer`

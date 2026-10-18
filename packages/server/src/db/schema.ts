@@ -1,4 +1,4 @@
-import type { UserRole } from "@borobiya/shared";
+import type { CancellationType, UserRole } from "@borobiya/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -71,8 +71,27 @@ export const userSessions = pgTable(
   (table) => [index("user_sessions_user_id_idx").on(table.userId)]
 );
 
+export const cancellationReasons = pgTable(
+  "cancellation_reasons",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: text("type").$type<CancellationType>().notNull(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    labelFa: text("label_fa"),
+    requiresCustomText: boolean("requires_custom_text").notNull().default(false),
+    isActive: boolean("is_active").notNull().default(true)
+  },
+  (table) => [
+    check("cancellation_reasons_type_check", sql`"type" IN ('requester', 'rescuer')`),
+    check("cancellation_reasons_key_check", sql`"key" ~ '^[a-z][a-z0-9_]*$'`),
+    unique("cancellation_reasons_type_key_unique").on(table.type, table.key)
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
 export type UserSecurityAnswerRow = typeof userSecurityAnswers.$inferSelect;
 export type UserSessionRow = typeof userSessions.$inferSelect;
+export type CancellationReasonRow = typeof cancellationReasons.$inferSelect;

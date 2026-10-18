@@ -117,7 +117,7 @@ packages/server/
 ├── Dockerfile                # workspace-aware Bun API image
 ├── drizzle/                  # checked-in SQL migrations, journal, and schema snapshots
 ├── drizzle.config.ts         # Drizzle Kit schema/migration configuration
-├── package.json              # Fastify, Drizzle, Postgres.js, security plugins, and Swagger
+├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
     ├── app.ts                # creates Fastify app; only public health is a live handler
@@ -128,13 +128,20 @@ packages/server/
     │   └── env.test.ts
     ├── db/
     │   ├── client.ts         # explicit, currently unused Drizzle/Postgres.js factory
-    │   └── schema.ts         # initial users/security-questions/answers/sessions schema
+    │   ├── schema.ts         # auth/session/cancellation-reason tables
+    │   ├── seed.ts           # transactional, idempotent reference/admin seeder
+    │   ├── seed-config.ts    # production-safe bootstrap password policy
+    │   ├── seed-data.ts      # Persian questions and localized cancellation reasons
+    │   └── seed-data.test.ts
+    ├── security/
+    │   ├── password.ts      # Argon2id hash/verify helpers
+    │   └── password.test.ts
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. The initial SQL migration is checked in, but auth/domain handlers, seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
+The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. The initial migrations and idempotent seed command are checked in, but auth/domain handlers, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
 
 ---
 
@@ -211,8 +218,8 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 ## 8. Database Migrations
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
-- Initial Drizzle schema declarations and the checked-in T1.1.2 migration cover `users`, `security_questions`, `user_security_answers`, and `user_sessions` under `packages/server/drizzle/`.
-- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations to `DATABASE_URL`. Neither is run by Fastify startup; the API database connection remains future work.
+- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons` under `packages/server/drizzle/`.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; API database connection remains future work.
 
 ---
 
@@ -278,8 +285,8 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] Root `bun run dev` orchestration for API + client
 - [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
 - [x] `.env.example`, `.gitignore`, and Docker build exclusions
-- [x] Drizzle/Postgres.js decision, initial schema declarations/config, and first SQL migration
-- [ ] API database connection, auth handlers, and seeds
+- [x] Drizzle/Postgres.js decision, schema/migrations, seed data, and Argon2id bootstrap
+- [ ] API database connection and auth handlers
 - [ ] Map tile/style/routing/geocoding data and generation pipeline
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

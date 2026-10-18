@@ -55,11 +55,11 @@ curl http://localhost:8080/docs                 # Swagger UI
 curl http://localhost:8000/health               # Martin
 ```
 
-Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. Use the Vite client at `http://localhost:5173` (see §2.4). The initial auth-table migration is checked in, but the API does not open a database connection or apply migrations at startup; data seeds remain future work. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
+Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. Use the Vite client at `http://localhost:5173` (see §2.4). Auth/reference migrations and an explicit seed command are checked in, but the API does not open a database connection or run them at startup. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
 
 ### 2.3 Database status
 
-PostGIS is created and health-checked by Compose. The initial Drizzle migration for `users`, `security_questions`, `user_security_answers`, and `user_sessions` is checked in under `packages/server/drizzle/`. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, or `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither command runs at API startup; the API still does not connect to PostgreSQL. Seeds are not implemented yet, and `db:setup`/`db:seed` remain unwired.
+PostGIS is created and health-checked by Compose. Drizzle migrations under `packages/server/drizzle/` create the four auth tables plus `cancellation_reasons`. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; the API still does not connect to PostgreSQL. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
 ### 2.4 Client and development loop
 
@@ -116,11 +116,11 @@ bun install
 bun run dev   # API and Vite client concurrently
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment but does not connect to PostgreSQL yet; migrations/seeds are not implemented. The map server and its data-generation scripts are also separate future tasks. Docker is optional for working on the current API/client scaffold.
+The API requires a syntactically valid `DATABASE_URL` in its environment but does not connect to PostgreSQL. The auth/reference migrations and `db:seed` command are available for manual use against a running database; map data and its generation scripts remain future tasks. Docker is optional for working on the current API/client scaffold.
 
 ### 3.3 Windows Caveats
 
-- PostgreSQL/PostGIS is not needed by the current API skeleton; install it for database tasks later (or use Compose on WSL2/Docker Desktop).
+- PostgreSQL/PostGIS is not needed by the API skeleton, but a running database is required to apply migrations and run `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL locally).
 - Martin binaries and OSM tile-generation tools are not part of this scaffold. There are no bundled map tiles or styles to serve yet.
 
 ---
@@ -133,6 +133,8 @@ NODE_ENV=development
 HOST=0.0.0.0
 PORT=3000
 DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
+# Optional: admin123 fallback is accepted only when NODE_ENV=development or test.
+# ADMIN_SEED_PASSWORD=
 JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
 JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
@@ -199,7 +201,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 | `bun --filter @borobiya/server db:generate` | root | Generates a Drizzle migration from `packages/server/src/db/schema.ts`; does not apply it |
 | `bun --filter @borobiya/server db:migrate` | root | Applies pending Drizzle migrations to the configured `DATABASE_URL`; not run by API startup |
 | `bun run db:setup` | server | Not wired yet |
-| `bun run db:seed` | server | Planned with T1.1.3; not wired yet |
+| `bun --filter @borobiya/server db:seed` | root | Idempotently seeds reference data and the bootstrap admin; run after `db:migrate` |
 | `bun run map:dev` | root | Planned; local Martin scripts are not wired yet |
 | `bun run map:update --region=iran` | map-server | Planned; see MAP_SERVER.md §4 |
 | `bun --filter @borobiya/client generate:api` | root | Fetches `/docs/json` from the running API and writes Zopia modules to `packages/client/src/generated/api/` |
