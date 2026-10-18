@@ -31,7 +31,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.2.2** `POST /_auth/login` — username+password, Argon2id verify, 5/15m per IP+username, access/refresh JWTs (15m/7d), persisted refresh hash, browser HttpOnly cookie/native body — completed 2026-10-18
 - [x] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — signed refresh verification, session/account matching, atomic hash rotation, browser HttpOnly cookie/native body transport, idempotent logout, account-state checks, and guest-only enforcement — completed 2026-10-18
 - [x] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m single-use resetToken) — Argon2id answer checks, persisted one-time challenge/token, atomic password reset, session revocation, guest-only enforcement, and rate limits — completed 2026-10-18
-- [ ] **T1.2.5** `POST /_admin/users` — admin creates user without questions, set `mustCompleteSecurityQuestions=true`
+- [x] **T1.2.5** `POST /_admin/users` — active admin access-token authorization, Argon2id password hash, role `user`, optional initial active state, duplicate-username conflict, no question rows, and `mustCompleteSecurityQuestions=true` — completed 2026-10-18
 - [ ] **T1.2.6** `POST /_user/complete-security-questions` — middleware blocks all other `_user` ops until done, returns `SECURITY_QUESTIONS_REQUIRED` code
 - [ ] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions` + guards (guest-only `_auth`, redirect if `mustCompleteSecurityQuestions`)
 

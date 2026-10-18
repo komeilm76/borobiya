@@ -57,6 +57,7 @@ describe("Fastify server skeleton", () => {
     const forgotRequest = paths["/_auth/forgot-password/request"]?.post;
     const forgotVerify = paths["/_auth/forgot-password/verify"]?.post;
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
+    const adminCreateUser = paths["/_admin/users"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -97,6 +98,50 @@ describe("Fastify server skeleton", () => {
     expect(forgotVerify?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
     expect(forgotReset?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(forgotReset?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
+    expect(adminCreateUser?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(adminCreateUser?.["x-borobiya-access"]).toBe("admin");
+    expect(adminCreateUser?.security).toEqual([{ bearerAuth: [] }]);
+    expect(adminCreateUser?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      409: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(adminCreateUser?.requestBody).toMatchObject({
+      required: true,
+      content: {
+        "application/json": {
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            required: ["username", "password"],
+            properties: {
+              username: expect.any(Object),
+              password: expect.any(Object),
+              isActive: expect.any(Object)
+            }
+          }
+        }
+      }
+    });
+    expect(adminCreateUser?.requestBody).not.toHaveProperty("content.application/json.schema.properties.securityQuestions");
+    const adminCreateSuccessResponse = adminCreateUser?.responses as {
+      201?: { content?: { "application/json"?: { schema?: unknown } } };
+    };
+    expect(adminCreateSuccessResponse?.[201]?.content?.["application/json"]?.schema).toMatchObject({
+      type: "object",
+      properties: {
+        id: expect.any(Object),
+        username: expect.any(Object),
+        role: expect.any(Object),
+        mustCompleteSecurityQuestions: expect.any(Object),
+        isActive: expect.any(Object),
+        avgRating: expect.any(Object),
+        createdAt: expect.any(Object)
+      }
+    });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -118,6 +163,10 @@ describe("Fastify server skeleton", () => {
     const missingRefreshToken = await app.inject({ method: "POST", url: "/_auth/refresh" });
     expect(missingRefreshToken.statusCode).toBe(401);
     expect(missingRefreshToken.json()).toMatchObject({ code: "INVALID_REFRESH" });
+
+    const missingAdminToken = await app.inject({ method: "POST", url: "/_admin/users", payload: {} });
+    expect(missingAdminToken.statusCode).toBe(401);
+    expect(missingAdminToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("advertises the gateway API prefix while retaining the direct API server", async () => {

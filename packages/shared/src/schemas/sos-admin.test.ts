@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cancellationReasonCreateSchema, categoryCreateSchema, categoryUpdateSchema, createUserSchema } from "./admin";
+import {
+  cancellationReasonCreateSchema,
+  categoryCreateSchema,
+  categoryUpdateSchema,
+  createAdminUserSchema,
+  createUserSchema
+} from "./admin";
 import { dispatchSchema, missionRatingSchema, sosRequestSchema } from "./sos";
 
 const id1 = "00000000-0000-4000-8000-000000000020";
@@ -29,6 +35,16 @@ describe("SOS and admin schemas", () => {
     expect(missionRatingSchema.safeParse({ rating: 0 }).success).toBe(false);
     expect(createUserSchema.safeParse({ username: "admin_user", password: "admin1234" }).success).toBe(true);
     expect(createUserSchema.safeParse({ username: "admin_user", password: "weak" }).success).toBe(false);
+    expect(createAdminUserSchema.safeParse({
+      username: "new_user",
+      password: "admin1234",
+      isActive: false
+    }).success).toBe(true);
+    expect(createAdminUserSchema.safeParse({
+      username: "new_user",
+      password: "admin1234",
+      securityQuestions: []
+    }).success).toBe(false);
   });
 
   it("rejects duplicate IDs and empty category patches", () => {

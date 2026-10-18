@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/{register,login,refresh,logout,forgot-password/*}` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers currently include `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, and admin-only `POST /_admin/users`; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -41,7 +41,7 @@ Error shape (uniform):
 | `/_auth` | **Guest only** | Not logged in | If JWT present → `403 ALREADY_AUTHENTICATED` | `if loggedIn → redirect /_user/dashboard` | `POST /_auth/login` |
 | `/_public` | Open | Everyone | None (optional auth pass-through) | None | `GET /_public/incident-types` |
 | `/_user` | Required `user` | Authed users (+ admin may opt-in) | `authenticate` + `authorize(['user','admin'])` | Require login → `/_auth/login` | `POST /_user/sos/requests` |
-| `/_admin` | Required `admin` | Admins only | `authenticate` + `authorize(['admin'])` | Role check → `403` | `POST /_admin/users` |
+| `/_admin` | Required `admin` | Admins only | Access-JWT verification and role authorization; `POST /_admin/users` also checks current role/active/suspended state | Role/state check → `401`/`403` | `POST /_admin/users` |
 
 > Decision to document: Does `admin` role allow `/_user/*`? Spec says “_user — Only authenticated users”; recommended: allow `admin` to call `_user` (useful for debugging), but explicitly document: **Admin can call `_user` endpoints** (since they are users too). Alternatively restrict to `user` only — pick one and keep consistent.
 
@@ -261,11 +261,13 @@ GET /_user/sync?since=ISO → { events: [...], location: ..., missions: ... }
 ```
 GET   /_admin/users?q=&isActive=&hasCategory=&page=&limit=   → paginated list
 GET   /_admin/users/:id                                       → detail + devices + missions
-POST  /_admin/users           { username, password, isActive? } // no security questions
+POST  /_admin/users           { username, password, isActive? } → 201 userProfile
 PATCH /_admin/users/:id/status { isActive: boolean }
 PATCH /_admin/users/:id/unsuspend
 // NO DELETE — must not exist
 ```
+
+`POST /_admin/users` requires a signed, unexpired access JWT with the `admin` role and rechecks that the current admin account is still an active, unsuspended admin. The password is stored as an Argon2id hash; the new account always has role `user`, defaults to active unless `isActive` is supplied, and is created without any `user_security_answers` rows. Its response sets `mustCompleteSecurityQuestions: true`. It returns `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` for missing or invalid bearer access tokens, `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED` when authorization fails, `400 VALIDATION_ERROR` for invalid bodies, and `409 USERNAME_TAKEN` for a duplicate username.
 
 ### 6.2 Incidents & Categories
 
@@ -335,7 +337,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/{register,login,refresh,logout,forgot-password/*}` are currently marked `implemented`.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, and `POST /_admin/users` are currently marked `implemented`.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -377,11 +379,13 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
-| 401 | `UNAUTHORIZED` | Missing/invalid JWT |
-| 403 | `FORBIDDEN` | Wrong role |
+| 401 | `UNAUTHORIZED` | Missing credentials |
+| 401 | `INVALID_ACCESS_TOKEN` | Malformed, invalid-signature, expired, or wrong-use bearer access JWT |
+| 403 | `FORBIDDEN` | Wrong role (generic contract code) |
+| 403 | `ADMIN_REQUIRED` | A verified access token or current account does not have the admin role |
 | 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
-| 403 | `ACCOUNT_INACTIVE` | Login or refresh for a deactivated account |
-| 403 | `ACCOUNT_SUSPENDED` | Login or refresh for a suspended account |
+| 403 | `ACCOUNT_INACTIVE` | Login/refresh or admin operation for a deactivated account |
+| 403 | `ACCOUNT_SUSPENDED` | Login/refresh or admin operation for a suspended account |
 | 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks `_user` |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
 | 404 | `NOT_FOUND` | Unknown id |

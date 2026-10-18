@@ -43,8 +43,11 @@ export function signRefreshToken(identity: SessionTokenIdentity, secret: string)
   return signSessionToken("refresh", identity, secret, REFRESH_TOKEN_TTL_SECONDS);
 }
 
-/** Verify refresh signature, lifetime, and claim types; accept pre-rotation T1.2.2 session IDs during rollout. */
-export async function verifyRefreshToken(token: string, secret: string): Promise<SessionTokenIdentity | null> {
+async function verifySessionToken(
+  token: string,
+  secret: string,
+  expectedUse: "access" | "refresh"
+): Promise<SessionTokenIdentity | null> {
   try {
     const { payload } = await jwtVerify(token, textEncoder.encode(secret), { algorithms: ["HS256"] });
     const sessionId = typeof payload.sessionId === "string"
@@ -53,7 +56,7 @@ export async function verifyRefreshToken(token: string, secret: string): Promise
         ? payload.jti
         : undefined;
     if (
-      payload.tokenUse !== "refresh" ||
+      payload.tokenUse !== expectedUse ||
       typeof payload.sub !== "string" ||
       typeof payload.deviceId !== "string" ||
       (payload.role !== "user" && payload.role !== "admin") ||
@@ -71,6 +74,16 @@ export async function verifyRefreshToken(token: string, secret: string): Promise
   } catch {
     return null;
   }
+}
+
+/** Verify an access-token signature, expiry, and claims; accept T1.2.2 jti session IDs during rollout. */
+export function verifyAccessToken(token: string, secret: string): Promise<SessionTokenIdentity | null> {
+  return verifySessionToken(token, secret, "access");
+}
+
+/** Verify a refresh-token signature, expiry, and claims; accept T1.2.2 jti session IDs during rollout. */
+export function verifyRefreshToken(token: string, secret: string): Promise<SessionTokenIdentity | null> {
+  return verifySessionToken(token, secret, "refresh");
 }
 
 /** SHA-256 is appropriate for high-entropy, randomly signed refresh tokens. */

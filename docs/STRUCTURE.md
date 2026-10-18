@@ -120,9 +120,12 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health, registration, and login handlers are live
-    ├── app.test.ts           # Fastify inject/security/CORS/rate-limit tests
+    ├── app.ts                # creates Fastify app; health, auth/session/recovery, and admin-create handlers are live
+    ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
+    ├── admin/
+    │   ├── users.ts          # access-token protected POST /_admin/users handler
+    │   └── users.test.ts     # admin auth, user-creation, state, and conflict tests
     ├── config/
     │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
     │   └── env.test.ts
@@ -130,10 +133,15 @@ packages/server/
     │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
     │   ├── login.test.ts     # token/session/account-status regression tests
     │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
-    │   └── register.test.ts  # registration behavior/rate-limit regression tests
+    │   ├── register.test.ts  # registration behavior/rate-limit regression tests
+    │   ├── session.ts        # refresh rotation and logout routes
+    │   └── forgot-password.ts # server-selected recovery challenges and reset flow
     ├── db/
-    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime auth handlers
+    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
+    │   ├── admin-user-store.ts # current-admin checks and user-only insert
+    │   ├── admin-user-store.test.ts # persistence/default/conflict assertions without live PostgreSQL
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
+    │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
     │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason tables
     │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
@@ -144,13 +152,13 @@ packages/server/
     ├── security/
     │   ├── password.ts      # Argon2id hash/verify helpers
     │   ├── password.test.ts
-    │   └── tokens.ts        # HS256 access/refresh JWT issuance and refresh hashing
+    │   └── tokens.ts        # HS256 access/refresh JWT signing and verification
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
-        └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
+        └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates the PostgreSQL client for the registration and login stores, which issue database queries on demand; migrations and the idempotent seed command remain explicit developer operations and are not run at startup. `POST /_auth/register`, `POST /_auth/login`, and public health are live runtime handlers. Other shared route descriptors remain contracts, and refresh/logout, recovery, remaining auth/domain handlers, realtime, and background jobs are not present yet.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, and admin stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health, all T1.2.1–T1.2.5 auth/session/recovery/admin-create handlers, and their relevant auth route contracts are live. Remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 

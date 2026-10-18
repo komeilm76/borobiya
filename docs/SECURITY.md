@@ -45,15 +45,17 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 
 ### 1.5 Admin-Created Users
 
-- `POST /_admin/users` skips questions; sets `mustCompleteSecurityQuestions=true`.
+- Implemented `POST /_admin/users` accepts only `{ username, password, isActive? }`; strict validation rejects any supplied security-question fields. It stores the password with Argon2id, creates a regular `user` role account, honors `isActive` (default `true`), and creates no `user_security_answers` rows.
+- Every created account has `mustCompleteSecurityQuestions=true`. The handler returns the standard user profile and reports duplicate usernames as `409 USERNAME_TAKEN`.
+- The route verifies a signed, unexpired HS256 access JWT with `tokenUse: "access"`, requires the admin role, then checks the current admin record remains admin, active, and unsuspended. A verified token with an inactive, suspended, or demoted account is denied.
 - Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
-- Middleware on every other `/_user/*` request:
+- **T1.2.6 remains pending:** middleware on every other `/_user/*` request must block incomplete accounts:
   ```ts
   if (req.user.mustCompleteSecurityQuestions && req.url !== "/_user/complete-security-questions") {
     throw { status: 403, code: "SECURITY_QUESTIONS_REQUIRED" };
   }
   ```
-- Frontend forces redirect to `/_user/complete-security-questions` when the returned user flag is true.
+- The frontend task remains pending: force redirect to `/_user/complete-security-questions` when the returned user flag is true.
 
 ---
 
@@ -69,7 +71,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
 - Access and refresh JWTs use HS256 with separate `JWT_SECRET` and `JWT_REFRESH_SECRET`; login issues a 15-minute access token and 7-day refresh token.
-- Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. The verifier temporarily accepts legacy refresh JWTs where `jti` held the session ID.
+- Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. Access and refresh verifiers temporarily accept legacy T1.2.2 JWTs where `jti` held the session ID.
 - `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token and has a unique index. Refresh validates signature, expiry, session/user/device claims, and current account status, then uses a conditional update on the current hash to rotate it atomically; concurrent reuse cannot return two usable tokens.
 - Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
 - Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
@@ -129,9 +131,9 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-Enforced at **both** layers (fail-closed):
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` currently verifies access-token signature/expiry/use, admin role, and current admin account state in its handler; broad `_user` middleware and other admin handlers remain pending.
 
-**Backend (Fastify hooks):**
+**Backend policy sketch (shared hooks for future route groups):**
 
 ```ts
 fastify.register(authRoutes, { prefix: '/_auth' }); // no auth, but if JWT present → 403 ALREADY_AUTHENTICATED

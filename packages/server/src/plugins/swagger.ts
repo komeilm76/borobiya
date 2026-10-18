@@ -18,7 +18,8 @@ const implementedOperationIds = new Set([
   "authLogout",
   "authForgotPasswordRequest",
   "authForgotPasswordVerify",
-  "authForgotPasswordReset"
+  "authForgotPasswordReset",
+  "adminCreateUser"
 ]);
 
 interface JsonObjectSchema {
