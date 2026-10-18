@@ -115,7 +115,8 @@ packages/shared/
 ```text
 packages/server/
 ├── Dockerfile                # workspace-aware Bun API image
-├── package.json              # Fastify, security plugins, Swagger UI, shared contracts, dotenv, zod
+├── drizzle.config.ts         # Drizzle Kit schema/migration configuration
+├── package.json              # Fastify, Drizzle, Postgres.js, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
     ├── app.ts                # creates Fastify app; only public health is a live handler
@@ -124,12 +125,15 @@ packages/server/
     ├── config/
     │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
     │   └── env.test.ts
+    ├── db/
+    │   ├── client.ts         # explicit, currently unused Drizzle/Postgres.js factory
+    │   └── schema.ts         # initial users/security-questions/answers/sessions schema
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-The API validates `DATABASE_URL` but does not connect to PostgreSQL. Auth/domain handlers, database migrations/seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
+The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. Auth/domain handlers, the first SQL migration, seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
 
 ---
 
@@ -205,8 +209,9 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 
 ## 8. Database Migrations
 
-- PostgreSQL/PostGIS is provisioned by Compose, but the API does not connect to it yet.
-- ORM choice and schema are open; no migration or seed files/scripts exist in the current scaffold. See the T1.1 tasks before using the database.
+- ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
+- Initial Drizzle schema declarations cover `users`, `security_questions`, `user_security_answers`, and `user_sessions`; `bun --filter @borobiya/server db:generate` generates a migration into `packages/server/drizzle/`.
+- T1.1.1 does not apply a migration or connect the API at startup. The first reviewed migration and runtime database wiring remain follow-up work under T1.1.2.
 
 ---
 
@@ -272,7 +277,8 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] Root `bun run dev` orchestration for API + client
 - [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
 - [x] `.env.example`, `.gitignore`, and Docker build exclusions
-- [ ] API persistence/auth handlers and database migrations/seeds
+- [x] Drizzle/Postgres.js decision, initial schema declarations, and Drizzle Kit config
+- [ ] First SQL migration, API database connection, auth handlers, and seeds
 - [ ] Map tile/style/routing/geocoding data and generation pipeline
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

@@ -20,7 +20,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 ### 1.1 Database & Seed
 
-- [ ] **T1.1.1** Decide ORM: Drizzle vs Prisma (document in ARCHITECTURE ADR) + init schema
+- [x] **T1.1.1** Decide ORM: Drizzle + Postgres.js (document in ARCHITECTURE ADR) + initial account/security/session schema — completed 2026-10-18
 - [ ] **T1.1.2** Migration: `users`, `security_questions`, `user_security_answers`, `user_sessions` (see ERD)
 - [ ] **T1.1.3** Seed: 15 security questions + cancellation_reasons + default `admin / admin123` (must change)
 - [ ] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users`

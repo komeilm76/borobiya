@@ -47,6 +47,7 @@ gantt
 - [x] Root `docker-compose.yml` (api, postgres, map-server, nginx), `.env.example`, strict `tsconfig` — completed 2026-10-18
 - [x] OpenAPI at `/docs` + `/docs/json` via `@fastify/swagger` + Swagger UI — completed 2026-10-18
 - [x] Zopia wired: `bun --filter @borobiya/client generate:api` — completed 2026-10-18
+- [x] Select Drizzle ORM + Postgres.js and scaffold initial auth/account schema (ADR-011) — completed 2026-10-18
 
 ### M1.2 Auth System
 - [ ] `security_questions` seed (15), `user_security_answers` table

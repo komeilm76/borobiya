@@ -396,7 +396,7 @@ Server must have:
 - **Other Protections:**
   - Helmet headers, CORS strict allowlist via ENV
   - Input sanitization via Zod (no raw `req.body` usage)
-  - SQL injection prevention via parameterized queries / ORM (Prisma/Drizzle)
+  - SQL injection prevention via parameterized Drizzle queries and reviewed raw SQL
   - No sensitive data in logs
   - JWT: short accessToken (15min) + long refreshToken (7d) stored httpOnly cookie or secure storage (mobile)
 
@@ -755,6 +755,7 @@ router.beforeEach((to) => {
 | **MapLibre GL JS** | Vector map rendering | Core map lib, no Mapbox fees |
 | **Fastify** | Backend framework | Fast, plugin-based, OpenAPI integration |
 | **PostgreSQL + PostGIS** | Database | For users, missions, + geospatial queries (`ST_Distance`, `GEOGRAPHY`) |
+| **Drizzle ORM + Postgres.js** | TypeScript database access | SQL-first schemas and explicit PostGIS SQL support; see ADR-011 |
 | **Zod** | Schema validation | For all API input/output, shared between client/server |
 | **OpenAPI / Swagger** | API docs | Generated from shared Zod route descriptors via `@fastify/swagger` |
 | **JSDoc** | Code docs | For all exported functions/classes |
@@ -766,7 +767,6 @@ router.beforeEach((to) => {
 | **VueUse** | Vue composables | `useGeolocation`, `useStorage`, `useDark`, `useWebSocket`, etc. |
 
 **Additional Recommended (Document if used):**
-- Prisma or Drizzle ORM (Postgres)
 - Redis for rate-limit + socket adapter (optional for single-instance dev)
 - Husky/Lefthook for git hooks
 
@@ -1048,7 +1048,7 @@ borobiya/
 ├── docs/                 # All markdown docs
 ├── packages/
 │   ├── shared/           # Zod schemas, TS types (used by both)
-│   ├── server/           # Fastify API + Socket.IO + Prisma/Drizzle
+│   ├── server/           # Fastify API + Drizzle (Socket.IO/persistence integration later)
 │   └── client/           # Vue + Vuetify + Tailwind + MapLibre + Ionic
 │       ├── src/
 │       │   ├── views/_auth, _public, _user, _admin

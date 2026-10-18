@@ -436,6 +436,19 @@ Performance targets: map load <2s LAN, location update <500ms socket, route <1s.
 | 008 | 2025-05-01 | Rescuer cancel = hard path + instant admin alert | Prevent abandonment |
 | 009 | 2025-05-01 | Zod+km-api+Zopia shared contract | Type safety + AI consumption |
 | 010 | 2025-05-02 | Martin + Planetiler + OSRM + Photon for MVP | Lightest viable offline stack |
+| 011 | 2026-10-18 | Drizzle ORM + Postgres.js for PostgreSQL | SQL-first, Bun-friendly schema/migrations, and explicit PostGIS SQL support |
 
-> Add new ADRs as `| 011 | YYYY-MM-DD | ...` — do not remove history.
+### ADR-011 — Drizzle ORM + Postgres.js
+
+**Status:** Accepted (T1.1.1).
+
+**Context:** The API uses Bun and PostgreSQL/PostGIS. The schema needs native PostgreSQL constraints and later spatial columns/queries such as `GEOGRAPHY(Point,4326)`, GiST indexes, and `ST_Distance`.
+
+**Decision:** Use Drizzle ORM (`drizzle-orm`) with the Postgres.js driver (`postgres`) and Drizzle Kit for schema-driven, SQL migration generation. Keep the application schema in `packages/server/src/db/schema.ts` and migration output in `packages/server/drizzle/`.
+
+**Rationale:** Drizzle keeps table definitions close to PostgreSQL/SQL, supports TypeScript without a separate generated query-engine client, and leaves PostGIS-specific DDL/queries explicit through custom types and SQL expressions. Prisma was considered but rejected for this scaffold because its abstraction around unsupported native geography types would require raw SQL for central spatial features and introduces an additional generated-client workflow. Drizzle is less opinionated about higher-level relation access and requires migrations to be reviewed; generated SQL will therefore be checked in and hand-edited where necessary.
+
+**Consequences:** The first schema declarations cover `users`, `security_questions`, `user_security_answers`, and `user_sessions`. No migration is applied by T1.1.1, and the Fastify bootstrap still does not instantiate the database client. Database connection and migration behavior will be wired in subsequent tasks.
+
+> Add new ADRs after this entry as `| 012 | YYYY-MM-DD | ...` — do not remove history.
 

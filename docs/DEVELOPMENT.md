@@ -59,7 +59,7 @@ Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, no
 
 ### 2.3 Database status
 
-PostGIS is created and health-checked by Compose for the upcoming persistence work. The API scaffold does not connect to it, and `db:setup`, `db:migrate`, and `db:seed` commands are not wired; do not run migration or admin-creation commands yet. Those belong to the database/auth backlog tasks.
+PostGIS is created and health-checked by Compose for the upcoming persistence work. The API scaffold does not connect to it. Drizzle Kit can generate SQL from the initial schema with `bun --filter @borobiya/server db:generate`; T1.1.2 will review and commit the initial migration. No `db:migrate`, `db:setup`, or `db:seed` command is wired yet, so do not apply migrations or attempt admin creation until those backlog tasks are complete.
 
 ### 2.4 Client and development loop
 
@@ -196,6 +196,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 | `bun run build` | root | Not wired yet |
 | `bun run lint` | root | Not wired yet |
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
+| `bun --filter @borobiya/server db:generate` | root | Generates a Drizzle migration from `packages/server/src/db/schema.ts`; does not apply it |
 | `bun run db:setup` | server | Planned with database/migration tasks; not wired yet |
 | `bun run db:migrate` | server | Planned with database/migration tasks; not wired yet |
 | `bun run db:seed` | server | Planned with database/seed tasks; not wired yet |

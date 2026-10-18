@@ -75,12 +75,18 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 |---|-------|--------|-------|--------|
 | 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | ORM choice (Drizzle vs Prisma) not decided | Blocks DB migrations | TBD | 🔵 Open — ADR needed |
+| 3 | Initial migration/runtime wiring not implemented yet | Blocks persistence-backed auth and seed work | TBD | 🟡 Next: T1.1.2 migration |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
+
+### 2026-10-18 — Drizzle ORM and initial database schema (T1.1.1)
+
+- Selected Drizzle ORM with Postgres.js and recorded ADR-011, including the PostGIS/raw-SQL rationale and migration tradeoffs.
+- Added initial schema declarations for `users`, `security_questions`, `user_security_answers`, and `user_sessions`, a Drizzle Kit config/generation script, and an explicit database client factory. The factory is not called by the Fastify app; no migration was retained or applied.
+- Validation: frozen-lockfile install, server typecheck/tests, and a generated-migration smoke test (output inspected then removed) passed. PostgreSQL runtime integration remains for T1.1.2 and could not be exercised without Docker.
 
 ### 2026-10-18 — Root dev orchestration and Compose scaffold (T1.0.7)
 

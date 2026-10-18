@@ -168,7 +168,7 @@ If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can red
 
 - **Zod everywhere:** No raw `req.body`; every route has `schema: { body: zodToJsonSchema(...) }`.
 - Use `km-api` to co-locate schema+handler (see API.md).
-- DB: parameterized queries via Drizzle/Prisma — never interpolate strings.
+- DB: parameterized Drizzle queries and reviewed `sql` fragments — never interpolate untrusted strings.
 - Sanitize HTML: descriptions rendered as plain text or sanitized via `dompurify` if rich.
 
 ---
