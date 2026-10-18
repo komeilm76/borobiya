@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/register` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health`, `POST /_auth/register`, and `POST /_auth/login` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -80,13 +80,15 @@ The handler verifies the five question IDs against the seeded catalog, hashes th
 
 ```text
 Request: { username, password }
-Web 200: { accessToken, user } + Set-Cookie for the HttpOnly refresh token
-Native 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
+Browser (Origin header) 200: { accessToken, user } + Set-Cookie refreshToken
+Native (no Origin header) 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
+400: { code: "VALIDATION_ERROR" }
 401: { code: "INVALID_CREDENTIALS" }
-403: { code: "ACCOUNT_SUSPENDED", suspendedUntil, reason }
-403: { code: "SECURITY_QUESTIONS_REQUIRED" } // when mustCompleteSecurityQuestions
+403: { code: "ALREADY_AUTHENTICATED" | "ACCOUNT_INACTIVE" | "ACCOUNT_SUSPENDED" }
 429: { code: "RATE_LIMITED" }
 ```
+
+The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
 
 Rate: 5/15m per `ip+username`.
 
@@ -312,7 +314,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/register` are currently marked `implemented`.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health`, `POST /_auth/register`, and `POST /_auth/login` are currently marked `implemented`.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -354,8 +356,9 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
 | 401 | `UNAUTHORIZED` | Missing/invalid JWT |
 | 403 | `FORBIDDEN` | Wrong role |
-| 403 | `ALREADY_AUTHENTICATED` | Authed user hits `/_auth/*` |
-| 403 | `ACCOUNT_SUSPENDED` | `isSuspended` |
+| 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
+| 403 | `ACCOUNT_INACTIVE` | Login attempt for a deactivated account |
+| 403 | `ACCOUNT_SUSPENDED` | Login attempt for a suspended account |
 | 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks `_user` |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
 | 404 | `NOT_FOUND` | Unknown id |

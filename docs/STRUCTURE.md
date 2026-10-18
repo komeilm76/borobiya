@@ -117,20 +117,23 @@ packages/server/
 ├── Dockerfile                # workspace-aware Bun API image
 ├── drizzle/                  # checked-in SQL migrations, journal, and schema snapshots
 ├── drizzle.config.ts         # Drizzle Kit schema/migration configuration
-├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, security plugins, and Swagger
+├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; public health and registration handlers are live
+    ├── app.ts                # creates Fastify app; health, registration, and login handlers are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit tests
     ├── server.ts             # validates environment and listens
     ├── config/
     │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
     │   └── env.test.ts
     ├── auth/
-    │   ├── register.ts      # registration route, Argon2id hashing, and IP+username limit
-    │   └── register.test.ts # registration behavior/rate-limit regression tests
+    │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
+    │   ├── login.test.ts     # token/session/account-status regression tests
+    │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
+    │   └── register.test.ts  # registration behavior/rate-limit regression tests
     ├── db/
-    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime registration
+    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime auth handlers
+    │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
     │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason tables
     │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
@@ -140,13 +143,14 @@ packages/server/
     │   └── seed-data.test.ts
     ├── security/
     │   ├── password.ts      # Argon2id hash/verify helpers
-    │   └── password.test.ts
+    │   ├── password.test.ts
+    │   └── tokens.ts        # HS256 access/refresh JWT issuance and refresh hashing
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-Fastify creates the PostgreSQL client for the registration store, which issues database queries on demand; migrations and the idempotent seed command remain explicit developer operations and are not run at startup. `POST /_auth/register` and public health are live runtime handlers. Other shared route descriptors remain contracts, and the remaining auth/domain handlers, realtime, and background jobs are not present yet.
+Fastify creates the PostgreSQL client for the registration and login stores, which issue database queries on demand; migrations and the idempotent seed command remain explicit developer operations and are not run at startup. `POST /_auth/register`, `POST /_auth/login`, and public health are live runtime handlers. Other shared route descriptors remain contracts, and refresh/logout, recovery, remaining auth/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 
@@ -224,7 +228,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
 - Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
-- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; runtime database access currently supports registration only.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; runtime database access currently supports registration and login sessions.
 
 ---
 
@@ -292,7 +296,8 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] `.env.example`, `.gitignore`, and Docker build exclusions
 - [x] Drizzle/Postgres.js decision, schema/migrations, seed data, and Argon2id bootstrap
 - [x] Registration handler with database-backed persistence and Argon2id hashes
-- [ ] Remaining auth/domain handlers and session/token enforcement
+- [x] Login handler with Argon2id verification, 15m/7d JWT issuance, session persistence, and rate limiting
+- [ ] Refresh/logout, recovery, and remaining auth/domain handlers
 - [ ] Map tile/style/routing/geocoding data and generation pipeline
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

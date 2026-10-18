@@ -52,7 +52,7 @@ export const authRoutes = {
     meta: {
       operationId: "authLogin",
       summary: "Authenticate with username and password",
-      description: "Web clients receive the refresh token only via an HttpOnly cookie; native clients may receive it in the response body.",
+      description: "Requests with an Origin header receive the refresh token only via an HttpOnly cookie; native clients should omit Origin and receive it in the response body.",
       tags: ["auth"],
       access: "guest"
     }

@@ -52,6 +52,7 @@ describe("Fastify server skeleton", () => {
     const operationCount = Object.values(paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
     const refresh = paths["/_auth/refresh"]?.post;
     const registration = paths["/_auth/register"]?.post;
+    const login = paths["/_auth/login"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -71,6 +72,14 @@ describe("Fastify server skeleton", () => {
       400: expect.any(Object),
       403: expect.any(Object),
       409: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(login?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(login?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
       429: expect.any(Object)
     });
     expect(refresh?.["x-borobiya-runtime-status"]).toBe("contract-only");
@@ -93,11 +102,7 @@ describe("Fastify server skeleton", () => {
       description: "Successful response with no response body."
     });
 
-    const unimplemented = await app.inject({
-      method: "POST",
-      url: "/_auth/login",
-      payload: { username: "test_user", password: "password123" }
-    });
+    const unimplemented = await app.inject({ method: "POST", url: "/_auth/refresh" });
     expect(unimplemented.statusCode).toBe(404);
   });
 

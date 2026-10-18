@@ -2,7 +2,9 @@ import { apiRoutes } from "@borobiya/shared/api";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ServerConfig } from "./config/env";
 import { createDatabase } from "./db/client";
+import { DrizzleUserLoginStore, type UserLoginStore } from "./db/login-store";
 import { DrizzleUserRegistrationStore, type UserRegistrationStore } from "./db/registration-store";
+import { registerLoginRoute, type PasswordVerifier } from "./auth/login";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
 import { registerSwagger } from "./plugins/swagger";
@@ -22,10 +24,14 @@ const sensitiveLogPaths = [
 ];
 
 export interface FastifyAppDependencies {
-  /** Override persistence in tests; production defaults to the configured PostgreSQL database. */
+  /** Override registration persistence in tests; production defaults to the configured PostgreSQL database. */
   registrationStore?: UserRegistrationStore;
-  /** Override hashing in tests; production defaults to the Argon2id helper. */
+  /** Override login/session persistence in tests; production defaults to the configured PostgreSQL database. */
+  loginStore?: UserLoginStore;
+  /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
+  /** Override login password verification in tests; production uses Argon2id. */
+  verifyPassword?: PasswordVerifier;
 }
 
 export async function createFastifyApp(
@@ -43,9 +49,19 @@ export async function createFastifyApp(
   await registerHttpSecurityPlugins(app, config);
   await registerSwagger(app, config.openApiServerPath);
 
-  const database = dependencies.registrationStore ? undefined : createDatabase(config.databaseUrl);
+  const database =
+    dependencies.registrationStore && dependencies.loginStore
+      ? undefined
+      : createDatabase(config.databaseUrl);
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
+  const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
   await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
+  await registerLoginRoute(app, {
+    store: loginStore,
+    jwtSecret: config.jwtSecret,
+    jwtRefreshSecret: config.jwtRefreshSecret,
+    verifyPassword: dependencies.verifyPassword
+  });
 
   if (database) {
     app.addHook("onClose", async () => {

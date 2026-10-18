@@ -61,8 +61,8 @@ sequenceDiagram
   participant Web as Web Device
   participant Phone as Phone Device
   participant API
-  Web->>API: POST /_auth/login → deviceId=web-uuid, session created
-  Phone->>API: POST /_auth/login → deviceId=phone-uuid, now activeDevices=2
+  Web->>API: POST /_auth/login → session/device UUID created server-side
+  Phone->>API: POST /_auth/login → another session/device UUID created
   Web->>API: POST /_user/location/share {...}
   API-->>Web: 409 {code:"PRIORITY_DEVICE_REQUIRED", activeDevices:[web, phone]}
   Web->>Web: show modal: "Select broadcasting device"

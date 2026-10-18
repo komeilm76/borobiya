@@ -109,9 +109,10 @@ sequenceDiagram
   API-->>Client: 201 {user}
   User->>Client: POST /_auth/login {username,password}
   Client->>API: rate-limit 5/15min per IP+username
-  API->>DB: verify hash, check isActive/isSuspended/mustCompleteSecurityQuestions
-  API-->>Client: {accessToken 15m, user} + HttpOnly refresh cookie (web)
-  Note over Client: Web stores access in memory; native clients may receive refreshToken in body for secure storage
+  API->>DB: verify hash, enforce isActive/isSuspended, read mustCompleteSecurityQuestions
+  API-->>Client: {accessToken 15m, user} + HttpOnly refresh cookie (browser)
+  Note over Client: Browser stores refresh in HttpOnly cookie; native clients receive refreshToken in body
+  Note over Client: If mustCompleteSecurityQuestions=true, route to completion; T1.2.6 gates other _user endpoints
 ```
 
 **Forgot Password:**

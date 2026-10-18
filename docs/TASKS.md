@@ -28,7 +28,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 ### 1.2 Auth (`_auth`, `_admin` user creation)
 
 - [x] **T1.2.1** `POST /_auth/register` — five existing unique questions, duplicate-username handling, Argon2id password/normalized-answer hashes, atomic persistence, guest-only 403, and 5/15m IP+username limit — completed 2026-10-18
-- [ ] **T1.2.2** `POST /_auth/login` — username+password only, rate-limit 5/15m per IP+username, JWT 15m/7d → *AI*
+- [x] **T1.2.2** `POST /_auth/login` — username+password, Argon2id verify, 5/15m per IP+username, access/refresh JWTs (15m/7d), persisted refresh hash, browser HttpOnly cookie/native body — completed 2026-10-18
 - [ ] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — httpOnly refresh rotation
 - [ ] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m resetToken) → *AI*
 - [ ] **T1.2.5** `POST /_admin/users` — admin creates user without questions, set `mustCompleteSecurityQuestions=true`

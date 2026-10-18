@@ -338,11 +338,10 @@ Map Server is a **completely separate service** responsible for:
   ```
 - Admin **does NOT need to provide security questions**.
 - Created user has flag: `mustCompleteSecurityQuestions: true`
-- On first login, middleware checks this flag and:
-  - Returns `403` with code `SECURITY_QUESTIONS_REQUIRED`
-  - Frontend **forces redirect** to `/_auth/complete-security-questions` (or `/_user/setup-security-questions`)
-  - User **cannot perform any other operation** until 5 questions are completed.
-  - Endpoint: `POST /_user/complete-security-questions` (or `/_auth/...`) with same 5-question payload as register.
+- Login returns an access token and the `mustCompleteSecurityQuestions: true` flag so the user can reach the onboarding endpoint.
+- Frontend **forces redirect** to `/_user/complete-security-questions`.
+- Middleware returns `403 SECURITY_QUESTIONS_REQUIRED` for every other `/_user/*` operation until five questions are completed.
+- Endpoint: `POST /_user/complete-security-questions` with the same five-question payload as registration.
 - Admin's own account **does not require security questions** at all (`isAdmin` bypass).
 
 ### 8.6. Security Questions Data Model
@@ -804,7 +803,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   bun --filter @borobiya/client generate:api
   ```
 - The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
-- All shared API contracts appear in OpenAPI. `GET /_public/health` and `POST /_auth/register` are registered at runtime; other operations are marked `contract-only` and return 404 until implemented.
+- All shared API contracts appear in OpenAPI. `GET /_public/health`, `POST /_auth/register`, and `POST /_auth/login` are registered at runtime; other operations are marked `contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract
@@ -917,7 +916,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
   bun install
   bun --filter @borobiya/client dev  # Vite client with HMR at :5173
   ```
-  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); database-backed persistence currently covers registration only, and project map data/assets are not implemented yet.
+  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); database-backed persistence currently covers registration and login sessions, and project map data/assets are not implemented yet.
 
 ### 19.3. Android Build Workflow (planned)
 - **GitHub Actions `android.yml` (not present yet):**
@@ -939,7 +938,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 - Secrets via `.env` (never commit). Registration uses the configured `DATABASE_URL` after auth/reference migrations and seed data are applied; migrations and seed commands do not run at startup. Change the local `admin / admin123` credential before exposing the service. The map server has no bundled tile/style/routing/geocoding assets yet.
 
 ### 20.2. Development (Windows without Docker)
-- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; the registration handler uses the configured database after setup.
+- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; registration and login use the configured database after setup.
 - Steps documented in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md):
   ```bash
   bun install

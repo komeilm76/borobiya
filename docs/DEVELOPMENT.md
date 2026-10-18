@@ -1,6 +1,6 @@
 # Borobiya — Development Guide
 
-> TL;DR: Use **`bun run dev`** for the API + client with hot reload, or **Docker Compose** for the API, PostGIS, Martin, and Nginx. Registration uses Drizzle-backed PostgreSQL persistence when migrations and seed data are ready; database migrations are not automatic. Map data and style assets are not bundled yet. Strict `bun` + `strict: true` TypeScript everywhere.
+> TL;DR: Use **`bun run dev`** for the API + client with hot reload, or **Docker Compose** for the API, PostGIS, Martin, and Nginx. Registration and login use Drizzle-backed PostgreSQL persistence when migrations and seed data are ready; database migrations are not automatic. Map data and style assets are not bundled yet. Strict `bun` + `strict: true` TypeScript everywhere.
 
 ---
 
@@ -55,11 +55,11 @@ curl http://localhost:8080/docs                 # Swagger UI
 curl http://localhost:8000/health               # Martin
 ```
 
-Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. The Swagger UI served through Nginx advertises `/api` first for “Try it out” and also lists `/` for direct API access; set `OPENAPI_SERVER_PATH` if you change the gateway prefix. Use the Vite client at `http://localhost:5173` (see §2.4). Auth/reference migrations and an explicit seed command are checked in but are not run at startup; after applying them and seeding the question catalog, `POST /_auth/register` uses the configured PostgreSQL database. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
+Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. The Swagger UI served through Nginx advertises `/api` first for “Try it out” and also lists `/` for direct API access; set `OPENAPI_SERVER_PATH` if you change the gateway prefix. Use the Vite client at `http://localhost:5173` (see §2.4). Auth/reference migrations and an explicit seed command are checked in but are not run at startup; after applying them and seeding the question catalog, `POST /_auth/register` and `POST /_auth/login` use the configured PostgreSQL database. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
 
 ### 2.3 Database status
 
-Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; the registration route uses the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
+Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; registration and login use the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
 ### 2.4 Client and development loop
 
@@ -116,7 +116,7 @@ bun install
 bun run dev   # API and Vite client concurrently
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration queries use PostgreSQL after those steps, while map data and its generation scripts remain future tasks. Docker is optional for working on the current API/client scaffold.
+The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps, while map data and its generation scripts remain future tasks. Docker is optional for working on the current API/client scaffold.
 
 ### 3.3 Windows Caveats
 
@@ -254,7 +254,7 @@ bun --filter @borobiya/client build
 - Shared-contract tests use Vitest and cover the documented Zod invariants and route descriptors.
 - Server tests use `fastify.inject()`; no network listener or database is needed.
 - Client tests verify namespaced routes and placeholder registration; feature/component tests will be added with those features.
-- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, trusted proxy IP/CIDRs, host/port, and rate-limit values; registration queries connect to PostgreSQL on demand, but migrations are not automatic.
+- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, trusted proxy IP/CIDRs, host/port, and rate-limit values; registration and login queries connect to PostgreSQL on demand, but migrations are not automatic.
 - The Vite browser client uses same-origin `/api` and `/map` paths; its server-side dev proxy reads backend targets from the root `.env`.
 
 ---
@@ -263,7 +263,7 @@ bun --filter @borobiya/client build
 
 | Symptom | Fix |
 |---------|-----|
-| API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; registration database queries run only when the route is used |
+| API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; registration/login database queries run only when a route is used |
 | `relation "users" does not exist` | The migration is checked in but is not applied automatically; start PostgreSQL and run `bun --filter @borobiya/server db:migrate` against the intended `DATABASE_URL` |
 | Map blank, 404 tiles/styles | Expected until map data and style assets are added; `docker compose logs map-server` checks Martin startup |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |

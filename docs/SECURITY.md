@@ -45,13 +45,14 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 ### 1.5 Admin-Created Users
 
 - `POST /_admin/users` skips questions; sets `mustCompleteSecurityQuestions=true`.
-- Middleware on every `/_user/*` request:
+- Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
+- Middleware on every other `/_user/*` request:
   ```ts
   if (req.user.mustCompleteSecurityQuestions && req.url !== "/_user/complete-security-questions") {
     throw { status: 403, code: "SECURITY_QUESTIONS_REQUIRED" };
   }
   ```
-- Frontend forces redirect to `/complete-security-questions` if code received.
+- Frontend forces redirect to `/_user/complete-security-questions` when the returned user flag is true.
 
 ---
 
@@ -66,14 +67,15 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 | `resetToken` | 10 min | One-time in body | Forgot reset |
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
-- Payload: `{ sub: userId, role: 'user'|'admin', deviceId, iat, exp }`.
-- Refresh flow rotates refresh token (invalidate old hash in `user_sessions.refreshTokenHash`).
-- Web login/refresh responses must not expose `refreshToken` in JSON; rotate it through an `HttpOnly` cookie. Native clients may use the body and must store the token with platform secure storage.
+- Access and refresh JWTs use HS256 with separate `JWT_SECRET` and `JWT_REFRESH_SECRET`; login issues a 15-minute access token and 7-day refresh token.
+- Payload includes `{ sub: userId, role, deviceId, jti: sessionId, tokenUse, iat, exp }`; access and refresh token uses are distinct.
+- `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token; refresh flow later rotates that hash.
+- Browser login/refresh responses must not expose `refreshToken` in JSON; send it through an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
 
 ### 2.2 Sessions & Devices
 
 - `user_sessions(id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)`.
-- `deviceId` derived from `userAgent+screen` or explicit client UUID (`crypto.randomUUID()` stored in localStorage).
+- Until the login contract accepts a client-stable device ID, each successful login creates a server-generated session/device UUID; the user-agent is saved as the session's `deviceName`. A future client device ID can make the identifier stable across logins.
 - `GET /_user/devices` returns active table; user can revoke others (optional).
 
 ### 2.3 Multi-Device Priority
@@ -96,7 +98,7 @@ Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store;
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration now applies the 5/15m IP+username limit in `packages/server/src/auth/register.ts`; the login, password-recovery, and feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration and login now apply the 5/15m IP+username limit in their route handlers; password-recovery and feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
 
 ---
 
@@ -110,9 +112,10 @@ if (locationUpdatesPerSec > 50)   suspend(24*H, "location_spam");
 if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 ```
 
-- `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work alongside enforcement.
-- On login, if `isSuspended && now < suspendedUntil` → `403 {code: "ACCOUNT_SUSPENDED", suspendedUntil, reason}`.
-- Message: “Account suspended due to suspicious activity. Contact admin.”
+- `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work.
+- Login rejects an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an admin clears it.
+- Login also rejects `isActive=false` with `403 {code: "ACCOUNT_INACTIVE"}`.
+- Message: “Account suspended. Contact an administrator.”
 
 ### 4.2 Manual
 
@@ -152,7 +155,7 @@ router.beforeEach((to) => {
 
 ### 5.1 `_auth` Guest-Only
 
-The registration handler fails closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Other `/_auth` handlers must preserve this guest-only invariant when implemented.
+The registration and login handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Remaining `/_auth` handlers must preserve this guest-only invariant when implemented.
 
 ### 5.2 No Delete Invariant
 

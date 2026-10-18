@@ -52,11 +52,11 @@ gantt
 ### M1.2 Auth System
 - [x] Initial `users`, `security_questions`, `user_security_answers`, and `user_sessions` schema/migration — T1.1.1–T1.1.2 completed 2026-10-18
 - [x] `cancellation_reasons` table/migration + 15 security-question seeds, 11 cancellation reasons, and Argon2id bootstrap admin — T1.1.3 completed 2026-10-18
-- [ ] `POST /_auth/register` — 5 unique Q validation (zod superRefine)
-- [ ] `POST /_auth/login` — username+password only, argon2id, rate-limit 5/15m
+- [x] `POST /_auth/register` — 5 unique Q validation (T1.2.1)
+- [x] `POST /_auth/login` — username+password, Argon2id verification, 5/15m limit, access/refresh JWT issuance (T1.2.2)
+- [ ] `POST /_auth/refresh` and `POST /_auth/logout` — refresh rotation/revocation via HttpOnly cookie or native body
 - [ ] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
 - [ ] `POST /_admin/users` (no questions) + `mustCompleteSecurityQuestions` flag + forced redirect
-- [ ] JWT 15m/7d, refresh via httpOnly cookie
 - [ ] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
 
 ### M1.3 Map Server (Independent)
