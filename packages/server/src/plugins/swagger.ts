@@ -19,6 +19,8 @@ const implementedOperationIds = new Set([
   "authForgotPasswordRequest",
   "authForgotPasswordVerify",
   "authForgotPasswordReset",
+  "publicSecurityQuestions",
+  "userGetMe",
   "adminCreateUser",
   "userCompleteSecurityQuestions"
 ]);

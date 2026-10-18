@@ -5,10 +5,13 @@ import { securityQuestions, userSecurityAnswers, users } from "./schema";
 
 export interface SecurityQuestionsUserRecord {
   id: string;
+  username: string;
   role: UserRole;
   isActive: boolean;
   isSuspended: boolean;
   mustCompleteSecurityQuestions: boolean;
+  avgRating: number | null;
+  createdAt: Date;
 }
 
 export interface SecurityQuestionAnswerHash {
@@ -33,10 +36,13 @@ export class DrizzleUserSecurityQuestionsStore implements UserSecurityQuestionsS
     const matchingUsers = await this.db
       .select({
         id: users.id,
+        username: users.username,
         role: users.role,
         isActive: users.isActive,
         isSuspended: users.isSuspended,
-        mustCompleteSecurityQuestions: users.mustCompleteSecurityQuestions
+        mustCompleteSecurityQuestions: users.mustCompleteSecurityQuestions,
+        avgRating: users.avgRating,
+        createdAt: users.createdAt
       })
       .from(users)
       .where(eq(users.id, id))

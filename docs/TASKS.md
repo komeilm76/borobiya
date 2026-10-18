@@ -33,7 +33,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m single-use resetToken) — Argon2id answer checks, persisted one-time challenge/token, atomic password reset, session revocation, guest-only enforcement, and rate limits — completed 2026-10-18
 - [x] **T1.2.5** `POST /_admin/users` — active admin access-token authorization, Argon2id password hash, role `user`, optional initial active state, duplicate-username conflict, no question rows, and `mustCompleteSecurityQuestions=true` — completed 2026-10-18
 - [x] **T1.2.6** `POST /_user/complete-security-questions` — validate five unique catalog question IDs, store normalized Argon2id answer hashes, atomically clear `mustCompleteSecurityQuestions`, and gate other `/_user` routes with `403 SECURITY_QUESTIONS_REQUIRED` — completed 2026-10-18
-- [ ] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions` + guards (guest-only `_auth`, redirect if `mustCompleteSecurityQuestions`)
+- [x] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions`, guest-only `_auth` and authenticated user/admin guards, session restoration, and mandatory onboarding redirects — completed 2026-10-18
 
 ### 1.3 Admin User Management (No Delete!)
 

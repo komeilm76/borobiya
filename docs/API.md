@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers currently include `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `POST /_admin/users`, and `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `POST /_admin/users`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -161,9 +161,11 @@ The server checks token validity before the expensive password hash, then atomic
 ### 3.6 Security Questions Helpers
 
 ```
-GET /_public/security-questions          // open, returns all 15 seeded: {id, text}
-GET /_auth/security-questions            // alias for guest
+GET /_public/security-questions          // open, returns seeded prompts: {id, text}
+GET /_auth/security-questions            // guest alias (contract-only)
 ```
+
+`GET /_public/security-questions` is live and returns the catalog used by registration and onboarding; question prompts are public, but answer hashes are never returned. The guest alias remains contract-only.
 
 ---
 
@@ -191,7 +193,7 @@ GET    /_user/devices                    → [{ id, deviceName, ip, isCurrentDev
 POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ```
 
-`POST /_user/complete-security-questions` requires an access JWT, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The remaining `_user` operations shown here are still contract-only.
+`POST /_user/complete-security-questions` requires an access JWT, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. `GET /_user/me` returns the current profile with `Cache-Control: no-store` after onboarding; incomplete accounts receive the security-question gate response. Other `_user` operations shown here remain contract-only.
 
 ### 5.2 User Search
 

@@ -24,10 +24,13 @@ const questionIds = [
 ];
 const incompleteUser: SecurityQuestionsUserRecord = {
   id: identity.userId,
+  username: "rescue_user1",
   role: "user",
   isActive: true,
   isSuspended: false,
-  mustCompleteSecurityQuestions: true
+  mustCompleteSecurityQuestions: true,
+  avgRating: null,
+  createdAt: new Date("2026-10-18T00:00:00.000Z")
 };
 const validBody = {
   securityQuestions: questionIds.map((questionId, index) => ({
@@ -136,6 +139,13 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
     expect(before.statusCode).toBe(403);
     expect(before.headers["cache-control"]).toBe("no-store");
     expect(before.json().code).toBe("SECURITY_QUESTIONS_REQUIRED");
+    const incompleteProfile = await app.inject({
+      method: "GET",
+      url: "/_user/me",
+      headers: { authorization: `Bearer ${token}` }
+    });
+    expect(incompleteProfile.statusCode).toBe(403);
+    expect(incompleteProfile.json().code).toBe("SECURITY_QUESTIONS_REQUIRED");
     const wrongMethod = await app.inject({
       method: "GET",
       url: "/_user/complete-security-questions",
@@ -155,10 +165,25 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
       url: "/_user/protected",
       headers: { authorization: `Bearer ${token}` }
     });
+    const profile = await app.inject({
+      method: "GET",
+      url: "/_user/me",
+      headers: { authorization: `Bearer ${token}` }
+    });
 
     expect(completed.statusCode).toBe(200);
     expect(after.statusCode).toBe(200);
     expect(after.json()).toEqual({ userId: identity.userId, mustCompleteSecurityQuestions: false });
+    expect(profile.statusCode).toBe(200);
+    expect(profile.json()).toEqual({
+      id: identity.userId,
+      username: "rescue_user1",
+      role: "user",
+      mustCompleteSecurityQuestions: false,
+      isActive: true,
+      avgRating: null,
+      createdAt: "2026-10-18T00:00:00.000Z"
+    });
   });
 
   it.each([

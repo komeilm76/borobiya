@@ -5,6 +5,7 @@ import { pinia } from "./stores";
 import { vuetify } from "./plugins/vuetify";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles/tailwind.css";
+import "./styles/auth.css";
 
 const router = createAppRouter();
 createApp(App).use(pinia).use(router).use(vuetify).mount("#app");

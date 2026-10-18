@@ -17,12 +17,30 @@
         <v-btn class="nav-button" to="/_public/landing" variant="text" rounded="lg">
           خانه
         </v-btn>
-        <v-btn class="nav-button d-none d-sm-flex" to="/_user/dashboard" variant="text" rounded="lg">
+        <v-btn
+          v-if="auth.isAuthenticated && auth.mustCompleteSecurityQuestions"
+          class="nav-button d-none d-sm-flex"
+          to="/_user/complete-security-questions"
+          variant="text"
+          rounded="lg"
+        >
+          تکمیل حساب
+        </v-btn>
+        <v-btn
+          v-else-if="auth.isAuthenticated"
+          class="nav-button d-none d-sm-flex"
+          to="/_user/dashboard"
+          variant="text"
+          rounded="lg"
+        >
           پیشخوان
         </v-btn>
-        <v-btn class="login-button" to="/_auth/login" color="primary" variant="flat" rounded="lg">
+        <v-btn v-if="!auth.isAuthenticated" class="login-button" to="/_auth/login" color="primary" variant="flat" rounded="lg">
           <v-icon class="me-1" icon="mdi-account-outline" />
           ورود
+        </v-btn>
+        <v-btn v-else class="login-button" color="primary" variant="tonal" rounded="lg" @click="logout">
+          خروج
         </v-btn>
       </nav>
     </v-app-bar>
@@ -43,5 +61,28 @@
 </template>
 
 <script setup lang="ts">
-import { RouterLink, RouterView } from "vue-router";
+import { onMounted } from "vue";
+import { RouterLink, RouterView, useRouter } from "vue-router";
+import { pinia } from "./stores";
+import { useAuthStore } from "./stores/auth";
+
+const auth = useAuthStore(pinia);
+const router = useRouter();
+
+async function logout(): Promise<void> {
+  try {
+    await auth.logout();
+  } catch {
+    // Clear the local session and return to the guest flow even if the network is unavailable.
+  } finally {
+    await router.replace("/_auth/login");
+  }
+}
+
+onMounted(async () => {
+  await auth.ensureSession();
+  if (auth.isAuthenticated && auth.mustCompleteSecurityQuestions) {
+    await router.replace("/_user/complete-security-questions");
+  }
+});
 </script>

@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { allApiRoutes, apiRoutes } from "@borobiya/shared/api";
-import { createFastifyApp } from "./app";
+import type { SecurityQuestion } from "@borobiya/shared";
+import type { UserRecoveryStore } from "./db/recovery-store";
+import { createFastifyApp, type FastifyAppDependencies } from "./app";
 import { parseServerEnv } from "./config/env";
 
 const serverConfig = parseServerEnv({
@@ -18,10 +20,25 @@ afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
 });
 
-async function makeApp(overrides: Partial<typeof serverConfig> = {}) {
-  const app = await createFastifyApp({ ...serverConfig, ...overrides });
+async function makeApp(
+  overrides: Partial<typeof serverConfig> = {},
+  dependencies: FastifyAppDependencies = {}
+) {
+  const app = await createFastifyApp({ ...serverConfig, ...overrides }, dependencies);
   apps.push(app);
   return app;
+}
+
+function makeRecoveryStore(questions: SecurityQuestion[]): UserRecoveryStore {
+  return {
+    async findAccountByUsername() { return null; },
+    async listSecurityQuestions() { return questions.map(({ id, text }) => ({ questionId: id, text })); },
+    async saveRecoveryChallenge() { return null; },
+    async findActiveRecoveryChallenge() { return null; },
+    async issuePasswordResetToken() { return false; },
+    async isPasswordResetTokenValid() { return false; },
+    async resetPasswordWithToken() { return false; }
+  };
 }
 
 describe("Fastify server skeleton", () => {
@@ -34,6 +51,19 @@ describe("Fastify server skeleton", () => {
     expect(response.json().uptime).toEqual(expect.any(Number));
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("serves the public security-question catalog for registration and onboarding", async () => {
+    const questions = [
+      { id: "10000000-0000-4000-8000-000000000001", text: "Question one?" },
+      { id: "10000000-0000-4000-8000-000000000002", text: "Question two?" }
+    ];
+    const app = await makeApp({}, { recoveryStore: makeRecoveryStore(questions) });
+    const response = await app.inject({ method: "GET", url: "/_public/security-questions" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual(questions);
+    expect(response.headers["cache-control"]).toBe("public, max-age=3600");
   });
 
   it("serves Swagger UI and documents shared contracts without fake runtime routes", async () => {
@@ -59,6 +89,7 @@ describe("Fastify server skeleton", () => {
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
     const adminCreateUser = paths["/_admin/users"]?.post;
     const completeSecurityQuestions = paths["/_user/complete-security-questions"]?.post;
+    const publicSecurityQuestions = paths["/_public/security-questions"]?.get;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -155,6 +186,17 @@ describe("Fastify server skeleton", () => {
       429: expect.any(Object)
     });
     expect(completeSecurityQuestions?.requestBody).toHaveProperty("content.application/json.schema.properties.securityQuestions");
+    expect(userProfile?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(userProfile?.["x-borobiya-access"]).toBe("authenticated");
+    expect(userProfile?.security).toEqual([{ bearerAuth: [] }]);
+    expect(userProfile?.responses).toMatchObject({
+      200: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(publicSecurityQuestions?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(publicSecurityQuestions?.responses).toHaveProperty("200");
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -188,6 +230,10 @@ describe("Fastify server skeleton", () => {
     });
     expect(missingUserToken.statusCode).toBe(401);
     expect(missingUserToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingUserProfileToken = await app.inject({ method: "GET", url: "/_user/me" });
+    expect(missingUserProfileToken.statusCode).toBe(401);
+    expect(missingUserProfileToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("advertises the gateway API prefix while retaining the direct API server", async () => {

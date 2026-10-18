@@ -4,6 +4,9 @@ import {
   type RouteRecordRaw,
   type RouterHistory
 } from "vue-router";
+import { pinia } from "../stores";
+import { useAuthStore } from "../stores/auth";
+import { createAuthGuard, type AuthGuardState } from "./guards";
 
 export const routeRecords: RouteRecordRaw[] = [
   { path: "/", redirect: "/_public/landing" },
@@ -30,42 +33,22 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_auth/login",
     name: "auth-login",
-    component: () => import("@client/views/_auth/PlaceholderView.vue"),
-    props: {
-      title: "ورود",
-      description: "برای دسترسی امن به همراهان و ابزارهای امدادی وارد حساب کاربری خود شوید.",
-      icon: "mdi-login-variant"
-    }
+    component: () => import("@client/views/_auth/LoginView.vue")
   },
   {
     path: "/_auth/register",
     name: "auth-register",
-    component: () => import("@client/views/_auth/PlaceholderView.vue"),
-    props: {
-      title: "ساخت حساب",
-      description: "ساخت حساب و تنظیم پرسش‌های امنیتی در این صفحه پیاده‌سازی خواهد شد.",
-      icon: "mdi-account-plus-outline"
-    }
+    component: () => import("@client/views/_auth/RegisterView.vue")
   },
   {
     path: "/_auth/forgot-password",
     name: "auth-forgot-password",
-    component: () => import("@client/views/_auth/PlaceholderView.vue"),
-    props: {
-      title: "بازیابی گذرواژه",
-      description: "مراحل بازیابی حساب با پرسش‌های امنیتی در این بخش قرار می‌گیرند.",
-      icon: "mdi-lock-reset"
-    }
+    component: () => import("@client/views/_auth/ForgotPasswordView.vue")
   },
   {
     path: "/_user/complete-security-questions",
     name: "user-complete-security-questions",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "پرسش‌های امنیتی",
-      description: "تکمیل پرسش‌های امنیتی برای محافظت بهتر از حساب کاربری در دسترس خواهد بود.",
-      icon: "mdi-shield-key-outline"
-    }
+    component: () => import("@client/views/_user/CompleteSecurityQuestionsView.vue")
   },
   {
     path: "/_user/dashboard",
@@ -189,6 +172,11 @@ export const routeRecords: RouteRecordRaw[] = [
   }
 ];
 
-export function createAppRouter(history: RouterHistory = createWebHistory(import.meta.env.BASE_URL)) {
-  return createRouter({ history, routes: routeRecords });
+export function createAppRouter(
+  history: RouterHistory = createWebHistory(import.meta.env.BASE_URL),
+  auth: AuthGuardState = useAuthStore(pinia)
+) {
+  const router = createRouter({ history, routes: routeRecords });
+  router.beforeEach(createAuthGuard(auth));
+  return router;
 }

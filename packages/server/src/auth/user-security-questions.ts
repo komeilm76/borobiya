@@ -7,9 +7,12 @@ import { verifyAccessToken, type SessionTokenIdentity } from "../security/tokens
 import { normalizeSecurityAnswer, type PasswordHasher } from "./register";
 
 export interface AuthenticatedUserContext extends SessionTokenIdentity {
+  username: string;
   isActive: boolean;
   isSuspended: boolean;
   mustCompleteSecurityQuestions: boolean;
+  avgRating: number | null;
+  createdAt: Date;
 }
 
 declare module "fastify" {
@@ -94,9 +97,12 @@ export async function registerUserSecurityQuestionsRoute(
 
     request.authenticatedUser = {
       ...identity,
+      username: user.username,
       isActive: user.isActive,
       isSuspended: user.isSuspended,
-      mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions
+      mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
+      avgRating: user.avgRating,
+      createdAt: user.createdAt
     };
 
     if (user.mustCompleteSecurityQuestions && (request.method !== route.method || path !== route.url)) {
@@ -107,6 +113,21 @@ export async function registerUserSecurityQuestionsRoute(
         "Complete your security questions before using other user features."
       );
     }
+  });
+
+  app.get(apiRoutes.user.me.url, async (request, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return sendUnauthorized(reply, "UNAUTHORIZED");
+
+    return reply.header("cache-control", "no-store").send({
+      id: user.userId,
+      username: user.username,
+      role: user.role,
+      mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
+      isActive: user.isActive,
+      avgRating: user.avgRating,
+      createdAt: user.createdAt.toISOString()
+    });
   });
 
   app.post(route.url, async (request, reply) => {

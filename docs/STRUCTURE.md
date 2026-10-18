@@ -120,7 +120,7 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health, auth/session/recovery, admin-create, and onboarding handlers are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin-create, profile, and onboarding handlers are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
@@ -137,8 +137,8 @@ packages/server/
     │   ├── rate-limit.ts     # bounded per-IP+username limiter key generation
     │   ├── rate-limit.test.ts # bounded-key regression tests
     │   ├── session.ts        # refresh rotation and logout routes
-    │   ├── user-security-questions.ts # user auth guard and onboarding completion route
-    │   ├── user-security-questions.test.ts # guard, validation, hashing, and completion tests
+    │   ├── user-security-questions.ts # user auth guard, GET /_user/me, and onboarding completion
+    │   ├── user-security-questions.test.ts # profile, guard, validation, hashing, and completion tests
     │   ├── forgot-password.ts # server-selected recovery challenges and reset flow
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
@@ -148,7 +148,7 @@ packages/server/
     │   ├── admin-user-store.test.ts # persistence/default/conflict assertions without live PostgreSQL
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
-    │   ├── security-questions-store.ts # user state, question catalog, and atomic onboarding persistence
+    │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
     │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason tables
@@ -167,7 +167,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, and onboarding stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health, T1.2.1–T1.2.6 auth/session/recovery/admin-create/onboarding handlers, and their relevant contracts are live. The onboarding auth hook is ready for future `/_user` handlers; remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, and onboarding stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and their relevant contracts are live. The onboarding auth hook is ready for future `/_user` handlers; remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 
@@ -178,7 +178,7 @@ packages/client/
 ├── package.json              # name: "@borobiya/client"; Vue 3, Vuetify, Tailwind, Pinia, VueUse, Zopia
 ├── README.md
 ├── index.html                # Persian-first RTL document shell
-├── vite.config.ts            # Vue/Vuetify/Tailwind, @ alias, same-origin API/map proxies
+├── vite.config.ts            # Vue/Vuetify/Tailwind, @/client/shared aliases, same-origin API/map proxies
 ├── scripts/
 │   └── generate-api.ts       # fetches /docs/json and runs Zopia
 ├── tsconfig.json
@@ -186,28 +186,42 @@ packages/client/
 │   └── favicon.svg
 └── src/
     ├── main.ts               # Vue + Pinia + router + Vuetify bootstrap
-    ├── App.vue               # shared application shell
+    ├── App.vue               # shared shell, session bootstrap, and logout control
     ├── env.d.ts
+    ├── api/
+    │   ├── http.ts           # same-origin JSON requests and structured API errors
+    │   ├── http.test.ts
+    │   ├── error-message.ts  # localized auth/API errors
+    │   └── security-questions.ts # cached public question catalog
     ├── router/
-    │   ├── index.ts          # 17 namespaced placeholder views; auth guards later
+    │   ├── index.ts          # namespaced routes and auth-guard wiring
+    │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
+    │   ├── guards.test.ts
     │   └── index.test.ts
     ├── stores/
-    │   └── index.ts          # Pinia instance
+    │   ├── index.ts          # Pinia instance
+    │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
+    │   └── auth.test.ts
     ├── composables/
     │   └── useSystemTheme.ts # VueUse starting point
     ├── plugins/
     │   └── vuetify.ts        # Persian locale, RTL, base light/dark palettes
     ├── styles/
-    │   └── tailwind.css      # Tailwind utilities + app shell styling
+    │   ├── tailwind.css      # Tailwind utilities + app shell styling
+    │   └── auth.css          # responsive authentication and onboarding layouts
     └── views/
         ├── PlaceholderPage.vue
+        ├── _auth/LoginView.vue
+        ├── _auth/RegisterView.vue
+        ├── _auth/ForgotPasswordView.vue
         ├── _auth/PlaceholderView.vue
         ├── _public/PlaceholderView.vue
+        ├── _user/CompleteSecurityQuestionsView.vue
         ├── _user/PlaceholderView.vue
         └── _admin/PlaceholderView.vue
 ```
 
-MapLibre, API/auth stores, feature components, Capacitor, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. Remaining feature views, MapLibre, Capacitor, and Android packaging remain future work.
 
 ---
 

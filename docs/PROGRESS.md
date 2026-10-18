@@ -6,13 +6,13 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and T1.2.1–T1.2.6 registration, login, refresh/logout, forgot-password recovery, admin user creation, and security-question onboarding are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist. Health, the auth/session/recovery handlers, admin-only `POST /_admin/users`, and `POST /_user/complete-security-questions` are live. The user-route authorization hook gates incomplete accounts; live-PostgreSQL verification, onboarding UI, remaining auth/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and T1.2.1–T1.2.7 auth, session, recovery, admin creation, security-question onboarding, and frontend guard tasks are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, the auth/session/recovery handlers, public security-question catalog, admin-only `POST /_admin/users`, authenticated `GET /_user/me`, onboarding completion, and client auth pages/guards are live. Live-PostgreSQL verification, remaining auth/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 30% | 🟡 Registration, login, refresh/logout, recovery, admin creation, and onboarding completion/auth gate are implemented; frontend guards and remaining user/admin handlers remain |
+| Auth & Users | 35% | 🟡 Registration, login, refresh/logout, recovery, admin creation, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -29,7 +29,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 30% | T1.2.1–T1.2.6 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, 15m/7d access/refresh tokens, atomic refresh rotation/logout, single-use password reset, session revocation, current-admin authorization, incomplete-user route guard, and route/store/OpenAPI tests; frontend guards and remaining user handlers remain |
+| Auth system | 35% | T1.2.1–T1.2.7 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, 15m/7d access/refresh tokens, atomic refresh rotation/logout, single-use password reset, session revocation, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user handlers remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-18 — Authentication UI and route guards (T1.2.7)
+
+- Replaced the auth/onboarding placeholders with Persian RTL login, registration, three-step password recovery, and security-question completion forms. Added same-origin API handling, localized errors, unique question selection, and tests for API calls and client session state.
+- Added an auth store that keeps access tokens in memory, restores them with the HttpOnly refresh cookie, reloads completed profiles, and detects the server onboarding gate. Router guards enforce guest-only auth pages, protected user/admin routes, safe return paths, role checks, and onboarding redirects. Implemented `GET /_public/security-questions` and `GET /_user/me` as support endpoints for catalog loading and session restoration.
+- Validation: 160 workspace tests (28 shared, 116 server, 16 client), all three typechecks, client production build, and `git diff --check` passed. No live PostgreSQL is available, so database integration remains unverified.
 
 ### 2026-10-18 — Security-question onboarding and authorization gate (T1.2.6)
 

@@ -31,7 +31,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         "@": resolve(packageRoot, "src"),
-        "@client": resolve(packageRoot, "src")
+        "@client": resolve(packageRoot, "src"),
+        "@shared": resolve(packageRoot, "../shared/src")
       }
     },
     server: {

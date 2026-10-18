@@ -121,6 +121,12 @@ export async function createFastifyApp(
     uptime: process.uptime(),
     version: process.env.npm_package_version ?? "0.1.0"
   }));
+  app.get(apiRoutes.public.securityQuestions.url, async (_request, reply) => {
+    const questions = await recoveryStore.listSecurityQuestions();
+    return reply
+      .header("cache-control", "public, max-age=3600")
+      .send(questions.map(({ questionId, text }) => ({ id: questionId, text })));
+  });
 
   return app;
 }

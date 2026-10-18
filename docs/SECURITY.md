@@ -52,7 +52,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
 - `POST /_user/complete-security-questions` accepts five unique IDs from the seeded catalog, normalizes answers with `trim().toLowerCase()`, stores Argon2id hashes, and atomically clears the flag only after all five rows are stored. Repeated requests do not overwrite completed answers and return `409 SECURITY_QUESTIONS_ALREADY_COMPLETED`.
 - A Fastify `/_user` authorization hook verifies the signed/unexpired access token and current user role/account state. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
-- The frontend task remains pending: force redirect to `/_user/complete-security-questions` when the returned user flag is true.
+- The Vue client now exposes login, registration, forgot-password, and completion forms. It keeps the access token in memory, stores only the minimal non-secret user snapshot in `sessionStorage`, and relies on the HttpOnly refresh cookie to restore sessions. The router keeps `/_auth/*` guest-only, protects `/_user/*` and admin routes, and forces every signed-in user with the onboarding flag through `/_user/complete-security-questions` before other pages. `GET /_user/me` refreshes the profile; the `SECURITY_QUESTIONS_REQUIRED` response preserves onboarding status when the profile endpoint is gated.
 
 ---
 
@@ -128,7 +128,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` verifies the admin token and current admin account state, while a `/_user` authorization hook checks access-token validity, current user role/account state, and the onboarding flag. Other admin handlers and broad frontend guards remain pending.
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` verifies the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
 
 **Backend policy sketch (shared hooks for future route groups):**
 
@@ -144,16 +144,7 @@ fastify.register(async (f) => {
 }, { prefix: '/_admin' });
 ```
 
-**Frontend (router guard):**
-
-```ts
-router.beforeEach((to) => {
-  const a = useAuthStore();
-  if (to.path.startsWith('/_auth') && a.isLoggedIn) return '/_user/dashboard';
-  if (to.path.startsWith('/_user') && !a.isLoggedIn) return '/_auth/login';
-  if (to.path.startsWith('/_admin') && a.user?.role !== 'admin') return '/403';
-});
-```
+**Frontend (implemented router guard):** `/_auth/*` pages redirect signed-in users away; protected user/admin pages redirect guests to login with a safe internal return path; non-admin users are sent back to the user dashboard; and a signed-in account with `mustCompleteSecurityQuestions=true` is redirected to onboarding from every route except the completion form. The server hook remains authoritative if client-side state is stale or tampered with.
 
 ### 5.1 `_auth` Guest-Only
 
