@@ -68,7 +68,7 @@ export const authRoutes = {
     meta: {
       operationId: "authRefresh",
       summary: "Rotate refresh and access tokens",
-      description: "Accepts a refresh token in the request body or cookie. Web clients receive the rotated token via an HttpOnly cookie; native clients may use the response body.",
+      description: "Validates and atomically rotates the persisted refresh session. Requests with an Origin header receive the replacement only via an HttpOnly cookie; native clients should omit Origin to receive it in the response body.",
       tags: ["auth"],
       access: "guest"
     }
@@ -79,12 +79,12 @@ export const authRoutes = {
     schema: {
       body: refreshBodySchema.optional(),
       cookies: refreshCookiesSchema,
-      responses: { 200: logoutResponseSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 200: logoutResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
     },
     meta: {
       operationId: "authLogout",
       summary: "Invalidate the current refresh token",
-      description: "Accepts the refresh token from the HttpOnly cookie or, for native clients, the request body.",
+      description: "Revokes the refresh session when possible and expires the refresh cookie; missing or invalid refresh tokens are handled idempotently.",
       tags: ["auth"],
       access: "guest"
     }

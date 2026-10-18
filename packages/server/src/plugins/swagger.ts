@@ -10,7 +10,7 @@ const jsonSchemaOptions = {
   reused: "inline"
 } as const;
 
-const implementedOperationIds = new Set(["publicHealth", "authRegister", "authLogin"]);
+const implementedOperationIds = new Set(["publicHealth", "authRegister", "authLogin", "authRefresh", "authLogout"]);
 
 interface JsonObjectSchema {
   properties?: Record<string, unknown>;
@@ -214,7 +214,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.1.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health, user registration, and login are implemented at runtime; remaining operations are contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health, user registration, login, refresh, and logout are implemented at runtime; remaining operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

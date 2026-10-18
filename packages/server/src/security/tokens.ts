@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { UserRole } from "@borobiya/shared";
-import { SignJWT } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -24,11 +24,12 @@ async function signSessionToken(
   return new SignJWT({
     role: identity.role,
     deviceId: identity.deviceId,
+    sessionId: identity.sessionId,
     tokenUse
   })
     .setProtectedHeader({ alg: "HS256", typ: "JWT" })
     .setSubject(identity.userId)
-    .setJti(identity.sessionId)
+    .setJti(randomUUID())
     .setIssuedAt(issuedAt)
     .setExpirationTime(issuedAt + lifetimeSeconds)
     .sign(textEncoder.encode(secret));
@@ -40,6 +41,36 @@ export function signAccessToken(identity: SessionTokenIdentity, secret: string):
 
 export function signRefreshToken(identity: SessionTokenIdentity, secret: string): Promise<string> {
   return signSessionToken("refresh", identity, secret, REFRESH_TOKEN_TTL_SECONDS);
+}
+
+/** Verify refresh signature, lifetime, and claim types; accept pre-rotation T1.2.2 session IDs during rollout. */
+export async function verifyRefreshToken(token: string, secret: string): Promise<SessionTokenIdentity | null> {
+  try {
+    const { payload } = await jwtVerify(token, textEncoder.encode(secret), { algorithms: ["HS256"] });
+    const sessionId = typeof payload.sessionId === "string"
+      ? payload.sessionId
+      : typeof payload.jti === "string"
+        ? payload.jti
+        : undefined;
+    if (
+      payload.tokenUse !== "refresh" ||
+      typeof payload.sub !== "string" ||
+      typeof payload.deviceId !== "string" ||
+      (payload.role !== "user" && payload.role !== "admin") ||
+      !sessionId
+    ) {
+      return null;
+    }
+
+    return {
+      userId: payload.sub,
+      role: payload.role,
+      deviceId: payload.deviceId,
+      sessionId
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** SHA-256 is appropriate for high-entropy, randomly signed refresh tokens. */

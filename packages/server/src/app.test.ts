@@ -53,6 +53,7 @@ describe("Fastify server skeleton", () => {
     const refresh = paths["/_auth/refresh"]?.post;
     const registration = paths["/_auth/register"]?.post;
     const login = paths["/_auth/login"]?.post;
+    const logout = paths["/_auth/logout"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -82,8 +83,11 @@ describe("Fastify server skeleton", () => {
       403: expect.any(Object),
       429: expect.any(Object)
     });
-    expect(refresh?.["x-borobiya-runtime-status"]).toBe("contract-only");
+    expect(refresh?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(refresh?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
     expect(refresh?.requestBody).toMatchObject({ required: false });
+    expect(logout?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(logout?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -102,8 +106,9 @@ describe("Fastify server skeleton", () => {
       description: "Successful response with no response body."
     });
 
-    const unimplemented = await app.inject({ method: "POST", url: "/_auth/refresh" });
-    expect(unimplemented.statusCode).toBe(404);
+    const missingRefreshToken = await app.inject({ method: "POST", url: "/_auth/refresh" });
+    expect(missingRefreshToken.statusCode).toBe(401);
+    expect(missingRefreshToken.json()).toMatchObject({ code: "INVALID_REFRESH" });
   });
 
   it("advertises the gateway API prefix while retaining the direct API server", async () => {

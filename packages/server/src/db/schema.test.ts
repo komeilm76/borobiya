@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { users } from "./schema";
+import { userSessions, users } from "./schema";
 
 describe("users database schema", () => {
   it("declares account flags, bounded ratings, and indexed PostGIS location", () => {
@@ -33,6 +33,19 @@ describe("users database schema", () => {
           indexConfig.name === "idx_users_last_location_gist" && indexConfig.method === "gist"
       )
     ).toBe(true);
+  });
+
+  it("indexes and uniquely constrains stored refresh-token hashes", () => {
+    const config = getTableConfig(userSessions);
+    const refreshTokenHashIndex = config.indexes.find(
+      ({ config: indexConfig }) => indexConfig.name === "user_sessions_refresh_token_hash_unique"
+    );
+
+    expect(refreshTokenHashIndex?.config.unique).toBe(true);
+    const indexedColumnNames = refreshTokenHashIndex?.config.columns
+      .map((column) => ("name" in column ? column.name : undefined))
+      .filter((name): name is string => typeof name === "string");
+    expect(indexedColumnNames).toEqual(["refresh_token_hash"]);
   });
 
   it("enables PostGIS before declaring the unquoted geography column", () => {

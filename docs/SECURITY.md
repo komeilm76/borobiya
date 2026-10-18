@@ -63,14 +63,15 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 | Token | Lifetime | Storage | Usage |
 |-------|----------|---------|-------|
 | `accessToken` | 15 min | Memory (JS var) + `Authorization: Bearer` | Every API call |
-| `refreshToken` | 7 days | httpOnly, Secure, SameSite=Lax cookie (web) or `Capacitor Preferences` / Secure Storage (Android) | `/ _auth/refresh` |
+| `refreshToken` | 7 days | HttpOnly, Secure, SameSite=Lax cookie (web) or platform Secure Storage (native) | `/_auth/refresh` |
 | `resetToken` | 10 min | One-time in body | Forgot reset |
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
 - Access and refresh JWTs use HS256 with separate `JWT_SECRET` and `JWT_REFRESH_SECRET`; login issues a 15-minute access token and 7-day refresh token.
-- Payload includes `{ sub: userId, role, deviceId, jti: sessionId, tokenUse, iat, exp }`; access and refresh token uses are distinct.
-- `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token; refresh flow later rotates that hash.
-- Browser login/refresh responses must not expose `refreshToken` in JSON; send it through an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
+- Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. The verifier temporarily accepts legacy refresh JWTs where `jti` held the session ID.
+- `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token and has a unique index. Refresh validates signature, expiry, session/user/device claims, and current account status, then uses a conditional update on the current hash to rotate it atomically; concurrent reuse cannot return two usable tokens.
+- Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
+- Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
 
 ### 2.2 Sessions & Devices
 
@@ -113,8 +114,8 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 ```
 
 - `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work.
-- Login rejects an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an admin clears it.
-- Login also rejects `isActive=false` with `403 {code: "ACCOUNT_INACTIVE"}`.
+- Login and refresh reject an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Refresh also revokes the presented session and clears the browser cookie. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an admin clears it.
+- Login and refresh reject `isActive=false` with `403 {code: "ACCOUNT_INACTIVE"}`; refresh revokes the presented session.
 - Message: “Account suspended. Contact an administrator.”
 
 ### 4.2 Manual
@@ -155,7 +156,7 @@ router.beforeEach((to) => {
 
 ### 5.1 `_auth` Guest-Only
 
-The registration and login handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Remaining `/_auth` handlers must preserve this guest-only invariant when implemented.
+The registration, login, refresh, and logout handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Refresh/logout accept the refresh credential only through the cookie or native request body, never through the bearer header.
 
 ### 5.2 No Delete Invariant
 

@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar
 } from "drizzle-orm/pg-core";
@@ -82,7 +83,10 @@ export const userSessions = pgTable(
     lastActiveAt: timestamp("last_active_at", { withTimezone: true }).notNull().defaultNow(),
     isOnline: boolean("is_online").notNull().default(false)
   },
-  (table) => [index("user_sessions_user_id_idx").on(table.userId)]
+  (table) => [
+    index("user_sessions_user_id_idx").on(table.userId),
+    uniqueIndex("user_sessions_refresh_token_hash_unique").on(table.refreshTokenHash)
+  ]
 );
 
 export const cancellationReasons = pgTable(

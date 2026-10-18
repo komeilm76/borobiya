@@ -4,15 +4,15 @@
 
 ---
 
-## Overall: 19% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 20% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and T1.2.1 registration plus T1.2.2 login are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist. Health, registration, and login are live; auth persistence uses Drizzle, and login issues HS256 access/refresh JWTs while storing refresh-token hashes in sessions. Refresh/logout rotation and other auth/domain handlers, live-PostgreSQL verification, map assets, feature views, and remaining product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and T1.2.1–T1.2.3 registration, login, refresh, and logout are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist. Health and the four implemented auth routes are live; refresh tokens are verified against persisted sessions and atomically rotated, while logout revokes sessions. Live-PostgreSQL verification, remaining auth/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 10% | 🟡 Registration and login/session issuance are implemented with persistence, hashing, JWTs, and rate limits; refresh/logout, recovery, request authorization, remaining handlers, and UI remain |
+| Auth & Users | 15% | 🟡 Registration, login, refresh, logout, persisted session rotation/revocation, account-state checks, and rate limits are implemented; recovery, remaining handlers, request authorization, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -24,12 +24,12 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 18%
+### Phase 1 — Foundation (Auth & Map) — 19%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 10% | Registration and T1.2.2 login complete: Argon2id, atomic registration, 15m/7d JWTs, hashed refresh-token sessions, route limits, and tests; refresh/logout rotation, recovery, authorization enforcement, and UI remain |
+| Auth system | 15% | T1.2.1–T1.2.3 complete: Argon2id registration/login, 15m/7d JWTs, signed refresh verification, atomic persisted-hash rotation, idempotent logout, account-state checks, and route tests; recovery, remaining authorization enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -75,12 +75,19 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 |---|-------|--------|-------|--------|
 | 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | No live PostgreSQL is available in the current agent environment | Registration transactions and login/session persistence are wired and route-tested with injected stores, but Drizzle queries cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test register/login with PostgreSQL |
+| 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh, and logout are route-tested with injected stores, but Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth flows with PostgreSQL |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
+
+### 2026-10-18 — Refresh rotation and logout (T1.2.3)
+
+- Implemented `POST /_auth/refresh` and `POST /_auth/logout` with cookie parsing, signed/unexpired token verification, persisted session/account matching, atomic single-use hash rotation, current role/account-state checks, and idempotent session revocation/cookie clearing.
+- Browser clients receive rotated refresh tokens only through HttpOnly cookies; native clients omit `Origin` and receive the token in JSON. Added unique JWT `jti` values with stable `sessionId` claims and rollout compatibility for legacy T1.2.2 tokens; added a unique refresh-hash index/migration.
+- Updated shared contracts, OpenAPI runtime status, API/security docs, and T1.2.3 completion status. Route tests cover transport, stale/concurrent rotation, invalid/expired/legacy tokens, account states, guest-only behavior, and logout idempotency.
+- Validation: frozen-lockfile install; 80 workspace tests (26 shared, 52 server, 2 client); all three typechecks; client production build; Drizzle generation with no unexpected schema changes; migration CLI help; and `git diff --check` passed. No live PostgreSQL is available, so migration application and database-backed integration remain unverified.
 
 ### 2026-10-18 — User login and token issuance (T1.2.2)
 

@@ -29,7 +29,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 - [x] **T1.2.1** `POST /_auth/register` — five existing unique questions, duplicate-username handling, Argon2id password/normalized-answer hashes, atomic persistence, guest-only 403, and 5/15m IP+username limit — completed 2026-10-18
 - [x] **T1.2.2** `POST /_auth/login` — username+password, Argon2id verify, 5/15m per IP+username, access/refresh JWTs (15m/7d), persisted refresh hash, browser HttpOnly cookie/native body — completed 2026-10-18
-- [ ] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — httpOnly refresh rotation
+- [x] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — signed refresh verification, session/account matching, atomic hash rotation, browser HttpOnly cookie/native body transport, idempotent logout, account-state checks, and guest-only enforcement — completed 2026-10-18
 - [ ] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m resetToken) → *AI*
 - [ ] **T1.2.5** `POST /_admin/users` — admin creates user without questions, set `mustCompleteSecurityQuestions=true`
 - [ ] **T1.2.6** `POST /_user/complete-security-questions` — middleware blocks all other `_user` ops until done, returns `SECURITY_QUESTIONS_REQUIRED` code

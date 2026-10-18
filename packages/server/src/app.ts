@@ -1,10 +1,12 @@
 import { apiRoutes } from "@borobiya/shared/api";
+import cookie from "@fastify/cookie";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ServerConfig } from "./config/env";
 import { createDatabase } from "./db/client";
 import { DrizzleUserLoginStore, type UserLoginStore } from "./db/login-store";
 import { DrizzleUserRegistrationStore, type UserRegistrationStore } from "./db/registration-store";
 import { registerLoginRoute, type PasswordVerifier } from "./auth/login";
+import { registerSessionRoutes } from "./auth/session";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
 import { registerSwagger } from "./plugins/swagger";
@@ -46,6 +48,7 @@ export async function createFastifyApp(
     }
   });
 
+  await app.register(cookie);
   await registerHttpSecurityPlugins(app, config);
   await registerSwagger(app, config.openApiServerPath);
 
@@ -61,6 +64,11 @@ export async function createFastifyApp(
     jwtSecret: config.jwtSecret,
     jwtRefreshSecret: config.jwtRefreshSecret,
     verifyPassword: dependencies.verifyPassword
+  });
+  await registerSessionRoutes(app, {
+    store: loginStore,
+    jwtSecret: config.jwtSecret,
+    jwtRefreshSecret: config.jwtRefreshSecret
   });
 
   if (database) {

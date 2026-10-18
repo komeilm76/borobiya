@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
 import { userSessions, users } from "./schema";
@@ -24,12 +24,31 @@ export interface LoginSessionInput {
   isOnline: boolean;
 }
 
+export interface RefreshSessionRecord {
+  id: string;
+  userId: string;
+  deviceId: string;
+  refreshTokenHash: string;
+  role: UserRole;
+  isActive: boolean;
+  isSuspended: boolean;
+}
+
 export interface UserLoginStore {
   findUserByUsername(username: string): Promise<LoginUserRecord | null>;
   createSession(session: LoginSessionInput): Promise<void>;
+  findSessionByRefreshTokenHash(tokenHash: string): Promise<RefreshSessionRecord | null>;
+  rotateRefreshToken(input: {
+    sessionId: string;
+    currentTokenHash: string;
+    nextTokenHash: string;
+    lastActiveAt: Date;
+  }): Promise<boolean>;
+  revokeSession(sessionId: string, userId: string): Promise<boolean>;
+  revokeSessionByRefreshTokenHash(tokenHash: string): Promise<boolean>;
 }
 
-/** Drizzle-backed login lookups and persisted refresh-token sessions. */
+/** Drizzle-backed credential lookups and persisted refresh-token sessions. */
 export class DrizzleUserLoginStore implements UserLoginStore {
   constructor(private readonly db: Database) {}
 
@@ -52,5 +71,64 @@ export class DrizzleUserLoginStore implements UserLoginStore {
 
   async createSession(session: LoginSessionInput): Promise<void> {
     await this.db.insert(userSessions).values(session);
+  }
+
+  async findSessionByRefreshTokenHash(tokenHash: string): Promise<RefreshSessionRecord | null> {
+    const matchingSessions = await this.db
+      .select({
+        id: userSessions.id,
+        userId: userSessions.userId,
+        deviceId: userSessions.deviceId,
+        refreshTokenHash: userSessions.refreshTokenHash,
+        role: users.role,
+        isActive: users.isActive,
+        isSuspended: users.isSuspended
+      })
+      .from(userSessions)
+      .innerJoin(users, eq(userSessions.userId, users.id))
+      .where(eq(userSessions.refreshTokenHash, tokenHash))
+      .limit(1);
+    const session = matchingSessions[0];
+    if (!session?.refreshTokenHash) return null;
+    return session as RefreshSessionRecord;
+  }
+
+  async rotateRefreshToken(input: {
+    sessionId: string;
+    currentTokenHash: string;
+    nextTokenHash: string;
+    lastActiveAt: Date;
+  }): Promise<boolean> {
+    const updated = await this.db
+      .update(userSessions)
+      .set({
+        refreshTokenHash: input.nextTokenHash,
+        lastActiveAt: input.lastActiveAt,
+        isOnline: true
+      })
+      .where(and(
+        eq(userSessions.id, input.sessionId),
+        eq(userSessions.refreshTokenHash, input.currentTokenHash)
+      ))
+      .returning({ id: userSessions.id });
+    return updated.length === 1;
+  }
+
+  async revokeSession(sessionId: string, userId: string): Promise<boolean> {
+    const revoked = await this.db
+      .update(userSessions)
+      .set({ refreshTokenHash: null, isOnline: false })
+      .where(and(eq(userSessions.id, sessionId), eq(userSessions.userId, userId)))
+      .returning({ id: userSessions.id });
+    return revoked.length === 1;
+  }
+
+  async revokeSessionByRefreshTokenHash(tokenHash: string): Promise<boolean> {
+    const revoked = await this.db
+      .update(userSessions)
+      .set({ refreshTokenHash: null, isOnline: false })
+      .where(eq(userSessions.refreshTokenHash, tokenHash))
+      .returning({ id: userSessions.id });
+    return revoked.length === 1;
   }
 }

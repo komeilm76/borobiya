@@ -47,7 +47,11 @@ function makeLoginStore(options: { user?: LoginUserRecord | null } = {}) {
     },
     async createSession(session) {
       calls.sessions.push(session);
-    }
+    },
+    async findSessionByRefreshTokenHash() { return null; },
+    async rotateRefreshToken() { return false; },
+    async revokeSession() { return false; },
+    async revokeSessionByRefreshTokenHash() { return false; }
   };
   return { store, calls };
 }
@@ -130,7 +134,8 @@ describe("POST /_auth/login", () => {
       isOnline: true
     });
     expect(calls.sessions[0]?.refreshTokenHash).toBe(hashRefreshToken(refreshToken));
-    expect(refresh.payload.jti).toBe(calls.sessions[0]?.id);
+    expect(refresh.payload.sessionId).toBe(calls.sessions[0]?.id);
+    expect(refresh.payload.jti).not.toBe(calls.sessions[0]?.id);
     expect(refresh.payload.deviceId).toBe(calls.sessions[0]?.deviceId);
   });
 

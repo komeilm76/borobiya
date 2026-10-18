@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health`, `POST /_auth/register`, and `POST /_auth/login` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/{register,login,refresh,logout}` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -97,16 +97,24 @@ Rate: 5/15m per `ip+username`.
 ```text
 Request: native body { refreshToken } or web HttpOnly cookie (body may be omitted)
 Web 200: { accessToken } + rotated HttpOnly refresh-token cookie
-Native 200: { accessToken, refreshToken } (store refreshToken in secure storage)
-401: { code: "INVALID_REFRESH" }
+Native 200: { accessToken, refreshToken } (store replacement token in secure storage)
+400: { code: "VALIDATION_ERROR" } // malformed body
+401: { code: "INVALID_REFRESH" } // bad/expired JWT, missing persistence, or a lost concurrent rotation
+403: { code: "ALREADY_AUTHENTICATED" | "ACCOUNT_INACTIVE" | "ACCOUNT_SUSPENDED" }
 ```
+
+The handler verifies the refresh-token signature and expiry, matches the JWT's user/device/session claims to the stored session hash, checks current account state, then conditionally replaces the hash. The conditional update allows only one concurrent refresh to succeed. Tokens use distinct random JWT IDs (`jti`) and carry the stable session ID separately; legacy login tokens whose `jti` is the session ID remain accepted while they roll over. Browser responses keep refresh tokens out of JSON; native clients omit `Origin` and store the body token in secure storage.
 
 ### 3.4 POST `/_auth/logout`
 
 ```text
 Request: web HttpOnly refresh-token cookie or native body { refreshToken }
-200: { ok: true }  // invalidate refreshTokenHash in user_sessions
+200: { ok: true }  // invalidate the session; expire the browser cookie
+400: { code: "VALIDATION_ERROR" } // malformed body
+403: { code: "ALREADY_AUTHENTICATED" }
 ```
+
+Logout is idempotent: missing, invalid, or expired tokens still receive `{ ok: true }` and a cookie-clear response. A verified token revokes only its claimed session; an unverified token can affect a session only if its hash exactly matches the stored hash. Native clients should also clear their platform secure-storage token after a successful response.
 
 ### 3.5 Forgot Password
 
@@ -314,7 +322,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health`, `POST /_auth/register`, and `POST /_auth/login` are currently marked `implemented`.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/{register,login,refresh,logout}` are currently marked `implemented`.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 

@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { apiRoutes } from "@borobiya/shared/api";
 import { loginSchema } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
-import { REFRESH_TOKEN_TTL_SECONDS, hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
+import { hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
+import { refreshTokenCookie } from "./cookies";
 import { verifyPassword as argon2VerifyPassword } from "../security/password";
 import type { UserLoginStore } from "../db/login-store";
 
@@ -25,16 +26,6 @@ function errorResponse(code: string, message: string, issues: unknown[] = []) {
 
 function isLoginInput(value: unknown): value is { username?: unknown } {
   return typeof value === "object" && value !== null;
-}
-
-function refreshCookie(token: string): string {
-  return [
-    `refreshToken=${token}`,
-    `Max-Age=${REFRESH_TOKEN_TTL_SECONDS}`,
-    "HttpOnly",
-    "Secure",
-    "SameSite=Lax"
-  ].join("; ");
 }
 
 export async function registerLoginRoute(
@@ -119,7 +110,7 @@ export async function registerLoginRoute(
     // Browser requests carry Origin and keep the refresh JWT exclusively in an HttpOnly cookie.
     // Native clients omit Origin and receive it in the body for secure platform storage.
     if (request.headers.origin !== undefined) {
-      return response.header("set-cookie", refreshCookie(refreshToken)).send(responseBody);
+      return response.header("set-cookie", refreshTokenCookie(refreshToken)).send(responseBody);
     }
     return response.send({ ...responseBody, refreshToken });
   });
