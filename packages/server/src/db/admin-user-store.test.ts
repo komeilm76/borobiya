@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AdminUserListQuery } from "@borobiya/shared";
 import type { Database } from "./client";
-import { DrizzleAdminUserStore, type AdminUserRecord } from "./admin-user-store";
+import {
+  DrizzleAdminUserStore,
+  type AdminUserRecord
+} from "./admin-user-store";
 import { adminAuditLog, userSessions, users } from "./schema";
 
 function makeStore(returnedUsers: unknown[]) {
@@ -28,6 +32,38 @@ function makeStore(returnedUsers: unknown[]) {
     get insertedTable() { return insertedTable; },
     get insertedValues() { return insertedValues; },
     get conflictTarget() { return conflictTarget; }
+  };
+}
+
+class ReadQueryBuilder implements PromiseLike<unknown> {
+  readonly from = vi.fn((_table: unknown) => this);
+  readonly where = vi.fn((_condition?: unknown) => this);
+  readonly orderBy = vi.fn((..._order: unknown[]) => this);
+  readonly limit = vi.fn((_limit: number) => this);
+  readonly offset = vi.fn((_offset: number) => this);
+
+  constructor(private readonly result: unknown) {}
+
+  then<TResult1 = unknown, TResult2 = never>(
+    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve(this.result).then(onfulfilled, onrejected);
+  }
+}
+
+function makeReadStore(results: unknown[][]) {
+  const builders: ReadQueryBuilder[] = [];
+  const select = vi.fn((_selection: unknown) => {
+    const builder = new ReadQueryBuilder(results[builders.length] ?? []);
+    builders.push(builder);
+    return builder;
+  });
+  const database = { select } as unknown as Database;
+  return {
+    store: new DrizzleAdminUserStore(database),
+    select,
+    builders
   };
 }
 
@@ -107,6 +143,68 @@ const createdUser: AdminUserRecord = {
 const adminId = "81e5295a-9381-4bc5-844c-3cf0f52df30e";
 
 describe("DrizzleAdminUserStore", () => {
+  it("searches users by username/status and returns stable paginated results", async () => {
+    const mocks = makeReadStore([[{ total: 6 }], [createdUser]]);
+    const query: AdminUserListQuery = {
+      q: "ali%_",
+      isActive: false,
+      hasCategory: false,
+      page: 2,
+      limit: 5
+    };
+    const result = await mocks.store.listUsers(query);
+
+    expect(result).toEqual({
+      items: [createdUser],
+      total: 6,
+      page: 2,
+      limit: 5,
+      totalPages: 2
+    });
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(mocks.builders[0]?.where).toHaveBeenCalledOnce();
+    expect(mocks.builders[1]?.where).toHaveBeenCalledOnce();
+    expect(mocks.builders[1]?.orderBy).toHaveBeenCalledOnce();
+    expect(mocks.builders[1]?.limit).toHaveBeenCalledWith(5);
+    expect(mocks.builders[1]?.offset).toHaveBeenCalledWith(5);
+  });
+
+  it("returns no users for hasCategory=true until category assignments are introduced", async () => {
+    const mocks = makeReadStore([]);
+    const result = await mocks.store.listUsers({ hasCategory: true, page: 3, limit: 10 });
+
+    expect(result).toEqual({ items: [], total: 0, page: 3, limit: 10, totalPages: 0 });
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("returns account devices and marks only the requesting admin's session as current", async () => {
+    const sessionId = "81e5295a-9381-4bc5-844c-3cf0f52df30e";
+    const session = {
+      id: sessionId,
+      deviceName: "Firefox on Linux",
+      ip: "192.0.2.4",
+      lastActiveAt: createdUser.createdAt,
+      isOnline: true
+    };
+    const mocks = makeReadStore([[createdUser], [session]]);
+    const result = await mocks.store.getUserDetails(createdUser.id, sessionId);
+
+    expect(result).toEqual({
+      ...createdUser,
+      devices: [{ ...session, isCurrentDevice: true }],
+      missions: []
+    });
+    expect(mocks.select).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null without querying device sessions when the user is missing", async () => {
+    const mocks = makeReadStore([[]]);
+    const result = await mocks.store.getUserDetails(createdUser.id, "81e5295a-9381-4bc5-844c-3cf0f52df30e");
+
+    expect(result).toBeNull();
+    expect(mocks.select).toHaveBeenCalledOnce();
+  });
+
   it("persists only the user row, requires question completion, and leaves the active default intact", async () => {
     const mocks = makeStore([createdUser]);
     const result = await mocks.store.createAdminCreatedUser({

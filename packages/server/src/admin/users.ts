@@ -1,7 +1,12 @@
 import { apiRoutes } from "@borobiya/shared/api";
-import { createAdminUserSchema, idParamsSchema, toggleActiveSchema } from "@borobiya/shared";
+import {
+  adminUserListQuerySchema,
+  createAdminUserSchema,
+  idParamsSchema,
+  toggleActiveSchema
+} from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { AdminUserRecord, AdminUserStore } from "../db/admin-user-store";
+import type { AdminUserDetailRecord, AdminUserRecord, AdminUserStore } from "../db/admin-user-store";
 import { hashPassword as argon2HashPassword } from "../security/password";
 import { verifyAccessToken, type SessionTokenIdentity } from "../security/tokens";
 import type { PasswordHasher } from "../auth/register";
@@ -78,13 +83,76 @@ function profilePayload(user: AdminUserRecord) {
   };
 }
 
+function detailPayload(user: AdminUserDetailRecord) {
+  return {
+    ...profilePayload(user),
+    devices: user.devices.map((device) => ({
+      ...device,
+      lastActiveAt: device.lastActiveAt.toISOString()
+    })),
+    missions: user.missions
+  };
+}
+
 export async function registerAdminUserRoutes(
   app: FastifyInstance,
   dependencies: AdminUsersRouteDependencies
 ): Promise<void> {
   const hashPassword = dependencies.hashPassword ?? argon2HashPassword;
+  const listRoute = apiRoutes.admin.listUsers;
+  const detailRoute = apiRoutes.admin.getUser;
   const createRoute = apiRoutes.admin.createUser;
   const statusRoute = apiRoutes.admin.updateUserStatus;
+
+  app.get(listRoute.url, async (request, reply) => {
+    const identity = await authorizeAdmin(request, reply, dependencies);
+    if (!identity) return;
+
+    const parsed = adminUserListQuerySchema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.code(400).send(errorResponse(
+        "VALIDATION_ERROR",
+        "Query validation failed.",
+        parsed.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      ));
+    }
+
+    const result = await dependencies.store.listUsers(parsed.data);
+    return reply
+      .code(200)
+      .header("cache-control", "no-store")
+      .send({
+        items: result.items.map(profilePayload),
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages
+      });
+  });
+
+  app.get(detailRoute.url, async (request, reply) => {
+    const identity = await authorizeAdmin(request, reply, dependencies);
+    if (!identity) return;
+
+    const parsedParams = idParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return reply.code(400).send(errorResponse(
+        "VALIDATION_ERROR",
+        "Path parameter validation failed.",
+        parsedParams.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      ));
+    }
+
+    const user = await dependencies.store.getUserDetails(parsedParams.data.id, identity.sessionId);
+    if (!user) {
+      return reply.code(404).send(errorResponse("USER_NOT_FOUND", "The requested user does not exist."));
+    }
+
+    return reply
+      .code(200)
+      .header("cache-control", "no-store")
+      .send(detailPayload(user));
+  });
 
   app.post(createRoute.url, async (request, reply) => {
     const identity = await authorizeAdmin(request, reply, dependencies);

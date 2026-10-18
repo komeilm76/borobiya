@@ -71,7 +71,7 @@ export const adminRoutes = {
     url: "/_admin/users/:id",
     schema: {
       params: uuidPathParamsSchema,
-      responses: { 200: adminUserDetailSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: adminUserDetailSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "adminGetUser",

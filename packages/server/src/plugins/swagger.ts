@@ -21,6 +21,8 @@ const implementedOperationIds = new Set([
   "authForgotPasswordReset",
   "publicSecurityQuestions",
   "userGetMe",
+  "adminListUsers",
+  "adminGetUser",
   "adminCreateUser",
   "adminUpdateUserStatus",
   "userCompleteSecurityQuestions"
@@ -228,7 +230,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.1.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user creation/status, and authenticated profile/onboarding routes are implemented at runtime; remaining operations are contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, and authenticated profile/onboarding routes are implemented at runtime; remaining operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

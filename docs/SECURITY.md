@@ -135,7 +135,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` and `PATCH /_admin/users/:id/status` verify the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
 
 **Backend policy sketch (shared hooks for future route groups):**
 

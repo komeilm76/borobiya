@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import type { UserRole } from "@borobiya/shared";
+import { and, asc, count, desc, eq, ilike, type SQL } from "drizzle-orm";
+import type { AdminUserListQuery, Mission, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
 import { adminAuditLog, userSessions, users } from "./schema";
 
@@ -19,8 +19,32 @@ export interface AdminUserRecord {
   createdAt: Date;
 }
 
+export interface AdminUserDeviceRecord {
+  id: string;
+  deviceName: string | null;
+  ip: string | null;
+  isCurrentDevice: boolean;
+  lastActiveAt: Date;
+  isOnline: boolean;
+}
+
+export interface AdminUserDetailRecord extends AdminUserRecord {
+  devices: AdminUserDeviceRecord[];
+  missions: Mission[];
+}
+
+export interface AdminUserListResult {
+  items: AdminUserRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface AdminUserStore {
   findAdminActorById(id: string): Promise<AdminActorRecord | null>;
+  listUsers(query: AdminUserListQuery): Promise<AdminUserListResult>;
+  getUserDetails(id: string, currentSessionId: string): Promise<AdminUserDetailRecord | null>;
   createAdminCreatedUser(input: {
     username: string;
     passwordHash: string;
@@ -43,7 +67,11 @@ const adminUserSelection = {
   createdAt: users.createdAt
 };
 
-/** Drizzle persistence for privileged user creation/status changes and current admin checks. */
+function escapeLikeSearchTerm(value: string): string {
+  return value.replace(/[\\%_]/g, "\\$&");
+}
+
+/** Drizzle persistence for privileged user lookups/status changes and current admin checks. */
 export class DrizzleAdminUserStore implements AdminUserStore {
   constructor(private readonly db: Database) {}
 
@@ -54,6 +82,75 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       .where(eq(users.id, id))
       .limit(1);
     return matchingUsers[0] ?? null;
+  }
+
+  async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
+    // Category membership is introduced in T3.1.1; until then every persisted account is unassigned.
+    if (query.hasCategory === true) {
+      return { items: [], total: 0, page: query.page, limit: query.limit, totalPages: 0 };
+    }
+
+    const conditions: SQL[] = [];
+    if (query.q) {
+      conditions.push(ilike(users.username, `%${escapeLikeSearchTerm(query.q)}%`));
+    }
+    if (query.isActive !== undefined) {
+      conditions.push(eq(users.isActive, query.isActive));
+    }
+    const where = and(...conditions);
+
+    const [countResult] = await this.db
+      .select({ total: count() })
+      .from(users)
+      .where(where);
+    const total = countResult?.total ?? 0;
+    const items = await this.db
+      .select(adminUserSelection)
+      .from(users)
+      .where(where)
+      .orderBy(desc(users.createdAt), asc(users.id))
+      .limit(query.limit)
+      .offset((query.page - 1) * query.limit);
+
+    return {
+      items,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit)
+    };
+  }
+
+  async getUserDetails(id: string, currentSessionId: string): Promise<AdminUserDetailRecord | null> {
+    const matchingUsers = await this.db
+      .select(adminUserSelection)
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    const user = matchingUsers[0];
+    if (!user) return null;
+
+    const sessions = await this.db
+      .select({
+        id: userSessions.id,
+        deviceName: userSessions.deviceName,
+        ip: userSessions.ip,
+        lastActiveAt: userSessions.lastActiveAt,
+        isOnline: userSessions.isOnline
+      })
+      .from(userSessions)
+      .where(eq(userSessions.userId, id))
+      .orderBy(desc(userSessions.lastActiveAt), asc(userSessions.id));
+
+    return {
+      ...user,
+      devices: sessions.map((session) => ({
+        ...session,
+        isCurrentDevice: session.id === currentSessionId
+      })),
+      // Missions cannot exist until their SOS domain table is added in T3.5.1.
+      missions: []
+    };
   }
 
   async createAdminCreatedUser(input: {

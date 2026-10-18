@@ -87,6 +87,8 @@ describe("Fastify server skeleton", () => {
     const forgotRequest = paths["/_auth/forgot-password/request"]?.post;
     const forgotVerify = paths["/_auth/forgot-password/verify"]?.post;
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
+    const adminListUsers = paths["/_admin/users"]?.get;
+    const adminGetUser = paths["/_admin/users/{id}"]?.get;
     const adminCreateUser = paths["/_admin/users"]?.post;
     const adminUpdateUserStatus = paths["/_admin/users/{id}/status"]?.patch;
     const completeSecurityQuestions = paths["/_user/complete-security-questions"]?.post;
@@ -131,6 +133,36 @@ describe("Fastify server skeleton", () => {
     expect(forgotVerify?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
     expect(forgotReset?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(forgotReset?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
+    expect(adminListUsers?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(adminListUsers?.["x-borobiya-access"]).toBe("admin");
+    expect(adminListUsers?.security).toEqual([{ bearerAuth: [] }]);
+    expect(adminListUsers?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(adminListUsers?.parameters).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "q", in: "query", required: false }),
+      expect.objectContaining({ name: "isActive", in: "query", required: false }),
+      expect.objectContaining({ name: "hasCategory", in: "query", required: false }),
+      expect.objectContaining({ name: "page", in: "query", required: false }),
+      expect.objectContaining({ name: "limit", in: "query", required: false })
+    ]));
+    expect(adminGetUser?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(adminGetUser?.["x-borobiya-access"]).toBe("admin");
+    expect(adminGetUser?.security).toEqual([{ bearerAuth: [] }]);
+    expect(adminGetUser?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      404: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(adminGetUser?.responses).toHaveProperty("200.content.application/json.schema.properties.devices");
+    expect(adminGetUser?.responses).toHaveProperty("200.content.application/json.schema.properties.missions");
     expect(adminCreateUser?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(adminCreateUser?.["x-borobiya-access"]).toBe("admin");
     expect(adminCreateUser?.security).toEqual([{ bearerAuth: [] }]);
@@ -241,6 +273,16 @@ describe("Fastify server skeleton", () => {
     const missingAdminToken = await app.inject({ method: "POST", url: "/_admin/users", payload: {} });
     expect(missingAdminToken.statusCode).toBe(401);
     expect(missingAdminToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingAdminListToken = await app.inject({ method: "GET", url: "/_admin/users" });
+    const missingAdminDetailToken = await app.inject({
+      method: "GET",
+      url: "/_admin/users/00000000-0000-4000-8000-000000000001"
+    });
+    expect(missingAdminListToken.statusCode).toBe(401);
+    expect(missingAdminListToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+    expect(missingAdminDetailToken.statusCode).toBe(401);
+    expect(missingAdminDetailToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
 
     const missingAdminStatusToken = await app.inject({
       method: "PATCH",

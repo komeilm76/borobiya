@@ -41,7 +41,7 @@ export interface FastifyAppDependencies {
   loginStore?: UserLoginStore;
   /** Override password-recovery persistence in tests; production defaults to the configured PostgreSQL database. */
   recoveryStore?: UserRecoveryStore;
-  /** Override admin user creation and current admin-account checks in tests. */
+  /** Override admin user management queries/mutations and current admin-account checks in tests. */
   adminUserStore?: AdminUserStore;
   /** Override user authorization/onboarding persistence in tests. */
   securityQuestionsStore?: UserSecurityQuestionsStore;

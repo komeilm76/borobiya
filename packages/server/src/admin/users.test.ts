@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
-import type { AdminActorRecord, AdminUserRecord, AdminUserStore } from "../db/admin-user-store";
+import type {
+  AdminActorRecord,
+  AdminUserDetailRecord,
+  AdminUserListResult,
+  AdminUserRecord,
+  AdminUserStore
+} from "../db/admin-user-store";
 import { registerAdminUserRoutes } from "./users";
 import { signAccessToken, signRefreshToken } from "../security/tokens";
 
@@ -25,6 +31,18 @@ const defaultCreatedUser: AdminUserRecord = {
   avgRating: null,
   createdAt
 };
+const defaultUsersPage: AdminUserListResult = {
+  items: [defaultCreatedUser],
+  total: 1,
+  page: 1,
+  limit: 20,
+  totalPages: 1
+};
+const defaultUserDetail: AdminUserDetailRecord = {
+  ...defaultCreatedUser,
+  devices: [],
+  missions: []
+};
 const activeAdmin: AdminActorRecord = { role: "admin", isActive: true, isSuspended: false };
 const validBody = { username: "new_responder", password: "CorrectHorseBattery9" };
 const apps: FastifyInstance[] = [];
@@ -35,18 +53,26 @@ afterEach(async () => {
 
 function makeStore(options: {
   actor?: AdminActorRecord | null;
+  listResult?: AdminUserListResult;
+  userDetail?: AdminUserDetailRecord | null;
   createdUser?: AdminUserRecord | null;
   statusUser?: AdminUserRecord | null;
 } = {}) {
   const actor = options.actor === undefined ? activeAdmin : options.actor;
+  const listResult = options.listResult === undefined ? defaultUsersPage : options.listResult;
+  const userDetail = options.userDetail === undefined ? defaultUserDetail : options.userDetail;
   const createdUser = options.createdUser === undefined ? defaultCreatedUser : options.createdUser;
   const statusUser = options.statusUser === undefined ? { ...defaultCreatedUser, isActive: false } : options.statusUser;
   const findAdminActorById = vi.fn<AdminUserStore["findAdminActorById"]>(async () => actor);
+  const listUsers = vi.fn<AdminUserStore["listUsers"]>(async () => listResult);
+  const getUserDetails = vi.fn<AdminUserStore["getUserDetails"]>(async () => userDetail);
   const createAdminCreatedUser = vi.fn<AdminUserStore["createAdminCreatedUser"]>(async () => createdUser);
   const updateUserActiveStatus = vi.fn<AdminUserStore["updateUserActiveStatus"]>(async () => statusUser);
   return {
-    store: { findAdminActorById, createAdminCreatedUser, updateUserActiveStatus },
+    store: { findAdminActorById, listUsers, getUserDetails, createAdminCreatedUser, updateUserActiveStatus },
     findAdminActorById,
+    listUsers,
+    getUserDetails,
     createAdminCreatedUser,
     updateUserActiveStatus
   };
@@ -85,6 +111,150 @@ async function expiredAdminToken() {
     .setExpirationTime(issuedAt + 30)
     .sign(new TextEncoder().encode(jwtSecret));
 }
+
+describe("GET /_admin/users", () => {
+  it("validates filters and pagination, then returns a no-store profile page", async () => {
+    const result: AdminUserListResult = {
+      items: [defaultCreatedUser],
+      total: 6,
+      page: 2,
+      limit: 5,
+      totalPages: 2
+    };
+    const mocks = makeStore({ listResult: result });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "GET",
+      url: "/_admin/users?q=%20responder%20&isActive=false&hasCategory=false&page=2&limit=5",
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      items: [{
+        id: defaultCreatedUser.id,
+        username: defaultCreatedUser.username,
+        role: "user",
+        mustCompleteSecurityQuestions: true,
+        isActive: true,
+        avgRating: null,
+        createdAt: createdAt.toISOString()
+      }],
+      total: 6,
+      page: 2,
+      limit: 5,
+      totalPages: 2
+    });
+    expect(mocks.listUsers).toHaveBeenCalledWith({
+      q: "responder",
+      isActive: false,
+      hasCategory: false,
+      page: 2,
+      limit: 5
+    });
+  });
+
+  it("rejects invalid query parameters and non-admin requests before listing", async () => {
+    const mocks = makeStore();
+    const { app } = await makeApp(mocks.store);
+    const invalidQuery = await app.inject({
+      method: "GET",
+      url: "/_admin/users?isActive=perhaps",
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+    const guestRequest = await app.inject({ method: "GET", url: "/_admin/users" });
+
+    expect(invalidQuery.statusCode).toBe(400);
+    expect(invalidQuery.json().code).toBe("VALIDATION_ERROR");
+    expect(guestRequest.statusCode).toBe(401);
+    expect(guestRequest.json().code).toBe("UNAUTHORIZED");
+    expect(mocks.listUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /_admin/users/:id", () => {
+  const targetId = randomUUID();
+
+  it("returns a user's profile, devices, and missions", async () => {
+    const sessionId = randomUUID();
+    const detail: AdminUserDetailRecord = {
+      ...defaultCreatedUser,
+      id: targetId,
+      devices: [{
+        id: sessionId,
+        deviceName: "Firefox on Linux",
+        ip: "192.0.2.4",
+        isCurrentDevice: false,
+        lastActiveAt: createdAt,
+        isOnline: true
+      }],
+      missions: [{
+        id: randomUUID(),
+        sosRequestId: randomUUID(),
+        rescuerId: targetId,
+        requesterId: randomUUID(),
+        status: "pending",
+        cancelledBy: null,
+        cancellationReasonId: null,
+        cancellationCustomText: null,
+        cancelledAt: null,
+        createdAt: createdAt.toISOString(),
+        updatedAt: createdAt.toISOString()
+      }]
+    };
+    const mocks = makeStore({ userDetail: detail });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "GET",
+      url: `/_admin/users/${targetId}`,
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      id: targetId,
+      username: "new_responder",
+      role: "user",
+      mustCompleteSecurityQuestions: true,
+      isActive: true,
+      avgRating: null,
+      createdAt: createdAt.toISOString(),
+      devices: [{
+        id: sessionId,
+        deviceName: "Firefox on Linux",
+        ip: "192.0.2.4",
+        isCurrentDevice: false,
+        lastActiveAt: createdAt.toISOString(),
+        isOnline: true
+      }],
+      missions: detail.missions
+    });
+    expect(mocks.getUserDetails).toHaveBeenCalledWith(targetId, adminIdentity.sessionId);
+  });
+
+  it("rejects invalid IDs and returns 404 for users that do not exist", async () => {
+    const mocks = makeStore({ userDetail: null });
+    const { app } = await makeApp(mocks.store);
+    const invalidId = await app.inject({
+      method: "GET",
+      url: "/_admin/users/not-a-uuid",
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+    const missingUser = await app.inject({
+      method: "GET",
+      url: `/_admin/users/${randomUUID()}`,
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+
+    expect(invalidId.statusCode).toBe(400);
+    expect(invalidId.json().code).toBe("VALIDATION_ERROR");
+    expect(missingUser.statusCode).toBe(404);
+    expect(missingUser.json().code).toBe("USER_NOT_FOUND");
+    expect(mocks.getUserDetails).toHaveBeenCalledOnce();
+  });
+});
 
 describe("POST /_admin/users", () => {
   it("creates a user without answers and requires security-question completion", async () => {
