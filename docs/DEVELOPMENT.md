@@ -55,11 +55,11 @@ curl http://localhost:8080/docs                 # Swagger UI
 curl http://localhost:8000/health               # Martin
 ```
 
-Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. Use the Vite client at `http://localhost:5173` (see §2.4). The API currently validates `DATABASE_URL` but does not open a database connection, and database migrations/seeds are not implemented yet. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
+Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. Use the Vite client at `http://localhost:5173` (see §2.4). The initial auth-table migration is checked in, but the API does not open a database connection or apply migrations at startup; data seeds remain future work. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
 
 ### 2.3 Database status
 
-PostGIS is created and health-checked by Compose for the upcoming persistence work. The API scaffold does not connect to it. Drizzle Kit can generate SQL from the initial schema with `bun --filter @borobiya/server db:generate`; T1.1.2 will review and commit the initial migration. No `db:migrate`, `db:setup`, or `db:seed` command is wired yet, so do not apply migrations or attempt admin creation until those backlog tasks are complete.
+PostGIS is created and health-checked by Compose. The initial Drizzle migration for `users`, `security_questions`, `user_security_answers`, and `user_sessions` is checked in under `packages/server/drizzle/`. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, or `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither command runs at API startup; the API still does not connect to PostgreSQL. Seeds are not implemented yet, and `db:setup`/`db:seed` remain unwired.
 
 ### 2.4 Client and development loop
 
@@ -197,9 +197,9 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 | `bun run lint` | root | Not wired yet |
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
 | `bun --filter @borobiya/server db:generate` | root | Generates a Drizzle migration from `packages/server/src/db/schema.ts`; does not apply it |
-| `bun run db:setup` | server | Planned with database/migration tasks; not wired yet |
-| `bun run db:migrate` | server | Planned with database/migration tasks; not wired yet |
-| `bun run db:seed` | server | Planned with database/seed tasks; not wired yet |
+| `bun --filter @borobiya/server db:migrate` | root | Applies pending Drizzle migrations to the configured `DATABASE_URL`; not run by API startup |
+| `bun run db:setup` | server | Not wired yet |
+| `bun run db:seed` | server | Planned with T1.1.3; not wired yet |
 | `bun run map:dev` | root | Planned; local Martin scripts are not wired yet |
 | `bun run map:update --region=iran` | map-server | Planned; see MAP_SERVER.md §4 |
 | `bun --filter @borobiya/client generate:api` | root | Fetches `/docs/json` from the running API and writes Zopia modules to `packages/client/src/generated/api/` |
@@ -262,7 +262,7 @@ bun --filter @borobiya/client build
 | Symptom | Fix |
 |---------|-----|
 | API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; the current API validates it but does not connect to PostgreSQL |
-| `relation "users" does not exist` | Persistence/migrations are not implemented yet; see the T1.1 database tasks |
+| `relation "users" does not exist` | The migration is checked in but is not applied automatically; start PostgreSQL and run `bun --filter @borobiya/server db:migrate` against the intended `DATABASE_URL` |
 | Map blank, 404 tiles/styles | Expected until map data and style assets are added; `docker compose logs map-server` checks Martin startup |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |
 | `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/_user/complete-security-questions` |

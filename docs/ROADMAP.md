@@ -50,7 +50,8 @@ gantt
 - [x] Select Drizzle ORM + Postgres.js and scaffold initial auth/account schema (ADR-011) — completed 2026-10-18
 
 ### M1.2 Auth System
-- [ ] `security_questions` seed (15), `user_security_answers` table
+- [x] Initial `users`, `security_questions`, `user_security_answers`, and `user_sessions` schema/migration — T1.1.1–T1.1.2 completed 2026-10-18
+- [ ] `security_questions` seed (15) + `cancellation_reasons` seed
 - [ ] `POST /_auth/register` — 5 unique Q validation (zod superRefine)
 - [ ] `POST /_auth/login` — username+password only, argon2id, rate-limit 5/15m
 - [ ] Forgot flow: request → verify (server picks 3/5) → reset (10m token)

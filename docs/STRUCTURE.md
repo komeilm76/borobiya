@@ -115,6 +115,7 @@ packages/shared/
 ```text
 packages/server/
 ├── Dockerfile                # workspace-aware Bun API image
+├── drizzle/                  # checked-in SQL migrations, journal, and schema snapshots
 ├── drizzle.config.ts         # Drizzle Kit schema/migration configuration
 ├── package.json              # Fastify, Drizzle, Postgres.js, security plugins, and Swagger
 ├── tsconfig.json
@@ -133,7 +134,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. Auth/domain handlers, the first SQL migration, seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
+The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. The initial SQL migration is checked in, but auth/domain handlers, seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
 
 ---
 
@@ -210,8 +211,8 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 ## 8. Database Migrations
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
-- Initial Drizzle schema declarations cover `users`, `security_questions`, `user_security_answers`, and `user_sessions`; `bun --filter @borobiya/server db:generate` generates a migration into `packages/server/drizzle/`.
-- T1.1.1 does not apply a migration or connect the API at startup. The first reviewed migration and runtime database wiring remain follow-up work under T1.1.2.
+- Initial Drizzle schema declarations and the checked-in T1.1.2 migration cover `users`, `security_questions`, `user_security_answers`, and `user_sessions` under `packages/server/drizzle/`.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations to `DATABASE_URL`. Neither is run by Fastify startup; the API database connection remains future work.
 
 ---
 
@@ -277,8 +278,8 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] Root `bun run dev` orchestration for API + client
 - [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
 - [x] `.env.example`, `.gitignore`, and Docker build exclusions
-- [x] Drizzle/Postgres.js decision, initial schema declarations, and Drizzle Kit config
-- [ ] First SQL migration, API database connection, auth handlers, and seeds
+- [x] Drizzle/Postgres.js decision, initial schema declarations/config, and first SQL migration
+- [ ] API database connection, auth handlers, and seeds
 - [ ] Map tile/style/routing/geocoding data and generation pipeline
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

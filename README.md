@@ -935,7 +935,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 ### 20.1. Production (Ubuntu)
 - OS: **Ubuntu 22.04/24.04 LTS**
 - A local **Compose scaffold** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, and Nginx. Host ports bind to loopback; Nginx is HTTP-only on port 8080. It is not yet a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
-- Secrets via `.env` (never commit). The API currently validates `DATABASE_URL` but does not connect to the database; migrations/seeds are future work. The map server has no bundled tile/style/routing/geocoding assets yet.
+- Secrets via `.env` (never commit). The API currently validates `DATABASE_URL` but does not connect to the database. The initial auth-table SQL migration is checked in but is not applied at startup; data seeds are future work. The map server has no bundled tile/style/routing/geocoding assets yet.
 
 ### 20.2. Development (Windows without Docker)
 - Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is optional until persistence tasks are implemented.

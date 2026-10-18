@@ -8,7 +8,8 @@
     "start": "bun src/server.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",
-    "db:generate": "drizzle-kit generate --config=drizzle.config.ts"
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
   },
   "dependencies": {
     "@borobiya/shared": "workspace:*",
