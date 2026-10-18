@@ -58,6 +58,7 @@ describe("Fastify server skeleton", () => {
     const forgotVerify = paths["/_auth/forgot-password/verify"]?.post;
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
     const adminCreateUser = paths["/_admin/users"]?.post;
+    const completeSecurityQuestions = paths["/_user/complete-security-questions"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -142,6 +143,18 @@ describe("Fastify server skeleton", () => {
         createdAt: expect.any(Object)
       }
     });
+    expect(completeSecurityQuestions?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(completeSecurityQuestions?.["x-borobiya-access"]).toBe("authenticated");
+    expect(completeSecurityQuestions?.security).toEqual([{ bearerAuth: [] }]);
+    expect(completeSecurityQuestions?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      409: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(completeSecurityQuestions?.requestBody).toHaveProperty("content.application/json.schema.properties.securityQuestions");
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -167,6 +180,14 @@ describe("Fastify server skeleton", () => {
     const missingAdminToken = await app.inject({ method: "POST", url: "/_admin/users", payload: {} });
     expect(missingAdminToken.statusCode).toBe(401);
     expect(missingAdminToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingUserToken = await app.inject({
+      method: "POST",
+      url: "/_user/complete-security-questions",
+      payload: {}
+    });
+    expect(missingUserToken.statusCode).toBe(401);
+    expect(missingUserToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("advertises the gateway API prefix while retaining the direct API server", async () => {
@@ -201,10 +222,22 @@ describe("Fastify server skeleton", () => {
       url: "/_public/health",
       headers: { origin: "https://untrusted.example" }
     });
+    const preflight = await app.inject({
+      method: "OPTIONS",
+      url: "/_user/me",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "authorization"
+      }
+    });
 
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
     expect(allowed.headers["access-control-allow-credentials"]).toBe("true");
     expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(preflight.statusCode).toBe(204);
+    expect(preflight.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(preflight.headers["access-control-allow-headers"]).toContain("authorization");
   });
 
   it("ignores spoofed forwarded IP headers unless the proxy is trusted", async () => {

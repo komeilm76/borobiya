@@ -4,11 +4,21 @@ import { describe, expect, it } from "vitest";
 import {
   passwordResetChallenges,
   passwordResetTokens,
+  userSecurityAnswers,
   userSessions,
   users
 } from "./schema";
 
 describe("users database schema", () => {
+  it("declares one answer per user/question with both foreign keys", () => {
+    const config = getTableConfig(userSecurityAnswers);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(config.uniqueConstraints.some(({ name }) => name === "user_security_answers_user_question_unique")).toBe(true);
+    expect(config.foreignKeys).toHaveLength(2);
+    expect(columns.get("answer_hash")?.notNull).toBe(true);
+  });
+
   it("declares account flags, bounded ratings, and indexed PostGIS location", () => {
     const config = getTableConfig(users);
     const columns = new Map(config.columns.map((column) => [column.name, column]));

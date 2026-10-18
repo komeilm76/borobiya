@@ -50,12 +50,8 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - Every created account has `mustCompleteSecurityQuestions=true`. The handler returns the standard user profile and reports duplicate usernames as `409 USERNAME_TAKEN`.
 - The route verifies a signed, unexpired HS256 access JWT with `tokenUse: "access"`, requires the admin role, then checks the current admin record remains admin, active, and unsuspended. A verified token with an inactive, suspended, or demoted account is denied.
 - Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
-- **T1.2.6 remains pending:** middleware on every other `/_user/*` request must block incomplete accounts:
-  ```ts
-  if (req.user.mustCompleteSecurityQuestions && req.url !== "/_user/complete-security-questions") {
-    throw { status: 403, code: "SECURITY_QUESTIONS_REQUIRED" };
-  }
-  ```
+- `POST /_user/complete-security-questions` accepts five unique IDs from the seeded catalog, normalizes answers with `trim().toLowerCase()`, stores Argon2id hashes, and atomically clears the flag only after all five rows are stored. Repeated requests do not overwrite completed answers and return `409 SECURITY_QUESTIONS_ALREADY_COMPLETED`.
+- A Fastify `/_user` authorization hook verifies the signed/unexpired access token and current user role/account state. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
 - The frontend task remains pending: force redirect to `/_user/complete-security-questions` when the returned user flag is true.
 
 ---
@@ -132,7 +128,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` currently verifies access-token signature/expiry/use, admin role, and current admin account state in its handler; broad `_user` middleware and other admin handlers remain pending.
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` verifies the admin token and current admin account state, while a `/_user` authorization hook checks access-token validity, current user role/account state, and the onboarding flag. Other admin handlers and broad frontend guards remain pending.
 
 **Backend policy sketch (shared hooks for future route groups):**
 

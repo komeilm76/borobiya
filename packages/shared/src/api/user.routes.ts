@@ -53,7 +53,13 @@ export const userRoutes = {
     url: "/_user/complete-security-questions",
     schema: {
       body: completeSecurityQuestionsSchema,
-      responses: { 200: completeSecurityQuestionsResponseSchema, 400: errorSchema, 401: errorSchema }
+      responses: {
+        200: completeSecurityQuestionsResponseSchema,
+        400: errorSchema,
+        401: errorSchema,
+        403: errorSchema,
+        409: errorSchema
+      }
     },
     meta: {
       operationId: "userCompleteSecurityQuestions",

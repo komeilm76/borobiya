@@ -3,6 +3,7 @@ import {
   forgotPasswordQuestionsResponseSchema,
   forgotPasswordRequestSchema,
   forgotPasswordResetSchema,
+  completeSecurityQuestionsSchema,
   forgotPasswordVerifySchema,
   loginResponseSchema,
   loginSchema,
@@ -41,6 +42,14 @@ describe("auth schemas", () => {
     duplicateQuestions[4] = { ...duplicateQuestions[4]!, questionId: questionIds[0]! };
 
     expect(registerSchema.safeParse({ ...validRegistration, securityQuestions: duplicateQuestions }).success).toBe(false);
+  });
+
+  it("requires five unique answers for security-question onboarding", () => {
+    const securityQuestions = validRegistration.securityQuestions;
+    expect(completeSecurityQuestionsSchema.safeParse({ securityQuestions }).success).toBe(true);
+    expect(completeSecurityQuestionsSchema.safeParse({
+      securityQuestions: [securityQuestions[0], securityQuestions[1], securityQuestions[2], securityQuestions[3], securityQuestions[0]]
+    }).success).toBe(false);
   });
 
   it("enforces the documented password policy and confirmation", () => {

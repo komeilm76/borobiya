@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers currently include `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, and admin-only `POST /_admin/users`; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers currently include `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `POST /_admin/users`, and `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -40,7 +40,7 @@ Error shape (uniform):
 |--------|------|-----|--------------|----------------|---------|
 | `/_auth` | **Guest only** | Not logged in | If JWT present → `403 ALREADY_AUTHENTICATED` | `if loggedIn → redirect /_user/dashboard` | `POST /_auth/login` |
 | `/_public` | Open | Everyone | None (optional auth pass-through) | None | `GET /_public/incident-types` |
-| `/_user` | Required `user` | Authed users (+ admin may opt-in) | `authenticate` + `authorize(['user','admin'])` | Require login → `/_auth/login` | `POST /_user/sos/requests` |
+| `/_user` | Required `user` | Authed users (+ admin may opt-in) | Access-JWT verification and current account-state checks; incomplete accounts may only complete security questions | Require login → `/_auth/login`; incomplete account → onboarding | `POST /_user/complete-security-questions` |
 | `/_admin` | Required `admin` | Admins only | Access-JWT verification and role authorization; `POST /_admin/users` also checks current role/active/suspended state | Role/state check → `401`/`403` | `POST /_admin/users` |
 
 > Decision to document: Does `admin` role allow `/_user/*`? Spec says “_user — Only authenticated users”; recommended: allow `admin` to call `_user` (useful for debugging), but explicitly document: **Admin can call `_user` endpoints** (since they are users too). Alternatively restrict to `user` only — pick one and keep consistent.
@@ -190,6 +190,8 @@ PATCH  /_user/me                         Body { username? } // limited fields
 GET    /_user/devices                    → [{ id, deviceName, ip, isCurrentDevice, lastActiveAt, isOnline }]
 POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ```
+
+`POST /_user/complete-security-questions` requires an access JWT, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The remaining `_user` operations shown here are still contract-only.
 
 ### 5.2 User Search
 
@@ -384,10 +386,11 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 403 | `FORBIDDEN` | Wrong role (generic contract code) |
 | 403 | `ADMIN_REQUIRED` | A verified access token or current account does not have the admin role |
 | 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
-| 403 | `ACCOUNT_INACTIVE` | Login/refresh or admin operation for a deactivated account |
-| 403 | `ACCOUNT_SUSPENDED` | Login/refresh or admin operation for a suspended account |
-| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks `_user` |
+| 403 | `ACCOUNT_INACTIVE` | Login/refresh or authenticated operation for a deactivated account |
+| 403 | `ACCOUNT_SUSPENDED` | Login/refresh or authenticated operation for a suspended account |
+| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks non-onboarding `_user` routes |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
+| 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
