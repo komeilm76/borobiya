@@ -155,6 +155,7 @@ bun run dev            # concurrently: api:3000 + client:5173
 ```env
 # API
 NODE_ENV=development
+HOST=0.0.0.0
 PORT=3000
 DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
 JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
@@ -198,11 +199,13 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
 | `bun run dev` | root | Concurrent `server` + `client` dev |
-| `bun --filter server dev` | root | API only (`fastify --watch`) |
-| `bun --filter client dev` | root | Vite HMR only |
+| `bun --filter @borobiya/server dev` | root | Fastify API skeleton (`bun --watch`) |
+| `bun --filter @borobiya/server test` | root | Server environment and Fastify inject tests |
+| `bun --filter @borobiya/server typecheck` | root | Strict server TypeScript check |
+| `bun --filter @borobiya/client dev` | root | Vite HMR only (added in T1.0.5) |
 | `bun run build` | root | Build all |
 | `bun run lint` | root | ESLint + `vue-tsc --noEmit` + `tsc --noEmit` |
-| `bun test` / `bun --filter server test` | root/server | Vitest |
+| `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
 | `bun run db:setup` | server | Create DB + migrate + seed |
 | `bun run db:migrate` | server | Run migrations |
 | `bun run db:seed` | server | Seed questions + reasons + admin |
@@ -235,15 +238,19 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 ## 8. Testing
 
 ```bash
-# Available now: shared API contracts
+# Shared API contracts
 bun --filter @borobiya/shared test
 bun --filter @borobiya/shared typecheck
 
-# Server/client test scripts will be added with those workspaces.
+# Fastify server skeleton
+bun --filter @borobiya/server test
+bun --filter @borobiya/server typecheck
+bun --filter @borobiya/server dev
 ```
 
-- Shared-contract tests use Vitest and cover the documented Zod invariants.
-- API tests will use `fastify.inject()` — no HTTP server needed.
+- Shared-contract tests use Vitest and cover the documented Zod invariants and route descriptors.
+- Server tests use `fastify.inject()`; no network listener or database is needed.
+- Before starting the server, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, host/port, and rate-limit values; no database connection is opened yet.
 - Frontend tests will use `@vue/test-utils` + Vitest for stores.
 
 ---

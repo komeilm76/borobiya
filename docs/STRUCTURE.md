@@ -132,19 +132,20 @@ packages/shared/
 
 ```text
 packages/server/
-├── package.json              # name: "@borobiya/server", deps: fastify, pg/postgres, drizzle/prisma, socket.io, zod, argon2
+├── package.json              # Fastify, security plugins, @borobiya/shared, dotenv, zod; DB/socket deps later
 ├── src/
-│   ├── app.ts                # createFastifyApp()
-│   ├── server.ts             # entry: listen
+│   ├── app.ts                # createFastifyApp() + public health route
+│   ├── server.ts             # validated config + listen entrypoint
 │   ├── config/
-│   │   ├── env.ts            # zod-validated env (DATABASE_URL, JWT_SECRET, etc.)
-│   │   ├── cors.ts
-│   │   └── rateLimit.ts
+│   │   ├── env.ts            # Zod-validated host, port, DB URL, secrets, CORS, rate limits
+│   │   └── env.test.ts
 │   ├── plugins/
-│   │   ├── auth.ts           # decorate authenticate + authorize(roles)
-│   │   ├── swagger.ts        # fastify-swagger + zod-to-json-schema
-│   │   ├── socket.ts         # socket.io init + auth middleware
+│   │   ├── security.ts       # Helmet, CORS allowlist, global rate-limit shell
+│   │   ├── auth.ts           # decorate authenticate + authorize(roles), future
+│   │   ├── swagger.ts        # OpenAPI wiring, T1.0.6
+│   │   ├── socket.ts         # socket.io init + auth middleware, future
 │   │   └── errorHandler.ts
+│   ├── app.test.ts           # inject, security headers, CORS, and rate limit
 │   ├── modules/
 │   │   ├── auth/             # routes, service, repository per domain
 │   │   │   ├── auth.routes.ts      # imports api defs from @borobiya/shared
@@ -180,6 +181,7 @@ packages/server/
 ├── drizzle.config.ts / prisma/schema.prisma
 ├── tsconfig.json
 ├── vitest.config.ts
+├── README.md
 └── Dockerfile
 ```
 
@@ -315,6 +317,7 @@ map-server/
 
 ```env
 NODE_ENV=development
+HOST=0.0.0.0
 PORT=3000
 DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
 JWT_SECRET=replace-with-a-random-secret-of-at-least-32-characters

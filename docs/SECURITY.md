@@ -82,7 +82,7 @@ const ok = await argon2.verify(hash, password);
 
 ## 3. Rate Limiting
 
-Via `@fastify/rate-limit` (in-memory dev, Redis `ioredis` prod).
+Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store; Redis-backed production storage is a later scaling task.
 
 | Scope | Limit | Key |
 |-------|-------|-----|
@@ -93,7 +93,7 @@ Via `@fastify/rate-limit` (in-memory dev, Redis `ioredis` prod).
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Config in `src/config/rateLimit.ts`, wired as Fastify `onRoute` hooks.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Route-specific limits (including IP+username and user/device keys) will be added with the auth and feature handlers.
 
 ---
 
@@ -176,7 +176,7 @@ If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can red
 
 ```ts
 await fastify.register(helmet, {
-  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], connectSrc: ["'self'", process.env.MAP_SERVER_URL] } }
+  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], connectSrc: ["'self'"] } }
 });
 fastify.register(cors, {
   origin: (process.env.CORS_ORIGINS || "").split(","), // strict allowlist, not '*'

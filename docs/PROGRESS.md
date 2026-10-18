@@ -4,14 +4,14 @@
 
 ---
 
-## Overall: 10% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 13% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline and first three implementation tasks are complete. Shared schemas and route contracts now exist; the API server, client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first four implementation tasks are complete. Shared schemas, route contracts, and a validated Fastify server skeleton now exist; domain handlers, persistence, the client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 43% | 🟡 T1.0.1–T1.0.3 complete; T1.0.4–T1.0.7 pending |
+| Monorepo scaffold | 57% | 🟡 T1.0.1–T1.0.4 complete; T1.0.5–T1.0.7 pending |
 | Auth & Users | 0% | ⬜ Schemas and route descriptors exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
@@ -24,12 +24,12 @@ The documentation baseline and first three implementation tasks are complete. Sh
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 10%
+### Phase 1 — Foundation (Auth & Map) — 13%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 43% | T1.0.1–T1.0.3 root config, shared Zod schemas, and km-api descriptors done; server runtime wiring remains |
-| Auth system | 0% | Schemas exist; endpoints, persistence, security enforcement, and UI remain |
+| Monorepo + Contracts | 57% | T1.0.1–T1.0.4 root config, shared Zod schemas, km-api descriptors, and Fastify shell done; domain handlers and data wiring remain |
+| Auth system | 0% | Schemas and route contracts exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -81,6 +81,14 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-18 — Fastify server foundation (T1.0.4)
+
+- Added the `@borobiya/server` workspace with Fastify 5, workspace shared contracts, dotenv loading, and Node type support.
+- Added Zod environment validation for `HOST`, `PORT`, PostgreSQL URL, distinct 32+ character JWT secrets, explicit CORS origins, and global rate-limit settings; defaults bind to `0.0.0.0` for container/preview access.
+- Registered Helmet, a strict credentials-aware CORS allowlist, and the global in-memory IP rate limit; added a public health endpoint and sensitive-field log redaction.
+- Added 7 server tests for env validation, health/security headers, CORS, and rate limiting. This is a skeleton only: no database connection, auth middleware, domain handlers, Redis, or OpenAPI wiring yet.
+- Validation: frozen-lockfile install, all shared/server tests and typechecks, and `git diff --check` passed.
 
 ### 2026-10-18 — Shared route descriptors (T1.0.3)
 
