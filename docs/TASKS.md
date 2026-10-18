@@ -37,7 +37,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 ### 1.3 Admin User Management (No Delete!)
 
-- [ ] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + audit log `admin_audit_log`
+- [x] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + transactional audit log `admin_audit_log`, refresh-session revocation on deactivation, and status/no-op handling — completed 2026-10-18
 - [ ] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions)
 - [ ] **T1.3.3** Ensure NO `DELETE /_admin/users/:id` exists (add test that asserts 404 on DELETE)
 - [ ] **T1.3.4** Frontend `_admin/users` table + activate/deactivate toggle + search

@@ -5,6 +5,7 @@ import {
   check,
   customType,
   index,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -89,6 +90,25 @@ export const userSessions = pgTable(
   ]
 );
 
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => users.id),
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: uuid("target_id"),
+    meta: jsonb("meta").$type<{ previousIsActive: boolean; isActive: boolean } | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    index("admin_audit_log_admin_created_at_idx").on(table.adminId, table.createdAt),
+    index("admin_audit_log_target_idx").on(table.targetType, table.targetId)
+  ]
+);
+
 export const passwordResetChallenges = pgTable(
   "password_reset_challenges",
   {
@@ -149,6 +169,7 @@ export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
 export type UserSecurityAnswerRow = typeof userSecurityAnswers.$inferSelect;
 export type UserSessionRow = typeof userSessions.$inferSelect;
+export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
 export type PasswordResetChallengeRow = typeof passwordResetChallenges.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type CancellationReasonRow = typeof cancellationReasons.$inferSelect;

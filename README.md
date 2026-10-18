@@ -802,7 +802,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   bun --filter @borobiya/client generate:api
   ```
 - The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
-- All shared API contracts appear in OpenAPI. Runtime handlers include `GET /_public/health`, `GET /_public/security-questions`, the registration/login/refresh/logout/forgot-password routes, admin-only `POST /_admin/users`, and authenticated `GET /_user/me` plus `POST /_user/complete-security-questions`. The client includes login, registration, recovery, onboarding, and route guards; remaining operations are marked `contract-only` and return 404 until implemented.
+- All shared API contracts appear in OpenAPI. Runtime handlers include `GET /_public/health`, `GET /_public/security-questions`, the registration/login/refresh/logout/forgot-password routes, admin-only `POST /_admin/users` and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` plus `POST /_user/complete-security-questions`. The client includes login, registration, recovery, onboarding, and route guards; remaining operations are marked `contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract

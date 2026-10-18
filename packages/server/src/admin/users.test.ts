@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
-import type { AdminActorRecord, AdminCreatedUserRecord, AdminUserStore } from "../db/admin-user-store";
+import type { AdminActorRecord, AdminUserRecord, AdminUserStore } from "../db/admin-user-store";
 import { registerAdminUserRoutes } from "./users";
 import { signAccessToken, signRefreshToken } from "../security/tokens";
 
@@ -16,7 +16,7 @@ const adminIdentity = {
 };
 const ordinaryUserIdentity = { ...adminIdentity, role: "user" as const };
 const createdAt = new Date("2026-10-18T12:00:00.000Z");
-const defaultCreatedUser: AdminCreatedUserRecord = {
+const defaultCreatedUser: AdminUserRecord = {
   id: randomUUID(),
   username: "new_responder",
   role: "user",
@@ -35,16 +35,20 @@ afterEach(async () => {
 
 function makeStore(options: {
   actor?: AdminActorRecord | null;
-  createdUser?: AdminCreatedUserRecord | null;
+  createdUser?: AdminUserRecord | null;
+  statusUser?: AdminUserRecord | null;
 } = {}) {
   const actor = options.actor === undefined ? activeAdmin : options.actor;
   const createdUser = options.createdUser === undefined ? defaultCreatedUser : options.createdUser;
+  const statusUser = options.statusUser === undefined ? { ...defaultCreatedUser, isActive: false } : options.statusUser;
   const findAdminActorById = vi.fn<AdminUserStore["findAdminActorById"]>(async () => actor);
   const createAdminCreatedUser = vi.fn<AdminUserStore["createAdminCreatedUser"]>(async () => createdUser);
+  const updateUserActiveStatus = vi.fn<AdminUserStore["updateUserActiveStatus"]>(async () => statusUser);
   return {
-    store: { findAdminActorById, createAdminCreatedUser },
+    store: { findAdminActorById, createAdminCreatedUser, updateUserActiveStatus },
     findAdminActorById,
-    createAdminCreatedUser
+    createAdminCreatedUser,
+    updateUserActiveStatus
   };
 }
 
@@ -244,5 +248,98 @@ describe("POST /_admin/users", () => {
 
     expect(response.statusCode).toBe(409);
     expect(response.json().code).toBe("USERNAME_TAKEN");
+  });
+});
+
+describe("PATCH /_admin/users/:id/status", () => {
+  const targetId = randomUUID();
+
+  it("changes the target user's active state and returns the updated profile without hashing anything", async () => {
+    const updatedUser = { ...defaultCreatedUser, id: targetId, isActive: false };
+    const mocks = makeStore({ statusUser: updatedUser });
+    const { app, hashPassword } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/_admin/users/${targetId}/status`,
+      headers: { authorization: `Bearer ${await adminToken()}` },
+      payload: { isActive: false }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual({
+      id: targetId,
+      username: "new_responder",
+      role: "user",
+      mustCompleteSecurityQuestions: true,
+      isActive: false,
+      avgRating: null,
+      createdAt: createdAt.toISOString()
+    });
+    expect(mocks.findAdminActorById).toHaveBeenCalledWith(userId);
+    expect(mocks.updateUserActiveStatus).toHaveBeenCalledWith({
+      adminId: userId,
+      userId: targetId,
+      isActive: false
+    });
+    expect(hashPassword).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ role: "admin", isActive: false, isSuspended: false }, "ACCOUNT_INACTIVE"],
+    [{ role: "admin", isActive: true, isSuspended: true }, "ACCOUNT_SUSPENDED"],
+    [{ role: "user", isActive: true, isSuspended: false }, "ADMIN_REQUIRED"],
+    [null, "ADMIN_REQUIRED"]
+  ] as const)("refuses to update status when the current admin account is not authorized", async (actor, code) => {
+    const mocks = makeStore({ actor });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/_admin/users/${targetId}/status`,
+      headers: { authorization: `Bearer ${await adminToken()}` },
+      payload: { isActive: false }
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json().code).toBe(code);
+    expect(mocks.updateUserActiveStatus).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["invalid target ID", "/_admin/users/not-a-uuid/status", { isActive: false }],
+    ["invalid status body", `/_admin/users/${targetId}/status`, { isActive: "false" }],
+    ["unexpected body field", `/_admin/users/${targetId}/status`, { isActive: false, role: "admin" }]
+  ])("rejects %s with validation error", async (_name, url, payload) => {
+    const mocks = makeStore();
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "PATCH",
+      url,
+      headers: { authorization: `Bearer ${await adminToken()}` },
+      payload
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().code).toBe("VALIDATION_ERROR");
+    expect(mocks.updateUserActiveStatus).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a missing user and does not write status or audit data", async () => {
+    const mocks = makeStore({ statusUser: null });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/_admin/users/${targetId}/status`,
+      headers: { authorization: `Bearer ${await adminToken()}` },
+      payload: { isActive: true }
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json().code).toBe("USER_NOT_FOUND");
+    expect(mocks.updateUserActiveStatus).toHaveBeenCalledWith({
+      adminId: userId,
+      userId: targetId,
+      isActive: true
+    });
   });
 });

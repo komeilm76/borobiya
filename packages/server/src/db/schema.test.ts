@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
+  adminAuditLog,
   passwordResetChallenges,
   passwordResetTokens,
   userSecurityAnswers,
@@ -83,6 +84,32 @@ describe("users database schema", () => {
     expect(migrationSql).toContain('CREATE TABLE "password_reset_challenges"');
     expect(migrationSql).toContain('CREATE TABLE "password_reset_tokens"');
     expect(migrationSql).toContain('CONSTRAINT "password_reset_tokens_token_hash_unique" UNIQUE("token_hash")');
+  });
+
+  it("persists the admin audit trail with an admin foreign key and query indexes", () => {
+    const config = getTableConfig(adminAuditLog);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+    const indexNames = config.indexes.map(({ config: indexConfig }) => indexConfig.name);
+
+    expect(columns.has("id")).toBe(true);
+    expect(columns.get("admin_id")?.notNull).toBe(true);
+    expect(columns.get("action")?.notNull).toBe(true);
+    expect(columns.get("target_type")?.notNull).toBe(false);
+    expect(columns.get("target_id")?.notNull).toBe(false);
+    expect(columns.get("meta")?.getSQLType()).toBe("jsonb");
+    expect(columns.get("created_at")?.notNull).toBe(true);
+    expect(config.foreignKeys).toHaveLength(1);
+    expect(indexNames).toEqual([
+      "admin_audit_log_admin_created_at_idx",
+      "admin_audit_log_target_idx"
+    ]);
+
+    const migrationSql = readFileSync(new URL("../../drizzle/0005_tidy_imperial_guard.sql", import.meta.url), "utf8");
+    expect(migrationSql).toContain('CREATE TABLE "admin_audit_log"');
+    expect(migrationSql).toContain('"admin_id" uuid NOT NULL');
+    expect(migrationSql).toContain('CONSTRAINT "admin_audit_log_admin_id_users_id_fk" FOREIGN KEY ("admin_id")');
+    expect(migrationSql).toContain('"meta" jsonb');
+    expect(migrationSql).toContain('CREATE INDEX "admin_audit_log_admin_created_at_idx"');
   });
 
   it("enables PostGIS before declaring the unquoted geography column", () => {

@@ -6,13 +6,13 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and T1.2.1–T1.2.7 auth, session, recovery, admin creation, security-question onboarding, and frontend guard tasks are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, the auth/session/recovery handlers, public security-question catalog, admin-only `POST /_admin/users`, authenticated `GET /_user/me`, onboarding completion, and client auth pages/guards are live. Live-PostgreSQL verification, remaining auth/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, and T1.3.1 admin user-status task are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user creation and status handlers, authenticated profile/onboarding routes, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 35% | 🟡 Registration, login, refresh/logout, recovery, admin creation, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
+| Auth & Users | 37% | 🟡 Registration, login, refresh/logout, recovery, admin creation/status + audit, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -29,7 +29,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 35% | T1.2.1–T1.2.7 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, 15m/7d access/refresh tokens, atomic refresh rotation/logout, single-use password reset, session revocation, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user handlers remain |
+| Auth system | 37% | T1.2.1–T1.2.7 and T1.3.1 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, admin status changes with transactional auditing/session revocation, 15m/7d access/refresh tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -75,12 +75,18 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 |---|-------|--------|-------|--------|
 | 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh/logout, recovery, admin creation, and onboarding are tested with injected stores; Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth/admin/onboarding flows with PostgreSQL |
+| 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh/logout, recovery, admin creation/status, and onboarding are tested with injected stores; Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth/admin/onboarding flows with PostgreSQL |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
+
+### 2026-10-18 — Admin user status and audit trail (T1.3.1)
+
+- Implemented admin-only `PATCH /_admin/users/:id/status` with signed access-token verification, current-admin role/active/suspended checks, UUID/body validation, idempotent no-op handling, and `USER_NOT_FOUND` responses.
+- Added a Drizzle migration for `admin_audit_log`. Status changes, audit events with before/after active state, and refresh-session revocation on deactivation run in one row-locked transaction; reactivation does not revive old sessions. Updated OpenAPI runtime status, tests, and API/security/structure documentation.
+- Validation: 174 workspace tests (28 shared, 130 server, 16 client), all three typechecks, client production build, a repeat Drizzle generation with no schema changes, and `git diff --check` passed. No live PostgreSQL is available, so migration application and database-backed transaction integration remain unverified.
 
 ### 2026-10-18 — Authentication UI and route guards (T1.2.7)
 

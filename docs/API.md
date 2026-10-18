@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `POST /_admin/users`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `POST /_admin/users` and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -41,7 +41,7 @@ Error shape (uniform):
 | `/_auth` | **Guest only** | Not logged in | If JWT present → `403 ALREADY_AUTHENTICATED` | `if loggedIn → redirect /_user/dashboard` | `POST /_auth/login` |
 | `/_public` | Open | Everyone | None (optional auth pass-through) | None | `GET /_public/incident-types` |
 | `/_user` | Required `user` | Authed users (+ admin may opt-in) | Access-JWT verification and current account-state checks; incomplete accounts may only complete security questions | Require login → `/_auth/login`; incomplete account → onboarding | `POST /_user/complete-security-questions` |
-| `/_admin` | Required `admin` | Admins only | Access-JWT verification and role authorization; `POST /_admin/users` also checks current role/active/suspended state | Role/state check → `401`/`403` | `POST /_admin/users` |
+| `/_admin` | Required `admin` | Admins only | Access-JWT verification and role authorization; user creation/status also recheck current role/active/suspended state | Role/state check → `401`/`403` | `POST /_admin/users` |
 
 > Decision to document: Does `admin` role allow `/_user/*`? Spec says “_user — Only authenticated users”; recommended: allow `admin` to call `_user` (useful for debugging), but explicitly document: **Admin can call `_user` endpoints** (since they are users too). Alternatively restrict to `user` only — pick one and keep consistent.
 
@@ -273,6 +273,8 @@ PATCH /_admin/users/:id/unsuspend
 
 `POST /_admin/users` requires a signed, unexpired access JWT with the `admin` role and rechecks that the current admin account is still an active, unsuspended admin. The password is stored as an Argon2id hash; the new account always has role `user`, defaults to active unless `isActive` is supplied, and is created without any `user_security_answers` rows. Its response sets `mustCompleteSecurityQuestions: true`. It returns `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` for missing or invalid bearer access tokens, `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED` when authorization fails, `400 VALIDATION_ERROR` for invalid bodies, and `409 USERNAME_TAKEN` for a duplicate username.
 
+`PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN`, `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
+
 ### 6.2 Incidents & Categories
 
 ```
@@ -393,7 +395,8 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks non-onboarding `_user` routes |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
-| 404 | `NOT_FOUND` | Unknown id |
+| 404 | `NOT_FOUND` | Unknown id for a generic operation |
+| 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |

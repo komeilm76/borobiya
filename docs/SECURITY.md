@@ -54,6 +54,13 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - A Fastify `/_user` authorization hook verifies the signed/unexpired access token and current user role/account state. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
 - The Vue client now exposes login, registration, forgot-password, and completion forms. It keeps the access token in memory, stores only the minimal non-secret user snapshot in `sessionStorage`, and relies on the HttpOnly refresh cookie to restore sessions. The router keeps `/_auth/*` guest-only, protects `/_user/*` and admin routes, and forces every signed-in user with the onboarding flag through `/_user/complete-security-questions` before other pages. `GET /_user/me` refreshes the profile; the `SECURITY_QUESTIONS_REQUIRED` response preserves onboarding status when the profile endpoint is gated.
 
+### 1.6 Admin User Activation/Deactivation
+
+- `PATCH /_admin/users/:id/status` accepts only `{ isActive: boolean }` and applies the same signed access-token and current active/unsuspended admin checks as user creation.
+- The status update, append-only audit insert, and refresh-session invalidation are one database transaction. The audit event uses `user_activated` or `user_deactivated`, `targetType: "user"`, the target ID, and metadata `{ previousIsActive, isActive }`. Requests that repeat the current state return the profile without writing another event.
+- Deactivation sets `users.is_active=false`, clears every `user_sessions.refresh_token_hash` for that user, and marks those sessions offline. The current protected-route account-state checks reject access tokens for inactive accounts; reactivation does not revive old refresh sessions, so a fresh login is required.
+- Invalid IDs/bodies receive `400 VALIDATION_ERROR`; a missing target receives `404 USER_NOT_FOUND`. The response is `Cache-Control: no-store`. No user-delete route is registered.
+
 ---
 
 ## 2. Tokens & Sessions
@@ -128,7 +135,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` verifies the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `POST /_admin/users` and `PATCH /_admin/users/:id/status` verify the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
 
 **Backend policy sketch (shared hooks for future route groups):**
 
@@ -192,7 +199,7 @@ fastify.register(cors, {
 - **Never log:** `password`, `answer`, `refreshToken`, `resetToken`, `JWT_SECRET`.
 - Env secrets via `.env` (gitignored) + `.env.example` (documented, no real values).
 - In Docker: `env_file: .env`, secrets not baked into image.
-- Audit table: `admin_audit_log(id, adminId, action, targetType, targetId, meta, createdAt)` — for activate/deactivate/unsuspend/dispatch.
+- `admin_audit_log(id, adminId, action, targetType, targetId, meta, createdAt)` is now migrated. Status events write `user_activated`/`user_deactivated` with before/after active-state metadata; unsuspend/dispatch audit events await those handlers.
 
 ---
 

@@ -88,6 +88,7 @@ describe("Fastify server skeleton", () => {
     const forgotVerify = paths["/_auth/forgot-password/verify"]?.post;
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
     const adminCreateUser = paths["/_admin/users"]?.post;
+    const adminUpdateUserStatus = paths["/_admin/users/{id}/status"]?.patch;
     const completeSecurityQuestions = paths["/_user/complete-security-questions"]?.post;
     const publicSecurityQuestions = paths["/_public/security-questions"]?.get;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
@@ -159,6 +160,24 @@ describe("Fastify server skeleton", () => {
       }
     });
     expect(adminCreateUser?.requestBody).not.toHaveProperty("content.application/json.schema.properties.securityQuestions");
+    expect(adminUpdateUserStatus?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(adminUpdateUserStatus?.["x-borobiya-access"]).toBe("admin");
+    expect(adminUpdateUserStatus?.security).toEqual([{ bearerAuth: [] }]);
+    expect(adminUpdateUserStatus?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      404: expect.any(Object),
+      429: expect.any(Object)
+    });
+    expect(adminUpdateUserStatus?.parameters).toContainEqual(expect.objectContaining({
+      name: "id",
+      in: "path",
+      required: true,
+      schema: expect.objectContaining({ type: "string", format: "uuid" })
+    }));
+    expect(adminUpdateUserStatus?.requestBody).toHaveProperty("content.application/json.schema.properties.isActive");
     const adminCreateSuccessResponse = adminCreateUser?.responses as {
       201?: { content?: { "application/json"?: { schema?: unknown } } };
     };
@@ -222,6 +241,14 @@ describe("Fastify server skeleton", () => {
     const missingAdminToken = await app.inject({ method: "POST", url: "/_admin/users", payload: {} });
     expect(missingAdminToken.statusCode).toBe(401);
     expect(missingAdminToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingAdminStatusToken = await app.inject({
+      method: "PATCH",
+      url: "/_admin/users/00000000-0000-4000-8000-000000000001/status",
+      payload: { isActive: false }
+    });
+    expect(missingAdminStatusToken.statusCode).toBe(401);
+    expect(missingAdminStatusToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
 
     const missingUserToken = await app.inject({
       method: "POST",
