@@ -7,7 +7,9 @@ import { loginSchema, registerSchema } from "@borobiya/shared";
 import type { LoginInput, RegisterInput } from "@borobiya/shared";
 ```
 
-Input schemas validate untrusted request data. Security-answer schemas trim surrounding whitespace; the authentication service must still lowercase answers before argon2 hashing and comparison as required by `docs/SECURITY.md`. Server-only rules that depend on database state or environment configuration (such as username uniqueness and the maximum history-sharing window) remain server responsibilities. The geocoding query schema defaults to five results and caps requests at twenty.
+Input schemas validate untrusted request data. Security-answer schemas trim surrounding whitespace; the authentication service must still lowercase answers before argon2 hashing and comparison as required by `docs/SECURITY.md`. Server-only rules that depend on database state or environment configuration (such as username uniqueness and the maximum history-sharing window) remain server responsibilities.
+
+Query schemas coerce URL pagination values to numbers, default to `page=1` and `limit=20`, and cap pagination limits at 100. User search trims `q` to at most 30 characters, accepts `online=true|false`, and requires `lat` and `lon` together. Geocoding trims `q` to 1–200 characters, defaults `limit` to 5 (maximum 20), and parses bounding boxes in `west,south,east,north` order.
 
 Run package checks from the repository root:
 
