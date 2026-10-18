@@ -6,12 +6,12 @@
 
 ## Overall: 17% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline and first six implementation tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, and a Persian-first Vue client shell with namespaced route placeholders now exist; only the health handler is live, while domain handlers, persistence, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first seven implementation tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist; only the health handler is live, while domain handlers, persistence, map assets, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 86% | 🟡 T1.0.1–T1.0.6 complete; T1.0.7 pending |
+| Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 0% | ⬜ Schemas and route descriptors exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
@@ -28,7 +28,7 @@ The documentation baseline and first six implementation tasks are complete. Shar
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 86% | T1.0.1–T1.0.6 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, and OpenAPI/Zopia wiring done; root orchestration remains |
+| Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 0% | Schemas and route contracts exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-18 — Root dev orchestration and Compose scaffold (T1.0.7)
+
+- Added root `bun run dev` using Bun's parallel workspace runner to start the Fastify API and Vite client together, plus an API Dockerfile, Compose services for PostGIS, Martin, API, and Nginx, and a gateway config for `/api`, `/docs`, and `/map`.
+- Added Compose/Postgres host settings to `.env.example` and documented the actual scaffold limits: API config validates a database URL but does not connect, and map data/styles/routing assets are absent. Updated quick-start and development docs; marked T1.0.7 complete.
+- Validation: root dev command, workspace tests/typechecks/build, Compose YAML syntax/structure validation, and `git diff --check` passed. Docker/Compose runtime validation could not run because Docker is not installed in the agent environment.
 
 ### 2026-10-18 — OpenAPI and Zopia generation (T1.0.6)
 

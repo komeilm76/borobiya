@@ -1,6 +1,6 @@
 # Borobiya — Development Guide
 
-> TL;DR: Two ways to dev — **Docker on Ubuntu (recommended, prod-like)** or **Bare Bun on Windows (no Docker)**. Both hit the same API + Map Server endpoints. Strict `bun` + `strict: true` TS everywhere.
+> TL;DR: Use **`bun run dev`** for the API + client with hot reload, or **Docker Compose** for the API, PostGIS, Martin, and Nginx. The API currently validates `DATABASE_URL` but does not connect to PostgreSQL; map data and style assets are not bundled yet. Strict `bun` + `strict: true` TypeScript everywhere.
 
 ---
 
@@ -10,7 +10,7 @@
 |-------------|---------|-------------|--------------|
 | Bun | 1.4.3+ (project pin: 1.4.3) | Container image `oven/bun:1.4.3` | `powershell -c "irm bun.sh/install.ps1|iex"` |
 | Node.js fallback | Server: 20+; client Vite: `^20.19.0 || >=22.12.0` | Not needed if Bun image | Vite requires Node 20.19+ or 22.12+ |
-| PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Install `postgresql-16` + `postgis` extension |
+| PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Optional until database tasks (T1.1); install later if needed |
 | Git | 2.40+ | host | host |
 | Docker + Compose | 25+ | host | optional (WSL2) |
 | Android Studio | Hedgehog+ | for APK | for APK |
@@ -26,86 +26,67 @@ docker --version && docker compose version
 
 ---
 
-## 2. Docker (Ubuntu) — Recommended
+## 2. Docker Compose (Linux, macOS, or Windows with Docker Desktop)
 
-### 2.1 Clone & Env
+### 2.1 Clone & environment
 
 ```bash
 git clone https://github.com/komeilm76/borobiya.git
 cd borobiya
 cp .env.example .env
-# Edit .env: fill JWT_SECRET (32+ random), DATABASE_URL, MAP_* urls
-openssl rand -base64 32  # generate secrets
 ```
 
-### 2.2 Launch
+Replace both JWT placeholders with different 32+ character secrets (for example, generate each with `openssl rand -base64 32`). Replace the example PostgreSQL password with a URL-safe value such as `openssl rand -hex 24`. If you change the database user/password for bare-Bun development too, keep `DATABASE_URL` in `.env` in sync. Do not commit `.env`.
+
+### 2.2 Start the services
 
 ```bash
-docker compose up -d
-# Check
+docker compose up --build -d
 docker compose ps
-docker compose logs -f api
-curl http://localhost:3000/_public/health
-curl http://localhost:8000/styles/light.json | head
-```
-
-`docker-compose.yml` services:
-
-```yaml
-services:
-  postgres:
-    image: postgis/postgis:16-3.4
-    volumes: [pgdata:/var/lib/postgresql/data]
-    environment: { POSTGRES_USER: borobiya, POSTGRES_DB: borobiya, POSTGRES_PASSWORD: secret }
-    ports: ["5432:5432"]
-  api:
-    build: ./packages/server
-    ports: ["3000:3000"]
-    env_file: .env
-    depends_on: [postgres, map-server]
-  map-server:
-    image: maplibre/martin:v0.12
-    volumes: [map-data:/data:ro, ./map-server/styles:/styles:ro, ./map-server/martin-config.yaml:/config.yaml:ro]
-    ports: ["8000:8000"]
-    command: ["--config", "/config.yaml", "--listen", "0.0.0.0:8000"]
-  nginx:
-    image: nginx:stable
-    ports: ["80:80", "443:443"]
-    volumes: ["./nginx.conf:/etc/nginx/nginx.conf:ro"]
-```
-
-### 2.3 DB Setup
-
-```bash
-docker compose exec api bun run db:migrate
-docker compose exec api bun run db:seed   # 15 security questions + admin + cancellation reasons
-# Create admin manually:
-curl -X POST http://localhost:3000/_admin/users -H "Authorization: Bearer ..." -d '{"username":"admin","password":"Admin1234"}'
-```
-
-### 2.4 Dev Loop
-
-```bash
-# Logs
 docker compose logs -f api map-server
-# Shell
-docker compose exec api sh
-# Rebuild after dep change
-docker compose up -d --build api
-# Reset DB
-docker compose down -v && docker compose up -d
 ```
 
-### 2.5 Client
+The Compose stack contains `api`, PostGIS `postgres`, Martin `map-server`, and the Nginx gateway. Host ports are loopback-bound by default: API `3000`, PostgreSQL `5432`, Martin `8000`, and Nginx `8080`.
 
 ```bash
-# Client runs on host for HMR (Vite proxies same-origin paths to Docker)
-cd packages/client
-bun install
-bun run dev   # http://localhost:5173 → /api to Fastify, /map to Map Server via vite.config.ts
+curl http://localhost:3000/_public/health       # API directly
+curl http://localhost:8080/api/_public/health   # API through Nginx
+curl http://localhost:8080/docs                 # Swagger UI
+curl http://localhost:8000/health               # Martin
 ```
 
-Or run client in Docker via `docker-compose.override.yml` that adds `client` service.
+Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. Use the Vite client at `http://localhost:5173` (see §2.4). The API currently validates `DATABASE_URL` but does not open a database connection, and database migrations/seeds are not implemented yet. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
+
+### 2.3 Database status
+
+PostGIS is created and health-checked by Compose for the upcoming persistence work. The API scaffold does not connect to it, and `db:setup`, `db:migrate`, and `db:seed` commands are not wired; do not run migration or admin-creation commands yet. Those belong to the database/auth backlog tasks.
+
+### 2.4 Client and development loop
+
+For a local API + client with hot reload, stop the Compose stack first (the API uses host port `3000`) and run from the repository root:
+
+```bash
+bun install
+bun run dev   # API + Vite concurrently; client at http://localhost:5173
+```
+
+To keep the Compose API and Martin running while using Vite on the host, start the stack and run only the client instead:
+
+```bash
+docker compose up --build -d
+bun --filter @borobiya/client dev
+```
+
+The Vite dev proxy reads `API_PROXY_TARGET` and `MAP_SERVER_URL` from the root `.env` and defaults to the Compose-published host ports. `bun run dev` and a Compose API cannot both bind host port `3000` at the same time.
+
+Useful commands:
+
+```bash
+docker compose logs -f api map-server       # follow service logs
+docker compose up --build -d api            # rebuild/restart API after source or dependency changes
+docker compose down                         # stop containers; retain Postgres volume
+docker compose down -v                      # destructive: also removes persisted Postgres data
+```
 
 ---
 
@@ -131,19 +112,16 @@ Or run client in Docker via `docker-compose.override.yml` that adds `client` ser
 ```bash
 cd borobiya
 bun install
-# After copying .env.example to .env and replacing the JWT placeholders:
-bun --filter @borobiya/server dev
-# In another terminal:
-bun --filter @borobiya/client dev
+# Copy .env.example to .env and replace the two JWT placeholders first.
+bun run dev   # API and Vite client concurrently
 ```
 
-Root `bun run dev`, database setup, migrations/seeds, and the local Map Server scripts are planned for later foundation tasks; they are not wired yet.
+The API requires a syntactically valid `DATABASE_URL` in its environment but does not connect to PostgreSQL yet; migrations/seeds are not implemented. The map server and its data-generation scripts are also separate future tasks. Docker is optional for working on the current API/client scaffold.
 
 ### 3.3 Windows Caveats
 
-- No PostGIS Docker → use host PG (ensure `postgis` extension installed; Windows PG may need `CREATE EXTENSION` as superuser).
-- Martin binary: download from `github.com/maplibre/martin/releases` — `martin-windows-x86_64.zip`, extract to `bin/`.
-- OSM Tile generation (Planetiler/OSRM) may be skipped on Windows — use prebuilt `tehran.pmtiles` from release assets.
+- PostgreSQL/PostGIS is not needed by the current API skeleton; install it for database tasks later (or use Compose on WSL2/Docker Desktop).
+- Martin binaries and OSM tile-generation tools are not part of this scaffold. There are no bundled map tiles or styles to serve yet.
 
 ---
 
@@ -157,9 +135,17 @@ PORT=3000
 DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
 JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
 JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
 # Explicit reverse-proxy IPs/CIDRs only; leave empty for direct access.
 TRUSTED_PROXY_IPS=
+# Compose-only values: use a URL-safe password; host ports are localhost-bound.
+POSTGRES_USER=borobiya
+POSTGRES_PASSWORD=change-me
+POSTGRES_DB=borobiya
+POSTGRES_PORT=5432
+API_PORT=3000
+MAP_SERVER_PORT=8000
+NGINX_PORT=8080
 API_PROXY_TARGET=http://127.0.0.1:3000
 
 # Global rate limit: 100 requests per minute; auth/SOS routes apply stricter limits.
@@ -189,7 +175,7 @@ VITE_API_URL=/api
 VITE_MAP_URL=/map
 ```
 
-Copy this template to `.env`, replace the placeholders, and never commit `.env`. Generate independent JWT secrets with `openssl rand -base64 32`; do not use the example strings in production.
+The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. `MAP_*` URLs are placeholders: the current scaffold has no project styles, tiles, routing graph, or geocoder data.
 
 ---
 
@@ -198,7 +184,7 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 | Command | Where | What |
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
-| `bun run dev` | root | Concurrent API + client (root orchestration planned for T1.0.7) |
+| `bun run dev` | root | Runs the API and Vite client concurrently with Bun's workspace runner; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
 | `bun --filter @borobiya/server dev` | root | Fastify API skeleton (`bun --watch`) |
 | `bun --filter @borobiya/server test` | root | Server environment and Fastify inject tests |
 | `bun --filter @borobiya/server typecheck` | root | Strict server TypeScript check |
@@ -207,8 +193,8 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 | `bun --filter @borobiya/client typecheck` | root | Vue SFC and TypeScript check |
 | `bun --filter @borobiya/client build` | root | Typecheck and production Vite build |
 | `bun --filter @borobiya/client preview` | root | Preview the production build |
-| `bun run build` | root | Build all (root orchestration planned for T1.0.7) |
-| `bun run lint` | root | ESLint + `vue-tsc` + `tsc` (root lint script planned) |
+| `bun run build` | root | Not wired yet |
+| `bun run lint` | root | Not wired yet |
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
 | `bun run db:setup` | server | Planned with database/migration tasks; not wired yet |
 | `bun run db:migrate` | server | Planned with database/migration tasks; not wired yet |
@@ -274,13 +260,13 @@ bun --filter @borobiya/client build
 
 | Symptom | Fix |
 |---------|-----|
-| `ECONNREFUSED :5432` | PG not running — `docker compose up postgres` or Windows service |
-| `relation "users" does not exist` | Run `bun run db:migrate` |
-| Map blank, 404 tiles | `map-server` down — `docker compose logs map-server`, check `map-data` volume has `.pmtiles` |
+| API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; the current API validates it but does not connect to PostgreSQL |
+| `relation "users" does not exist` | Persistence/migrations are not implemented yet; see the T1.1 database tasks |
+| Map blank, 404 tiles/styles | Expected until map data and style assets are added; `docker compose logs map-server` checks Martin startup |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |
 | `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/_user/complete-security-questions` |
 | Vite HMR slow | `bun --filter @borobiya/client dev` (already binds to `0.0.0.0`) |
-| Port conflicts 3000/5173/8000 | Change in `.env` + `vite.config.ts` proxy |
+| Port conflicts 3000/5173/8000/8080 | Change Compose host ports in `.env`; for Vite's targets, update `API_PROXY_TARGET` and `MAP_SERVER_URL` too |
 
 ---
 

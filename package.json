@@ -6,6 +6,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "scripts": {
+    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev"
+  },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"

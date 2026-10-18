@@ -16,7 +16,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.0.4** Create `packages/server` Fastify skeleton + `app.ts`, `server.ts`, env validation, helmet, cors, rate-limit plugin shell — completed 2026-10-18
 - [x] **T1.0.5** Create `packages/client` Vite+Vue3+Vuetify+Tailwind+Pinia+VueUse skeleton + `views/_auth/_public/_user/_admin` placeholders — completed 2026-10-18
 - [x] **T1.0.6** Wire OpenAPI: `@fastify/swagger` + Swagger UI → `/docs` + `/docs/json`; Zopia generation script — completed 2026-10-18
-- [ ] **T1.0.7** Root script `bun run dev` (concurrently api+client) + `docker-compose.yml` (api, postgres, map-server, nginx)
+- [x] **T1.0.7** Root script `bun run dev` (concurrently API+client) + Docker Compose (`api`, `postgres`, `map-server`, `nginx`) — completed 2026-10-18
 
 ### 1.1 Database & Seed
 

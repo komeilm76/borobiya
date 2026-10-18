@@ -1,6 +1,6 @@
 # Borobiya — Map Server (Offline Vector)
 
-> TL;DR: Fully offline, no `tile.openstreetmap.org` at runtime. Self-host **Martin** (tiles PBF), **OSRM** (routing car/bike/foot), **Photon** (geocode/reverse) as a separate container/service. Data generated from OSM PBF via Planetiler/Tippecanoe. Configurable region via ENV.
+> TL;DR: The target design is fully offline: self-host **Martin** (vector tiles), **OSRM** (routing), and **Photon** (geocoding) as separate services, with configurable OSM-derived data. **Current scaffold status:** Compose runs Martin with an empty, ignored `map-server/data/` directory and PostGIS connection; no project tiles, style/sprite/font assets, OSRM graph, Photon index, or data-generation scripts are present yet. Endpoint examples below describe the planned service, not currently available product features.
 
 ---
 

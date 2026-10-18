@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+map-server/data
+map-server/tiles
+map-server/osrm/data
+map-server/photon/data
+*.pmtiles
+*.mbtiles
+*.osm.pbf
+*.osrm*

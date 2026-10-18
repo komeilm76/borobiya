@@ -44,7 +44,7 @@ gantt
 - [x] Init `packages/shared` with all Zod schemas — completed 2026-10-18
 - [x] Init `packages/server` Fastify skeleton + `@borobiya/shared` — completed 2026-10-18
 - [x] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse — completed 2026-10-18
-- [ ] Root `docker-compose.yml`, `.env.example`, `tsconfig` strict
+- [x] Root `docker-compose.yml` (api, postgres, map-server, nginx), `.env.example`, strict `tsconfig` — completed 2026-10-18
 - [x] OpenAPI at `/docs` + `/docs/json` via `@fastify/swagger` + Swagger UI — completed 2026-10-18
 - [x] Zopia wired: `bun --filter @borobiya/client generate:api` — completed 2026-10-18
 

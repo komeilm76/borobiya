@@ -897,24 +897,29 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 
 ## 19. Workflows & CI/CD
 
-### 19.1. Git Hooks / Gates (Minimum)
-- Use **Husky** or **Lefthook**:
+### 19.1. Git Hooks / Gates (planned)
+- Add **Husky** or **Lefthook**:
   - `pre-commit`: `bun run lint` + `bun run typecheck` (vue-tsc + tsc)
   - `pre-push`: `bun run test` (vitest) + `bun run build` dry-run
 - **Branch protection:** `main` requires PR + 1 review (if team >1) or at least passing CI.
 
+These hooks and gates are recommendations only; no hook config, CI workflow, or root lint/test/build scripts are wired yet.
+
 ### 19.2. Launch / Deploy Workflow
-- **GitHub Actions `deploy.yml`:**
+- **GitHub Actions `deploy.yml` (planned; not present yet):**
   - On push to `main`: build Docker images, push to registry, SSH to Ubuntu server, `docker compose pull && docker compose up -d`
   - Includes: `api`, `postgres`, `map-server`, `nginx` (reverse proxy)
-- **Local launch:**
+- **Local launch (scaffold):**
   ```bash
-  docker compose up -d          # prod-like
-  bun run dev                   # dev without docker (windows)
+  cp .env.example .env          # replace the JWT placeholders and Postgres password
+  docker compose up --build -d  # API, PostGIS, Martin, and Nginx; local ports only
+  bun install
+  bun --filter @borobiya/client dev  # Vite client with HMR at :5173
   ```
+  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); API persistence and project map data/assets are not implemented yet.
 
-### 19.3. Android Build Workflow
-- **GitHub Actions `android.yml`:**
+### 19.3. Android Build Workflow (planned)
+- **GitHub Actions `android.yml` (not present yet):**
   - On tag `v*`: `bun run build:web`, `npx cap sync android`, `cd android && ./gradlew assembleRelease`, upload APK/AAB artifact
 - **Local:**
   ```bash
@@ -929,29 +934,18 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 
 ### 20.1. Production (Ubuntu)
 - OS: **Ubuntu 22.04/24.04 LTS**
-- Fully **Dockerized** via `docker-compose.yml`:
-  ```yaml
-  services:
-    api: { build: ./server, ports: ["3000:3000"], env_file: .env, depends_on: [postgres, map-server] }
-    postgres: { image: postgis/postgis:16-3.4, volumes: [pgdata:/var/lib/postgresql/data] }
-    map-server:
-      image: maplibre/martin # or custom
-      volumes: [mapdata:/data]
-      ports: ["8000:8000"]
-    nginx: { image: nginx, ports: ["80:80","443:443"] }
-  ```
-- Secrets via `.env` (never commit).
+- A local **Compose scaffold** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, and Nginx. Host ports bind to loopback; Nginx is HTTP-only on port 8080. It is not yet a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
+- Secrets via `.env` (never commit). The API currently validates `DATABASE_URL` but does not connect to the database; migrations/seeds are future work. The map server has no bundled tile/style/routing/geocoding assets yet.
 
 ### 20.2. Development (Windows without Docker)
-- Requirements: `Bun`, `PostgreSQL`, `Node 20+`
-- Steps documented in `DEVELOPMENT.md`:
+- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is optional until persistence tasks are implemented.
+- Steps documented in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md):
   ```bash
   bun install
-  bun run db:setup     # create db, migrate, seed questions
-  bun run map:dev      # run local Martin with sample tiles
-  bun run dev          # vite + fastify concurrently
+  cp .env.example .env   # replace the JWT placeholders
+  bun run dev            # API + Vite concurrently
   ```
-- Map data for dev: small `tehran.pmtiles` (~500MB) in `data/`.
+- The API does not connect to PostgreSQL yet. `db:setup`, migrations/seeds, `map:dev`, and sample map assets are not implemented or bundled.
 
 ---
 

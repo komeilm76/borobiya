@@ -28,32 +28,23 @@ borobiya/
 │       └── MAP_PIPELINE.md
 │
 ├── packages/
-│   ├── shared/               # Zod schemas + TS types — single source of truth
-│   ├── server/               # Fastify API skeleton; DB/Socket.IO later
-│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse; MapLibre/native later
+│   ├── shared/               # Zod schemas + API contracts
+│   ├── server/               # Fastify API skeleton; Dockerfile lives here
+│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse scaffold
 │
-├── map-server/               # Independent vector tile + routing + geocoding
-│   ├── tiles/                # (gitignored) *.pmtiles / *.mbtiles lives here
-│   ├── styles/               # MapLibre style JSONs (light/dark)
-│   ├── martin-config.yaml
-│   ├── osrm/
-│   └── photon/
+├── map-server/
+│   ├── README.md             # Runtime data location and current asset limitations
+│   └── data/                 # (gitignored; created/populated locally) Martin tile sources
 │
-├── data/                     # (gitignored) local OSM extracts, sample tiles
-│   └── maps/
-│       └── tehran.pmtiles
-│
-├── android/                  # Capacitor output (generated, not committed initially)
-│
-├── docker-compose.yml
-├── docker-compose.override.yml   # local dev overrides
+├── docker-compose.yml        # api, postgres, map-server, nginx
+├── nginx.conf                # local HTTP gateway for /api, /docs, and /map
+├── .dockerignore
 ├── .env.example
-├── .env                      # (gitignored) real secrets
+├── .env                      # (gitignored) local secrets/config
 ├── .gitignore
-├── lefthook.yml / .husky/
-├── package.json              # root (workspaces)
+├── package.json              # Bun workspaces + root `dev` orchestration
 ├── tsconfig.json
-└── README.md                 # Project prompt/spec (frozen source-of-truth)
+└── README.md
 ```
 
 ---
@@ -62,26 +53,17 @@ borobiya/
 
 ```json
 {
+  "name": "borobiya",
   "private": true,
+  "packageManager": "bun@1.4.3",
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "concurrently \"bun --filter server dev\" \"bun --filter client dev\"",
-    "build": "bun --filter '*' build",
-    "test": "vitest run",
-    "lint": "eslint . && vue-tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "map:update": "bun run --filter map-server update",
-    "db:setup": "bun --filter server db:setup",
-    "cap:sync": "bun --filter client build && npx cap copy android"
-  },
-  "packageManager": "bun@1.4.3",
-  "devDependencies": {
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev"
   }
 }
 ```
 
-Alternative: use `pnpm`/`npm` workspaces — but Bun is mandated, so `bun workspaces` via `workspaces` field.
+The root `dev` script uses Bun's built-in parallel workspace runner; it does not add a third-party concurrency dependency. Root build/lint/database/map scripts are not wired yet.
 
 ---
 
@@ -132,63 +114,22 @@ packages/shared/
 
 ```text
 packages/server/
-├── package.json              # Fastify, security plugins, @fastify/swagger + UI, @borobiya/shared, dotenv, zod
-├── src/
-│   ├── app.ts                # createFastifyApp() + implemented public health route
-│   ├── server.ts             # validated config + listen entrypoint
-│   ├── config/
-│   │   ├── env.ts            # Zod-validated host, port, DB URL, secrets, CORS, rate limits
-│   │   └── env.test.ts
-│   ├── plugins/
-│   │   ├── security.ts       # Helmet, CORS allowlist, global rate-limit shell
-│   │   ├── auth.ts           # decorate authenticate + authorize(roles), future
-│   │   ├── swagger.ts        # Swagger UI + OpenAPI catalog from shared descriptors; contract-only paths are not handlers
-│   │   ├── socket.ts         # socket.io init + auth middleware, future
-│   │   └── errorHandler.ts
-│   ├── app.test.ts           # inject, security headers, CORS, and rate limit
-│   ├── modules/
-│   │   ├── auth/             # routes, service, repository per domain
-│   │   │   ├── auth.routes.ts      # imports api defs from @borobiya/shared
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.controller.ts
-│   │   │   └── auth.test.ts
-│   │   ├── user/
-│   │   ├── admin/
-│   │   ├── sos/              # requests, proposals, missions, ratings
-│   │   ├── location/
-│   │   ├── search/
-│   │   └── public/
-│   ├── db/
-│   │   ├── schema.ts         # drizzle/prisma schema (PostGIS types)
-│   │   ├── migrate.ts
-│   │   ├── seed.ts           # security_questions (15), cancellation_reasons, admin user
-│   │   └── client.ts         # postgres pool
-│   ├── jobs/
-│   │   ├── cron.ts            # node-cron entry
-│   │   ├── expireShares.ts
-│   │   ├── pruneHistory.ts
-│   │   └── expireSos.ts
-│   ├── realtime/
-│   │   ├── rooms.ts
-│   │   ├── events.ts          # typed emit helpers
-│   │   └── heartbeat.ts
-│   ├── lib/
-│   │   ├── hash.ts           # argon2 wrapper + normalizeAnswer()
-│   │   ├── jwt.ts
-│   │   └── geo.ts            # ST_Distance helpers
-│   └── types/
-│       └── fastify.d.ts      # augment FastifyRequest.user
-├── drizzle.config.ts / prisma/schema.prisma  # planned with database setup
+├── Dockerfile                # workspace-aware Bun API image
+├── package.json              # Fastify, security plugins, Swagger UI, shared contracts, dotenv, zod
 ├── tsconfig.json
-├── README.md
-└── Dockerfile                # planned with container orchestration
+└── src/
+    ├── app.ts                # creates Fastify app; only public health is a live handler
+    ├── app.test.ts           # Fastify inject/security/CORS/rate-limit tests
+    ├── server.ts             # validates environment and listens
+    ├── config/
+    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
+    │   └── env.test.ts
+    └── plugins/
+        ├── security.ts       # Helmet, CORS allowlist, global rate limit
+        └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-**Naming:**
-- Routes: `*.routes.ts` (km-api descriptor + handler wiring).
-- Service: pure logic, takes DB client as arg.
-- Repository: SQL queries (if not using ORM directly).
-- No barrel that hides circular deps — import explicit.
+The API validates `DATABASE_URL` but does not connect to PostgreSQL. Auth/domain handlers, database migrations/seeds, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
 
 ---
 
@@ -236,29 +177,11 @@ MapLibre, API/auth stores, feature components, Capacitor, and Android packaging 
 
 ```text
 map-server/
-├── README.md
-├── docker-compose.map.yml    # optional separate compose
-├── martin-config.yaml        # sources: pmtiles/mbtiles + postgis
-├── styles/
-│   ├── light.json            # MapLibre style — same sources, light paint
-│   ├── dark.json
-│   ├── sprites/              # icon sprite sheet + json
-│   └── glyphs/               # font pbf glyphs {fontstack}/{range}.pbf
-├── osrm/
-│   ├── profiles/             # car.lua, bicycle.lua, foot.lua
-│   ├── prepare.sh            # osrm-extract + partition + customize
-│   └── data/                 # (gitignored) *.osrm*
-├── photon/
-│   ├── photon.json
-│   └── data/                 # (gitignored) ES index
-├── scripts/
-│   ├── generate-tiles.sh     # planetiler/tippecanoe pipeline
-│   ├── build-routing.sh
-│   ├── build-geocode.sh
-│   └── update.sh             # orchestrates all + version stamp
-├── Dockerfile                # optional custom Martin image
-└── data/                     # (gitignored) downloaded OSM PBFs
+├── README.md                 # documents the ignored runtime data directory
+└── data/                     # created/used locally; ignored by Git; currently empty
 ```
+
+Compose runs Martin v0.12 against the read-only `map-server/data/` bind mount and the PostGIS service. The planned styles, sprites, glyphs, OSRM graph, Photon index, and OSM data pipeline do not exist in the scaffold yet; see [`MAP_SERVER.md`](./MAP_SERVER.md) for the design/runbook.
 
 ---
 
@@ -266,42 +189,24 @@ map-server/
 
 | File | Purpose |
 |------|---------|
-| `.env.example` | Documented env vars (see Appendix §24.1 of spec) |
-| `docker-compose.yml` | api + postgres + map-server + nginx + optional redis |
-| `.gitignore` | See §10 below |
-| `lefthook.yml` | pre-commit: lint + typecheck; pre-push: test + build |
-| `tsconfig.json` | Strict shared TypeScript defaults and explicit `@shared/*`, `@client/*`, and `@server/*` aliases; package configs define their own source includes |
-| `package.json` | Workspaces + root scripts |
+| `.env.example` | Local API and Compose environment template; copy to ignored `.env` |
+| `.dockerignore` | Excludes secrets, dependencies, build output, and map datasets from image contexts |
+| `docker-compose.yml` | `api`, `postgres`, `map-server`, and `nginx`; no Redis service |
+| `nginx.conf` | Local HTTP proxy for `/api/`, `/docs`, and `/map/` |
+| `.gitignore` | Excludes local secrets, generated output, and large map data |
+| `tsconfig.json` | Strict shared TypeScript defaults and explicit workspace aliases |
+| `package.json` | Workspaces + root `dev` script |
 
-`.env.example` must include (per spec §3.5 + §17.2 + §24.1):
+`.env.example` includes API validation settings plus these Compose variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `API_PORT`, `MAP_SERVER_PORT`, and `NGINX_PORT`. The sample JWT/Postgres values are placeholders and must be changed outside local scaffolding.
 
-```env
-NODE_ENV=development
-HOST=0.0.0.0
-PORT=3000
-DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
-JWT_SECRET=replace-with-a-random-secret-of-at-least-32-characters
-JWT_REFRESH_SECRET=replace-with-a-different-random-secret-of-at-least-32-characters
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=100
-LOCATION_HISTORY_RETENTION_DAYS=90
-LOCATION_HISTORY_MAX_SHARE_DAYS=30
-MAP_SERVER_URL=http://localhost:8000
-MAP_REGION=tehran
-MAP_BBOX=51.0,35.5,51.7,35.9
-MAP_DATA_VERSION=development
-API_PROXY_TARGET=http://127.0.0.1:3000
-VITE_API_URL=/api
-VITE_MAP_URL=/map
-```
+Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup; it does not currently open a database connection.
 
 ---
 
 ## 8. Database Migrations
 
-- Tool: **Drizzle Kit** or **Prisma Migrate** (decision logged in ARCHITECTURE ADR).
-- Folder: `packages/server/migrations/` or `prisma/migrations/`.
-- Seed: `packages/server/src/db/seed.ts` — 15 security questions, cancellation reasons, default admin.
+- PostgreSQL/PostGIS is provisioned by Compose, but the API does not connect to it yet.
+- ORM choice and schema are open; no migration or seed files/scripts exist in the current scaffold. See the T1.1 tasks before using the database.
 
 ---
 
@@ -361,11 +266,13 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 
 ---
 
-## 12. Implementation Checklist for Init
+## 12. Foundation Status
 
-- [ ] `mkdir -p packages/{shared,server,client} map-server/{styles,osrm,photon} data/maps docs/DIAGRAMS`
-- [ ] `bun init` at root + each package
-- [ ] Copy `.env.example` from ARCHITECTURE appendix
-- [ ] Add `docker-compose.yml` (4 services)
-- [ ] Commit `docs/` first (this PR)
+- [x] Bun workspaces, shared contracts, Fastify skeleton, and Vue client scaffold
+- [x] Root `bun run dev` orchestration for API + client
+- [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
+- [x] `.env.example`, `.gitignore`, and Docker build exclusions
+- [ ] API persistence/auth handlers and database migrations/seeds
+- [ ] Map tile/style/routing/geocoding data and generation pipeline
+- [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 
