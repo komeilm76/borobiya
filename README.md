@@ -848,7 +848,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 ## 17. Data Storage & Retention
 
 ### 17.1. Key Tables (PostgreSQL)
-- `users (id, username unique, passwordHash, role enum('user','admin'), isActive, isSuspended, suspendedUntil, avgRating, mustCompleteSecurityQuestions, createdAt)`
+- `users (id, username unique, passwordHash, role enum('user','admin'), isActive, isSuspended, suspendedUntil, avgRating, mustCompleteSecurityQuestions, lastLocation GEOGRAPHY(Point,4326), createdAt)`
 - `security_questions (id, text)`
 - `user_security_answers (id, userId, questionId, answerHash)`
 - `user_sessions (id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)`
@@ -939,7 +939,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 - Secrets via `.env` (never commit). The API currently validates `DATABASE_URL` but does not connect to the database. Auth/reference migrations and an explicit seed command are checked in but are not run at startup; change the local `admin / admin123` credential before exposing the service. The map server has no bundled tile/style/routing/geocoding assets yet.
 
 ### 20.2. Development (Windows without Docker)
-- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is optional until persistence tasks are implemented.
+- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; the current API skeleton still does not connect to it.
 - Steps documented in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md):
   ```bash
   bun install

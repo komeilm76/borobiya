@@ -442,13 +442,13 @@ Performance targets: map load <2s LAN, location update <500ms socket, route <1s.
 
 **Status:** Accepted (T1.1.1).
 
-**Context:** The API uses Bun and PostgreSQL/PostGIS. The schema needs native PostgreSQL constraints and later spatial columns/queries such as `GEOGRAPHY(Point,4326)`, GiST indexes, and `ST_Distance`.
+**Context:** The API uses Bun and PostgreSQL/PostGIS. The schema needs native PostgreSQL constraints and spatial columns/queries such as `GEOGRAPHY(Point,4326)`, GiST indexes, and `ST_Distance`; T1.1.4 adds the first user-location column and spatial index.
 
 **Decision:** Use Drizzle ORM (`drizzle-orm`) with the Postgres.js driver (`postgres`) and Drizzle Kit for schema-driven, SQL migration generation. Keep the application schema in `packages/server/src/db/schema.ts` and migration output in `packages/server/drizzle/`.
 
 **Rationale:** Drizzle keeps table definitions close to PostgreSQL/SQL, supports TypeScript without a separate generated query-engine client, and leaves PostGIS-specific DDL/queries explicit through custom types and SQL expressions. Prisma was considered but rejected for this scaffold because its abstraction around unsupported native geography types would require raw SQL for central spatial features and introduces an additional generated-client workflow. Drizzle is less opinionated about higher-level relation access and requires migrations to be reviewed; generated SQL will therefore be checked in and hand-edited where necessary.
 
-**Consequences:** The T1.1.2 migration covers `users`, `security_questions`, `user_security_answers`, and `user_sessions`; T1.1.3 adds the `cancellation_reasons` table and initial data seed. Migrations must be applied explicitly. The Fastify bootstrap still does not instantiate the database client, so API persistence remains a later task.
+**Consequences:** The T1.1.2 migration covers the initial `users`, `security_questions`, `user_security_answers`, and `user_sessions` schema; T1.1.3 adds the `cancellation_reasons` table and initial data seed; T1.1.4 enables PostGIS and adds user state, rating, and last-location fields with a GiST index. Migrations must be applied explicitly. The Fastify bootstrap still does not instantiate the database client, so API persistence remains a later task.
 
 > Add new ADRs after this entry as `| 012 | YYYY-MM-DD | ...` — do not remove history.
 

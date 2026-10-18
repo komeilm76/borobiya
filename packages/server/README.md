@@ -6,7 +6,7 @@ Before starting, copy the repository's `.env.example` to `.env` and replace the 
 
 ## Database foundation
 
-The project selected **Drizzle ORM** with the Postgres.js driver. `src/db/schema.ts` declares the account/security/session and cancellation-reason tables, `src/db/client.ts` provides an explicit client factory, and `drizzle.config.ts` points Drizzle Kit at the schema. The migrations are checked in under `drizzle/`; they are not applied automatically, and the factory is not called by the running API.
+The project selected **Drizzle ORM** with the Postgres.js driver. `src/db/schema.ts` declares account state, security/session, cancellation-reason, and PostGIS last-location fields. `src/db/client.ts` provides an explicit client factory, and `drizzle.config.ts` points Drizzle Kit at the schema. The checked-in migrations enable PostGIS and add a GiST index for spatial lookup; they are not applied automatically, and the factory is not called by the running API.
 
 Use the explicit database commands from the repository root:
 

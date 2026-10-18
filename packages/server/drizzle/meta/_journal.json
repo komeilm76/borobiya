@@ -15,6 +15,13 @@
       "when": 1792340649744,
       "tag": "0001_dashing_the_fallen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792342429199,
+      "tag": "0002_lazy_shiver_man",
+      "breakpoints": true
     }
   ]
 }

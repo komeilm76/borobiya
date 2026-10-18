@@ -3,7 +3,9 @@ import { sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  customType,
   index,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -12,7 +14,12 @@ import {
   varchar
 } from "drizzle-orm/pg-core";
 
-/** Core account table. Status/location fields are added by later database tasks. */
+/** Raw driver-string PostGIS geography; keep generated DDL unquoted and project app coordinates with spatial SQL. */
+const geographyPoint = customType<{ data: string; driverData: string }>({
+  dataType: () => "geography(Point,4326)"
+});
+
+/** Core account and user-state fields; geospatial writes should use PostGIS constructors. */
 export const users = pgTable(
   "users",
   {
@@ -20,6 +27,11 @@ export const users = pgTable(
     username: varchar("username", { length: 30 }).notNull(),
     passwordHash: text("password_hash").notNull(),
     role: varchar("role", { length: 10 }).$type<UserRole>().notNull().default("user"),
+    isActive: boolean("is_active").notNull().default(true),
+    isSuspended: boolean("is_suspended").notNull().default(false),
+    mustCompleteSecurityQuestions: boolean("must_complete_security_questions").notNull().default(false),
+    avgRating: numeric("avg_rating", { precision: 2, scale: 1, mode: "number" }),
+    lastLocation: geographyPoint("last_location"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
@@ -28,7 +40,9 @@ export const users = pgTable(
       "users_username_format_check",
       sql`char_length("username") BETWEEN 3 AND 30 AND "username" ~ '^[a-z0-9_]+$'`
     ),
-    check("users_role_check", sql`"role" IN ('user', 'admin')`)
+    check("users_role_check", sql`"role" IN ('user', 'admin')`),
+    check("users_avg_rating_range_check", sql`"avg_rating" IS NULL OR "avg_rating" BETWEEN 0 AND 5`),
+    index("idx_users_last_location_gist").using("gist", table.lastLocation)
   ]
 );
 

@@ -46,7 +46,7 @@ CREATE TABLE users (
   suspension_reason TEXT,
   is_on_mission BOOLEAN NOT NULL DEFAULT false,
   must_complete_security_questions BOOLEAN NOT NULL DEFAULT false,
-  avg_rating NUMERIC(2,1),       -- cached avg from mission_ratings
+  avg_rating NUMERIC(2,1) CHECK (avg_rating IS NULL OR avg_rating BETWEEN 0 AND 5), -- cached avg from mission_ratings
   last_location GEOGRAPHY(Point,4326),
   preferences JSONB,              -- { theme: 'light'|'dark' }
   created_at TIMESTAMPTZ DEFAULT now()
@@ -230,6 +230,7 @@ CREATE TABLE admin_audit_log (
 
 ## Notes
 
+- This is the target ERD. Current Drizzle migrations cover the auth/reference tables and T1.1.4 user-state/rating/location columns; domain tables and remaining user columns (including `suspended_until`, `suspension_reason`, and `is_on_mission`) remain future tasks.
 - **Geospatial:** `last_location` and `sos_requests.location` use `GEOGRAPHY(Point,4326)` for meter-accurate `ST_Distance`.
 - **No delete:** No `deleted_at` — deactivated users stay with `is_active=false` for audit.
 - **Retention:** `location_history` pruned by cron; partitioning by month optional.

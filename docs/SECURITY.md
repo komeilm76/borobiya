@@ -110,7 +110,7 @@ if (locationUpdatesPerSec > 50)   suspend(24*H, "location_spam");
 if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 ```
 
-- Columns: `users.isSuspended`, `suspendedUntil`, `suspensionReason`.
+- `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work alongside enforcement.
 - On login, if `isSuspended && now < suspendedUntil` → `403 {code: "ACCOUNT_SUSPENDED", suspendedUntil, reason}`.
 - Message: “Account suspended due to suspicious activity. Contact admin.”
 

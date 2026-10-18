@@ -128,7 +128,8 @@ packages/server/
     │   └── env.test.ts
     ├── db/
     │   ├── client.ts         # explicit, currently unused Drizzle/Postgres.js factory
-    │   ├── schema.ts         # auth/session/cancellation-reason tables
+    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason tables
+    │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
     │   ├── seed.ts           # transactional, idempotent reference/admin seeder
     │   ├── seed-config.ts    # production-safe bootstrap password policy
     │   ├── seed-data.ts      # Persian questions and localized cancellation reasons
@@ -218,7 +219,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 ## 8. Database Migrations
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
-- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons` under `packages/server/drizzle/`.
+- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
 - `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; API database connection remains future work.
 
 ---

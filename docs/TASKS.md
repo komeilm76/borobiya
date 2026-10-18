@@ -23,7 +23,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.1.1** Decide ORM: Drizzle + Postgres.js (document in ARCHITECTURE ADR) + initial account/security/session schema — completed 2026-10-18
 - [x] **T1.1.2** Migration: `users`, `security_questions`, `user_security_answers`, `user_sessions` (see ERD) — completed 2026-10-18
 - [x] **T1.1.3** Add/migrate and seed 15 security questions + 11 scoped cancellation reasons + Argon2id bootstrap admin (`admin / admin123`, local only; must change) — completed 2026-10-18
-- [ ] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users`
+- [x] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users` — completed 2026-10-18
 
 ### 1.2 Auth (`_auth`, `_admin` user creation)
 

@@ -10,7 +10,7 @@
 |-------------|---------|-------------|--------------|
 | Bun | 1.4.3+ (project pin: 1.4.3) | Container image `oven/bun:1.4.3` | `powershell -c "irm bun.sh/install.ps1|iex"` |
 | Node.js fallback | Server: 20+; client Vite: `^20.19.0 || >=22.12.0` | Not needed if Bun image | Vite requires Node 20.19+ or 22.12+ |
-| PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Optional until database tasks (T1.1); install later if needed |
+| PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Required to apply T1.1.4 migrations; install PostgreSQL with the PostGIS extension |
 | Git | 2.40+ | host | host |
 | Docker + Compose | 25+ | host | optional (WSL2) |
 | Android Studio | Hedgehog+ | for APK | for APK |
@@ -59,7 +59,7 @@ Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, no
 
 ### 2.3 Database status
 
-PostGIS is created and health-checked by Compose. Drizzle migrations under `packages/server/drizzle/` create the four auth tables plus `cancellation_reasons`. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; the API still does not connect to PostgreSQL. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
+Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; the API still does not connect to PostgreSQL. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
 ### 2.4 Client and development loop
 
@@ -120,7 +120,7 @@ The API requires a syntactically valid `DATABASE_URL` in its environment but doe
 
 ### 3.3 Windows Caveats
 
-- PostgreSQL/PostGIS is not needed by the API skeleton, but a running database is required to apply migrations and run `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL locally).
+- PostgreSQL/PostGIS is not needed just to run the API skeleton, but a running database with PostGIS available is required to apply migrations and run `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL/PostGIS locally).
 - Martin binaries and OSM tile-generation tools are not part of this scaffold. There are no bundled map tiles or styles to serve yet.
 
 ---
