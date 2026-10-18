@@ -8,7 +8,7 @@
 
 | Requirement | Version | Docker path | Windows path |
 |-------------|---------|-------------|--------------|
-| Bun | 1.1+ | Container image `oven/bun:1.1` | `powershell -c "irm bun.sh/install.ps1|iex"` |
+| Bun | 1.4.3+ (project pin: 1.4.3) | Container image `oven/bun:1.4.3` | `powershell -c "irm bun.sh/install.ps1|iex"` |
 | Node.js fallback | 20+ | Not needed if Bun image | If Bun fails, use Node 20 |
 | PostgreSQL + PostGIS | PG 16, PostGIS 3.4 | Docker service `postgis/postgis:16-3.4` | Install `postgresql-16` + `postgis` extension |
 | Git | 2.40+ | host | host |
@@ -99,10 +99,10 @@ docker compose down -v && docker compose up -d
 ### 2.5 Client
 
 ```bash
-# Client runs on host for HMR (Vite proxies to Docker)
+# Client runs on host for HMR (Vite proxies same-origin paths to Docker)
 cd packages/client
 bun install
-bun run dev   # http://localhost:5173 → proxies /api to :3000, /tiles to :8000 via vite.config.ts
+bun run dev   # http://localhost:5173 → /api to Fastify, /map to Map Server via vite.config.ts
 ```
 
 Or run client in Docker via `docker-compose.override.yml` that adds `client` service.
@@ -156,13 +156,13 @@ bun run dev            # concurrently: api:3000 + client:5173
 # API
 NODE_ENV=development
 PORT=3000
-DATABASE_URL=postgresql://borobiya:secret@localhost:5432/borobiya
-JWT_SECRET=change-me-32-chars-min-please-use-openssl
-JWT_REFRESH_SECRET=change-me-32-chars-different-from-above
+DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
+JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
+JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 
-# Rate & Retention
-RATE_LIMIT_WINDOW_MS=900000
+# Global rate limit: 100 requests per minute; auth/SOS routes apply stricter limits.
+RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=100
 LOCATION_HISTORY_RETENTION_DAYS=90
 LOCATION_HISTORY_MAX_SHARE_DAYS=30
@@ -170,11 +170,11 @@ SOS_PHOTO_MAX_SIZE_MB=5
 SOS_REQUEST_AUTO_EXPIRE_HOURS=24
 MISSION_STATUS_TIMEOUT_HOURS=6
 
-# Map
+# Independent Map Server (server-to-server URLs for local development)
 MAP_SERVER_URL=http://localhost:8000
 MAP_REGION=tehran
 MAP_BBOX=51.0,35.5,51.7,35.9
-MAP_DATA_VERSION=2025-05-01
+MAP_DATA_VERSION=development
 MAP_MAX_ZOOM=14
 MAP_MIN_ZOOM=0
 MAP_STYLE_LIGHT=http://localhost:8000/styles/light.json
@@ -183,13 +183,12 @@ MAP_ROUTING_URL=http://localhost:8000/route
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 MAP_REVERSE_URL=http://localhost:8000/reverse
 
-# Client (Vite needs VITE_ prefix)
-VITE_API_URL=http://localhost:3000
-VITE_MAP_URL=http://localhost:8000
-VITE_API_PREFIX=/
+# Browser-facing paths stay same-origin; Vite and the production proxy forward them.
+VITE_API_URL=/api
+VITE_MAP_URL=/map
 ```
 
-Never commit `.env`.
+Copy this template to `.env`, replace the placeholders, and never commit `.env`. Generate independent JWT secrets with `openssl rand -base64 32`; do not use the example strings in production.
 
 ---
 

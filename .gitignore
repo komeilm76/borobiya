@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build and test output
+build/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local map and user data (never commit large/private datasets)
+data/maps/
+data/uploads/
+map-server/data/
+map-server/tiles/
+map-server/osrm/data/
+map-server/photon/data/
+*.pmtiles
+*.mbtiles
+*.osm.pbf
+*.osrm*
+
+# Generated application code and native builds
+packages/client/src/generated/
+android/
+
+# Tool and operating-system artifacts
+.vite/
+.turbo/
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

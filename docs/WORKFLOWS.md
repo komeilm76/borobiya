@@ -139,7 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: "1.1.0" }
+        with: { bun-version: "1.4.3" }
       - run: bun install
       - run: bun run lint
       - run: bun run typecheck

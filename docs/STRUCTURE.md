@@ -73,7 +73,7 @@ borobiya/
     "db:setup": "bun --filter server db:setup",
     "cap:sync": "bun --filter client build && npx cap copy android"
   },
-  "packageManager": "bun@1.1.0"
+  "packageManager": "bun@1.4.3"
 }
 ```
 
@@ -300,7 +300,7 @@ map-server/
 | `docker-compose.yml` | api + postgres + map-server + nginx + optional redis |
 | `.gitignore` | See §10 below |
 | `lefthook.yml` | pre-commit: lint + typecheck; pre-push: test + build |
-| `tsconfig.json` | Root strict config, path alias `@/*` → `packages/*/src` |
+| `tsconfig.json` | Strict shared TypeScript defaults and explicit `@shared/*`, `@client/*`, and `@server/*` aliases; package configs define their own source includes |
 | `package.json` | Workspaces + root scripts |
 
 `.env.example` must include (per spec §3.5 + §17.2 + §24.1):
@@ -308,18 +308,19 @@ map-server/
 ```env
 NODE_ENV=development
 PORT=3000
-DATABASE_URL=postgresql://borobiya:secret@localhost:5432/borobiya
-JWT_SECRET=
-JWT_REFRESH_SECRET=
+DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
+JWT_SECRET=replace-with-a-random-secret-of-at-least-32-characters
+JWT_REFRESH_SECRET=replace-with-a-different-random-secret-of-at-least-32-characters
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=100
 LOCATION_HISTORY_RETENTION_DAYS=90
 LOCATION_HISTORY_MAX_SHARE_DAYS=30
-RATE_LIMIT_WINDOW_MS=900000
 MAP_SERVER_URL=http://localhost:8000
 MAP_REGION=tehran
-MAP_BBOX=44.0,25.0,63.0,39.0
-MAP_DATA_VERSION=2025-05-01
-VITE_API_URL=http://localhost:3000
-VITE_MAP_URL=http://localhost:8000
+MAP_BBOX=51.0,35.5,51.7,35.9
+MAP_DATA_VERSION=development
+VITE_API_URL=/api
+VITE_MAP_URL=/map
 ```
 
 ---
@@ -374,17 +375,17 @@ coverage/
 {
   "compilerOptions": {
     "strict": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./packages/*/src/*"],
-      "@shared/*": ["./packages/shared/src/*"],
-      "@client/*": ["./packages/client/src/*"],
-      "@server/*": ["./packages/server/src/*"]
+      "@shared/*": ["packages/shared/src/*"],
+      "@client/*": ["packages/client/src/*"],
+      "@server/*": ["packages/server/src/*"]
     }
   }
 }
 ```
 
-Vite mirrors with `resolve.alias`.
+The explicit aliases map one workspace at a time; a broad `@/*` mapping is intentionally avoided because it is ambiguous. Vite mirrors these aliases with `resolve.alias`.
 
 ---
 
