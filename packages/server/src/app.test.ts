@@ -51,6 +51,7 @@ describe("Fastify server skeleton", () => {
     const paths = document.paths as Record<string, Record<string, Record<string, unknown>>>;
     const operationCount = Object.values(paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
     const refresh = paths["/_auth/refresh"]?.post;
+    const registration = paths["/_auth/register"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -64,6 +65,14 @@ describe("Fastify server skeleton", () => {
     expect(document.info.description).toContain("contract-only");
     expect(paths["/_public/health"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(paths["/_public/health"]?.get?.responses).toHaveProperty("429");
+    expect(registration?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(registration?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      403: expect.any(Object),
+      409: expect.any(Object),
+      429: expect.any(Object)
+    });
     expect(refresh?.["x-borobiya-runtime-status"]).toBe("contract-only");
     expect(refresh?.requestBody).toMatchObject({ required: false });
     expect(refreshParameters).toContainEqual({

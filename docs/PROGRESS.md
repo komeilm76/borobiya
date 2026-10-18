@@ -4,15 +4,15 @@
 
 ---
 
-## Overall: 17% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 18% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline, first seven foundation tasks, and the initial Drizzle schema/migration/seed/user-state tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist; only the health handler is live, while domain handlers, API database integration, map assets, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, and the T1.2.1 registration endpoint are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client shell, root API/client orchestration, and a local Compose service stack now exist. Health and registration are live; registration uses Drizzle-backed atomic persistence and Argon2id hashing. Login and other domain handlers, live-PostgreSQL verification, map assets, feature views, and remaining product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 0% | ⬜ Account-state, session, security-question, cancellation-reason, and PostGIS location schema/migrations plus seeds exist; API handlers, runtime DB integration, security enforcement, and UI remain |
+| Auth & Users | 5% | 🟡 T1.2.1 registration is implemented with persistence, rate limiting, and tests; login, sessions/tokens, recovery, security enforcement, remaining handlers, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -24,12 +24,12 @@ The documentation baseline, first seven foundation tasks, and the initial Drizzl
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 16%
+### Phase 1 — Foundation (Auth & Map) — 17%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 0% | Account-state/security schema, migrations, and bootstrap seed exist; handlers, API DB integration, security enforcement, and UI remain |
+| Auth system | 5% | T1.2.1 registration handler, Argon2id hashing, atomic DB persistence, route-level rate limit, and tests complete; login, tokens/sessions, recovery, authorization enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -75,12 +75,18 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 |---|-------|--------|-------|--------|
 | 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | Fastify does not yet use the database client | Auth handlers cannot persist data; migration and seed commands are explicit developer operations only | TBD | 🟡 Next: T1.2.1 registration and API database integration |
+| 3 | No live PostgreSQL is available in the current agent environment | Registration persistence is wired and tested with an injected store, but the Drizzle transaction/migration path cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and run an end-to-end registration smoke test with PostgreSQL |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
+
+### 2026-10-18 — User registration (T1.2.1)
+
+- Implemented `POST /_auth/register`: Zod validation, five unique existing question IDs, duplicate-username conflict checks (including insert races), sequential Argon2id hashing of the password and `trim().toLowerCase()` answers, and atomic user/answer persistence.
+- Added guest-only 403 handling, a 5-attempt/15-minute per-IP+username limit, runtime OpenAPI status, route regression tests, and updated API/security/task documentation. Login and remaining auth flows are still pending.
+- Validation: 55 workspace tests (26 shared, 27 server, 2 client), all three typechecks, client production build, Drizzle generation with no schema changes, and migration CLI help passed. No live PostgreSQL service is available for transaction/migration integration testing.
 
 ### 2026-10-18 — Completed-task bug review
 

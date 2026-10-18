@@ -54,7 +54,7 @@ bun install
 bun --filter @borobiya/client dev # Vite HMR at http://localhost:5173
 ```
 
-Open `http://localhost:3000/docs` for Swagger or `http://localhost:8080/docs` through Nginx. The auth and reference-data migrations are checked in but are not applied automatically, and the API does not connect to PostgreSQL yet; the map server starts without project tiles/styles. See [DEVELOPMENT.md](./DEVELOPMENT.md#2-docker-compose-linux-macos-or-windows-with-docker-desktop) for details.
+Open `http://localhost:3000/docs` for Swagger or `http://localhost:8080/docs` through Nginx. The auth and reference-data migrations are checked in but are not applied automatically; after setup, `POST /_auth/register` uses PostgreSQL. The map server starts without project tiles/styles. See [DEVELOPMENT.md](./DEVELOPMENT.md#2-docker-compose-linux-macos-or-windows-with-docker-desktop) for details.
 
 ### Without Docker
 
@@ -64,7 +64,7 @@ cp .env.example .env              # replace the JWT placeholders
 bun run dev                       # API + Vite client concurrently
 ```
 
-The current API requires valid environment values but does not open a database connection. The auth/reference migrations and `db:seed` command are available, but nothing runs automatically at startup; map data and `map:dev` are not implemented yet. See [DEVELOPMENT.md](./DEVELOPMENT.md#3-windows-without-docker) for prerequisites.
+The API requires valid environment values; registration opens PostgreSQL connections on demand after the auth/reference migrations and `db:seed` have been run. Database setup is not automatic at startup; map data and `map:dev` are not implemented yet. See [DEVELOPMENT.md](./DEVELOPMENT.md#3-windows-without-docker) for prerequisites.
 
 ---
 

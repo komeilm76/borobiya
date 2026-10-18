@@ -4,7 +4,7 @@ import rateLimit from "@fastify/rate-limit";
 import type { FastifyInstance } from "fastify";
 import type { ServerConfig } from "../config/env";
 
-/** Register baseline HTTP hardening; route-specific limits can be layered on later. */
+/** Register baseline HTTP hardening; auth handlers may add stricter route-specific limits. */
 export async function registerHttpSecurityPlugins(
   app: FastifyInstance,
   config: ServerConfig

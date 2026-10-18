@@ -10,6 +10,8 @@ const jsonSchemaOptions = {
   reused: "inline"
 } as const;
 
+const implementedOperationIds = new Set(["publicHealth", "authRegister"]);
+
 interface JsonObjectSchema {
   properties?: Record<string, unknown>;
   required?: string[];
@@ -155,7 +157,7 @@ function buildOperation(route: ApiRouteDefinition): OpenApiOperation {
     responses: buildResponses(route),
     "x-borobiya-access": route.meta.access,
     // The docs publish the complete contract catalog without registering fake handlers.
-    "x-borobiya-runtime-status": route.meta.operationId === "publicHealth" ? "implemented" : "contract-only"
+    "x-borobiya-runtime-status": implementedOperationIds.has(route.meta.operationId) ? "implemented" : "contract-only"
   };
 
   if (route.meta.description) operation.description = route.meta.description;
@@ -212,7 +214,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.1.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. At this scaffold stage, only the public health operation is registered at runtime; other operations are published as contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health and user registration are implemented at runtime; remaining operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

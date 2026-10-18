@@ -1,6 +1,9 @@
 import { apiRoutes } from "@borobiya/shared/api";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ServerConfig } from "./config/env";
+import { createDatabase } from "./db/client";
+import { DrizzleUserRegistrationStore, type UserRegistrationStore } from "./db/registration-store";
+import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
 import { registerSwagger } from "./plugins/swagger";
 
@@ -18,7 +21,17 @@ const sensitiveLogPaths = [
   "req.body.resetToken"
 ];
 
-export async function createFastifyApp(config: ServerConfig): Promise<FastifyInstance> {
+export interface FastifyAppDependencies {
+  /** Override persistence in tests; production defaults to the configured PostgreSQL database. */
+  registrationStore?: UserRegistrationStore;
+  /** Override hashing in tests; production defaults to the Argon2id helper. */
+  hashPassword?: PasswordHasher;
+}
+
+export async function createFastifyApp(
+  config: ServerConfig,
+  dependencies: FastifyAppDependencies = {}
+): Promise<FastifyInstance> {
   const app = Fastify({
     trustProxy: config.trustedProxyIps.length > 0 ? config.trustedProxyIps : false,
     logger: {
@@ -29,6 +42,16 @@ export async function createFastifyApp(config: ServerConfig): Promise<FastifyIns
 
   await registerHttpSecurityPlugins(app, config);
   await registerSwagger(app, config.openApiServerPath);
+
+  const database = dependencies.registrationStore ? undefined : createDatabase(config.databaseUrl);
+  const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
+  await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
+
+  if (database) {
+    app.addHook("onClose", async () => {
+      await database.client.end();
+    });
+  }
 
   app.get(apiRoutes.public.health.url, async () => ({
     status: "ok" as const,

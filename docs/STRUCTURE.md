@@ -120,14 +120,18 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; only public health is a live handler
+    ├── app.ts                # creates Fastify app; public health and registration handlers are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit tests
     ├── server.ts             # validates environment and listens
     ├── config/
     │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
     │   └── env.test.ts
+    ├── auth/
+    │   ├── register.ts      # registration route, Argon2id hashing, and IP+username limit
+    │   └── register.test.ts # registration behavior/rate-limit regression tests
     ├── db/
-    │   ├── client.ts         # explicit, currently unused Drizzle/Postgres.js factory
+    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime registration
+    │   ├── registration-store.ts # username/question queries and atomic user/answer write
     │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason tables
     │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
     │   ├── seed.ts           # transactional, idempotent reference/admin seeder
@@ -142,7 +146,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI; other paths are contract-only
 ```
 
-The API validates `DATABASE_URL` but does not connect to PostgreSQL; the explicit database factory is not called by Fastify startup. The initial migrations and idempotent seed command are checked in, but auth/domain handlers, realtime, and background jobs are not present yet; the `@borobiya/shared` route descriptors are contracts, not registered runtime endpoints.
+Fastify creates the PostgreSQL client for the registration store, which issues database queries on demand; migrations and the idempotent seed command remain explicit developer operations and are not run at startup. `POST /_auth/register` and public health are live runtime handlers. Other shared route descriptors remain contracts, and the remaining auth/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 
@@ -212,7 +216,7 @@ Compose runs Martin v0.12 against the read-only `map-server/data/` bind mount an
 
 `.env.example` includes API validation settings plus these Compose variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `API_PORT`, `MAP_SERVER_PORT`, and `NGINX_PORT`. The sample JWT/Postgres values are placeholders and must be changed outside local scaffolding.
 
-Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup; it does not currently open a database connection.
+Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup. Registration queries open database connections on demand; migrations and seeds are not automatic.
 
 ---
 
@@ -220,7 +224,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
 - Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
-- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; API database connection remains future work.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; runtime database access currently supports registration only.
 
 ---
 
@@ -287,7 +291,8 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
 - [x] `.env.example`, `.gitignore`, and Docker build exclusions
 - [x] Drizzle/Postgres.js decision, schema/migrations, seed data, and Argon2id bootstrap
-- [ ] API database connection and auth handlers
+- [x] Registration handler with database-backed persistence and Argon2id hashes
+- [ ] Remaining auth/domain handlers and session/token enforcement
 - [ ] Map tile/style/routing/geocoding data and generation pipeline
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

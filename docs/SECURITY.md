@@ -32,7 +32,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - **Hash** same as passwords (argon2id) — store only `answerHash`.
 - **5 unique `questionId`** — validate `new Set(ids).size===5 && ids.length===5` via `zod.superRefine` + DB unique.
 - Table: `user_security_answers (id, userId, questionId, answerHash)` with `UNIQUE(userId, questionId)`.
-- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded, and the future auth flow must persist only their Argon2id hashes.
+- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded. `POST /_auth/register` validates selected IDs and persists only normalized Argon2id answer hashes; future verification must apply the same normalization.
 
 ### 1.4 Forgot Password Invariants
 
@@ -96,7 +96,7 @@ Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store;
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers. Route-specific limits (including IP+username and user/device keys) will be added with the auth and feature handlers.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration now applies the 5/15m IP+username limit in `packages/server/src/auth/register.ts`; the login, password-recovery, and feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
 
 ---
 
@@ -152,7 +152,7 @@ router.beforeEach((to) => {
 
 ### 5.1 `_auth` Guest-Only
 
-If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can redirect cleanly.
+The registration handler fails closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Other `/_auth` handlers must preserve this guest-only invariant when implemented.
 
 ### 5.2 No Delete Invariant
 

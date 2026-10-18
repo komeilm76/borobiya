@@ -3,8 +3,8 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 /**
- * Construct an explicit Drizzle/Postgres.js client. The server bootstrap does not
- * call this factory yet, so adding the ORM does not open a database connection.
+ * Construct a Drizzle/Postgres.js client for runtime handlers. Postgres.js opens
+ * connections on demand when a query is issued; app shutdown closes the pool.
  */
 export function createDatabase(databaseUrl: string) {
   const client = postgres(databaseUrl);

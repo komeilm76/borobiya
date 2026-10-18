@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. At the current scaffold stage, only `GET /_public/health` has a runtime handler; the other documented operations are contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/register` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -58,9 +58,9 @@ Body = z.strictObject({
   username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/),
   password: z.string().min(8).max(1024).regex(/^(?=.*\p{L})(?=.*\p{Nd}).+$/u), // Unicode letter + decimal digit
   confirmPassword: z.string(),
-  securityQuestions: z.array(z.object({
+  securityQuestions: z.array(z.strictObject({
     questionId: z.string().uuid(),
-    answer: z.string().min(1).max(200)
+    answer: z.string().trim().min(1).max(200)
   })).length(5)
 }).superRefine((d, ctx) => {
   if (d.password !== d.confirmPassword) ctx.addIssue({ path: ["confirmPassword"], ... });
@@ -68,11 +68,13 @@ Body = z.strictObject({
 })
 
 → 201 { user: { id, username, createdAt } }
-→ 400 { code: "VALIDATION_ERROR", issues }
+→ 400 { code: "VALIDATION_ERROR", issues } // invalid body or question IDs not in the catalog
+→ 403 { code: "ALREADY_AUTHENTICATED" }
 → 409 { code: "USERNAME_TAKEN" }
+→ 429 { code: "RATE_LIMITED" }
 ```
 
-Normalize answers: `trim().toLowerCase()` before argon2 hash.
+The handler verifies the five question IDs against the seeded catalog, hashes the password and answers with Argon2id, and writes the user plus all five answer hashes in one transaction. Normalize answers: `trim().toLowerCase()` before hashing. Rate: 5 attempts per 15 minutes per `ip+username`.
 
 ### 3.2 POST `/_auth/login`
 
@@ -310,7 +312,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; the server's `GET /_public/health` is currently the only implemented operation.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/register` are currently marked `implemented`.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -349,7 +351,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Zod fail |
+| 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
 | 401 | `UNAUTHORIZED` | Missing/invalid JWT |
 | 403 | `FORBIDDEN` | Wrong role |
 | 403 | `ALREADY_AUTHENTICATED` | Authed user hits `/_auth/*` |

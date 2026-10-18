@@ -804,7 +804,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   bun --filter @borobiya/client generate:api
   ```
 - The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
-- All shared API contracts appear in OpenAPI; only `GET /_public/health` is currently registered at runtime. Contract-only operations are marked with `x-borobiya-runtime-status: contract-only` and return 404 until implemented.
+- All shared API contracts appear in OpenAPI. `GET /_public/health` and `POST /_auth/register` are registered at runtime; other operations are marked `contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract
@@ -917,7 +917,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
   bun install
   bun --filter @borobiya/client dev  # Vite client with HMR at :5173
   ```
-  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); API persistence and project map data/assets are not implemented yet.
+  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); database-backed persistence currently covers registration only, and project map data/assets are not implemented yet.
 
 ### 19.3. Android Build Workflow (planned)
 - **GitHub Actions `android.yml` (not present yet):**
@@ -936,17 +936,17 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 ### 20.1. Production (Ubuntu)
 - OS: **Ubuntu 22.04/24.04 LTS**
 - A local **Compose scaffold** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, and Nginx. Host ports bind to loopback; Nginx is HTTP-only on port 8080. It is not yet a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
-- Secrets via `.env` (never commit). The API currently validates `DATABASE_URL` but does not connect to the database. Auth/reference migrations and an explicit seed command are checked in but are not run at startup; change the local `admin / admin123` credential before exposing the service. The map server has no bundled tile/style/routing/geocoding assets yet.
+- Secrets via `.env` (never commit). Registration uses the configured `DATABASE_URL` after auth/reference migrations and seed data are applied; migrations and seed commands do not run at startup. Change the local `admin / admin123` credential before exposing the service. The map server has no bundled tile/style/routing/geocoding assets yet.
 
 ### 20.2. Development (Windows without Docker)
-- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; the current API skeleton still does not connect to it.
+- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; the registration handler uses the configured database after setup.
 - Steps documented in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md):
   ```bash
   bun install
   cp .env.example .env   # replace the JWT placeholders
   bun run dev            # API + Vite concurrently
   ```
-- The API does not connect to PostgreSQL yet. `db:setup`, migrations/seeds, `map:dev`, and sample map assets are not implemented or bundled.
+- Registration uses Drizzle-backed PostgreSQL persistence once the checked-in migrations and seed data are applied; migrations/seeds are not run automatically. `db:setup`, `map:dev`, and sample map assets are not implemented or bundled.
 
 ---
 

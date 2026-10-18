@@ -113,7 +113,7 @@ docker compose down               # keep the Postgres volume
 docker compose down -v             # destructive: remove database volume
 ```
 
-This is a local scaffold, not production deployment configuration: Nginx is HTTP-only and loopback-bound. The API validates `DATABASE_URL` but does not connect to PostgreSQL; Martin has no project tile/style/routing/geocoding assets yet.
+This is a local scaffold, not production deployment configuration: Nginx is HTTP-only and loopback-bound. Registration uses the configured PostgreSQL database after migrations and seed data are applied; the API does not apply migrations automatically. Martin has no project tile/style/routing/geocoding assets yet.
 
 ### 3.2 Dev (Bun, with watch)
 
