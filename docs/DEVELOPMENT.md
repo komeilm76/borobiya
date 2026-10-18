@@ -215,7 +215,13 @@ Copy this template to `.env`, replace the placeholders, and never commit `.env`.
 | `bun run db:seed` | server | Planned with database/seed tasks; not wired yet |
 | `bun run map:dev` | root | Planned; local Martin scripts are not wired yet |
 | `bun run map:update --region=iran` | map-server | Planned; see MAP_SERVER.md §4 |
-| `bunx zopia --input http://localhost:3000/docs/json --output packages/client/src/generated/zod.ts` | client | Planned with T1.0.6 OpenAPI/codegen wiring |
+| `bun --filter @borobiya/client generate:api` | root | Fetches `/docs/json` from the running API and writes Zopia modules to `packages/client/src/generated/api/` |
+
+---
+
+### OpenAPI client generation
+
+Start the API first, then run `bun --filter @borobiya/client generate:api`. By default the script fetches `http://localhost:3000/docs/json`; set `API_OPENAPI_URL` to use another server or `ZOPIA_OUTPUT_DIR` to change the output directory. Generated code under `packages/client/src/generated/` is intentionally ignored by Git.
 
 ---
 

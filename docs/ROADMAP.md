@@ -45,8 +45,8 @@ gantt
 - [x] Init `packages/server` Fastify skeleton + `@borobiya/shared` — completed 2026-10-18
 - [x] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse — completed 2026-10-18
 - [ ] Root `docker-compose.yml`, `.env.example`, `tsconfig` strict
-- [ ] OpenAPI at `/docs` + `/docs/json` via `fastify-swagger`
-- [ ] Zopia wired: `bunx zopia --input /docs/json --output generated/`
+- [x] OpenAPI at `/docs` + `/docs/json` via `@fastify/swagger` + Swagger UI — completed 2026-10-18
+- [x] Zopia wired: `bun --filter @borobiya/client generate:api` — completed 2026-10-18
 
 ### M1.2 Auth System
 - [ ] `security_questions` seed (15), `user_security_answers` table

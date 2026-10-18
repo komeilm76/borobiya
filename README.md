@@ -756,7 +756,7 @@ router.beforeEach((to) => {
 | **Fastify** | Backend framework | Fast, plugin-based, OpenAPI integration |
 | **PostgreSQL + PostGIS** | Database | For users, missions, + geospatial queries (`ST_Distance`, `GEOGRAPHY`) |
 | **Zod** | Schema validation | For all API input/output, shared between client/server |
-| **OpenAPI / Swagger** | API docs | Auto-generated from Fastify + Zod via `fastify-swagger` |
+| **OpenAPI / Swagger** | API docs | Generated from shared Zod route descriptors via `@fastify/swagger` |
 | **JSDoc** | Code docs | For all exported functions/classes |
 | **km-api** | API helper | Helper for structured API definitions (see 15) |
 | **Zopia** | Swagger → Zod generator | Converts OpenAPI to Zod schemas for client (see 15) |
@@ -792,17 +792,18 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   ```
 
 ### 15.2. km-api
-- A helper library (by Komeil) to **structure Fastify routes** with Zod + OpenAPI in one place.
-- Allows defining: `method, url, zod schema, handler, openapi meta` co-located.
-- Reduces boilerplate for `fastify.route({...})` + `schema` + `preHandler`.
+- A helper library (by Komeil) used by `packages/shared/src/api/define-route.ts` to keep route method, path, Zod schemas, and OpenAPI metadata in a shared descriptor.
+- Application handlers remain server-side and are registered separately; a shared contract does not imply a live endpoint.
+- The server's Swagger catalog is built from these descriptors without creating placeholder handlers.
 
 ### 15.3. Zopia
 - **Docs:** https://komeilm76.github.io/zopia/
-- When backend exposes **OpenAPI/Swagger JSON** (`/docs/json`), frontend can run:
+- The Fastify server exposes **Swagger UI** at `/docs` and **OpenAPI JSON** at `/docs/json`. Start the API, then generate client modules with:
   ```bash
-  bunx zopia --input http://localhost:3000/docs/json --output src/shared/generated/zod.ts
+  bun --filter @borobiya/client generate:api
   ```
-- Zopia **auto-generates Zod schemas + TypeScript types** for all API endpoints.
+- The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
+- All shared API contracts appear in OpenAPI; only `GET /_public/health` is currently registered at runtime. Contract-only operations are marked with `x-borobiya-runtime-status: contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract
@@ -810,11 +811,11 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 
 ### 15.4. Combined Workflow
 ```
-[ shared/schemas (Zod) ] --km-api--> [ Fastify Server ] --generates--> [ OpenAPI JSON /docs/json ]
-                                                                              |
-                                                                              | zopia
-                                                                              v
-[ Frontend src ] <---- [ Auto-generated Zod schemas + TS types ] <------------
+[ shared Zod schemas + route descriptors ] --> [ Fastify Swagger plugin ] --> [ OpenAPI JSON /docs/json ]
+                                                                                |
+                                                                                | Zopia
+                                                                                v
+[ Client source ] <---------- [ Generated client modules ] <--------------------
 ```
 - Folder `shared/` is symlinked or git-submodule between `server/` and `client/` OR monorepo `packages/shared`.
 

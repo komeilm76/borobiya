@@ -2,6 +2,7 @@ import { apiRoutes } from "@borobiya/shared/api";
 import Fastify, { type FastifyInstance } from "fastify";
 import type { ServerConfig } from "./config/env";
 import { registerHttpSecurityPlugins } from "./plugins/security";
+import { registerSwagger } from "./plugins/swagger";
 
 const sensitiveLogPaths = [
   "req.headers.authorization",
@@ -27,6 +28,7 @@ export async function createFastifyApp(config: ServerConfig): Promise<FastifyIns
   });
 
   await registerHttpSecurityPlugins(app, config);
+  await registerSwagger(app);
 
   app.get(apiRoutes.public.health.url, async () => ({
     status: "ok" as const,

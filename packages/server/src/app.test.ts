@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
-import { apiRoutes } from "@borobiya/shared/api";
+import { allApiRoutes, apiRoutes } from "@borobiya/shared/api";
 import { createFastifyApp } from "./app";
 import { parseServerEnv } from "./config/env";
 
@@ -34,6 +34,61 @@ describe("Fastify server skeleton", () => {
     expect(response.json().uptime).toEqual(expect.any(Number));
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("serves Swagger UI and documents shared contracts without fake runtime routes", async () => {
+    const app = await makeApp();
+    const ui = await app.inject({ method: "GET", url: "/docs" });
+    const response = await app.inject({ method: "GET", url: "/docs/json" });
+
+    expect(ui.statusCode).toBe(200);
+    expect(ui.headers["content-type"]).toContain("text/html");
+    expect(ui.body).toContain("swagger-ui-bundle.js");
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("application/json");
+
+    const document = response.json();
+    const paths = document.paths as Record<string, Record<string, Record<string, unknown>>>;
+    const operationCount = Object.values(paths).reduce((count, pathItem) => count + Object.keys(pathItem).length, 0);
+    const refresh = paths["/_auth/refresh"]?.post;
+    const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
+    const userProfile = paths["/_user/me"]?.get;
+    const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
+    const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
+    const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
+    const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
+
+    expect(document.openapi).toBe("3.0.3");
+    expect(operationCount).toBe(allApiRoutes.length);
+    expect(document.info.description).toContain("contract-only");
+    expect(paths["/_public/health"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(paths["/_public/health"]?.get?.responses).toHaveProperty("429");
+    expect(refresh?.["x-borobiya-runtime-status"]).toBe("contract-only");
+    expect(refresh?.requestBody).toMatchObject({ required: false });
+    expect(refreshParameters).toContainEqual({
+      name: "refreshToken",
+      in: "cookie",
+      required: false,
+      schema: { type: "string", minLength: 1 }
+    });
+    expect(userProfile?.security).toEqual([{ bearerAuth: [] }]);
+    expect(mapStyleParameters).toContainEqual({
+      name: "theme",
+      in: "path",
+      required: true,
+      schema: { type: "string", enum: ["light", "dark"] }
+    });
+    expect(uploadPhoto?.requestBody).toHaveProperty("content.multipart/form-data");
+    expect(revokeShare?.responses).toHaveProperty("200", {
+      description: "Successful response with no response body."
+    });
+
+    const unimplemented = await app.inject({
+      method: "POST",
+      url: "/_auth/login",
+      payload: { username: "test_user", password: "password123" }
+    });
+    expect(unimplemented.statusCode).toBe(404);
   });
 
   it("registers the shared map-style descriptor using Fastify path syntax", async () => {
@@ -81,6 +136,7 @@ describe("Fastify server skeleton", () => {
 
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(429);
+    expect(second.json()).toMatchObject({ error: true, code: "RATE_LIMITED", issues: [] });
   });
 
   it("uses the forwarded client IP when the immediate proxy is allowlisted", async () => {

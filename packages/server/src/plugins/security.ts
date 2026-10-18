@@ -30,6 +30,13 @@ export async function registerHttpSecurityPlugins(
   await app.register(rateLimit, {
     global: true,
     max: config.rateLimitMax,
-    timeWindow: config.rateLimitWindowMs
+    timeWindow: config.rateLimitWindowMs,
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: 429,
+      error: true,
+      code: "RATE_LIMITED",
+      message: `Too many requests. Retry in ${context.after}.`,
+      issues: []
+    })
   });
 }

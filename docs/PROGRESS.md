@@ -4,14 +4,14 @@
 
 ---
 
-## Overall: 16% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 17% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline and first five implementation tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton, and a Persian-first Vue client shell with namespaced route placeholders now exist; domain handlers, persistence, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first six implementation tasks are complete. Shared schemas, route contracts, a validated Fastify skeleton with an OpenAPI contract catalog, and a Persian-first Vue client shell with namespaced route placeholders now exist; only the health handler is live, while domain handlers, persistence, feature views, and product functionality remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 71% | 🟡 T1.0.1–T1.0.5 complete; T1.0.6–T1.0.7 pending |
+| Monorepo scaffold | 86% | 🟡 T1.0.1–T1.0.6 complete; T1.0.7 pending |
 | Auth & Users | 0% | ⬜ Schemas and route descriptors exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
@@ -28,7 +28,7 @@ The documentation baseline and first five implementation tasks are complete. Sha
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 71% | T1.0.1–T1.0.5 root config, shared contracts, Fastify shell, and Vue/Vuetify client scaffold done; OpenAPI and root orchestration remain |
+| Monorepo + Contracts | 86% | T1.0.1–T1.0.6 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, and OpenAPI/Zopia wiring done; root orchestration remains |
 | Auth system | 0% | Schemas and route contracts exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
@@ -82,6 +82,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-18 — OpenAPI and Zopia generation (T1.0.6)
+
+- Added Swagger UI at `/docs` and OpenAPI 3.0 JSON at `/docs/json`; the document is generated from all 59 shared Zod route descriptors, including cookie parameters, bearer security, request media types, optional bodies, and no-content responses.
+- Kept unimplemented domain endpoints out of Fastify's runtime route table and marked them `x-borobiya-runtime-status: contract-only`; only the existing health handler is live. Added the global 429 response to the OpenAPI catalog and aligned the rate-limit payload with the shared error shape.
+- Added `bun --filter @borobiya/client generate:api`, which fetches the live OpenAPI document and invokes Zopia into the ignored `packages/client/src/generated/api/` directory.
+- Validation: server tests/typecheck, client typecheck/build, OpenAPI path/operation assertions, and Zopia generation smoke test passed.
+
 ### 2026-10-18 — Vue client foundation (T1.0.5)
 
 - Added the `@borobiya/client` Vue 3/Vite workspace with Vuetify, Tailwind CSS 4, Pinia, VueUse, Vue Router, Persian locale, and RTL shell styling.
@@ -94,7 +101,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 - Added the `@borobiya/server` workspace with Fastify 5, workspace shared contracts, dotenv loading, and Node type support.
 - Added Zod environment validation for `HOST`, `PORT`, PostgreSQL URL, distinct 32+ character JWT secrets, explicit CORS origins, and global rate-limit settings; defaults bind to `0.0.0.0` for container/preview access.
 - Registered Helmet, a strict credentials-aware CORS allowlist, and the global in-memory IP rate limit; added a public health endpoint and sensitive-field log redaction.
-- Added 7 server tests for env validation, health/security headers, CORS, and rate limiting. This is a skeleton only: no database connection, auth middleware, domain handlers, Redis, or OpenAPI wiring yet.
+- Added 7 server tests for env validation, health/security headers, CORS, and rate limiting. At that milestone the server was only a skeleton: no database connection, auth middleware, domain handlers, Redis, or OpenAPI wiring (the contract catalog was added in T1.0.6).
 - Validation: frozen-lockfile install, all shared/server tests and typechecks, and `git diff --check` passed.
 
 ### 2026-10-18 — Shared route descriptors (T1.0.3)

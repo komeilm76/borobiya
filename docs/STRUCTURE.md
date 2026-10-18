@@ -132,9 +132,9 @@ packages/shared/
 
 ```text
 packages/server/
-├── package.json              # Fastify, security plugins, @borobiya/shared, dotenv, zod; DB/socket deps later
+├── package.json              # Fastify, security plugins, @fastify/swagger + UI, @borobiya/shared, dotenv, zod
 ├── src/
-│   ├── app.ts                # createFastifyApp() + public health route
+│   ├── app.ts                # createFastifyApp() + implemented public health route
 │   ├── server.ts             # validated config + listen entrypoint
 │   ├── config/
 │   │   ├── env.ts            # Zod-validated host, port, DB URL, secrets, CORS, rate limits
@@ -142,7 +142,7 @@ packages/server/
 │   ├── plugins/
 │   │   ├── security.ts       # Helmet, CORS allowlist, global rate-limit shell
 │   │   ├── auth.ts           # decorate authenticate + authorize(roles), future
-│   │   ├── swagger.ts        # OpenAPI wiring, T1.0.6
+│   │   ├── swagger.ts        # Swagger UI + OpenAPI catalog from shared descriptors; contract-only paths are not handlers
 │   │   ├── socket.ts         # socket.io init + auth middleware, future
 │   │   └── errorHandler.ts
 │   ├── app.test.ts           # inject, security headers, CORS, and rate limit
@@ -196,10 +196,12 @@ packages/server/
 
 ```text
 packages/client/
-├── package.json              # name: "@borobiya/client"; Vue 3, Vuetify, Tailwind, Pinia, VueUse
+├── package.json              # name: "@borobiya/client"; Vue 3, Vuetify, Tailwind, Pinia, VueUse, Zopia
 ├── README.md
 ├── index.html                # Persian-first RTL document shell
 ├── vite.config.ts            # Vue/Vuetify/Tailwind, @ alias, same-origin API/map proxies
+├── scripts/
+│   └── generate-api.ts       # fetches /docs/json and runs Zopia
 ├── tsconfig.json
 ├── public/
 │   └── favicon.svg

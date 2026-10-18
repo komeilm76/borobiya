@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Route prefixes enforce access: `_auth` (guest-only), `_public` (open), `_user` (authed user), `_admin` (admin). Every request validated by Zod from `packages/shared`. Swagger at `/docs` + `/docs/json` for Zopia codegen.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. At the current scaffold stage, only `GET /_public/health` has a runtime handler; the other documented operations are contract-only and return 404 until implemented.
 
 ---
 
@@ -278,11 +278,11 @@ Seeded on first migration (see SECURITY.md §10).
 
 ```mermaid
 flowchart LR
-  A[packages/shared/schemas/*.ts<br/>loginSchema, sosRequestSchema...]
-  A -->|imported via @borobiya/shared| B[Fastify Server<br/>km-api route defs<br/>zodToJsonSchema → OpenAPI]
+  A[packages/shared schemas + route descriptors<br/>Zod contracts]
+  A -->|imported via @borobiya/shared/api| B[Fastify Swagger plugin<br/>Zod → OpenAPI 3.0 JSON Schema]
   B --> C[GET /docs/json<br/>OpenAPI 3.0]
-  C -->|bunx zopia --input /docs/json --output src/generated/zod.ts| D[Client src/generated/zod.ts<br/>auto Zod schemas + TS types]
-  D --> E[Client api.ts<br/>typed fetch with Zod parse]
+  C -->|bun --filter @borobiya/client generate:api| D[Client src/generated/api<br/>Zopia-generated modules]
+  D --> E[Client API layer<br/>typed contract integration]
 ```
 
 **Adding a new endpoint:**
@@ -307,9 +307,10 @@ flowchart LR
    ```
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
-3. In the server workspace, attach a handler through the Fastify adapter; a shared descriptor does not contain application handlers or register a server route itself.
-4. T1.0.6 wires the `km-api` configs into `/docs/json`; then run `bunx zopia --input http://localhost:3000/docs/json`.
-5. Use generated schemas in client form validation.
+3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; the server's `GET /_public/health` is currently the only implemented operation.
+5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
+6. Use generated modules in client API integration and form validation.
 
 ---
 
