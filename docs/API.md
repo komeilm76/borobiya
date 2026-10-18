@@ -14,6 +14,8 @@ OpenAPI JSON: GET /docs/json
 Health:       GET /_public/health      → { status: "ok", uptime, version }
 ```
 
+The OpenAPI document uses `/` for a directly exposed API and `/api` first when served by Compose through Nginx (with `/` retained as the direct-port alternative). Configure `OPENAPI_SERVER_PATH` when a gateway uses a different prefix.
+
 Headers:
 ```
 Authorization: Bearer <accessToken>   // for _user & _admin
@@ -52,9 +54,9 @@ Implementation sketch (see ARCHITECTURE.md §13.3 and SECURITY.md §5).
 ### 3.1 POST `/_auth/register`
 
 ```ts
-Body = z.object({
+Body = z.strictObject({
   username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/),
-  password: z.string().min(8).regex(/^(?=.*[A-Za-z])(?=.*\d).+$/), // 1 letter + 1 number
+  password: z.string().min(8).max(1024).regex(/^(?=.*\p{L})(?=.*\p{Nd}).+$/u), // Unicode letter + decimal digit
   confirmPassword: z.string(),
   securityQuestions: z.array(z.object({
     questionId: z.string().uuid(),

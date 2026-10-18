@@ -18,6 +18,7 @@ describe("server environment validation", () => {
       databaseUrl: validEnv.DATABASE_URL,
       jwtSecret: validEnv.JWT_SECRET,
       jwtRefreshSecret: validEnv.JWT_REFRESH_SECRET,
+      openApiServerPath: "/",
       corsOrigins: ["http://localhost:5173", "http://localhost:3000"],
       trustedProxyIps: [],
       rateLimitWindowMs: 60_000,
@@ -52,6 +53,12 @@ describe("server environment validation", () => {
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "*" })).toThrow(/CORS_ORIGINS/);
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "http://localhost:5173/app" })).toThrow(/CORS_ORIGINS/);
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "file:///tmp" })).toThrow(/CORS_ORIGINS/);
+  });
+
+  it("validates an OpenAPI base path for direct and gateway deployments", () => {
+    expect(parseServerEnv({ ...validEnv, OPENAPI_SERVER_PATH: "/api" }).openApiServerPath).toBe("/api");
+    expect(() => parseServerEnv({ ...validEnv, OPENAPI_SERVER_PATH: "//attacker.example" })).toThrow(/OPENAPI_SERVER_PATH/);
+    expect(() => parseServerEnv({ ...validEnv, OPENAPI_SERVER_PATH: "api" })).toThrow(/OPENAPI_SERVER_PATH/);
   });
 
   it("validates an explicit trusted-proxy IP/CIDR allowlist", () => {

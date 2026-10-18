@@ -57,7 +57,7 @@ Roles:
 1. Go to **Login** → click **Create account**.
 2. Fill:
    - **Username** — 3–30 chars, lowercase letters/digits/underscore only (e.g., `ali_123`).
-   - **Password** — at least 8 chars, include a letter and a number.
+   - **Password** — 8–1024 characters, include a letter and a decimal digit (Persian-script characters are accepted).
    - **Confirm Password** — same as password.
    - **Security Questions** — pick **5 different** questions from the list, type your answers.
      - Answers are **case-insensitive** (e.g., “Tehran” = “tehran”). Trim spaces.

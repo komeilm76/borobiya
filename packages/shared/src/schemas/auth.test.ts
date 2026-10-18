@@ -43,6 +43,25 @@ describe("auth schemas", () => {
   it("enforces the documented password policy and confirmation", () => {
     expect(registerSchema.safeParse({ ...validRegistration, password: "onlyletters", confirmPassword: "onlyletters" }).success).toBe(false);
     expect(registerSchema.safeParse({ ...validRegistration, confirmPassword: "different123" }).success).toBe(false);
+
+    const persianPassword = "گذرواژه۱۲۳۴";
+    expect(registerSchema.safeParse({
+      ...validRegistration,
+      password: persianPassword,
+      confirmPassword: persianPassword
+    }).success).toBe(true);
+
+    const maximumLengthPassword = "A1".repeat(512);
+    expect(registerSchema.safeParse({
+      ...validRegistration,
+      password: maximumLengthPassword,
+      confirmPassword: maximumLengthPassword
+    }).success).toBe(true);
+    expect(registerSchema.safeParse({
+      ...validRegistration,
+      password: `${maximumLengthPassword}1`,
+      confirmPassword: `${maximumLengthPassword}1`
+    }).success).toBe(false);
   });
 
   it("keeps login validation separate from new-password policy", () => {

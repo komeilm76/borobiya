@@ -82,6 +82,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-18 — Completed-task bug review
+
+- Fixed the OpenAPI server base URL mismatch: Swagger “Try it out” now targets `/api` first behind Compose/Nginx and keeps `/` as the direct-API alternative; host development still defaults to `/`.
+- Replaced the ASCII-only, unbounded new-password check with Unicode letter/decimal-digit validation and a 1024-character limit; aligned seed-password errors and documentation. Corrected the README login example to allow legacy credentials as the actual login schema does.
+- Validation: frozen-lockfile install; 48 workspace tests; all three typechecks; client production build; repeat `db:generate` with no schema changes; `db:migrate --help`; gateway-path assertions; and `git diff --check` all passed.
+
 ### 2026-10-18 — User state and PostGIS last-location schema (T1.1.4)
 
 - Added `is_active`, `is_suspended`, and `must_complete_security_questions` with safe defaults; added nullable `avg_rating NUMERIC(2,1)` constrained to 0–5.

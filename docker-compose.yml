@@ -29,6 +29,7 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}
+      OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
       MAP_SERVER_URL: http://map-server:3000
       MAP_STYLE_LIGHT: http://map-server:3000/styles/light.json

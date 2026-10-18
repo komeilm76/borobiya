@@ -200,7 +200,7 @@ export function buildOpenApiPaths(): OpenApiPaths {
   return paths;
 }
 
-export async function registerSwagger(app: FastifyInstance): Promise<void> {
+export async function registerSwagger(app: FastifyInstance, openApiServerPath = "/"): Promise<void> {
   const tags = [...new Set(allApiRoutes.flatMap((route) => route.meta.tags))].map((name) => ({
     name: name.replace(/^#/, "")
   }));
@@ -214,7 +214,10 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
         description:
           "OpenAPI is generated from the shared Zod route contracts. At this scaffold stage, only the public health operation is registered at runtime; other operations are published as contract-only and currently return 404."
       },
-      servers: [{ url: "/" }],
+      servers: [
+        { url: openApiServerPath },
+        ...(openApiServerPath === "/" ? [] : [{ url: "/" }])
+      ],
       tags,
       components: {
         securitySchemes: {

@@ -20,6 +20,6 @@ export function resolveAdminSeedPassword(environment: AdminSeedEnvironment): str
   try {
     return passwordSchema.parse(configuredPassword ?? DEFAULT_ADMIN_PASSWORD);
   } catch {
-    throw new Error("ADMIN_SEED_PASSWORD must be at least 8 characters and contain a letter and a number.");
+    throw new Error("ADMIN_SEED_PASSWORD must be 8–1024 characters and contain a letter and a decimal digit.");
   }
 }

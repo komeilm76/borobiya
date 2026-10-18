@@ -28,7 +28,7 @@ export async function createFastifyApp(config: ServerConfig): Promise<FastifyIns
   });
 
   await registerHttpSecurityPlugins(app, config);
-  await registerSwagger(app);
+  await registerSwagger(app, config.openApiServerPath);
 
   app.get(apiRoutes.public.health.url, async () => ({
     status: "ok" as const,

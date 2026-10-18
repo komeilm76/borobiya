@@ -310,7 +310,7 @@ Map Server is a **completely separate service** responsible for:
   }
   ```
 - **Rules:**
-  - Password: min 8 chars, at least 1 letter + 1 number (configurable via zod)
+  - Password: 8–1024 chars, at least one Unicode letter + decimal digit
   - 5 security questions from **predefined list** (seeded in DB, e.g., 15 questions)
   - **No duplicate question** allowed — validated via `zod.superRefine` + DB unique check
   - All answers hashed (see 8.4)
@@ -785,9 +785,9 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 - Example:
   ```ts
   // shared/schemas/auth.ts
-  export const loginSchema = z.object({
+  export const loginSchema = z.strictObject({
     username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/),
-    password: z.string().min(8)
+    password: z.string().min(1) // Existing credentials are checked against their stored hash.
   })
   export type LoginInput = z.infer<typeof loginSchema>
   ```

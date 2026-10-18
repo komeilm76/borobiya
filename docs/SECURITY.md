@@ -15,7 +15,7 @@
 
 - **Hash:** `argon2id` (preferred, `memoryCost 64MB, timeCost 3, parallelism 1`) or `bcrypt cost 12`.
 - Never store/recover plaintext. Never log.
-- **Policy:** min 8 chars, at least 1 letter + 1 number (Zod refine, configurable via `PASSWORD_POLICY` env if needed).
+- **Policy:** 8–1024 characters, at least one Unicode letter + decimal digit (validated by the shared Zod schema).
 - Compare via `argon2.verify()` — timing-safe.
 
 ```ts

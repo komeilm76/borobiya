@@ -59,6 +59,7 @@ describe("Fastify server skeleton", () => {
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
 
     expect(document.openapi).toBe("3.0.3");
+    expect(document.servers).toEqual([{ url: "/" }]);
     expect(operationCount).toBe(allApiRoutes.length);
     expect(document.info.description).toContain("contract-only");
     expect(paths["/_public/health"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
@@ -89,6 +90,14 @@ describe("Fastify server skeleton", () => {
       payload: { username: "test_user", password: "password123" }
     });
     expect(unimplemented.statusCode).toBe(404);
+  });
+
+  it("advertises the gateway API prefix while retaining the direct API server", async () => {
+    const app = await makeApp({ openApiServerPath: "/api" });
+    const response = await app.inject({ method: "GET", url: "/docs/json" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().servers).toEqual([{ url: "/api" }, { url: "/" }]);
   });
 
   it("registers the shared map-style descriptor using Fastify path syntax", async () => {

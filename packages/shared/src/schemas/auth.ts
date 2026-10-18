@@ -5,7 +5,8 @@ import { authUserSchema, registeredUserSchema } from "./user";
 export const passwordSchema = z
   .string()
   .min(8)
-  .regex(/^(?=.*[A-Za-z])(?=.*\d).+$/, "Password must contain at least one letter and one number.");
+  .max(1024)
+  .regex(/^(?=.*\p{L})(?=.*\p{Nd}).+$/u, "Password must contain at least one letter and one decimal digit.");
 export type Password = z.infer<typeof passwordSchema>;
 
 export const securityQuestionAnswerSchema = z.strictObject({

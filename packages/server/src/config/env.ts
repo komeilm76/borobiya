@@ -22,6 +22,11 @@ const postgresUrlSchema = z
     return protocol === "postgres:" || protocol === "postgresql:";
   }, "Must use the postgres:// or postgresql:// scheme.");
 
+const openApiServerPathSchema = z
+  .string()
+  .trim()
+  .regex(/^\/(?:[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*)?$/, "Must be / or a safe absolute API path prefix.");
+
 function splitCorsOrigins(value: string): string[] {
   return [...new Set(value.split(",").map((origin) => origin.trim()).filter(Boolean))];
 }
@@ -52,6 +57,7 @@ const rawServerEnvSchema = z.object({
   DATABASE_URL: postgresUrlSchema,
   JWT_SECRET: secretSchema,
   JWT_REFRESH_SECRET: secretSchema,
+  OPENAPI_SERVER_PATH: openApiServerPathSchema.default("/"),
   CORS_ORIGINS: z.string().trim().min(1),
   TRUSTED_PROXY_IPS: z.string().default(""),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1).max(2_147_483_647).default(60_000),
@@ -121,6 +127,7 @@ export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
   databaseUrl: env.DATABASE_URL,
   jwtSecret: env.JWT_SECRET,
   jwtRefreshSecret: env.JWT_REFRESH_SECRET,
+  openApiServerPath: env.OPENAPI_SERVER_PATH,
   corsOrigins: splitCorsOrigins(env.CORS_ORIGINS),
   trustedProxyIps: splitTrustedProxyIps(env.TRUSTED_PROXY_IPS),
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
