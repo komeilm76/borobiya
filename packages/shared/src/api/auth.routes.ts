@@ -52,6 +52,7 @@ export const authRoutes = {
     meta: {
       operationId: "authLogin",
       summary: "Authenticate with username and password",
+      description: "Web clients receive the refresh token only via an HttpOnly cookie; native clients may receive it in the response body.",
       tags: ["auth"],
       access: "guest"
     }
@@ -60,14 +61,14 @@ export const authRoutes = {
     method: "POST",
     url: "/_auth/refresh",
     schema: {
-      body: refreshBodySchema,
+      body: refreshBodySchema.optional(),
       cookies: refreshCookiesSchema,
       responses: { 200: refreshResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
     },
     meta: {
       operationId: "authRefresh",
       summary: "Rotate refresh and access tokens",
-      description: "Accepts a refresh token in the request body or the configured refresh-token cookie.",
+      description: "Accepts a refresh token in the request body or cookie. Web clients receive the rotated token via an HttpOnly cookie; native clients may use the response body.",
       tags: ["auth"],
       access: "guest"
     }
@@ -76,12 +77,14 @@ export const authRoutes = {
     method: "POST",
     url: "/_auth/logout",
     schema: {
+      body: refreshBodySchema.optional(),
       cookies: refreshCookiesSchema,
       responses: { 200: logoutResponseSchema, 401: errorSchema, 403: errorSchema }
     },
     meta: {
       operationId: "authLogout",
       summary: "Invalidate the current refresh token",
+      description: "Accepts the refresh token from the HttpOnly cookie or, for native clients, the request body.",
       tags: ["auth"],
       access: "guest"
     }

@@ -12,8 +12,7 @@ import {
   apiErrorResponses,
   noContentResponseSchema,
   locationHistoryQuerySchema,
-  sharePathParamsSchema,
-  uuidPathParamsSchema
+  sharePathParamsSchema
 } from "./common";
 import { defineRoute } from "./define-route";
 
@@ -34,9 +33,9 @@ export const locationRoutes = {
   }),
   revokeShare: defineRoute({
     method: "DELETE",
-    url: "/_user/location/share/:id",
+    url: "/_user/location/share/:shareId",
     schema: {
-      params: uuidPathParamsSchema,
+      params: sharePathParamsSchema,
       responses: { 200: noContentResponseSchema, ...apiErrorResponses }
     },
     meta: {

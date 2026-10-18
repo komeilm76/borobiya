@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   forgotPasswordVerifySchema,
+  loginResponseSchema,
   loginSchema,
+  refreshResponseSchema,
   registerSchema
 } from "./auth";
+import { apiRoutes } from "../api";
 
 const questionIds = [
   "00000000-0000-4000-8000-000000000001",
@@ -57,5 +60,25 @@ describe("auth schemas", () => {
       ...valid,
       answers: [valid.answers[0], valid.answers[0], valid.answers[2]]
     }).success).toBe(false);
+  });
+
+  it("supports HttpOnly-cookie web sessions and secure-storage native token bodies", () => {
+    const loginWithoutBodyToken = {
+      accessToken: "access-token",
+      user: {
+        id: questionIds[0],
+        username: "rescue_user1",
+        role: "user",
+        mustCompleteSecurityQuestions: false
+      }
+    };
+    expect(loginResponseSchema.safeParse(loginWithoutBodyToken).success).toBe(true);
+    expect(loginResponseSchema.safeParse({ ...loginWithoutBodyToken, refreshToken: "refresh-token" }).success).toBe(true);
+    expect(refreshResponseSchema.safeParse({ accessToken: "access-token" }).success).toBe(true);
+    expect(refreshResponseSchema.safeParse({ accessToken: "access-token", refreshToken: "refresh-token" }).success).toBe(true);
+    expect(apiRoutes.auth.refresh.schema.body?.safeParse(undefined).success).toBe(true);
+    expect(apiRoutes.auth.refresh.schema.body?.safeParse({ refreshToken: "refresh-token" }).success).toBe(true);
+    expect(apiRoutes.auth.logout.schema.body?.safeParse(undefined).success).toBe(true);
+    expect(apiRoutes.auth.logout.schema.body?.safeParse({ refreshToken: "refresh-token" }).success).toBe(true);
   });
 });

@@ -158,6 +158,8 @@ DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
 JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
 JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+# Explicit reverse-proxy IPs/CIDRs only; leave empty for direct access.
+TRUSTED_PROXY_IPS=
 API_PROXY_TARGET=http://127.0.0.1:3000
 
 # Global rate limit: 100 requests per minute; auth/SOS routes apply stricter limits.
@@ -257,7 +259,7 @@ bun --filter @borobiya/client build
 - Shared-contract tests use Vitest and cover the documented Zod invariants and route descriptors.
 - Server tests use `fastify.inject()`; no network listener or database is needed.
 - Client tests verify namespaced routes and placeholder registration; feature/component tests will be added with those features.
-- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, host/port, and rate-limit values; no database connection is opened yet.
+- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, trusted proxy IP/CIDRs, host/port, and rate-limit values; no database connection is opened yet.
 - The Vite browser client uses same-origin `/api` and `/map` paths; its server-side dev proxy reads backend targets from the root `.env`.
 
 ---

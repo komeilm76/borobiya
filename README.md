@@ -285,8 +285,10 @@ Map Server is a **completely separate service** responsible for:
 - **Only:** `username` + `password` — No email, no phone number.
 - Endpoint: `POST /_auth/login`
   ```ts
-  { username: string, password: string } -> { accessToken, refreshToken, user }
+  { username: string, password: string } -> { accessToken, user }
   ```
+  - Web: the refresh token is set only as an HttpOnly cookie, never returned in JSON.
+  - Native: the refresh token may be returned in the body for platform secure storage.
 - Username is **arbitrary unique identifier** (3-30 chars, alphanumeric + underscore, lowercase).
 - Rate-limited: 5 attempts / 15min per IP+username.
 
@@ -689,7 +691,7 @@ Table missions (
   PATCH /_user/me
   GET  /_user/devices
   POST /_user/location/share
-  DELETE /_user/location/share/:id
+  DELETE /_user/location/share/:shareId
   POST /_user/sos/requests
   GET  /_user/sos/requests
   GET  /_user/sos/missions

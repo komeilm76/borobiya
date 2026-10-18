@@ -28,14 +28,35 @@ describe("shared km-api route descriptors", () => {
     for (const route of allApiRoutes) {
       const pathParams = [...route.url.matchAll(/:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)\}/g)]
         .map((match) => match[1] ?? match[2]);
-      const schemaParams = route.schema.params ? Object.keys(route.schema.params.shape) : [];
+      const paramsSchema = "params" in route.schema ? route.schema.params : undefined;
+      const schemaParams = paramsSchema ? Object.keys(paramsSchema.shape) : [];
       const openApiPath = route.url.replace(/:([A-Za-z_][A-Za-z0-9_]*)/g, "{$1}");
+      const expressParams = [...route.makeExpressPathShape().matchAll(/:([A-Za-z_][A-Za-z0-9_]*)/g)]
+        .map((match) => match[1]);
 
       expect(route.url.startsWith("/")).toBe(true);
       expect(schemaParams).toEqual(pathParams);
+      expect(expressParams).toEqual(pathParams);
       expect(route.makeOpenApiPathShape()).toBe(openApiPath);
       expect(Object.keys(route.response).length).toBeGreaterThan(0);
     }
+  });
+
+  it("uses the documented shareId name in the revoke route and parameter schema", () => {
+    const route = apiRoutes.location.revokeShare;
+
+    expect(route.url).toBe("/_user/location/share/:shareId");
+    expect(Object.keys(route.schema.params?.shape ?? {})).toEqual(["shareId"]);
+    expect(route.makeFullPath({ shareId: "00000000-0000-4000-8000-000000000001" }))
+      .toBe("/_user/location/share/00000000-0000-4000-8000-000000000001");
+  });
+
+  it("converts OpenAPI placeholders for Fastify routes with static suffixes", () => {
+    const route = apiRoutes.public.mapStyle;
+
+    expect(route.makeFullPath({ theme: "light" })).toBe("/_public/map/styles/light.json");
+    expect(route.makeExpressPathShape()).toBe("/_public/map/styles/:theme.json");
+    expect(route.makeOpenApiPathShape()).toBe("/_public/map/styles/{theme}.json");
   });
 
   it("maps access policy and deprecated metadata onto km-api fields", () => {

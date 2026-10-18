@@ -1,5 +1,6 @@
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
+import { isIP } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,25 @@ function splitCorsOrigins(value: string): string[] {
   return [...new Set(value.split(",").map((origin) => origin.trim()).filter(Boolean))];
 }
 
+function splitTrustedProxyIps(value: string): string[] {
+  return [...new Set(value.split(",").map((ip) => ip.trim()).filter(Boolean))];
+}
+
+function isValidTrustedProxyIp(value: string): boolean {
+  const [address, prefix, ...extraParts] = value.split("/");
+  if (!address || extraParts.length > 0) return false;
+
+  const ipVersion = isIP(address);
+  if (ipVersion === 0) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d+$/.test(prefix)) return false;
+
+  const prefixLength = Number(prefix);
+  const maxPrefixLength = ipVersion === 4 ? 32 : 128;
+  // A /0 entry would trust every possible peer and defeat the allowlist.
+  return prefixLength > 0 && prefixLength <= maxPrefixLength;
+}
+
 const rawServerEnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   HOST: z.string().trim().min(1).default("0.0.0.0"),
@@ -33,6 +53,7 @@ const rawServerEnvSchema = z.object({
   JWT_SECRET: secretSchema,
   JWT_REFRESH_SECRET: secretSchema,
   CORS_ORIGINS: z.string().trim().min(1),
+  TRUSTED_PROXY_IPS: z.string().default(""),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1).max(2_147_483_647).default(60_000),
   RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000_000).default(100)
 }).superRefine((env, context) => {
@@ -80,6 +101,17 @@ const rawServerEnvSchema = z.object({
       });
     }
   });
+
+  const trustedProxyIps = splitTrustedProxyIps(env.TRUSTED_PROXY_IPS);
+  trustedProxyIps.forEach((ip, index) => {
+    if (!isValidTrustedProxyIp(ip)) {
+      context.addIssue({
+        code: "custom",
+        path: ["TRUSTED_PROXY_IPS"],
+        message: `Entry ${index + 1} must be an IP address or CIDR with a non-zero prefix.`
+      });
+    }
+  });
 });
 
 export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
@@ -90,6 +122,7 @@ export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
   jwtSecret: env.JWT_SECRET,
   jwtRefreshSecret: env.JWT_REFRESH_SECRET,
   corsOrigins: splitCorsOrigins(env.CORS_ORIGINS),
+  trustedProxyIps: splitTrustedProxyIps(env.TRUSTED_PROXY_IPS),
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
   rateLimitMax: env.RATE_LIMIT_MAX
 }));

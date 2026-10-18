@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { apiRoutes } from "@borobiya/shared/api";
 import { createFastifyApp } from "./app";
 import { parseServerEnv } from "./config/env";
 
@@ -35,6 +36,18 @@ describe("Fastify server skeleton", () => {
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
   });
 
+  it("registers the shared map-style descriptor using Fastify path syntax", async () => {
+    const app = await makeApp();
+    const route = apiRoutes.public.mapStyle;
+    app.get(route.makeExpressPathShape(), async (request) => ({
+      theme: (request.params as { theme: string }).theme
+    }));
+
+    const response = await app.inject({ method: "GET", url: route.makeFullPath({ theme: "light" }) });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ theme: "light" });
+  });
+
   it("allows only configured browser origins and supports credentials", async () => {
     const app = await makeApp();
     const allowed = await app.inject({
@@ -53,12 +66,43 @@ describe("Fastify server skeleton", () => {
     expect(denied.headers["access-control-allow-origin"]).toBeUndefined();
   });
 
-  it("enforces the configured global per-IP rate limit", async () => {
+  it("ignores spoofed forwarded IP headers unless the proxy is trusted", async () => {
     const app = await makeApp({ rateLimitMax: 1 });
-    const first = await app.inject({ method: "GET", url: "/_public/health" });
-    const second = await app.inject({ method: "GET", url: "/_public/health" });
+    const first = await app.inject({
+      method: "GET",
+      url: "/_public/health",
+      headers: { "x-forwarded-for": "203.0.113.1" }
+    });
+    const second = await app.inject({
+      method: "GET",
+      url: "/_public/health",
+      headers: { "x-forwarded-for": "203.0.113.2" }
+    });
 
     expect(first.statusCode).toBe(200);
     expect(second.statusCode).toBe(429);
+  });
+
+  it("uses the forwarded client IP when the immediate proxy is allowlisted", async () => {
+    const app = await makeApp({ rateLimitMax: 1, trustedProxyIps: ["127.0.0.1"] });
+    const firstClient = await app.inject({
+      method: "GET",
+      url: "/_public/health",
+      headers: { "x-forwarded-for": "203.0.113.1" }
+    });
+    const secondClient = await app.inject({
+      method: "GET",
+      url: "/_public/health",
+      headers: { "x-forwarded-for": "203.0.113.2" }
+    });
+    const repeatedClient = await app.inject({
+      method: "GET",
+      url: "/_public/health",
+      headers: { "x-forwarded-for": "203.0.113.1" }
+    });
+
+    expect(firstClient.statusCode).toBe(200);
+    expect(secondClient.statusCode).toBe(200);
+    expect(repeatedClient.statusCode).toBe(429);
   });
 });

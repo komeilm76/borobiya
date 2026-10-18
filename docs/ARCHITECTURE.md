@@ -110,8 +110,8 @@ sequenceDiagram
   User->>Client: POST /_auth/login {username,password}
   Client->>API: rate-limit 5/15min per IP+username
   API->>DB: verify hash, check isActive/isSuspended/mustCompleteSecurityQuestions
-  API-->>Client: {accessToken 15m, refreshToken 7d httpOnly}
-  Note over Client: store access in memory, refresh via httpOnly cookie or Capacitor secure storage
+  API-->>Client: {accessToken 15m, user} + HttpOnly refresh cookie (web)
+  Note over Client: Web stores access in memory; native clients may receive refreshToken in body for secure storage
 ```
 
 **Forgot Password:**

@@ -112,7 +112,8 @@ export type RefreshBody = z.infer<typeof refreshBodySchema>;
 
 export const refreshResponseSchema = z.strictObject({
   accessToken: z.string().min(1),
-  refreshToken: z.string().min(1)
+  // Web clients receive this token only through an HttpOnly cookie; native clients may use the body.
+  refreshToken: z.string().min(1).optional()
 });
 export type RefreshResponse = z.infer<typeof refreshResponseSchema>;
 
@@ -123,7 +124,8 @@ export type LogoutResponse = z.infer<typeof logoutResponseSchema>;
 
 export const loginResponseSchema = z.strictObject({
   accessToken: z.string().min(1),
-  refreshToken: z.string().min(1),
+  // Web clients receive this token only through an HttpOnly cookie; native clients may use the body.
+  refreshToken: z.string().min(1).optional(),
   user: authUserSchema
 });
 export type LoginResponse = z.infer<typeof loginResponseSchema>;

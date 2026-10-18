@@ -74,27 +74,32 @@ Normalize answers: `trim().toLowerCase()` before argon2 hash.
 
 ### 3.2 POST `/_auth/login`
 
-```ts
-Body { username, password } → 200 { accessToken, refreshToken, user: { id, username, role, mustCompleteSecurityQuestions } }
-→ 401 { code: "INVALID_CREDENTIALS" }
-→ 403 { code: "ACCOUNT_SUSPENDED", suspendedUntil, reason }
-→ 403 { code: "SECURITY_QUESTIONS_REQUIRED" } // when mustCompleteSecurityQuestions
-→ 429 { code: "RATE_LIMITED" }
+```text
+Request: { username, password }
+Web 200: { accessToken, user } + Set-Cookie for the HttpOnly refresh token
+Native 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
+401: { code: "INVALID_CREDENTIALS" }
+403: { code: "ACCOUNT_SUSPENDED", suspendedUntil, reason }
+403: { code: "SECURITY_QUESTIONS_REQUIRED" } // when mustCompleteSecurityQuestions
+429: { code: "RATE_LIMITED" }
 ```
 
 Rate: 5/15m per `ip+username`.
 
 ### 3.3 POST `/_auth/refresh`
 
-```ts
-Body { refreshToken } or cookie → 200 { accessToken, refreshToken }
-→ 401 { code: "INVALID_REFRESH" }
+```text
+Request: native body { refreshToken } or web HttpOnly cookie (body may be omitted)
+Web 200: { accessToken } + rotated HttpOnly refresh-token cookie
+Native 200: { accessToken, refreshToken } (store refreshToken in secure storage)
+401: { code: "INVALID_REFRESH" }
 ```
 
 ### 3.4 POST `/_auth/logout`
 
-```ts
-→ 200 { ok: true }  // invalidate refreshTokenHash in user_sessions
+```text
+Request: web HttpOnly refresh-token cookie or native body { refreshToken }
+200: { ok: true }  // invalidate refreshTokenHash in user_sessions
 ```
 
 ### 3.5 Forgot Password
@@ -173,7 +178,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 ```
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
 → 201 { shareId, expiresAt? }
-DELETE /_user/location/share/:id         → 200 (immediate revoke)
+DELETE /_user/location/share/:shareId    → 200 (immediate revoke)
 GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }

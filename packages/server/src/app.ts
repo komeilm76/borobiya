@@ -19,6 +19,7 @@ const sensitiveLogPaths = [
 
 export async function createFastifyApp(config: ServerConfig): Promise<FastifyInstance> {
   const app = Fastify({
+    trustProxy: config.trustedProxyIps.length > 0 ? config.trustedProxyIps : false,
     logger: {
       level: config.nodeEnv === "test" ? "silent" : "info",
       redact: { paths: sensitiveLogPaths, censor: "[REDACTED]" }

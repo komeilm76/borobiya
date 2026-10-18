@@ -19,6 +19,7 @@ describe("server environment validation", () => {
       jwtSecret: validEnv.JWT_SECRET,
       jwtRefreshSecret: validEnv.JWT_REFRESH_SECRET,
       corsOrigins: ["http://localhost:5173", "http://localhost:3000"],
+      trustedProxyIps: [],
       rateLimitWindowMs: 60_000,
       rateLimitMax: 100
     });
@@ -51,6 +52,18 @@ describe("server environment validation", () => {
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "*" })).toThrow(/CORS_ORIGINS/);
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "http://localhost:5173/app" })).toThrow(/CORS_ORIGINS/);
     expect(() => parseServerEnv({ ...validEnv, CORS_ORIGINS: "file:///tmp" })).toThrow(/CORS_ORIGINS/);
+  });
+
+  it("validates an explicit trusted-proxy IP/CIDR allowlist", () => {
+    const config = parseServerEnv({
+      ...validEnv,
+      TRUSTED_PROXY_IPS: "127.0.0.1, 10.20.0.0/16,127.0.0.1"
+    });
+    expect(config.trustedProxyIps).toEqual(["127.0.0.1", "10.20.0.0/16"]);
+
+    expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "proxy.internal" })).toThrow(/TRUSTED_PROXY_IPS/);
+    expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "0.0.0.0/0" })).toThrow(/TRUSTED_PROXY_IPS/);
+    expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "192.168.0.1/33" })).toThrow(/TRUSTED_PROXY_IPS/);
   });
 
   it("rejects invalid ports and non-Postgres database URLs", () => {

@@ -66,6 +66,7 @@ const ok = await argon2.verify(hash, password);
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
 - Payload: `{ sub: userId, role: 'user'|'admin', deviceId, iat, exp }`.
 - Refresh flow rotates refresh token (invalidate old hash in `user_sessions.refreshTokenHash`).
+- Web login/refresh responses must not expose `refreshToken` in JSON; rotate it through an `HttpOnly` cookie. Native clients may use the body and must store the token with platform secure storage.
 
 ### 2.2 Sessions & Devices
 
@@ -93,7 +94,7 @@ Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store;
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Route-specific limits (including IP+username and user/device keys) will be added with the auth and feature handlers.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers. Route-specific limits (including IP+username and user/device keys) will be added with the auth and feature handlers.
 
 ---
 
