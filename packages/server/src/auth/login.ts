@@ -3,6 +3,7 @@ import { apiRoutes } from "@borobiya/shared/api";
 import { loginSchema } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
 import { hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
+import { usernameRateLimitKey } from "./rate-limit";
 import { refreshTokenCookie } from "./cookies";
 import { DUMMY_ARGON2ID_HASH, verifyPassword as argon2VerifyPassword } from "../security/password";
 import type { UserLoginStore } from "../db/login-store";
@@ -23,10 +24,6 @@ function errorResponse(code: string, message: string, issues: unknown[] = []) {
   return { error: true as const, code, message, issues };
 }
 
-function isLoginInput(value: unknown): value is { username?: unknown } {
-  return typeof value === "object" && value !== null;
-}
-
 export async function registerLoginRoute(
   app: FastifyInstance,
   dependencies: LoginRouteDependencies
@@ -40,13 +37,7 @@ export async function registerLoginRoute(
         max: 5,
         timeWindow: 15 * 60 * 1000,
         hook: "preHandler",
-        keyGenerator: (request) => {
-          const body = isLoginInput(request.body)
-            ? request.body as { username?: unknown }
-            : undefined;
-          const username = typeof body?.username === "string" ? body.username.toLowerCase() : "<invalid>";
-          return `${request.ip}:${username}`;
-        }
+        keyGenerator: usernameRateLimitKey
       }
     }
   }, async (request, reply) => {
@@ -65,7 +56,20 @@ export async function registerLoginRoute(
     }
 
     const user = await dependencies.store.findUserByUsername(parsed.data.username);
-    const passwordMatches = await verifyPassword(user?.passwordHash ?? DUMMY_LOGIN_PASSWORD_HASH, parsed.data.password);
+    let passwordMatches = false;
+    try {
+      passwordMatches = await verifyPassword(user?.passwordHash ?? DUMMY_LOGIN_PASSWORD_HASH, parsed.data.password);
+    } catch {
+      // A malformed/corrupted stored hash must fail closed without making the account lookup timing obvious.
+      if (user) {
+        try {
+          await verifyPassword(DUMMY_LOGIN_PASSWORD_HASH, parsed.data.password);
+        } catch {
+          // The dummy verification also fails closed if the verifier itself is unavailable.
+        }
+      }
+      passwordMatches = false;
+    }
     if (!user || !passwordMatches) {
       return reply.code(401).send(errorResponse("INVALID_CREDENTIALS", "Invalid username or password."));
     }

@@ -134,8 +134,12 @@ packages/server/
     │   ├── login.test.ts     # token/session/account-status regression tests
     │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
     │   ├── register.test.ts  # registration behavior/rate-limit regression tests
+    │   ├── rate-limit.ts     # bounded per-IP+username limiter key generation
+    │   ├── rate-limit.test.ts # bounded-key regression tests
     │   ├── session.ts        # refresh rotation and logout routes
-    │   └── forgot-password.ts # server-selected recovery challenges and reset flow
+    │   ├── forgot-password.ts # server-selected recovery challenges and reset flow
+    │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
+    │   └── recovery-decoys.test.ts
     ├── db/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks and user-only insert
@@ -152,7 +156,8 @@ packages/server/
     ├── security/
     │   ├── password.ts      # Argon2id hash/verify helpers
     │   ├── password.test.ts
-    │   └── tokens.ts        # HS256 access/refresh JWT signing and verification
+    │   ├── tokens.ts        # HS256 access/refresh JWT signing and verification
+    │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status

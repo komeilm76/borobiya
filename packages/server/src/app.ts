@@ -84,6 +84,7 @@ export async function createFastifyApp(
   });
   await registerForgotPasswordRoutes(app, {
     store: recoveryStore,
+    decoySecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword,
     verifyAnswer: dependencies.verifySecurityAnswer
   });

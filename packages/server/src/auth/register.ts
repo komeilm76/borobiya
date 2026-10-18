@@ -3,6 +3,7 @@ import { registerSchema, type RegisterInput } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
 import { hashPassword as argon2HashPassword } from "../security/password";
 import type { RegistrationAnswerHash, UserRegistrationStore } from "../db/registration-store";
+import { usernameRateLimitKey } from "./rate-limit";
 
 export type PasswordHasher = (password: string) => Promise<string>;
 
@@ -19,10 +20,6 @@ function errorResponse(code: string, message: string, issues: unknown[] = []) {
   return { error: true as const, code, message, issues };
 }
 
-function isRegistrationInput(value: unknown): value is { username?: unknown } {
-  return typeof value === "object" && value !== null;
-}
-
 export async function registerAuthRoutes(
   app: FastifyInstance,
   dependencies: RegisterRouteDependencies
@@ -36,13 +33,7 @@ export async function registerAuthRoutes(
         max: 5,
         timeWindow: 15 * 60 * 1000,
         hook: "preHandler",
-        keyGenerator: (request) => {
-          const body = isRegistrationInput(request.body)
-            ? request.body as { username?: unknown }
-            : undefined;
-          const username = typeof body?.username === "string" ? body.username.toLowerCase() : "<invalid>";
-          return `${request.ip}:${username}`;
-        }
+        keyGenerator: usernameRateLimitKey
       }
     }
   }, async (request, reply) => {

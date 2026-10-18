@@ -49,8 +49,8 @@ export type SecurityQuestionsResponse = z.infer<typeof securityQuestionsResponse
 
 export const loginSchema = z.strictObject({
   username: usernameSchema,
-  // Login checks the stored credential; new-password policy is applied at creation/reset.
-  password: z.string().min(1)
+  // Login checks the stored credential; bound it to the largest password accepted at creation/reset.
+  password: z.string().min(1).max(1024)
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 

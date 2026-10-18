@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { idSchema } from "@borobiya/shared";
 import type { UserRole } from "@borobiya/shared";
 import { jwtVerify, SignJWT } from "jose";
 
@@ -49,7 +50,10 @@ async function verifySessionToken(
   expectedUse: "access" | "refresh"
 ): Promise<SessionTokenIdentity | null> {
   try {
-    const { payload } = await jwtVerify(token, textEncoder.encode(secret), { algorithms: ["HS256"] });
+    const { payload } = await jwtVerify(token, textEncoder.encode(secret), {
+      algorithms: ["HS256"],
+      requiredClaims: ["exp"]
+    });
     const sessionId = typeof payload.sessionId === "string"
       ? payload.sessionId
       : typeof payload.jti === "string"
@@ -58,9 +62,11 @@ async function verifySessionToken(
     if (
       payload.tokenUse !== expectedUse ||
       typeof payload.sub !== "string" ||
+      !idSchema.safeParse(payload.sub).success ||
       typeof payload.deviceId !== "string" ||
       (payload.role !== "user" && payload.role !== "admin") ||
-      !sessionId
+      !sessionId ||
+      !idSchema.safeParse(sessionId).success
     ) {
       return null;
     }

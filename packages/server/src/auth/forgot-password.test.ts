@@ -15,6 +15,7 @@ import { createFastifyApp } from "../app";
 import { parseServerEnv } from "../config/env";
 import { DUMMY_ARGON2ID_HASH, hashPassword as argon2HashPassword } from "../security/password";
 import { hashPasswordResetToken, PASSWORD_RESET_TOKEN_TTL_SECONDS } from "../security/password-reset-token";
+import { selectRecoveryDecoySet } from "./recovery-decoys";
 import type { SecurityAnswerVerifier } from "./forgot-password";
 
 const testConfig = parseServerEnv({
@@ -250,22 +251,30 @@ describe("POST /_auth/forgot-password/request", () => {
     expect(state.calls.catalogLookups).toBe(0);
   });
 
-  it("returns decoy questions for unknown accounts without revealing account existence in the status or shape", async () => {
+  it("returns stable decoy-question pools for unknown accounts without revealing account existence", async () => {
     const state = makeRecoveryStore({ account: null });
     const app = await makeApp(state.store);
+    const responses = [];
 
-    const response = await app.inject({
-      method: "POST",
-      url: "/_auth/forgot-password/request",
-      payload: { username: "missing_user" }
-    });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      responses.push(await app.inject({
+        method: "POST",
+        url: "/_auth/forgot-password/request",
+        payload: { username: "missing_user" }
+      }));
+    }
 
-    expect(response.statusCode).toBe(200);
-    expect(Object.keys(response.json()).sort()).toEqual(["questionIds", "questions"]);
-    expect(response.json().questionIds).toHaveLength(3);
-    expect(response.json().questionIds.every((id: string) => publicQuestions.some((question) => question.questionId === id))).toBe(true);
+    expect(responses.every(({ statusCode }) => statusCode === 200)).toBe(true);
+    expect(Object.keys(responses[0]!.json()).sort()).toEqual(["questionIds", "questions"]);
+    expect(responses[0]!.json().questionIds).toHaveLength(3);
+    const returnedIds = new Set(responses.flatMap((response) => response.json().questionIds as string[]));
+    const decoyPool = new Set(
+      selectRecoveryDecoySet(publicQuestions, "missing_user", testConfig.jwtSecret).map(({ questionId }) => questionId)
+    );
+    expect([...returnedIds].every((id) => decoyPool.has(id))).toBe(true);
+    expect(returnedIds.size).toBeLessThanOrEqual(5);
     expect(state.calls.savedChallenges).toEqual([]);
-    expect(state.calls.catalogLookups).toBe(1);
+    expect(state.calls.catalogLookups).toBe(5);
   });
 
   it("fails closed if the seeded question catalog cannot provide three decoy questions", async () => {

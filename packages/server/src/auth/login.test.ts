@@ -206,6 +206,23 @@ describe("POST /_auth/login", () => {
     expect(response.json()).toMatchObject({ code: "INVALID_CREDENTIALS" });
   });
 
+  it("fails closed with generic credentials and dummy work for a malformed stored password hash", async () => {
+    const { store, calls } = makeLoginStore({ user: { ...baseUser, passwordHash: "corrupted-hash" } });
+    const verifiedHashes: string[] = [];
+    const app = await makeApp(store, async (hash) => {
+      verifiedHashes.push(hash);
+      if (hash === "corrupted-hash") throw new Error("malformed password hash");
+      return false;
+    });
+
+    const response = await app.inject({ method: "POST", url: "/_auth/login", payload: loginPayload });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ error: true, code: "INVALID_CREDENTIALS" });
+    expect(verifiedHashes).toEqual(["corrupted-hash", DUMMY_LOGIN_PASSWORD_HASH]);
+    expect(calls.sessions).toEqual([]);
+  });
+
   it.each([
     ["inactive", { ...baseUser, isActive: false }, "ACCOUNT_INACTIVE"],
     ["suspended", { ...baseUser, isSuspended: true }, "ACCOUNT_SUSPENDED"]

@@ -1,5 +1,5 @@
 import { apiRoutes } from "@borobiya/shared/api";
-import { createAdminUserSchema, idSchema } from "@borobiya/shared";
+import { createAdminUserSchema } from "@borobiya/shared";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { AdminUserStore } from "../db/admin-user-store";
 import { hashPassword as argon2HashPassword } from "../security/password";
@@ -40,7 +40,7 @@ export async function registerAdminUserRoutes(
     }
 
     const identity = await verifyAccessToken(token, dependencies.jwtSecret);
-    if (!identity || !idSchema.safeParse(identity.userId).success) {
+    if (!identity) {
       return reply.code(401).send(errorResponse("INVALID_ACCESS_TOKEN", "A valid admin access token is required."));
     }
     if (identity.role !== "admin") {

@@ -82,6 +82,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-18 — Auth hardening bug review
+
+- Fixed token verification accepting signed JWTs with no `exp` claim and rejecting malformed UUID subject/session claims before they reach persistence queries.
+- Bound login password input to the largest value accepted at account creation; malformed stored Argon2 hashes now fail with generic `INVALID_CREDENTIALS` after dummy verification rather than returning a server error.
+- Centralized per-IP+username rate-limit key generation; invalid, oversized, and uppercase username variants now share a bounded invalid bucket instead of aliasing valid lowercase usernames. Unknown recovery accounts now draw from a stable, HMAC-keyed five-question decoy pool, closing the repeated-request question-catalog leak.
+- Validation: 129 workspace tests (27 shared, 100 server, 2 client), all three typechecks, client production build, Drizzle generation/no-schema-change check, migration CLI help, and `git diff --check` passed. PostgreSQL integration remains unavailable.
+
 ### 2026-10-18 — Admin user creation (T1.2.5)
 
 - Implemented admin-only `POST /_admin/users` with signed/expiring access-token checks, current admin role/active/suspended-state verification, strict body validation, Argon2id password hashing, optional active-state handling, and race-safe duplicate-username conflicts.

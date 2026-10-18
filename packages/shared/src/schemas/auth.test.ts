@@ -67,9 +67,11 @@ describe("auth schemas", () => {
     }).success).toBe(false);
   });
 
-  it("keeps login validation separate from new-password policy", () => {
+  it("keeps login validation separate from new-password policy while bounding password size", () => {
     expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy" }).success).toBe(true);
     expect(loginSchema.safeParse({ username: "RescueUser", password: "legacy" }).success).toBe(false);
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "x".repeat(1024) }).success).toBe(true);
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "x".repeat(1025) }).success).toBe(false);
   });
 
   it("requires exactly three unique answers in the forgot-password verification step", () => {

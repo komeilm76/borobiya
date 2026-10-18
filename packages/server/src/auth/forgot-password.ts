@@ -18,11 +18,14 @@ import {
   PASSWORD_RESET_TOKEN_TTL_SECONDS
 } from "../security/password-reset-token";
 import { normalizeSecurityAnswer, type PasswordHasher } from "./register";
+import { usernameRateLimitKey } from "./rate-limit";
+import { selectRecoveryDecoySet } from "./recovery-decoys";
 
 export type SecurityAnswerVerifier = (hash: string, answer: string) => Promise<boolean>;
 
 export interface ForgotPasswordRouteDependencies {
   store: UserRecoveryStore;
+  decoySecret: string;
   hashPassword?: PasswordHasher;
   verifyAnswer?: SecurityAnswerVerifier;
 }
@@ -37,14 +40,6 @@ function errorResponse(code: string, message: string, issues: unknown[] = []) {
 
 function isAuthenticated(request: FastifyRequest): boolean {
   return request.headers.authorization !== undefined;
-}
-
-function usernameRateLimitKey(request: FastifyRequest): string {
-  const body = typeof request.body === "object" && request.body !== null
-    ? request.body as { username?: unknown }
-    : undefined;
-  const username = typeof body?.username === "string" ? body.username.toLowerCase() : "<invalid>";
-  return `${request.ip}:${username}`;
 }
 
 function usernameRateLimit() {
@@ -113,7 +108,10 @@ export async function registerForgotPasswordRoutes(
       : await dependencies.store.listSecurityQuestions();
     if (catalog.length < 3) return recoveryUnavailable(reply);
 
-    const questions = sampleThree(catalog);
+    const questionPool = account?.answers.length === 5
+      ? catalog
+      : selectRecoveryDecoySet(catalog, parsed.data.username, dependencies.decoySecret);
+    const questions = sampleThree(questionPool);
     if (account?.answers.length === 5) {
       const now = new Date();
       const challengeId = await dependencies.store.saveRecoveryChallenge({
