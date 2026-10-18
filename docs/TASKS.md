@@ -12,7 +12,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 - [x] **T1.0.1** Init root `package.json` (workspaces), `tsconfig.json` strict, `.gitignore`, `.env.example` → *see STRUCTURE.md §7* — completed 2026-10-18
 - [x] **T1.0.2** Create `packages/shared` with Zod schemas: `auth`, `user`, `location`, `sos`, `admin`, `search`, `common` + enums — completed 2026-10-18
-- [ ] **T1.0.3** Add `km-api` scaffold in `packages/shared/src/api/*` (method, url, schema, meta)
+- [x] **T1.0.3** Add `km-api` scaffold in `packages/shared/src/api/*` (method, url, schema, meta) — completed 2026-10-18
 - [ ] **T1.0.4** Create `packages/server` Fastify skeleton + `app.ts`, `server.ts`, env validation, helmet, cors, rate-limit plugin shell
 - [ ] **T1.0.5** Create `packages/client` Vite+Vue3+Vuetify+Tailwind+Pinia+VueUse skeleton + `views/_auth/_public/_user/_admin` placeholders
 - [ ] **T1.0.6** Wire OpenAPI: `fastify-swagger` → `/docs` + `/docs/json`; Zopia generation script

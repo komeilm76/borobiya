@@ -140,7 +140,7 @@ GET /_auth/security-questions            // alias for guest
 ```
 GET /_public/health                      // { status:"ok" }
 GET /_public/security-questions
-GET /_public/incident-types              // for SOS form dropdown (also under _user)
+GET /_public/incident-types              // public SOS form dropdown
 GET /_public/map/styles/:theme.json     // proxy or redirect to Map Server styles
 ```
 
@@ -282,10 +282,28 @@ flowchart LR
 
 **Adding a new endpoint:**
 
-1. Add `export const mySchema = z.object({...})` in `packages/shared/src/schemas/`.
-2. Add `export const myRoute = defineRoute({ method:'post', url:'/_user/my', schema:{ body:mySchema }, meta:{ tags:['user'] } })` in `packages/shared/src/api/`.
-3. Implement in `packages/server/src/modules/.../*.routes.ts` via `fastify.route(myRoute)`.
-4. Run `bun run docs` → verify Swagger; then on client `bunx zopia --input http://localhost:3000/docs/json`.
+1. Add request and response Zod schemas in `packages/shared/src/schemas/`.
+2. Add a descriptor in `packages/shared/src/api/`:
+
+   ```ts
+   import { defineRoute } from "@borobiya/shared/api";
+
+   export const myRoute = defineRoute({
+     method: "POST",
+     url: "/_user/my",
+     schema: { body: mySchema, responses: { 201: myResponseSchema, 400: errorSchema } },
+     meta: {
+       operationId: "userCreateMyResource",
+       summary: "Create a resource",
+       tags: ["user"],
+       access: "authenticated"
+     }
+   });
+   ```
+
+   `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
+3. In the server workspace, attach a handler through the Fastify adapter; a shared descriptor does not contain application handlers or register a server route itself.
+4. T1.0.6 wires the `km-api` configs into `/docs/json`; then run `bunx zopia --input http://localhost:3000/docs/json`.
 5. Use generated schemas in client form validation.
 
 ---

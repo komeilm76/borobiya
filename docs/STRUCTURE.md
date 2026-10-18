@@ -87,11 +87,11 @@ Alternative: use `pnpm`/`npm` workspaces — but Bun is mandated, so `bun worksp
 
 ## 3. `packages/shared` — Contract Package
 
-**Purpose:** One lightweight runtime dependency (`zod`) for shared schemas and inferred types; no Fastify, Vue, or database imports. The `km-api` route descriptors are added in T1.0.3.
+**Purpose:** Shared Zod schemas, inferred types, and `km-api` route descriptors; runtime dependencies are Zod and `km-api`. No Fastify, Vue, or database imports—the server adds handler wiring separately.
 
 ```text
 packages/shared/
-├── package.json              # name: "@borobiya/shared"; Zod runtime dependency; test/typecheck scripts
+├── package.json              # name: "@borobiya/shared"; Zod + km-api runtime dependencies
 ├── src/
 │   ├── schemas/
 │   │   ├── auth.ts           # loginSchema, registerSchema, forgotSchemas, completeSecurityQuestionsSchema
@@ -103,12 +103,16 @@ packages/shared/
 │   │   ├── common.ts         # paginationQuerySchema, idSchema, errorSchema
 │   │   └── index.ts          # barrel export
 │   ├── api/
-│   │   ├── auth.routes.ts    # km-api definitions (method, url, schema, meta)
-│   │   ├── user.routes.ts
-│   │   ├── admin.routes.ts
+│   │   ├── define-route.ts   # method/url/schema/meta adapter to km-api
+│   │   ├── common.ts         # path, query, response, and error helpers
+│   │   ├── auth.routes.ts
 │   │   ├── public.routes.ts
+│   │   ├── user.routes.ts
+│   │   ├── location.routes.ts
 │   │   ├── sos.routes.ts
-│   │   └── index.ts
+│   │   ├── admin.routes.ts
+│   │   ├── index.ts          # grouped descriptors + complete route registry
+│   │   └── index.test.ts
 │   ├── types/
 │   │   ├── enums.ts          # Severity, MissionStatus, CancellationType, IncidentSlug
 │   │   └── models.ts         # Inferred TS types from Zod (or standalone)

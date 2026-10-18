@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  apiRoutes,
   incidentSlugSchema,
   loginSchema,
   missionProgressStatusSchema,
@@ -12,5 +13,6 @@ describe("shared package barrel", () => {
     expect(severitySchema.enum.high).toBe("high");
     expect(missionProgressStatusSchema.safeParse("on_the_way").success).toBe(true);
     expect(incidentSlugSchema.safeParse("fire").success).toBe(true);
+    expect(apiRoutes.auth.login.url).toBe("/_auth/login");
   });
 });

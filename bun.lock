@@ -13,6 +13,7 @@
       "name": "@borobiya/shared",
       "version": "0.1.0",
       "dependencies": {
+        "km-api": "^0.4.1",
         "zod": "^4.6.7",
       },
     },
@@ -171,6 +172,8 @@
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
     "js-tokens": ["js-tokens@9.0.1", "", {}, "sha512-mxa9E9ITFOt0ban3j6L5MpjwegGz6lBQmM1IJkWeBZGcMxto50+eWdjC/52xDbS2vy0k7vIMK0Fe2wfL9OQSpQ=="],
+
+    "km-api": ["km-api@0.4.1", "", { "peerDependencies": { "zod": "^4.3.6" } }, "sha512-A905O4VGdNyQ3JAKNEXwg85qTyKTBsx+JIqS7psKIuJUM6muZRkXC/Ue6j2y94jjhj5fwHiD77LgG8sGIZl3Vg=="],
 
     "loupe": ["loupe@3.2.1", "", {}, "sha512-CdzqowRJCeLU72bHvWqwRBBlLcMEtIvGrlvef74kMnV2AolS9Y8xUv1I0U/MNAWMhBlKIoyuEgoJ0t/bbwHbLQ=="],
 

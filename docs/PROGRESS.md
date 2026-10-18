@@ -4,15 +4,15 @@
 
 ---
 
-## Overall: 8% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 10% — Phase 1 Foundation underway (2026-10-18)
 
-The documentation baseline and first two implementation tasks are complete. The shared contract package now exists; the API server, client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline and first three implementation tasks are complete. Shared schemas and route contracts now exist; the API server, client runtime, and product features remain unimplemented. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
-| Monorepo scaffold | 29% | 🟡 T1.0.1 and T1.0.2 complete; T1.0.3–T1.0.7 pending |
-| Auth & Users | 0% | ⬜ Contracts exist; auth flows are not implemented |
+| Monorepo scaffold | 43% | 🟡 T1.0.1–T1.0.3 complete; T1.0.4–T1.0.7 pending |
+| Auth & Users | 0% | ⬜ Schemas and route descriptors exist; handlers, persistence, security enforcement, and UI remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -24,11 +24,11 @@ The documentation baseline and first two implementation tasks are complete. The 
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 7%
+### Phase 1 — Foundation (Auth & Map) — 10%
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Monorepo + Contracts | 29% | T1.0.1 root config and T1.0.2 shared Zod contracts done; km-api descriptors and runtime wiring remain |
+| Monorepo + Contracts | 43% | T1.0.1–T1.0.3 root config, shared Zod schemas, and km-api descriptors done; server runtime wiring remains |
 | Auth system | 0% | Schemas exist; endpoints, persistence, security enforcement, and UI remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
@@ -81,6 +81,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-18 — Shared route descriptors (T1.0.3)
+
+- Added `km-api` 0.4.1 and a `defineRoute({ method, url, schema, meta })` adapter that preserves Borobiya descriptors while producing km-api configs.
+- Added 59 route contracts across auth, public, user, location, SOS, and admin APIs. Handler registration and OpenAPI server wiring remain future tasks.
+- Added route tests for unique operation IDs/method paths, path-parameter alignment, OpenAPI path conversion, auth/deprecation mapping, and public exports.
+- Validation: frozen-lockfile install, all 23 Vitest tests across six files, shared TypeScript typecheck, route subpath/path-helper smoke test, and `git diff --check` passed.
 
 ### 2026-10-18 — Shared contracts (T1.0.2)
 
