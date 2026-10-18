@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  forgotPasswordQuestionsResponseSchema,
+  forgotPasswordRequestSchema,
+  forgotPasswordResetSchema,
   forgotPasswordVerifySchema,
   loginResponseSchema,
   loginSchema,
@@ -79,6 +82,25 @@ describe("auth schemas", () => {
       ...valid,
       answers: [valid.answers[0], valid.answers[0], valid.answers[2]]
     }).success).toBe(false);
+  });
+
+  it("validates forgot-password request, exact question response, and password reset contracts", () => {
+    expect(forgotPasswordRequestSchema.safeParse({ username: "rescue_user1" }).success).toBe(true);
+    expect(forgotPasswordRequestSchema.safeParse({ username: "rescue_user1", questionIds: questionIds.slice(0, 3) }).success).toBe(false);
+
+    const questionResponse = {
+      questionIds: questionIds.slice(0, 3),
+      questions: ["First?", "Second?", "Third?"]
+    };
+    expect(forgotPasswordQuestionsResponseSchema.safeParse(questionResponse).success).toBe(true);
+    expect(forgotPasswordQuestionsResponseSchema.safeParse({
+      ...questionResponse,
+      questionIds: [questionIds[0], questionIds[0], questionIds[2]]
+    }).success).toBe(false);
+
+    const reset = { resetToken: "opaque-token", newPassword: "safePass123", confirmPassword: "safePass123" };
+    expect(forgotPasswordResetSchema.safeParse(reset).success).toBe(true);
+    expect(forgotPasswordResetSchema.safeParse({ ...reset, confirmPassword: "otherPass456" }).success).toBe(false);
   });
 
   it("supports HttpOnly-cookie web sessions and secure-storage native token bodies", () => {

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { jwtVerify } from "jose";
 import type { UserRegistrationStore } from "../db/registration-store";
+import type { UserRecoveryStore } from "../db/recovery-store";
 import type { LoginSessionInput, LoginUserRecord, UserLoginStore } from "../db/login-store";
 import { createFastifyApp } from "../app";
 import { parseServerEnv } from "../config/env";
@@ -61,11 +62,21 @@ const registrationStore: UserRegistrationStore = {
   async securityQuestionsExist() { return true; },
   async createUserWithAnswers() { return null; }
 };
+const recoveryStore: UserRecoveryStore = {
+  async findAccountByUsername() { return null; },
+  async listSecurityQuestions() { return []; },
+  async saveRecoveryChallenge() { return null; },
+  async findActiveRecoveryChallenge() { return null; },
+  async issuePasswordResetToken() { return false; },
+  async isPasswordResetTokenValid() { return false; },
+  async resetPasswordWithToken() { return false; }
+};
 
 async function makeApp(store: UserLoginStore, verifyPassword?: PasswordVerifier): Promise<FastifyInstance> {
   const app = await createFastifyApp(testConfig, {
     registrationStore,
     loginStore: store,
+    recoveryStore,
     verifyPassword
   });
   apps.push(app);

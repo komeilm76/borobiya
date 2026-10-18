@@ -7,6 +7,8 @@ import { DrizzleUserLoginStore, type UserLoginStore } from "./db/login-store";
 import { DrizzleUserRegistrationStore, type UserRegistrationStore } from "./db/registration-store";
 import { registerLoginRoute, type PasswordVerifier } from "./auth/login";
 import { registerSessionRoutes } from "./auth/session";
+import { registerForgotPasswordRoutes, type SecurityAnswerVerifier } from "./auth/forgot-password";
+import { DrizzleUserRecoveryStore, type UserRecoveryStore } from "./db/recovery-store";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
 import { registerSwagger } from "./plugins/swagger";
@@ -30,10 +32,14 @@ export interface FastifyAppDependencies {
   registrationStore?: UserRegistrationStore;
   /** Override login/session persistence in tests; production defaults to the configured PostgreSQL database. */
   loginStore?: UserLoginStore;
+  /** Override password-recovery persistence in tests; production defaults to the configured PostgreSQL database. */
+  recoveryStore?: UserRecoveryStore;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
   verifyPassword?: PasswordVerifier;
+  /** Override recovery-answer verification in tests; production uses Argon2id. */
+  verifySecurityAnswer?: SecurityAnswerVerifier;
 }
 
 export async function createFastifyApp(
@@ -53,11 +59,12 @@ export async function createFastifyApp(
   await registerSwagger(app, config.openApiServerPath);
 
   const database =
-    dependencies.registrationStore && dependencies.loginStore
+    dependencies.registrationStore && dependencies.loginStore && dependencies.recoveryStore
       ? undefined
       : createDatabase(config.databaseUrl);
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
   const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
+  const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
   await registerLoginRoute(app, {
     store: loginStore,
@@ -69,6 +76,11 @@ export async function createFastifyApp(
     store: loginStore,
     jwtSecret: config.jwtSecret,
     jwtRefreshSecret: config.jwtRefreshSecret
+  });
+  await registerForgotPasswordRoutes(app, {
+    store: recoveryStore,
+    hashPassword: dependencies.hashPassword,
+    verifyAnswer: dependencies.verifySecurityAnswer
   });
 
   if (database) {

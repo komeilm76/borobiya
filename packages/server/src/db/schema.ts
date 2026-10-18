@@ -89,6 +89,43 @@ export const userSessions = pgTable(
   ]
 );
 
+export const passwordResetChallenges = pgTable(
+  "password_reset_challenges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    questionIds: uuid("question_ids").array().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("password_reset_challenges_user_id_unique").on(table.userId),
+    check("password_reset_challenges_question_ids_count_check", sql`cardinality("question_ids") = 3`),
+    index("password_reset_challenges_expires_at_idx").on(table.expiresAt)
+  ]
+);
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("password_reset_tokens_token_hash_unique").on(table.tokenHash),
+    index("password_reset_tokens_user_id_idx").on(table.userId),
+    index("password_reset_tokens_expires_at_idx").on(table.expiresAt)
+  ]
+);
+
 export const cancellationReasons = pgTable(
   "cancellation_reasons",
   {
@@ -112,4 +149,6 @@ export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
 export type UserSecurityAnswerRow = typeof userSecurityAnswers.$inferSelect;
 export type UserSessionRow = typeof userSessions.$inferSelect;
+export type PasswordResetChallengeRow = typeof passwordResetChallenges.$inferSelect;
+export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type CancellationReasonRow = typeof cancellationReasons.$inferSelect;

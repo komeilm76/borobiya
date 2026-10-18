@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
-import { userSessions, users } from "./schema";
+import {
+  passwordResetChallenges,
+  passwordResetTokens,
+  userSessions,
+  users
+} from "./schema";
 
 describe("users database schema", () => {
   it("declares account flags, bounded ratings, and indexed PostGIS location", () => {
@@ -46,6 +51,28 @@ describe("users database schema", () => {
       .map((column) => ("name" in column ? column.name : undefined))
       .filter((name): name is string => typeof name === "string");
     expect(indexedColumnNames).toEqual(["refresh_token_hash"]);
+  });
+
+  it("stores short-lived recovery challenges and one-time hashed password reset tokens", () => {
+    const challengeConfig = getTableConfig(passwordResetChallenges);
+    const tokenConfig = getTableConfig(passwordResetTokens);
+    const challengeColumns = new Map(challengeConfig.columns.map((column) => [column.name, column]));
+    const tokenColumns = new Map(tokenConfig.columns.map((column) => [column.name, column]));
+
+    expect(challengeColumns.get("question_ids")?.getSQLType()).toBe("uuid[]");
+    expect(challengeColumns.get("expires_at")?.notNull).toBe(true);
+    expect(challengeColumns.get("consumed_at")?.notNull).toBe(false);
+    expect(challengeConfig.uniqueConstraints.some(({ name }) => name === "password_reset_challenges_user_id_unique")).toBe(true);
+    expect(challengeConfig.checks.some(({ name }) => name === "password_reset_challenges_question_ids_count_check")).toBe(true);
+
+    expect(tokenColumns.get("token_hash")?.notNull).toBe(true);
+    expect(tokenConfig.uniqueConstraints.some(({ name }) => name === "password_reset_tokens_token_hash_unique")).toBe(true);
+    expect(tokenConfig.indexes.some(({ config: indexConfig }) => indexConfig.name === "password_reset_tokens_user_id_idx")).toBe(true);
+
+    const migrationSql = readFileSync(new URL("../../drizzle/0004_spotty_captain_midlands.sql", import.meta.url), "utf8");
+    expect(migrationSql).toContain('CREATE TABLE "password_reset_challenges"');
+    expect(migrationSql).toContain('CREATE TABLE "password_reset_tokens"');
+    expect(migrationSql).toContain('CONSTRAINT "password_reset_tokens_token_hash_unique" UNIQUE("token_hash")');
   });
 
   it("enables PostGIS before declaring the unquoted geography column", () => {

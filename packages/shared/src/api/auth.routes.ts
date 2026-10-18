@@ -94,11 +94,12 @@ export const authRoutes = {
     url: "/_auth/forgot-password/request",
     schema: {
       body: forgotPasswordRequestSchema,
-      responses: { 200: forgotPasswordQuestionsResponseSchema, 400: errorSchema, 403: errorSchema, 429: errorSchema }
+      responses: { 200: forgotPasswordQuestionsResponseSchema, 400: errorSchema, 403: errorSchema, 429: errorSchema, 503: errorSchema }
     },
     meta: {
       operationId: "authForgotPasswordRequest",
       summary: "Request security questions for password recovery",
+      description: "The server chooses three of the account's five saved questions; unknown or unconfigured accounts receive decoy questions.",
       tags: ["auth"],
       access: "guest"
     }
@@ -113,6 +114,7 @@ export const authRoutes = {
     meta: {
       operationId: "authForgotPasswordVerify",
       summary: "Verify security answers for password recovery",
+      description: "Checks all three answers against the active server-selected challenge and returns a single-use, ten-minute reset token.",
       tags: ["auth"],
       access: "guest"
     }
@@ -127,6 +129,7 @@ export const authRoutes = {
     meta: {
       operationId: "authForgotPasswordReset",
       summary: "Set a new password with a recovery token",
+      description: "Consumes the opaque reset token atomically, hashes the new password, and revokes active refresh sessions.",
       tags: ["auth"],
       access: "guest"
     }

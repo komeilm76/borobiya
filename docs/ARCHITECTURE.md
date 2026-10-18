@@ -122,13 +122,14 @@ sequenceDiagram
   participant Client
   participant API
   Client->>API: POST /_auth/forgot-password/request {username}
-  API->>API: pick 3 random of user's 5 questionIds (server-decided!)
-  API-->>Client: {questionIds, question texts}
+  API->>DB: choose and persist 3 of the user's 5 question IDs for 10 minutes
+  API-->>Client: {questionIds, question texts} (decoys for unknown/unconfigured accounts)
   Client->>API: POST /_auth/forgot-password/verify {username, answers[3]}
-  API->>API: hash compare trimmed+lowercased answers
-  API-->>Client: {resetToken 10min}
+  API->>DB: load active challenge and Argon2id-verify normalized answers
+  API->>DB: consume challenge; store SHA-256 hash of opaque reset token
+  API-->>Client: {resetToken 10min, single-use}
   Client->>API: POST /_auth/forgot-password/reset {resetToken, newPassword}
-  API->>API: verify token, hash new password
+  API->>DB: atomically consume token, update password, revoke refresh sessions
   API-->>Client: 200 ok → redirect to login
 ```
 

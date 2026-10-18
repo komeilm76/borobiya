@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/{register,login,refresh,logout}` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. `GET /_public/health` and `POST /_auth/{register,login,refresh,logout,forgot-password/*}` have runtime handlers; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -122,19 +122,28 @@ Logout is idempotent: missing, invalid, or expired tokens still receive `{ ok: t
 
 ```
 POST /_auth/forgot-password/request
-Body { username } → 200 { questionIds: string[3], questions: string[3] }
+Body { username }
+→ 200 { questionIds: string[3], questions: string[3] }
+→ 400 { code: "VALIDATION_ERROR" }
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
+→ 503 { code: "RECOVERY_UNAVAILABLE" }
 ```
-- Server randomly picks 3 of user's 5 (do not allow client choice).
-- Rate-limit 5/15m.
+
+The server randomly chooses three of the account's five saved questions and persists that exact, ten-minute challenge; the client cannot substitute a different set at verification. Unknown accounts and accounts without five saved answers receive three decoy questions with the same status and response shape. Question answers/hashes are never returned. Request/verify are limited to five attempts per 15 minutes per IP+username.
 
 **Verify**
 
 ```
 POST /_auth/forgot-password/verify
-Body { username, answers: [{questionId, answer}] } // len 3
-→ 200 { resetToken } // JWT, 10m, single-use
-→ 400 { code: "WRONG_ANSWERS" }
+Body { username, answers: [{questionId, answer}] } // exactly 3 unique answers from the active challenge
+→ 200 { resetToken } // opaque, 10m, single-use
+→ 400 { code: "WRONG_ANSWERS" } // same response for unknown users and incorrect/mismatched answers
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
 ```
+
+Answers are normalized with `trim().toLowerCase()` and compared against Argon2id hashes. The reset token is 32 cryptographically random bytes encoded as base64url; only its SHA-256 hash is stored. A successful verification consumes the recovery challenge and replaces any older reset token for that account.
 
 **Reset**
 
@@ -142,8 +151,12 @@ Body { username, answers: [{questionId, answer}] } // len 3
 POST /_auth/forgot-password/reset
 Body { resetToken, newPassword, confirmPassword }
 → 200 { ok: true }
-→ 400 { code: "INVALID_RESET_TOKEN"/"VALIDATION_ERROR" }
+→ 400 { code: "INVALID_RESET_TOKEN" | "VALIDATION_ERROR" }
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
 ```
+
+The server checks token validity before the expensive password hash, then atomically claims the token in the same transaction that updates the password; only one concurrent reset succeeds. A successful reset stores the Argon2id password hash, deletes outstanding reset tokens, consumes recovery challenges, and revokes the user's refresh sessions. Reset attempts are limited to five per 15 minutes per IP because this request has no username field.
 
 ### 3.6 Security Questions Helpers
 
@@ -322,7 +335,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/{register,login,refresh,logout}` are currently marked `implemented`.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health` and `POST /_auth/{register,login,refresh,logout,forgot-password/*}` are currently marked `implemented`.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -362,11 +375,13 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | HTTP | Code | When |
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
+| 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
+| 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing/invalid JWT |
 | 403 | `FORBIDDEN` | Wrong role |
 | 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
-| 403 | `ACCOUNT_INACTIVE` | Login attempt for a deactivated account |
-| 403 | `ACCOUNT_SUSPENDED` | Login attempt for a suspended account |
+| 403 | `ACCOUNT_INACTIVE` | Login or refresh for a deactivated account |
+| 403 | `ACCOUNT_SUSPENDED` | Login or refresh for a suspended account |
 | 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks `_user` |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
 | 404 | `NOT_FOUND` | Unknown id |
@@ -375,6 +390,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
 | 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection |
 | 429 | `RATE_LIMITED` | Too many req |
+| 503 | `RECOVERY_UNAVAILABLE` | Security-question catalog or recovery challenge storage is unavailable |
 | 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |
 | — | `CANCEL_RATE_LIMITED` | 3 cancels/hour |
 

@@ -1,5 +1,9 @@
 import * as argon2 from "argon2";
 
+/** Argon2id dummy hash used to equalize credential-verification work for unknown accounts. */
+export const DUMMY_ARGON2ID_HASH =
+  "$argon2id$v=19$m=65536,p=1,t=3$AHApo5m5DGT6zKjrS09uXw$lGqa37zJwlxc7HkKTOkZT+Tkm+oVpzvjP3WhvX3uoQE";
+
 const passwordHashOptions: argon2.HashOptions = {
   type: argon2.argon2id,
   memoryCost: 64 * 1024,

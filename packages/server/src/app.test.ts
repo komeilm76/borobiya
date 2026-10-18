@@ -54,6 +54,9 @@ describe("Fastify server skeleton", () => {
     const registration = paths["/_auth/register"]?.post;
     const login = paths["/_auth/login"]?.post;
     const logout = paths["/_auth/logout"]?.post;
+    const forgotRequest = paths["/_auth/forgot-password/request"]?.post;
+    const forgotVerify = paths["/_auth/forgot-password/verify"]?.post;
+    const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
@@ -88,6 +91,12 @@ describe("Fastify server skeleton", () => {
     expect(refresh?.requestBody).toMatchObject({ required: false });
     expect(logout?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(logout?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
+    expect(forgotRequest?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(forgotRequest?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object), 503: expect.any(Object) });
+    expect(forgotVerify?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(forgotVerify?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
+    expect(forgotReset?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(forgotReset?.responses).toMatchObject({ 200: expect.any(Object), 400: expect.any(Object), 403: expect.any(Object), 429: expect.any(Object) });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",

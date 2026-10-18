@@ -4,7 +4,7 @@ import { loginSchema } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
 import { hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
 import { refreshTokenCookie } from "./cookies";
-import { verifyPassword as argon2VerifyPassword } from "../security/password";
+import { DUMMY_ARGON2ID_HASH, verifyPassword as argon2VerifyPassword } from "../security/password";
 import type { UserLoginStore } from "../db/login-store";
 
 export type PasswordVerifier = (hash: string, password: string) => Promise<boolean>;
@@ -17,8 +17,7 @@ export interface LoginRouteDependencies {
 }
 
 /** Argon2id dummy hash keeps unknown-user and wrong-password failures on the same verification path. */
-export const DUMMY_LOGIN_PASSWORD_HASH =
-  "$argon2id$v=19$m=65536,p=1,t=3$AHApo5m5DGT6zKjrS09uXw$lGqa37zJwlxc7HkKTOkZT+Tkm+oVpzvjP3WhvX3uoQE";
+export const DUMMY_LOGIN_PASSWORD_HASH = DUMMY_ARGON2ID_HASH;
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
   return { error: true as const, code, message, issues };

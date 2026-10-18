@@ -318,11 +318,10 @@ Map Server is a **completely separate service** responsible for:
 ### 8.3. Forgot Password
 - Flow:
   1.  `POST /_auth/forgot-password/request` with `{ username }`
-  2.  Server randomly picks **3 out of the user's 5 questions** and returns **only question texts** (not answers): `{ questionIds: string[], questions: string[] }`
-      - Selection is **server-decided** (random or deterministic via userId hash). Must not be client-chosen.
-  3.  User answers: `POST /_auth/forgot-password/verify` with `{ username, answers: [{questionId, answer}] }`
-  4.  If all 3 correct (hashed compare), server issues `resetToken` (short-lived 10min)
-  5.  `POST /_auth/forgot-password/reset` with `{ resetToken, newPassword, confirmPassword }`
+  2.  Server randomly picks **3 out of the user's 5 questions**, persists that ten-minute challenge, and returns only `{ questionIds, questions }` (never answer hashes). Unknown/unconfigured accounts receive decoy questions with the same response shape.
+  3.  User answers: `POST /_auth/forgot-password/verify` with `{ username, answers: [{questionId, answer}] }`; only the server-selected IDs are accepted, and answers are normalized and Argon2id-verified.
+  4.  If all 3 are correct, server issues a single-use, opaque 32-byte `resetToken` (10-minute expiry; only its SHA-256 hash is stored).
+  5.  `POST /_auth/forgot-password/reset` with `{ resetToken, newPassword, confirmPassword }`; a successful reset invalidates other reset challenges/tokens and revokes all refresh sessions.
 
 ### 8.4. Secure Storage
 - **Passwords:** Hashed with `argon2id` (preferred) or `bcrypt` (cost 12) — never plain, never reversible.

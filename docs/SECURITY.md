@@ -32,15 +32,16 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - **Hash** same as passwords (argon2id) — store only `answerHash`.
 - **5 unique `questionId`** — validate `new Set(ids).size===5 && ids.length===5` via `zod.superRefine` + DB unique.
 - Table: `user_security_answers (id, userId, questionId, answerHash)` with `UNIQUE(userId, questionId)`.
-- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded. `POST /_auth/register` validates selected IDs and persists only normalized Argon2id answer hashes; future verification must apply the same normalization.
+- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded. `POST /_auth/register` validates selected IDs and persists only normalized Argon2id answer hashes; `POST /_auth/forgot-password/verify` uses the same normalization before comparison.
 
 ### 1.4 Forgot Password Invariants
 
-- **Server picks 3/5** — client must NOT choose. Random or deterministic (`hash(userId+salt) % 5` pick 3).
-- Return only `questionIds + texts`, never answer hashes.
-- Verify: all 3 must pass `argon2.verify`.
-- On success issue `resetToken` (JWT or opaque random string, 10 min expiry, single-use, stored in `password_reset_tokens` with `expiresAt`).
-- `POST /_auth/forgot-password/reset` consumes token → new password + invalidate old tokens.
+- **Server picks 3/5** — client must NOT choose. Select three distinct answers with a cryptographically secure random shuffle and persist the selected IDs as a ten-minute challenge.
+- Return only `questionIds + texts`, never answer hashes. Unknown or unconfigured accounts receive a decoy set with the same response shape; verification failures use a generic `WRONG_ANSWERS` response.
+- Verify: all three submitted IDs must match the active server-selected challenge and all three normalized answers must pass `argon2.verify`. Always perform three comparisons, using a dummy Argon2id hash for unknown accounts or invalid challenge IDs.
+- On success issue a 32-byte opaque, base64url `resetToken` with a ten-minute expiry. Store only its SHA-256 hash in `password_reset_tokens`; claim it atomically so replay or concurrent reuse cannot reset the password twice.
+- `POST /_auth/forgot-password/reset` consumes the token and updates the Argon2id password in one transaction, invalidates other reset/challenge tokens, and revokes all refresh sessions. The user must log in again.
+- Limit request/verify to five attempts per 15 minutes per IP+username; limit reset attempts to five per 15 minutes per IP (the reset body has no username).
 
 ### 1.5 Admin-Created Users
 
@@ -94,12 +95,13 @@ Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store;
 |-------|-------|-----|
 | Global | 100 req/min | `ip` |
 | `_auth/login`, `_auth/register` | 5 req/15m | `ip+username` |
-| `_auth/forgot-password/*` | 5 req/15m | `ip+username` |
+| `_auth/forgot-password/request`, `/verify` | 5 req/15m | `ip+username` |
+| `_auth/forgot-password/reset` | 5 req/15m | `ip` |
 | `POST /_user/sos/requests` | 3 req/min | `userId` |
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration and login now apply the 5/15m IP+username limit in their route handlers; password-recovery and feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration, login, and the recovery request/verify routes apply 5/15m IP+username limits; reset applies 5/15m per IP. Feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
 
 ---
 
@@ -156,7 +158,7 @@ router.beforeEach((to) => {
 
 ### 5.1 `_auth` Guest-Only
 
-The registration, login, refresh, and logout handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Refresh/logout accept the refresh credential only through the cookie or native request body, never through the bearer header.
+The registration, login, refresh, logout, and all forgot-password handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Refresh/logout accept the refresh credential only through the cookie or native request body, never through the bearer header.
 
 ### 5.2 No Delete Invariant
 
