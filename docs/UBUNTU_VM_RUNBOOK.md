@@ -192,7 +192,7 @@ cp .env.example .env
 nano .env
 ```
 
-In `.env`, keep the project bbox as `MAP_BBOX=51.0,35.5,51.7,35.9`, set a private `NOMINATIM_PASSWORD`, and use these values for the current Geofabrik `latest` snapshot and this Ubuntu release:
+In `.env`, keep the project bbox as `MAP_BBOX=51.0,35.5,51.7,35.9` and use these values for the current Geofabrik `latest` snapshot and this Ubuntu release:
 
 ```env
 MAP_SOURCE_URL=https://download.geofabrik.de/asia/iran-latest.osm.pbf
@@ -215,10 +215,18 @@ NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
 PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
 
-The `.env.example` already contains the resource-tuning values; edit the existing entries rather than appending duplicate keys. Generate a password locally if needed, then paste it only into `.env`:
+The `.env.example` already contains the resource-tuning values; edit the existing entries rather than appending duplicate keys.
+
+Then generate real secrets—the API refuses to start while `.env` contains the example placeholders (`Replace the example placeholder secret`). Run this **before** the first `docker compose up`, and do not change the database passwords afterwards: PostgreSQL and Nominatim keep the first password inside their data volumes.
 
 ```bash
-python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+DB_PASS="$(openssl rand -hex 24)"
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
+sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
+sed -i "s|^NOMINATIM_PASSWORD=.*|NOMINATIM_PASSWORD=$(openssl rand -hex 24)|" .env
+sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${DB_PASS}|" .env
+sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://borobiya:${DB_PASS}@localhost:5432/borobiya|" .env
+unset DB_PASS
 ```
 
 Load the file into this terminal. Do not share `.env` or the password:
@@ -349,13 +357,22 @@ OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon
 
 #### If step 12 fails
 
-`Interrupted` / `No such image` for several images means **one** pull failed and Compose cancelled the rest—fix only the first `Error response from daemon: ...` line, then rerun the `up -d` command. Two known cases:
+`Interrupted` / `No such image` for several images means **one** pull failed and Compose cancelled the rest—fix only the first `Error response from daemon: ...` line, then rerun the `up -d` command. Known cases:
 
 - `osrm-backend:v26.10.0: not found` — old checkout; upstream has no bare `v26.10.0` tag. The correct tag is `v26.10.0-debian` (already fixed in this repo): `git pull --ff-only`, then rerun. If step 10 never finished (check `ls map-server/osrm/data/car`), rerun step 10 first—it uses the same image.
 - `borobiya/photon:1.3.0: No such image` — Photon is built locally, not pulled. Build it once, then rerun `up -d`:
 
 ```bash
 docker compose --profile geocoding build photon
+```
+
+- `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
+
+```bash
+sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
+sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
+docker compose up -d api
+docker compose logs --tail=20 api
 ```
 
 ### 13. Verify tiles, all route profiles, forward geocoding, and reverse geocoding

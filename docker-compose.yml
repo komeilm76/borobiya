@@ -22,13 +22,22 @@ services:
       context: .
       dockerfile: packages/server/Dockerfile
     restart: unless-stopped
-    env_file:
-      - .env
+    # Pass only the variables packages/server/src/config/env.ts validates.
+    # Never hand the whole local .env (host DATABASE_URL, unrelated service
+    # passwords) to the container via env_file.
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}
+      # No defaults on purpose: the API must fail closed until .env contains
+      # real, different secrets (see .env.example).
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-}
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
       MAP_SERVER_URL: http://map-server:3000

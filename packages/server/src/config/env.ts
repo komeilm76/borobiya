@@ -5,7 +5,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
-loadDotEnv({ path: repositoryEnvPath });
+// Quiet: in Docker there is no repository .env file (Compose supplies the
+// environment), and dotenv's "injected env" banner is only log noise there.
+loadDotEnv({ path: repositoryEnvPath, quiet: true });
 
 const secretSchema = z
   .string()

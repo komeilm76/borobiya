@@ -194,7 +194,7 @@ fastify.register(cors, {
 
 - **Never log:** `password`, `answer`, `refreshToken`, `resetToken`, `JWT_SECRET`.
 - Env secrets via `.env` (gitignored) + `.env.example` (documented, no real values).
-- In Docker: `env_file: .env`, secrets not baked into image.
+- In Docker: Compose passes only the API's validated variables through `environment:` interpolation from the local `.env` (no whole-file `env_file` dump); secrets are never baked into the image (`.dockerignore` excludes `.env`).
 - `admin_audit_log(id, adminId, action, targetType, targetId, meta, createdAt)` is now migrated. Status events write `user_activated`/`user_deactivated` with before/after active-state metadata; unsuspend/dispatch audit events await those handlers.
 
 ---
