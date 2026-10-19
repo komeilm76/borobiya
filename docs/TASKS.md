@@ -54,7 +54,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 ### 1.5 Client Map & Theming
 
 - [x] **T1.5.1** Initialize MapLibre in `components/map/MapCanvas.vue` centered on Tehran with local style loading, source attribution, navigation/scale controls, and runtime zoom/bounds config — completed 2026-10-19; option tests, component-entry Vite build, client typecheck pass
-- [ ] **T1.5.2** Theme switch: `map.setStyle(newStyle)` <200ms, preserve camera/markers, sprites/glyphs work both themes
+- [x] **T1.5.2** Reactive light/dark style switch via `map.setStyle(newStyle, { diff: true })`; configure a 150ms paint transition, preserve the existing map camera/markers, and share sprite/glyph assets — completed 2026-10-19; 32 client tests, typecheck, and light/dark style parity/SVG validation pass (live end-to-end rendering benchmark pending approved map data)
 - [ ] **T1.5.3** App-wide dark/light: Vuetify theme + Tailwind `dark:` + `localStorage` + `prefers-color-scheme`, no flash
 - [ ] **T1.5.4** Graceful degradation if Map Server down (toast, cached tiles, no crash)
 - [ ] **T1.5.5** Build `views/_user/map` (full-screen map) + `views/_user/dashboard` (map widget)

@@ -308,7 +308,7 @@ The graph estimates are per profile; this Compose design runs three separate OSR
 
 ## 9. Client Integration (MapLibre)
 
-`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount.
+`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount. Its `styleUrl` prop is reactive: changing it to `/map/style/dark` or `/map/style/light` calls `map.setStyle(url, { diff: true })` on the existing map, preserving the current camera transform and DOM-backed markers; `setStyle(url)` is also exposed for imperative callers.
 
 A map view can compose it directly:
 
@@ -322,7 +322,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 </script>
 ```
 
-The two Martin styles share sources and sprites/glyphs; wiring a theme toggle through `map.setStyle()` is T1.5.2. MapLibre GL JS 6.15.0 includes its right-to-left text shaping support, so the client does not need an external runtime RTL plugin.
+The light and dark Martin styles share sources, sprite and glyph endpoints, and every layer's non-paint structure; `map-server/scripts/verify-styles.py` checks that parity and validates all referenced SVG sprites. Both styles set a 150ms global paint transition with zero delay. T1.5.2 is implemented by the reactive `styleUrl` prop and exposed `setStyle(url)` method: both use `map.setStyle(url, { diff: true })` so only style changes are applied to the existing map. This keeps camera and marker state intact and avoids reloading the shared source/sprite/glyph configuration. The paint-transition budget is below 200ms, but live end-to-end rendering time cannot be measured until approved map data is available. MapLibre GL JS 6.15.0 includes its right-to-left text shaping support, so the client does not need an external runtime RTL plugin.
 
 Navigation pitch (see ARCHITECTURE.md §9.3):
 

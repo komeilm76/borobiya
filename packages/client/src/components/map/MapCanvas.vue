@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, shallowRef } from "vue";
+import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMapConfig } from "@/api/map-config";
@@ -13,7 +13,9 @@ import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
   DEFAULT_TEHRAN_CENTER,
-  createMapCanvasOptions
+  createMapCanvasOptions,
+  resolveMapStyleUrl,
+  switchMapStyle
 } from "./map-canvas-options";
 
 const props = withDefaults(defineProps<{
@@ -37,20 +39,41 @@ const emit = defineEmits<{
 const container = ref<HTMLDivElement | null>(null);
 const map = shallowRef<MapLibreMap | null>(null);
 let configRequest: AbortController | null = null;
+let activeStyleUrl: string | null = null;
+let pendingStyleUrl: string | null = null;
+
+function updateStyle(styleUrl: string): void {
+  const nextStyleUrl = resolveMapStyleUrl(styleUrl);
+  const instance = map.value;
+  if (!instance) {
+    pendingStyleUrl = nextStyleUrl;
+    return;
+  }
+  if (nextStyleUrl === activeStyleUrl) return;
+
+  // A style diff keeps the same Map instance, camera transform, and DOM-backed markers.
+  activeStyleUrl = switchMapStyle(instance, nextStyleUrl);
+  pendingStyleUrl = null;
+}
+
+watch(() => props.styleUrl, updateStyle);
 
 async function initializeMap(controller: AbortController): Promise<void> {
   const { Map: MapLibre, NavigationControl, ScaleControl } = await import("maplibre-gl");
   if (controller.signal.aborted || !container.value) return;
+  const initialStyleUrl = pendingStyleUrl ?? props.styleUrl;
 
   const instance = new MapLibre({
     container: container.value,
     ...createMapCanvasOptions(null, {
-      styleUrl: props.styleUrl,
+      styleUrl: initialStyleUrl,
       center: props.center,
       zoom: props.zoom
     })
   });
   map.value = instance;
+  activeStyleUrl = resolveMapStyleUrl(initialStyleUrl);
+  pendingStyleUrl = null;
 
   instance.addControl(new NavigationControl({
     showCompass: true,
@@ -91,9 +114,11 @@ onBeforeUnmount(() => {
   configRequest = null;
   map.value?.remove();
   map.value = null;
+  activeStyleUrl = null;
+  pendingStyleUrl = null;
 });
 
-defineExpose({ map });
+defineExpose({ map, setStyle: updateStyle });
 </script>
 
 <style scoped>

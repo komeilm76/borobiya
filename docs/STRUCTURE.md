@@ -196,8 +196,8 @@ packages/client/
     │   └── map-config.ts     # same-origin validated map settings
     ├── components/
     │   └── map/
-    │       ├── MapCanvas.vue # MapLibre canvas, Tehran default, attribution and controls
-    │       └── map-canvas-options.ts # default and runtime map bounds/zoom options
+    │       ├── MapCanvas.vue # MapLibre canvas, Tehran default, reactive diff-based light/dark styles
+    │       └── map-canvas-options.ts # map options, runtime bounds/zoom, and style switch helper
     ├── router/
     │   ├── index.ts          # namespaced routes and auth-guard wiring
     │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
@@ -226,7 +226,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas now loads the local light style, applies validated runtime bounds/zoom settings, and adds navigation, scale, and attribution controls. Full map/dashboard views, theme switching, graceful map-server degradation, Capacitor, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads the local light style, applies validated runtime bounds/zoom settings, adds navigation, scale, and attribution controls, and supports reactive diff-based light/dark style changes on the same map instance. Full map/dashboard views, app-wide theme synchronization, graceful map-server degradation, Capacitor, and Android packaging remain future work.
 
 ---
 

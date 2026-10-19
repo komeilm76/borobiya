@@ -67,8 +67,9 @@ gantt
 
 ### M1.4 Client Map Canvas
 - [x] MapLibre GL JS init, center on Tehran, attribution (T1.5.1; reusable canvas component; runtime verification pending map data)
-- [ ] Dark/Light styles (same source, different paint) with `<200ms` switch via `setStyle`
-- [ ] Gesture-friendly controls, pitch/zoom preserve on style change
+- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2; live end-to-end benchmark pending approved map data)
+- [x] Preserve camera and DOM-backed markers by diffing styles on the existing map instance (T1.5.2)
+- [x] Gesture-friendly pan/zoom controls; preserve camera state (including pitch, bearing, and zoom) when switching styles
 - [ ] Graceful fallback if Map Server down (toast + cached tiles)
 
 **Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled.

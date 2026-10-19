@@ -55,13 +55,29 @@ def main() -> None:
     light = load_style("light.json")
     dark = load_style("dark.json")
 
-    for key in ("sources", "sprite", "glyphs"):
+    for key in ("sources", "sprite", "glyphs", "transition"):
         if light.get(key) != dark.get(key):
             fail(f"light and dark styles must share {key}")
     if light["sources"].get("tehran", {}).get("type") != "vector":
         fail("styles must define the tehran vector source")
     if light.get("sprite") != "/sprite/borobiya" or light.get("glyphs") != "/font/{fontstack}/{range}":
         fail("styles must use the configured local sprite and glyph endpoints")
+
+    transition = light.get("transition")
+    if not isinstance(transition, dict):
+        fail("styles must define a global paint transition shorter than 200ms")
+    duration = transition.get("duration", 300)
+    delay = transition.get("delay", 0)
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or isinstance(delay, bool)
+        or not isinstance(delay, (int, float))
+        or duration < 0
+        or delay < 0
+        or duration + delay >= 200
+    ):
+        fail("style transition duration plus delay must be less than 200ms")
 
     light_layers = light.get("layers")
     dark_layers = dark.get("layers")
@@ -108,7 +124,7 @@ def main() -> None:
 
     print(
         f"OK: light/dark share {len(light['sources'])} source(s) and {len(light_layers)} layers; "
-        f"paint differs; {len(sprite_files)} SVG sprites validated"
+        f"paint differs with {duration + delay:g}ms transition; {len(sprite_files)} SVG sprites validated"
     )
 
 

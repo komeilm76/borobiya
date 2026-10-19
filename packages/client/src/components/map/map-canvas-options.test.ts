@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mapConfigSchema } from "@shared/schemas/map";
 import {
   DEFAULT_MAP_BOUNDS,
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
   DEFAULT_TEHRAN_CENTER,
-  createMapCanvasOptions
+  createMapCanvasOptions,
+  resolveMapStyleUrl,
+  switchMapStyle
 } from "./map-canvas-options";
 
 const runtimeConfig = mapConfigSchema.parse({
@@ -14,6 +16,22 @@ const runtimeConfig = mapConfigSchema.parse({
   dataVersion: "development",
   minZoom: 2,
   maxZoom: 16
+});
+
+describe("MapCanvas style switching", () => {
+  it("normalizes empty style URLs to the default light style", () => {
+    expect(resolveMapStyleUrl()).toBe(DEFAULT_MAP_STYLE);
+    expect(resolveMapStyleUrl("  ")).toBe(DEFAULT_MAP_STYLE);
+    expect(resolveMapStyleUrl("  /map/style/dark  ")).toBe("/map/style/dark");
+  });
+
+  it("diffs the requested style into the existing map instance", () => {
+    const setStyle = vi.fn();
+    const map = { setStyle } as unknown as Parameters<typeof switchMapStyle>[0];
+
+    expect(switchMapStyle(map, "/map/style/dark")).toBe("/map/style/dark");
+    expect(setStyle).toHaveBeenCalledExactlyOnceWith("/map/style/dark", { diff: true });
+  });
 });
 
 describe("MapCanvas initial options", () => {

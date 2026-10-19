@@ -1,5 +1,5 @@
 import type { MapConfig } from "@shared/schemas/map";
-import type { LngLatLike, MapOptions } from "maplibre-gl";
+import type { LngLatLike, Map as MapLibreMap, MapOptions } from "maplibre-gl";
 
 export type MapCanvasRuntimeConfig = Pick<MapConfig, "bbox" | "minZoom" | "maxZoom">;
 
@@ -20,6 +20,18 @@ export interface MapCanvasDisplayOptions {
   zoom?: number;
 }
 
+/** Resolve a style URL consistently for both initial map creation and theme switches. */
+export function resolveMapStyleUrl(styleUrl?: string): string {
+  return styleUrl?.trim() || DEFAULT_MAP_STYLE;
+}
+
+/** Diff the new style into the existing map instance so its camera and DOM markers survive. */
+export function switchMapStyle(map: Pick<MapLibreMap, "setStyle">, styleUrl?: string): string {
+  const nextStyleUrl = resolveMapStyleUrl(styleUrl);
+  map.setStyle(nextStyleUrl, { diff: true });
+  return nextStyleUrl;
+}
+
 /** Build a same-origin, Tehran-centered MapLibre setup from the public map settings. */
 export function createMapCanvasOptions(
   config: MapCanvasRuntimeConfig | null = FALLBACK_RUNTIME_CONFIG,
@@ -32,7 +44,7 @@ export function createMapCanvasOptions(
   const zoom = Math.min(maxZoom, Math.max(minZoom, requestedZoom));
 
   return {
-    style: display.styleUrl?.trim() || DEFAULT_MAP_STYLE,
+    style: resolveMapStyleUrl(display.styleUrl),
     center: display.center ?? DEFAULT_TEHRAN_CENTER,
     zoom,
     minZoom,

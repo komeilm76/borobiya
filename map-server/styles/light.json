@@ -15,6 +15,10 @@
   },
   "sprite": "/sprite/borobiya",
   "glyphs": "/font/{fontstack}/{range}",
+  "transition": {
+    "duration": 150,
+    "delay": 0
+  },
   "layers": [
     {
       "id": "background",
