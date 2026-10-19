@@ -308,7 +308,7 @@ The graph estimates are per profile; this Compose design runs three separate OSR
 
 ## 9. Client Integration (MapLibre)
 
-`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount. Its `styleUrl` prop is reactive: changing it to `/map/style/dark` or `/map/style/light` calls `map.setStyle(url, { diff: true })` on the existing map, preserving the current camera transform and DOM-backed markers; `setStyle(url)` is also exposed for imperative callers.
+`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults and shows a non-blocking toast. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount. Its `styleUrl` prop is reactive: changing it to `/map/style/dark` or `/map/style/light` calls `map.setStyle(url, { diff: true })` on the existing map, preserving the current camera transform and DOM-backed markers; `setStyle(url)` is also exposed for imperative callers.
 
 A map view can compose it directly:
 
@@ -323,6 +323,12 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 ```
 
 The light and dark Martin styles share sources, sprite and glyph endpoints, and every layer's non-paint structure; `map-server/scripts/verify-styles.py` checks that parity and validates all referenced SVG sprites. Both styles set a 150ms global paint transition with zero delay. T1.5.2 is implemented by the reactive `styleUrl` prop and exposed `setStyle(url)` method: both use `map.setStyle(url, { diff: true })` so only style changes are applied to the existing map. This keeps camera and marker state intact and avoids reloading the shared source/sprite/glyph configuration. The paint-transition budget is below 200ms, but live end-to-end rendering time cannot be measured until approved map data is available. MapLibre GL JS 6.15.0 includes its right-to-left text shaping support, so the client does not need an external runtime RTL plugin.
+
+### 9.1 Map Server outage cache and recovery
+
+The client registers `packages/client/public/map-cache-worker.js` when the browser supports Service Workers (secure origins: HTTPS or localhost). It applies a network-first strategy to same-origin map styles, vector tiles, sprites, and glyph ranges, storing successful responses in a dedicated Cache Storage bucket capped at 512 resources. Network errors and HTTP 5xx responses use a matching cached resource when available; API, map configuration, routing, and geocoding requests are deliberately excluded. A cache fallback posts a message to `MapCanvas.vue`, which displays a deduplicated accessible toast. MapLibre's in-memory tile cache is also configured for eight zoom levels to keep previously loaded coverage available for the current page session. A retry action reloads the current style on the same map instance.
+
+The service worker does not make a first-time visit offline-capable: resources must have loaded successfully once while online. Browsers on plain-HTTP LAN origins cannot use Service Workers, so those deployments retain only MapLibre's in-memory fallback unless served over HTTPS. `packages/client/src/services/map-cache-worker.test.ts` exercises network caching, offline/5xx fallback, cache misses, and request scoping. A real Map Server outage test still requires the unavailable local map runtime/data.
 
 Navigation pitch (see ARCHITECTURE.md §9.3):
 

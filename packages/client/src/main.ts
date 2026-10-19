@@ -4,6 +4,7 @@ import { createAppRouter } from "./router";
 import { pinia } from "./stores";
 import { useThemeStore } from "./stores/theme";
 import { vuetify } from "./plugins/vuetify";
+import { registerMapCacheWorker } from "./services/map-cache";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles/tailwind.css";
 import "./styles/auth.css";
@@ -14,6 +15,8 @@ watch(
   (name) => { vuetify.theme.global.name.value = name; },
   { immediate: true, flush: "sync" }
 );
+
+void registerMapCacheWorker();
 
 const router = createAppRouter();
 createApp(App).use(pinia).use(router).use(vuetify).mount("#app");

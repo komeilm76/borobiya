@@ -5,6 +5,7 @@ import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
   DEFAULT_TEHRAN_CENTER,
+  MAP_TILE_CACHE_ZOOM_LEVELS,
   createMapCanvasOptions,
   resolveMapStyleUrl,
   switchMapStyle
@@ -35,6 +36,17 @@ describe("MapCanvas style switching", () => {
 });
 
 describe("MapCanvas initial options", () => {
+  it("uses local fallback bounds and zoom limits when runtime configuration is unavailable", () => {
+    expect(createMapCanvasOptions(null, { zoom: 99 })).toMatchObject({
+      style: DEFAULT_MAP_STYLE,
+      center: DEFAULT_TEHRAN_CENTER,
+      zoom: 14,
+      minZoom: 0,
+      maxZoom: 14,
+      maxBounds: DEFAULT_MAP_BOUNDS
+    });
+  });
+
   it("defaults to Tehran with same-origin style, map bounds, zoom limits, and attribution", () => {
     const options = createMapCanvasOptions();
     expect(options).toMatchObject({
@@ -43,7 +55,8 @@ describe("MapCanvas initial options", () => {
       zoom: DEFAULT_MAP_ZOOM,
       minZoom: 0,
       maxZoom: 14,
-      maxBounds: DEFAULT_MAP_BOUNDS
+      maxBounds: DEFAULT_MAP_BOUNDS,
+      maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS
     });
     expect(options.attributionControl).not.toBe(false);
   });

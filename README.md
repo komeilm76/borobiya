@@ -161,6 +161,12 @@ Map Server is a **completely separate service** responsible for:
 - Offline Geocoding + Reverse Geocoding (address display on click)
 - Offline Routing for 3 profiles
 
+### 3.7. Map Server outage fallback
+- `MapCanvas.vue` reports MapLibre/configuration failures through an accessible toast with a retry action. A failed `/map-config` request does not block map creation; documented Tehran bounds and zoom defaults are used.
+- On secure origins (HTTPS or localhost), the client registers a map-only service worker. It uses a network-first strategy and stores successful same-origin styles, vector tiles, sprites, and glyphs in Cache Storage (up to 512 resources); on a network failure or server 5xx, a cached response is served and the client is notified. It does not cache API/configuration, routing, or geocoding responses.
+- MapLibre also retains eight zoom levels in its in-memory tile cache, preserving already-loaded coverage during the current page session. If service workers are unavailable (for example, plain HTTP on a LAN), that in-memory fallback still applies; persistent browser caching requires a secure origin.
+- A full map/dashboard view and live Map Server outage test remain separate/future work; the client cache behavior is covered by automated worker tests.
+
 ---
 
 ## 4. Theming — Dark / Light

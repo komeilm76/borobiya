@@ -6,7 +6,7 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.3 MapLibre canvas initialization, reactive map style switching, and app-wide theme support are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and offline route/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.4 MapLibre initialization, style switching, app-wide themes, and map-outage fallback are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and offline route/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
@@ -31,7 +31,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
 | Map Server | 20% | T1.4.1, T1.4.3, and T1.4.6 pins/styles/assets/configuration are complete; T1.4.2 real tile serving, T1.4.4 real OSRM route verification, and T1.4.5 geocoding remain pending |
-| Client Map canvas | 55% | 🟡 T1.5.1–T1.5.3 reusable MapLibre canvas, reactive light/dark diff switching, and app-wide persisted light/dark/system themes are implemented; live map-rendering verification, full map/dashboard views, and outage handling remain pending |
+| Client Map canvas | 65% | 🟡 T1.5.1–T1.5.4 reusable MapLibre canvas, reactive light/dark diff switching, persisted app-wide themes, outage toast/retry, and cached map-resource fallback are implemented; live map-rendering verification and full map/dashboard views remain pending |
 
 ### Phase 2 — Location Sharing — 0%
 
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-19 — Added Map Server outage fallback (T1.5.4; implementation complete, live outage unverified)
+
+- Added an accessible map error/configuration snackbar with a same-instance style retry; `/map-config` failure continues using safe local bounds/zoom. MapLibre's memory tile cache now retains eight zoom levels.
+- Added a map-only network-first Service Worker cache for same-origin style/tile/sprite/glyph resources (512-entry cap), with cache fallback on offline/5xx and client notification; API/config/route/geocode requests are excluded. Persistent browser cache requires HTTPS or localhost, while the in-memory cache remains available on insecure LAN origins.
+- Worker tests cover network caching, offline/5xx fallback, empty-cache 503, and request scoping. Full Map Server outage testing remains blocked by missing local map runtime/data.
 
 ### 2026-10-19 — Added app-wide theme preference and no-flash startup (T1.5.3; complete)
 

@@ -7,6 +7,7 @@ export const DEFAULT_MAP_STYLE = "/map/style/light";
 export const DEFAULT_MAP_ZOOM = 11;
 export const DEFAULT_TEHRAN_CENTER: [number, number] = [51.389, 35.6892];
 export const DEFAULT_MAP_BOUNDS: [number, number, number, number] = [51.0, 35.5, 51.7, 35.9];
+export const MAP_TILE_CACHE_ZOOM_LEVELS = 8;
 
 const FALLBACK_RUNTIME_CONFIG: MapCanvasRuntimeConfig = {
   bbox: DEFAULT_MAP_BOUNDS,
@@ -50,6 +51,7 @@ export function createMapCanvasOptions(
     minZoom,
     maxZoom,
     maxBounds: runtimeConfig.bbox,
+    maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS,
     attributionControl: {}
   };
 }
