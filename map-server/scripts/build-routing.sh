@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-OSRM_IMAGE="ghcr.io/project-osrm/osrm-backend:v26.10.0"
+OSRM_IMAGE="ghcr.io/project-osrm/osrm-backend:v26.10.0-debian"
 MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
 MAP_REGION="${MAP_REGION:-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"

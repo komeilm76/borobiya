@@ -82,6 +82,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Fixed OSRM image tag (VM step 12 blocker)
+
+- Corrected the pinned OSRM image from `ghcr.io/project-osrm/osrm-backend:v26.10.0` (does not exist—upstream's publish workflow only creates suffixed tags plus bare `latest`, verified against the `v26.10.0` workflow run, which completed successfully) to the multi-arch `v26.10.0-debian` tag in `docker-compose.yml`, `build-routing.sh`, and `docs/MAP_SERVER.md`. The bad reference had made Compose abort every other pull/build in step 12 (`Interrupted`/`No such image` cascade, including Martin, PostGIS, and the locally built Photon image); Martin's `ghcr.io/maplibre/martin:1.16.1` tag was re-verified against upstream docs and is unchanged. Runbook step 12 now has a short failure note covering this and the local Photon build. If step 10 had failed on the same tag, the OSRM graphs must be rebuilt after `git pull`; live T1.4.2/.4/.5 checks still require the VM rerun.
+
 ### 2026-10-19 — Unblocked VM step 8: Osmium pin aligned to Ubuntu 24.04, host-proxy runbook section
 
 - Re-pinned Osmium Tool to **1.16.0** (Ubuntu 24.04 apt) consistently in `prepare-tehran-pbf.sh`, `.env.example`, `docs/MAP_SERVER.md`, and the VM runbook. The previous default blocked the crop on the target VM whenever `.env` was stale or not loaded in the terminal, which then made `verify-map-pbf.sh` report the (not yet created) crop as missing. The script's version-mismatch error now prints the exact fix, and runbook step 8 documents both errors with a one-line `sed` fix for a stale `MAP_OSMIUM_VERSION`.

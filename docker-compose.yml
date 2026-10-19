@@ -111,7 +111,7 @@ services:
     profiles: ["geocoding"]
 
   osrm-car:
-    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:
@@ -119,7 +119,7 @@ services:
     profiles: ["routing"]
 
   osrm-bicycle:
-    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:
@@ -127,7 +127,7 @@ services:
     profiles: ["routing"]
 
   osrm-foot:
-    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:

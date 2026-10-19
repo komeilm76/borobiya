@@ -347,6 +347,17 @@ docker stats --no-stream
 
 OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon is capped at a 1.5 GiB heap. Nominatim is not a serving dependency and should stay stopped. If the VM becomes memory pressured, do not start Nominatim alongside this serving stack.
 
+#### If step 12 fails
+
+`Interrupted` / `No such image` for several images means **one** pull failed and Compose cancelled the rest—fix only the first `Error response from daemon: ...` line, then rerun the `up -d` command. Two known cases:
+
+- `osrm-backend:v26.10.0: not found` — old checkout; upstream has no bare `v26.10.0` tag. The correct tag is `v26.10.0-debian` (already fixed in this repo): `git pull --ff-only`, then rerun. If step 10 never finished (check `ls map-server/osrm/data/car`), rerun step 10 first—it uses the same image.
+- `borobiya/photon:1.3.0: No such image` — Photon is built locally, not pulled. Build it once, then rerun `up -d`:
+
+```bash
+docker compose --profile geocoding build photon
+```
+
 ### 13. Verify tiles, all route profiles, forward geocoding, and reverse geocoding
 
 Run the scripted acceptance checks first:
