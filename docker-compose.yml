@@ -32,8 +32,8 @@ services:
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
       MAP_SERVER_URL: http://map-server:3000
-      MAP_STYLE_LIGHT: http://map-server:3000/styles/light.json
-      MAP_STYLE_DARK: http://map-server:3000/styles/dark.json
+      MAP_STYLE_LIGHT: http://map-server:3000/style/light
+      MAP_STYLE_DARK: http://map-server:3000/style/dark
       MAP_ROUTING_URL: http://map-server:3000/route
       MAP_GEOCODE_URL: http://map-server:3000/geocode
       MAP_REVERSE_URL: http://map-server:3000/reverse
@@ -54,9 +54,13 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}
-    command: ["/data"]
+    command: ["--config", "/martin.yaml"]
     volumes:
+      - ./map-server/martin.yaml:/martin.yaml:ro
       - ./map-server/data:/data:ro
+      - ./map-server/styles:/styles:ro
+      - ./map-server/sprites:/sprites:ro
+      - ./map-server/fonts:/fonts:ro
     ports:
       - "127.0.0.1:${MAP_SERVER_PORT:-8000}:3000"
     depends_on:

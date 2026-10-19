@@ -50,8 +50,8 @@ graph TB
 
   subgraph MapServer [Independent Map Server :8000]
     direction TB
-    MARTIN[Martin / TileServer-GL<br/>GET /tiles/{z}/{x}/{y}.pbf]
-    STYLE[Styles<br/>/styles/light.json<br/>/styles/dark.json]
+    MARTIN[Martin 1.16.1<br/>GET /{sourceID}/{z}/{x}/{y}]
+    STYLE[Styles / assets<br/>/style/{id}<br/>/sprite/{id}.* · /font/{stack}/{range}]
     ROUTING[Routing Engine<br/>OSRM / Valhalla<br/>POST /route]
     GEOCODE[Geocoding<br/>Photon / Nominatim<br/>GET /geocode, /reverse]
     DATA[(Data Volume<br/>pmtiles/mbtiles + OSRM graph + search index)]
@@ -208,7 +208,7 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 | Tile generation | **Planetiler** (JVM, fast) , Tippecanoe | Planetiler → `pmtiles` |
 | Routing | **OSRM** (C++, fastest), Valhalla (more profiles), GraphHopper | OSRM for dev (prebuilt profiles) |
 | Geocoding | **Photon** (ES-backed, light), Nominatim (heavier), Pelias | Photon for dev, Nominatim for prod scale |
-| Style hosting | Static JSON + sprites + glyphs served by Martin/nginx | nginx or Martin static |
+| Style hosting | Martin `/style/{id}` plus runtime SVG sprite and TTF glyph generation | Martin 1.16.1 |
 | Data storage | PMTiles single file + OSRM graph + Photon index on host volume | Docker volume `map-data:/data` |
 
 ### 6.2 Why Separate
@@ -219,7 +219,7 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 
 ### 6.3 Versioning & Update
 
-- Tiles versioned via path ` /tiles/v{DATE}/{z}/{x}/{y}.pbf` or header `X-Map-Data-Version`.
+- Martin exposes each PMTiles archive by its filename-derived source ID, e.g. `/tehran/{z}/{x}/{y}`; versioned archives can use distinct source IDs. A separate `X-Map-Data-Version` response header remains a future update-pipeline feature.
 - Update pipeline: `bun run map:update --region=iran` → download PBF → generate → stage → admin approves promote → symlink swap (zero downtime).
 
 ### 6.4 Offline Guarantees

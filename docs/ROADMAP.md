@@ -60,10 +60,10 @@ gantt
 - [ ] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
 
 ### M1.3 Map Server (Independent)
-- [ ] Choose stack: **Martin + Planetiler + OSRM + Photon** (ADR-10)
-- [ ] Download Tehran PBF (sample), generate `tehran.pmtiles` (tippecanoe fallback)
-- [ ] Serve `GET /tiles/{z}/{x}/{y}.pbf` + `GET /styles/{light,dark}.json` + fonts/sprites
-- [ ] Document in `MAP_SERVER.md` with OS choice rationale
+- [x] Choose and pin **Martin + Planetiler + OSRM + Photon** (T1.4.1)
+- [ ] Generate `tehran.pmtiles` from a reuse-approved Tehran PBF and verify Martin's `/{sourceID}/{z}/{x}/{y}` MVT route (T1.4.2)
+- [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; static validation complete, real-server check pending)
+- [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas
 - [ ] MapLibre GL JS init, center on Tehran, attribution

@@ -1,6 +1,6 @@
 # Borobiya — Map Server (Offline Vector)
 
-> TL;DR: The target design is fully offline: self-host **Martin 1.16.1** (vector tiles), **OSRM 26.10.0** (routing), and **Photon 1.3.0** (geocoding) as separate services, with configurable OSM-derived data. **Current scaffold status:** Compose pins Martin 1.16.1 and runs it with an empty, ignored `map-server/data/` directory and PostGIS connection; no project tiles, style/sprite/font assets, OSRM graph, Photon index, or data-generation scripts are present yet. Endpoint examples below describe the planned service, not currently available product features.
+> TL;DR: The target design is fully offline: self-host **Martin 1.16.1** (vector tiles and styles), **OSRM 26.10.0** (routing), and **Photon 1.3.0** (geocoding) as separate services, with configurable OSM-derived data. **Current scaffold status:** Martin is configured to serve committed light/dark styles, SVG-derived sprites, and dynamically generated glyphs; the Tehran PMTiles archive is still not generated, so its tile route remains unverified. The pinned Planetiler generation and MVT smoke-test scripts exist, but generation is blocked in this environment by missing Java 21+ and the candidate PBF's reuse terms are unresolved. Routing, geocoding, and a real Martin runtime check remain pending.
 
 ---
 
@@ -29,9 +29,9 @@ Internet ──download once─►│  │  OSM PBF    │  (geofabrik)   │
                          │         │ planetiler/tippecanoe  │
                          │  ┌──────▼──────┐                │
                          │  │ PMTiles/MBTiles              │
-                         │  │ + Martin serve               │──► GET /tiles/{z}/{x}/{y}.pbf
-                         │  │ + Styles light/dark JSON     │──► GET /styles/*.json
-                         │  │ + Sprites + Glyphs           │──► /sprites/* /fonts/*
+                         │  │ + Martin serve               │──► GET /{sourceID}/{z}/{x}/{y}
+                         │  │ + Styles light/dark JSON     │──► GET /style/{id}
+                         │  │ + Sprites + Glyphs           │──► /sprite/* /font/*
                          │  └─────────────┘                │
                          │  ┌─────────────┐                │
                          │  │ OSRM graph  │ osrm-extract   │──► POST /route?profile=car|bike|foot
@@ -56,7 +56,7 @@ The following latest stable (non-prerelease) releases were selected from the pro
 | Tile generation | **Planetiler 0.10.2** | [`planetiler.jar`](https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar); SHA-256 `f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d` | Produces PMTiles from OSM extracts; Java 21+ is required for the JAR. [Release](https://github.com/onthegomap/planetiler/releases/tag/v0.10.2). |
 | Routing | **OSRM 26.10.0** | `ghcr.io/project-osrm/osrm-backend:v26.10.0` | Official GHCR image; the release includes car, bicycle, and foot Lua profiles. [Release](https://github.com/Project-OSRM/osrm-backend/releases/tag/v26.10.0). |
 | Geocoding | **Photon 1.3.0** | [`photon-1.3.0.jar`](https://github.com/komoot/photon/releases/download/1.3.0/photon-1.3.0.jar); SHA-256 `a89707c0045e4807b2a1180e132e68e108d998709f48b6c94b98a6e281f571a5` | Java 21+; embedded OpenSearch is the default, and external OpenSearch requires 3.x. Photon imports from a Nominatim database or Photon JSON dump, **not a raw OSM PBF**. [Release](https://github.com/komoot/photon/releases/tag/1.3.0). |
-| Style hosting | Static files via **nginx** or Martin | — | Same-origin and cacheable; selected releases are recorded above. | — |
+| Styles, sprites, glyphs | **Martin 1.16.1** | `/style/{id}`, `/sprite/{id}.*`, `/font/{stack}/{range}` | Martin serves style JSON and generates sprite sheets and glyph PBF ranges from local SVG/TTF assets on demand; no external runtime requests. [Style docs](https://maplibre.org/martin/using/sources-styles/). |
 
 The versions are exact pins, not compatibility ranges. Upgrade them deliberately: review release notes, refresh JAR checksums, and rerun the tile-serving, routing-profile, and geocoding checks. Photon’s input constraint is called out here because the later offline-index task must select/provision a Nominatim or Photon-JSON import path before a PBF-to-geocoder command can be documented.
 
@@ -72,20 +72,12 @@ The versions are exact pins, not compatibility ranges. Upgrade them deliberately
 ### 4.2 Steps
 
 ```bash
-# 1. Download
-curl -L https://download.geofabrik.de/asia/iran-latest.osm.pbf -o data/iran.osm.pbf
+# 1–2. Download/cut a Tehran extract if needed, verify the pinned Planetiler JAR,
+#    and generate map-server/data/tehran.pmtiles (Java 21+, curl, osmium if no PBF exists).
+./map-server/scripts/generate-tiles.sh
 
-# Optional: cut to Tehran bbox for dev
-osmium extract --bbox 51.0,35.5,51.7,35.9 data/iran.osm.pbf -o data/tehran.osm.pbf
-
-# 2. Generate vector tiles with pinned Planetiler 0.10.2 (Java 21+)
-curl -fL https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar \
-  -o data/planetiler-0.10.2.jar
-echo 'f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d  data/planetiler-0.10.2.jar' | sha256sum -c -
-java -Xmx4g -jar data/planetiler-0.10.2.jar \
-  --osm-path=data/tehran.osm.pbf --output=data/tehran.pmtiles --download
-# or Tippecanoe for small region:
-tippecanoe -o data/tehran.mbtiles -zg --drop-densest-as-needed data/tehran.geojson
+# Optional alternative for small GeoJSON-only areas:
+tippecanoe -o map-server/data/tehran.mbtiles -zg --drop-densest-as-needed data/tehran.geojson
 
 # 3. Build routing graphs (OSRM)
 osrm-extract -p map-server/osrm/profiles/car.lua data/tehran.osm.pbf
@@ -103,65 +95,87 @@ cp data/tehran.osrm* map-server/osrm/data/
 # Restart services via scripts/update.sh
 ```
 
-Planned scripts for `map-server/scripts/` are `generate-tiles.sh`, `build-routing.sh`, `build-geocode.sh`, and `update.sh` (orchestrator + version stamp); none are implemented in the current scaffold.
+`map-server/scripts/generate-tiles.sh` downloads/crops the Tehran PBF if needed, verifies Planetiler 0.10.2 by SHA-256, and generates the ignored PMTiles archive. `map-server/scripts/verify-tehran-tiles.sh` checks Martin health and an MVT tile response. Routing, geocoding, and update scripts (`build-routing.sh`, `build-geocode.sh`, `update.sh`) remain future work.
 
-### 4.3 Styles
+### 4.3 Styles, sprites, and glyphs
 
-Two JSONs share same `sources` but different `layers.paint`:
+The committed styles are MapLibre Style Spec v8 documents with the same vector source, layer IDs/order, filters, and layout. The theme-specific differences are in layer paint values:
 
 - `map-server/styles/light.json`
 - `map-server/styles/dark.json`
 
-Minimal example:
+Martin serves these as `/style/light` and `/style/dark`. Through the Compose Nginx gateway, use `/map/style/light` and `/map/style/dark`.
+
+The style resources use root-relative URLs, not hard-coded hosts. This works both when a browser loads the style through `/map/style/light` and when it loads the style directly from Martin. The Vite dev proxy and Nginx gateway forward `/tehran/`, `/sprite/`, and `/font/` to Martin on the same origin:
 
 ```json
 {
-  "version": 8,
   "sources": {
-    "borobiya": { "type": "vector", "tiles": ["http://localhost:8000/tiles/{z}/{x}/{y}.pbf"], "minzoom": 0, "maxzoom": 14 }
+    "tehran": {
+      "type": "vector",
+      "tiles": ["/tehran/{z}/{x}/{y}"],
+      "minzoom": 0,
+      "maxzoom": 14
+    }
   },
-  "layers": [
-    { "id": "background", "type": "background", "paint": { "background-color": "#ffffff" } },
-    { "id": "roads", "type": "line", "source": "borobiya", "source-layer": "roads", "paint": { "line-color": "#cccccc" } }
-  ],
-  "glyphs": "http://localhost:8000/fonts/{fontstack}/{range}.pbf",
-  "sprite": "http://localhost:8000/sprites/sprite"
+  "sprite": "/sprite/borobiya",
+  "glyphs": "/font/{fontstack}/{range}"
 }
 ```
 
-Dark variant flips `background-color` to `#121212`, road colors, label halo.
+The tile source uses the default Planetiler OpenMapTiles profile (`water`, `transportation`, `place`, `poi`, and related layers). Sprite source files live in `map-server/sprites/borobiya/*.svg`; Martin builds and caches the PNG/JSON sprites at request time, for example `/sprite/borobiya.json` and `/sprite/borobiya.png`. No generated sprite binaries are committed.
 
-Sprites/glyphs generated once: OpenMapTiles style + `font-maker`.
+The style uses the `Borobiya Sans` font alias. `map-server/fonts/` contains Noto Sans Regular for Latin and Noto Naskh Arabic Regular as its Arabic/Persian fallback. Martin reads the licensed TTFs and dynamically serves requested glyph ranges at `/font/{fontstack}/{range}`; pre-generated glyph PBFs and `font-maker` are not required. Font provenance, checksums, copyright, and the SIL Open Font License 1.1 are documented alongside the files in `map-server/fonts/README.md` and `OFL.txt`.
+
+Run the dependency-free style/source/layer/SVG consistency check with `python3 map-server/scripts/verify-styles.py`. The JSON style documents were also checked against MapLibre's style specification during implementation.
 
 ---
 
-## 5. Martin Config (`martin-config.yaml`)
+## 5. Martin Config (`map-server/martin.yaml`)
+
+Compose mounts the checked-in Martin config and all style assets read-only. Its container paths are:
 
 ```yaml
 postgres:
-  connection_string: ${DATABASE_URL}  # optional PostGIS sources
+  connection_string: ${DATABASE_URL}
 pmtiles:
-  paths:
-    - /data/tehran.pmtiles
-mbtiles:
-  paths:
-    - /data/tehran.mbtiles
+  paths: [/data]
+styles:
+  paths: [/styles]
+sprites:
+  paths: [/sprites/borobiya]
+fonts:
+  paths: [/fonts]
+  aliases:
+    Borobiya Sans: [Noto Sans Regular, Noto Naskh Arabic Regular]
 ```
 
-Martin 1.16.1 uses `paths` for local PMTiles/MBTiles; configure PostGIS table discovery with its `postgres.auto_publish` settings when the tile tables are added.
+The actual file is `map-server/martin.yaml`. Martin discovers PMTiles sources from `/data`; when the archive is named `tehran.pmtiles`, its source ID is `tehran` and its MVT route is `/tehran/{z}/{x}/{y}` (an optional `.pbf` suffix redirects). `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. Configure PostGIS table discovery with `postgres.auto_publish` when tile tables are added.
 
-Start:
+Start the local dependencies:
 
 ```bash
-martin --config martin-config.yaml --listen-addresses 0.0.0.0:8000
+docker compose up -d postgres map-server
 ```
 
-Verify:
+Verify the style and dynamically served assets (these can be checked before tile generation):
 
 ```bash
-curl http://localhost:8000/tiles/5/18/12.pbf -o /tmp/tile.pbf && file /tmp/tile.pbf
-curl http://localhost:8000/styles/light.json | jq .sources
+curl http://localhost:8000/style/light | jq .sources
+curl http://localhost:8000/sprite/borobiya.json | jq
+curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
+# Through the Nginx /map/ prefix:
+curl http://localhost:8080/map/style/dark | jq .name
 ```
+
+After `tehran.pmtiles` has been generated, verify a real MVT response:
+
+```bash
+./map-server/scripts/verify-tehran-tiles.sh
+MARTIN_URL=http://localhost:8080/map ./map-server/scripts/verify-tehran-tiles.sh
+```
+
+This checkout's styles and assets are statically validated, but this environment has not run Martin or produced the PMTiles archive.
 
 ---
 
@@ -242,8 +256,8 @@ MAP_DATA_VERSION=2025-05-01
 MAP_MAX_ZOOM=14
 MAP_MIN_ZOOM=0
 MAP_SERVER_URL=http://localhost:8000          # API tells clients
-MAP_STYLE_LIGHT=http://localhost:8000/styles/light.json
-MAP_STYLE_DARK=http://localhost:8000/styles/dark.json
+MAP_STYLE_LIGHT=http://localhost:8000/style/light
+MAP_STYLE_DARK=http://localhost:8000/style/dark
 MAP_ROUTING_URL=http://localhost:8000/route
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 MAP_REVERSE_URL=http://localhost:8000/reverse
@@ -266,16 +280,16 @@ Document on provisioning ticket.
 
 ```ts
 import maplibregl from "maplibre-gl";
+const mapUrl = import.meta.env.VITE_MAP_URL ?? "/map";
 const map = new maplibregl.Map({
   container: "map",
-  style: import.meta.env.VITE_MAP_STYLE_LIGHT, // http://localhost:8000/styles/light.json
+  style: `${mapUrl}/style/light`,
   center: [51.38, 35.68],
   zoom: 11
 });
-// Theme toggle
+// Both styles share sources and assets, so MapLibre can swap without external requests.
 function toggleTheme(dark: boolean) {
-  const style = dark ? VITE_MAP_STYLE_DARK : VITE_MAP_STYLE_LIGHT;
-  map.setStyle(style); // preserves camera/markers
+  map.setStyle(`${mapUrl}/style/${dark ? "dark" : "light"}`);
 }
 ```
 

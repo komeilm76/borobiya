@@ -74,9 +74,9 @@ Scale without code change — only ENV + volume.
 
 ```
 map-server/styles/light.json
-map-server/styles/dark.json  ─┐ same sources.tiles = /tiles/{z}/{x}/{y}.pbf
-map-server/styles/sprites/   ─┤ served via Martin/nginx
-map-server/styles/glyphs/    ─┘
+map-server/styles/dark.json  ─┐ same sources.tiles = /tehran/{z}/{x}/{y}
+map-server/sprites/borobiya/*.svg ─┤ Martin creates sprite PNG/JSON on demand
+map-server/fonts/*.ttf       ─┘ Martin creates glyph PBF ranges on demand
 ```
 
 Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint.
@@ -87,9 +87,12 @@ Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint
 
 ```bash
 # Tiles
-curl http://localhost:8000/tiles/5/18/12.pbf -o /tmp/t.pbf && ls -lh /tmp/t.pbf
+curl http://localhost:8000/tehran/12/2632/1612 -o /tmp/t.pbf && ls -lh /tmp/t.pbf
 # Style
-curl http://localhost:8000/styles/light.json | jq .sources
+curl http://localhost:8000/style/light | jq .sources
+# Runtime-generated sprite and glyphs
+curl http://localhost:8000/sprite/borobiya.json | jq
+curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
 # Route
 curl -X POST http://localhost:8000/route -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car"}' -H 'Content-Type: application/json'
 # Geocode

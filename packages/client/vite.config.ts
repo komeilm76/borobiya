@@ -19,10 +19,17 @@ function stripPrefix(prefix: string) {
 }
 
 export default defineConfig(({ mode }) => {
-  // Only the proxy process reads these targets; browser code uses same-origin /api and /map paths.
+  // Only the proxy process reads these targets; browser code uses same-origin /api, /map, and Martin resource paths.
   const env = loadEnv(mode, repositoryRoot, "");
   const apiPrefix = proxyPrefix(env.VITE_API_URL, "/api");
   const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
+  const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
+  const mapResourceProxy = Object.fromEntries(
+    ["/tehran/", "/sprite/", "/font/"].map((prefix) => [
+      prefix,
+      { target: mapServerTarget, changeOrigin: true }
+    ])
+  );
 
   return {
     root: packageRoot,
@@ -45,10 +52,11 @@ export default defineConfig(({ mode }) => {
           rewrite: stripPrefix(apiPrefix)
         },
         [mapPrefix]: {
-          target: env.MAP_SERVER_URL || "http://127.0.0.1:8000",
+          target: mapServerTarget,
           changeOrigin: true,
           rewrite: stripPrefix(mapPrefix)
-        }
+        },
+        ...mapResourceProxy
       }
     },
     preview: {

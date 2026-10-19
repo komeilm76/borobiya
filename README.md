@@ -115,9 +115,9 @@ Map Server is a **completely separate service** responsible for:
 
 | Service | Tool Examples (Choose one, document choice) | Endpoint Example |
 |---|---|---|
-| **Vector Tile Serving** | Martin, Tegola, TileServer-GL (vector mode) | `GET /tiles/{z}/{x}/{y}.pbf` |
+| **Vector Tile Serving** | Martin 1.16.1 (PMTiles) | `GET /tehran/{z}/{x}/{y}` (source ID from archive name) |
 | **Tile Data Generation** | Tippecanoe, Planetiler, OpenMapTiles | Build pipeline |
-| **Style Hosting** | Static JSON + Fonts + Sprites | `GET /styles/dark.json`, `GET /styles/light.json` |
+| **Style Hosting** | Martin-served JSON + dynamic fonts/sprites | `GET /style/dark`, `GET /style/light` |
 | **Routing** | OSRM, Valhalla, GraphHopper (self-hosted) | `POST /route`, `POST /route/multi` |
 | **Geocoding** | Nominatim (offline), Photon, Pelias, OpenCage offline | `GET /geocode?q=...`, `GET /reverse?lat=&lon=` |
 | **Data Storage** | PMTiles, MBTiles, PostgreSQL/PostGIS | Internal |
@@ -135,7 +135,7 @@ Map Server is a **completely separate service** responsible for:
 - **Update Mechanism (Must be documented):**
   - Manual trigger: Admin uploads new `region.osm.pbf` or admin runs `bun run map:update --region=iran`
   - Semi-automatic: Cron job checks for new dump weekly/monthly, builds in staging, admin approves promotion to production.
-  - Versioning: `/tiles/v2025.05.01/{z}/{x}/{y}.pbf` or header `X-Map-Data-Version`
+  - Versioning: publish versioned PMTiles files under distinct source IDs (e.g. `/tehran-2025-05-01/{z}/{x}/{y}`); a response version header is future work
   - Zero-downtime switch via symlink/volume swap.
 - **Distribution:**
   - In Docker: Map Server volume (`map-data:/data`)
@@ -1031,8 +1031,8 @@ RATE_LIMIT_MAX=100
 # Map Server
 MAP_SERVER_URL=http://localhost:8000
 MAP_REGION=tehran
-MAP_STYLE_LIGHT=http://localhost:8000/styles/light.json
-MAP_STYLE_DARK=http://localhost:8000/styles/dark.json
+MAP_STYLE_LIGHT=http://localhost:8000/style/light
+MAP_STYLE_DARK=http://localhost:8000/style/dark
 MAP_ROUTING_URL=http://localhost:8000/route
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 

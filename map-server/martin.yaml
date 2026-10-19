@@ -1,0 +1,23 @@
+# Martin 1.16.1 resource configuration. Paths are container paths from docker-compose.yml.
+postgres:
+  connection_string: ${DATABASE_URL}
+
+pmtiles:
+  paths:
+    - /data
+
+styles:
+  paths:
+    - /styles
+
+sprites:
+  paths:
+    - /sprites/borobiya
+
+fonts:
+  paths:
+    - /fonts
+  aliases:
+    Borobiya Sans:
+      - Noto Sans Regular
+      - Noto Naskh Arabic Regular

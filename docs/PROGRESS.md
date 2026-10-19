@@ -6,14 +6,14 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, and T1.4.1 map-server tool-version selection are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, and T1.4.1 map-server tool-version selection plus T1.4.3 style/assets are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and routing/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 5% | 🟡 T1.4.1 exact release pins are selected; data, styles, routing, and geocoding are not implemented |
+| Map Server | 15% | 🟡 T1.4.1 and T1.4.3 are complete: Martin styles, licensed fonts, SVG sprites, and runtime resource configuration are in place; T1.4.2 PMTiles generation/real tile serving is still blocked, and routing/geocoding remain pending |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -30,7 +30,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 5% | T1.4.1 pinned Martin 1.16.1, Planetiler 0.10.2, OSRM 26.10.0, and Photon 1.3.0; runtime/data pipeline remains pending |
+| Map Server | 15% | T1.4.1 and T1.4.3 pins/styles/assets/configuration are complete; tile generation and real Martin serving (T1.4.2), routing, and geocoding remain pending |
 | Client Map canvas | 0% | — |
 
 ### Phase 2 — Location Sharing — 0%
@@ -73,7 +73,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 | # | Issue | Impact | Owner | Status |
 |---|-------|--------|-------|--------|
-| 1 | Docker/Compose are not installed and Bun is not on `PATH` in the current agent environment | Compose runtime cannot be checked; Bun 1.4.3 is invoked through `npm exec` for install, tests, and typecheck | Environment | 🟡 Validation limitation |
+| 1 | Docker/Compose, Java, and Bun are not installed/on `PATH` in the current agent environment; release assets redirect outside its network allowlist; the candidate Tehran PBF's reuse terms are unresolved | Compose/Martin runtime and Planetiler generation cannot be exercised here, and the sample is not an approved project asset; Bun 1.4.3 is invoked through `npm exec` for workspace checks | Environment / data provenance | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
 | 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh/logout, recovery, admin user list/detail/create/status, and onboarding are tested with injected stores; Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth/admin/onboarding flows with PostgreSQL |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
@@ -81,6 +81,19 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-19 — Added MapLibre styles and Martin assets (T1.4.3)
+
+- Added light/dark v8 styles with the same `tehran` vector source and identical layer IDs, order, filters, and layouts; theme differences are in layer paint. Both documents validate against `@maplibre/maplibre-gl-style-spec` 26.4.4, and `map-server/scripts/verify-styles.py` provides a dependency-free parity/SVG check.
+- Added `map-server/martin.yaml` and Compose mounts for the styles, SVG sprite source, fonts, and data. Config validates against Martin 1.16.1's published schema. Martin generates sprite PNG/JSON sheets and glyph PBF ranges dynamically; no generated binary assets or `font-maker` build are needed.
+- Bundled Noto Sans Regular and Noto Naskh Arabic Regular under SIL OFL 1.1, with provenance/checksums; configured a Latin + Arabic/Persian fallback alias. Added the Borobiya POI SVG icons and updated endpoint/development documentation.
+- T1.4.3 is complete based on static validation. Martin/Docker are unavailable here, so the style/sprite/font endpoints were not exercised against a real server; tile serving remains blocked under T1.4.2.
+
+### 2026-10-19 — Started Tehran tile generation (T1.4.2; incomplete)
+
+- Downloaded a 9.2 MB local Tehran OSM PBF sample into ignored `map-server/data/tehran.osm.pbf`; validated its PBF header, Tehran bounds (51.27–51.55 E, 35.60–35.81 N), and object counts with libosmium. A local source/checksum note is stored beside it; the sample is not committed.
+- Corrected the Martin 1.16.1 tile URL in the runbook and task criteria: `tehran.pmtiles` is served at `/tehran/{z}/{x}/{y}`; `.pbf` is an optional redirect suffix, while the bare `/{z}/{x}/{y}.pbf` route is not a Martin source endpoint. Added `generate-tiles.sh` (pinned JAR checksum, PBF crop fallback, atomic output) and `verify-tehran-tiles.sh` (health, status, MVT content type, non-empty tile); both pass `bash -n`, and the verifier's response handling passed against a local HTTP fixture (not Martin).
+- T1.4.2 remains unchecked: no Java or Docker is installed, and the official Planetiler release download redirects to a host outside the sandbox network allowlist. No PMTiles archive was generated and no Martin tile request was run.
 
 ### 2026-10-19 — Pinned map-server toolchain versions (T1.4.1)
 
