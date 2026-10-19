@@ -1,6 +1,6 @@
 # Borobiya — Map Server (Offline Vector)
 
-> TL;DR: the offline target self-hosts **Martin 1.16.1**, **OSRM 26.10.0**, and **Photon 1.3.0**. The approved source is Geofabrik's date-pinned Iran OSM snapshot (ODbL 1.0). `prepare-tehran-pbf.sh` verifies it and clips one `MAP_BBOX` PBF for Planetiler, all OSRM profiles, and Nominatim→Photon. Generator/import/proxy smoke tests are scripted; live tile, route, and geocode acceptance remains open until the local Docker/Java 21 run succeeds.
+> TL;DR: the offline target self-hosts **Martin 1.16.1**, **OSRM 26.10.0**, and **Photon 1.3.0**. The approved source is Geofabrik's date-pinned Iran OSM snapshot (ODbL 1.0). `prepare-tehran-pbf.sh` verifies it and clips one `MAP_BBOX` PBF for Planetiler, all OSRM profiles, and Nominatim→Photon. Generator/import/proxy smoke tests are scripted; live tile, route, and geocode acceptance remains open until the local Docker/Java 21 run succeeds. For the 4-vCPU/6-GiB Ubuntu 24.04 VM, follow [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md).
 
 ---
 
@@ -107,7 +107,7 @@ set -a; source .env; set +a
 # The same cropped PBF is mounted as Nominatim's local PBF_PATH for the Photon import; see §7.
 ```
 
-Prerequisites for preparation are `curl`, `osmium-tool` 1.19.1 (recorded in the manifest), Python 3, and SHA-256/MD5 utilities. Install Osmium with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script enforces `MAP_OSMIUM_VERSION=1.19.1` by default; if your package repository only provides another release, review it and set that exact `MAP_OSMIUM_VERSION` before preparation. The Planetiler build additionally needs Java 21+; the routing build needs Docker. To deliberately regenerate an existing crop after changing `MAP_BBOX`, set `MAP_CROP_OVERWRITE=1` after reviewing the data directory. `verify-map-pbf.sh` checks the crop hash, region, bbox, ODbL record, and strategy before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
+Prerequisites for preparation are `curl`, Osmium Tool, Python 3, and SHA-256/MD5 utilities. The manifest records the exact installed Osmium version. Install with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script defaults to `MAP_OSMIUM_VERSION=1.19.1`; Ubuntu 24.04's archive provides 1.16.0, so on that release set `MAP_OSMIUM_VERSION=1.16.0` in `.env` after reviewing the installed `osmium --version`. The explicit override is checked and recorded in provenance. Planetiler uses a conservative 3 GiB Java heap by default (`PLANETILER_HEAP=3g`) for 6 GiB machines; it additionally needs Java 21+. The routing build needs Docker and defaults to two OSRM build threads. To deliberately regenerate an existing crop after changing `MAP_BBOX`, set `MAP_CROP_OVERWRITE=1` after reviewing the data directory. `verify-map-pbf.sh` checks the crop hash, region, bbox, ODbL record, and strategy before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
 
 `map-server/scripts/generate-tiles.sh` verifies Planetiler 0.10.2 by SHA-256 and writes `<region>.pmtiles` plus a manifest containing the cropped-PBF hash. `build-routing.sh` uses that same verified crop for each profile and records the input/manifest hashes beside each graph. `verify-tehran-tiles.sh`, `verify-routing.sh`, and `verify-geocoding.sh` are live service smoke tests. No map service or data build has yet been accepted against the user's local Docker/Java runtime; keep T1.4.2, T1.4.4, and T1.4.5 open until those commands pass.
 
@@ -206,7 +206,7 @@ set -a; source .env; set +a
 ./map-server/scripts/build-routing.sh
 ```
 
-It runs the pinned `ghcr.io/project-osrm/osrm-backend:v26.10.0` image against that exact cropped PBF, extracts and prepares MLD graphs for all three bundled profiles, then publishes them to `map-server/osrm/data/{car,bicycle,foot}/<MAP_REGION>.osrm`. Each profile directory also records the cropped-PBF SHA-256 and source-manifest SHA-256. The output directory is Git-ignored. To build to a different location, set `MAP_OSRM_DATA_DIR` both for this command and in the Compose `.env`.
+It runs the pinned `ghcr.io/project-osrm/osrm-backend:v26.10.0` image against that exact cropped PBF, extracts and prepares MLD graphs for car, bicycle, and foot **sequentially** (never concurrently), then publishes them to `map-server/osrm/data/{car,bicycle,foot}/<MAP_REGION>.osrm`. `OSRM_BUILD_THREADS` defaults to 2 and is passed to extract/partition/customize for the 6 GiB VM. Each profile directory also records the cropped-PBF SHA-256, source-manifest SHA-256, and build thread count. The output directory is Git-ignored. To build to a different location, set `MAP_OSRM_DATA_DIR` both for this command and in the Compose `.env`.
 
 After successful graph generation, start the local Compose stack with routing enabled:
 
@@ -214,7 +214,7 @@ After successful graph generation, start the local Compose stack with routing en
 docker compose --profile routing up -d
 ```
 
-`routing-gateway` runs in the default profile and can answer `/health` without graph data; the three OSRM services are in Compose's `routing` profile. Once the profiles are enabled, the gateway forwards only to the local `osrm-car`, `osrm-bicycle`, or `osrm-foot` service. No public routing service or external network is used.
+`routing-gateway` runs in the default profile and can answer `/health` without graph data; the three OSRM services are in Compose's `routing` profile. Each `osrm-routed` service starts with one worker thread and `--max-table-size 100`. The table-size flag caps `/table` query locations (the default), not the graph's RAM use; the thread setting limits runtime concurrency. Once the profiles are enabled, the gateway forwards only to the local `osrm-car`, `osrm-bicycle`, or `osrm-foot` service. No public routing service or external network is used.
 
 ### Project API and OSRM adapter
 
@@ -274,7 +274,7 @@ Once Nominatim reports healthy, import its local database into Photon. The comma
 
 ```bash
 cd map-server/photon/data
-java -jar ../photon-1.3.0.jar import \
+java -Xms512m -Xmx2g -jar ../photon-1.3.0.jar import \
   -host 127.0.0.1 -port "$NOMINATIM_DB_PORT" \
   -database nominatim -user nominatim -password "$NOMINATIM_PASSWORD" \
   -languages fa,en
@@ -286,7 +286,7 @@ docker compose --profile geocoding up -d --build photon
 docker compose --profile geocoding-import stop nominatim
 ```
 
-Nominatim's host ports default to `8081` (HTTP health/diagnostics) and `5433` (PostgreSQL); Photon listens on `2322`. The Photon runtime serves its local index without Nominatim running. The app gateway forwards `/geocode` to Photon `/api` and `/reverse` to Photon `/reverse`, validating query inputs and returning Photon GeoJSON. Start the runtime routing/geocoding stack with:
+Nominatim's host ports default to `8081` (HTTP health/diagnostics) and `5433` (PostgreSQL); Photon listens on `2322`. For a 6 GiB VM, `.env.example` uses two Nominatim import threads, 1 GiB shared memory, conservative PostgreSQL memory settings, a 2 GiB Photon import heap, and a 1.5 GiB Photon runtime heap. Nominatim must remain running while Photon imports its database; stop it afterward to free RAM. The Photon runtime serves its local index without Nominatim running. The app gateway forwards `/geocode` to Photon `/api` and `/reverse` to Photon `/reverse`, validating query inputs and returning Photon GeoJSON. Start the runtime routing/geocoding stack with:
 
 ```bash
 docker compose --profile routing --profile geocoding up -d
@@ -315,8 +315,12 @@ MAP_SOURCE_DATE=2026-10-18
 MAP_SOURCE_DATA_TIMESTAMP=2026-10-18T20:25:06Z
 MAP_SOURCE_MD5=a23eb2f21e426677bd243b2712ec1bc8
 MAP_SOURCE_BYTES=229852435
-MAP_OSMIUM_VERSION=1.19.1
+MAP_OSMIUM_VERSION=1.19.1  # Ubuntu 24.04 apt provides 1.16.0; record that override if installed
+MAP_SOURCE_PBF=./map-server/data/source/iran-261018.osm.pbf
 MAP_PBF=./map-server/data/tehran.osm.pbf
+PLANETILER_HEAP=3g
+OSRM_BUILD_THREADS=2
+OSRM_RUNTIME_THREADS=1
 MAP_SERVER_URL=http://localhost:8000
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
@@ -328,9 +332,15 @@ MAP_REVERSE_URL=http://localhost:8001/reverse
 NOMINATIM_HTTP_PORT=8081
 NOMINATIM_DB_PORT=5433
 NOMINATIM_PASSWORD=replace-with-a-random-password
-NOMINATIM_THREADS=4
-NOMINATIM_SHM_SIZE=2g
+NOMINATIM_THREADS=2
+NOMINATIM_SHM_SIZE=1g
+NOMINATIM_POSTGRES_SHARED_BUFFERS=512MB
+NOMINATIM_POSTGRES_MAINTENANCE_WORK_MEM=1GB
+NOMINATIM_POSTGRES_AUTOVACUUM_WORK_MEM=128MB
+NOMINATIM_POSTGRES_WORK_MEM=32MB
+NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
 PHOTON_PORT=2322
+PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
 
 **Geographic coverage:** Defaults target Tehran. `prepare-tehran-pbf.sh` creates the shared crop from the approved Iran snapshot using `MAP_BBOX`; Planetiler, each OSRM profile, and Nominatim use that same PBF. Generated tile/route manifests store its SHA-256, while `MAP_DATA_VERSION` records the source snapshot. For another region, provide a matching approved source and update the Compose environment/volumes. The committed MapLibre styles still name the Tehran source, so changing `MAP_REGION` alone is not a complete region switch.

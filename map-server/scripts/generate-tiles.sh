@@ -104,7 +104,7 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
   "$OUTPUT" "$MAP_DATA_VERSION" "$map_min_zoom" "$map_max_zoom" "$MAP_BBOX" "$MAP_PBF"
 (
   cd -- "$MAP_DATA_DIR"
-  java "-Xmx${PLANETILER_HEAP:-4g}" -jar "$PLANETILER_JAR" \
+  java "-Xmx${PLANETILER_HEAP:-3g}" -jar "$PLANETILER_JAR" \
     --osm-path="$MAP_PBF" \
     --output="$temp_output" \
     --bounds="$MAP_BBOX" \

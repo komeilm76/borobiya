@@ -1,0 +1,305 @@
+# Ubuntu 24.04 VMware Runbook — Offline Tehran Map Pipeline
+
+This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes), and T1.4.5 (Photon geocoding) on the requested VM: **Ubuntu 24.04 LTS, 4 vCPU, 6 GiB RAM, 40 GB disk**. It deliberately builds Planetiler, OSRM, and Photon one after another; only the final acceptance phase starts Martin, all three OSRM services, and Photon together. Nominatim has to stay up during the Photon import, then is stopped to free memory.
+
+> **Resource warning:** 6 GiB is tight for five live map services. The defaults below reduce Java heaps, database memory, and thread counts, but they cannot guarantee the complete stack fits on every dataset/runtime. Check `free -h` and `df -h /` first. If services are killed by the OOM killer, run the live route profiles one at a time or increase the VM to 8 GiB. Keep at least 15–20 GiB free on the filesystem before starting imports.
+
+## Before you begin: two version/data details
+
+- The repository's normal, reproducible source is the immutable `iran-261018.osm.pbf`. This guide follows the requested `iran-latest.osm.pbf` URL instead. **As of 2026-10-19**, Geofabrik's latest file reports data timestamp `2026-10-18T20:25:06Z`, is 229,852,435 bytes, and its official sidecar reports MD5 `a23eb2f21e426677bd243b2712ec1bc8`—the same bytes as the dated archive. `latest` is mutable. If you run this later and the official sidecar, timestamp, or size has changed, stop and update the `.env` source URL/date/timestamp/MD5/bytes together; do not bypass the preparation script's checksum failure. [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [current MD5 sidecar](https://download.geofabrik.de/asia/iran-latest.osm.pbf.md5).
+- Ubuntu 24.04's standard `osmium-tool` package is **1.16.0**, while the project example defaults to 1.19.1. Install the Ubuntu package, then set `MAP_OSMIUM_VERSION=1.16.0` in `.env`. The preparation script verifies the version and writes it into the crop manifest. [Ubuntu Noble package](https://packages.ubuntu.com/noble/utils/osmium-tool).
+- `--max-table-size 100` is an OSRM `/table` query-size limit, **not** a general RAM limit. We keep the default cap and set OSRM runtime workers to one. [OSRM command-line options](https://project-osrm.org/docs/v26.4.0/tools).
+
+---
+
+## Phase A — Install prerequisites
+
+### A1. Update Ubuntu
+
+Open a terminal in the VM:
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+If the upgrade installs a new kernel, reboot and reopen a terminal before continuing:
+
+```bash
+sudo reboot
+```
+
+### A2. Install Docker Engine and Compose v2 from Docker's official apt repository
+
+These are Docker's official Ubuntu repository steps. [Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/).
+
+```bash
+sudo apt install -y ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io \
+  docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker
+```
+
+Allow your normal account to use Docker without `sudo` (the Docker group grants root-equivalent access):
+
+```bash
+sudo usermod -aG docker "$USER"
+newgrp docker
+```
+
+If the group is still not recognized, log out of Ubuntu and back in, then reopen the terminal.
+
+### A3. Install Java 21, Osmium, Git, wget, and Python
+
+Ubuntu 24.04 provides OpenJDK 21 from its standard repositories; no PPA is needed. [Ubuntu OpenJDK availability](https://documentation.ubuntu.com/ubuntu-for-developers/reference/availability/java/).
+
+```bash
+sudo apt install -y openjdk-21-jdk software-properties-common
+sudo add-apt-repository -y universe
+sudo apt update
+sudo apt install -y osmium-tool git wget python3
+```
+
+The Ubuntu 24.04 `osmium-tool` package reports version 1.16.0. The project example defaults to 1.19.1, so set `MAP_OSMIUM_VERSION=1.16.0` in `.env` below. The preparation script verifies the version and records it in the crop manifest. [Ubuntu Noble package](https://packages.ubuntu.com/noble/utils/osmium-tool).
+
+### A4. Verify all prerequisites and VM capacity
+
+```bash
+docker --version
+docker compose version
+java --version
+javac --version
+git --version
+curl --version | head -n 1
+wget --version | head -n 1
+osmium --version
+nproc
+free -h
+df -h /
+docker run --rm hello-world
+```
+
+Expected key results: Java reports version 21; `osmium --version` reports 1.16.0; Docker Compose reports v2; `nproc` reports 4. If `df -h /` shows less than about 15 GiB free, expand the VM disk before proceeding.
+
+### A5. Clone the implementation branch
+
+If this is a fresh VM:
+
+```bash
+cd ~
+git clone --single-branch --branch arena/91f87b17-borobiya \
+  https://github.com/komeilm76/borobiya.git
+cd ~/borobiya
+git log -1 --oneline
+```
+
+The latest implementation should show commit `f32191e` or a newer commit on that same branch. If you already cloned the repository, update that checkout instead:
+
+```bash
+cd ~/borobiya
+git fetch origin arena/91f87b17-borobiya
+git switch arena/91f87b17-borobiya
+git pull --ff-only origin arena/91f87b17-borobiya
+```
+
+If `git switch` says that branch does not exist locally, create its tracking branch once:
+
+```bash
+git switch --track -c arena/91f87b17-borobiya origin/arena/91f87b17-borobiya
+```
+
+### A6. Configure the VM-friendly environment
+
+```bash
+cd ~/borobiya
+cp .env.example .env
+nano .env
+```
+
+In `.env`, keep the project bbox as `MAP_BBOX=51.0,35.5,51.7,35.9`, set a private `NOMINATIM_PASSWORD`, and use these values for the current Geofabrik `latest` snapshot and this Ubuntu release:
+
+```env
+MAP_SOURCE_URL=https://download.geofabrik.de/asia/iran-latest.osm.pbf
+MAP_SOURCE_DATE=2026-10-18
+MAP_SOURCE_DATA_TIMESTAMP=2026-10-18T20:25:06Z
+MAP_SOURCE_MD5=a23eb2f21e426677bd243b2712ec1bc8
+MAP_SOURCE_BYTES=229852435
+MAP_SOURCE_PBF=./map-server/data/source/iran-latest.osm.pbf
+MAP_OSMIUM_VERSION=1.16.0
+PLANETILER_HEAP=3g
+OSRM_BUILD_THREADS=2
+OSRM_RUNTIME_THREADS=1
+NOMINATIM_THREADS=2
+NOMINATIM_SHM_SIZE=1g
+NOMINATIM_POSTGRES_SHARED_BUFFERS=512MB
+NOMINATIM_POSTGRES_MAINTENANCE_WORK_MEM=1GB
+NOMINATIM_POSTGRES_AUTOVACUUM_WORK_MEM=128MB
+NOMINATIM_POSTGRES_WORK_MEM=32MB
+NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
+PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
+```
+
+The `.env.example` already contains the resource-tuning values; edit the existing entries rather than appending duplicate keys. Generate a password locally if needed, then paste it only into `.env`:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+```
+
+Load the file into this terminal. Do not share `.env` or the password:
+
+```bash
+set -a
+source .env
+set +a
+```
+
+---
+
+## Phase B — Data and pipeline
+
+### 7. Download and verify Geofabrik `iran-latest.osm.pbf`
+
+```bash
+mkdir -p map-server/data/source
+cd map-server/data/source
+wget --continue https://download.geofabrik.de/asia/iran-latest.osm.pbf
+wget -O iran-latest.osm.pbf.md5 \
+  https://download.geofabrik.de/asia/iran-latest.osm.pbf.md5
+cat iran-latest.osm.pbf.md5
+md5sum -c iran-latest.osm.pbf.md5
+wc -c iran-latest.osm.pbf
+cd ../../..
+```
+
+For the snapshot reviewed on 2026-10-19, expect `iran-latest.osm.pbf: OK`, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, and 229,852,435 bytes. The sidecar is the source of truth: if these differ, stop and update the source metadata in `.env` before preparing anything.
+
+### 8. Crop Tehran once with the configured `MAP_BBOX`
+
+Confirm the terminal still has `.env` loaded, then run:
+
+```bash
+osmium --version
+./map-server/scripts/prepare-tehran-pbf.sh
+./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
+```
+
+The preparation script rechecks the source MD5 and size, uses Osmium smart extraction with the configured WGS84 bbox, and records source and crop SHA-256 values in `map-server/data/tehran.source.json`. Copy those SHA-256 values from its output for the acceptance report. `Planetiler`, OSRM, and Nominatim must all use this exact crop; Photon imports the resulting Nominatim database.
+
+If you intentionally need to repeat a crop, first inspect the generated data. Only then run `MAP_CROP_OVERWRITE=1 ./map-server/scripts/prepare-tehran-pbf.sh`.
+
+### 9. Generate PMTiles with Planetiler
+
+Run this alone; do not start the map stack yet:
+
+```bash
+PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh
+```
+
+The script uses `-Xmx3g` by default, checks Java 21+, downloads/verifies Planetiler 0.10.2, and writes the PMTiles archive plus build metadata. If the Java process is killed for memory, stop and share the final log and `free -h`; do not immediately raise the heap on a 6 GiB VM.
+
+### 10. Build OSRM car, bicycle, and foot graphs sequentially
+
+```bash
+OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh
+```
+
+The script completes `car`, then `bicycle`, then `foot`; each profile's extract/partition/customize commands run in temporary `docker run --rm` containers. It never launches the three graph builds concurrently. Each build uses two threads and records the shared crop hash. Allow enough disk for all three generated graphs before beginning.
+
+### 11. Build the Photon index from Nominatim
+
+Download the pinned Photon JAR and start only the Nominatim import service:
+
+```bash
+./map-server/scripts/download-photon.sh
+docker compose --profile geocoding-import up -d nominatim
+docker compose --profile geocoding-import ps nominatim
+docker compose --profile geocoding-import logs --tail=100 nominatim
+```
+
+Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared Tehran crop and may take a while. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database.
+
+```bash
+cd map-server/photon/data
+java -Xms512m -Xmx2g -jar ../photon-1.3.0.jar import \
+  -host 127.0.0.1 -port "$NOMINATIM_DB_PORT" \
+  -database nominatim -user nominatim -password "$NOMINATIM_PASSWORD" \
+  -languages fa,en
+cd ../../..
+```
+
+After a successful import, stop Nominatim to free RAM. Its database volume and the Photon index are preserved:
+
+```bash
+docker compose --profile geocoding-import stop nominatim
+```
+
+### 12. Start the live map services together
+
+Only after the tile archive, three OSRM graphs, and Photon index have been built:
+
+```bash
+docker compose --profile routing --profile geocoding up -d \
+  map-server routing-gateway osrm-car osrm-bicycle osrm-foot photon
+docker compose --profile routing --profile geocoding ps
+docker stats --no-stream
+```
+
+OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon is capped at a 1.5 GiB heap. Nominatim is not a serving dependency and should stay stopped. If the VM becomes memory pressured, do not start Nominatim alongside this serving stack.
+
+### 13. Verify tiles, all route profiles, forward geocoding, and reverse geocoding
+
+Run the scripted acceptance checks first:
+
+```bash
+./map-server/scripts/verify-tehran-tiles.sh
+./map-server/scripts/verify-routing.sh
+./map-server/scripts/verify-geocoding.sh
+```
+
+These scripts issue real HTTP requests to Martin (`localhost:8000`) and the local gateway (`localhost:8001`) and validate non-empty MVT/GeoJSON/routes. To inspect the raw responses with `curl`:
+
+```bash
+# Martin MVT tile — should be HTTP 200 and non-empty protobuf bytes.
+curl -fS -o /tmp/tehran-z12-x2632-y1612.pbf \
+  -w 'tile HTTP %{http_code}; %{size_download} bytes\n' \
+  http://localhost:8000/tehran/12/2632/1612
+
+# Routing — change profile to car, bicycle, then foot.
+curl -fsS -H 'Content-Type: application/json' \
+  -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car","alternatives":true}' \
+  http://localhost:8001/route | python3 -m json.tool
+
+# Forward geocoding — expect a non-empty FeatureCollection.
+curl -fsS -G --data-urlencode 'q=Azadi Square' --data-urlencode 'limit=5' \
+  http://localhost:8001/geocode | python3 -m json.tool
+
+# Reverse geocoding near central Tehran — expect a FeatureCollection.
+curl -fsS -G --data-urlencode 'lat=35.70' --data-urlencode 'lon=51.40' \
+  http://localhost:8001/reverse | python3 -m json.tool
+```
+
+The three task checkboxes remain open until all three scripted checks pass on this VM. Keep the output from the preparation script (source/crop SHA-256) and the three smoke tests; share those outputs without `.env`, passwords, or private credentials.
+
+To stop services without deleting built data or named volumes:
+
+```bash
+docker compose --profile routing --profile geocoding down
+docker compose --profile geocoding-import down
+```
+
+Do **not** add `-v`; that would delete persistent Compose volumes.

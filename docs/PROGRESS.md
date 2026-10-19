@@ -82,6 +82,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Added Ubuntu 24.04 low-memory VM runbook and resource tuning
+
+- Added a complete Docker Engine/Compose, Java 21, Osmium, data, build, import, launch, and live verification walkthrough for the user's 4-vCPU/6-GiB/40-GB VMware VM.
+- Reduced Planetiler's default Java heap to 3 GiB; OSRM builders now run profiles sequentially with two threads, OSRM runtimes use one worker and a 100-location table cap, and Nominatim/Photon use conservative memory defaults.
+- Documented the Ubuntu 24.04 Osmium 1.16.0 package override and the current `iran-latest` checksum/date; real workload fit remains to be verified on the VM.
+
 ### 2026-10-19 — Shared OSM crop and offline geocoder pipeline (T1.4.2/4/5 implementation; live checks pending)
 
 - Added a reproducible preparation flow for the approved Geofabrik Iran snapshot (2026-10-18): verifies official MD5, crops `MAP_BBOX` once with Osmium smart extraction, computes source/crop SHA-256 values, and writes an ODbL provenance manifest. Tile and OSRM builders validate the same crop; OSRM graphs record the PBF and manifest hashes.

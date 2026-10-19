@@ -75,14 +75,19 @@ services:
       NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-change-me}
       IMPORT_STYLE: ${NOMINATIM_IMPORT_STYLE:-full}
       IMPORT_WIKIPEDIA: "false"
-      THREADS: ${NOMINATIM_THREADS:-4}
+      THREADS: ${NOMINATIM_THREADS:-2}
+      POSTGRES_SHARED_BUFFERS: ${NOMINATIM_POSTGRES_SHARED_BUFFERS:-512MB}
+      POSTGRES_MAINTENANCE_WORK_MEM: ${NOMINATIM_POSTGRES_MAINTENANCE_WORK_MEM:-1GB}
+      POSTGRES_AUTOVACUUM_WORK_MEM: ${NOMINATIM_POSTGRES_AUTOVACUUM_WORK_MEM:-128MB}
+      POSTGRES_WORK_MEM: ${NOMINATIM_POSTGRES_WORK_MEM:-32MB}
+      POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
     volumes:
       - ./map-server/data:/nominatim/data:ro
       - nominatim-data:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${NOMINATIM_HTTP_PORT:-8081}:8080"
       - "127.0.0.1:${NOMINATIM_DB_PORT:-5433}:5432"
-    shm_size: ${NOMINATIM_SHM_SIZE:-2g}
+    shm_size: ${NOMINATIM_SHM_SIZE:-1g}
     profiles: ["geocoding-import"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS 'http://127.0.0.1:8080/status?format=json' >/dev/null"]
@@ -96,6 +101,8 @@ services:
       context: ./map-server/photon
     image: borobiya/photon:1.3.0
     restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: "${PHOTON_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1536m}"
     command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "fa"]
     volumes:
       - ./map-server/photon/data:/var/lib/photon
@@ -106,7 +113,7 @@ services:
   osrm-car:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/car:/data:ro
     profiles: ["routing"]
@@ -114,7 +121,7 @@ services:
   osrm-bicycle:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/bicycle:/data:ro
     profiles: ["routing"]
@@ -122,7 +129,7 @@ services:
   osrm-foot:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/foot:/data:ro
     profiles: ["routing"]

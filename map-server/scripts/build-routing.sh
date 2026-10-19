@@ -7,6 +7,7 @@ OSRM_IMAGE="ghcr.io/project-osrm/osrm-backend:v26.10.0"
 MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
 MAP_REGION="${MAP_REGION:-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
+OSRM_BUILD_THREADS="${OSRM_BUILD_THREADS:-2}"
 # The canonical prepared crop is the default; explicit paths remain available for audited local setups.
 MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}}"
 OSRM_DATA_DIR="${MAP_OSRM_DATA_DIR:-$REPO_ROOT/map-server/osrm/data}"
@@ -17,6 +18,7 @@ fail() {
 }
 
 [[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION must be a lowercase region slug'
+[[ "$OSRM_BUILD_THREADS" =~ ^[1-4]$ ]] || fail 'OSRM_BUILD_THREADS must be an integer from 1 to 4'
 if [[ "$MAP_PBF" != /* ]]; then
   MAP_PBF="$PWD/$MAP_PBF"
 fi
@@ -48,29 +50,32 @@ trap cleanup EXIT
 
 for profile in car bicycle foot; do
   mkdir -p "$staging/$profile"
-  printf 'Extracting %s graph for %s from the approved PBF...\n' "$profile" "$MAP_REGION"
+  printf 'Extracting %s graph for %s from the approved PBF (%s threads)...\n' "$profile" "$MAP_REGION" "$OSRM_BUILD_THREADS"
   docker run --rm \
     --mount "type=bind,source=$MAP_PBF,target=/input/$MAP_REGION.osm.pbf,readonly" \
     --mount "type=bind,source=$staging,target=/data" \
     "$OSRM_IMAGE" osrm-extract \
+    --threads "$OSRM_BUILD_THREADS" \
     --profile "/opt/$profile.lua" \
     "/input/$MAP_REGION.osm.pbf" \
     --output "/data/$profile/$MAP_REGION"
   docker run --rm --mount "type=bind,source=$staging,target=/data" \
-    "$OSRM_IMAGE" osrm-partition "/data/$profile/$MAP_REGION.osrm"
+    "$OSRM_IMAGE" osrm-partition --threads "$OSRM_BUILD_THREADS" \
+    "/data/$profile/$MAP_REGION.osrm"
   docker run --rm --mount "type=bind,source=$staging,target=/data" \
-    "$OSRM_IMAGE" osrm-customize "/data/$profile/$MAP_REGION.osrm"
+    "$OSRM_IMAGE" osrm-customize --threads "$OSRM_BUILD_THREADS" \
+    "/data/$profile/$MAP_REGION.osrm"
 done
 
 # Record the exact shared cropped PBF and bbox for every generated graph.
 python3 - "$staging" "$MAP_REGION" "$MAP_BBOX" "$MAP_PBF" \
-  "$MAP_DATA_DIR/$MAP_REGION.source.json" "$OSRM_IMAGE" <<'PY'
+  "$MAP_DATA_DIR/$MAP_REGION.source.json" "$OSRM_IMAGE" "$OSRM_BUILD_THREADS" <<'PY'
 import hashlib
 import json
 import pathlib
 import sys
 
-staging, region, bbox_text, pbf_path, source_manifest_path, image = sys.argv[1:]
+staging, region, bbox_text, pbf_path, source_manifest_path, image, build_threads = sys.argv[1:]
 bbox = [float(value) for value in bbox_text.split(",")]
 
 def sha256(path):
@@ -88,6 +93,7 @@ for profile in ("car", "bicycle", "foot"):
         "profile": profile,
         "algorithm": "mld",
         "osrmImage": image,
+        "buildThreads": int(build_threads),
         "bbox": bbox,
         "sourcePbfSha256": pbf_sha256,
         "sourceManifestSha256": source_manifest_sha256,
