@@ -1,4 +1,5 @@
 import { parseMapConfig } from "./map-config.mjs";
+import { DEFAULT_PHOTON_UPSTREAMS, handleGeocodeRequest } from "./geocoding.mjs";
 
 const DEFAULT_UPSTREAMS = Object.freeze({
   car: "http://osrm-car:5000/route/v1/car",
@@ -11,6 +12,13 @@ function configuredUpstreams(env = process.env) {
     car: env.OSRM_CAR_URL || DEFAULT_UPSTREAMS.car,
     bicycle: env.OSRM_BICYCLE_URL || DEFAULT_UPSTREAMS.bicycle,
     foot: env.OSRM_FOOT_URL || DEFAULT_UPSTREAMS.foot
+  };
+}
+
+function configuredGeocodingUpstreams(env = process.env) {
+  return {
+    geocode: env.PHOTON_GEOCODE_URL || DEFAULT_PHOTON_UPSTREAMS.geocode,
+    reverse: env.PHOTON_REVERSE_URL || DEFAULT_PHOTON_UPSTREAMS.reverse
   };
 }
 
@@ -58,6 +66,7 @@ function routeResult(osrmResponse, profile) {
 
 export async function handleRoutingRequest(request, {
   upstreams = configuredUpstreams(),
+  geocodingUpstreams = configuredGeocodingUpstreams(),
   mapConfig = parseMapConfig(process.env),
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000
@@ -68,6 +77,9 @@ export async function handleRoutingRequest(request, {
   }
   if (pathname === "/config") {
     return request.method === "GET" ? json(mapConfig) : json({ error: "method_not_allowed" }, 405);
+  }
+  if (pathname === "/geocode" || pathname === "/reverse") {
+    return handleGeocodeRequest(request, { upstreams: geocodingUpstreams, fetchImpl, timeoutMs });
   }
   if (pathname !== "/route") return json({ error: "not_found" }, 404);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -138,4 +150,4 @@ export async function handleRoutingRequest(request, {
   return routeResult(osrmResponse, input.profile);
 }
 
-export { DEFAULT_UPSTREAMS };
+export { DEFAULT_UPSTREAMS, configuredGeocodingUpstreams, DEFAULT_PHOTON_UPSTREAMS };

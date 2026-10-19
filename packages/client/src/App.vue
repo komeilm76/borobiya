@@ -98,6 +98,16 @@
 
     <footer class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
+      <a
+        class="osm-attribution"
+        href="https://www.openstreetmap.org/copyright"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="© OpenStreetMap contributors؛ اطلاعات مجوز Open Database License (ODbL)"
+        title="OpenStreetMap contributors — Open Database License (ODbL)"
+      >
+        © OpenStreetMap contributors
+      </a>
       <span class="footer-status"><span class="status-dot" /> نسخهٔ اولیه</span>
     </footer>
   </v-app>

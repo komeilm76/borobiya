@@ -6,11 +6,11 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
 MAP_REGION="${MAP_REGION:-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
-MAP_DATA_VERSION="${MAP_DATA_VERSION:-development}"
+MAP_DATA_VERSION="${MAP_DATA_VERSION:-2026-10-18}"
 MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
 MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
-# MAP_PBF is preferred; TEHRAN_PBF remains a compatibility alias for existing local setups.
-MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-}}"
+# The canonical prepared crop is the default; explicit paths remain available for audited local setups.
+MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}}"
 PLANETILER_VERSION="0.10.2"
 PLANETILER_SHA256="f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d"
 PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
@@ -54,11 +54,10 @@ awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
   'BEGIN { exit !(west >= -180 && west <= 180 && east >= -180 && east <= 180 && south >= -90 && south <= 90 && north >= -90 && north <= 90 && west < east && south < north) }' || \
   fail 'MAP_BBOX must be an ordered WGS84 west,south,east,north box'
 
-[[ -n "$MAP_PBF" ]] || fail 'set MAP_PBF (or TEHRAN_PBF) to a reuse-approved region .osm.pbf; this script does not select or download map data'
 if [[ "$MAP_PBF" != /* ]]; then
   MAP_PBF="$PWD/$MAP_PBF"
 fi
-[[ -s "$MAP_PBF" ]] || fail "PBF is missing or empty: $MAP_PBF"
+[[ -s "$MAP_PBF" ]] || fail "cropped PBF is missing or empty: $MAP_PBF; run scripts/prepare-tehran-pbf.sh first"
 
 command -v java >/dev/null 2>&1 || fail 'Java 21+ is required (Planetiler 0.10.2)'
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
@@ -68,6 +67,8 @@ if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1
 fi
 mkdir -p "$MAP_DATA_DIR"
 MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
+MAP_DATA_DIR="$MAP_DATA_DIR" MAP_REGION="$MAP_REGION" MAP_BBOX="$MAP_BBOX" \
+  "$SCRIPT_DIR/verify-map-pbf.sh" "$MAP_PBF"
 PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
 OUTPUT="$MAP_DATA_DIR/$MAP_REGION.pmtiles"
 METADATA="$MAP_DATA_DIR/$MAP_REGION.metadata.json"
@@ -115,9 +116,10 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
 
 bbox_json="$(awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
   'BEGIN { printf "[%.15g,%.15g,%.15g,%.15g]", west, south, east, north }')"
-printf '{"region":"%s","dataVersion":"%s","bbox":%s,"minZoom":%d,"maxZoom":%d,"sourcePbfSha256":"%s","pmtilesSha256":"%s"}\n' \
+printf '{"region":"%s","dataVersion":"%s","bbox":%s,"minZoom":%d,"maxZoom":%d,"sourcePbfSha256":"%s","sourceManifestSha256":"%s","pmtilesSha256":"%s"}\n' \
   "$MAP_REGION" "$MAP_DATA_VERSION" "$bbox_json" "$map_min_zoom" "$map_max_zoom" \
-  "$(sha256_file "$MAP_PBF")" "$(sha256_file "$temp_output")" > "$metadata_tmp"
+  "$(sha256_file "$MAP_PBF")" "$(sha256_file "$MAP_DATA_DIR/$MAP_REGION.source.json")" \
+  "$(sha256_file "$temp_output")" > "$metadata_tmp"
 mv -f "$temp_output" "$OUTPUT"
 mv -f "$metadata_tmp" "$METADATA"
 trap - EXIT

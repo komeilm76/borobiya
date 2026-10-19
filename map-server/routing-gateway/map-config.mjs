@@ -1,7 +1,7 @@
 export const DEFAULT_MAP_CONFIG = Object.freeze({
   region: "tehran",
   bbox: Object.freeze([51.0, 35.5, 51.7, 35.9]),
-  dataVersion: "development",
+  dataVersion: "2026-10-18",
   minZoom: 0,
   maxZoom: 14
 });

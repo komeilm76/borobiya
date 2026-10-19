@@ -20,7 +20,7 @@ function stripPrefix(prefix: string) {
 }
 
 export default defineConfig(({ mode }) => {
-  // Only the proxy process reads service targets; browser code uses same-origin /api, /map, /map-config, /route, and Martin resource paths.
+  // Only the proxy process reads service targets; browser code uses same-origin /api, /map, /map-config, /route, /geocode, /reverse, and Martin resource paths.
   const env = loadEnv(mode, repositoryRoot, "");
   // Validate the same public MAP_* settings that the routing gateway exposes at /map-config.
   parseMapConfig(env);
@@ -56,6 +56,14 @@ export default defineConfig(({ mode }) => {
           rewrite: () => "/config"
         },
         "/route": {
+          target: routingTarget,
+          changeOrigin: true
+        },
+        "/geocode": {
+          target: routingTarget,
+          changeOrigin: true
+        },
+        "/reverse": {
           target: routingTarget,
           changeOrigin: true
         },

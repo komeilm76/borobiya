@@ -6,14 +6,14 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and offline route/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL source, single `MAP_BBOX` crop, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks remain pending the user's local Docker/Java run. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 20% | 🟡 T1.4.1, T1.4.3, and T1.4.6 are complete: Martin styles/assets and validated configurable map settings are in place; T1.4.2 real tile generation, T1.4.4 real OSRM routing, and T1.4.5 geocoding remain open |
+| Map Server | 20% | 🟡 T1.4.1, T1.4.3, and T1.4.6 are complete; the approved Geofabrik crop, OSRM and Nominatim→Photon build paths, proxies, and OSM attribution are implemented, but T1.4.2/.4/.5 remain open until local live smoke tests pass |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -30,7 +30,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 20% | T1.4.1, T1.4.3, and T1.4.6 pins/styles/assets/configuration are complete; T1.4.2 real tile serving, T1.4.4 real OSRM route verification, and T1.4.5 geocoding remain pending |
+| Map Server | 20% | T1.4.1, T1.4.3, and T1.4.6 pins/styles/assets/configuration are complete; T1.4.2/.4/.5 generation/import/proxies are implemented, but real tile, route, and geocoding acceptance is pending local service checks |
 | Client Map canvas | 75% | 🟡 T1.5.1–T1.5.5 reusable MapLibre canvas, theme-aware light/dark switching, outage fallback, full map route, and dashboard map widget are implemented; live map-data rendering and location/search/routing integrations remain pending |
 
 ### Phase 2 — Location Sharing — 0%
@@ -73,7 +73,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 | # | Issue | Impact | Owner | Status |
 |---|-------|--------|-------|--------|
-| 1 | Docker/Compose, Java, and Bun are not installed/on `PATH` in the current agent environment; release assets redirect outside its network allowlist; the candidate Tehran PBF's reuse terms are unresolved | Compose/Martin runtime and Planetiler generation cannot be exercised here, and the sample is not an approved project asset; Bun 1.4.3 is invoked through `npm exec` for workspace checks | Environment / data provenance | 🟡 Validation limitation |
+| 1 | Docker/Compose, Java 21+, and the 230 MB Geofabrik PBF are unavailable in the agent workspace; the user can run Docker and Java locally | Source/license are approved and official MD5 is pinned, but the source/crop SHA-256 and live Martin/OSRM/Nominatim/Photon checks require the user's local run | Environment / data provenance | 🟡 Validation limitation |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
 | 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh/logout, recovery, admin user list/detail/create/status, and onboarding are tested with injected stores; Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth/admin/onboarding flows with PostgreSQL |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-19 — Shared OSM crop and offline geocoder pipeline (T1.4.2/4/5 implementation; live checks pending)
+
+- Added a reproducible preparation flow for the approved Geofabrik Iran snapshot (2026-10-18): verifies official MD5, crops `MAP_BBOX` once with Osmium smart extraction, computes source/crop SHA-256 values, and writes an ODbL provenance manifest. Tile and OSRM builders validate the same crop; OSRM graphs record the PBF and manifest hashes.
+- Added an opt-in Nominatim 5.3 import container consuming that crop, a checksum-verified Photon 1.3.0 JAR download/build path, local `/geocode` and `/reverse` gateway proxies, and live smoke scripts. Added linked OSM attribution in the app footer (both MapLibre styles already expose it).
+- Validation: gateway unit/integration tests 19/19; client tests 48/48, typecheck and production build; shared tests 32/32 and typecheck; server tests 143/143 and typecheck; style, shell, synthetic crop-manifest, YAML parse, and diff checks pass. Docker, Java, Osmium, and the real PBF are unavailable here, so T1.4.2, T1.4.4, and T1.4.5 remain unchecked pending local service results; source SHA-256 will be recorded after the local download.
 
 ### 2026-10-19 — Added user map and dashboard views (T1.5.5; live map data unverified)
 

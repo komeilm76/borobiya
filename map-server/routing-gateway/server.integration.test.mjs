@@ -55,8 +55,25 @@ async function waitForStartup(child) {
   });
 }
 
-test("serves POST /route offline through a local OSRM-compatible endpoint", async () => {
+test("serves route, geocode, and reverse requests offline through local services", async () => {
   const upstreamRequests = [];
+  const photonRequests = [];
+  const photonFixture = {
+    type: "FeatureCollection",
+    features: [{
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [51.38, 35.7] },
+      properties: { name: "Azadi Square", city: "Tehran", country: "Iran" }
+    }]
+  };
+  const photon = createServer((incoming, outgoing) => {
+    photonRequests.push(incoming.url);
+    outgoing.writeHead(200, { "content-type": "application/geo+json" });
+    outgoing.end(JSON.stringify(photonFixture));
+  });
+  const photonPort = await listen(photon);
+  const photonBase = `http://127.0.0.1:${photonPort}`;
+
   const osrm = createServer(async (incoming, outgoing) => {
     let body = "";
     for await (const chunk of incoming) body += chunk;
@@ -80,6 +97,8 @@ test("serves POST /route offline through a local OSRM-compatible endpoint", asyn
       OSRM_CAR_URL: `${upstreamBase}/route/v1/car`,
       OSRM_BICYCLE_URL: `${upstreamBase}/route/v1/bike`,
       OSRM_FOOT_URL: `${upstreamBase}/route/v1/foot`,
+      PHOTON_GEOCODE_URL: `${photonBase}/api`,
+      PHOTON_REVERSE_URL: `${photonBase}/reverse`,
       MAP_REGION: "tehran",
       MAP_BBOX: "51.0,35.5,51.7,35.9",
       MAP_DATA_VERSION: "development",
@@ -129,6 +148,23 @@ test("serves POST /route offline through a local OSRM-compatible endpoint", asyn
       "/route/v1/foot"
     ]);
     assert.deepEqual(upstreamRequests[0].body.coordinates, [[51.38, 35.68], [51.41, 35.70]]);
+
+    const geocodeResponse = await fetch(`http://127.0.0.1:${gatewayPort}/geocode?q=Azadi%20Square`);
+    assert.equal(geocodeResponse.status, 200);
+    assert.deepEqual(await geocodeResponse.json(), photonFixture);
+
+    const reverseResponse = await fetch(`http://127.0.0.1:${gatewayPort}/reverse?lat=35.7&lon=51.4`);
+    assert.equal(reverseResponse.status, 200);
+    assert.deepEqual(await reverseResponse.json(), photonFixture);
+
+    const geocodeUrl = new URL(photonRequests[0], photonBase);
+    const reverseUrl = new URL(photonRequests[1], photonBase);
+    assert.equal(geocodeUrl.pathname, "/api");
+    assert.equal(geocodeUrl.searchParams.get("q"), "Azadi Square");
+    assert.equal(geocodeUrl.searchParams.get("limit"), "5");
+    assert.equal(reverseUrl.pathname, "/reverse");
+    assert.equal(reverseUrl.searchParams.get("lat"), "35.7");
+    assert.equal(reverseUrl.searchParams.get("lon"), "51.4");
   } finally {
     if (child.exitCode === null && child.signalCode === null) {
       const exited = once(child, "exit");
@@ -136,5 +172,6 @@ test("serves POST /route offline through a local OSRM-compatible endpoint", asyn
       await exited;
     }
     await close(osrm);
+    await close(photon);
   }
 });

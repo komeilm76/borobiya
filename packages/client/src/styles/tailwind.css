@@ -326,6 +326,25 @@ a {
   font-size: 0.75rem;
 }
 
+.osm-attribution {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.18em;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.osm-attribution:hover,
+.osm-attribution:focus-visible {
+  text-decoration-color: currentColor;
+}
+
+.osm-attribution:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
 .footer-status {
   display: inline-flex;
   align-items: center;

@@ -4,9 +4,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 OSRM_IMAGE="ghcr.io/project-osrm/osrm-backend:v26.10.0"
+MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
 MAP_REGION="${MAP_REGION:-tehran}"
-# MAP_PBF is preferred; TEHRAN_PBF remains a compatibility alias for existing setups.
-MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-}}"
+MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
+# The canonical prepared crop is the default; explicit paths remain available for audited local setups.
+MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}}"
 OSRM_DATA_DIR="${MAP_OSRM_DATA_DIR:-$REPO_ROOT/map-server/osrm/data}"
 
 fail() {
@@ -15,13 +17,17 @@ fail() {
 }
 
 [[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION must be a lowercase region slug'
-[[ -n "$MAP_PBF" ]] || fail 'set MAP_PBF (or TEHRAN_PBF) to a reuse-approved region .osm.pbf; this script never downloads map data'
 if [[ "$MAP_PBF" != /* ]]; then
   MAP_PBF="$PWD/$MAP_PBF"
 fi
-[[ -s "$MAP_PBF" ]] || fail "PBF is missing or empty: $MAP_PBF"
+[[ -s "$MAP_PBF" ]] || fail "cropped PBF is missing or empty: $MAP_PBF; run scripts/prepare-tehran-pbf.sh first"
+mkdir -p "$MAP_DATA_DIR"
+MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
+MAP_DATA_DIR="$MAP_DATA_DIR" MAP_REGION="$MAP_REGION" MAP_BBOX="$MAP_BBOX" \
+  "$SCRIPT_DIR/verify-map-pbf.sh" "$MAP_PBF"
 
 command -v docker >/dev/null 2>&1 || fail 'Docker is required to run the pinned OSRM backend image'
+command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to write the OSRM provenance manifests'
 docker info >/dev/null 2>&1 || fail 'Docker daemon is unavailable'
 
 mkdir -p "$OSRM_DATA_DIR"
@@ -56,7 +62,41 @@ for profile in car bicycle foot; do
     "$OSRM_IMAGE" osrm-customize "/data/$profile/$MAP_REGION.osrm"
 done
 
-# Publish only after all three profiles have extracted and completed MLD preparation.
+# Record the exact shared cropped PBF and bbox for every generated graph.
+python3 - "$staging" "$MAP_REGION" "$MAP_BBOX" "$MAP_PBF" \
+  "$MAP_DATA_DIR/$MAP_REGION.source.json" "$OSRM_IMAGE" <<'PY'
+import hashlib
+import json
+import pathlib
+import sys
+
+staging, region, bbox_text, pbf_path, source_manifest_path, image = sys.argv[1:]
+bbox = [float(value) for value in bbox_text.split(",")]
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+pbf_sha256 = sha256(pbf_path)
+source_manifest_sha256 = sha256(source_manifest_path)
+for profile in ("car", "bicycle", "foot"):
+    metadata = {
+        "region": region,
+        "profile": profile,
+        "algorithm": "mld",
+        "osrmImage": image,
+        "bbox": bbox,
+        "sourcePbfSha256": pbf_sha256,
+        "sourceManifestSha256": source_manifest_sha256,
+    }
+    output = pathlib.Path(staging) / profile / f"{region}.metadata.json"
+    output.write_text(json.dumps(metadata, separators=(",", ":")) + "\n", encoding="utf-8")
+PY
+
+# Publish only after all three profiles and provenance manifests are ready.
 for profile in car bicycle foot; do
   mv -- "$staging/$profile" "$OSRM_DATA_DIR/$profile"
 done

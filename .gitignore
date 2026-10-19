@@ -20,6 +20,7 @@ map-server/data/
 map-server/tiles/
 map-server/osrm/data/
 map-server/photon/data/
+map-server/photon/*.jar
 *.pmtiles
 *.mbtiles
 *.osm.pbf
