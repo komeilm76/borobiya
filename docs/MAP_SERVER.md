@@ -308,20 +308,21 @@ The graph estimates are per profile; this Compose design runs three separate OSR
 
 ## 9. Client Integration (MapLibre)
 
-```ts
-import maplibregl from "maplibre-gl";
-const mapUrl = import.meta.env.VITE_MAP_URL ?? "/map";
-const map = new maplibregl.Map({
-  container: "map",
-  style: `${mapUrl}/style/light`,
-  center: [51.38, 35.68],
-  zoom: 11
-});
-// Both styles share sources and assets, so MapLibre can swap without external requests.
-function toggleTheme(dark: boolean) {
-  map.setStyle(`${mapUrl}/style/${dark ? "dark" : "light"}`);
-}
+`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount.
+
+A map view can compose it directly:
+
+```vue
+<template>
+  <MapCanvas class="map-panel" aria-label="نقشهٔ تعاملی تهران" />
+</template>
+
+<script setup lang="ts">
+import MapCanvas from "@/components/map/MapCanvas.vue";
+</script>
 ```
+
+The two Martin styles share sources and sprites/glyphs; wiring a theme toggle through `map.setStyle()` is T1.5.2. MapLibre GL JS 6.15.0 includes its right-to-left text shaping support, so the client does not need an external runtime RTL plugin.
 
 Navigation pitch (see ARCHITECTURE.md §9.3):
 

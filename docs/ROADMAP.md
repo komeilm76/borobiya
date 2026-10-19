@@ -66,7 +66,7 @@ gantt
 - [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas
-- [ ] MapLibre GL JS init, center on Tehran, attribution
+- [x] MapLibre GL JS init, center on Tehran, attribution (T1.5.1; reusable canvas component; runtime verification pending map data)
 - [ ] Dark/Light styles (same source, different paint) with `<200ms` switch via `setStyle`
 - [ ] Gesture-friendly controls, pitch/zoom preserve on style change
 - [ ] Graceful fallback if Map Server down (toast + cached tiles)

@@ -192,7 +192,12 @@ packages/client/
     │   ├── http.ts           # same-origin JSON requests and structured API errors
     │   ├── http.test.ts
     │   ├── error-message.ts  # localized auth/API errors
-    │   └── security-questions.ts # cached public question catalog
+    │   ├── security-questions.ts # cached public question catalog
+    │   └── map-config.ts     # same-origin validated map settings
+    ├── components/
+    │   └── map/
+    │       ├── MapCanvas.vue # MapLibre canvas, Tehran default, attribution and controls
+    │       └── map-canvas-options.ts # default and runtime map bounds/zoom options
     ├── router/
     │   ├── index.ts          # namespaced routes and auth-guard wiring
     │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
@@ -221,7 +226,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. Remaining feature views, MapLibre, Capacitor, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas now loads the local light style, applies validated runtime bounds/zoom settings, and adds navigation, scale, and attribution controls. Full map/dashboard views, theme switching, graceful map-server degradation, Capacitor, and Android packaging remain future work.
 
 ---
 
