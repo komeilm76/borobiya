@@ -160,11 +160,7 @@ The registration, login, refresh, logout, and all forgot-password handlers fail 
 ### 5.2 No Delete Invariant
 
 - No `DELETE /_admin/users/:id` handler may exist.
-- Add a test:
-  ```ts
-  const res = await app.inject({ method: 'DELETE', url: '/_admin/users/xxx', headers });
-  expect(res.statusCode).not.toBe(200);
-  ```
+- A runtime regression test sends `DELETE /_admin/users/:id` to the Fastify app and asserts `404`; the OpenAPI contract also contains no DELETE operation for that path.
 - Only `PATCH /.../status {isActive}` + `PATCH /.../unsuspend`.
 
 ---

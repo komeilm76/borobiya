@@ -4,15 +4,15 @@
 
 ---
 
-## Overall: 21% — Phase 1 Foundation underway (2026-10-18)
+## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, and T1.3.1–T1.3.2 admin user-management tasks are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers, authenticated profile/onboarding routes, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, and T1.3.1–T1.3.3 admin user-management tasks are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers, authenticated profile/onboarding routes, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 40% | 🟡 Registration, login, refresh/logout, recovery, admin user list/detail/create/status + audit, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
+| Auth & Users | 41% | 🟡 Registration, login, refresh/logout, recovery, admin user list/detail/create/status + audit and no-delete regression coverage, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
 | Map Server | 0% | ⬜ Not started |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
@@ -29,7 +29,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 40% | T1.2.1–T1.2.7 and T1.3.1–T1.3.2 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail, 15m/7d access/refresh tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
+| Auth system | 41% | T1.2.1–T1.2.7 and T1.3.1–T1.3.3 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail, tested no-delete invariant, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
 | Map Server | 0% | — |
 | Client Map canvas | 0% | — |
 
@@ -81,6 +81,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-19 — No-delete invariant (T1.3.3)
+
+- Added a Fastify runtime regression test asserting `DELETE /_admin/users/:id` returns `404`, and an OpenAPI assertion that the user detail path has no DELETE operation. No delete handler or contract was introduced.
+- Validation: 183 workspace tests (28 shared, 139 server, 16 client), all three typechecks, client production build, and `git diff --check` passed.
 
 ### 2026-10-18 — Admin user list and detail (T1.3.2)
 

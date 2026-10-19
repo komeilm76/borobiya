@@ -89,6 +89,7 @@ describe("Fastify server skeleton", () => {
     const forgotReset = paths["/_auth/forgot-password/reset"]?.post;
     const adminListUsers = paths["/_admin/users"]?.get;
     const adminGetUser = paths["/_admin/users/{id}"]?.get;
+    expect(paths["/_admin/users/{id}"]).not.toHaveProperty("delete");
     const adminCreateUser = paths["/_admin/users"]?.post;
     const adminUpdateUserStatus = paths["/_admin/users/{id}/status"]?.patch;
     const completeSecurityQuestions = paths["/_user/complete-security-questions"]?.post;
@@ -303,6 +304,16 @@ describe("Fastify server skeleton", () => {
     const missingUserProfileToken = await app.inject({ method: "GET", url: "/_user/me" });
     expect(missingUserProfileToken.statusCode).toBe(401);
     expect(missingUserProfileToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("does not expose DELETE /_admin/users/:id", async () => {
+    const app = await makeApp();
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/_admin/users/00000000-0000-4000-8000-000000000001"
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 
   it("advertises the gateway API prefix while retaining the direct API server", async () => {
