@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, ilike, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNotNull, type SQL } from "drizzle-orm";
 import type { AdminUserListQuery, Mission, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
 import { adminAuditLog, userSessions, users } from "./schema";
@@ -43,6 +43,7 @@ export interface AdminUserListResult {
 
 export interface AdminUserStore {
   findAdminActorById(id: string): Promise<AdminActorRecord | null>;
+  hasActiveSession(input: { userId: string; sessionId: string; deviceId: string }): Promise<boolean>;
   listUsers(query: AdminUserListQuery): Promise<AdminUserListResult>;
   getUserDetails(id: string, currentSessionId: string): Promise<AdminUserDetailRecord | null>;
   createAdminCreatedUser(input: {
@@ -82,6 +83,20 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       .where(eq(users.id, id))
       .limit(1);
     return matchingUsers[0] ?? null;
+  }
+
+  async hasActiveSession(input: { userId: string; sessionId: string; deviceId: string }): Promise<boolean> {
+    const sessions = await this.db
+      .select({ id: userSessions.id })
+      .from(userSessions)
+      .where(and(
+        eq(userSessions.id, input.sessionId),
+        eq(userSessions.userId, input.userId),
+        eq(userSessions.deviceId, input.deviceId),
+        isNotNull(userSessions.refreshTokenHash)
+      ))
+      .limit(1);
+    return sessions.length === 1;
   }
 
   async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {

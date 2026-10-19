@@ -3,6 +3,7 @@ import type { LocationQuery, RouteLocationRaw, RouteLocationNormalized } from "v
 
 const LOGIN_PATH = "/_auth/login";
 const DASHBOARD_PATH = "/_user/dashboard";
+const ADMIN_USERS_PATH = "/_admin/users";
 const ONBOARDING_PATH = "/_user/complete-security-questions";
 
 export interface AuthGuardState {
@@ -26,8 +27,7 @@ function isProtectedPath(path: string): boolean {
   return path === "/_user" || path.startsWith("/_user/") || isAdminPath(path);
 }
 
-function safeRedirect(query: LocationQuery): string | null {
-  const candidate = query.redirect;
+function safeRedirectPath(candidate: unknown): string | null {
   if (
     typeof candidate !== "string" ||
     !candidate.startsWith("/") ||
@@ -38,6 +38,20 @@ function safeRedirect(query: LocationQuery): string | null {
     return null;
   }
   return candidate;
+}
+
+function safeRedirect(query: LocationQuery): string | null {
+  return safeRedirectPath(query.redirect);
+}
+
+export function resolvePostLoginDestination(
+  redirect: unknown,
+  auth: Pick<AuthGuardState, "mustCompleteSecurityQuestions" | "user">
+): string {
+  const safeRedirect = safeRedirectPath(redirect);
+  if (safeRedirect) return safeRedirect;
+  if (auth.mustCompleteSecurityQuestions) return ONBOARDING_PATH;
+  return auth.user?.role === "admin" ? ADMIN_USERS_PATH : DASHBOARD_PATH;
 }
 
 export function resolveAuthNavigation(

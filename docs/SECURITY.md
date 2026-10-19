@@ -41,24 +41,24 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - Return only `questionIds + texts`, never answer hashes. Unknown or unconfigured accounts receive three random questions from a stable, server-keyed five-question decoy pool for that username, so repeated requests do not expose that decoys draw from a larger catalog than a real account's saved five. Responses share the same shape; verification failures use a generic `WRONG_ANSWERS` response.
 - Verify: all three submitted IDs must match the active server-selected challenge and all three normalized answers must pass `argon2.verify`. Always perform three comparisons, using a dummy Argon2id hash for unknown accounts or invalid challenge IDs.
 - On success issue a 32-byte opaque, base64url `resetToken` with a ten-minute expiry. Store only its SHA-256 hash in `password_reset_tokens`; claim it atomically so replay or concurrent reuse cannot reset the password twice.
-- `POST /_auth/forgot-password/reset` consumes the token and updates the Argon2id password in one transaction, invalidates other reset/challenge tokens, and revokes all refresh sessions. The user must log in again.
+- `POST /_auth/forgot-password/reset` consumes the token and updates the Argon2id password in one transaction, invalidates other reset/challenge tokens, and revokes all refresh sessions. Protected routes also require the persisted session to remain unrevoked, so outstanding access JWTs stop working immediately; the user must log in again.
 - Limit request/verify to five attempts per 15 minutes per IP+username; limit reset attempts to five per 15 minutes per IP (the reset body has no username).
 
 ### 1.5 Admin-Created Users
 
 - Implemented `POST /_admin/users` accepts only `{ username, password, isActive? }`; strict validation rejects any supplied security-question fields. It stores the password with Argon2id, creates a regular `user` role account, honors `isActive` (default `true`), and creates no `user_security_answers` rows.
 - Every created account has `mustCompleteSecurityQuestions=true`. The handler returns the standard user profile and reports duplicate usernames as `409 USERNAME_TAKEN`.
-- The route verifies a signed, unexpired HS256 access JWT with `tokenUse: "access"`, requires the admin role, then checks the current admin record remains admin, active, and unsuspended. A verified token with an inactive, suspended, or demoted account is denied.
+- The route verifies a signed, unexpired HS256 access JWT with `tokenUse: "access"`, requires the admin role, then checks the current admin record remains admin, active, and unsuspended and that the token's persisted session has not been revoked. A verified token with an inactive, suspended, demoted, or logged-out session is denied.
 - Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
 - `POST /_user/complete-security-questions` accepts five unique IDs from the seeded catalog, normalizes answers with `trim().toLowerCase()`, stores Argon2id hashes, and atomically clears the flag only after all five rows are stored. Repeated requests do not overwrite completed answers and return `409 SECURITY_QUESTIONS_ALREADY_COMPLETED`.
-- A Fastify `/_user` authorization hook verifies the signed/unexpired access token and current user role/account state. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
+- A Fastify `/_user` authorization hook verifies the signed/unexpired access token, current user role/account state, and a matching persisted session whose refresh-token hash is still present. Logout, password reset, and admin revocation therefore invalidate access JWTs on protected routes immediately, not only at access-token expiry. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
 - The Vue client now exposes login, registration, forgot-password, and completion forms. It keeps the access token in memory, stores only the minimal non-secret user snapshot in `sessionStorage`, and relies on the HttpOnly refresh cookie to restore sessions. The router keeps `/_auth/*` guest-only, protects `/_user/*` and admin routes, and forces every signed-in user with the onboarding flag through `/_user/complete-security-questions` before other pages. `GET /_user/me` refreshes the profile; the `SECURITY_QUESTIONS_REQUIRED` response preserves onboarding status when the profile endpoint is gated.
 
 ### 1.6 Admin User Activation/Deactivation
 
 - `PATCH /_admin/users/:id/status` accepts only `{ isActive: boolean }` and applies the same signed access-token and current active/unsuspended admin checks as user creation.
 - The status update, append-only audit insert, and refresh-session invalidation are one database transaction. The audit event uses `user_activated` or `user_deactivated`, `targetType: "user"`, the target ID, and metadata `{ previousIsActive, isActive }`. Requests that repeat the current state return the profile without writing another event.
-- Deactivation sets `users.is_active=false`, clears every `user_sessions.refresh_token_hash` for that user, and marks those sessions offline. The current protected-route account-state checks reject access tokens for inactive accounts; reactivation does not revive old refresh sessions, so a fresh login is required.
+- Deactivation sets `users.is_active=false`, clears every `user_sessions.refresh_token_hash` for that user, and marks those sessions offline. Both user and admin authorization checks require the token's matching session to remain persisted and unrevoked, so logout, password reset, or deactivation invalidates outstanding access JWTs immediately. Reactivation does not revive the old session; a fresh login is required.
 - Invalid IDs/bodies receive `400 VALIDATION_ERROR`; a missing target receives `404 USER_NOT_FOUND`. The response is `Cache-Control: no-store`. No user-delete route is registered.
 
 ---
@@ -78,7 +78,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 - Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. Verifiers require an unexpired `exp` claim and valid user/session UUIDs, and temporarily accept legacy T1.2.2 JWTs where `jti` held the session ID.
 - `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token and has a unique index. Refresh validates signature, expiry, session/user/device claims, and current account status, then uses a conditional update on the current hash to rotate it atomically; concurrent reuse cannot return two usable tokens.
 - Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
-- Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
+- Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. User/admin authorization checks reject access JWTs backed by that revoked session immediately. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
 
 ### 2.2 Sessions & Devices
 
@@ -135,7 +135,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token and current admin account state; the `/_user` hook checks access-token validity, current user role/account state, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
+The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token, current admin account state, and an unrevoked matching session; the `/_user` hook checks access-token validity, current user role/account state, the persisted session, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
 
 **Backend policy sketch (shared hooks for future route groups):**
 

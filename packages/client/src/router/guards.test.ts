@@ -3,6 +3,7 @@ import type { RouteLocationNormalized } from "vue-router";
 import {
   createAuthGuard,
   resolveAuthNavigation,
+  resolvePostLoginDestination,
   type AuthGuardLocation,
   type AuthGuardState
 } from "./guards";
@@ -63,6 +64,22 @@ describe("client auth navigation guard", () => {
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: ordinaryUser })))
       .toBe("/_user/dashboard");
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: admin }))).toBe(true);
+  });
+
+  it("sends admins to user management after login and keeps user onboarding/default destinations", () => {
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/users");
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/dashboard");
+    expect(resolvePostLoginDestination(undefined, makeAuth({
+      user: admin,
+      mustCompleteSecurityQuestions: true
+    }))).toBe("/_user/complete-security-questions");
+  });
+
+  it("preserves only safe post-login redirects", () => {
+    const auth = makeAuth({ user: admin });
+    expect(resolvePostLoginDestination("/_admin/dashboard?tab=overview", auth)).toBe("/_admin/dashboard?tab=overview");
+    expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/users");
   });
 
   it("restores auth state before navigating to a guest-only or protected page", async () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Database } from "./client";
 import { DrizzleUserSecurityQuestionsStore } from "./security-questions-store";
-import { userSecurityAnswers, users } from "./schema";
+import { userSecurityAnswers, userSessions, users } from "./schema";
 
 const answerHashes = Array.from({ length: 5 }, (_, index) => ({
   questionId: `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
@@ -47,7 +47,44 @@ function makeStore(updatedUsers: unknown[]) {
   };
 }
 
+class SessionReadBuilder implements PromiseLike<unknown> {
+  readonly from = vi.fn((_table: unknown) => this);
+  readonly where = vi.fn((_condition?: unknown) => this);
+  readonly limit = vi.fn((_limit: number) => this);
+
+  constructor(private readonly result: unknown) {}
+
+  then<TResult1 = unknown, TResult2 = never>(
+    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve(this.result).then(onfulfilled, onrejected);
+  }
+}
+
+function makeSessionStore(result: unknown[]) {
+  const builder = new SessionReadBuilder(result);
+  const select = vi.fn(() => builder);
+  const store = new DrizzleUserSecurityQuestionsStore({ select } as unknown as Database);
+  return { store, builder };
+}
+
 describe("DrizzleUserSecurityQuestionsStore", () => {
+  it("only authorizes a matching session with an unrevoked refresh credential", async () => {
+    const identity = {
+      userId: "00000000-0000-4000-8000-000000000099",
+      sessionId: "00000000-0000-4000-8000-000000000077",
+      deviceId: "00000000-0000-4000-8000-000000000088"
+    };
+    const active = makeSessionStore([{ id: identity.sessionId }]);
+    const revoked = makeSessionStore([]);
+
+    await expect(active.store.hasActiveSession(identity)).resolves.toBe(true);
+    await expect(revoked.store.hasActiveSession(identity)).resolves.toBe(false);
+    expect(active.builder.from).toHaveBeenCalledWith(userSessions);
+    expect(active.builder.where).toHaveBeenCalledOnce();
+    expect(active.builder.limit).toHaveBeenCalledWith(1);
+  });
   it("in one transaction inserts five answer hashes and clears the required-completion flag", async () => {
     const mocks = makeStore([{ id: "00000000-0000-4000-8000-000000000099" }]);
     const completed = await mocks.store.completeSecurityQuestions({

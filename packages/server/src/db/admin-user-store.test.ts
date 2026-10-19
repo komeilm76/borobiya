@@ -143,6 +143,22 @@ const createdUser: AdminUserRecord = {
 const adminId = "81e5295a-9381-4bc5-844c-3cf0f52df30e";
 
 describe("DrizzleAdminUserStore", () => {
+  it("recognizes only persisted, unrevoked sessions for the matching user and device", async () => {
+    const identity = {
+      userId: "81e5295a-9381-4bc5-844c-3cf0f52df30e",
+      sessionId: "71e5295a-9381-4bc5-844c-3cf0f52df30e",
+      deviceId: "51e5295a-9381-4bc5-844c-3cf0f52df30e"
+    };
+    const active = makeReadStore([[{ id: identity.sessionId }]]);
+    const revoked = makeReadStore([[]]);
+
+    await expect(active.store.hasActiveSession(identity)).resolves.toBe(true);
+    await expect(revoked.store.hasActiveSession(identity)).resolves.toBe(false);
+    expect(active.builders[0]?.from).toHaveBeenCalledWith(userSessions);
+    expect(active.builders[0]?.where).toHaveBeenCalledOnce();
+    expect(active.builders[0]?.limit).toHaveBeenCalledWith(1);
+  });
+
   it("searches users by username/status and returns stable paginated results", async () => {
     const mocks = makeReadStore([[{ total: 6 }], [createdUser]]);
     const query: AdminUserListQuery = {

@@ -296,22 +296,26 @@ async function loadUsers(): Promise<void> {
   activeListController = null;
   listError.value = "";
   loading.value = true;
-
-  const accessToken = auth.accessToken;
-  if (!accessToken) {
-    users.value = [];
-    total.value = 0;
-    totalPages.value = 0;
-    listError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
-    loading.value = false;
-    return;
-  }
-
-  const controller = new AbortController();
-  activeListController = controller;
-  const isActive = statusFilter.value === "all" ? undefined : statusFilter.value === "active";
+  let controller: AbortController | null = null;
 
   try {
+    // A page can remain open beyond the 15-minute access-token lifetime. Refresh before
+    // each list request so the explicit Refresh button can recover the HttpOnly session.
+    await auth.ensureSession();
+    if (requestVersion !== listRequestVersion) return;
+
+    const accessToken = auth.accessToken;
+    if (!accessToken) {
+      users.value = [];
+      total.value = 0;
+      totalPages.value = 0;
+      listError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
+      return;
+    }
+
+    controller = new AbortController();
+    activeListController = controller;
+    const isActive = statusFilter.value === "all" ? undefined : statusFilter.value === "active";
     const response = await listAdminUsers({
       q: search.value.trim() || undefined,
       isActive,
@@ -333,14 +337,14 @@ async function loadUsers(): Promise<void> {
     total.value = response.total;
     totalPages.value = response.totalPages;
   } catch (error) {
-    if (controller.signal.aborted || requestVersion !== listRequestVersion) return;
+    if (controller?.signal.aborted || requestVersion !== listRequestVersion) return;
     users.value = [];
     total.value = 0;
     totalPages.value = 0;
     listError.value = friendlyAdminError(error, "بارگذاری فهرست کاربران انجام نشد. دوباره تلاش کنید.");
   } finally {
     if (requestVersion === listRequestVersion) {
-      activeListController = null;
+      if (activeListController === controller) activeListController = null;
       loading.value = false;
     }
   }
@@ -385,16 +389,19 @@ function closeStatusDialog(): void {
 
 async function confirmStatusChange(): Promise<void> {
   const pendingChange = statusChange.value;
-  const accessToken = auth.accessToken;
   if (!pendingChange || statusSavingUserId.value !== null) return;
-  if (!accessToken) {
-    statusError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
-    return;
-  }
 
   statusSavingUserId.value = pendingChange.user.id;
   statusError.value = "";
   try {
+    // Refresh a near-expiry token before mutating; a mounted admin page may outlive its JWT.
+    await auth.ensureSession();
+    const accessToken = auth.accessToken;
+    if (!accessToken) {
+      statusError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
+      return;
+    }
+
     await updateAdminUserStatus(pendingChange.user.id, pendingChange.nextIsActive, accessToken);
     statusChange.value = null;
     successMessage.value = pendingChange.nextIsActive

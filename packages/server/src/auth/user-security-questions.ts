@@ -94,6 +94,13 @@ export async function registerUserSecurityQuestionsRoute(
     if (user.isSuspended) {
       return sendError(reply, 403, "ACCOUNT_SUSPENDED", "This account is suspended. Contact an administrator.");
     }
+    if (!(await dependencies.store.hasActiveSession({
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      deviceId: identity.deviceId
+    }))) {
+      return sendUnauthorized(reply, "INVALID_ACCESS_TOKEN");
+    }
 
     request.authenticatedUser = {
       ...identity,

@@ -46,6 +46,7 @@ afterEach(async () => {
 
 function makeStore(options: {
   user?: SecurityQuestionsUserRecord | null;
+  sessionActive?: boolean;
   questionsExist?: boolean;
   completionSucceeds?: boolean;
 } = {}) {
@@ -61,6 +62,7 @@ function makeStore(options: {
     calls.userLookups.push(id);
     return user ? { ...user, mustCompleteSecurityQuestions } : null;
   });
+  const hasActiveSession = vi.fn<UserSecurityQuestionsStore["hasActiveSession"]>(async () => options.sessionActive ?? true);
   const securityQuestionsExist = vi.fn<UserSecurityQuestionsStore["securityQuestionsExist"]>(async (ids) => {
     calls.questionLookups.push([...ids]);
     return options.questionsExist ?? true;
@@ -73,9 +75,10 @@ function makeStore(options: {
     return true;
   });
   return {
-    store: { findUserById, securityQuestionsExist, completeSecurityQuestions },
+    store: { findUserById, hasActiveSession, securityQuestionsExist, completeSecurityQuestions },
     calls,
     findUserById,
+    hasActiveSession,
     securityQuestionsExist,
     completeSecurityQuestions
   };
@@ -113,6 +116,11 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ ok: true });
+    expect(mocks.hasActiveSession).toHaveBeenCalledWith({
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      deviceId: identity.deviceId
+    });
     expect(hashPassword).toHaveBeenCalledTimes(5);
     expect(hashPassword).toHaveBeenNthCalledWith(1, "answer 1");
     expect(mocks.securityQuestionsExist).toHaveBeenCalledWith(questionIds);
@@ -206,6 +214,7 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
     expect(response.statusCode).toBe(401);
     expect(response.json().code).toBe(code);
     expect(mocks.findUserById).not.toHaveBeenCalled();
+    expect(mocks.hasActiveSession).not.toHaveBeenCalled();
     expect(mocks.completeSecurityQuestions).not.toHaveBeenCalled();
   });
 
@@ -228,6 +237,25 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
     expect(response.json().code).toBe(code);
     expect(hashPassword).not.toHaveBeenCalled();
     expect(mocks.completeSecurityQuestions).not.toHaveBeenCalled();
+  });
+
+  it("rejects access tokens whose persisted session was revoked by logout, reset, or deactivation", async () => {
+    const activeUser = { ...incompleteUser, mustCompleteSecurityQuestions: false };
+    const mocks = makeStore({ user: activeUser, sessionActive: false });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "GET",
+      url: "/_user/protected",
+      headers: { authorization: `Bearer ${await accessToken()}` }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().code).toBe("INVALID_ACCESS_TOKEN");
+    expect(mocks.hasActiveSession).toHaveBeenCalledWith({
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      deviceId: identity.deviceId
+    });
   });
 
   it("rejects malformed bodies and unavailable question IDs before hashing", async () => {

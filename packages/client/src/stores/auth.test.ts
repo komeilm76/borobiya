@@ -59,6 +59,28 @@ describe("client auth store", () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api${apiRoutes.auth.login.url}`);
   });
 
+  it("refreshes an expired access token before the next protected operation", async () => {
+    const expiredAccessToken = "e30.eyJleHAiOjF9.signature";
+    const refreshedAccessToken = "refreshed-access-token";
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: expiredAccessToken, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse({ accessToken: refreshedAccessToken }),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    await auth.ensureSession();
+
+    expect(auth.accessToken).toBe(refreshedAccessToken);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      `/api${apiRoutes.auth.login.url}`,
+      `/api${apiRoutes.auth.refresh.url}`,
+      `/api${apiRoutes.user.me.url}`
+    ]);
+  });
+
   it("restores a browser session with the HttpOnly refresh cookie and reloads the current profile", async () => {
     const fetchMock = fakeFetch(jsonResponse({ accessToken }), jsonResponse(profile));
     vi.stubGlobal("fetch", fetchMock);

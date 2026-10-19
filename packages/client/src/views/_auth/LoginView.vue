@@ -114,6 +114,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { loginSchema } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
+import { resolvePostLoginDestination } from "../../router/guards";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
@@ -138,11 +139,7 @@ async function submitLogin(): Promise<void> {
   submitting.value = true;
   try {
     await auth.login(parsed.data);
-    const redirect = route.query.redirect;
-    const destination = typeof redirect === "string" && redirect.startsWith("/") && !redirect.startsWith("//")
-      ? redirect
-      : auth.mustCompleteSecurityQuestions ? "/_user/complete-security-questions" : "/_user/dashboard";
-    await router.replace(destination);
+    await router.replace(resolvePostLoginDestination(route.query.redirect, auth));
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ورود انجام نشد. دوباره تلاش کنید.");
   } finally {

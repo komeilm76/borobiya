@@ -53,6 +53,7 @@ afterEach(async () => {
 
 function makeStore(options: {
   actor?: AdminActorRecord | null;
+  sessionActive?: boolean;
   listResult?: AdminUserListResult;
   userDetail?: AdminUserDetailRecord | null;
   createdUser?: AdminUserRecord | null;
@@ -64,13 +65,15 @@ function makeStore(options: {
   const createdUser = options.createdUser === undefined ? defaultCreatedUser : options.createdUser;
   const statusUser = options.statusUser === undefined ? { ...defaultCreatedUser, isActive: false } : options.statusUser;
   const findAdminActorById = vi.fn<AdminUserStore["findAdminActorById"]>(async () => actor);
+  const hasActiveSession = vi.fn<AdminUserStore["hasActiveSession"]>(async () => options.sessionActive ?? true);
   const listUsers = vi.fn<AdminUserStore["listUsers"]>(async () => listResult);
   const getUserDetails = vi.fn<AdminUserStore["getUserDetails"]>(async () => userDetail);
   const createAdminCreatedUser = vi.fn<AdminUserStore["createAdminCreatedUser"]>(async () => createdUser);
   const updateUserActiveStatus = vi.fn<AdminUserStore["updateUserActiveStatus"]>(async () => statusUser);
   return {
-    store: { findAdminActorById, listUsers, getUserDetails, createAdminCreatedUser, updateUserActiveStatus },
+    store: { findAdminActorById, hasActiveSession, listUsers, getUserDetails, createAdminCreatedUser, updateUserActiveStatus },
     findAdminActorById,
+    hasActiveSession,
     listUsers,
     getUserDetails,
     createAdminCreatedUser,
@@ -146,6 +149,11 @@ describe("GET /_admin/users", () => {
       limit: 5,
       totalPages: 2
     });
+    expect(mocks.hasActiveSession).toHaveBeenCalledWith({
+      userId: adminIdentity.userId,
+      sessionId: adminIdentity.sessionId,
+      deviceId: adminIdentity.deviceId
+    });
     expect(mocks.listUsers).toHaveBeenCalledWith({
       q: "responder",
       isActive: false,
@@ -169,6 +177,27 @@ describe("GET /_admin/users", () => {
     expect(invalidQuery.json().code).toBe("VALIDATION_ERROR");
     expect(guestRequest.statusCode).toBe(401);
     expect(guestRequest.json().code).toBe("UNAUTHORIZED");
+    expect(mocks.listUsers).not.toHaveBeenCalled();
+  });
+});
+
+describe("admin access session revocation", () => {
+  it("rejects a still-signed access token after its persisted session was revoked", async () => {
+    const mocks = makeStore({ sessionActive: false });
+    const { app } = await makeApp(mocks.store);
+    const response = await app.inject({
+      method: "GET",
+      url: "/_admin/users",
+      headers: { authorization: `Bearer ${await adminToken()}` }
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json().code).toBe("INVALID_ACCESS_TOKEN");
+    expect(mocks.hasActiveSession).toHaveBeenCalledWith({
+      userId: adminIdentity.userId,
+      sessionId: adminIdentity.sessionId,
+      deviceId: adminIdentity.deviceId
+    });
     expect(mocks.listUsers).not.toHaveBeenCalled();
   });
 });

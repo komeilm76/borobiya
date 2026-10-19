@@ -67,6 +67,14 @@ async function authorizeAdmin(
     reply.code(403).send(errorResponse("ACCOUNT_SUSPENDED", "This admin account is suspended."));
     return null;
   }
+  if (!(await dependencies.store.hasActiveSession({
+    userId: identity.userId,
+    sessionId: identity.sessionId,
+    deviceId: identity.deviceId
+  }))) {
+    reply.code(401).send(errorResponse("INVALID_ACCESS_TOKEN", "A valid admin access token is required."));
+    return null;
+  }
 
   return identity;
 }
