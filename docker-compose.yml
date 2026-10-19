@@ -34,7 +34,7 @@ services:
       MAP_SERVER_URL: http://map-server:3000
       MAP_STYLE_LIGHT: http://map-server:3000/style/light
       MAP_STYLE_DARK: http://map-server:3000/style/dark
-      MAP_ROUTING_URL: http://map-server:3000/route
+      MAP_ROUTING_URL: http://routing-gateway:3000/route
       MAP_GEOCODE_URL: http://map-server:3000/geocode
       MAP_REVERSE_URL: http://map-server:3000/reverse
     ports:
@@ -67,6 +67,54 @@ services:
       postgres:
         condition: service_healthy
 
+  osrm-car:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    volumes:
+      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/car:/data:ro
+    profiles: ["routing"]
+
+  osrm-bicycle:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    volumes:
+      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/bicycle:/data:ro
+    profiles: ["routing"]
+
+  osrm-foot:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "/data/${MAP_REGION:-tehran}.osrm"]
+    volumes:
+      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/foot:/data:ro
+    profiles: ["routing"]
+
+  routing-gateway:
+    build:
+      context: ./map-server/routing-gateway
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      MAP_REGION: ${MAP_REGION:-tehran}
+      MAP_BBOX: ${MAP_BBOX:-51.0,35.5,51.7,35.9}
+      MAP_DATA_VERSION: ${MAP_DATA_VERSION:-development}
+      MAP_MIN_ZOOM: ${MAP_MIN_ZOOM:-0}
+      MAP_MAX_ZOOM: ${MAP_MAX_ZOOM:-14}
+      OSRM_CAR_URL: http://osrm-car:5000/route/v1/car
+      OSRM_BICYCLE_URL: http://osrm-bicycle:5000/route/v1/bike
+      OSRM_FOOT_URL: http://osrm-foot:5000/route/v1/foot
+    ports:
+      - "127.0.0.1:${MAP_ROUTING_PORT:-8001}:3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   nginx:
     image: nginx:stable-alpine
     restart: unless-stopped
@@ -79,6 +127,8 @@ services:
         condition: service_healthy
       map-server:
         condition: service_started
+      routing-gateway:
+        condition: service_healthy
 
 volumes:
   postgres-data: {}

@@ -4,19 +4,17 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
-mkdir -p "$MAP_DATA_DIR"
-MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
-TEHRAN_PBF="${TEHRAN_PBF:-$MAP_DATA_DIR/tehran.osm.pbf}"
-if [[ "$TEHRAN_PBF" != /* ]]; then
-  TEHRAN_PBF="$PWD/$TEHRAN_PBF"
-fi
-IRAN_PBF="$MAP_DATA_DIR/iran-latest.osm.pbf"
+MAP_REGION="${MAP_REGION:-tehran}"
+MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
+MAP_DATA_VERSION="${MAP_DATA_VERSION:-development}"
+MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
+MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
+# MAP_PBF is preferred; TEHRAN_PBF remains a compatibility alias for existing local setups.
+MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-}}"
 PLANETILER_VERSION="0.10.2"
 PLANETILER_SHA256="f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d"
 PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
 PLANETILER_URL="https://github.com/onthegomap/planetiler/releases/download/v$PLANETILER_VERSION/planetiler.jar"
-IRAN_PBF_URL="${IRAN_PBF_URL:-https://download.geofabrik.de/asia/iran-latest.osm.pbf}"
-OUTPUT="$MAP_DATA_DIR/tehran.pmtiles"
 
 fail() {
   printf 'generate-tiles: %s\n' "$*" >&2
@@ -29,9 +27,38 @@ sha256_file() {
   elif command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | awk '{print $1}'
   else
-    fail 'sha256sum or shasum is required to verify the pinned Planetiler JAR'
+    fail 'sha256sum or shasum is required to verify the pinned Planetiler JAR and input data'
   fi
 }
+
+[[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION must be a lowercase region slug'
+[[ "$MAP_DATA_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail 'MAP_DATA_VERSION must be a 1-64 character version slug'
+[[ "$MAP_MIN_ZOOM" =~ ^[0-9]+$ ]] || fail 'MAP_MIN_ZOOM must be an integer from 0 to 16'
+[[ "$MAP_MAX_ZOOM" =~ ^[0-9]+$ ]] || fail 'MAP_MAX_ZOOM must be an integer from 0 to 16'
+map_min_zoom=$((10#$MAP_MIN_ZOOM))
+map_max_zoom=$((10#$MAP_MAX_ZOOM))
+(( map_min_zoom <= 16 && map_max_zoom <= 16 )) || fail 'Planetiler 0.10.2 supports zoom levels up to 16'
+(( map_min_zoom <= map_max_zoom )) || fail 'MAP_MIN_ZOOM cannot exceed MAP_MAX_ZOOM'
+
+# Normalize and validate west,south,east,north before passing it to Planetiler.
+MAP_BBOX="${MAP_BBOX//[[:space:]]/}"
+[[ "$MAP_BBOX" != *, ]] || fail 'MAP_BBOX must contain exactly four coordinates'
+IFS=',' read -r west south east north extra_bbox_part <<< "$MAP_BBOX"
+[[ -n "${west:-}" && -n "${south:-}" && -n "${east:-}" && -n "${north:-}" && -z "${extra_bbox_part:-}" ]] || \
+  fail 'MAP_BBOX must contain west,south,east,north coordinates'
+for coordinate in "$west" "$south" "$east" "$north"; do
+  awk -v value="$coordinate" 'BEGIN { exit !(value ~ /^[-+]?([0-9]+([.][0-9]*)?|[.][0-9]+)$/) }' || \
+    fail 'MAP_BBOX coordinates must be finite decimal numbers'
+done
+awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
+  'BEGIN { exit !(west >= -180 && west <= 180 && east >= -180 && east <= 180 && south >= -90 && south <= 90 && north >= -90 && north <= 90 && west < east && south < north) }' || \
+  fail 'MAP_BBOX must be an ordered WGS84 west,south,east,north box'
+
+[[ -n "$MAP_PBF" ]] || fail 'set MAP_PBF (or TEHRAN_PBF) to a reuse-approved region .osm.pbf; this script does not select or download map data'
+if [[ "$MAP_PBF" != /* ]]; then
+  MAP_PBF="$PWD/$MAP_PBF"
+fi
+[[ -s "$MAP_PBF" ]] || fail "PBF is missing or empty: $MAP_PBF"
 
 command -v java >/dev/null 2>&1 || fail 'Java 21+ is required (Planetiler 0.10.2)'
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
@@ -40,6 +67,10 @@ if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1
   fail 'sha256sum or shasum is required to verify the pinned Planetiler JAR'
 fi
 mkdir -p "$MAP_DATA_DIR"
+MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
+PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
+OUTPUT="$MAP_DATA_DIR/$MAP_REGION.pmtiles"
+METADATA="$MAP_DATA_DIR/$MAP_REGION.metadata.json"
 
 java_version="$(java -version 2>&1 | awk -F '"' '/version/ { print $2; exit }')"
 java_major="${java_version%%.*}"
@@ -49,28 +80,6 @@ fi
 if [[ ! "$java_major" =~ ^[0-9]+$ ]] || (( java_major < 21 )); then
   fail "Java 21+ is required; found '${java_version:-unknown}'"
 fi
-
-# Use a supplied/previously downloaded Tehran extract when available. Otherwise,
-# download the Iran extract and cut Tehran's bbox (west,south,east,north).
-if [[ ! -s "$TEHRAN_PBF" ]]; then
-  command -v osmium >/dev/null 2>&1 || fail 'osmium-tool is required to cut Tehran from the Iran PBF'
-  if [[ ! -s "$IRAN_PBF" ]]; then
-    iran_tmp="$IRAN_PBF.part"
-    trap 'rm -f "${iran_tmp:-}"' EXIT
-    printf 'Downloading Iran OSM extract...\n'
-    curl -fL --retry 2 "$IRAN_PBF_URL" -o "$iran_tmp"
-    mv "$iran_tmp" "$IRAN_PBF"
-    trap - EXIT
-  fi
-  printf 'Extracting Tehran bbox from %s...\n' "$IRAN_PBF"
-  mkdir -p "$(dirname -- "$TEHRAN_PBF")"
-  pbf_tmp="$(dirname -- "$TEHRAN_PBF")/.tehran.$$.osm.pbf"
-  trap 'rm -f "${pbf_tmp:-}"' EXIT
-  osmium extract --bbox 51.0,35.5,51.7,35.9 "$IRAN_PBF" --output-format=pbf --output "$pbf_tmp"
-  mv "$pbf_tmp" "$TEHRAN_PBF"
-  trap - EXIT
-fi
-[[ -s "$TEHRAN_PBF" ]] || fail "Tehran PBF is missing or empty: $TEHRAN_PBF"
 
 # Fetch the pinned JAR only if it is absent or fails the published checksum.
 if [[ ! -f "$PLANETILER_JAR" ]] || [[ "$(sha256_file "$PLANETILER_JAR")" != "$PLANETILER_SHA256" ]]; then
@@ -86,18 +95,31 @@ fi
 
 [[ "$(sha256_file "$PLANETILER_JAR")" == "$PLANETILER_SHA256" ]] || fail 'Planetiler JAR checksum verification failed'
 
-# Build to a temporary archive so an interrupted run does not replace a valid map.
-temp_output="$(dirname -- "$MAP_DATA_DIR")/.tehran.$$.pmtiles"
-trap 'rm -f "${temp_output:-}"' EXIT
-printf 'Generating %s from %s...\n' "$OUTPUT" "$TEHRAN_PBF"
+# Keep temporary artifacts outside Martin's source directory until a complete build is ready.
+temp_output="$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.$$.pmtiles"
+metadata_tmp="$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.$$.metadata.json"
+trap 'rm -f "${temp_output:-}" "${metadata_tmp:-}"' EXIT
+printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
+  "$OUTPUT" "$MAP_DATA_VERSION" "$map_min_zoom" "$map_max_zoom" "$MAP_BBOX" "$MAP_PBF"
 (
   cd -- "$MAP_DATA_DIR"
   java "-Xmx${PLANETILER_HEAP:-4g}" -jar "$PLANETILER_JAR" \
-    --osm-path="$TEHRAN_PBF" \
+    --osm-path="$MAP_PBF" \
     --output="$temp_output" \
+    --bounds="$MAP_BBOX" \
+    --minzoom="$map_min_zoom" \
+    --maxzoom="$map_max_zoom" \
     --download --force
 )
 [[ -s "$temp_output" ]] || fail 'Planetiler did not produce a non-empty PMTiles archive'
+
+bbox_json="$(awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
+  'BEGIN { printf "[%.15g,%.15g,%.15g,%.15g]", west, south, east, north }')"
+printf '{"region":"%s","dataVersion":"%s","bbox":%s,"minZoom":%d,"maxZoom":%d,"sourcePbfSha256":"%s","pmtilesSha256":"%s"}\n' \
+  "$MAP_REGION" "$MAP_DATA_VERSION" "$bbox_json" "$map_min_zoom" "$map_max_zoom" \
+  "$(sha256_file "$MAP_PBF")" "$(sha256_file "$temp_output")" > "$metadata_tmp"
 mv -f "$temp_output" "$OUTPUT"
+mv -f "$metadata_tmp" "$METADATA"
 trap - EXIT
 printf 'Created %s (%s bytes)\n' "$OUTPUT" "$(wc -c < "$OUTPUT" | tr -d ' ')"
+printf 'Wrote build metadata %s\n' "$METADATA"

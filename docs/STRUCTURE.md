@@ -229,11 +229,18 @@ Login, registration, recovery, onboarding, and the corresponding route guards ar
 
 ```text
 map-server/
-├── README.md                 # documents the ignored runtime data directory
-└── data/                     # created/used locally; ignored by Git; currently empty
+├── README.md                 # map-server setup and runtime-data status
+├── martin.yaml               # Martin's PMTiles, style, sprite, and font configuration
+├── styles/                   # committed light/dark MapLibre styles
+├── sprites/                  # committed SVG source artwork for Martin sprites
+├── fonts/                    # licensed TTFs and provenance
+├── scripts/                  # tile, routing, and asset verification/build scripts
+├── routing-gateway/          # project POST /route adapter and tests
+├── data/                     # local generated PMTiles; ignored by Git
+└── osrm/data/                # local car/bicycle/foot OSRM graphs; ignored by Git
 ```
 
-Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount and the PostGIS service. The planned styles, sprites, glyphs, OSRM graph, Photon index, and OSM data pipeline do not exist in the scaffold yet; see [`MAP_SERVER.md`](./MAP_SERVER.md) for the design/runbook.
+Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount and PostGIS. Committed light/dark styles, SVG sprite sources, Noto Sans/Noto Naskh Arabic fonts, and `martin.yaml` configure the style runtime. The ignored PMTiles archive is not generated. Compose also defines three optional OSRM profile services plus a project-contract routing gateway; the OSRM graphs are not generated, and the real offline route test remains pending an approved PBF and Docker/OSRM runtime. See [`MAP_SERVER.md`](./MAP_SERVER.md) for the design and runbook; Photon is not configured yet.
 
 ---
 
@@ -243,8 +250,8 @@ Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount a
 |------|---------|
 | `.env.example` | Local API and Compose environment template; copy to ignored `.env` |
 | `.dockerignore` | Excludes secrets, dependencies, build output, and map datasets from image contexts |
-| `docker-compose.yml` | `api`, `postgres`, `map-server`, and `nginx`; no Redis service |
-| `nginx.conf` | Local HTTP proxy for `/api/`, `/docs`, and `/map/` |
+| `docker-compose.yml` | `api`, `postgres`, `map-server`, routing gateway, optional OSRM profile services, and `nginx`; no Redis service |
+| `nginx.conf` | Local HTTP proxy for `/api/`, `/docs`, `/map/`, `/map-config`, and `/route` |
 | `.gitignore` | Excludes local secrets, generated output, and large map data |
 | `tsconfig.json` | Strict shared TypeScript defaults and explicit workspace aliases |
 | `package.json` | Workspaces + root `dev` script |

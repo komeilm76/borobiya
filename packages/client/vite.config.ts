@@ -3,6 +3,7 @@ import vue from "@vitejs/plugin-vue";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv } from "vite";
+import { parseMapConfig } from "../../map-server/routing-gateway/map-config.mjs";
 import { defineConfig } from "vitest/config";
 import vuetify from "vite-plugin-vuetify";
 
@@ -19,11 +20,14 @@ function stripPrefix(prefix: string) {
 }
 
 export default defineConfig(({ mode }) => {
-  // Only the proxy process reads these targets; browser code uses same-origin /api, /map, and Martin resource paths.
+  // Only the proxy process reads service targets; browser code uses same-origin /api, /map, /map-config, /route, and Martin resource paths.
   const env = loadEnv(mode, repositoryRoot, "");
+  // Validate the same public MAP_* settings that the routing gateway exposes at /map-config.
+  parseMapConfig(env);
   const apiPrefix = proxyPrefix(env.VITE_API_URL, "/api");
   const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
   const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
+  const routingTarget = new URL(env.MAP_ROUTING_URL || "http://127.0.0.1:8001/route").origin;
   const mapResourceProxy = Object.fromEntries(
     ["/tehran/", "/sprite/", "/font/"].map((prefix) => [
       prefix,
@@ -46,6 +50,15 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       allowedHosts: ["localhost", "127.0.0.1", ".e2b.app"],
       proxy: {
+        "/map-config": {
+          target: routingTarget,
+          changeOrigin: true,
+          rewrite: () => "/config"
+        },
+        "/route": {
+          target: routingTarget,
+          changeOrigin: true
+        },
         [apiPrefix]: {
           target: env.API_PROXY_TARGET || "http://127.0.0.1:3000",
           changeOrigin: true,

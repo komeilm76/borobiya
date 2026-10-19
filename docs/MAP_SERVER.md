@@ -1,6 +1,6 @@
 # Borobiya — Map Server (Offline Vector)
 
-> TL;DR: The target design is fully offline: self-host **Martin 1.16.1** (vector tiles and styles), **OSRM 26.10.0** (routing), and **Photon 1.3.0** (geocoding) as separate services, with configurable OSM-derived data. **Current scaffold status:** Martin is configured to serve committed light/dark styles, SVG-derived sprites, and dynamically generated glyphs; the Tehran PMTiles archive is still not generated, so its tile route remains unverified. The pinned Planetiler generation and MVT smoke-test scripts exist, but generation is blocked in this environment by missing Java 21+ and the candidate PBF's reuse terms are unresolved. Routing, geocoding, and a real Martin runtime check remain pending.
+> TL;DR: The target design is fully offline: self-host **Martin 1.16.1** (vector tiles and styles), **OSRM 26.10.0** (routing), and **Photon 1.3.0** (geocoding) as separate services, with configurable OSM-derived data. **Current scaffold status:** Martin is configured to serve committed light/dark styles, SVG-derived sprites, and dynamically generated glyphs; the Tehran PMTiles archive is still not generated, so its tile route remains unverified. The pinned Planetiler generation and MVT smoke-test scripts exist, but generation is blocked in this environment by missing Java 21+ and the candidate PBF's reuse terms are unresolved. Separate OSRM profile services, a graph builder, and the `POST /route` adapter are configured, but a real route test is still blocked by the same unapproved data and missing Docker/OSRM runtime. Photon indexing and a real Martin runtime check remain pending.
 
 ---
 
@@ -12,9 +12,11 @@
 | **Fully Offline** | Works on LAN with ZERO internet. No runtime `maps.googleapis.com`, `api.mapbox.com` | Any online provider |
 | **Independent** | Map Server deployable on separate VM/box, own lifecycle | Tied to API server process |
 
-Clients only call:
+Clients use:
 - `https://borobiya.local/api` → API
-- `https://map.borobiya.local` or `https://borobiya.local:8000` → Map Server
+- `https://map.borobiya.local` or the local `/map` prefix → Martin tiles/styles/assets
+- `https://borobiya.local/route` (or local port 8001) → project routing adapter
+- `https://borobiya.local/map-config` → public region/bounds/version/zoom settings; the gateway serves these at `/config`
 
 ---
 
@@ -34,8 +36,8 @@ Internet ──download once─►│  │  OSM PBF    │  (geofabrik)   │
                          │  │ + Sprites + Glyphs           │──► /sprite/* /font/*
                          │  └─────────────┘                │
                          │  ┌─────────────┐                │
-                         │  │ OSRM graph  │ osrm-extract   │──► POST /route?profile=car|bike|foot
-                         │  │ Valhalla alt│                │──► POST /route/multi (waypoints)
+                         │  │ OSRM graphs │ car/bicycle/foot│──► POST /route (adapter)
+                         │  │ MLD services│                │──► OSRM /route/v1/{profile}
                          │  └─────────────┘                │
                          │  ┌─────────────┐                │
                          │  │ Photon index│                │──► GET /geocode?q=& GET /reverse?lat=&lon=
@@ -72,30 +74,32 @@ The versions are exact pins, not compatibility ranges. Upgrade them deliberately
 ### 4.2 Steps
 
 ```bash
-# 1–2. Download/cut a Tehran extract if needed, verify the pinned Planetiler JAR,
-#    and generate map-server/data/tehran.pmtiles (Java 21+, curl, osmium if no PBF exists).
-./map-server/scripts/generate-tiles.sh
+# 1–2. Generate region-named tiles from a reuse-approved region PBF.
+# MAP_BBOX is west,south,east,north; Planetiler clips to it and uses the zoom range.
+MAP_PBF=/path/to/reuse-approved-tehran.osm.pbf \
+MAP_REGION=tehran \
+MAP_BBOX=51.0,35.5,51.7,35.9 \
+MAP_DATA_VERSION=2026-10-19 \
+MAP_MIN_ZOOM=0 MAP_MAX_ZOOM=14 \
+  ./map-server/scripts/generate-tiles.sh
+# Creates map-server/data/tehran.pmtiles and tehran.metadata.json.
 
 # Optional alternative for small GeoJSON-only areas:
 tippecanoe -o map-server/data/tehran.mbtiles -zg --drop-densest-as-needed data/tehran.geojson
 
-# 3. Build routing graphs (OSRM)
-osrm-extract -p map-server/osrm/profiles/car.lua data/tehran.osm.pbf
-osrm-partition data/tehran.osrm && osrm-customize data/tehran.osrm
-osrm-routed --algorithm mld data/tehran.osrm --port 5000
-# Repeat for bicycle.lua / foot.lua (or Valhalla build_tiles)
+# 3. Build separate OSRM graphs from an approved PBF cropped for the same region.
+MAP_PBF=/path/to/reuse-approved-tehran.osm.pbf MAP_REGION=tehran \
+  ./map-server/scripts/build-routing.sh
 
 # 4. Photon 1.3.0 cannot import an .osm.pbf directly. It needs a Nominatim
 # PostgreSQL database or a Photon JSON dump; choose/provision that input in T1.4.5.
 # See §7 for the pinned Photon import and serve commands.
 
-# 5. Deploy to volume
-cp data/tehran.pmtiles map-server/data/
-cp data/tehran.osrm* map-server/osrm/data/
-# Restart services via scripts/update.sh
+# 5. Start local services after generating data; MAP_* values come from .env.
+docker compose --profile routing up -d
 ```
 
-`map-server/scripts/generate-tiles.sh` downloads/crops the Tehran PBF if needed, verifies Planetiler 0.10.2 by SHA-256, and generates the ignored PMTiles archive. `map-server/scripts/verify-tehran-tiles.sh` checks Martin health and an MVT tile response. Routing, geocoding, and update scripts (`build-routing.sh`, `build-geocode.sh`, `update.sh`) remain future work.
+`map-server/scripts/generate-tiles.sh` requires an explicit reuse-approved `MAP_PBF`, validates `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, and the zoom range, verifies Planetiler 0.10.2 by SHA-256, and writes `<region>.pmtiles` plus a checksum/settings manifest. `build-routing.sh` uses the same explicit region PBF to create profile-specific `<region>.osrm` graphs. `verify-tehran-tiles.sh` and `verify-routing.sh` are local runtime smoke tests. The generated PMTiles and OSRM graphs are Git-ignored; no source PBF is selected implicitly. Real-data checks remain pending an approved PBF and runnable container environment. Geocoding and update scripts (`build-geocode.sh`, `update.sh`) remain future work.
 
 ### 4.3 Styles, sprites, and glyphs
 
@@ -179,35 +183,59 @@ This checkout's styles and assets are statically validated, but this environment
 
 ---
 
-## 6. OSRM Setup
+## 6. OSRM Routing Setup
 
-**Pinned Docker image example (OSRM is not yet in the root Compose scaffold):**
+OSRM chooses a transport profile while building the graph with `osrm-extract`; a single prepared graph cannot switch between car, bicycle, and foot at request time. The Compose setup therefore uses three isolated graph directories and three OSRM services. The official OSRM 26.10.0 image includes `/opt/car.lua`, `/opt/bicycle.lua`, and `/opt/foot.lua`. OSRM's HTTP profile name for its bundled bicycle rules is `bike`, so the gateway maps the public `bicycle` value to `/route/v1/bike`.
 
-```yaml
-osrm:
-  image: ghcr.io/project-osrm/osrm-backend:v26.10.0
-  command: osrm-routed --algorithm mld /data/tehran.osrm --port 8000 --max-table-size 1000
-  volumes: [map-data:/data:ro]
+### Build graphs
+
+Use a Tehran PBF whose reuse terms have been confirmed. The ignored candidate PBF in `map-server/data/` is not approved and must not be used until its licensing is resolved. The build script does not download or select a dataset implicitly:
+
+```bash
+MAP_PBF=/absolute/path/to/reuse-approved-tehran.osm.pbf MAP_REGION=tehran \
+  ./map-server/scripts/build-routing.sh
 ```
 
-**Profiles:** Provide Lua files per transport:
+It runs the pinned `ghcr.io/project-osrm/osrm-backend:v26.10.0` image, extracts and prepares MLD graphs for all three bundled profiles, then publishes them to `map-server/osrm/data/{car,bicycle,foot}/<MAP_REGION>.osrm`. That output directory is Git-ignored. To build to a different location, set `MAP_OSRM_DATA_DIR` both for this command and in the Compose `.env`.
 
-- `car.lua` — motorway/primary, one-way respected
-- `bicycle.lua` — cycleways preferred, footways allowed
-- `foot.lua` — sidewalks, pedestrian streets
+After successful graph generation, start the local Compose stack with routing enabled:
 
-**API (on Map Server):**
-
-```
-POST /route
-Body { from:{lat,lon}, to:{lat,lon}, profile:"car"|"bicycle"|"foot", alternatives: true }
-→ { routes: [{ distance_m, duration_s, polyline: "encoded", legs: []}, ...] } // 2-3 alternatives
-
-POST /route/multi
-Body { waypoints:[{lat,lon}], profile, optimize?:boolean } → TSP if optimize, returns ordered
+```bash
+docker compose --profile routing up -d
 ```
 
-Document exact payloads in Swagger if proxying via API (recommended: Map Server directly, API just config passthrough).
+`routing-gateway` runs in the default profile and can answer `/health` without graph data; the three OSRM services are in Compose's `routing` profile. Once the profiles are enabled, the gateway forwards only to the local `osrm-car`, `osrm-bicycle`, or `osrm-foot` service. No public routing service or external network is used.
+
+### Project API and OSRM adapter
+
+The project contract remains a simple `POST /route`; its body is translated to OSRM's native `POST /route/v1/{profile}` JSON API (coordinates are converted from `{lat,lon}` objects to `[longitude,latitude]` arrays):
+
+```json
+{
+  "from": { "lat": 35.68, "lon": 51.38 },
+  "to": { "lat": 35.70, "lon": 51.41 },
+  "profile": "car",
+  "alternatives": true
+}
+```
+
+`profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, and OSRM `legs`, plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
+
+`GET /map-config` is the public, same-origin configuration endpoint (gateway path `/config`). It returns only `{ region, bbox, dataVersion, minZoom, maxZoom }`; invalid region, bounds, version, or zoom environment values prevent the gateway from starting. Both Nginx and Vite proxy this endpoint to the same routing gateway, and the client validates the response before using it.
+
+Run the deterministic, network-free gateway tests with Node.js:
+
+```bash
+node --test map-server/routing-gateway/*.test.mjs
+```
+
+After the approved graphs and OSRM services are running, exercise the real offline route endpoint for all three profiles:
+
+```bash
+./map-server/scripts/verify-routing.sh
+```
+
+This checkout cannot yet pass the real route smoke test: Docker/OSRM are unavailable in the current environment and the local candidate PBF's reuse terms are unresolved. T1.4.4 remains open until graphs are built from an approved dataset and the smoke test succeeds.
 
 ---
 
@@ -250,29 +278,31 @@ Response:
 ## 8. ENV Configuration
 
 ```env
-MAP_REGION=tehran          # iran | tehran | middle-east | custom
-MAP_BBOX=44.0,25.0,63.0,39.0
-MAP_DATA_VERSION=2025-05-01
-MAP_MAX_ZOOM=14
+MAP_REGION=tehran          # lowercase slug; must match the archive/graph names
+MAP_BBOX=51.0,35.5,51.7,35.9  # west,south,east,north in WGS84
+MAP_DATA_VERSION=development  # version slug published by GET /map-config
 MAP_MIN_ZOOM=0
+MAP_MAX_ZOOM=14              # Planetiler 0.10.2 supports up to 16
 MAP_SERVER_URL=http://localhost:8000          # API tells clients
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
-MAP_ROUTING_URL=http://localhost:8000/route
+MAP_ROUTING_URL=http://localhost:8001/route
+MAP_ROUTING_PORT=8001
+MAP_OSRM_DATA_DIR=./map-server/osrm/data
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 MAP_REVERSE_URL=http://localhost:8000/reverse
 ```
 
-**Geographic coverage:** Start with `tehran` (500MB–1GB) for dev. Scaling to `iran` (~4–6GB tiles + 2GB OSRM + 3GB Photon) requires no code change — only `MAP_REGION` + volume swap.
+**Geographic coverage:** Defaults target Tehran. The pipeline names archives and OSRM graphs from `MAP_REGION`, clips tile output to `MAP_BBOX`, and stamps `MAP_DATA_VERSION` plus zoom bounds in the build manifest. For another region, provide a matching approved PBF and update the Compose environment/volumes. The committed MapLibre styles still name the Tehran source, so matching runtime style/client source wiring for non-Tehran regions remains future work; do not treat changing `MAP_REGION` alone as a complete region switch.
 
 Disk/RAM guide:
 
-| Region | PMTiles | OSRM graph | Photon index | RAM to serve (min) |
-|--------|---------|-----------|--------------|-------------------|
-| Tehran | 0.5 GB | 0.8 GB | 1.2 GB | 2 GB |
-| Iran | 3–5 GB | 2 GB | 4 GB | 4–8 GB |
+| Region | PMTiles | OSRM graph (per profile) | Photon index | RAM to serve |
+|--------|---------|--------------------------|--------------|---------------|
+| Tehran | ~0.5 GB | ~0.8 GB (rough estimate) | ~1.2 GB | Benchmark pending |
+| Iran | ~3–5 GB | ~2 GB (rough estimate) | ~4 GB | Benchmark pending |
 
-Document on provisioning ticket.
+The graph estimates are per profile; this Compose design runs three separate OSRM processes and three graphs. Memory figures from the earlier single-profile plan are not valid for that deployment, so benchmark the full set before sizing.
 
 ---
 

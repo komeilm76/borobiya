@@ -165,7 +165,7 @@ jobs:
 ### 5.1 Target
 
 - **Host:** Ubuntu 22.04/24.04 LTS VPS (4GB RAM for 1k users goal).
-- **Current local stack:** `docker-compose.yml` with `api`, `postgres`, `map-server`, `nginx`; loopback-only HTTP. Production TLS/domain routing via Let's Encrypt remains a future deployment task.
+- **Current local stack:** `docker-compose.yml` with `api`, `postgres`, `map-server`, `routing-gateway`, optional OSRM profile services (`--profile routing`), and `nginx`; loopback-only HTTP. Production TLS/domain routing via Let's Encrypt remains a future deployment task.
 
 ### 5.2 Workflow
 

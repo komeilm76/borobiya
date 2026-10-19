@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> From OSM dump to serving PBF + routing + geocoding offline.
+> Current pipeline scaffolding from an explicitly approved OSM PBF to local map services. Photon import and automated promotion remain future work.
 
 ---
 
@@ -8,65 +8,56 @@
 
 ```mermaid
 flowchart TD
-  A[Download region.osm.pbf<br/>geofabrik.de / openstreetmap.fr]
-  A --> B1[Generate Tiles<br/>Planetiler / Tippecanoe]
-  A --> B2[Build Routing Graph<br/>osrm-extract + partition + customize]
-  A --> B3[Build Geocode Index<br/>Photon Nominatim import]
-  B1 --> C[tiles.pmtiles / mbtiles]
-  B2 --> D[*.osrm graph + profiles]
-  B3 --> E[Photon ES index]
-  C & D & E --> F[Deploy to Map Server volume<br/>map-data:/data]
-  F --> G[Martin :8000<br/>OSRM :8000/route<br/>Photon :2322/api]
-  G --> H[Clients via MapLibre<br/>tiles/styles/route/geocode]
-  I[ENV MAP_REGION=tehran<br/>MAP_DATA_VERSION=2025-05-01] -.-> A & F & G
-  J[Admin: bun run map:update<br/>or Cron weekly] --> A
-  J --> K[Stage → Admin approve → Symlink swap<br/>Zero downtime]
-  K --> F
+  A[Reuse-approved region PBF<br/>supplied explicitly as MAP_PBF]
+  A --> B1[Planetiler 0.10.2<br/>MAP_BBOX + min/max zoom]
+  A --> B2[OSRM 26.10.0<br/>car / bicycle / foot graphs]
+  B1 --> C[<region>.pmtiles<br/>+ metadata manifest]
+  B2 --> D[car/bicycle/foot<br/><region>.osrm graphs]
+  C --> E[Martin :8000<br/>tiles / styles / sprites / glyphs]
+  D --> F[Routing gateway :8001<br/>POST /route]
+  E --> G[Same-origin Nginx :8080<br/>/map/* + /map-config + /route]
+  F --> G
+  H[MAP_REGION<br/>MAP_BBOX<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM] -.-> B1 & B2 & F & G
+  F --> I[GET /config internally<br/>exposed as GET /map-config]
+  J[Photon offline index<br/>not configured — T1.4.5] -.-> G
 ```
+
+`MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser fetches `/map-config`; it does not receive service URLs. The tile and OSRM build scripts require an explicit `MAP_PBF` (or the legacy `TEHRAN_PBF` alias) and never select or download an input dataset implicitly.
 
 ---
 
-## 2. Update Flow (Versioned, Zero-Downtime)
-
-```mermaid
-sequenceDiagram
-  participant Admin
-  participant CLI as bun run map:update
-  participant Staging as /data/staging/v2025-05-08
-  participant Prod as /data/current (symlink)
-  participant Martin
-
-  Admin->>CLI: bun run map:update --region=iran
-  CLI->>CLI: download latest PBF, generate pmtiles, OSRM graph, Photon index
-  CLI->>Staging: write new version files + version.json
-  CLI-->>Admin: "Staging ready: v2025-05-08 — approve via POST /_admin/map/promote"
-  Admin->>Prod: POST /_admin/map/promote {version:"2025-05-08"}
-  Prod->>Prod: ln -sfn /data/staging/v2025-05-08 /data/current
-  Prod->>Martin: SIGHUP / reload config → serves new tiles
-  Martin-->>Admin: 200 {activeVersion:"2025-05-08"}
-  Note over CLI,Prod: Clients send X-Map-Data-Version header for cache bust
-```
-
----
-
-## 3. Geographic Coverage Matrix
+## 2. Update Flow (Build Artifacts)
 
 ```mermaid
 flowchart LR
-  T[Tehran 0.5GB tiles<br/>dev default] --> I[Iran 4GB]
-  I --> M[Middle-East 12GB]
-  M --> C[Custom bbox]
-  I & M & C -.-> ENV
-  ENV[MAP_REGION env<br/>MAP_BBOX, MAP_MAX_ZOOM]
+  A[Approved source PBF] --> B[Build tiles + metadata]
+  A --> C[Build three OSRM profiles]
+  B --> D[Review / checksum artifacts]
+  C --> D
+  D --> E[Copy artifacts into ignored runtime data directories]
+  E --> F[Start Martin and optional routing profile services]
+  F --> G[Run tile and route smoke tests]
 ```
 
-| Region | PBF size | PMTiles | OSRM | Photon | Min RAM |
-|--------|----------|---------|------|--------|---------|
-| Tehran bbox | 100 MB | 0.5 GB | 0.8 GB | 1.2 GB | 2 GB |
-| Iran | 600 MB | 3–5 GB | 2 GB | 4 GB | 4–8 GB |
-| MENA | 2 GB | 12 GB | 6 GB | 10 GB | 16 GB |
+Automated downloads, Photon indexing, staging promotion, and zero-downtime activation have not been implemented. Tile/archive generation and real route verification remain blocked until an approved PBF and suitable runtimes are available.
 
-Scale without code change — only ENV + volume.
+---
+
+## 3. Geographic Coverage and Settings
+
+```mermaid
+flowchart LR
+  T[Tehran starter bbox] --> I[Other region]
+  I --> C[Custom bbox]
+  T & I & C -.-> ENV
+  ENV[MAP_REGION<br/>MAP_BBOX<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
+  ENV --> CFG[GET /map-config]
+  CFG --> CLIENT[Client validates shared MapConfig schema]
+```
+
+The defaults target Tehran: region `tehran`, WGS84 bbox `51.0,35.5,51.7,35.9`, version `development`, and zoom range 0–14. The build scripts name the archive and OSRM graph from `MAP_REGION` and apply the bbox/zoom settings to Planetiler. A region change also requires matching data and runtime style/client source wiring; the committed MapLibre styles currently use the Tehran source.
+
+Disk estimates are preliminary and OSRM values are per profile; this deployment runs three separate OSRM processes. Runtime memory has not been benchmarked.
 
 ---
 
@@ -79,35 +70,32 @@ map-server/sprites/borobiya/*.svg ─┤ Martin creates sprite PNG/JSON on deman
 map-server/fonts/*.ttf       ─┘ Martin creates glyph PBF ranges on demand
 ```
 
-Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint.
+Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint. The region source in both committed styles is currently `tehran`.
 
 ---
 
 ## 5. Verification Commands
 
 ```bash
-# Tiles
+# Tiles (after generating an archive and starting Martin)
 curl http://localhost:8000/tehran/12/2632/1612 -o /tmp/t.pbf && ls -lh /tmp/t.pbf
-# Style
+# Style and runtime-generated assets
 curl http://localhost:8000/style/light | jq .sources
-# Runtime-generated sprite and glyphs
 curl http://localhost:8000/sprite/borobiya.json | jq
 curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
-# Route
-curl -X POST http://localhost:8000/route -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car"}' -H 'Content-Type: application/json'
-# Geocode
-curl 'http://localhost:2322/api?q=azadi&limit=3' | jq
-curl 'http://localhost:2322/reverse?lat=35.70&lon=51.38' | jq
+# Public map settings through the same-origin gateway
+curl http://localhost:8080/map-config | jq
+# Route (after approved OSRM graphs are built)
+curl -X POST http://localhost:8080/route -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car"}' -H 'Content-Type: application/json'
 ```
 
 ---
 
-## 6. Failure Modes
+## 6. Remaining Data Tasks
 
-| Failure | Symptom | Mitigation |
-|---------|---------|------------|
-| PBF corrupt | Planetiler fails | Checksum (`sha256sum`), re-download |
-| OSRM version mismatch | 500 on route | Rebuild after PBF update, lock OSRM version in Dockerfile |
-| Tile missing at zoom>MAX | Blank tiles | Raise `MAP_MAX_ZOOM`, regenerate |
-| Photon OOM | Index kill | Increase heap `-Xmx8g`, use SSD |
-
+| Task | Status |
+|------|--------|
+| Generate Tehran PMTiles and verify Martin MVT route | T1.4.2 open: PBF reuse approval and Java/Docker runtime pending |
+| Build three OSRM graphs and verify a real offline route | T1.4.4 open: same approved-PBF/runtime blockers |
+| Configure Photon and test geocode/reverse | T1.4.5 open: import source and index not selected |
+| Wire map settings through pipeline/runtime and document | T1.4.6 complete; checks recorded in `docs/PROGRESS.md` |

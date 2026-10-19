@@ -55,7 +55,7 @@ curl http://localhost:8080/docs                 # Swagger UI
 curl http://localhost:8000/health               # Martin
 ```
 
-Nginx proxies `/api/` to Fastify and `/map/` to Martin; it is a gateway only, not a built client web server. The Swagger UI served through Nginx advertises `/api` first for “Try it out” and also lists `/` for direct API access; set `OPENAPI_SERVER_PATH` if you change the gateway prefix. Use the Vite client at `http://localhost:5173` (see §2.4). Auth/reference migrations and an explicit seed command are checked in but are not run at startup; after applying them and seeding the question catalog, `POST /_auth/register` and `POST /_auth/login` use the configured PostgreSQL database. Martin starts without project map assets, so tile/style, routing, and geocoding requests are not usable until the future map-data tasks populate `map-server/data/` and add the supporting assets. That directory is ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
+Nginx proxies `/api/` to Fastify, `/map/` and Martin's root-relative assets to Martin, `/map-config` to the public map-config endpoint, and `POST /route` to the routing gateway; it is a gateway only, not a built client web server. The Swagger UI served through Nginx advertises `/api` first for “Try it out” and also lists `/` for direct API access; set `OPENAPI_SERVER_PATH` if you change the gateway prefix. Use the Vite client at `http://localhost:5173` (see §2.4). Auth/reference migrations and an explicit seed command are checked in but are not run at startup; after applying them and seeding the question catalog, `POST /_auth/register` and `POST /_auth/login` use the configured PostgreSQL database. Martin is configured with committed styles, SVG sprite sources, and glyph fonts, but no PMTiles archive is present so tile requests remain unverified. A routing gateway and optional OSRM profile services are scaffolded, but routing is unavailable until graphs are built from an approved PBF; geocoding has not been configured yet. Generated map datasets are ignored by Git; see [`map-server/README.md`](../map-server/README.md). `TRUSTED_PROXY_IPS` is empty by default for safety; if you expose Nginx beyond local development, configure the exact proxy IP so Fastify can safely honor forwarded client addresses.
 
 ### 2.3 Database status
 
@@ -168,7 +168,9 @@ MAP_MAX_ZOOM=14
 MAP_MIN_ZOOM=0
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
-MAP_ROUTING_URL=http://localhost:8000/route
+MAP_ROUTING_URL=http://localhost:8001/route
+MAP_ROUTING_PORT=8001
+MAP_OSRM_DATA_DIR=./map-server/osrm/data
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 MAP_REVERSE_URL=http://localhost:8000/reverse
 
@@ -177,7 +179,7 @@ VITE_API_URL=/api
 VITE_MAP_URL=/map
 ```
 
-The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. `MAP_*` URLs are placeholders: the current scaffold has no project styles, tiles, routing graph, or geocoder data.
+The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. The style URLs point to the configured Martin runtime, but no PMTiles archive is generated; the routing gateway is configured but has no OSRM graphs until an approved PBF is processed. Geocoding remains unconfigured.
 
 ---
 

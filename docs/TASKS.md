@@ -47,9 +47,9 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.4.1** Pick exact tools: Martin 1.16.1 / Planetiler 0.10.2 / OSRM 26.10.0 / Photon 1.3.0; document pins in MAP_SERVER.md — completed 2026-10-19
 - [ ] **T1.4.2** Build the Tehran PBF→`tehran.pmtiles` pipeline + verify the MVT tile route `/tehran/{z}/{x}/{y}` (source ID comes from the archive name)
 - [x] **T1.4.3** Author `styles/light.json` + `styles/dark.json` (same `sources`, different `layers` paint) + Martin-served SVG sprites and dynamic TTF glyphs — completed 2026-10-19; assets are configured, but real Martin runtime verification remains pending
-- [ ] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline
+- [ ] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline — Compose, OSRM graph builder, and adapter tests added; real-route check pending an approved PBF and Docker/OSRM runtime
 - [ ] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse`
-- [ ] **T1.4.6** ENV wiring: `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MAX_ZOOM` + update pipeline doc
+- [x] **T1.4.6** Wire `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MIN_ZOOM`, and `MAP_MAX_ZOOM` through Compose, validated public `/map-config`, client/schema, tile/routing scripts, and pipeline documentation — completed 2026-10-19; offline tests/typechecks/build/YAML/shell checks pass
 
 ### 1.5 Client Map & Theming
 

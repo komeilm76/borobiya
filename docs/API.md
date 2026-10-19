@@ -8,7 +8,9 @@
 
 ```
 API:  http://localhost:3000            (Fastify)
-Map:  http://localhost:8000            (Martin/OSRM/Photon) — see MAP_SERVER.md
+Maps: http://localhost:8000            (Martin) — see MAP_SERVER.md
+Route: http://localhost:8001/route      (OSRM adapter; graphs not yet generated)
+Map config: GET /map-config              (region, bounds, version, and zoom range)
 Swagger UI:   GET /docs
 OpenAPI JSON: GET /docs/json
 Health:       GET /_public/health      → { status: "ok", uptime, version }
@@ -20,7 +22,7 @@ Headers:
 ```
 Authorization: Bearer <accessToken>   // for _user & _admin
 Content-Type: application/json
-X-Map-Data-Version: 2025-05-01        // optional, from Map Server
+X-Map-Data-Version: development       // reserved optional version pin; not currently enforced
 ```
 
 Error shape (uniform):

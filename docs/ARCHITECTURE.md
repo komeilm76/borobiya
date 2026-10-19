@@ -48,13 +48,13 @@ graph TB
     REDIS[(Redis<br/>rate-limit + socket adapter<br/>optional for single-instance)]
   end
 
-  subgraph MapServer [Independent Map Server :8000]
+  subgraph MapServer [Independent Map Services]
     direction TB
-    MARTIN[Martin 1.16.1<br/>GET /{sourceID}/{z}/{x}/{y}]
+    MARTIN[Martin :8000<br/>GET /{sourceID}/{z}/{x}/{y}]
     STYLE[Styles / assets<br/>/style/{id}<br/>/sprite/{id}.* · /font/{stack}/{range}]
-    ROUTING[Routing Engine<br/>OSRM / Valhalla<br/>POST /route]
+    ROUTING[Routing gateway :8001<br/>POST /route → local OSRM profiles]
     GEOCODE[Geocoding<br/>Photon / Nominatim<br/>GET /geocode, /reverse]
-    DATA[(Data Volume<br/>pmtiles/mbtiles + OSRM graph + search index)]
+    DATA[(Data Volume<br/>PMTiles + three OSRM graphs + search index)]
   end
 
   A --> NGINX

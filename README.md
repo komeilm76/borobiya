@@ -144,14 +144,14 @@ Map Server is a **completely separate service** responsible for:
 ### 3.5. Geographic Coverage of Offline Data
 - **Configurable via ENV / Config File:**
   ```env
-  MAP_REGION=iran           # iran | tehran | middle-east | custom
-  MAP_BBOX=44.0,25.0,63.0,39.0
-  MAP_DATA_VERSION=2025-05-01
-  MAP_MAX_ZOOM=14
+  MAP_REGION=tehran
+  MAP_BBOX=51.0,35.5,51.7,35.9 # west,south,east,north
+  MAP_DATA_VERSION=development
   MAP_MIN_ZOOM=0
+  MAP_MAX_ZOOM=14              # Planetiler supports up to 16
   ```
 - Initial dev can use **single city/province** to keep size small (e.g., Tehran, 1-2GB).
-- Architecture must be **horizontally scalable** to expand to whole country later without code change.
+- Target: **horizontally scalable** coverage without a code change. The current pipeline accepts region settings, but the committed map styles/client source wiring still names `tehran`; a non-Tehran runtime switch needs matching source wiring (see [`docs/MAP_SERVER.md`](docs/MAP_SERVER.md)).
 - Document disk/RAM requirements per region.
 
 ### 3.6. Map Features to Support
@@ -1031,14 +1031,18 @@ RATE_LIMIT_MAX=100
 # Map Server
 MAP_SERVER_URL=http://localhost:8000
 MAP_REGION=tehran
+MAP_BBOX=51.0,35.5,51.7,35.9
+MAP_DATA_VERSION=development
+MAP_MIN_ZOOM=0
+MAP_MAX_ZOOM=14
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
-MAP_ROUTING_URL=http://localhost:8000/route
+MAP_ROUTING_URL=http://localhost:8001/route
 MAP_GEOCODE_URL=http://localhost:8000/geocode
 
-# Android
-VITE_API_URL=http://localhost:3000
-VITE_MAP_URL=http://localhost:8000
+# Browser-facing paths (forwarded by Vite/Nginx)
+VITE_API_URL=/api
+VITE_MAP_URL=/map
 ```
 
 ### 24.2. Folder Structure (Monorepo)
