@@ -53,22 +53,12 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_user/dashboard",
     name: "user-dashboard",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "پیشخوان",
-      description: "خلاصهٔ وضعیت، همراهان و دسترسی سریع به ابزارهای کاربر در اینجا نمایش داده می‌شود.",
-      icon: "mdi-view-dashboard-outline"
-    }
+    component: () => import("@client/views/_user/UserDashboardView.vue")
   },
   {
     path: "/_user/map",
     name: "user-map",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "نقشهٔ همراهان",
-      description: "نقشهٔ آفلاین، موقعیت‌های به‌اشتراک‌گذاشته‌شده و مسیرهای امدادی در این صفحه قرار می‌گیرند.",
-      icon: "mdi-map-outline"
-    }
+    component: () => import("@client/views/_user/UserMapView.vue")
   },
   {
     path: "/_user/location-shares",

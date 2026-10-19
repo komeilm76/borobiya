@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import { mapConfigSchema } from "@shared/schemas/map";
 import {
+  DEFAULT_DARK_MAP_STYLE,
   DEFAULT_MAP_BOUNDS,
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
   DEFAULT_TEHRAN_CENTER,
   MAP_TILE_CACHE_ZOOM_LEVELS,
   createMapCanvasOptions,
+  mapStyleForTheme,
   resolveMapStyleUrl,
   switchMapStyle
 } from "./map-canvas-options";
@@ -20,6 +22,11 @@ const runtimeConfig = mapConfigSchema.parse({
 });
 
 describe("MapCanvas style switching", () => {
+  it("uses the map style matching the resolved app theme", () => {
+    expect(mapStyleForTheme(false)).toBe(DEFAULT_MAP_STYLE);
+    expect(mapStyleForTheme(true)).toBe(DEFAULT_DARK_MAP_STYLE);
+  });
+
   it("normalizes empty style URLs to the default light style", () => {
     expect(resolveMapStyleUrl()).toBe(DEFAULT_MAP_STYLE);
     expect(resolveMapStyleUrl("  ")).toBe(DEFAULT_MAP_STYLE);

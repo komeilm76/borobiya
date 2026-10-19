@@ -4,6 +4,7 @@ import type { LngLatLike, Map as MapLibreMap, MapOptions } from "maplibre-gl";
 export type MapCanvasRuntimeConfig = Pick<MapConfig, "bbox" | "minZoom" | "maxZoom">;
 
 export const DEFAULT_MAP_STYLE = "/map/style/light";
+export const DEFAULT_DARK_MAP_STYLE = "/map/style/dark";
 export const DEFAULT_MAP_ZOOM = 11;
 export const DEFAULT_TEHRAN_CENTER: [number, number] = [51.389, 35.6892];
 export const DEFAULT_MAP_BOUNDS: [number, number, number, number] = [51.0, 35.5, 51.7, 35.9];
@@ -24,6 +25,11 @@ export interface MapCanvasDisplayOptions {
 /** Resolve a style URL consistently for both initial map creation and theme switches. */
 export function resolveMapStyleUrl(styleUrl?: string): string {
   return styleUrl?.trim() || DEFAULT_MAP_STYLE;
+}
+
+/** Select the local style that matches the app-wide resolved theme. */
+export function mapStyleForTheme(isDark: boolean): string {
+  return isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE;
 }
 
 /** Diff the new style into the existing map instance so its camera and DOM markers survive. */

@@ -57,7 +57,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.5.2** Reactive light/dark style switch via `map.setStyle(newStyle, { diff: true })`; configure a 150ms paint transition, preserve the existing map camera/markers, and share sprite/glyph assets — completed 2026-10-19; 32 client tests, typecheck, and light/dark style parity/SVG validation pass (live end-to-end rendering benchmark pending approved map data)
 - [x] **T1.5.3** App-wide light/dark theme: Vuetify + Tailwind manual `dark:` variant, persisted `system`/`light`/`dark` preference, live OS preference updates, and synchronous pre-paint initialization — completed 2026-10-19; 38 client tests, typecheck, and production build pass
 - [x] **T1.5.4** Graceful degradation if Map Server down (toast, cached tiles, no crash) — completed 2026-10-19; MapCanvas shows configuration/map error toasts with retry, Cache Storage service worker falls back to saved map resources on offline/5xx, and MapLibre retains eight in-memory tile-cache zoom levels; worker tests/typecheck/build pass. Real outage test awaits the unavailable Map Server/data runtime.
-- [ ] **T1.5.5** Build `views/_user/map` (full-screen map) + `views/_user/dashboard` (map widget)
+- [x] **T1.5.5** Build `views/_user/map` (full-screen map) + `views/_user/dashboard` (map widget) — completed 2026-10-19; both views use the shared MapCanvas and follow the resolved app theme, user routes/navigation are wired, and a privacy-aware dashboard explains that live sharing is not yet available; 46/46 client tests, typecheck, and production build pass. Live map-data rendering remains unverified pending the map runtime/data.
 
 ---
 

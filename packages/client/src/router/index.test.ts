@@ -29,6 +29,11 @@ describe("client route records", () => {
     }
   });
 
+  it("binds the user dashboard and map routes to their functional views", () => {
+    expect(routeRecords.find((route) => route.path === "/_user/dashboard")?.component).toEqual(expect.any(Function));
+    expect(routeRecords.find((route) => route.path === "/_user/map")?.component).toEqual(expect.any(Function));
+  });
+
   it("binds the admin users route to the functional user-management view", () => {
     expect(routeRecords.find((route) => route.path === "/_admin/users")?.component).toEqual(expect.any(Function));
   });

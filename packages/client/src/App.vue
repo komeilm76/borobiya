@@ -69,6 +69,15 @@
         >
           پیشخوان
         </v-btn>
+        <v-btn
+          v-if="auth.isAuthenticated && !auth.mustCompleteSecurityQuestions && auth.user?.role === 'user'"
+          class="nav-button d-none d-sm-flex"
+          to="/_user/map"
+          variant="text"
+          rounded="lg"
+        >
+          نقشه
+        </v-btn>
         <v-btn v-if="!auth.isAuthenticated" class="login-button" to="/_auth/login" color="primary" variant="flat" rounded="lg">
           <v-icon class="me-1" icon="mdi-account-outline" />
           ورود

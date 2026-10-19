@@ -115,57 +115,39 @@ If admin created you (`mustCompleteSecurityQuestions` flag):
 
 ## 7. Theme
 
-- Click **Moon/Sun icon** (top bar) to toggle **Dark / Light**.
-- Map style changes instantly (<200ms) with same tiles; markers persist.
-- Preference saved to localStorage + server (`user.preferences.theme`).
+- Use the theme menu in the top bar to choose **System**, **Light**, or **Dark**.
+- The app and MapLibre view follow the resolved theme; style changes retain the current map instance and camera.
+- The preference is stored in local browser storage. The configured 150ms style transition has not yet been benchmarked against live map data.
 
-[Screenshot: Theme toggle + light vs dark map comparison]
+[Screenshot: Theme menu + light and dark map]
 
 ---
 
 ## 8. Map Basics
 
-Open **Map** (`/_user/map`) — full-screen MapLibre view centered on your region.
+Open **Map** (`/_user/map`) for the full-height MapLibre view, or use the map preview on **Dashboard** (`/_user/dashboard`). Both start centered on Tehran and follow the selected app theme.
 
-- **Pan:** drag.
-- **Zoom:** scroll / pinch / +/- buttons.
-- **My location:** **Aim icon** centers map on your GPS (blue dot).
-- **Click/long-press** on map → shows address (reverse geocode) in bottom sheet — copyable.
-- **Offline:** Map still renders from local tiles; address search also works offline.
+- **Pan:** drag the map.
+- **Zoom:** scroll/pinch or use the map's zoom controls.
+- The scale and compass/navigation controls are provided by MapLibre.
+- If map settings are unavailable, the view uses safe default bounds and zoom. Map resource errors show a retry toast; previously cached resources may still be displayed.
+- The first map visit needs the local Map Server. The browser cache stores map resources after a successful load on secure origins (HTTPS or localhost); already-loaded tiles also remain in MapLibre's in-memory cache for the current page session.
 
-[Screenshot: Full-screen map with controls + bottom sheet]
+**Current scope:** this version displays the base map only. GPS location, live companion markers, search, reverse geocoding, and routing are not enabled yet.
 
----
-
-## 9. Search — Users & Places
-
-### User search
-
-- In Dashboard or Map search bar → type username or category.
-- Filters: category, incident type, online, distance from me.
-- Results show distance, rating, online dot.
-
-### Place/Address search
-
-- In Map search bar → type place name (e.g., “Azadi Square”) → 5 suggestions with address → tap to fly to location.
-
-[Screenshot: Search autocomplete]
+[Screenshot: Dashboard map widget and full-height map view]
 
 ---
 
-## 10. Routing & Navigation
+## 9. Search — Planned
 
-1. On Map, **long-press** to set origin or use **My location**.
-2. Tap **Directions** → add destinations (waypoints). Drag to reorder; toggle **Optimize order** to shorten.
-3. Choose **Transport:** `Car` / `Bicycle` / `Walking`.
-4. 2–3 alternative routes appear with **distance + duration** → tap preferred → **Start Navigation**.
-5. Map enters **Navigation Mode:**
-   - Car: pitched 60°, 3D follow, zoom 17
-   - Bicycle: 45°, zoom 16
-   - Walking: top-down (pitch 0), zoom 17
-6. **Exit Navigation** → camera resets.
+User search and place/address search are not available in the current client. Search bars, filters, reverse geocoding, and place suggestions will be documented here once those features are implemented.
 
-[Screenshot: Route alternatives + navigation mode]
+---
+
+## 10. Routing & Navigation — Planned
+
+Route selection, transport profiles, alternatives, and turn-by-turn navigation are not available in the current client. This section will be updated when the client and offline routing service are implemented.
 
 ---
 

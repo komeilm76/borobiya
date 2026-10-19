@@ -184,9 +184,10 @@ packages/client/
 ├── tsconfig.json
 ├── public/
 │   ├── favicon.svg
-│   └── theme-init.js         # synchronous pre-paint theme selection
+│   ├── theme-init.js         # synchronous pre-paint theme selection
+│   └── map-cache-worker.js   # network-first cache for same-origin map resources
 └── src/
-    ├── main.ts               # Vue + Pinia + router + synchronized Vuetify theme bootstrap
+    ├── main.ts               # Vue + Pinia + router + theme bootstrap + map cache registration
     ├── App.vue               # shared shell, session bootstrap, theme menu, and logout control
     ├── env.d.ts
     ├── api/
@@ -197,13 +198,16 @@ packages/client/
     │   └── map-config.ts     # same-origin validated map settings
     ├── components/
     │   └── map/
-    │       ├── MapCanvas.vue # MapLibre canvas, Tehran default, reactive diff-based light/dark styles
-    │       └── map-canvas-options.ts # map options, runtime bounds/zoom, and style switch helper
+    │       ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
+    │       └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
     ├── router/
     │   ├── index.ts          # namespaced routes and auth-guard wiring
     │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
     │   ├── guards.test.ts
     │   └── index.test.ts
+    ├── services/
+    │   ├── map-cache.ts      # Service Worker registration/activation for map requests
+    │   └── map-cache-worker.test.ts
     ├── stores/
     │   ├── index.ts          # Pinia instance
     │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
@@ -228,11 +232,13 @@ packages/client/
         ├── _auth/PlaceholderView.vue
         ├── _public/PlaceholderView.vue
         ├── _user/CompleteSecurityQuestionsView.vue
+        ├── _user/UserDashboardView.vue # responsive dashboard with map widget
+        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view
         ├── _user/PlaceholderView.vue
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads the local light style, applies validated runtime bounds/zoom settings, and supports reactive diff-based light/dark style changes on the same map instance. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. Full map/dashboard views, graceful map-server degradation, Capacitor, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. Search, routing, live locations, and Android packaging remain future work.
 
 ---
 
