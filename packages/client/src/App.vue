@@ -27,6 +27,15 @@
           تکمیل حساب
         </v-btn>
         <v-btn
+          v-else-if="auth.isAuthenticated && auth.user?.role === 'admin'"
+          class="nav-button d-none d-sm-flex"
+          to="/_admin/users"
+          variant="text"
+          rounded="lg"
+        >
+          مدیریت کاربران
+        </v-btn>
+        <v-btn
           v-else-if="auth.isAuthenticated"
           class="nav-button d-none d-sm-flex"
           to="/_user/dashboard"

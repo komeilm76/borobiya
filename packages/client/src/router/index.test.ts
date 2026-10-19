@@ -14,6 +14,7 @@ describe("client route records", () => {
     expect(paths).toContain("/_user/map");
     expect(paths).toContain("/_user/complete-security-questions");
     expect(paths).toContain("/_admin/dashboard");
+    expect(paths).toContain("/_admin/users");
     expect(paths).toContain("/_admin/dispatch");
   });
 
@@ -26,6 +27,10 @@ describe("client route records", () => {
     ]) {
       expect(routeRecords.find((route) => route.path === path)?.component).toEqual(expect.any(Function));
     }
+  });
+
+  it("binds the admin users route to the functional user-management view", () => {
+    expect(routeRecords.find((route) => route.path === "/_admin/users")?.component).toEqual(expect.any(Function));
   });
 
   it("uses unique route names and redirects the root to the public landing page", () => {

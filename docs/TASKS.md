@@ -40,7 +40,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + transactional audit log `admin_audit_log`, refresh-session revocation on deactivation, and status/no-op handling — completed 2026-10-18
 - [x] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions) — completed 2026-10-18; category assignments and mission records remain empty until T3.1.1/T3.5.1 add those tables
 - [x] **T1.3.3** Ensure NO `DELETE /_admin/users/:id` exists; runtime regression test asserts `404` and OpenAPI omits the operation — completed 2026-10-19
-- [ ] **T1.3.4** Frontend `_admin/users` table + activate/deactivate toggle + search
+- [x] **T1.3.4** Frontend `/_admin/users` searchable, paginated account table with status filtering and activate/deactivate confirmation — completed 2026-10-19
 
 ### 1.4 Map Server (Independent, Offline Vector)
 

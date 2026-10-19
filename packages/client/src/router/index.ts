@@ -123,12 +123,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_admin/users",
     name: "admin-users",
-    component: () => import("@client/views/_admin/PlaceholderView.vue"),
-    props: {
-      title: "مدیریت کاربران",
-      description: "جست‌وجو و مدیریت وضعیت حساب‌های کاربری در این بخش پیاده‌سازی می‌شود.",
-      icon: "mdi-account-multiple-outline"
-    }
+    component: () => import("@client/views/_admin/AdminUsersView.vue")
   },
   {
     path: "/_admin/categories",
