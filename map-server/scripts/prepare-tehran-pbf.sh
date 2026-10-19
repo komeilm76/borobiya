@@ -11,7 +11,10 @@ MAP_SOURCE_DATE="${MAP_SOURCE_DATE:-2026-10-18}"
 MAP_SOURCE_DATA_TIMESTAMP="${MAP_SOURCE_DATA_TIMESTAMP:-2026-10-18T20:25:06Z}"
 MAP_SOURCE_MD5="${MAP_SOURCE_MD5:-a23eb2f21e426677bd243b2712ec1bc8}"
 MAP_SOURCE_BYTES="${MAP_SOURCE_BYTES:-229852435}"
-MAP_OSMIUM_VERSION="${MAP_OSMIUM_VERSION:-1.19.1}"
+# Pinned to Ubuntu 24.04's apt osmium-tool release (the target VM); keep in sync
+# with .env.example and docs/MAP_SERVER.md. Override only after reviewing
+# `osmium --version` on the machine that produces the crop.
+MAP_OSMIUM_VERSION="${MAP_OSMIUM_VERSION:-1.16.0}"
 MAP_SOURCE_PBF="${MAP_SOURCE_PBF:-}"
 MAP_CROPPED_PBF="${MAP_CROPPED_PBF:-}"
 
@@ -66,7 +69,7 @@ command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to write and va
 osmium_version="$(osmium --version 2>&1 | awk '{ for (i = 1; i <= NF; i++) if ($i ~ /^[0-9]+[.][0-9]+[.][0-9]+$/) { print $i; exit } }')"
 [[ -n "$osmium_version" ]] || fail 'could not read a three-part osmium-tool version from `osmium --version`'
 [[ "$osmium_version" == "$MAP_OSMIUM_VERSION" ]] || \
-  fail "osmium-tool $MAP_OSMIUM_VERSION is required (found $osmium_version); set MAP_OSMIUM_VERSION to an explicitly reviewed installed version to override"
+  fail "osmium-tool $MAP_OSMIUM_VERSION is required (found $osmium_version); if the installed version is the reviewed one, set MAP_OSMIUM_VERSION=$osmium_version in .env and reload it (set -a; source .env; set +a), or run once with: MAP_OSMIUM_VERSION=$osmium_version $0"
 
 mkdir -p "$MAP_DATA_DIR/source"
 MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"

@@ -82,6 +82,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Unblocked VM step 8: Osmium pin aligned to Ubuntu 24.04, host-proxy runbook section
+
+- Re-pinned Osmium Tool to **1.16.0** (Ubuntu 24.04 apt) consistently in `prepare-tehran-pbf.sh`, `.env.example`, `docs/MAP_SERVER.md`, and the VM runbook. The previous default blocked the crop on the target VM whenever `.env` was stale or not loaded in the terminal, which then made `verify-map-pbf.sh` report the (not yet created) crop as missing. The script's version-mismatch error now prints the exact fix, and runbook step 8 documents both errors with a dynamic `sed` sync of `MAP_OSMIUM_VERSION` to the installed `osmium --version`.
+- Added a Proxy set/verify/remove section to `docs/UBUNTU_VM_RUNBOOK.md` using a dynamically detected VMware host (NAT gateway) address: terminal exports (`curl`/`wget`/`git`), `apt` config, Docker daemon image pulls, and Java/Planetiler `--download`, plus complete removal commands for each layer. No proxy values were added to `.env` or Compose; the serving stack remains offline. Steps 7/9/11–13 now cross-reference the proxy section; live T1.4.2/.4/.5 checks still require the user's VM run.
+
 ### 2026-10-19 — Added Ubuntu 24.04 low-memory VM runbook and resource tuning
 
 - Added a complete Docker Engine/Compose, Java 21, Osmium, data, build, import, launch, and live verification walkthrough for the user's 4-vCPU/6-GiB/40-GB VMware VM.
