@@ -2,6 +2,12 @@ import { createVuetify } from "vuetify";
 import { fa } from "vuetify/locale";
 import "vuetify/styles";
 
+function getInitialThemeName(): "borobiyaLight" | "borobiyaDark" {
+  return typeof document !== "undefined" && document.documentElement.dataset.theme === "dark"
+    ? "borobiyaDark"
+    : "borobiyaLight";
+}
+
 export const vuetify = createVuetify({
   locale: {
     locale: "fa",
@@ -10,7 +16,7 @@ export const vuetify = createVuetify({
     rtl: { fa: true }
   },
   theme: {
-    defaultTheme: "borobiyaLight",
+    defaultTheme: getInitialThemeName(),
     themes: {
       borobiyaLight: {
         dark: false,

@@ -6,7 +6,7 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.2 MapLibre canvas initialization and reactive map style switching are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and offline route/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.3 MapLibre canvas initialization, reactive map style switching, and app-wide theme support are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, generated map tiles and offline route/search data, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
@@ -31,7 +31,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
 | Map Server | 20% | T1.4.1, T1.4.3, and T1.4.6 pins/styles/assets/configuration are complete; T1.4.2 real tile serving, T1.4.4 real OSRM route verification, and T1.4.5 geocoding remain pending |
-| Client Map canvas | 35% | 🟡 T1.5.1–T1.5.2 reusable MapLibre canvas and reactive light/dark diff switching are implemented; live `<200ms` rendering verification, full map/dashboard views, app-wide theme sync, and outage handling remain pending |
+| Client Map canvas | 55% | 🟡 T1.5.1–T1.5.3 reusable MapLibre canvas, reactive light/dark diff switching, and app-wide persisted light/dark/system themes are implemented; live map-rendering verification, full map/dashboard views, and outage handling remain pending |
 
 ### Phase 2 — Location Sharing — 0%
 
@@ -82,11 +82,17 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Added app-wide theme preference and no-flash startup (T1.5.3; complete)
+
+- Added a persisted `system`/`light`/`dark` theme preference, a header menu to select it, and live `prefers-color-scheme` updates when following the system. Vuetify's global theme and Tailwind's manual `dark:` variant stay synchronized with the root theme class.
+- Added synchronous pre-paint `theme-init.js` and theme-color metadata updates to prevent a flash of the wrong theme; expanded dark palettes across the app shell and authentication screens.
+- Added preference/resolution tests and VM tests for pre-paint system detection and explicit override. Client tests passed (38/38), typecheck and production build passed.
+
 ### 2026-10-19 — Added reactive light/dark map styles (T1.5.2; complete; live latency unverified)
 
 - Made `MapCanvas.vue` react to `styleUrl` changes and exposed an imperative `setStyle(url)` method. Style switches use `map.setStyle(url, { diff: true })` on the existing MapLibre instance, retaining camera position and DOM-backed markers.
 - Added option tests for style URL normalization and diff-based switching. Client tests passed (32/32), client typecheck passed, and `map-server/scripts/verify-styles.py` confirmed that light/dark styles share one source, 24 structurally matching layers, sprite/glyph endpoints, and all 9 SVG sprites.
-- Both styles configure a 150ms global paint transition with no delay. The live end-to-end rendering target is not benchmarked because approved map tile data/server runtime is unavailable; the app-wide theme and view integrations remain separate tasks T1.5.3 and T1.5.5.
+- Both styles configure a 150ms global paint transition with no delay. The live end-to-end map-rendering target is not benchmarked because approved map tile data/server runtime is unavailable; app-wide theming was subsequently implemented in T1.5.3, while map/dashboard views remain T1.5.5.
 
 ### 2026-10-19 — Initialized the MapLibre canvas (T1.5.1; complete)
 

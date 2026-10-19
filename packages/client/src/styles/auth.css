@@ -614,3 +614,142 @@
     align-items: stretch;
   }
 }
+
+:root.dark .auth-intro {
+  border-color: rgba(164, 211, 199, 0.16);
+  background:
+    radial-gradient(circle at 9% 88%, rgba(233, 179, 90, 0.1), transparent 36%),
+    linear-gradient(148deg, #1d3534 0%, #203132 49%, #302b21 100%);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.22);
+}
+
+:root.dark .auth-kicker {
+  border-color: rgba(164, 211, 199, 0.16);
+  color: #b5d9d1;
+  background: rgba(27, 41, 42, 0.72);
+}
+
+:root.dark .auth-hero-title,
+:root.dark .auth-card-heading h2,
+:root.dark .auth-success-state h2 {
+  color: #e3efeb;
+}
+
+:root.dark .auth-hero-title span,
+:root.dark .text-link,
+:root.dark .recovery-step.is-current {
+  color: #8bd2c8;
+}
+
+:root.dark .auth-hero-copy,
+:root.dark .auth-trust-row small,
+:root.dark .auth-feature-item small,
+:root.dark .auth-form-intro,
+:root.dark .auth-success-state > p:not(.auth-eyebrow) {
+  color: #aec1bc;
+}
+
+:root.dark .auth-trust-row {
+  border-color: rgba(190, 221, 213, 0.12);
+  background: rgba(27, 41, 42, 0.78);
+}
+
+:root.dark .trust-icon,
+:root.dark .auth-card-icon {
+  border-color: rgba(139, 210, 200, 0.16);
+  color: #8bd2c8;
+  background: linear-gradient(145deg, #24413e, #1b292a);
+}
+
+:root.dark .auth-trust-row strong,
+:root.dark .auth-feature-item strong,
+:root.dark .question-section-heading h3,
+:root.dark .recovery-question p {
+  color: #d5e5df;
+}
+
+:root.dark .auth-eyebrow {
+  color: #9abdb5;
+}
+
+:root.dark .auth-ring {
+  border-color: rgba(139, 210, 200, 0.16);
+}
+
+:root.dark .ring-small {
+  border-color: rgba(233, 179, 90, 0.25);
+}
+
+:root.dark .auth-cross {
+  border-color: rgba(139, 210, 200, 0.16);
+  color: rgba(139, 210, 200, 0.56);
+  background: rgba(27, 41, 42, 0.5);
+}
+
+:root.dark .auth-spark {
+  border-color: #1d3534;
+}
+
+:root.dark .feature-number {
+  color: #f0cb83;
+  background: rgba(233, 179, 90, 0.13);
+}
+
+:root.dark .auth-card {
+  border-color: rgba(190, 221, 213, 0.12);
+  background: rgba(27, 41, 42, 0.98) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.25) !important;
+}
+
+:root.dark .auth-form .v-field {
+  background: #202f30;
+}
+
+:root.dark .text-link:hover {
+  color: #b9e8e1;
+}
+
+:root.dark .auth-divider {
+  color: #91a7a2;
+}
+
+:root.dark .auth-divider::before,
+:root.dark .auth-divider::after {
+  background: rgba(190, 221, 213, 0.14);
+}
+
+:root.dark .auth-switch-copy {
+  color: #aec1bc;
+}
+
+:root.dark .auth-privacy-note,
+:root.dark .auth-form-intro {
+  color: #9fb3ae;
+}
+
+:root.dark .question-index {
+  border-color: rgba(139, 210, 200, 0.17);
+  color: #8bd2c8;
+  background: #213a38;
+}
+
+:root.dark .recovery-step {
+  color: #98aca7;
+}
+
+:root.dark .recovery-step-number {
+  border-color: rgba(139, 210, 200, 0.16);
+  color: #a9bfba;
+  background: rgba(27, 41, 42, 0.78);
+}
+
+:root.dark .recovery-question {
+  border-color: rgba(190, 221, 213, 0.12);
+  background: #192728;
+}
+
+:root.dark .auth-success-icon {
+  border-color: rgba(107, 190, 147, 0.2);
+  color: #8bd7aa;
+  background: #1d382d;
+}

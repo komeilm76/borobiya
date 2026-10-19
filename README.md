@@ -167,13 +167,13 @@ Map Server is a **completely separate service** responsible for:
 
 - **App-Wide Themes:**
   - `light` and `dark` via Vuetify theme + Tailwind `dark:` variant
-  - User preference stored in `localStorage` + backend `user.preferences.theme`
-  - System preference detection via `prefers-color-scheme`
+  - Theme preference (`system`, `light`, or `dark`) stored in `localStorage`; system preference is the default, with backend preference sync left for a later task
+  - Synchronous pre-paint bootstrap prevents a flash of the wrong theme; system preference follows `prefers-color-scheme`
 - **Map Theming:**
-  - Two separate MapLibre Style JSONs: `styles/borobiya-light.json` and `styles/borobiya-dark.json`
-  - Styles share same `sources` (same PBF tiles) but differ in `layers` paint (background, roads, labels, water, buildings).
-  - When user toggles theme, app must call `map.setStyle(newStyle)` and preserve camera position/markers.
-  - Ensure **sprites and glyphs** (fonts) work for both themes (white/black labels).
+  - MapLibre Style JSONs live at `map-server/styles/light.json` and `map-server/styles/dark.json`; Martin serves them through the same-origin `/map/style/light` and `/map/style/dark` paths.
+  - The styles share the same vector source, layer structure, sprite endpoint, and glyph endpoint, with theme-specific paint and a 150ms paint transition.
+  - `MapCanvas.vue` reacts to `styleUrl` changes using `map.setStyle(url, { diff: true })`, preserving the existing camera and DOM-backed markers.
+  - `map-server/scripts/verify-styles.py` validates theme parity, shared assets, referenced SVG sprites, and the sub-200ms paint-transition budget.
 
 ---
 

@@ -70,6 +70,7 @@ gantt
 - [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2; live end-to-end benchmark pending approved map data)
 - [x] Preserve camera and DOM-backed markers by diffing styles on the existing map instance (T1.5.2)
 - [x] Gesture-friendly pan/zoom controls; preserve camera state (including pitch, bearing, and zoom) when switching styles
+- [x] App-wide Vuetify/Tailwind theme selection, `system`/`light`/`dark` persistence, OS preference updates, and pre-paint initialization (T1.5.3)
 - [ ] Graceful fallback if Map Server down (toast + cached tiles)
 
 **Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled.

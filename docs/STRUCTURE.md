@@ -183,10 +183,11 @@ packages/client/
 │   └── generate-api.ts       # fetches /docs/json and runs Zopia
 ├── tsconfig.json
 ├── public/
-│   └── favicon.svg
+│   ├── favicon.svg
+│   └── theme-init.js         # synchronous pre-paint theme selection
 └── src/
-    ├── main.ts               # Vue + Pinia + router + Vuetify bootstrap
-    ├── App.vue               # shared shell, session bootstrap, and logout control
+    ├── main.ts               # Vue + Pinia + router + synchronized Vuetify theme bootstrap
+    ├── App.vue               # shared shell, session bootstrap, theme menu, and logout control
     ├── env.d.ts
     ├── api/
     │   ├── http.ts           # same-origin JSON requests and structured API errors
@@ -206,14 +207,19 @@ packages/client/
     ├── stores/
     │   ├── index.ts          # Pinia instance
     │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
-    │   └── auth.test.ts
+    │   ├── auth.test.ts
+    │   └── theme.ts          # persisted theme preference and system-change synchronization
     ├── composables/
-    │   └── useSystemTheme.ts # VueUse starting point
+    │   └── useSystemTheme.ts # reactive prefers-color-scheme signal
+    ├── theme/
+    │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
+    │   ├── theme-preference.test.ts
+    │   └── theme-init.test.ts # pre-paint bootstrap coverage
     ├── plugins/
-    │   └── vuetify.ts        # Persian locale, RTL, base light/dark palettes
+    │   └── vuetify.ts        # Persian locale, RTL, initial light/dark palette
     ├── styles/
-    │   ├── tailwind.css      # Tailwind utilities + app shell styling
-    │   └── auth.css          # responsive authentication and onboarding layouts
+    │   ├── tailwind.css      # manual dark variant + app shell light/dark styling
+    │   └── auth.css          # responsive light/dark authentication and onboarding layouts
     └── views/
         ├── PlaceholderPage.vue
         ├── _auth/LoginView.vue
@@ -226,7 +232,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads the local light style, applies validated runtime bounds/zoom settings, adds navigation, scale, and attribution controls, and supports reactive diff-based light/dark style changes on the same map instance. Full map/dashboard views, app-wide theme synchronization, graceful map-server degradation, Capacitor, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads the local light style, applies validated runtime bounds/zoom settings, and supports reactive diff-based light/dark style changes on the same map instance. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. Full map/dashboard views, graceful map-server degradation, Capacitor, and Android packaging remain future work.
 
 ---
 

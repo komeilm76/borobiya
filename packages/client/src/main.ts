@@ -1,11 +1,19 @@
-import { createApp } from "vue";
+import { createApp, watch } from "vue";
 import App from "./App.vue";
 import { createAppRouter } from "./router";
 import { pinia } from "./stores";
+import { useThemeStore } from "./stores/theme";
 import { vuetify } from "./plugins/vuetify";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles/tailwind.css";
 import "./styles/auth.css";
+
+const theme = useThemeStore(pinia);
+watch(
+  () => theme.vuetifyThemeName,
+  (name) => { vuetify.theme.global.name.value = name; },
+  { immediate: true, flush: "sync" }
+);
 
 const router = createAppRouter();
 createApp(App).use(pinia).use(router).use(vuetify).mount("#app");

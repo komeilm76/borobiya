@@ -14,6 +14,31 @@
       <v-spacer />
 
       <nav class="top-nav" aria-label="پیمایش اصلی">
+        <v-menu location="bottom end">
+          <template #activator="{ props: activatorProps }">
+            <v-btn
+              v-bind="activatorProps"
+              class="theme-toggle"
+              icon
+              variant="text"
+              :aria-label="themeMenuLabel"
+              :title="themeMenuLabel"
+            >
+              <v-icon :icon="appTheme.isDark ? 'mdi-weather-night' : 'mdi-white-balance-sunny'" />
+            </v-btn>
+          </template>
+          <v-list density="compact" min-width="200" aria-label="انتخاب پوسته">
+            <v-list-subheader>پوستهٔ برنامه</v-list-subheader>
+            <v-list-item
+              v-for="option in themeOptions"
+              :key="option.value"
+              :active="appTheme.preference === option.value"
+              :prepend-icon="option.icon"
+              :title="option.title"
+              @click="appTheme.setPreference(option.value)"
+            />
+          </v-list>
+        </v-menu>
         <v-btn class="nav-button" to="/_public/landing" variant="text" rounded="lg">
           خانه
         </v-btn>
@@ -54,7 +79,7 @@
       </nav>
     </v-app-bar>
 
-    <v-main class="app-main">
+    <v-main class="app-main dark:text-slate-100">
       <RouterView v-slot="{ Component, route }">
         <Transition mode="out-in" name="page-fade">
           <component :is="Component" :key="route.fullPath" />
@@ -70,12 +95,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { RouterLink, RouterView, useRouter } from "vue-router";
 import { pinia } from "./stores";
 import { useAuthStore } from "./stores/auth";
+import { useThemeStore } from "./stores/theme";
+import type { ThemePreference } from "./theme/theme-preference";
 
 const auth = useAuthStore(pinia);
+const appTheme = useThemeStore(pinia);
+const themeMenuLabel = computed(() => `انتخاب پوسته؛ پوستهٔ فعلی: ${appTheme.isDark ? "تیره" : "روشن"}`);
+const themeOptions: { value: ThemePreference; title: string; icon: string }[] = [
+  { value: "system", title: "پیروی از دستگاه", icon: "mdi-theme-light-dark" },
+  { value: "light", title: "روشن", icon: "mdi-white-balance-sunny" },
+  { value: "dark", title: "تیره", icon: "mdi-weather-night" }
+];
 const router = useRouter();
 
 async function logout(): Promise<void> {

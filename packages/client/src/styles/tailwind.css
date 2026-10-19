@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
   color: #193536;
@@ -382,4 +384,122 @@ a {
     flex-direction: column;
     justify-content: center;
   }
+}
+
+:root.dark {
+  color-scheme: dark;
+}
+
+:root.dark body {
+  color: #edf5f2;
+  background: #111c1d;
+}
+
+:root.dark .app-topbar {
+  border-bottom-color: rgba(190, 221, 213, 0.12) !important;
+  background: rgba(27, 41, 42, 0.92) !important;
+}
+
+:root.dark .brand-link {
+  color: #edf5f2;
+}
+
+:root.dark .brand-tagline {
+  color: #9cb1ac;
+}
+
+:root.dark .nav-button {
+  color: #b6cbc5 !important;
+}
+
+:root.dark .app-main {
+  color: #edf5f2;
+  background:
+    radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.07), transparent 30%),
+    radial-gradient(ellipse at 92% 72%, rgba(113, 199, 190, 0.08), transparent 34%),
+    #111c1d;
+}
+
+:root.dark .eyebrow {
+  color: #9fc4bc;
+}
+
+:root.dark .eyebrow-separator {
+  color: #526968;
+}
+
+:root.dark .hero-title {
+  color: #e5f0ec;
+}
+
+:root.dark .hero-copy {
+  color: #afc1bc;
+}
+
+:root.dark .welcome-card {
+  border-color: rgba(190, 221, 213, 0.12);
+  background:
+    radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.08), transparent 37%),
+    rgba(27, 41, 42, 0.96) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24) !important;
+}
+
+:root.dark .welcome-symbol {
+  border-color: rgba(133, 202, 191, 0.18);
+  color: #8bd2c8;
+  background: linear-gradient(145deg, #203b39, #1b292a 70%);
+}
+
+:root.dark .symbol-orbit {
+  border-color: rgba(139, 210, 200, 0.18);
+}
+
+:root.dark .orbit-two {
+  border-color: rgba(233, 179, 90, 0.24);
+}
+
+:root.dark .symbol-spark {
+  border-color: #203b39;
+}
+
+:root.dark .status-label {
+  border-color: rgba(107, 190, 147, 0.2);
+  color: #a6dfbd;
+  background: #1c352b;
+}
+
+:root.dark .welcome-title {
+  color: #e1eeea;
+}
+
+:root.dark .welcome-copy {
+  color: #a9bcb7;
+}
+
+:root.dark .skeleton-note {
+  border-color: rgba(190, 221, 213, 0.12);
+  background: rgba(27, 41, 42, 0.78);
+}
+
+:root.dark .note-icon {
+  color: #e6bd72;
+  background: #3a321f;
+}
+
+:root.dark .skeleton-note strong {
+  color: #d8e7e2;
+}
+
+:root.dark .note-copy {
+  color: #a7bab5;
+}
+
+:root.dark .note-version {
+  color: #819994;
+}
+
+:root.dark .app-footer {
+  border-top-color: rgba(190, 221, 213, 0.1);
+  color: #9aafaa;
+  background: rgba(27, 41, 42, 0.82);
 }
