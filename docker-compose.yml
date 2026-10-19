@@ -50,7 +50,7 @@ services:
       start_period: 10s
 
   map-server:
-    image: ghcr.io/maplibre/martin:v0.12.0
+    image: ghcr.io/maplibre/martin:1.16.1
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}

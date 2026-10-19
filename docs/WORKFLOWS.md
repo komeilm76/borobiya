@@ -20,7 +20,7 @@
 feat: add SOS dispatch endpoint
 fix: reject location update from non-priority device
 docs: update map setup with photon version
-chore: bump martin to 0.12
+chore: bump Martin to 1.16.1
 refactor: extract priority device composable
 test: add register 5Q uniqueness test
 ```

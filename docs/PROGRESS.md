@@ -6,14 +6,14 @@
 
 ## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, and T1.3.1–T1.3.4 admin user-management tasks are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, and T1.4.1 map-server tool-version selection are complete. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, map assets, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 0% | ⬜ Not started |
+| Map Server | 5% | 🟡 T1.4.1 exact release pins are selected; data, styles, routing, and geocoding are not implemented |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -30,7 +30,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 0% | — |
+| Map Server | 5% | T1.4.1 pinned Martin 1.16.1, Planetiler 0.10.2, OSRM 26.10.0, and Photon 1.3.0; runtime/data pipeline remains pending |
 | Client Map canvas | 0% | — |
 
 ### Phase 2 — Location Sharing — 0%
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-19 — Pinned map-server toolchain versions (T1.4.1)
+
+- Selected and documented Martin 1.16.1, Planetiler 0.10.2, OSRM 26.10.0, and Photon 1.3.0 from official stable releases. Pinned the Compose Martin image and updated the version-specific examples and Java prerequisite; recorded SHA-256 hashes for the Planetiler and Photon JARs.
+- Corrected the Photon import guidance: Photon does not consume raw OSM PBF, so T1.4.5 must choose and provision a Nominatim database or Photon JSON dump.
+- Validation: checked official release metadata/assets and version-tag conventions, audited stale version references, and ran `git diff --check`. Docker/Compose runtime validation remains unavailable in this environment.
 
 ### 2026-10-19 — Completed-task bug review: session revocation and admin navigation
 

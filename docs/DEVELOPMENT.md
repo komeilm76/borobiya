@@ -14,7 +14,7 @@
 | Git | 2.40+ | host | host |
 | Docker + Compose | 25+ | host | optional (WSL2) |
 | Android Studio | Hedgehog+ | for APK | for APK |
-| Java 17 | For Planetiler | container | for tile generation |
+| Java | 21+ for the pinned Planetiler 0.10.2 and Photon 1.3.0 JARs | Not needed for containerized Martin/OSRM | Required when running the Planetiler and Photon JARs locally |
 
 **Verify:**
 

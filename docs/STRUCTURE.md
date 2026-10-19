@@ -233,7 +233,7 @@ map-server/
 └── data/                     # created/used locally; ignored by Git; currently empty
 ```
 
-Compose runs Martin v0.12 against the read-only `map-server/data/` bind mount and the PostGIS service. The planned styles, sprites, glyphs, OSRM graph, Photon index, and OSM data pipeline do not exist in the scaffold yet; see [`MAP_SERVER.md`](./MAP_SERVER.md) for the design/runbook.
+Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount and the PostGIS service. The planned styles, sprites, glyphs, OSRM graph, Photon index, and OSM data pipeline do not exist in the scaffold yet; see [`MAP_SERVER.md`](./MAP_SERVER.md) for the design/runbook.
 
 ---
 
