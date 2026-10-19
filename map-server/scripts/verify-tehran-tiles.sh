@@ -12,7 +12,7 @@ fail() {
 
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
 
-http_code="$(curl -sS -o /dev/null -w '%{http_code}' "$MARTIN_URL/health")" || \
+http_code="$(curl --retry 5 --retry-connrefused --retry-delay 2 -sS -o /dev/null -w '%{http_code}' "$MARTIN_URL/health")" || \
   fail "Martin health endpoint is unreachable: $MARTIN_URL/health"
 [[ "$http_code" == '200' ]] || fail "Martin health endpoint returned HTTP $http_code"
 
@@ -20,7 +20,7 @@ body_file="$(mktemp)"
 headers_file="$(mktemp)"
 trap 'rm -f "$body_file" "$headers_file"' EXIT
 
-http_code="$(curl -sS -D "$headers_file" -o "$body_file" -w '%{http_code}' \
+http_code="$(curl --retry 5 --retry-connrefused --retry-delay 2 -sS -D "$headers_file" -o "$body_file" -w '%{http_code}' \
   -H 'Accept: application/x-protobuf' "$MARTIN_URL$TILE_PATH")" || \
   fail "Tile request failed: $MARTIN_URL$TILE_PATH"
 [[ "$http_code" == '200' ]] || fail "Tile endpoint returned HTTP $http_code: $MARTIN_URL$TILE_PATH"

@@ -68,6 +68,12 @@ describe("database seed data", () => {
 
   it("permits the bootstrap credential only in development/test modes", () => {
     expect(resolveAdminSeedPassword({ nodeEnv: "development" })).toBe(DEFAULT_ADMIN_PASSWORD);
+    expect(resolveAdminSeedPassword({ nodeEnv: "development", adminSeedPassword: "" })).toBe(
+      DEFAULT_ADMIN_PASSWORD
+    );
+    expect(() =>
+      resolveAdminSeedPassword({ nodeEnv: "production", adminSeedPassword: "   " })
+    ).toThrow(/ADMIN_SEED_PASSWORD/);
     expect(
       resolveAdminSeedPassword({ nodeEnv: "production", adminSeedPassword: "ChangeMe987!" })
     ).toBe("ChangeMe987!");

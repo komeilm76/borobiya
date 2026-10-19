@@ -1,6 +1,10 @@
 # Martin 1.16.1 resource configuration. Paths are container paths from docker-compose.yml.
 postgres:
   connection_string: ${DATABASE_URL}
+  # Never auto-publish application tables/functions as public tile sources.
+  # In particular, users.last_location is private location data. Add only
+  # reviewed, public tile tables/functions explicitly if they are ever needed.
+  auto_publish: false
 
 pmtiles:
   paths:

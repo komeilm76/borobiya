@@ -366,12 +366,13 @@ OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon
 docker compose --profile geocoding build photon
 ```
 
-- `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
+- `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets, reload `.env` into this terminal (Compose prefers variables already in your shell over the edited file), and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
 
 ```bash
 sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
-docker compose up -d api
+set -a; source .env; set +a
+docker compose up -d --build api
 docker compose logs --tail=20 api
 ```
 

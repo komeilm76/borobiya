@@ -17,4 +17,6 @@ COPY packages/shared ./packages/shared
 WORKDIR /app/packages/server
 USER bun
 EXPOSE 3000
-CMD ["bun", "run", "start"]
+# Run the entrypoint directly so Docker's SIGTERM reaches the server process
+# (server.ts closes Fastify and the Postgres pool on shutdown signals).
+CMD ["bun", "src/server.ts"]

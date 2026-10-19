@@ -82,6 +82,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Deeper Docker/runtime review: Martin privacy fix and API lifecycle hardening
+
+- **Security fix:** disabled Martin Postgres auto-discovery (`postgres.auto_publish: false`). With only a connection string configured, Martin 1.16.1 defaults to publishing spatial tables/functions from the connected database, which would eventually include private `users.last_location` data after migrations. Only explicitly reviewed public tile tables/functions may be enabled later.
+- API container lifecycle: `server.ts` now closes Fastify (and therefore the Postgres pool) on `SIGINT`/`SIGTERM` and also closes the app if `listen()` fails; the Dockerfile runs `bun src/server.ts` directly so Docker signals reach the server instead of a package-script wrapper. A blank `ADMIN_SEED_PASSWORD` passed by Compose is now treated as unset by the seed password resolver (tested), instead of failing as a literal empty password.
+- Build/verification polish: excluded the Photon JAR from the root API build context (Photon's own build context is unaffected), added connection retries to `verify-tehran-tiles.sh` for a still-starting Martin, and documented reloading `.env` after the Step 12 JWT fix because Compose interpolation prefers stale shell variables over the edited file.
+- Validation: server tests 143/143 and typecheck; routing-gateway tests 19/19 under Node; a direct `bun src/server.ts` smoke test served `/_public/health` and exited 0 on SIGTERM with the graceful-shutdown log line; Compose/Martin YAML parses. Remaining known gap (full app only, not map Step 13): database migrations still run from the host Bun toolchain—the production API image intentionally excludes `drizzle-kit`, so `db:migrate` cannot run inside the container.
+
 ### 2026-10-19 — Fixed API placeholder-secret crash-loop at VM step 12; Docker env hardening
 
 - Root cause: following the runbook exactly still left the example `JWT_SECRET`/`JWT_REFRESH_SECRET` placeholders in `.env` (A6 only covered `NOMINATIM_PASSWORD`), so the API's fail-closed env validation crash-looped `borobiya-api-1` while the map services themselves started healthy. Runbook A6 now generates all secrets (two different JWT secrets, Nominatim + Postgres passwords, matching `DATABASE_URL`) with `openssl rand -hex` before the first `docker compose up`, warns against changing DB passwords after their volumes initialize, and step 12 documents the JWT-only fix (`sed` + `docker compose up -d api`) for already-running VMs.

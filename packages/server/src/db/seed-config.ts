@@ -11,7 +11,10 @@ export interface AdminSeedEnvironment {
 
 /** Allows the documented local default only in explicit development/test environments. */
 export function resolveAdminSeedPassword(environment: AdminSeedEnvironment): string {
-  const configuredPassword = environment.adminSeedPassword;
+  // Compose may pass an explicitly blank value when the optional variable is
+  // unset; treat blank as absent instead of as a literal empty password.
+  const configuredPassword =
+    environment.adminSeedPassword?.trim() === "" ? undefined : environment.adminSeedPassword;
   const isLocalEnvironment = environment.nodeEnv === "development" || environment.nodeEnv === "test";
   if (!isLocalEnvironment && (!configuredPassword || configuredPassword === DEFAULT_ADMIN_PASSWORD)) {
     throw new Error("Set a unique ADMIN_SEED_PASSWORD before seeding outside development/test.");
