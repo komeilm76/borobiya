@@ -178,9 +178,18 @@ nproc
 free -h
 df -h /
 docker run --rm hello-world
+DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}')"
+printf 'Docker root: %s\n' "$DOCKER_ROOT"
+df -h "$DOCKER_ROOT"
+df -i "$DOCKER_ROOT"
+if [[ -d /var/lib/containerd ]]; then
+  df -h /var/lib/containerd
+  df -i /var/lib/containerd
+fi
+docker system df -v
 ```
 
-Expected key results: Java reports version 21; `osmium --version` reports 1.16.0; Docker Compose reports v2; `nproc` reports 4. If `df -h /` shows less than about 15 GiB free, expand the VM disk before proceeding.
+Expected key results: Java reports version 21; `osmium --version` reports 1.16.0; Docker Compose reports v2; `nproc` reports 4. Keep at least 15–20 GiB free on the filesystem used by Docker/containerd before imports. The setup checks Docker's reported root and `/var/lib/containerd` (when present), and refuses to start below 15 GiB or 50,000 free inodes; it checks for at least 5 GiB again before building the final images. If the Docker/containerd filesystem is smaller, full, or nearly out of inodes, expand it or inspect/recover space before starting.
 
 ### A5. Clone the implementation branch
 
@@ -456,6 +465,21 @@ Expect seven services `Up`, all of them eventually reporting `(healthy)`: `postg
 ```bash
 docker compose --profile geocoding build photon
 ```
+
+- `failed to extract layer ... /var/lib/containerd/.../no space left on device` while exporting the Photon image — this is a full Docker/containerd storage filesystem, not a bad Photon JAR (the checksum step completed). Check both the configured Docker root and the containerd snapshot filesystem, plus image/cache/volume usage:
+
+```bash
+DOCKER_ROOT="$(docker info --format '{{.DockerRootDir}}')"
+df -h "$DOCKER_ROOT" && df -i "$DOCKER_ROOT"
+if [[ -d /var/lib/containerd ]]; then
+  df -h /var/lib/containerd
+  df -i /var/lib/containerd
+fi
+docker system df -v
+sudo du -xhd1 "$DOCKER_ROOT" /var/lib/containerd 2>/dev/null | sort -h
+```
+
+The setup now checks Docker/containerd free space and inodes before long work, builds the Photon runtime image before the disk-heavy Nominatim import, and checks storage again before the full-stack image build. If a retry is needed, first inspect `docker system df -v`; only prune reclaimable build cache/images when you are sure they can be rebuilt or downloaded again (`docker builder prune` does not remove volumes). **Do not** use `docker system prune --volumes` or `docker compose down -v` as a generic fix: named volumes contain the Nominatim and application databases. If space is held by a database volume or the Docker filesystem is too small, expand/move Docker storage instead. Rerun setup after resolving capacity; verified map stages are reused.
 
 - `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The step 12 `up -d` command does not include `api`, so a crash-looping container from an earlier attempt is left untouched until you recreate it explicitly. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets, reload `.env` into this terminal (Compose prefers variables already in your shell over the edited file), and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
 

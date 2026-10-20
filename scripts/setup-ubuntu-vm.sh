@@ -162,6 +162,50 @@ canonical_library_dir() {
   printf '%s' "$path"
 }
 
+DOCKER_STORAGE_ROOTS=()
+load_docker_storage_roots() {
+  local docker_root
+  if ! docker_root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)"; then
+    fail "could not query Docker's storage root; run 'docker info' and verify the daemon is healthy"
+  fi
+  [[ "$docker_root" == /* && -d "$docker_root" ]] || \
+    fail "Docker reported an invalid storage root: ${docker_root:-<empty>}"
+  DOCKER_STORAGE_ROOTS=("$docker_root")
+  # Docker's containerd image store may use this separate filesystem; check it
+  # too because layer extraction fails there even when DockerRootDir has space.
+  if [[ -d /var/lib/containerd ]]; then
+    DOCKER_STORAGE_ROOTS+=(/var/lib/containerd)
+  fi
+}
+
+check_docker_storage_capacity() {
+  local required_gib="$1" phase="$2"
+  local required_bytes=$((required_gib * 1024 * 1024 * 1024))
+  local path device available_bytes available_inodes available_gib
+  local -A checked_devices=()
+  (( ${#DOCKER_STORAGE_ROOTS[@]} > 0 )) || fail "Docker storage paths were not initialized"
+
+  for path in "${DOCKER_STORAGE_ROOTS[@]}"; do
+    device="$(stat -c '%d' -- "$path" 2>/dev/null || true)"
+    if [[ -n "$device" ]]; then
+      [[ -z "${checked_devices[$device]:-}" ]] || continue
+      checked_devices[$device]=1
+    fi
+    available_bytes="$(df -B1 --output=avail -- "$path" 2>/dev/null | tail -n 1 | tr -d '[:space:]')"
+    available_inodes="$(df -Pi -- "$path" 2>/dev/null | awk 'NR == 2 { print $4 }')"
+    [[ "$available_bytes" =~ ^[0-9]+$ && "$available_inodes" =~ ^[0-9]+$ ]] || \
+      fail "could not read free bytes/inodes for Docker storage at $path"
+    available_gib="$(awk -v bytes="$available_bytes" 'BEGIN { printf "%.1f", bytes / 1073741824 }')"
+    note "Docker storage $path: ${available_gib} GiB free; ${available_inodes} inodes free"
+    if (( available_bytes < required_bytes )); then
+      fail "Docker storage at $path has only ${available_gib} GiB free before $phase; at least ${required_gib} GiB is required. Inspect 'docker system df -v' and the runbook's disk-space recovery notes; do not prune Docker volumes blindly."
+    fi
+    if (( available_inodes < 50000 )); then
+      fail "Docker storage at $path has only $available_inodes free inodes before $phase; at least 50000 are required. Check 'df -i $path' and free space/inodes before retrying."
+    fi
+  done
+}
+
 # ---------- 0. Prerequisites (runbook Phase A must already be done) ----------
 log "Checking prerequisites (runbook Phase A)"
 missing=0
@@ -194,7 +238,11 @@ else
   note "docker + compose v2, Java ${java_major}, osmium, python3 OK; region catalog valid"
 fi
 free_gb="$(df -BG --output=avail . | tail -1 | tr -dc '0-9')"
-(( ${free_gb:-0} >= 15 )) || note "WARNING: only ${free_gb:-?} GiB free disk; imports may fail (runbook wants 15-20 GiB free)."
+(( ${free_gb:-0} >= 15 )) || note "WARNING: only ${free_gb:-?} GiB free on the repository filesystem; imports may fail (runbook wants 15-20 GiB free)."
+if (( !DRY_RUN )); then
+  load_docker_storage_roots
+  check_docker_storage_capacity 15 "starting the map setup"
+fi
 
 # ---------- 1. Environment + secrets (runbook A6) ----------
 log "Environment (.env)"
@@ -865,6 +913,10 @@ fi
 # ---------- 6. Photon index via Nominatim (runbook step 11) ----------
 log "Photon geocoding index (Nominatim import -> Photon import)"
 ./map-server/scripts/download-photon.sh
+# Build the runtime image before the disk-heavy Nominatim database import. This
+# surfaces a full containerd/Docker filesystem before spending time on the import.
+check_docker_storage_capacity 5 "building the Photon runtime image"
+docker compose --profile geocoding build photon
 
 reset_nominatim_volume() {
   docker compose --profile geocoding-import stop nominatim >/dev/null 2>&1 || true
@@ -947,6 +999,7 @@ fi
 
 # ---------- 7. Full stack + database init (runbook step 12 + migrations/seed) ----------
 log "Starting the full stack (builds local images on first run)"
+check_docker_storage_capacity 5 "building/recreating the full Compose stack after the Nominatim import"
 # Recreate map services explicitly so bind mounts and loaded files always
 # point at the selected library dataset, even after an in-place refresh.
 docker compose --profile routing --profile geocoding up -d --build --force-recreate \
