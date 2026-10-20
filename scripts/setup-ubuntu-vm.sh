@@ -327,6 +327,29 @@ run_selection_form() {
   FORM_SELECTION="$(IFS=','; printf '%s' "${chosen_areas[*]}")"
 }
 
+# Recover the selection of an already-built dataset when .env has none yet
+# (e.g. first run after upgrading a pre-catalog checkout), so an unattended
+# re-run keeps serving the areas that are actually on disk.
+existing_selection=""
+existing_source=""
+if [[ -s "map-server/data/${DATASET}.source.json" ]]; then
+  existing_selection="$(python3 - "map-server/data/${DATASET}.source.json" <<'PYEOF' 2>/dev/null || true
+import json, sys
+try:
+    areas = json.load(open(sys.argv[1], encoding="utf-8"))["areas"]
+    if isinstance(areas, list) and areas:
+        print(",".join(areas))
+except Exception:
+    pass
+PYEOF
+)"
+  [[ -n "$existing_selection" ]] && existing_source="existing dataset manifest"
+fi
+if [[ -z "$existing_selection" && -s map-server/data/tehran.osm.pbf && -s map-server/data/tehran.source.json ]]; then
+  existing_selection="ir-tehran"
+  existing_source="existing Tehran install (artifacts will migrate)"
+fi
+
 SELECTION_SOURCE=""
 SELECTION_INPUT=""
 if [[ -n "$ARG_REGIONS" ]]; then
@@ -335,6 +358,8 @@ elif [[ -n "${SETUP_REGIONS:-}" ]]; then
   SELECTION_INPUT="$SETUP_REGIONS"; SELECTION_SOURCE="SETUP_REGIONS"
 elif (( ! RESELECT )) && [[ -n "${MAP_REGION_IDS:-}" ]]; then
   SELECTION_INPUT="$MAP_REGION_IDS"; SELECTION_SOURCE="saved .env selection"
+elif (( ! RESELECT )) && [[ -n "$existing_selection" ]]; then
+  SELECTION_INPUT="$existing_selection"; SELECTION_SOURCE="$existing_source"
 elif (( INTERACTIVE )); then
   SELECTION_SOURCE="selection form"
 else

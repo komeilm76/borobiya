@@ -20,9 +20,9 @@ Selection rules (enforced by resolve):
   * area IDs are `<country>` (whole country) or `<country>-<city>`;
   * duplicates collapse, input order is preserved (first area is primary);
   * a whole-country area supersedes that country's cities;
-  * selected crop rectangles must not overlap — overlapping crops would put
-    duplicate OSM objects into the merged PBF that feeds Planetiler, OSRM,
-    and Nominatim.
+  * bounding boxes may overlap (including adjacent whole countries): every
+    input comes from the same pinned snapshot, and `osmium merge` writes an
+    object that appears in multiple inputs only once.
 """
 
 from __future__ import annotations
@@ -42,6 +42,10 @@ SLUG_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 MD5_RE = re.compile(r"^[0-9a-f]{32}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 GEOFABRIK_PREFIX = "https://download.geofabrik.de/"
+# The pre-catalog VM runbook temporarily recorded this mutable alias for the
+# exact 2026-10-18 Iran bytes. Migration accepts it only when every pinned
+# snapshot field below proves that byte identity.
+LEGACY_IRAN_LATEST_URL = "https://download.geofabrik.de/asia/iran-latest.osm.pbf"
 EPSILON = 1e-9
 
 
@@ -114,13 +118,6 @@ def point_in_bbox(point: object, bbox: list[float]) -> bool:
     west, south, east, north = bbox
     return west <= lon <= east and south <= lat <= north
 
-
-def bboxes_overlap(left: list[float], right: list[float]) -> bool:
-    """True only for a positive-area intersection; shared edges are fine."""
-    return (
-        min(left[2], right[2]) > max(left[0], right[0])
-        and min(left[3], right[3]) > max(left[1], right[1])
-    )
 
 
 def validate_catalog(catalog: dict) -> list[str]:
@@ -273,15 +270,6 @@ def resolve_selection(catalog: dict, selection_text: str) -> dict:
         canonical.append(token)
 
     areas = [index[token] for token in canonical]
-    for position, left in enumerate(areas):
-        for right in areas[position + 1:]:
-            if bboxes_overlap(left["bbox"], right["bbox"]):
-                fail(
-                    f"areas {left['id']} and {right['id']} have overlapping bounding boxes; "
-                    "their crops would duplicate OSM objects in the merged PBF. "
-                    "Select non-overlapping cities instead."
-                )
-
     union = [
         min(area["bbox"][0] for area in areas),
         min(area["bbox"][1] for area in areas),
@@ -349,7 +337,7 @@ def command_validate_catalog(catalog: dict, _args: argparse.Namespace) -> None:
 def command_list(catalog: dict, _args: argparse.Namespace) -> None:
     snapshot = catalog["snapshot"]
     print(f"Borobiya map areas — Geofabrik snapshot {snapshot['dataDate']} (ODbL-1.0, MD5-pinned)")
-    print("Select whole countries, individual cities, or any non-overlapping mix.\n")
+    print("Select whole countries, individual cities, or any mix (including adjacent countries).\n")
     for country in catalog["countries"]:
         source = catalog["sources"][country["source"]]
         heavy = "  [HEAVY: multi-GB build]" if country.get("wholeCountryHeavy") else ""
@@ -368,7 +356,7 @@ def command_menu_countries(catalog: dict, _args: argparse.Namespace) -> None:
 
 
 def command_menu_areas(catalog: dict, args: argparse.Namespace) -> None:
-    country = next((entry for entry in catalog["countries"] if entry["id"] == args.country), None)
+    country = next((entry for entry in catalog["countries"] if entry["id"] == args.country.lower()), None)
     if country is None:
         fail(f"unknown country {args.country!r}; valid: {', '.join(entry['id'] for entry in catalog['countries'])}")
     source = catalog["sources"][country["source"]]
@@ -667,29 +655,54 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
     """Convert the pre-catalog Tehran-only manifest to version 2 in place.
 
     Only the exact previously-pinned Iran snapshot + Tehran bbox can migrate;
-    anything else must be rebuilt so provenance stays honest.
+    anything else must be rebuilt so provenance stays honest. The historical
+    `iran-latest` URL is accepted only when provider, license, MD5, byte
+    count, data date, and data timestamp all prove it recorded that snapshot.
     """
     try:
         old = json.loads(Path(args.input).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read v1 manifest {args.input}: {error}")
+    if not isinstance(old, dict):
+        fail("v1 manifest must be a JSON object; rebuild instead")
     if old.get("region") != "tehran":
         fail("v1 migration supports only the Tehran dataset; rebuild anything else")
     index = area_index(catalog)
     tehran = index["ir-tehran"]
     pinned = catalog["sources"]["iran"]
-    source = old.get("source", {})
-    crop = old.get("crop", {})
-    if source.get("url") != pinned["url"] or source.get("md5") != pinned["md5"]:
+    snapshot = catalog["snapshot"]
+    source = old.get("source")
+    crop = old.get("crop")
+    if not isinstance(source, dict) or not isinstance(crop, dict):
+        fail("v1 manifest source/crop blocks are missing or invalid; rebuild instead")
+    try:
+        source_bytes = int(source.get("bytes"))
+    except (TypeError, ValueError):
+        source_bytes = None
+    source_matches_pinned_snapshot = (
+        source.get("provider") == snapshot["provider"]
+        and source.get("license") == snapshot["license"]
+        and source.get("url") in {pinned["url"], LEGACY_IRAN_LATEST_URL}
+        and source.get("md5") == pinned["md5"]
+        and source.get("dataDate") == snapshot["dataDate"]
+        and source.get("dataTimestamp") == snapshot["dataTimestamp"]
+        and source_bytes == pinned.get("bytes")
+        and SHA256_RE.match(str(source.get("sha256", ""))) is not None
+    )
+    if not source_matches_pinned_snapshot:
         fail("v1 manifest source does not match the pinned catalog Iran snapshot; rebuild instead")
-    if [float(value) for value in crop.get("bbox", [])] != tehran["bbox"] or crop.get("strategy") != "smart":
+    try:
+        crop_bbox = [float(value) for value in crop.get("bbox", [])]
+    except (TypeError, ValueError):
+        crop_bbox = []
+    if crop_bbox != tehran["bbox"] or crop.get("strategy") != "smart":
         fail("v1 manifest crop does not match the catalog Tehran bbox; rebuild instead")
     pbf_path = Path(args.pbf)
+    if not pbf_path.is_file() or pbf_path.stat().st_size == 0:
+        fail(f"dataset PBF is missing or empty: {pbf_path}; rebuild instead")
     actual_sha256 = sha256_file(pbf_path)
     if actual_sha256 != crop.get("sha256"):
         fail("dataset PBF does not match the v1 manifest crop SHA-256; rebuild instead")
-
-    snapshot = catalog["snapshot"]
     manifest = {
         "version": 2,
         "dataset": args.dataset,
@@ -701,8 +714,8 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
             "url": pinned["url"],
             "dataDate": snapshot["dataDate"],
             "dataTimestamp": snapshot["dataTimestamp"],
-            "file": source.get("file", "iran-261018.osm.pbf"),
-            "bytes": int(source["bytes"]),
+            "file": pinned["url"].rsplit("/", 1)[-1],
+            "bytes": source_bytes,
             "md5": pinned["md5"],
             "sha256": source["sha256"],
             "license": snapshot["license"],
@@ -722,8 +735,12 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
         "attribution": "© OpenStreetMap contributors",
         "attributionUrl": "https://www.openstreetmap.org/copyright",
     }
+    if source["url"] != pinned["url"]:
+        manifest["sources"][0]["migratedFromUrl"] = source["url"]
     output = Path(args.output)
-    output.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary = output.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(output)
     print(f"Migrated v1 Tehran manifest to version 2: {output}")
 
 

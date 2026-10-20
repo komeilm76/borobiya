@@ -3,7 +3,11 @@
 
 from __future__ import annotations
 
+import argparse
+import hashlib
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -71,16 +75,112 @@ class ResolveTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             regions.resolve_selection(CATALOG, "ir-tehran,,de-berlin")
 
-    def test_overlapping_whole_countries_rejected(self) -> None:
-        # Germany and Netherlands catalog rectangles intersect; merging both
-        # whole extracts could duplicate border objects.
-        with self.assertRaises(SystemExit):
-            regions.resolve_selection(CATALOG, "de,nl")
+    def test_adjacent_whole_countries_with_overlapping_bboxes_allowed(self) -> None:
+        # Germany and Netherlands catalog rectangles intersect, but both are
+        # built from the same snapshot and osmium merge emits shared objects once.
+        resolved = regions.resolve_selection(CATALOG, "de,nl")
+        self.assertEqual(resolved["ids"], ["de", "nl"])
+        self.assertEqual(resolved["bbox"], [3.36, 47.27, 15.04, 55.06])
+        self.assertEqual(resolved["sourceIds"], ["germany", "netherlands"])
+        self.assertEqual(resolved["languages"], ["de", "nl", "en"])
+        self.assertTrue(resolved["heavy"])
+
+    def test_all_whole_countries_can_be_selected_together(self) -> None:
+        resolved = regions.resolve_selection(CATALOG, "ir,de,tr,fr,gb,nl")
+        self.assertEqual(resolved["ids"], ["ir", "de", "tr", "fr", "gb", "nl"])
+        self.assertEqual(resolved["bbox"], [-8.65, 24.8, 63.4, 60.86])
+        self.assertEqual(resolved["languages"], ["fa", "de", "tr", "fr", "en", "nl"])
+        self.assertTrue(resolved["heavy"])
 
     def test_case_insensitive_ids(self) -> None:
         self.assertEqual(
             regions.resolve_selection(CATALOG, "IR-Tehran")["ids"], ["ir-tehran"]
         )
+
+
+class ManifestMigrationTests(unittest.TestCase):
+    def write_v1_manifest(self, root: Path, *, source_bytes: int) -> tuple[Path, Path]:
+        pbf_path = root / "borobiya.osm.pbf"
+        pbf_bytes = b"legacy Tehran crop"
+        pbf_path.write_bytes(pbf_bytes)
+        pinned = CATALOG["sources"]["iran"]
+        snapshot = CATALOG["snapshot"]
+        manifest = {
+            "region": "tehran",
+            "source": {
+                "provider": snapshot["provider"],
+                "url": regions.LEGACY_IRAN_LATEST_URL,
+                "dataDate": snapshot["dataDate"],
+                "dataTimestamp": snapshot["dataTimestamp"],
+                "file": "iran-latest.osm.pbf",
+                "bytes": source_bytes,
+                "md5": pinned["md5"],
+                "sha256": hashlib.sha256(b"pinned Iran source").hexdigest(),
+                "license": snapshot["license"],
+            },
+            "crop": {
+                "file": str(pbf_path),
+                "bbox": [51.0, 35.5, 51.7, 35.9],
+                "strategy": "smart",
+                "osmiumToolVersion": "1.16.0",
+                "sha256": hashlib.sha256(pbf_bytes).hexdigest(),
+            },
+            "attribution": "© OpenStreetMap contributors",
+            "attributionUrl": "https://www.openstreetmap.org/copyright",
+        }
+        manifest_path = root / "tehran.source.json"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        return manifest_path, pbf_path
+
+    def test_v1_latest_url_migrates_when_snapshot_identity_is_exact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            input_path, pbf_path = self.write_v1_manifest(
+                root, source_bytes=CATALOG["sources"]["iran"]["bytes"]
+            )
+            output_path = root / "borobiya.source.json"
+
+            regions.command_migrate_manifest_v1(
+                CATALOG,
+                argparse.Namespace(
+                    input=str(input_path),
+                    output=str(output_path),
+                    pbf=str(pbf_path),
+                    dataset="borobiya",
+                ),
+            )
+
+            migrated = json.loads(output_path.read_text(encoding="utf-8"))
+            source = migrated["sources"][0]
+            self.assertEqual(migrated["version"], 2)
+            self.assertEqual(source["url"], CATALOG["sources"]["iran"]["url"])
+            self.assertEqual(source["file"], "iran-261018.osm.pbf")
+            self.assertEqual(source["migratedFromUrl"], regions.LEGACY_IRAN_LATEST_URL)
+            regions.command_verify_manifest(
+                CATALOG,
+                argparse.Namespace(
+                    manifest=str(output_path),
+                    pbf=str(pbf_path),
+                    selection="ir-tehran",
+                    bbox="51.0,35.5,51.7,35.9",
+                ),
+            )
+
+    def test_v1_latest_url_rejected_when_snapshot_identity_differs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            input_path, pbf_path = self.write_v1_manifest(root, source_bytes=12345)
+
+            with self.assertRaises(SystemExit):
+                regions.command_migrate_manifest_v1(
+                    CATALOG,
+                    argparse.Namespace(
+                        input=str(input_path),
+                        output=str(root / "borobiya.source.json"),
+                        pbf=str(pbf_path),
+                        dataset="borobiya",
+                    ),
+                )
 
 
 class VerifyPointTests(unittest.TestCase):
