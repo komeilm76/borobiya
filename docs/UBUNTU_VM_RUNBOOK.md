@@ -368,14 +368,22 @@ OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon
 docker compose --profile geocoding build photon
 ```
 
-- `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets, reload `.env` into this terminal (Compose prefers variables already in your shell over the edited file), and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
+- `borobiya-api-1` keeps `Restarting` with `Replace the example placeholder secret` — `.env` still has the example JWT secrets. The step 12 `up -d` command does not include `api`, so a crash-looping container from an earlier attempt is left untouched until you recreate it explicitly. The map services are unaffected (step 13 can still run), but fix the API before using the full app. Generate two different secrets, reload `.env` into this terminal (Compose prefers variables already in your shell over the edited file), and recreate only the API. Do **not** change `POSTGRES_PASSWORD`/`NOMINATIM_PASSWORD` now; their volumes already store the first password.
 
 ```bash
 sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
 sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
 set -a; source .env; set +a
-docker compose up -d --build api
+docker compose up -d --build --force-recreate api
 docker compose logs --tail=20 api
+```
+
+- `borobiya-map-server-1` keeps `Restarting` and its logs end with `password authentication failed` — `POSTGRES_PASSWORD` in this terminal/`.env` no longer matches the password the existing `postgres-data` volume was initialized with (Postgres still shows `healthy`; its healthcheck does not log in). Either set `.env` back to the original password, or—at this stage the app database is still empty—reset only that one volume so it initializes with the current `.env` password, then rerun the step 12 `up -d` command. Map tiles, OSRM graphs, the Photon index, and the Nominatim volume are stored elsewhere and are not touched.
+
+```bash
+docker compose down
+docker volume rm borobiya_postgres-data
+set -a; source .env; set +a
 ```
 
 ### 13. Verify tiles, all route profiles, forward geocoding, and reverse geocoding
