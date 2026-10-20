@@ -82,6 +82,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — One-command VM setup script, admin password reset tool, repo re-scan
+
+- **Live map confirmed on the VM** (Tehran renders in the LAN browser after the worker fix).
+- **`scripts/setup-ubuntu-vm.sh`** automates the runbook launch end-to-end: prerequisite checks (Phase A stays manual), `.env` bootstrap with generated secrets, shared crop, PMTiles, OSRM graphs, Nominatim→Photon import with health waiting, full stack start, runtime migrations + seed, and the step-13 verification scripts, finishing with admin-login and next-step guidance. Idempotent/resumable — completed stages are skipped and existing `.env`/database passwords are never rotated. Runbook gained a short "Automated setup" section pointing to it.
+- **Admin recovery:** new `db:reset-admin-password` (`src/db/reset-admin-password.ts`) sets a new bootstrap-admin password and revokes admin sessions (seed remains create-only by design); documented in the runbook and DEVELOPMENT.md. Admin credentials recap: username `admin`; password is the `ADMIN_SEED_PASSWORD` used at seed time (`admin123` only for local development seeds without one).
+- **Repo re-scan fixes:** stale DEVELOPMENT.md claims that map generation was future work / no styles existed; env-var usage cross-checked client/Vite vs `.env.example` (only Vite's built-in `BASE_URL` differs). Full matrix green: shared 32/32, server 146/146, client 48/48, routing-gateway 19/19, all typechecks, ShellCheck (incl. the new setup script), style verifier, 32 runbook bash blocks.
+
 ### 2026-10-20 — Fixed blank map: MapLibre v6 worker now served explicitly (raw Vite plugin + setWorkerUrl)
 
 - Browser console from the VM pinpointed the empty map: `Error: Worker failed to load` from MapLibre, with zero tile requests (tiles are fetched inside the worker). MapLibre GL JS v6 locates its worker as a sibling of the loaded chunk (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`), but under Vite the library runs from the pre-bundled deps chunk (dev) or a hashed bundle (build), where that sibling file does not exist — Vite even logs the missing file. A `?url` asset import was rejected as a fix because in dev it serves Vite-transformed code with an injected `@vite/client` import, which is unsafe inside a worker. Instead, a small Vite plugin (`borobiya-maplibre-worker`) serves the package's self-contained `maplibre-gl-worker.mjs` **verbatim** at `/maplibre-gl-worker.mjs` in dev and emits it as a build asset, and `MapCanvas` calls `setWorkerUrl("/maplibre-gl-worker.mjs")` before creating the map.

@@ -13,6 +13,16 @@ This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes
 
 ---
 
+## Automated setup (alternative to the manual steps)
+
+After Phase A below (apt packages, Docker, Java, Osmium — the parts needing `sudo`), one script runs everything else in this runbook — steps A6 and 7–13 plus database migrations and the seed — and is safe to re-run (finished stages are skipped, existing `.env` secrets and database passwords are never rotated):
+
+```bash
+./scripts/setup-ubuntu-vm.sh
+```
+
+It prints the admin login (`admin` + the `ADMIN_SEED_PASSWORD` it generated into `.env`) when it finishes. If admin login ever fails because the admin was seeded with a different password, reset it with `docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts '<new-password>'`. The manual steps below remain the reference for what the script does and how to debug each stage.
+
 ## Proxy (optional)
 
 Only if the VM has no direct internet and downloads fail or time out. Otherwise skip this section.

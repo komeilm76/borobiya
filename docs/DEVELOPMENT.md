@@ -59,7 +59,7 @@ Nginx proxies `/api/` to Fastify, `/map/` and Martin's root-relative assets to M
 
 ### 2.3 Database status
 
-Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; registration and login use the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
+Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; registration and login use the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. If that password is lost, reset it (this also revokes admin sessions) with `bun --filter @borobiya/server db:reset-admin-password '<new-password>'`, or the same script inside the API image. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
 ### 2.4 Client and development loop
 
@@ -116,12 +116,12 @@ bun install
 bun run dev   # API and Vite client concurrently
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps, while map data and its generation scripts remain future tasks. Docker is optional for working on the current API/client scaffold.
+The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline; `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`. Docker is optional for working on the current API/client scaffold.
 
 ### 3.3 Windows Caveats
 
 - PostgreSQL/PostGIS is not needed just to run the API skeleton, but a running database with PostGIS available is required to apply migrations and run `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL/PostGIS locally).
-- Martin binaries and OSM tile-generation tools are not part of this scaffold. There are no bundled map tiles or styles to serve yet.
+- The Martin/OSRM/Photon services run via Docker (see `docs/MAP_SERVER.md`); styles, sprites, and fonts are committed, while tiles/graphs/indexes are generated locally and ignored by Git. Native Windows runs of the OSM toolchain (Osmium, Planetiler) are not supported — use the Ubuntu VM runbook.
 
 ---
 
