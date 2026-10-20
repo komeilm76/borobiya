@@ -75,3 +75,11 @@ server.listen(port, host, () => {
   const address = server.address();
   console.log(`Routing gateway listening on http://${host}:${typeof address === "object" && address ? address.port : port}`);
 });
+
+// Close gracefully on `docker compose down/stop` instead of dropping requests.
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 5_000).unref();
+  });
+}

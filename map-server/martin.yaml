@@ -1,10 +1,11 @@
 # Martin 1.16.1 resource configuration. Paths are container paths from docker-compose.yml.
-postgres:
-  connection_string: ${DATABASE_URL}
-  # Never auto-publish application tables/functions as public tile sources.
-  # In particular, users.last_location is private location data. Add only
-  # reviewed, public tile tables/functions explicitly if they are ever needed.
-  auto_publish: false
+# Deliberately NO postgres connection: Martin serves only the PMTiles archive,
+# styles, sprites, and fonts below. The old connection_string contributed zero
+# tile sources (no tables/functions were published) but made Martin exit on any
+# application-database credential mismatch, and its default auto-publish could
+# expose private spatial data such as users.last_location. If a reviewed public
+# Postgres tile source is ever added, configure it explicitly with
+# `auto_publish: false` and named tables/functions only.
 
 pmtiles:
   paths:

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "drizzle-kit";
 
 const packageRoot = fileURLToPath(new URL(".", import.meta.url));
-loadDotEnv({ path: resolve(packageRoot, "../../.env") });
+loadDotEnv({ path: resolve(packageRoot, "../../.env"), quiet: true });
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {

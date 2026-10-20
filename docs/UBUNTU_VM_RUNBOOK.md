@@ -357,7 +357,7 @@ docker stats --no-stream
 
 OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon is capped at a 1.5 GiB heap. Nominatim is not a serving dependency and should stay stopped. If the VM becomes memory pressured, do not start Nominatim alongside this serving stack.
 
-Expect seven services `Up`: `postgres`, `map-server`, and `routing-gateway` reporting `(healthy)`, plus `osrm-car`, `osrm-bicycle`, `osrm-foot`, and `photon`. This step does not start `api` or `nginx`; an `api` container left over from an earlier attempt may still appear in the list—if it shows `Restarting`, see the fixes below.
+Expect seven services `Up`, all of them eventually reporting `(healthy)`: `postgres`, `map-server`, `routing-gateway`, `osrm-car`, `osrm-bicycle`, `osrm-foot`, and `photon` (the OSRMs turn healthy once their graphs load, Photon after its index opens—give it a minute). This step does not start `api` or `nginx`; an `api` container left over from an earlier attempt may still appear in the list—if it shows `Restarting`, see the fixes below. Map serving no longer needs the application database: Martin serves tiles from files even if Postgres is down.
 
 #### If step 12 fails
 
@@ -380,13 +380,15 @@ docker compose up -d --build --force-recreate api
 docker compose logs --tail=20 api
 ```
 
-- `borobiya-map-server-1` keeps `Restarting` and its logs end with `password authentication failed` — `POSTGRES_PASSWORD` in this terminal/`.env` no longer matches the password the existing `postgres-data` volume was initialized with (Postgres still shows `healthy`; its healthcheck does not log in). Either set `.env` back to the original password, or—at this stage the app database is still empty—reset only that one volume so it initializes with the current `.env` password, then rerun the step 12 `up -d` command. Map tiles, OSRM graphs, the Photon index, and the Nominatim volume are stored elsewhere and are not touched.
+- `borobiya-postgres-1` shows `unhealthy` and dependents refuse to start (`dependency failed to start`)—on old checkouts this appeared as `map-server` restart-looping with `password authentication failed`. `POSTGRES_PASSWORD` in this terminal/`.env` no longer matches the password the existing `postgres-data` volume was initialized with; the healthcheck now logs in for real, so Postgres itself reports the problem. Either set `.env` back to the original password, or—at this stage the app database is still empty—reset only that one volume so it initializes with the current `.env` password, then rerun the step 12 `up -d` command. Map tiles, OSRM graphs, the Photon index, and the Nominatim volume are stored elsewhere and are not touched.
 
 ```bash
 docker compose down
 docker volume rm borobiya_postgres-data
 set -a; source .env; set +a
 ```
+
+- Compose complains the network needs to be recreated after a `git pull` (the project subnet is now pinned to `172.30.0.0/24`): run `docker compose down` once—without `-v`—then rerun the step 12 `up -d` command. Containers are recreated; volumes and built map data stay intact.
 
 ### 13. Verify tiles, all route profiles, forward geocoding, and reverse geocoding
 

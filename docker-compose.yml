@@ -10,11 +10,14 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    # Authenticate for real (pg_isready does not log in): if POSTGRES_PASSWORD
+    # was changed after the volume was initialized, this reports unhealthy and
+    # blocks dependents instead of letting them fail with auth errors.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tAc 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 10s
 
   api:
@@ -34,18 +37,14 @@ services:
       # real, different secrets (see .env.example).
       JWT_SECRET: ${JWT_SECRET:-}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
-      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
+      # Trust X-Forwarded-* only from peers on the pinned Compose subnet
+      # (the nginx container), so per-client rate limiting sees real client
+      # IPs instead of one shared proxy bucket. Override for other topologies.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.30.0.0/24}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
-      ADMIN_SEED_PASSWORD: ${ADMIN_SEED_PASSWORD:-}
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
-      MAP_SERVER_URL: http://map-server:3000
-      MAP_STYLE_LIGHT: http://map-server:3000/style/light
-      MAP_STYLE_DARK: http://map-server:3000/style/dark
-      MAP_ROUTING_URL: http://routing-gateway:3000/route
-      MAP_GEOCODE_URL: http://routing-gateway:3000/geocode
-      MAP_REVERSE_URL: http://routing-gateway:3000/reverse
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
     depends_on:
@@ -61,8 +60,9 @@ services:
   map-server:
     image: ghcr.io/maplibre/martin:1.16.1
     restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}
+    # No DATABASE_URL and no postgres dependency on purpose: martin.yaml
+    # configures no Postgres sources (see the privacy note there), so Martin
+    # serves tiles even while the application database is down.
     command: ["--config", "/martin.yaml"]
     volumes:
       - ./map-server/martin.yaml:/martin.yaml:ro
@@ -72,9 +72,6 @@ services:
       - ./map-server/fonts:/fonts:ro
     ports:
       - "127.0.0.1:${MAP_SERVER_PORT:-8000}:3000"
-    depends_on:
-      postgres:
-        condition: service_healthy
 
   nominatim:
     image: mediagis/nominatim:5.3-2026-06-23T09-03
@@ -101,12 +98,14 @@ services:
       - "127.0.0.1:${NOMINATIM_DB_PORT:-5433}:5432"
     shm_size: ${NOMINATIM_SHM_SIZE:-1g}
     profiles: ["geocoding-import"]
+    # Grace covers a slow first import (~70 min) before reporting unhealthy;
+    # the label never stops the import, it only informs `ps`/dependents.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS 'http://127.0.0.1:8080/status?format=json' >/dev/null"]
       interval: 15s
       timeout: 5s
-      retries: 20
-      start_period: 30m
+      retries: 40
+      start_period: 60m
 
   photon:
     build:
@@ -121,6 +120,13 @@ services:
     ports:
       - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
     profiles: ["geocoding"]
+    # The JRE image ships bash but no curl; probe /status over /dev/tcp.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2322 && printf 'GET /status HTTP/1.0\\r\\n\\r\\n' >&3 && IFS= read -r line <&3 && case \"$line\" in *' 200 '*) exit 0;; *) exit 1;; esac"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   osrm-car:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
@@ -129,6 +135,14 @@ services:
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/car:/data:ro
     profiles: ["routing"]
+    # osrm-routed binds :5000 only after its graph is loaded; a successful
+    # TCP connect therefore means the profile is ready to serve.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   osrm-bicycle:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
@@ -137,6 +151,12 @@ services:
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/bicycle:/data:ro
     profiles: ["routing"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   osrm-foot:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
@@ -145,6 +165,12 @@ services:
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/foot:/data:ro
     profiles: ["routing"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
 
   routing-gateway:
     build:
@@ -173,7 +199,7 @@ services:
       start_period: 10s
 
   nginx:
-    image: nginx:stable-alpine
+    image: nginx:1.30.6-alpine
     restart: unless-stopped
     ports:
       - "127.0.0.1:${NGINX_PORT:-8080}:80"
@@ -190,3 +216,11 @@ services:
 volumes:
   postgres-data: {}
   nominatim-data: {}
+
+# Pinned so the API's TRUSTED_PROXY_IPS default (172.30.0.0/24) always matches
+# the network nginx proxies from, instead of Docker's ephemeral 172.x pool.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -48,10 +48,12 @@ mkdir -p "$staging"
 cleanup() { rm -rf -- "$staging"; }
 trap cleanup EXIT
 
+# --user keeps generated graph files owned by the invoking user; the OSRM
+# image otherwise runs as root and leaves root-owned artifacts on the host.
 for profile in car bicycle foot; do
   mkdir -p "$staging/$profile"
   printf 'Extracting %s graph for %s from the approved PBF (%s threads)...\n' "$profile" "$MAP_REGION" "$OSRM_BUILD_THREADS"
-  docker run --rm \
+  docker run --rm --user "$(id -u):$(id -g)" \
     --mount "type=bind,source=$MAP_PBF,target=/input/$MAP_REGION.osm.pbf,readonly" \
     --mount "type=bind,source=$staging,target=/data" \
     "$OSRM_IMAGE" osrm-extract \
@@ -59,10 +61,10 @@ for profile in car bicycle foot; do
     --profile "/opt/$profile.lua" \
     "/input/$MAP_REGION.osm.pbf" \
     --output "/data/$profile/$MAP_REGION"
-  docker run --rm --mount "type=bind,source=$staging,target=/data" \
+  docker run --rm --user "$(id -u):$(id -g)" --mount "type=bind,source=$staging,target=/data" \
     "$OSRM_IMAGE" osrm-partition --threads "$OSRM_BUILD_THREADS" \
     "/data/$profile/$MAP_REGION.osrm"
-  docker run --rm --mount "type=bind,source=$staging,target=/data" \
+  docker run --rm --user "$(id -u):$(id -g)" --mount "type=bind,source=$staging,target=/data" \
     "$OSRM_IMAGE" osrm-customize --threads "$OSRM_BUILD_THREADS" \
     "/data/$profile/$MAP_REGION.osrm"
 done

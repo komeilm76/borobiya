@@ -13,7 +13,7 @@ import {
 } from "./seed-config";
 
 const packageRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
-loadDotEnv({ path: resolve(packageRoot, "../../.env") });
+loadDotEnv({ path: resolve(packageRoot, "../../.env"), quiet: true });
 
 async function seedDatabase(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL;

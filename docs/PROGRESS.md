@@ -82,6 +82,16 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Second config/script audit: decoupled Martin from Postgres, real healthchecks, in-image migrations
+
+- **Martin no longer connects to PostgreSQL.** `martin.yaml` published zero database sources, yet the connection made Martin exit on credential drift (seen live at step 12) and carried auto-publish privacy risk; the `postgres` block, the Compose `DATABASE_URL`, and the `depends_on: postgres` are removed. Martin now serves PMTiles/styles/sprites/fonts from files only, independent of the application database.
+- **Health checks now mean something.** Postgres healthcheck authenticates (`psql SELECT 1`) instead of `pg_isready`, so a password/volume mismatch reports `unhealthy` at the source. Photon (HTTP 200 on `/status` via bash `/dev/tcp`) and all three OSRM services (TCP connect after graph load) gained healthchecks; Nominatim's grace was widened to ~70 min so a slow first import is not mislabelled `unhealthy`.
+- **API/Compose hygiene.** Removed seven variables Compose passed to the API but `env.ts` never validated or used (`ADMIN_SEED_PASSWORD`, `MAP_*`); the service now receives exactly the 11 validated keys. Pinned the Compose subnet to `172.30.0.0/24` and defaulted `TRUSTED_PROXY_IPS` to it, so per-client rate limiting works behind Nginx. Pinned `nginx:1.30.6-alpine`.
+- **Nginx re-resolves upstreams.** `nginx.conf` uses Docker's embedded DNS (`resolver 127.0.0.11 valid=10s`) with variable `proxy_pass` and hoisted proxy headers, so recreating an upstream container no longer leaves Nginx proxying to a stale IP until restart.
+- **Migrations can run inside the API image.** New `src/db/migrate.ts` (drizzle-orm runtime migrator over the shipped `drizzle/` folder) plus `db:migrate:runtime`; the production image excludes drizzle-kit, so `docker compose run --rm api bun src/db/migrate.ts` is now the in-stack path. `seed.ts`/`drizzle.config.ts` dotenv banners silenced.
+- **Smaller items:** routing gateway closes gracefully on SIGINT/SIGTERM and runs via direct `bun server.mjs`; `build-routing.sh` builds OSRM graphs as the invoking user instead of leaving root-owned files. Docs/runbook updated for all of the above (existing stacks need one `docker compose down` + `up` for the network change).
+- Validation: Compose/Martin YAML assertions; Photon healthcheck command executed against a live test server (200→0, closed port→non-zero); Nginx config parsed clean with crossplane; ShellCheck clean on all scripts; routing-gateway tests 19/19; server tests 143/143 + typecheck; `migrate.ts` smoke (missing `DATABASE_URL` exits 1 with a clean message); style verifier OK; all 31 runbook bash blocks pass `bash -n`.
+
 ### 2026-10-20 — Runbook audit after live Step 12 success on the VM
 
 - Live VM verification progressed: after the Step 11 Nominatim fix and the Step 12 secret/password recovery, the full serving stack runs on the Ubuntu 24.04 VM—`postgres`, `api`, `map-server` (Martin), and `routing-gateway` report `(healthy)`, and `osrm-car`/`osrm-bicycle`/`osrm-foot` and `photon` are `Up`. Step 13 acceptance scripts are the remaining gate for T1.4.2/T1.4.4/T1.4.5.

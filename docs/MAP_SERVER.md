@@ -150,9 +150,7 @@ Run the dependency-free style/source/layer/SVG consistency check with `python3 m
 Compose mounts the checked-in Martin config and all style assets read-only. Its container paths are:
 
 ```yaml
-postgres:
-  connection_string: ${DATABASE_URL}
-  auto_publish: false
+# No postgres block: Martin serves files only (see below).
 pmtiles:
   paths: [/data]
 styles:
@@ -165,12 +163,12 @@ fonts:
     Borobiya Sans: [Noto Sans Regular, Noto Naskh Arabic Regular]
 ```
 
-The actual file is `map-server/martin.yaml`. Martin discovers PMTiles sources from `/data`; when the archive is named `tehran.pmtiles`, its source ID is `tehran` and its MVT route is `/tehran/{z}/{x}/{y}` (an optional `.pbf` suffix redirects). `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. PostGIS auto-discovery is explicitly disabled (`postgres.auto_publish: false`): Martin's default would otherwise publish spatial application tables—including private `users.last_location` data—as tile sources. Only explicitly reviewed public tile tables/functions may be configured in the future.
+The actual file is `map-server/martin.yaml`. Martin discovers PMTiles sources from `/data`; when the archive is named `tehran.pmtiles`, its source ID is `tehran` and its MVT route is `/tehran/{z}/{x}/{y}` (an optional `.pbf` suffix redirects). `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. Martin is deliberately **not connected to PostgreSQL**: it publishes no database tile sources, so the connection contributed only failure modes (Martin exited whenever application-database credentials drifted) and risk—Martin's default auto-publish would otherwise expose spatial application tables, including private `users.last_location` data, as public tile sources. If a reviewed public Postgres tile source is ever needed, add it explicitly with `auto_publish: false` and named tables/functions only.
 
-Start the local dependencies:
+Start Martin (no database dependency):
 
 ```bash
-docker compose up -d postgres map-server
+docker compose up -d map-server
 ```
 
 Verify the style and dynamically served assets (these can be checked before tile generation):
