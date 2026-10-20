@@ -82,6 +82,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Runbook audit after live Step 12 success on the VM
+
+- Live VM verification progressed: after the Step 11 Nominatim fix and the Step 12 secret/password recovery, the full serving stack runs on the Ubuntu 24.04 VM—`postgres`, `api`, `map-server` (Martin), and `routing-gateway` report `(healthy)`, and `osrm-car`/`osrm-bicycle`/`osrm-foot` and `photon` are `Up`. Step 13 acceptance scripts are the remaining gate for T1.4.2/T1.4.4/T1.4.5.
+- Audited `docs/UBUNTU_VM_RUNBOOK.md` against the repo (Compose defaults, `.env.example`, map script pins/env names, verify-script endpoints—all consistent) and fixed what had drifted: A5 now clones/updates branch `arena/ec9ffc7e-borobiya` (was the old `arena/91f87b17-borobiya`) and names commit `7afe63d`-or-newer instead of stale `f32191e`; intro VM disk corrected to 50 GB; step 11 notes `health: starting` during the Nominatim import is expected; step 12 states the expected seven-service healthy result and that it does not start `api`/`nginx`.
+
 ### 2026-10-20 — Step 12 troubleshooting: stale API container and Martin/Postgres password mismatch
 
 - Runbook step 12 now explains two restart-loop cases seen on the VM. (1) The step 12 `up -d` command intentionally starts only the map services, so a crash-looping `api` container from an earlier attempt (JWT placeholder secrets) survives untouched; the documented fix now uses `docker compose up -d --build --force-recreate api`. (2) `map-server` (Martin) restart-looping with `password authentication failed` means `POSTGRES_PASSWORD` changed after the `postgres-data` volume was initialized—the volume keeps the first password while Compose hands Martin the current terminal/`.env` value, and the Postgres healthcheck (`pg_isready`) cannot detect it. Documented recovery: restore the original password in `.env`, or at this pre-migration stage reset only `borobiya_postgres-data` and rerun step 12 (tiles, OSRM graphs, Photon index, and the Nominatim volume live elsewhere).

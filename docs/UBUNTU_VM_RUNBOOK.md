@@ -1,6 +1,6 @@
 # Ubuntu 24.04 VMware Runbook — Offline Tehran Map Pipeline
 
-This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes), and T1.4.5 (Photon geocoding) on the requested VM: **Ubuntu 24.04 LTS, 4 vCPU, 6 GiB RAM, 40 GB disk**. It deliberately builds Planetiler, OSRM, and Photon one after another; only the final acceptance phase starts Martin, all three OSRM services, and Photon together. Nominatim has to stay up during the Photon import, then is stopped to free memory.
+This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes), and T1.4.5 (Photon geocoding) on the requested VM: **Ubuntu 24.04 LTS, 4 vCPU, 6 GiB RAM, 50 GB disk**. It deliberately builds Planetiler, OSRM, and Photon one after another; only the final acceptance phase starts Martin, all three OSRM services, and Photon together. Nominatim has to stay up during the Photon import, then is stopped to free memory.
 
 > **Resource warning:** 6 GiB is tight for five live map services. The defaults below reduce Java heaps, database memory, and thread counts, but they cannot guarantee the complete stack fits on every dataset/runtime. Check `free -h` and `df -h /` first. If services are killed by the OOM killer, run the live route profiles one at a time or increase the VM to 8 GiB. Keep at least 15–20 GiB free on the filesystem before starting imports.
 
@@ -163,25 +163,25 @@ If this is a fresh VM:
 
 ```bash
 cd ~
-git clone --single-branch --branch arena/91f87b17-borobiya \
+git clone --single-branch --branch arena/ec9ffc7e-borobiya \
   https://github.com/komeilm76/borobiya.git
 cd ~/borobiya
 git log -1 --oneline
 ```
 
-The latest implementation should show commit `f32191e` or a newer commit on that same branch. If you already cloned the repository, update that checkout instead:
+The latest implementation should show commit `7afe63d` or a newer commit on that same branch. If you already cloned the repository, update that checkout instead:
 
 ```bash
 cd ~/borobiya
-git fetch origin arena/91f87b17-borobiya
-git switch arena/91f87b17-borobiya
-git pull --ff-only origin arena/91f87b17-borobiya
+git fetch origin arena/ec9ffc7e-borobiya
+git switch arena/ec9ffc7e-borobiya
+git pull --ff-only origin arena/ec9ffc7e-borobiya
 ```
 
 If `git switch` says that branch does not exist locally, create its tracking branch once:
 
 ```bash
-git switch --track -c arena/91f87b17-borobiya origin/arena/91f87b17-borobiya
+git switch --track -c arena/ec9ffc7e-borobiya origin/arena/ec9ffc7e-borobiya
 ```
 
 ### A6. Configure the VM-friendly environment
@@ -325,7 +325,7 @@ docker compose --profile geocoding-import ps nominatim
 docker compose --profile geocoding-import logs --tail=100 nominatim
 ```
 
-Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared Tehran crop and may take a while. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database.
+Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared Tehran crop and may take a while; `health: starting` during the import is expected—do not restart it. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database.
 
 If `ps` instead shows `Restarting`, read the first real error in the logs above. `chown: ... Read-only file system` means an old checkout whose Compose file mounted the PBF read-only inside `/nominatim`—`git pull --ff-only`, then `docker compose --profile geocoding-import up -d --force-recreate nominatim`. The half-initialized database volume can stay; the entrypoint drops and re-imports the database from scratch on the next start.
 
@@ -356,6 +356,8 @@ docker stats --no-stream
 ```
 
 OSRM runs with one runtime worker per profile and `--max-table-size 100`; Photon is capped at a 1.5 GiB heap. Nominatim is not a serving dependency and should stay stopped. If the VM becomes memory pressured, do not start Nominatim alongside this serving stack.
+
+Expect seven services `Up`: `postgres`, `map-server`, and `routing-gateway` reporting `(healthy)`, plus `osrm-car`, `osrm-bicycle`, `osrm-foot`, and `photon`. This step does not start `api` or `nginx`; an `api` container left over from an earlier attempt may still appear in the list—if it shows `Restarting`, see the fixes below.
 
 #### If step 12 fails
 
