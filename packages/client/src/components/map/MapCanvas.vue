@@ -78,11 +78,15 @@ function toError(value: unknown, fallbackMessage: string): Error {
 }
 
 function reportMapError(value: unknown): void {
+  // The toast stays user-friendly; the console keeps the actionable detail
+  // (failed style/tile URLs, WebGL initialization failures, ...).
+  console.error("[borobiya:map] map error", value);
   showNotice(MAP_FAILURE_NOTICE);
   emit("map-error", toError(value, "The map could not be loaded."));
 }
 
 function reportConfigError(value: unknown): void {
+  console.error("[borobiya:map] map config error", value);
   showNotice(MAP_CONFIG_NOTICE);
   emit("config-error", toError(value, "Map configuration could not be loaded."));
 }

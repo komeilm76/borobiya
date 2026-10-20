@@ -33,7 +33,12 @@ function suppliedRefreshToken(request: FastifyRequest, bodyToken: string | undef
   return bodyToken ?? request.cookies?.refreshToken;
 }
 
-function invalidRefreshReply(reply: FastifyReply) {
+type RefreshRejectionReason = "missing_token" | "token_invalid" | "session_mismatch" | "rotation_conflict";
+
+function invalidRefreshReply(reply: FastifyReply, request: FastifyRequest, reason: RefreshRejectionReason) {
+  // The client only ever sees INVALID_REFRESH; the reason exists so operators
+  // can tell a missing cookie from a stale/rotated token while debugging.
+  request.log.info({ refreshRejectionReason: reason }, "refresh token rejected");
   return reply
     .code(401)
     .header("cache-control", "no-store")
@@ -63,10 +68,10 @@ export async function registerSessionRoutes(
     }
 
     const refreshToken = suppliedRefreshToken(request, parsedBody.data?.refreshToken);
-    if (!refreshToken) return invalidRefreshReply(reply);
+    if (!refreshToken) return invalidRefreshReply(reply, request, "missing_token");
 
     const tokenIdentity = await verifyRefreshToken(refreshToken, dependencies.jwtRefreshSecret);
-    if (!tokenIdentity) return invalidRefreshReply(reply);
+    if (!tokenIdentity) return invalidRefreshReply(reply, request, "token_invalid");
 
     const currentTokenHash = hashRefreshToken(refreshToken);
     const session = await dependencies.store.findSessionByRefreshTokenHash(currentTokenHash);
@@ -76,7 +81,7 @@ export async function registerSessionRoutes(
       session.userId !== tokenIdentity.userId ||
       session.deviceId !== tokenIdentity.deviceId
     ) {
-      return invalidRefreshReply(reply);
+      return invalidRefreshReply(reply, request, "session_mismatch");
     }
 
     if (!session.isActive || session.isSuspended) {
@@ -105,7 +110,7 @@ export async function registerSessionRoutes(
       nextTokenHash: hashRefreshToken(nextRefreshToken),
       lastActiveAt: new Date()
     });
-    if (!rotated) return invalidRefreshReply(reply);
+    if (!rotated) return invalidRefreshReply(reply, request, "rotation_conflict");
 
     const response = reply.code(200).header("cache-control", "no-store").header("vary", "Origin");
     if (isBrowserRequest(request)) {
