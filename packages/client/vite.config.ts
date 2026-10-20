@@ -1,8 +1,10 @@
 import tailwindcss from "@tailwindcss/vite";
 import vue from "@vitejs/plugin-vue";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadEnv } from "vite";
+import { loadEnv, type Plugin } from "vite";
 import { parseMapConfig } from "../../map-server/routing-gateway/map-config.mjs";
 import { defineConfig } from "vitest/config";
 import vuetify from "vite-plugin-vuetify";
@@ -17,6 +19,30 @@ function proxyPrefix(value: string | undefined, fallback: string): string {
 
 function stripPrefix(prefix: string) {
   return (requestPath: string) => requestPath.slice(prefix.length) || "/";
+}
+
+// MapLibre GL JS v6 locates its worker as a sibling of its (pre)bundled chunk,
+// where Vite never emits it ("Worker failed to load"). Serve the package's
+// self-contained worker file verbatim at a stable path in dev and build;
+// MapCanvas points MapLibre at it via setWorkerUrl("/maplibre-gl-worker.mjs").
+const maplibreWorkerPath = createRequire(import.meta.url).resolve(
+  "maplibre-gl/dist/maplibre-gl-worker.mjs"
+);
+
+function maplibreWorkerPlugin(): Plugin {
+  const readWorker = () => readFileSync(maplibreWorkerPath);
+  return {
+    name: "borobiya-maplibre-worker",
+    configureServer(server) {
+      server.middlewares.use("/maplibre-gl-worker.mjs", (_request, response) => {
+        response.setHeader("Content-Type", "text/javascript; charset=utf-8");
+        response.end(readWorker());
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "maplibre-gl-worker.mjs", source: readWorker() });
+    }
+  };
 }
 
 export default defineConfig(({ mode }) => {
@@ -44,7 +70,7 @@ export default defineConfig(({ mode }) => {
   return {
     root: packageRoot,
     envDir: repositoryRoot,
-    plugins: [vue(), vuetify({ autoImport: true }), tailwindcss()],
+    plugins: [vue(), vuetify({ autoImport: true }), tailwindcss(), maplibreWorkerPlugin()],
     resolve: {
       alias: {
         "@": resolve(packageRoot, "src"),

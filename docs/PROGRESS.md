@@ -82,6 +82,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Fixed blank map: MapLibre v6 worker now served explicitly (raw Vite plugin + setWorkerUrl)
+
+- Browser console from the VM pinpointed the empty map: `Error: Worker failed to load` from MapLibre, with zero tile requests (tiles are fetched inside the worker). MapLibre GL JS v6 locates its worker as a sibling of the loaded chunk (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`), but under Vite the library runs from the pre-bundled deps chunk (dev) or a hashed bundle (build), where that sibling file does not exist — Vite even logs the missing file. A `?url` asset import was rejected as a fix because in dev it serves Vite-transformed code with an injected `@vite/client` import, which is unsafe inside a worker. Instead, a small Vite plugin (`borobiya-maplibre-worker`) serves the package's self-contained `maplibre-gl-worker.mjs` **verbatim** at `/maplibre-gl-worker.mjs` in dev and emits it as a build asset, and `MapCanvas` calls `setWorkerUrl("/maplibre-gl-worker.mjs")` before creating the map.
+- Validation: client typecheck + 48/48 tests; production build emits the worker byte-identical to the packaged file (SHA-256 match); dev server returns the same raw bytes (518,806 B, no `@vite/client` injection) while the old sibling-of-chunk path 404s exactly as in the browser report.
+
 ### 2026-10-20 — Fixed Photon healthcheck Compose interpolation; actionable API port-conflict error
 
 - VM evidence confirmed the live-E2E auth root cause: the Docker `api` container (pre-cookie-fix image) owns :3000 while `bun run dev`'s API dies with `EADDRINUSE` and `--watch` keeps waiting, so Vite kept proxying to the stale API whose unconditional `Secure` refresh cookie LAN browsers drop. The API now prints an actionable hint on `EADDRINUSE` (stop the Docker `api` service or change `PORT`) instead of only a stack trace.

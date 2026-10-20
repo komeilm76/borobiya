@@ -134,7 +134,11 @@ function handleServiceWorkerMessage(event: MessageEvent): void {
 watch(() => props.styleUrl, updateStyle);
 
 async function initializeMap(controller: AbortController): Promise<void> {
-  const { Map: MapLibre, NavigationControl, ScaleControl } = await import("maplibre-gl");
+  const { Map: MapLibre, NavigationControl, ScaleControl, setWorkerUrl } = await import("maplibre-gl");
+  // MapLibre v6 otherwise locates its worker relative to the (pre)bundled
+  // chunk URL, where the sibling worker file does not exist ("Worker failed
+  // to load"); the Vite config serves the packaged worker at this path instead.
+  setWorkerUrl("/maplibre-gl-worker.mjs");
   if (controller.signal.aborted || !container.value) return;
   const initialStyleUrl = pendingStyleUrl ?? props.styleUrl;
 
