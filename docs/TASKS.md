@@ -45,10 +45,10 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 ### 1.4 Map Server (Independent, Offline Vector)
 
 - [x] **T1.4.1** Pick exact tools: Martin 1.16.1 / Planetiler 0.10.2 / OSRM 26.10.0 / Photon 1.3.0; document pins in MAP_SERVER.md — completed 2026-10-19
-- [ ] **T1.4.2** Build the Tehran PBF→`tehran.pmtiles` pipeline + verify Martin `/tehran/{z}/{x}/{y}` — approved Geofabrik source, checksum-verified `MAP_BBOX` crop, builder and smoke test configured; real local tile response pending
-- [x] **T1.4.3** Author `styles/light.json` + `styles/dark.json` (same `sources`, different `layers` paint) + Martin-served SVG sprites and dynamic TTF glyphs — completed 2026-10-19; assets are configured, but real Martin runtime verification remains pending
-- [ ] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline — all three graphs consume the verified shared crop; local-fixture adapter tests pass, real OSRM smoke test pending
-- [ ] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse` — Nominatim imports the shared crop and Photon 1.3.0 imports its DB; real local geocoder smoke test pending
+- [x] **T1.4.2** Build the Tehran PBF→`tehran.pmtiles` pipeline + verify Martin `/tehran/{z}/{x}/{y}` — completed 2026-10-20 on the Ubuntu 24.04 VM: checksum-verified crop → Planetiler → Martin; `verify-tehran-tiles.sh` passes (`/tehran/12/2632/1612` → HTTP 200, `application/x-protobuf`, 222,867 bytes)
+- [x] **T1.4.3** Author `styles/light.json` + `styles/dark.json` (same `sources`, different `layers` paint) + Martin-served SVG sprites and dynamic TTF glyphs — completed 2026-10-19; Martin runtime serving these assets verified live on the VM 2026-10-20 (browser rendering E2E still pending a client run)
+- [x] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline — completed 2026-10-20 on the VM: `verify-routing.sh` passes for car (6,643 m / 609 s), bicycle (5,090 m / 1,489 s), and foot (4,803 m / 3,464 s), each with alternatives
+- [x] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse` — completed 2026-10-20 on the VM: `verify-geocoding.sh` passes (`/geocode?q=Azadi Square` → 5 features, first «میدان آزادی»; `/reverse` at 35.70,51.40 → «هادی خداپرست»)
 - [x] **T1.4.6** Wire `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MIN_ZOOM`, and `MAP_MAX_ZOOM` through Compose, validated public `/map-config`, client/schema, tile/routing scripts, and pipeline documentation — completed 2026-10-19; offline tests/typechecks/build/YAML/shell checks pass
 
 ### 1.5 Client Map & Theming

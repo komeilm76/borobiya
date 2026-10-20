@@ -4,16 +4,16 @@
 
 ---
 
-## Overall: 21% — Phase 1 Foundation underway (2026-10-19)
+## Overall: 24% — Phase 1 Foundation underway (2026-10-20)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL source, single `MAP_BBOX` crop, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks remain pending the user's local Docker/Java run. Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL source, single `MAP_BBOX` crop, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks have now passed on the user's Ubuntu 24.04 VM (runbook step 13 acceptance, 2026-10-20). Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 20% | 🟡 T1.4.1, T1.4.3, and T1.4.6 are complete; the approved Geofabrik crop, OSRM and Nominatim→Photon build paths, proxies, and OSM attribution are implemented, but T1.4.2/.4/.5 remain open until local live smoke tests pass |
+| Map Server | 100% | ✅ T1.4.1–T1.4.6 complete; live VM acceptance passed 2026-10-20 (Martin MVT tile, OSRM car/bicycle/foot routes, Photon forward/reverse geocoding) |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -30,7 +30,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 20% | T1.4.1, T1.4.3, and T1.4.6 pins/styles/assets/configuration are complete; T1.4.2/.4/.5 generation/import/proxies are implemented, but real tile, route, and geocoding acceptance is pending local service checks |
+| Map Server | 100% | T1.4.1–T1.4.6 complete: pins, styles/assets, shared-crop pipeline, PMTiles generation, OSRM graphs, Nominatim→Photon index, and gateway proxies all verified live on the Ubuntu VM (2026-10-20) |
 | Client Map canvas | 75% | 🟡 T1.5.1–T1.5.5 reusable MapLibre canvas, theme-aware light/dark switching, outage fallback, full map route, and dashboard map widget are implemented; live map-data rendering and location/search/routing integrations remain pending |
 
 ### Phase 2 — Location Sharing — 0%
@@ -81,6 +81,14 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-20 — Live map acceptance passed on the Ubuntu VM: T1.4.2, T1.4.4, T1.4.5 complete
+
+- Runbook step 13 acceptance passed end-to-end on the Ubuntu 24.04 VMware VM (4 vCPU / 6 GiB / 50 GB), against the shared Geofabrik crop built through steps 7–12:
+  - **Tiles (T1.4.2):** `verify-tehran-tiles.sh` — `GET /tehran/12/2632/1612` → HTTP 200, `application/x-protobuf`, 222,867 bytes.
+  - **Routing (T1.4.4):** `verify-routing.sh` — car 6,643 m / 609 s, bicycle 5,090 m / 1,489 s, foot 4,803 m / 3,464 s (2 alternatives each) between the central-Tehran probe points.
+  - **Geocoding (T1.4.5):** `verify-geocoding.sh` — forward `Azadi Square` → 5 features, first «میدان آزادی»; reverse at 35.70,51.40 → «هادی خداپرست». Raw `curl` equivalents for tile/route/geocode/reverse also exercised successfully.
+- `docs/TASKS.md` phase-1 checklist is now fully checked; Map Server area/milestone moved to 100%. Next: apply the second-audit stack update on the VM (one `down`/`up --build`), run in-image migrations + seed and verify auth end-to-end, capture `docker stats` for memory tuning, then client live-map E2E and Phase 2 (T2.1 live location sharing).
 
 ### 2026-10-20 — Second config/script audit: decoupled Martin from Postgres, real healthchecks, in-image migrations
 
