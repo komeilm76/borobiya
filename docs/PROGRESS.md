@@ -82,6 +82,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Fixed Photon healthcheck Compose interpolation; actionable API port-conflict error
+
+- VM evidence confirmed the live-E2E auth root cause: the Docker `api` container (pre-cookie-fix image) owns :3000 while `bun run dev`'s API dies with `EADDRINUSE` and `--watch` keeps waiting, so Vite kept proxying to the stale API whose unconditional `Secure` refresh cookie LAN browsers drop. The API now prints an actionable hint on `EADDRINUSE` (stop the Docker `api` service or change `PORT`) instead of only a stack trace.
+- Fixed a bug in the Photon healthcheck added by the second audit: its bash `$line` variable was eaten by Compose interpolation (`WARN The "line" variable is not set`), so the probe could never match HTTP 200 and Photon showed permanently `(unhealthy)` despite serving. The variable is now `$$`-escaped; validated by simulating Compose interpolation and executing the decoded probe against a live test server.
+- Validation: server 146/146 + typecheck; EADDRINUSE smoke test prints the new hint.
+
 ### 2026-10-20 — Diagnostics for live client E2E: refresh-rejection reasons, MapCanvas console errors
 
 - Follow-up to the LAN-dev fixes: sprite/style loading improved on the VM, but `POST /_auth/refresh` still returns 401 on reload and the map renders empty in the user's browser. Code re-audit found the client restore flow (deduped refresh, `credentials: "same-origin"`, tolerant profile load), server refresh rotation, service worker (guarded, network-first), style layer names (canonical OpenMapTiles), and both styles (pass the official `gl-style-validate`) all correct, so the remaining causes are environmental and need runtime evidence instead of more speculation. The refresh handler now logs a secret-free `refreshRejectionReason` (`missing_token` / `token_invalid` / `session_mismatch` / `rotation_conflict`) while the client contract stays `INVALID_REFRESH`, and `MapCanvas` logs the underlying MapLibre/config errors to the console (`[borobiya:map] ...`) alongside the user-friendly Persian toast. Prime suspects to discriminate with that evidence: a stale Docker `api` still bound to :3000 while `bun --watch` waits after an `EADDRINUSE` crash (old image = unconditional `Secure` cookie), no fresh login since the cookie fix (the pre-fix cookie was never stored), split JWT secrets between Docker/bun APIs, or WebGL unavailable in the test browser.

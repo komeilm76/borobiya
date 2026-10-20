@@ -32,6 +32,15 @@ export async function startServer() {
   } catch (error) {
     // Do not leave plugins or the database pool open if binding the port fails.
     await app.close().catch(() => undefined);
+    if ((error as NodeJS.ErrnoException | null)?.code === "EADDRINUSE") {
+      // Under `bun --watch` this failure otherwise looks deceptively alive:
+      // the watcher keeps waiting while some other process (usually the
+      // Docker `api` container) silently serves the port with stale code.
+      console.error(
+        `Port ${config.port} is already in use. If the Docker \`api\` service is running, ` +
+        "stop it (`docker compose stop api`) before `bun run dev`, or set a different PORT."
+      );
+    }
     throw error;
   }
   app.log.info({ address }, "Borobiya API listening");

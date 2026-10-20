@@ -121,8 +121,9 @@ services:
       - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
     profiles: ["geocoding"]
     # The JRE image ships bash but no curl; probe /status over /dev/tcp.
+    # $$ escapes Compose interpolation so bash receives the literal $line.
     healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2322 && printf 'GET /status HTTP/1.0\\r\\n\\r\\n' >&3 && IFS= read -r line <&3 && case \"$line\" in *' 200 '*) exit 0;; *) exit 1;; esac"]
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2322 && printf 'GET /status HTTP/1.0\\r\\n\\r\\n' >&3 && IFS= read -r line <&3 && case \"$$line\" in *' 200 '*) exit 0;; *) exit 1;; esac"]
       interval: 10s
       timeout: 5s
       retries: 12
