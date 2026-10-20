@@ -80,7 +80,10 @@ services:
     image: mediagis/nominatim:5.3-2026-06-23T09-03
     restart: unless-stopped
     environment:
-      PBF_PATH: /nominatim/data/${MAP_REGION:-tehran}.osm.pbf
+      # Keep the PBF outside /nominatim (PROJECT_DIR): the mediagis entrypoint
+      # recursively chowns that directory under `bash -e`, so a read-only
+      # mount inside it makes startup exit 1 ("Read-only file system").
+      PBF_PATH: /osm/${MAP_REGION:-tehran}.osm.pbf
       NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-change-me}
       IMPORT_STYLE: ${NOMINATIM_IMPORT_STYLE:-full}
       IMPORT_WIKIPEDIA: "false"
@@ -91,7 +94,7 @@ services:
       POSTGRES_WORK_MEM: ${NOMINATIM_POSTGRES_WORK_MEM:-32MB}
       POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
     volumes:
-      - ./map-server/data:/nominatim/data:ro
+      - ./map-server/data:/osm:ro
       - nominatim-data:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${NOMINATIM_HTTP_PORT:-8081}:8080"

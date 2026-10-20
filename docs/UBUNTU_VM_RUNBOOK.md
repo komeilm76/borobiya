@@ -327,6 +327,8 @@ docker compose --profile geocoding-import logs --tail=100 nominatim
 
 Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared Tehran crop and may take a while. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database.
 
+If `ps` instead shows `Restarting`, read the first real error in the logs above. `chown: ... Read-only file system` means an old checkout whose Compose file mounted the PBF read-only inside `/nominatim`—`git pull --ff-only`, then `docker compose --profile geocoding-import up -d --force-recreate nominatim`. The half-initialized database volume can stay; the entrypoint drops and re-imports the database from scratch on the next start.
+
 ```bash
 cd map-server/photon/data
 java -Xms512m -Xmx2g -jar ../photon-1.3.0.jar import \

@@ -82,6 +82,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-19 — Fixed Nominatim restart loop at VM step 11 (read-only mount inside chown'ed project dir)
+
+- Root cause, verified against the mediagis 5.3 image's own `start.sh`/`init.sh` (image-era commit `44bb833`): both run under `bash -ex` and recursively `chown -R nominatim:nominatim /nominatim` (`PROJECT_DIR`) before importing. Compose mounted `./map-server/data` read-only at `/nominatim/data`, so the `chown` failed with `Read-only file system`, the entrypoint exited 1, and the container restart-looped—Step 11 could never complete. Fixed by mounting the data directory read-only at `/osm` (outside `PROJECT_DIR`) and pointing `PBF_PATH` there; the crop stays read-only and host files are never re-owned. Existing failed attempts need no volume cleanup: no `import-finished` marker exists, so the entrypoint re-runs init and drops/re-imports the database on the next start (`--force-recreate` after `git pull`). Runbook step 11 documents the symptom and recovery.
+
 ### 2026-10-19 — Deeper Docker/runtime review: Martin privacy fix and API lifecycle hardening
 
 - **Security fix:** disabled Martin Postgres auto-discovery (`postgres.auto_publish: false`). With only a connection string configured, Martin 1.16.1 defaults to publishing spatial tables/functions from the connected database, which would eventually include private `users.last_location` data after migrations. Only explicitly reviewed public tile tables/functions may be enabled later.
