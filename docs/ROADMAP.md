@@ -54,27 +54,31 @@ gantt
 - [x] `cancellation_reasons` table/migration + 15 security-question seeds, 11 cancellation reasons, and Argon2id bootstrap admin — T1.1.3 completed 2026-10-18
 - [x] `POST /_auth/register` — 5 unique Q validation (T1.2.1)
 - [x] `POST /_auth/login` — username+password, Argon2id verification, 5/15m limit, access/refresh JWT issuance (T1.2.2)
-- [ ] `POST /_auth/refresh` and `POST /_auth/logout` — refresh rotation/revocation via HttpOnly cookie or native body
-- [ ] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
-- [ ] `POST /_admin/users` (no questions) + `mustCompleteSecurityQuestions` flag + forced redirect
-- [ ] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
+- [x] `POST /_auth/refresh` and `POST /_auth/logout` — refresh rotation/revocation via HttpOnly cookie or native body
+- [x] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
+- [x] `POST /_admin/users` (no questions) + `mustCompleteSecurityQuestions` flag + forced redirect
+- [x] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
 
 ### M1.3 Map Server (Independent)
 - [x] Choose and pin **Martin + Planetiler + OSRM + Photon** (T1.4.1)
 - [x] Generate the `borobiya.pmtiles` dataset archive from reuse-approved pinned PBFs (default Tehran) and verify Martin's `/{sourceID}/{z}/{x}/{y}` MVT route (T1.4.2)
 - [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; verified live incl. browser rendering 2026-10-20)
-- [ ] Standardized external map library with selectable snapshots and cache/update/offline policies (T1.4.7; code/tests complete, VM migration/offline acceptance pending)
+- [x] Configure car/bicycle/foot OSRM profiles and offline route adapter (T1.4.4; target-VM checks passed 2026-10-20)
+- [x] Configure Nominatim import + Photon index and offline geocoding adapter (T1.4.5; target-VM checks passed 2026-10-20)
+- [ ] Standardized external map library with selectable snapshots and cache/update/offline policies (T1.4.7; code/tests/docs complete, VM migration/offline acceptance pending before PR #2 merge)
 - [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas
-- [x] MapLibre GL JS init, center on Tehran, attribution (T1.5.1; reusable canvas component; runtime verification pending map data)
-- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2; live end-to-end benchmark pending approved map data)
+- [x] MapLibre GL JS init, configured bounds, attribution, and runtime map config (T1.5.1; Tehran rendered in the LAN browser on the target VM 2026-10-20)
+- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2; live theme-switch latency benchmark remains unmeasured)
 - [x] Preserve camera and DOM-backed markers by diffing styles on the existing map instance (T1.5.2)
 - [x] Gesture-friendly pan/zoom controls; preserve camera state (including pitch, bearing, and zoom) when switching styles
 - [x] App-wide Vuetify/Tailwind theme selection, `system`/`light`/`dark` persistence, OS preference updates, and pre-paint initialization (T1.5.3)
-- [ ] Graceful fallback if Map Server down (toast + cached tiles)
+- [x] Graceful fallback if Map Server down (toast + cached tiles); real offline/5xx outage behavior still needs a separate VM/browser acceptance run
 
-**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled.
+**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled. The original Tehran stack passed on the target VM; the current external-library refactor still needs its migration/offline acceptance before this phase is considered fully closed.
+
+**Phase gate:** Phase 2 (location sharing) remains unstarted until the repository audit and the required target-VM migration/offline checks for T1.4.7 are complete and confirmed.
 
 ---
 

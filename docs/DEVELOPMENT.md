@@ -1,6 +1,6 @@
 # Borobiya — Development Guide
 
-> TL;DR: Use **`bun run dev`** for the API + client with hot reload, or **Docker Compose** for the API, PostGIS, Martin, and Nginx. Registration and login use Drizzle-backed PostgreSQL persistence when migrations and seed data are ready; database migrations are not automatic. Map data and style assets are not bundled yet. Strict `bun` + `strict: true` TypeScript everywhere.
+> TL;DR: Use **`bun run dev`** for the API + client with hot reload, or **Docker Compose** for the API, PostGIS, Martin, routing gateway, and Nginx (OSRM/Photon are optional profiles; Nominatim is import-only). Auth, recovery, session, and user/admin account flows use Drizzle-backed PostgreSQL after explicit migrations and seed; migrations are not automatic. The map pipeline and style assets are implemented, while generated map data lives outside Git in the external map library. Strict `bun` + `strict: true` TypeScript everywhere.
 
 ---
 
@@ -46,7 +46,7 @@ docker compose ps
 docker compose logs -f api map-server
 ```
 
-The Compose stack contains `api`, PostGIS `postgres`, Martin `map-server`, and the Nginx gateway. Host ports are loopback-bound by default: API `3000`, PostgreSQL `5432`, Martin `8000`, and Nginx `8080`.
+The default Compose profile contains `api`, PostGIS `postgres`, Martin `map-server`, the routing gateway, and the Nginx gateway. The OSRM profile services and Photon are opt-in; Nominatim is available only for the geocoding-import workflow. Host ports are loopback-bound by default: API `3000`, PostgreSQL `5432`, Martin `8000`, routing gateway `8001`, and Nginx `8080`.
 
 ```bash
 curl http://localhost:3000/_public/health       # API directly
@@ -116,11 +116,11 @@ bun install
 bun run dev   # API and Vite client concurrently
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline for the areas/snapshot selected from `map-server/regions.json` (`MAP_REGION_IDS`, default `ir-tehran`; whole countries and/or cities; `MAP_SNAPSHOT=pinned|latest|YYYY-MM-DD`). All sources, crops, and generated dataset artifacts live in the standardized external map library (`MAP_LIBRARY_DIR`, default `~/.local/share/borobiya/map-library`; see `docs/MAP_LIBRARY.md`). `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`, including the library/snapshot/policy/area form (`--list-regions`, `--regions`, `--update-map`, `--offline`, `--reselect`, `--dry-run`). Docker is optional for working on the current API/client scaffold.
+The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration/login, refresh/logout, recovery, onboarding, and account-management routes use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline for the areas/snapshot selected from `map-server/regions.json` (`MAP_REGION_IDS`, default `ir-tehran`; whole countries and/or cities; `MAP_SNAPSHOT=pinned|latest|YYYY-MM-DD`). All sources, crops, and generated dataset artifacts live in the standardized external map library (`MAP_LIBRARY_DIR`, default `~/.local/share/borobiya/map-library`; see `docs/MAP_LIBRARY.md`). `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`, including the library/snapshot/policy/area form (`--list-regions`, `--regions`, `--update-map`, `--offline`, `--reselect`, `--dry-run`). Docker is optional for API/client work with a local PostgreSQL/PostGIS database, but the documented tile/routing/geocoding stack and OSM build pipeline target Ubuntu with Docker.
 
 ### 3.3 Windows Caveats
 
-- PostgreSQL/PostGIS is not needed just to run the API skeleton, but a running database with PostGIS available is required to apply migrations and run `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL/PostGIS locally).
+- PostgreSQL/PostGIS is required for the implemented database-backed auth/account routes, migrations, and `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL/PostGIS locally). The API can start without querying the database, but database-backed operations will not work until setup is complete.
 - The Martin/OSRM/Photon services run via Docker (see `docs/MAP_SERVER.md`); styles, sprites, and fonts are committed, while tiles/graphs/indexes are generated locally and ignored by Git. Native Windows runs of the OSM toolchain (Osmium, Planetiler) are not supported — use the Ubuntu VM runbook.
 
 ---
@@ -185,7 +185,7 @@ VITE_API_URL=/api
 VITE_MAP_URL=/map
 ```
 
-The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. The style URLs point to the configured Martin runtime, but no PMTiles archive is generated; the routing gateway is configured but has no OSRM graphs until an approved PBF is processed. Geocoding remains unconfigured.
+The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. A clean checkout intentionally has no PMTiles, OSRM graphs, or Photon index: generate these with the pipeline/runbook into `MAP_LIBRARY_DIR` before enabling the corresponding map services. The routing gateway and offline geocoding adapter are implemented; live dataset acceptance for the external-library refactor remains a target-VM gate.
 
 ---
 
@@ -195,11 +195,11 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
 | `bun run dev` | root | Runs the API and Vite client concurrently with Bun's workspace runner; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
-| `bun --filter @borobiya/server dev` | root | Fastify API skeleton (`bun --watch`) |
+| `bun --filter @borobiya/server dev` | root | Fastify API with database-backed auth, recovery, session, and account routes (`bun --watch`) |
 | `bun --filter @borobiya/server test` | root | Server environment and Fastify inject tests |
 | `bun --filter @borobiya/server typecheck` | root | Strict server TypeScript check |
 | `bun --filter @borobiya/client dev` | root | Vite on `0.0.0.0:5173`, with same-origin `/api` and `/map` proxies |
-| `bun --filter @borobiya/client test` | root | Client route-map tests |
+| `bun --filter @borobiya/client test` | root | Client API, auth/theme/router, map, attribution, and cache-worker tests |
 | `bun --filter @borobiya/client typecheck` | root | Vue SFC and TypeScript check |
 | `bun --filter @borobiya/client build` | root | Typecheck and production Vite build |
 | `bun --filter @borobiya/client preview` | root | Preview the production build |
@@ -250,7 +250,7 @@ Start the API first, then run `bun --filter @borobiya/client generate:api`. By d
 bun --filter @borobiya/shared test
 bun --filter @borobiya/shared typecheck
 
-# Fastify server skeleton
+# Fastify API
 bun --filter @borobiya/server test
 bun --filter @borobiya/server typecheck
 
@@ -262,8 +262,8 @@ bun --filter @borobiya/client build
 
 - Shared-contract tests use Vitest and cover the documented Zod invariants and route descriptors.
 - Server tests use `fastify.inject()`; no network listener or database is needed.
-- Client tests verify namespaced routes and placeholder registration; feature/component tests will be added with those features.
-- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, trusted proxy IP/CIDRs, host/port, and rate-limit values; registration and login queries connect to PostgreSQL on demand, but migrations are not automatic.
+- Client tests cover API error handling, auth state, route guards, map config/canvas options, theme behavior, attribution, and service-worker caching; live browser checks still depend on a running map stack.
+- Before starting the API, copy `.env.example` to `.env` and replace the placeholder JWT secrets. Startup validates `DATABASE_URL`, secrets, CORS origins, trusted proxy IP/CIDRs, host/port, and rate-limit values; database-backed auth/account routes connect to PostgreSQL on demand, but migrations are not automatic.
 - The Vite browser client uses same-origin `/api` and `/map` paths; its server-side dev proxy reads backend targets from the root `.env`.
 
 ---
@@ -274,7 +274,7 @@ bun --filter @borobiya/client build
 |---------|-----|
 | API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; registration/login database queries run only when a route is used |
 | `relation "users" does not exist` | The migration is checked in but is not applied automatically; start PostgreSQL and run `bun --filter @borobiya/server db:migrate` against the intended `DATABASE_URL` |
-| Map blank, 404 tiles/styles | Expected until map data and style assets are added; `docker compose logs map-server` checks Martin startup |
+| Map blank, 404 tiles | Check `docker compose logs map-server` and confirm a generated `borobiya.pmtiles` exists under the active `MAP_DATASET_DIR`; styles/sprites/fonts are committed, but map data is built separately into the external library |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |
 | `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/_user/complete-security-questions` |
 | Vite HMR slow | `bun --filter @borobiya/client dev` (already binds to `0.0.0.0`) |

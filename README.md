@@ -5,7 +5,7 @@
 > **Type:** Location Sharing & SOS Rescue Platform
 > **Platforms:** Admin Web Panel + User Web App + Android App (Ionic + Vue)
 > **Map Engine:** Self-Hosted Vector Map (PBF / SVG) via MapLibre — Fully Offline Capable
-> **Last Updated:** 2025
+> **Last Updated:** 2026-10-21
 
 ---
 
@@ -170,7 +170,7 @@ Map Server is a **completely separate service** responsible for:
 - `MapCanvas.vue` reports MapLibre/configuration failures through an accessible toast with a retry action. A failed `/map-config` request does not block map creation; documented Tehran bounds and zoom defaults are used.
 - On secure origins (HTTPS or localhost), the client registers a map-only service worker. It uses a network-first strategy and stores successful same-origin styles, vector tiles, sprites, and glyphs in Cache Storage (up to 512 resources); on a network failure or server 5xx, a cached response is served and the client is notified. It does not cache API/configuration, routing, or geocoding responses.
 - MapLibre also retains eight zoom levels in its in-memory tile cache, preserving already-loaded coverage during the current page session. If service workers are unavailable (for example, plain HTTP on a LAN), that in-memory fallback still applies; persistent browser caching requires a secure origin.
-- The user full-screen map and dashboard map widget share the reusable `MapCanvas` and follow the app's resolved theme. Live Map Server rendering/outage verification and location/search/routing features remain pending their separate tasks.
+- The user full-screen map and dashboard map widget share the reusable `MapCanvas` and follow the app's resolved theme. Tehran tiles rendered in the LAN browser, and the Tehran tile/routing/geocoding checks passed on the target Ubuntu VM on 2026-10-20. The external-library migration and offline acceptance for the current map-library changes still require the VM gate before merge; see [`docs/PROGRESS.md`](docs/PROGRESS.md). Location sharing, place search, and in-app routing UI remain separate product tasks.
 
 ---
 
@@ -923,11 +923,11 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 - **Local launch (scaffold):**
   ```bash
   cp .env.example .env          # replace the JWT placeholders and Postgres password
-  docker compose up --build -d  # API, PostGIS, Martin, and Nginx; local ports only
+  docker compose up --build -d  # default profile: API, PostGIS, Martin, routing gateway, and Nginx
   bun install
   bun --filter @borobiya/client dev  # Vite client with HMR at :5173
   ```
-  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only); database-backed persistence currently covers registration and login sessions, and project map data/assets are not implemented yet.
+  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only). Auth, recovery, session, and user/admin account flows use PostgreSQL after the explicit migrations and seed; SOS/location mission workflows remain planned. Map PBFs, PMTiles, OSRM graphs, and the Photon index are generated outside Git under the external library by the map pipeline; a clean checkout does not contain those large data artifacts.
 
 ### 19.3. Android Build Workflow (planned)
 - **GitHub Actions `android.yml` (not present yet):**
@@ -945,8 +945,8 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
 
 ### 20.1. Production (Ubuntu)
 - OS: **Ubuntu 22.04/24.04 LTS**
-- A local **Compose scaffold** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, and Nginx. Host ports bind to loopback; Nginx is HTTP-only on port 8080. It is not yet a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
-- Secrets via `.env` (never commit). Registration uses the configured `DATABASE_URL` after auth/reference migrations and seed data are applied; migrations and seed commands do not run at startup. Change the local `admin / admin123` credential before exposing the service. The map server has no bundled tile/style/routing/geocoding assets yet.
+- A local **Compose stack** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, routing gateway, and Nginx in the default profile; OSRM and Photon are optional profiles, and Nominatim is an import-only profile. Host ports bind to loopback; Nginx is HTTP-only on port 8080. This is not a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
+- Secrets via `.env` (never commit). Database-backed auth/recovery/session and user/admin account operations require the explicit migrations and seed; they do not run at API startup. Setup creates or requests an admin seed password; the local `admin / admin123` fallback is development-only. Map data is generated by the pipeline into the external library (`MAP_LIBRARY_DIR`), not bundled in Git; see [`docs/MAP_LIBRARY.md`](docs/MAP_LIBRARY.md).
 
 ### 20.2. Development (Windows without Docker)
 - Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; registration and login use the configured database after setup.
@@ -956,7 +956,7 @@ These hooks and gates are recommendations only; no hook config, CI workflow, or 
   cp .env.example .env   # replace the JWT placeholders
   bun run dev            # API + Vite concurrently
   ```
-- Registration uses Drizzle-backed PostgreSQL persistence once the checked-in migrations and seed data are applied; migrations/seeds are not run automatically. `db:setup`, `map:dev`, and sample map assets are not implemented or bundled.
+- Auth, recovery, session, and user/admin account flows use Drizzle-backed PostgreSQL after the checked-in migrations and seed data are applied; migrations/seeds are not run automatically. `db:setup` and `map:dev` are not wired. The map pipeline and styles/sprites/fonts are implemented, but generated regional data is intentionally stored outside the repository in the map library.
 
 ---
 

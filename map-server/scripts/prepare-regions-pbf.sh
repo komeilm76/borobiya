@@ -42,17 +42,23 @@ expand_home_path() {
   esac
 }
 
-if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR"
+elif [[ -n "${XDG_DATA_HOME:-}" ]]; then
+  [[ "$XDG_DATA_HOME" == /* ]] || fail 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly or correct XDG_DATA_HOME'
   DEFAULT_MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
 elif [[ -n "${HOME:-}" ]]; then
+  [[ "$HOME" == /* ]] || fail 'HOME must be absolute to derive the external map library; set MAP_LIBRARY_DIR explicitly'
   DEFAULT_MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
 else
-  DEFAULT_MAP_LIBRARY_DIR="$REPO_ROOT/map-server/data"
+  fail 'HOME and XDG_DATA_HOME are unset; set MAP_LIBRARY_DIR to an external absolute path'
 fi
-MAP_LIBRARY_DIR="$(expand_home_path "${MAP_LIBRARY_DIR:-$DEFAULT_MAP_LIBRARY_DIR}")"
+MAP_LIBRARY_DIR="$(expand_home_path "$DEFAULT_MAP_LIBRARY_DIR")"
 if [[ "$MAP_LIBRARY_DIR" != /* ]]; then
   MAP_LIBRARY_DIR="$PWD/$MAP_LIBRARY_DIR"
 fi
+[[ "$MAP_LIBRARY_DIR" != *$'\t'* && "$MAP_LIBRARY_DIR" != *$'\n'* && "$MAP_LIBRARY_DIR" != *$'\r'* ]] || \
+  fail 'MAP_LIBRARY_DIR must not contain tabs or line breaks (library paths are emitted as TSV)'
 
 # MAP_REGION is the dataset slug: it names the merged PBF, the PMTiles
 # archive (Martin source), and the OSRM graphs. Keep it stable ("borobiya")
@@ -85,6 +91,23 @@ sha256_file() {
   else
     fail 'sha256sum or shasum is required to record the source checksums'
   fi
+}
+
+is_project_local_regular_file() {
+  local candidate="$1" resolved=""
+  [[ -f "$candidate" && ! -L "$candidate" ]] || return 1
+  if ! resolved="$(python3 - "$candidate" <<'PY'
+from pathlib import Path
+import sys
+try:
+    print(Path(sys.argv[1]).resolve(strict=True))
+except (OSError, RuntimeError):
+    raise SystemExit(1)
+PY
+  )"; then
+    return 1
+  fi
+  [[ "$resolved" == "$REPO_ROOT/"* ]]
 }
 
 [[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION (dataset slug) must be a lowercase slug'
@@ -142,7 +165,8 @@ PY
 if [[ "$MAP_SOURCE_POLICY" != "refresh" && -s "$merged_pbf" && -s "$manifest" && "$(manifest_version "$manifest")" == "3" ]]; then
   if MAP_BBOX="$UNION_BBOX" "$SCRIPT_DIR/verify-map-pbf.sh" "$merged_pbf" >/dev/null 2>&1 && \
      python3 "$SCRIPT_DIR/regions.py" manifest-library-ready \
-       --manifest "$manifest" --library "$MAP_LIBRARY_DIR" >/dev/null 2>&1; then
+       --manifest "$manifest" --library "$MAP_LIBRARY_DIR" \
+       --osmium-version "$osmium_version" >/dev/null 2>&1; then
     printf 'Dataset already prepared for areas: %s (snapshot %s)\n' "$MAP_REGION_IDS" "$MAP_SNAPSHOT_DATE"
     MAP_BBOX="$UNION_BBOX" "$SCRIPT_DIR/verify-map-pbf.sh" "$merged_pbf"
     exit 0
@@ -171,6 +195,11 @@ printf 'Map library: %s\nDataset: %s\n' "$MAP_LIBRARY_DIR" "$MAP_DATASET_DIR"
 declare -A source_path_by_id=()
 declare -A source_sha_by_id=()
 while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_bytes _approx_mb _continent _country _relative source_pbf _snapshot_date; do
+  # `regions.py sources` uses `-` for unavailable optional columns. Keep the
+  # TSV rectangular because Bash collapses adjacent tab IFS whitespace.
+  [[ "$source_md5" != '-' ]] || source_md5=""
+  [[ "$source_bytes" != '-' ]] || source_bytes=""
+  [[ "$source_pbf" != '-' ]] || source_pbf=""
   source_dir="$(dirname -- "$source_pbf")"
   source_sidecar="${source_pbf}.md5"
   mkdir -p "$source_dir"
@@ -184,7 +213,7 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
       legacy_candidates+=("$REPO_ROOT/map-server/data/source/iran-latest.osm.pbf")
     fi
     for legacy_source in "${legacy_candidates[@]}"; do
-      if [[ -s "$legacy_source" && -n "$source_md5" && "$(md5_file "$legacy_source")" == "$source_md5" ]]; then
+      if is_project_local_regular_file "$legacy_source" && [[ -s "$legacy_source" && -n "$source_md5" && "$(md5_file "$legacy_source")" == "$source_md5" ]]; then
         mv -- "$legacy_source" "$source_pbf"
         printf 'Imported verified legacy source download into the map library: %s\n' "$source_pbf"
         break
@@ -200,11 +229,12 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     if [[ "$MAP_SOURCE_POLICY" == "offline" ]]; then
       fail "offline source policy: required source $source_id is missing from the map library: $source_pbf"
     fi
-    source_tmp="$source_dir/.${source_file_name}.$$.part"
+    source_tmp_dir="$(mktemp -d "$source_dir/.borobiya-source.XXXXXX")"
+    source_tmp="$source_tmp_dir/$source_file_name"
     sidecar_tmp=""
-    trap 'rm -f "${source_tmp:-}" "${sidecar_tmp:-}"' EXIT
+    trap 'rm -rf -- "${source_tmp_dir:-}"' EXIT
     if [[ "$MAP_SNAPSHOT_MODE" != "pinned" ]]; then
-      sidecar_tmp="${source_sidecar}.$$.part"
+      sidecar_tmp="$source_tmp_dir/$source_file_name.md5"
       curl -fL --retry 3 --retry-delay 2 "${source_url}.md5" -o "$sidecar_tmp"
       sidecar_md5="$(awk '{print tolower($1); exit}' "$sidecar_tmp")"
       [[ "$sidecar_md5" == "$source_md5" ]] || \
@@ -220,6 +250,7 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     if [[ -n "$sidecar_tmp" ]]; then
       mv -- "$sidecar_tmp" "$source_sidecar"
     fi
+    rmdir -- "$source_tmp_dir"
     trap - EXIT
   fi
 
@@ -271,9 +302,9 @@ while IFS=$'\t' read -r area_id _country_id source_id area_bbox area_name _conti
   if [[ "$MAP_SOURCE_POLICY" != "refresh" && ! -s "$crop_pbf" ]]; then
     legacy_crop="$REPO_ROOT/map-server/data/crops/$area_id.osm.pbf"
     legacy_meta="$REPO_ROOT/map-server/data/crops/$area_id.source.json"
-    if [[ -s "$legacy_crop" ]]; then
+    if is_project_local_regular_file "$legacy_crop" && [[ -s "$legacy_crop" ]]; then
       mv -- "$legacy_crop" "$crop_pbf"
-      if [[ -s "$legacy_meta" ]]; then
+      if is_project_local_regular_file "$legacy_meta" && [[ -s "$legacy_meta" ]]; then
         mv -- "$legacy_meta" "$crop_meta"
       fi
       printf 'Imported legacy crop into the map library: %s\n' "$crop_pbf"
@@ -283,17 +314,21 @@ while IFS=$'\t' read -r area_id _country_id source_id area_bbox area_name _conti
   if python3 "$SCRIPT_DIR/regions.py" verify-crop \
       --meta "$crop_meta" --crop "$crop_pbf" --area "$area_id" \
       --source-sha256 "${source_sha_by_id[$source_id]}" \
-      --snapshot-date "$MAP_SNAPSHOT_DATE" >/dev/null 2>&1; then
+      --osmium-version "$osmium_version" \
+      --snapshot-date "$MAP_SNAPSHOT_DATE" \
+      --library "$MAP_LIBRARY_DIR" >/dev/null 2>&1; then
     printf 'Area %s (%s): reusing verified crop\n' "$area_id" "$area_name"
   else
-    crop_tmp="$crop_dir/.$area_id.$$.osm.pbf"
-    trap 'rm -f "${crop_tmp:-}"' EXIT
+    crop_tmp_dir="$(mktemp -d "$crop_dir/.borobiya-crop.XXXXXX")"
+    crop_tmp="$crop_tmp_dir/$area_id.osm.pbf"
+    trap 'rm -rf -- "${crop_tmp_dir:-}"' EXIT
     printf 'Area %s (%s): cropping bbox %s from %s...\n' "$area_id" "$area_name" "$area_bbox" "$(basename -- "$source_pbf")"
     osmium extract --strategy=smart --bbox="$area_bbox" --set-bounds \
       --output="$crop_tmp" "$source_pbf"
     [[ -s "$crop_tmp" ]] || fail "osmium extract did not produce a non-empty crop for $area_id"
     osmium fileinfo "$crop_tmp" >/dev/null
     mv -- "$crop_tmp" "$crop_pbf"
+    rmdir -- "$crop_tmp_dir"
     trap - EXIT
     python3 "$SCRIPT_DIR/regions.py" write-crop-meta \
       --meta "$crop_meta" --crop "$crop_pbf" --area "$area_id" \
@@ -306,13 +341,15 @@ while IFS=$'\t' read -r area_id _country_id source_id area_bbox area_name _conti
 done <<< "$areas_output"
 
 # ---- 3. Merge into the single shared dataset PBF + provenance manifest ----
-merged_tmp="$MAP_DATA_DIR/.$MAP_REGION.$$.osm.pbf"
-trap 'rm -f "${merged_tmp:-}"' EXIT
+merged_tmp_dir="$(mktemp -d "$MAP_DATA_DIR/.borobiya-merge.XXXXXX")"
+merged_tmp="$merged_tmp_dir/$MAP_REGION.osm.pbf"
+trap 'rm -rf -- "${merged_tmp_dir:-}"' EXIT
 printf 'Merging %d area input(s) into %s...\n' "${#merge_inputs[@]}" "$merged_pbf"
 osmium merge --output="$merged_tmp" "${merge_inputs[@]}"
 [[ -s "$merged_tmp" ]] || fail 'osmium merge did not produce a non-empty dataset PBF'
 osmium fileinfo "$merged_tmp" >/dev/null
 mv -- "$merged_tmp" "$merged_pbf"
+rmdir -- "$merged_tmp_dir"
 trap - EXIT
 
 python3 "$SCRIPT_DIR/regions.py" write-manifest \

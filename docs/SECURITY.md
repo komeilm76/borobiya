@@ -95,7 +95,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 
 ## 3. Rate Limiting
 
-Via `@fastify/rate-limit`. The current server skeleton uses its in-memory store; Redis-backed production storage is a later scaling task.
+Via `@fastify/rate-limit`. The current API uses its in-memory store; Redis-backed production storage is a later scaling task.
 
 | Scope | Limit | Key |
 |-------|-------|-----|

@@ -1,27 +1,38 @@
 # `@borobiya/server`
 
-Fastify bootstrap for Borobiya. The current app validates server environment settings, registers Helmet, a credentials-aware CORS allowlist, and the global in-memory IP rate limit, exposes `GET /_public/health`, and serves the Swagger/OpenAPI contract catalog. Other API operations remain contract-only.
+Fastify + TypeScript API for Borobiya. The server validates its environment at startup, registers security headers, CORS and rate limiting, serves health/OpenAPI endpoints, and implements database-backed authentication, refresh/logout, password recovery/security-question flows, and admin user-management routes. SOS, live-location sharing, and mission workflows remain future work.
 
-Before starting, copy the repository's `.env.example` to `.env` and replace the JWT placeholders with distinct random secrets of at least 32 characters. `DATABASE_URL` is validated but the Fastify bootstrap does not open a database connection yet.
+The API uses PostgreSQL through Drizzle ORM and Postgres.js. Copy the repository's `.env.example` to `.env` and replace the JWT placeholders with distinct random secrets. In Compose, the API receives its container-internal `DATABASE_URL` from the `POSTGRES_*` settings; direct host development uses `DATABASE_URL` from `.env`.
 
-## Database foundation
+## Database setup
 
-The project selected **Drizzle ORM** with the Postgres.js driver. `src/db/schema.ts` declares account state, security/session, cancellation-reason, and PostGIS last-location fields. `src/db/client.ts` provides an explicit client factory, and `drizzle.config.ts` points Drizzle Kit at the schema. The checked-in migrations enable PostGIS and add a GiST index for spatial lookup; they are not applied automatically, and the factory is not called by the running API.
-
-Use the explicit database commands from the repository root:
+Migrations and seed data are **not** applied automatically at API startup. Apply the checked-in migrations before seeding:
 
 ```bash
-bun --filter @borobiya/server db:generate # create a reviewed migration from schema changes
-bun --filter @borobiya/server db:migrate # apply pending migrations to DATABASE_URL
-bun --filter @borobiya/server db:seed    # seed reference data and bootstrap admin
+bun --filter @borobiya/server db:migrate
+bun --filter @borobiya/server db:seed
 ```
 
-Apply migrations before seeding. The seed is idempotent and never overwrites an existing `admin` password. In local development it creates `admin` with the temporary password `admin123`; change it before exposing the service. Seeding refuses that fallback unless `NODE_ENV` is `development` or `test`; outside those modes, set a unique `ADMIN_SEED_PASSWORD`.
+`db:migrate` uses Drizzle Kit on a development host. The production API image does not include that dev dependency, so run the checked-in runtime migrator there:
+
+```bash
+docker compose run --rm api bun src/db/migrate.ts
+```
+
+The seed is idempotent and never overwrites an existing admin password. Local development may use the documented `admin123` fallback; outside development/test, provide a unique `ADMIN_SEED_PASSWORD`. To recover the bootstrap admin account and revoke its existing sessions:
+
+```bash
+bun --filter @borobiya/server db:reset-admin-password '<new-password>'
+# or, in Compose:
+docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts
+```
 
 ## Development commands
 
 ```bash
-bun --filter @borobiya/server typecheck
-bun --filter @borobiya/server test
 bun --filter @borobiya/server dev
+bun --filter @borobiya/server test
+bun --filter @borobiya/server typecheck
 ```
+
+Tests use injected stores/Fastify's `inject()` and do not require a live PostgreSQL server. `db:generate` creates a migration from schema changes; review the generated SQL before applying it.

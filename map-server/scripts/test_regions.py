@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import io
 import json
+from contextlib import redirect_stdout
 import sys
 import tempfile
 import unittest
@@ -103,6 +105,12 @@ class ResolveTests(unittest.TestCase):
 class SnapshotAndLibraryPathTests(unittest.TestCase):
     def test_library_paths_are_categorized_by_continent_country_city_and_date(self) -> None:
         snapshot_date = date(2026, 10, 18)
+        with self.assertRaises(SystemExit):
+            regions.library_paths(
+                regions.SCRIPT_DIR.parent.parent, snapshot_date, ["ir-tehran"]
+            )
+        with self.assertRaises(SystemExit):
+            regions.resolve_library_root("/")
         self.assertEqual(
             regions.source_relative_path(CATALOG, "hessen", snapshot_date).as_posix(),
             "sources/europe/de/hessen/2026-10-18/hessen-261018.osm.pbf",
@@ -114,6 +122,54 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
         )
         paths = regions.library_paths("/tmp/example-library", snapshot_date, ["ir-tehran"])
         self.assertTrue(str(paths["datasetDir"]).startswith("/tmp/example-library/datasets/2026-10-18/"))
+
+    def test_library_paths_reject_symlinked_storage_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "library"
+            outside = Path(temporary) / "outside"
+            root.mkdir()
+            outside.mkdir()
+            (root / "datasets").symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(SystemExit):
+                regions.library_paths(root, date(2026, 10, 18), ["ir-tehran"])
+
+    def test_library_source_metadata_rejects_symlink_escapes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "library"
+            snapshot_date = date(2026, 10, 17)
+            target = regions.library_path(
+                root, regions.source_relative_path(CATALOG, "iran", snapshot_date)
+            )
+            target.parent.mkdir(parents=True)
+            outside = Path(temporary) / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            regions.source_metadata_path(target).symlink_to(outside)
+
+            with self.assertRaises(SystemExit):
+                regions.effective_source(
+                    CATALOG,
+                    "iran",
+                    snapshot_date,
+                    library_root=root,
+                    policy="offline",
+                )
+
+    def test_atomic_json_write_does_not_follow_predictable_temp_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            target = root / "manifest.json"
+            outside = root / "outside.json"
+            predictable_temp = target.with_suffix(target.suffix + ".tmp")
+            outside.write_text("untouched", encoding="utf-8")
+            predictable_temp.symlink_to(outside)
+
+            regions.write_json_atomically(target, {"ready": True})
+
+            self.assertEqual(outside.read_text(encoding="utf-8"), "untouched")
+            self.assertEqual(
+                json.loads(target.read_text(encoding="utf-8")), {"ready": True}
+            )
 
     def test_explicit_snapshot_uses_official_sidecar_md5(self) -> None:
         expected_md5 = "a" * 32
@@ -133,6 +189,35 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
         self.assertTrue(descriptor["url"].endswith("iran-261017.osm.pbf"))
         self.assertEqual(descriptor["md5"], expected_md5)
         self.assertIsNone(descriptor["bytes"])
+
+    def test_sources_table_keeps_unknown_optional_fields_rectangular(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = io.StringIO()
+            # command_sources writes directly to stdout; capture that contract
+            # explicitly because the Bash consumer reads this as TSV.
+            with redirect_stdout(output):
+                regions.command_sources(
+                    CATALOG,
+                    argparse.Namespace(
+                        selection="ir-tehran",
+                        snapshot="2026-10-17",
+                        source_policy="offline",
+                        library=temporary,
+                    ),
+                )
+            fields = output.getvalue().rstrip("\n").split("\t")
+            self.assertEqual(len(fields), 11)
+            self.assertEqual(fields[0:4], [
+                "iran",
+                "https://download.geofabrik.de/asia/iran-261017.osm.pbf",
+                "iran-261017.osm.pbf",
+                "-",
+            ])
+            self.assertEqual(fields[4:7], ["-", "219", "asia"])
+            self.assertEqual(fields[7], "ir")
+            self.assertEqual(fields[8], "sources/asia/ir/iran/2026-10-17/iran-261017.osm.pbf")
+            self.assertEqual(fields[9], str(Path(temporary) / fields[8]))
+            self.assertEqual(fields[10], "2026-10-17")
 
     def test_offline_snapshot_uses_cached_source_metadata_without_network(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -192,6 +277,87 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
                 today=date(2026, 10, 20),
             )
 
+    def test_crop_cache_requires_the_same_osmium_version(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            crop_path = root / "ir-tehran.osm.pbf"
+            crop_path.write_bytes(b"cached city crop")
+            meta_path = root / "ir-tehran.source.json"
+            source_sha = "a" * 64
+            snapshot_date = regions.catalog_snapshot_date(CATALOG)
+            regions.write_crop_metadata(
+                CATALOG,
+                meta_path,
+                crop_path,
+                "ir-tehran",
+                source_sha,
+                "1.15.0",
+                snapshot_date,
+            )
+            args = argparse.Namespace(
+                meta=str(meta_path),
+                crop=str(crop_path),
+                area="ir-tehran",
+                source_sha256=source_sha,
+                osmium_version="1.16.0",
+                snapshot_date=snapshot_date.isoformat(),
+            )
+            with self.assertRaises(SystemExit):
+                regions.command_verify_crop(CATALOG, args)
+            args.osmium_version = "1.15.0"
+            regions.command_verify_crop(CATALOG, args)
+
+    def test_crop_cache_verification_rejects_symlink_escapes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "library"
+            snapshot_date = regions.catalog_snapshot_date(CATALOG)
+            crop_path = regions.library_path(
+                root,
+                regions.crop_relative_path(
+                    regions.area_index(CATALOG)["ir-tehran"], snapshot_date
+                ),
+            )
+            crop_path.parent.mkdir(parents=True)
+            crop_path.write_bytes(b"cached Tehran crop")
+            meta_path = crop_path.with_name("ir-tehran.source.json")
+            source_sha = "a" * 64
+            regions.write_crop_metadata(
+                CATALOG,
+                meta_path,
+                crop_path,
+                "ir-tehran",
+                source_sha,
+                "1.16.0",
+                snapshot_date,
+                root,
+            )
+            args = argparse.Namespace(
+                meta=str(meta_path),
+                crop=str(crop_path),
+                area="ir-tehran",
+                source_sha256=source_sha,
+                osmium_version="1.16.0",
+                snapshot_date=snapshot_date.isoformat(),
+                library=str(root),
+            )
+
+            outside_crop = base / "outside.osm.pbf"
+            outside_crop.write_bytes(b"cached Tehran crop")
+            crop_path.unlink()
+            crop_path.symlink_to(outside_crop)
+            with self.assertRaises(SystemExit):
+                regions.command_verify_crop(CATALOG, args)
+
+            crop_path.unlink()
+            crop_path.write_bytes(b"cached Tehran crop")
+            outside_meta = base / "outside.source.json"
+            outside_meta.write_bytes(meta_path.read_bytes())
+            meta_path.unlink()
+            meta_path.symlink_to(outside_meta)
+            with self.assertRaises(SystemExit):
+                regions.command_verify_crop(CATALOG, args)
+
     def test_write_and_verify_manifest_v3(self) -> None:
         catalog = copy.deepcopy(CATALOG)
         snapshot_date = regions.catalog_snapshot_date(catalog)
@@ -220,7 +386,8 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
             tehran = regions.area_index(catalog)["ir-tehran"]
             crop_target = root / regions.crop_relative_path(tehran, snapshot_date)
             crop_target.parent.mkdir(parents=True)
-            crop_target.write_bytes(b"fake Tehran crop")
+            crop_bytes = b"fake Tehran crop"
+            crop_target.write_bytes(crop_bytes)
             crop_meta = crop_target.with_name("ir-tehran.source.json")
             regions.write_crop_metadata(
                 catalog,
@@ -258,27 +425,109 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
                 manifest["sources"][0]["libraryRelativePath"],
                 "sources/asia/ir/iran/2026-10-18/iran-261018.osm.pbf",
             )
-            regions.command_verify_manifest(
-                catalog,
-                argparse.Namespace(
-                    manifest=str(paths["manifest"]),
-                    pbf=str(paths["pbf"]),
-                    selection="ir-tehran",
-                    bbox="51.0,35.5,51.7,35.9",
-                    snapshot="pinned",
-                    snapshot_date=snapshot_date.isoformat(),
-                    library=str(root),
-                ),
+            verify_args = argparse.Namespace(
+                manifest=str(paths["manifest"]),
+                pbf=str(paths["pbf"]),
+                selection="ir-tehran",
+                bbox="51.0,35.5,51.7,35.9",
+                snapshot="pinned",
+                snapshot_date=snapshot_date.isoformat(),
+                library=str(root),
             )
-            regions.command_manifest_library_ready(
-                catalog,
-                argparse.Namespace(manifest=str(paths["manifest"]), library=str(root)),
+            regions.command_verify_manifest(catalog, verify_args)
+            altered_manifest = copy.deepcopy(manifest)
+            altered_manifest["storage"]["librarySchemaVersion"] = True
+            paths["manifest"].write_text(json.dumps(altered_manifest), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(catalog, verify_args)
+            altered_manifest = copy.deepcopy(manifest)
+            altered_manifest["version"] = True
+            paths["manifest"].write_text(json.dumps(altered_manifest), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(catalog, verify_args)
+            altered_manifest = copy.deepcopy(manifest)
+            altered_manifest["storage"]["datasetRelativePath"] = "datasets/wrong/path"
+            paths["manifest"].write_text(json.dumps(altered_manifest), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(catalog, verify_args)
+            paths["manifest"].write_text(json.dumps(manifest), encoding="utf-8")
+            external_pbf = root.parent / "external.osm.pbf"
+            external_pbf.write_bytes(paths["pbf"].read_bytes())
+            external_manifest = copy.deepcopy(manifest)
+            external_manifest["merged"]["file"] = str(external_pbf)
+            paths["manifest"].write_text(json.dumps(external_manifest), encoding="utf-8")
+            external_args = copy.deepcopy(verify_args)
+            external_args.pbf = str(external_pbf)
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(catalog, external_args)
+            paths["manifest"].write_text(json.dumps(manifest), encoding="utf-8")
+            library_args = argparse.Namespace(
+                manifest=str(paths["manifest"]),
+                library=str(root),
+                osmium_version="1.16.0",
             )
+            regions.command_manifest_library_ready(catalog, library_args)
+            library_args.osmium_version = "1.15.0"
+            with self.assertRaises(SystemExit):
+                regions.command_manifest_library_ready(catalog, library_args)
+            library_args.osmium_version = "1.16.0"
+            source_target.write_bytes(b"tampered source")
+            with self.assertRaises(SystemExit):
+                regions.command_manifest_library_ready(catalog, library_args)
+            source_target.write_bytes(source_bytes)
+            crop_target.write_bytes(b"tampered crop")
+            with self.assertRaises(SystemExit):
+                regions.command_manifest_library_ready(catalog, library_args)
+            crop_target.write_bytes(crop_bytes)
             crop_target.rename(crop_target.with_suffix(".missing"))
             with self.assertRaises(SystemExit):
                 regions.command_manifest_library_ready(
                     catalog,
                     argparse.Namespace(manifest=str(paths["manifest"]), library=str(root)),
+                )
+
+
+class ManifestVerificationTests(unittest.TestCase):
+    def test_non_numeric_manifest_bbox_is_rejected_cleanly(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            pbf_path = root / "dataset.osm.pbf"
+            pbf_path.write_bytes(b"test dataset")
+            manifest_path = root / "dataset.source.json"
+            manifest_path.write_text(
+                json.dumps({
+                    "version": 3,
+                    "snapshot": {
+                        "provider": CATALOG["snapshot"]["provider"],
+                        "license": CATALOG["snapshot"]["license"],
+                        "date": CATALOG["snapshot"]["dataDate"],
+                    },
+                    "storage": {
+                        "librarySchemaVersion": 1,
+                        "datasetFingerprint": regions.dataset_fingerprint(
+                            regions.catalog_snapshot_date(CATALOG), ["ir-tehran"]
+                        ),
+                        "datasetRelativePath": regions.dataset_relative_path(
+                            regions.catalog_snapshot_date(CATALOG), ["ir-tehran"]
+                        ).as_posix(),
+                    },
+                    "areas": ["ir-tehran"],
+                    "bbox": ["51.0", 35.5, 51.7, 35.9],
+                }),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(
+                    CATALOG,
+                    argparse.Namespace(
+                        manifest=str(manifest_path),
+                        pbf=str(pbf_path),
+                        selection="ir-tehran",
+                        bbox=None,
+                        snapshot="pinned",
+                        snapshot_date=None,
+                    ),
                 )
 
 
@@ -340,15 +589,18 @@ class ManifestMigrationTests(unittest.TestCase):
             self.assertEqual(source["url"], CATALOG["sources"]["iran"]["url"])
             self.assertEqual(source["file"], "iran-261018.osm.pbf")
             self.assertEqual(source["migratedFromUrl"], regions.LEGACY_IRAN_LATEST_URL)
-            regions.command_verify_manifest(
-                CATALOG,
-                argparse.Namespace(
-                    manifest=str(output_path),
-                    pbf=str(pbf_path),
-                    selection="ir-tehran",
-                    bbox="51.0,35.5,51.7,35.9",
-                ),
+            verify_args = argparse.Namespace(
+                manifest=str(output_path),
+                pbf=str(pbf_path),
+                selection="ir-tehran",
+                bbox="51.0,35.5,51.7,35.9",
             )
+            regions.command_verify_manifest(CATALOG, verify_args)
+
+            migrated["sources"][0]["bytes"] += 1
+            output_path.write_text(json.dumps(migrated), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                regions.command_verify_manifest(CATALOG, verify_args)
 
     def test_v1_latest_url_rejected_when_snapshot_identity_differs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

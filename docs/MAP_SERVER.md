@@ -56,7 +56,7 @@ The following latest stable (non-prerelease) releases were selected from the pro
 
 | Capability | Selected release | Pinned artifact | Rationale / source |
 |------------|------------------|-----------------|--------------------|
-| Tile serving | **Martin 1.16.1** | `ghcr.io/maplibre/martin:1.16.1` | Official Martin image; serves PMTiles, MBTiles, and PostGIS sources. [Release](https://github.com/maplibre/martin/releases/tag/martin-v1.16.1). |
+| Tile serving | **Martin 1.16.1** | `ghcr.io/maplibre/martin:1.16.1` | Official Martin image; supports PMTiles, MBTiles, and PostGIS, while this project configures file-backed PMTiles only. [Release](https://github.com/maplibre/martin/releases/tag/martin-v1.16.1). |
 | Region crop | **Osmium Tool 1.16.0** | `osmium extract --strategy=smart --bbox=... --set-bounds` | Produces a reference-complete crop for the configured WGS84 box; the manifest records the installed Osmium version. `smart` preserves intersecting multipolygon relations for Nominatim address/country context. Pinned to Ubuntu 24.04's `osmium-tool` package so the target VM needs no override; `prepare-regions-pbf.sh` fails closed on any other installed version until `MAP_OSMIUM_VERSION` is deliberately changed. [Manual](https://docs.osmcode.org/osmium/latest/osmium-extract.html). |
 | Tile generation | **Planetiler 0.10.2** | [`planetiler.jar`](https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar); SHA-256 `f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d` | Produces PMTiles from the shared cropped PBF; Java 21+ is required for the JAR. [Release](https://github.com/onthegomap/planetiler/releases/tag/v0.10.2). |
 | Routing | **OSRM 26.10.0** | `ghcr.io/project-osrm/osrm-backend:v26.10.0-debian` | Official GHCR image; upstream publishes only suffixed version tags (`-debian` is the multi-arch manifest—there is no bare `v26.10.0` tag). The release includes car, bicycle, and foot Lua profiles. [Release](https://github.com/Project-OSRM/osrm-backend/releases/tag/v26.10.0). |
@@ -96,7 +96,19 @@ Set the project environment and prepare the data once. `MAP_REGION_IDS` selects 
 ```bash
 # From the repository root. For local use, copy .env.example to .env first.
 set -a; source .env; set +a
-export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+if [[ -z "${MAP_LIBRARY_DIR:-}" ]]; then
+  if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    [[ "$XDG_DATA_HOME" == /* ]] || { echo 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly.' >&2; exit 1; }
+    MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
+  elif [[ -n "${HOME:-}" && "$HOME" == /* ]]; then
+    MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
+  else
+    echo 'Set MAP_LIBRARY_DIR to an external absolute path (or set absolute HOME/XDG_DATA_HOME).' >&2
+    exit 1
+  fi
+fi
+[[ "$MAP_LIBRARY_DIR" == /* ]] || { echo 'MAP_LIBRARY_DIR must be absolute.' >&2; exit 1; }
+export MAP_LIBRARY_DIR
 eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" \
   --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" \
   --source-policy "${MAP_SOURCE_POLICY:-cache-first}" \

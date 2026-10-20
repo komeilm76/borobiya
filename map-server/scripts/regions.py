@@ -31,8 +31,10 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
 import sys
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from urllib.error import URLError
@@ -113,10 +115,14 @@ def bbox_problem(bbox: object) -> str | None:
         not isinstance(bbox, list)
         or len(bbox) != 4
         or any(isinstance(value, bool) or not isinstance(value, (int, float)) for value in bbox)
-        or not all(math.isfinite(value) for value in bbox)
     ):
         return "must be [west, south, east, north] finite numbers"
-    west, south, east, north = (float(value) for value in bbox)
+    try:
+        west, south, east, north = (float(value) for value in bbox)
+    except (OverflowError, ValueError):
+        return "must be [west, south, east, north] finite numbers"
+    if not all(math.isfinite(value) for value in (west, south, east, north)):
+        return "must be [west, south, east, north] finite numbers"
     if not (-180 <= west < east <= 180 and -90 <= south < north <= 90):
         return "must satisfy -180<=west<east<=180 and -90<=south<north<=90"
     return None
@@ -232,6 +238,49 @@ def source_country_index(catalog: dict) -> dict[str, dict]:
     return result
 
 
+def resolve_library_root(library_root: object) -> Path:
+    """Resolve an external library path and forbid project-local map storage."""
+    root = Path(str(library_root)).expanduser()
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    root = root.resolve()
+    if root == Path(root.anchor):
+        fail(f"map library root must not be a filesystem root: {root}")
+    repository_root = SCRIPT_DIR.parent.parent.resolve()
+    try:
+        root.relative_to(repository_root)
+    except ValueError:
+        return root
+    fail(f"map library must be outside the repository checkout: {root}")
+
+
+def library_path(library_root: object, relative_path: object) -> Path:
+    """Return a standardized library path without traversing internal symlinks."""
+    root = resolve_library_root(library_root)
+    relative = Path(str(relative_path))
+    if relative.is_absolute() or ".." in relative.parts:
+        fail(f"unsafe map library relative path: {relative_path!r}")
+    current = root
+    for part in relative.parts:
+        if part in ("", "."):
+            continue
+        current = current / part
+        if current.is_symlink():
+            fail(f"refusing to use a symlink inside the map library: {current}")
+    return current
+
+
+def library_member_path(library_root: object, path: object) -> Path:
+    """Validate an absolute candidate against the library without symlink traversal."""
+    root = resolve_library_root(library_root)
+    candidate = Path(os.path.abspath(Path(path).expanduser()))
+    try:
+        relative = candidate.relative_to(root)
+    except ValueError:
+        fail(f"map library path is outside the library root: {candidate}")
+    return library_path(root, relative)
+
+
 def source_relative_path(catalog: dict, source_id: str, snapshot_date: date) -> Path:
     country = source_country_index(catalog).get(source_id)
     if country is None:
@@ -279,22 +328,22 @@ def library_paths(
     area_ids: list[str],
     dataset: str = "borobiya",
 ) -> dict[str, Path]:
-    root = Path(str(library_root)).expanduser()
-    if not root.is_absolute():
-        root = Path.cwd() / root
-    root = root.resolve()
-    dataset_dir = root / dataset_relative_path(snapshot_date, area_ids)
+    root = resolve_library_root(library_root)
+    dataset_relative = dataset_relative_path(snapshot_date, area_ids)
+    dataset_dir = library_path(root, dataset_relative)
     return {
         "libraryDir": root,
         "datasetDir": dataset_dir,
         "dataDir": dataset_dir,
-        "pbf": dataset_dir / f"{dataset}.osm.pbf",
-        "manifest": dataset_dir / f"{dataset}.source.json",
-        "pmtiles": dataset_dir / f"{dataset}.pmtiles",
-        "tilesMetadata": dataset_dir / f"{dataset}.metadata.json",
-        "osrmDataDir": dataset_dir / "routing",
-        "photonDataDir": dataset_dir / "geocoding",
-        "photonStamp": dataset_dir / "geocoding" / ".borobiya-pbf.sha256",
+        "pbf": library_path(root, dataset_relative / f"{dataset}.osm.pbf"),
+        "manifest": library_path(root, dataset_relative / f"{dataset}.source.json"),
+        "pmtiles": library_path(root, dataset_relative / f"{dataset}.pmtiles"),
+        "tilesMetadata": library_path(root, dataset_relative / f"{dataset}.metadata.json"),
+        "osrmDataDir": library_path(root, dataset_relative / "routing"),
+        "photonDataDir": library_path(root, dataset_relative / "geocoding"),
+        "photonStamp": library_path(
+            root, dataset_relative / "geocoding" / ".borobiya-pbf.sha256"
+        ),
     }
 
 
@@ -314,15 +363,39 @@ def read_json_object(path: Path) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def read_source_metadata(target: Path) -> dict:
-    return read_json_object(source_metadata_path(target))
+def read_source_metadata(target: Path, library_root: object | None = None) -> dict:
+    path = source_metadata_path(target)
+    if library_root is not None:
+        path = library_member_path(library_root, path)
+    return read_json_object(path)
 
 
 def write_json_atomically(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    content = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            temporary = Path(handle.name)
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # NamedTemporaryFile uses mode 0600; restore normal umask-governed
+        # data-file permissions before atomically replacing the destination.
+        mask = os.umask(0)
+        os.umask(mask)
+        os.chmod(temporary, 0o666 & ~mask)
+        temporary.replace(path)
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
 
 def effective_source(
@@ -347,11 +420,16 @@ def effective_source(
     filename = url.rsplit("/", 1)[-1]
     relative = source_relative_path(catalog, source_id, snapshot_date)
     target = None
+    metadata_path = None
+    sidecar_path = None
     if library_root is not None:
-        root = Path(str(library_root)).expanduser()
-        if not root.is_absolute():
-            root = Path.cwd() / root
-        target = root.resolve() / relative
+        target = library_path(library_root, relative)
+        metadata_path = library_member_path(
+            library_root, source_metadata_path(target)
+        )
+        sidecar_path = library_member_path(
+            library_root, source_sidecar_path(target)
+        )
 
     md5: str | None = None
     byte_count: int | None = None
@@ -359,17 +437,23 @@ def effective_source(
         md5 = str(pinned["md5"]).lower()
         byte_count = pinned.get("bytes")
     else:
-        metadata = read_source_metadata(target) if target is not None else {}
+        metadata = read_json_object(metadata_path) if metadata_path is not None else {}
         if policy != "refresh" and metadata.get("url") == url:
             candidate = str(metadata.get("md5", "")).lower()
             if MD5_RE.match(candidate):
                 md5 = candidate
-                if isinstance(metadata.get("bytes"), int):
-                    byte_count = metadata["bytes"]
-        if md5 is None and policy != "refresh" and target is not None:
-            sidecar = source_sidecar_path(target)
-            if sidecar.is_file():
-                md5 = parse_md5_sidecar(sidecar.read_text(encoding="utf-8"), filename)
+                candidate_bytes = metadata.get("bytes")
+                if (
+                    isinstance(candidate_bytes, int)
+                    and not isinstance(candidate_bytes, bool)
+                    and candidate_bytes > 0
+                ):
+                    byte_count = candidate_bytes
+        if md5 is None and policy != "refresh" and sidecar_path is not None:
+            if sidecar_path.is_file():
+                md5 = parse_md5_sidecar(
+                    sidecar_path.read_text(encoding="utf-8"), filename
+                )
         if md5 is None and policy != "offline":
             md5 = fetch_source_md5(url, fetcher)
             if md5 is None:
@@ -470,7 +554,7 @@ def write_source_metadata(
     actual_sha256 = (sha256 or sha256_file(target)).lower()
     if not SHA256_RE.match(actual_sha256):
         fail(f"invalid SHA-256 for source {source_id}: {actual_sha256!r}")
-    existing = read_source_metadata(target)
+    existing = read_source_metadata(target, library_root)
     timestamp = data_timestamp or existing.get("dataTimestamp")
     if timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
         timestamp = catalog["snapshot"].get("dataTimestamp")
@@ -490,7 +574,10 @@ def write_source_metadata(
         "sha256": actual_sha256,
         "libraryRelativePath": descriptor["relativePath"].as_posix(),
     }
-    write_json_atomically(source_metadata_path(target), metadata)
+    metadata_path = library_member_path(
+        library_root, source_metadata_path(target)
+    )
+    write_json_atomically(metadata_path, metadata)
     return metadata
 
 
@@ -863,11 +950,15 @@ def command_sources(catalog: dict, args: argparse.Namespace) -> None:
         target = descriptor["path"]
         print(
             f"{descriptor['id']}\t{descriptor['url']}\t{descriptor['file']}\t"
-            f"{descriptor['md5'] or ''}\t"
-            f"{descriptor['bytes'] if descriptor['bytes'] is not None else ''}\t"
-            f"{descriptor['approxSizeMb'] or ''}\t{descriptor['continent']}\t"
-            f"{descriptor['countryId']}\t{descriptor['relativePath'].as_posix()}\t"
-            f"{target if target is not None else ''}\t{snapshot_date.isoformat()}"
+            # Use a non-empty marker for optional columns. Bash treats tab as
+            # IFS whitespace and would collapse adjacent empty fields, shifting
+            # every later value in prepare-regions-pbf.sh's `read` loop.
+            f"{descriptor['md5'] or '-'}\t"
+            f"{descriptor['bytes'] if descriptor['bytes'] is not None else '-'}\t"
+            f"{descriptor['approxSizeMb'] if descriptor['approxSizeMb'] is not None else '-'}\t"
+            f"{descriptor['continent']}\t{descriptor['countryId']}\t"
+            f"{descriptor['relativePath'].as_posix()}\t"
+            f"{target if target is not None else '-'}\t{snapshot_date.isoformat()}"
         )
 
 
@@ -887,7 +978,7 @@ def command_areas(catalog: dict, args: argparse.Namespace) -> None:
         bbox = "ALL" if area["kind"] == "country" else format_bbox(area["bbox"])
         if area["kind"] == "city":
             relative = crop_relative_path(area, snapshot_date)
-            crop_path = library_root / relative if library_root is not None else ""
+            crop_path = library_path(library_root, relative) if library_root is not None else ""
         else:
             relative = Path()
             crop_path = ""
@@ -903,29 +994,146 @@ def command_pinned_snapshot(catalog: dict, _args: argparse.Namespace) -> None:
 
 
 def command_manifest_library_ready(catalog: dict, args: argparse.Namespace) -> None:
-    """Check that every source/crop named by a v3 manifest exists in the library."""
-    del catalog
+    """Check that every source/crop in a v3 manifest exists and still hashes correctly."""
     manifest = read_json_object(Path(args.manifest))
     if manifest.get("version") != 3:
         raise SystemExit(1)
-    root = Path(str(args.library)).expanduser().resolve()
-    relatives: list[str] = []
-    for entry in manifest.get("sources", []):
-        if isinstance(entry, dict) and entry.get("libraryRelativePath"):
-            relatives.append(str(entry["libraryRelativePath"]))
-    for entry in manifest.get("crops", []):
-        if isinstance(entry, dict) and entry.get("libraryRelativePath"):
-            relatives.append(str(entry["libraryRelativePath"]))
-    if not relatives:
-        raise SystemExit(1)
-    missing = [relative for relative in relatives if not (root / relative).is_file()]
-    if missing:
-        print(
-            "regions: map library is incomplete; missing " + ", ".join(missing),
-            file=sys.stderr,
+    root = resolve_library_root(args.library)
+    index = area_index(catalog)
+    checked = 0
+    sha256_cache: dict[Path, str] = {}
+    md5_cache: dict[Path, str] = {}
+
+    def verify_library_file(relative_value: object, expected_sha: object, label: str) -> Path:
+        if not isinstance(relative_value, str) or not relative_value:
+            fail(f"{label} has no library-relative path")
+        relative = Path(relative_value)
+        if relative.is_absolute() or ".." in relative.parts:
+            fail(f"{label} has an unsafe library-relative path: {relative_value!r}")
+        path = library_path(root, relative).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            fail(f"{label} resolves outside the map library: {relative_value!r}")
+        if not path.is_file() or path.stat().st_size == 0:
+            fail(f"map library is incomplete; missing {relative_value}")
+        if not SHA256_RE.match(str(expected_sha or "")):
+            fail(f"{label} has an invalid expected SHA-256")
+        actual_sha = sha256_cache.get(path)
+        if actual_sha is None:
+            actual_sha = sha256_file(path)
+            sha256_cache[path] = actual_sha
+        if actual_sha != expected_sha:
+            fail(f"map library file {relative_value} SHA-256 mismatch: expected {expected_sha}, got {actual_sha}")
+        return path
+
+    sources = manifest.get("sources")
+    if not isinstance(sources, list) or not sources:
+        fail("version-3 manifest sources must be a non-empty list")
+    source_entries_by_id: dict[str, dict] = {}
+    for entry in sources:
+        if not isinstance(entry, dict):
+            fail("every version-3 manifest source entry must be an object")
+        source_id = entry.get("id")
+        if not isinstance(source_id, str) or source_id not in catalog.get("sources", {}):
+            fail(f"manifest source has an unknown or invalid id: {source_id!r}")
+        if source_id in source_entries_by_id:
+            fail(f"manifest contains duplicate source entry {source_id!r}")
+        source_entries_by_id[source_id] = entry
+        label = f"manifest source {source_id!r}"
+        source_path = verify_library_file(
+            entry.get("libraryRelativePath"), entry.get("sha256"), label
         )
-        raise SystemExit(1)
-    print(f"OK: map library contains all {len(relatives)} source/crop inputs for {args.manifest}")
+        expected_md5 = entry.get("md5")
+        if not MD5_RE.match(str(expected_md5 or "")):
+            fail(f"{label} has an invalid expected MD5")
+        actual_md5 = md5_cache.get(source_path)
+        if actual_md5 is None:
+            actual_md5 = md5_file(source_path)
+            md5_cache[source_path] = actual_md5
+        if actual_md5 != expected_md5:
+            fail(f"map library source {source_id} MD5 mismatch: expected {expected_md5}, got {actual_md5}")
+        expected_bytes = entry.get("bytes")
+        if (
+            not isinstance(expected_bytes, int)
+            or isinstance(expected_bytes, bool)
+            or source_path.stat().st_size != expected_bytes
+        ):
+            fail(f"map library source {source_id} byte count does not match its manifest")
+        metadata_path = library_path(
+            root, source_metadata_path(source_path).relative_to(root)
+        )
+        metadata = read_json_object(metadata_path)
+        metadata_expectations = {
+            "version": 1,
+            "id": source_id,
+            "provider": entry.get("provider"),
+            "license": entry.get("license"),
+            "snapshotDate": entry.get("dataDate"),
+            "url": entry.get("url"),
+            "file": entry.get("file"),
+            "bytes": expected_bytes,
+            "md5": expected_md5,
+            "sha256": entry.get("sha256"),
+            "libraryRelativePath": entry.get("libraryRelativePath"),
+        }
+        if any(metadata.get(key) != value for key, value in metadata_expectations.items()):
+            fail(f"map library source metadata is missing or inconsistent for {source_id}")
+        checked += 1
+
+    crops = manifest.get("crops")
+    if not isinstance(crops, list) or not crops:
+        fail("version-3 manifest crops must be a non-empty list")
+    seen_areas: set[str] = set()
+    snapshot = manifest.get("snapshot")
+    snapshot_date = snapshot.get("date") if isinstance(snapshot, dict) else None
+    for entry in crops:
+        if not isinstance(entry, dict):
+            fail("every version-3 manifest crop entry must be an object")
+        area_id = entry.get("area")
+        if not isinstance(area_id, str) or area_id not in index:
+            fail(f"manifest crop has an unknown or invalid area: {area_id!r}")
+        if area_id in seen_areas:
+            fail(f"manifest contains duplicate crop entry {area_id!r}")
+        seen_areas.add(area_id)
+        area = index[area_id]
+        label = f"manifest crop {area_id!r}"
+        crop_path = verify_library_file(
+            entry.get("libraryRelativePath"), entry.get("sha256"), label
+        )
+        if area["kind"] == "city":
+            source_entry = source_entries_by_id.get(area["source"])
+            if source_entry is None:
+                fail(f"{label} has no matching manifest source")
+            crop_metadata_path = library_path(
+                root,
+                crop_path.with_name(f"{area_id}.source.json").relative_to(root),
+            )
+            crop_metadata = read_json_object(crop_metadata_path)
+            metadata_bbox = crop_metadata.get("bbox")
+            if (
+                crop_metadata.get("area") != area_id
+                or crop_metadata.get("source") != area["source"]
+                or crop_metadata.get("sourceSha256") != source_entry.get("sha256")
+                or bbox_problem(metadata_bbox)
+                or [float(value) for value in metadata_bbox] != area["bbox"]
+                or crop_metadata.get("strategy") != "smart"
+                or crop_metadata.get("snapshotDate") != snapshot_date
+                or crop_metadata.get("sha256") != entry.get("sha256")
+                or crop_metadata.get("libraryRelativePath") != entry.get("libraryRelativePath")
+                or not isinstance(crop_metadata.get("osmiumToolVersion"), str)
+                or not crop_metadata["osmiumToolVersion"]
+                or (
+                    getattr(args, "osmium_version", None) is not None
+                    and crop_metadata["osmiumToolVersion"] != args.osmium_version
+                )
+            ):
+                fail(f"map library crop metadata is missing or inconsistent for {area_id}")
+        elif entry.get("strategy") != "whole-source":
+            fail(f"{label} must identify a whole-source input")
+        checked += 1
+
+    print(f"OK: map library contains all {checked} verified source/crop inputs for {args.manifest}")
 
 
 def command_manifest_summary(catalog: dict, args: argparse.Namespace) -> None:
@@ -993,10 +1201,7 @@ def source_file(
     relative = source_relative_path(catalog, source_id, snapshot_date)
     if library_root is None:
         return relative
-    root = Path(str(library_root)).expanduser()
-    if not root.is_absolute():
-        root = Path.cwd() / root
-    return root.resolve() / relative
+    return library_path(library_root, relative)
 
 
 def write_crop_metadata(
@@ -1013,6 +1218,24 @@ def write_crop_metadata(
     area = index.get(area_id.lower())
     if area is None or area["kind"] != "city":
         fail(f"crop metadata requires a city area id, got {area_id!r}")
+    library_relative: Path | None = None
+    if library_root is not None:
+        root = resolve_library_root(library_root)
+        crop_candidate = Path(os.path.abspath(crop_path.expanduser()))
+        try:
+            library_relative = crop_candidate.relative_to(root)
+        except ValueError:
+            fail(f"crop PBF is outside the map library: {crop_candidate}")
+        crop_path = library_path(root, library_relative)
+        if snapshot_date is not None and library_relative != crop_relative_path(area, snapshot_date):
+            fail(f"crop PBF path does not match the standardized library layout: {crop_path}")
+        expected_meta_path = crop_path.with_name(f"{area['id']}.source.json")
+        meta_candidate = Path(os.path.abspath(meta_path.expanduser()))
+        if meta_candidate != expected_meta_path:
+            fail(f"crop metadata path does not match the crop library location: {meta_candidate}")
+        meta_path = library_path(
+            root, expected_meta_path.relative_to(root)
+        )
     if not crop_path.is_file() or crop_path.stat().st_size == 0:
         fail(f"crop PBF is missing or empty: {crop_path}")
     if not SHA256_RE.match(source_sha256):
@@ -1028,12 +1251,8 @@ def write_crop_metadata(
     }
     if snapshot_date is not None:
         meta["snapshotDate"] = snapshot_date.isoformat()
-    if library_root is not None:
-        root = Path(str(library_root)).expanduser().resolve()
-        try:
-            meta["libraryRelativePath"] = crop_path.resolve().relative_to(root).as_posix()
-        except ValueError:
-            pass
+    if library_relative is not None:
+        meta["libraryRelativePath"] = library_relative.as_posix()
     write_json_atomically(meta_path, meta)
     return meta
 
@@ -1063,14 +1282,38 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
     area = index.get(args.area.lower())
     if area is None or area["kind"] != "city":
         fail(f"crop verification requires a city area id, got {args.area!r}")
+    crop_path = Path(args.crop).expanduser()
+    meta_path = Path(args.meta).expanduser()
+    snapshot_arg = getattr(args, "snapshot_date", None)
+    if getattr(args, "library", None):
+        library_root = resolve_library_root(args.library)
+        crop_snapshot = (
+            parse_snapshot_date(snapshot_arg, "--snapshot-date")
+            if snapshot_arg
+            else catalog_snapshot_date(catalog)
+        )
+        expected_crop = library_path(
+            library_root, crop_relative_path(area, crop_snapshot)
+        )
+        crop_candidate = Path(os.path.abspath(crop_path))
+        if crop_candidate != expected_crop:
+            raise SystemExit(1)
+        expected_meta = expected_crop.with_name(f"{area['id']}.source.json")
+        meta_candidate = Path(os.path.abspath(meta_path))
+        if meta_candidate != expected_meta:
+            raise SystemExit(1)
+        crop_path = expected_crop
+        meta_path = library_path(
+            library_root, expected_meta.relative_to(library_root)
+        )
     try:
-        meta = json.loads(Path(args.meta).read_text(encoding="utf-8"))
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         raise SystemExit(1)
-    crop_path = Path(args.crop)
+    if not isinstance(meta, dict):
+        raise SystemExit(1)
     if not crop_path.is_file() or crop_path.stat().st_size == 0:
         raise SystemExit(1)
-    snapshot_arg = getattr(args, "snapshot_date", None)
     if snapshot_arg:
         expected_snapshot = parse_snapshot_date(snapshot_arg, "--snapshot-date").isoformat()
         meta_snapshot = meta.get("snapshotDate")
@@ -1080,12 +1323,20 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
         )
         if meta_snapshot != expected_snapshot and not legacy_pinned_meta:
             raise SystemExit(1)
+    metadata_bbox = meta.get("bbox")
+    if bbox_problem(metadata_bbox):
+        raise SystemExit(1)
+    metadata_osmium = meta.get("osmiumToolVersion")
+    expected_osmium = getattr(args, "osmium_version", None)
     if (
         meta.get("area") != area["id"]
         or meta.get("source") != area["source"]
         or meta.get("sourceSha256") != args.source_sha256
         or meta.get("strategy") != "smart"
-        or [float(value) for value in meta.get("bbox", [])] != area["bbox"]
+        or [float(value) for value in metadata_bbox] != area["bbox"]
+        or not isinstance(metadata_osmium, str)
+        or not metadata_osmium
+        or (expected_osmium is not None and metadata_osmium != expected_osmium)
         or meta.get("sha256") != sha256_file(crop_path)
     ):
         raise SystemExit(1)
@@ -1138,6 +1389,11 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
             f"--data-dir {data_dir} does not match the standardized library dataset "
             f"directory {paths['datasetDir']}"
         )
+    if merged != paths["pbf"]:
+        fail(
+            f"--merged {merged} does not match the standardized dataset PBF "
+            f"path {paths['pbf']}"
+        )
 
     descriptors = {
         descriptor["id"]: descriptor
@@ -1172,7 +1428,7 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
         if expected_bytes is not None and actual_bytes != expected_bytes:
             fail(f"source {source_id} size mismatch: expected {expected_bytes}, got {actual_bytes}")
         source_sha[source_id] = sha256_file(path)
-        source_meta = read_source_metadata(path)
+        source_meta = read_source_metadata(path, library_root)
         data_timestamp = source_meta.get("dataTimestamp")
         if data_timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
             data_timestamp = snapshot.get("dataTimestamp")
@@ -1208,7 +1464,7 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
             })
         else:
             relative = crop_relative_path(area, snapshot_date)
-            crop_path = library_root / relative
+            crop_path = library_path(library_root, relative)
             if not crop_path.is_file() or crop_path.stat().st_size == 0:
                 fail(f"crop PBF is missing or empty: {crop_path}")
             crops.append({
@@ -1269,8 +1525,10 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"invalid provenance manifest {manifest_path}: {error}")
+    if not isinstance(manifest, dict):
+        fail(f"invalid provenance manifest {manifest_path}: expected a JSON object")
     version = manifest.get("version")
-    if version not in (2, 3):
+    if isinstance(version, bool) or not isinstance(version, int) or version not in (2, 3):
         fail(
             f"{manifest_path} is not a version-2 or version-3 (multi-area) manifest. "
             "Rebuild the dataset with prepare-regions-pbf.sh, or let "
@@ -1314,22 +1572,48 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
                 f"expected {expected_snapshot_date.isoformat()!r}"
             )
         storage = manifest.get("storage")
-        if isinstance(storage, dict) and storage.get("datasetFingerprint"):
-            expected_fingerprint = dataset_fingerprint(expected_snapshot_date, resolved["ids"])
-            if storage["datasetFingerprint"] != expected_fingerprint:
-                fail("manifest storage fingerprint does not match its snapshot/selection")
+        expected_fingerprint = dataset_fingerprint(expected_snapshot_date, resolved["ids"])
+        expected_dataset_path = dataset_relative_path(
+            expected_snapshot_date, resolved["ids"]
+        ).as_posix()
+        if (
+            not isinstance(storage, dict)
+            or isinstance(storage.get("librarySchemaVersion"), bool)
+            or not isinstance(storage.get("librarySchemaVersion"), int)
+            or storage.get("librarySchemaVersion") != 1
+            or storage.get("datasetFingerprint") != expected_fingerprint
+            or storage.get("datasetRelativePath") != expected_dataset_path
+        ):
+            fail("manifest storage metadata does not match its standardized snapshot/selection path")
 
-    if sorted(manifest.get("areas", [])) != sorted(resolved["ids"]):
+    manifest_areas = manifest.get("areas")
+    if (
+        not isinstance(manifest_areas, list)
+        or any(not isinstance(area_id, str) for area_id in manifest_areas)
+        or sorted(manifest_areas) != sorted(resolved["ids"])
+    ):
         fail(
-            f"manifest areas {manifest.get('areas')!r} do not match selected areas "
+            f"manifest areas {manifest_areas!r} do not match selected areas "
             f"{resolved['ids']!r}; rebuild with prepare-regions-pbf.sh"
         )
 
     def bbox_matches(candidate: object, expected: list[float]) -> bool:
-        return (
-            isinstance(candidate, list)
-            and len(candidate) == 4
-            and all(abs(float(value) - float(want)) <= EPSILON for value, want in zip(candidate, expected))
+        if (
+            not isinstance(candidate, list)
+            or len(candidate) != 4
+            or any(
+                isinstance(value, bool) or not isinstance(value, (int, float))
+                for value in candidate
+            )
+        ):
+            return False
+        try:
+            numeric = [float(value) for value in candidate]
+        except (OverflowError, ValueError):
+            return False
+        return all(math.isfinite(value) for value in numeric) and all(
+            abs(value - float(want)) <= EPSILON
+            for value, want in zip(numeric, expected)
         )
 
     if not bbox_matches(manifest.get("bbox"), resolved["bbox"]):
@@ -1348,9 +1632,21 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
     manifest_sources = manifest.get("sources")
     if not isinstance(manifest_sources, list):
         fail("manifest sources must be a list")
-    by_id = {entry.get("id"): entry for entry in manifest_sources if isinstance(entry, dict)}
-    if sorted(by_id) != sorted(resolved["sourceIds"]):
-        fail(f"manifest sources {sorted(by_id)!r} do not match selection sources {sorted(resolved['sourceIds'])!r}")
+    by_id: dict[str, dict] = {}
+    for entry in manifest_sources:
+        if not isinstance(entry, dict):
+            fail("every manifest source entry must be an object")
+        source_id = entry.get("id")
+        if not isinstance(source_id, str) or source_id not in catalog["sources"]:
+            fail(f"manifest source has an unknown or invalid id: {source_id!r}")
+        if source_id in by_id:
+            fail(f"manifest contains duplicate source entry {source_id!r}")
+        by_id[source_id] = entry
+    if set(by_id) != set(resolved["sourceIds"]):
+        fail(
+            f"manifest sources {sorted(by_id)!r} do not match "
+            f"selection sources {sorted(resolved['sourceIds'])!r}"
+        )
     for source_id, entry in by_id.items():
         pinned = catalog["sources"][source_id]
         if entry.get("provider") != snapshot["provider"] or entry.get("license") != snapshot["license"]:
@@ -1358,42 +1654,91 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         expected_url = dated_source_url(pinned["url"], expected_snapshot_date)
         if entry.get("url") != expected_url or entry.get("dataDate") != expected_snapshot_date.isoformat():
             fail(f"manifest source {source_id} does not match the expected snapshot {expected_snapshot_date.isoformat()}")
-        if expected_snapshot_date == pinned_date and entry.get("md5") != pinned["md5"]:
-            fail(f"manifest source {source_id} does not match the pinned catalog MD5")
+        if expected_snapshot_date == pinned_date:
+            if entry.get("md5") != pinned["md5"]:
+                fail(f"manifest source {source_id} does not match the pinned catalog MD5")
+            pinned_bytes = pinned.get("bytes")
+            if pinned_bytes is not None and entry.get("bytes") != pinned_bytes:
+                fail(f"manifest source {source_id} does not match the pinned catalog byte count")
         if not MD5_RE.match(str(entry.get("md5", ""))):
             fail(f"manifest source {source_id} has an invalid md5")
         if not isinstance(entry.get("bytes"), int) or isinstance(entry.get("bytes"), bool) or entry["bytes"] <= 0:
             fail(f"manifest source {source_id} has an invalid byte count")
-        if version == 3 and "libraryRelativePath" in entry:
-            expected_relative = source_relative_path(catalog, source_id, expected_snapshot_date).as_posix()
-            if entry["libraryRelativePath"] != expected_relative:
+        if version == 3:
+            expected_relative = source_relative_path(
+                catalog, source_id, expected_snapshot_date
+            ).as_posix()
+            if entry.get("libraryRelativePath") != expected_relative:
                 fail(f"manifest source {source_id} library path does not match the standardized layout")
         if not SHA256_RE.match(str(entry.get("sha256", ""))):
             fail(f"manifest source {source_id} has an invalid sha256")
 
     index = area_index(catalog)
     crops = manifest.get("crops")
-    if not isinstance(crops, list) or sorted(entry.get("area") for entry in crops if isinstance(entry, dict)) != sorted(resolved["ids"]):
-        fail("manifest crops do not match the selected areas")
+    if not isinstance(crops, list):
+        fail("manifest crops must be a list")
+    crops_by_area: dict[str, dict] = {}
     for crop in crops:
-        area = index[crop["area"]]
+        if not isinstance(crop, dict):
+            fail("every manifest crop entry must be an object")
+        area_id = crop.get("area")
+        if not isinstance(area_id, str) or area_id not in index:
+            fail(f"manifest crop has an unknown or invalid area: {area_id!r}")
+        if area_id in crops_by_area:
+            fail(f"manifest contains duplicate crop entry {area_id!r}")
+        crops_by_area[area_id] = crop
+    if set(crops_by_area) != set(resolved["ids"]):
+        fail("manifest crops do not match the selected areas")
+    for area_id, crop in crops_by_area.items():
+        area = index[area_id]
         expected_strategy = "whole-source" if area["kind"] == "country" else "smart"
         if crop.get("strategy") != expected_strategy:
-            fail(f"manifest crop {crop['area']} strategy must be {expected_strategy}")
+            fail(f"manifest crop {area_id} strategy must be {expected_strategy}")
         if area["kind"] == "city" and not bbox_matches(crop.get("bbox"), area["bbox"]):
-            fail(f"manifest crop {crop['area']} bbox does not match the catalog")
-        if version == 3 and "libraryRelativePath" in crop:
+            fail(f"manifest crop {area_id} bbox does not match the catalog")
+        if version == 3:
             expected_relative = (
                 source_relative_path(catalog, area["source"], expected_snapshot_date)
                 if area["kind"] == "country"
                 else crop_relative_path(area, expected_snapshot_date)
             ).as_posix()
-            if crop["libraryRelativePath"] != expected_relative:
-                fail(f"manifest crop {crop['area']} library path does not match the standardized layout")
+            if crop.get("libraryRelativePath") != expected_relative:
+                fail(f"manifest crop {area_id} library path does not match the standardized layout")
         if not SHA256_RE.match(str(crop.get("sha256", ""))):
-            fail(f"manifest crop {crop['area']} has an invalid sha256")
+            fail(f"manifest crop {area_id} has an invalid sha256")
 
-    merged = manifest.get("merged", {})
+    merged = manifest.get("merged")
+    if not isinstance(merged, dict):
+        fail("manifest merged block must be an object")
+    if version == 3:
+        expected_merged_path = (
+            dataset_relative_path(expected_snapshot_date, resolved["ids"])
+            / pbf_path.name
+        ).as_posix()
+        if merged.get("libraryRelativePath") != expected_merged_path:
+            fail("manifest merged PBF path does not match the standardized dataset location")
+        library_arg = getattr(args, "library", None)
+        if library_arg:
+            library_root = resolve_library_root(library_arg)
+            expected_pbf_path = library_path(library_root, expected_merged_path)
+            expected_dataset_name = pbf_path.name.removesuffix(".osm.pbf")
+            if not expected_dataset_name:
+                fail("version-3 manifest PBF must use the <dataset>.osm.pbf filename")
+            expected_manifest_path = library_path(
+                library_root,
+                dataset_relative_path(expected_snapshot_date, resolved["ids"])
+                / f"{expected_dataset_name}.source.json",
+            )
+            if library_member_path(library_root, pbf_path) != expected_pbf_path:
+                fail("verified PBF is not the standardized dataset file in the map library")
+            if library_member_path(library_root, manifest_path) != expected_manifest_path:
+                fail("verified manifest is not the standardized manifest in the map library")
+        try:
+            recorded_merged_file = Path(str(merged.get("file", ""))).resolve()
+        except (OSError, RuntimeError, ValueError):
+            fail("manifest merged PBF file path is invalid")
+        if recorded_merged_file != pbf_path.resolve():
+            fail("manifest merged PBF file path does not match the verified dataset")
     if not SHA256_RE.match(str(merged.get("sha256", ""))) or not merged.get("osmiumToolVersion"):
         fail("manifest merged block must carry a sha256 and the osmium-tool version")
     actual_sha256 = sha256_file(pbf_path)
@@ -1406,20 +1751,8 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
     )
 
 
-def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None:
-    """Convert the pre-catalog Tehran-only manifest to version 2 in place.
-
-    Only the exact previously-pinned Iran snapshot + Tehran bbox can migrate;
-    anything else must be rebuilt so provenance stays honest. The historical
-    `iran-latest` URL is accepted only when provider, license, MD5, byte
-    count, data date, and data timestamp all prove it recorded that snapshot.
-    """
-    try:
-        old = json.loads(Path(args.input).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as error:
-        fail(f"cannot read v1 manifest {args.input}: {error}")
-    if not isinstance(old, dict):
-        fail("v1 manifest must be a JSON object; rebuild instead")
+def validate_legacy_v1_manifest(catalog: dict, old: dict, pbf_path: Path) -> dict:
+    """Return verified Tehran v1 provenance, or fail closed before migration."""
     if old.get("region") != "tehran":
         fail("v1 migration supports only the Tehran dataset; rebuild anything else")
     index = area_index(catalog)
@@ -1437,7 +1770,7 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
     source_matches_pinned_snapshot = (
         source.get("provider") == snapshot["provider"]
         and source.get("license") == snapshot["license"]
-        and source.get("url") in {pinned["url"], LEGACY_IRAN_LATEST_URL}
+        and source.get("url") in (pinned["url"], LEGACY_IRAN_LATEST_URL)
         and source.get("md5") == pinned["md5"]
         and source.get("dataDate") == snapshot["dataDate"]
         and source.get("dataTimestamp") == snapshot["dataTimestamp"]
@@ -1446,18 +1779,52 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
     )
     if not source_matches_pinned_snapshot:
         fail("v1 manifest source does not match the pinned catalog Iran snapshot; rebuild instead")
+    raw_crop_bbox = crop.get("bbox")
+    if bbox_problem(raw_crop_bbox):
+        fail("v1 manifest crop bbox is invalid; rebuild instead")
     try:
-        crop_bbox = [float(value) for value in crop.get("bbox", [])]
-    except (TypeError, ValueError):
+        crop_bbox = [float(value) for value in raw_crop_bbox]
+    except (OverflowError, TypeError, ValueError):
         crop_bbox = []
     if crop_bbox != tehran["bbox"] or crop.get("strategy") != "smart":
         fail("v1 manifest crop does not match the catalog Tehran bbox; rebuild instead")
-    pbf_path = Path(args.pbf)
     if not pbf_path.is_file() or pbf_path.stat().st_size == 0:
         fail(f"dataset PBF is missing or empty: {pbf_path}; rebuild instead")
     actual_sha256 = sha256_file(pbf_path)
     if actual_sha256 != crop.get("sha256"):
         fail("dataset PBF does not match the v1 manifest crop SHA-256; rebuild instead")
+    return {
+        "source": source,
+        "crop": crop,
+        "sourceBytes": source_bytes,
+        "tehran": tehran,
+        "actualSha256": actual_sha256,
+    }
+
+
+def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None:
+    """Convert the pre-catalog Tehran-only manifest to version 2 in place.
+
+    Only the exact previously-pinned Iran snapshot + Tehran bbox can migrate;
+    anything else must be rebuilt so provenance stays honest. The historical
+    `iran-latest` URL is accepted only when provider, license, MD5, byte
+    count, data date, and data timestamp all prove it recorded that snapshot.
+    """
+    try:
+        old = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read v1 manifest {args.input}: {error}")
+    if not isinstance(old, dict):
+        fail("v1 manifest must be a JSON object; rebuild instead")
+    pbf_path = Path(args.pbf)
+    verified = validate_legacy_v1_manifest(catalog, old, pbf_path)
+    tehran = verified["tehran"]
+    pinned = catalog["sources"]["iran"]
+    snapshot = catalog["snapshot"]
+    source = verified["source"]
+    crop = verified["crop"]
+    source_bytes = verified["sourceBytes"]
+    actual_sha256 = verified["actualSha256"]
     manifest = {
         "version": 2,
         "dataset": args.dataset,
@@ -1565,6 +1932,7 @@ def main() -> None:
     manifest_library_ready = subparsers.add_parser("manifest-library-ready")
     manifest_library_ready.add_argument("--manifest", required=True)
     manifest_library_ready.add_argument("--library", required=True)
+    manifest_library_ready.add_argument("--osmium-version", required=True)
 
     verify_point = subparsers.add_parser("verify-point")
     verify_point.add_argument("area")
@@ -1583,7 +1951,9 @@ def main() -> None:
     verify_crop.add_argument("--crop", required=True)
     verify_crop.add_argument("--area", required=True)
     verify_crop.add_argument("--source-sha256", required=True)
+    verify_crop.add_argument("--osmium-version", required=True)
     verify_crop.add_argument("--snapshot-date")
+    verify_crop.add_argument("--library")
 
     write_source_meta = subparsers.add_parser("write-source-meta")
     write_source_meta.add_argument("--library", required=True)

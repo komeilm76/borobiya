@@ -66,7 +66,9 @@ services:
     command: ["--config", "/martin.yaml"]
     volumes:
       - ./map-server/martin.yaml:/martin.yaml:ro
-      - ${MAP_DATASET_DIR:-./map-server/data}:/data:ro
+      # Setup pins this to an active release. Before setup, use an isolated
+      # empty fallback so Compose cannot create datasets/current as a directory.
+      - "${MAP_DATASET_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/dataset}:/data:ro"
       - ./map-server/styles:/styles:ro
       - ./map-server/sprites:/sprites:ro
       - ./map-server/fonts:/fonts:ro
@@ -91,7 +93,7 @@ services:
       POSTGRES_WORK_MEM: ${NOMINATIM_POSTGRES_WORK_MEM:-32MB}
       POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
     volumes:
-      - ${MAP_DATASET_DIR:-./map-server/data}:/osm:ro
+      - "${MAP_DATASET_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/dataset}:/osm:ro"
       - nominatim-data:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${NOMINATIM_HTTP_PORT:-8081}:8080"
@@ -116,7 +118,7 @@ services:
       JAVA_TOOL_OPTIONS: "${PHOTON_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1536m}"
     command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "${PHOTON_DEFAULT_LANGUAGE:-fa}"]
     volumes:
-      - ${MAP_PHOTON_DATA_DIR:-./map-server/photon/data}:/var/lib/photon
+      - "${MAP_PHOTON_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/photon}:/var/lib/photon"
     ports:
       - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
     profiles: ["geocoding"]
@@ -134,7 +136,7 @@ services:
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
-      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/car:/data:ro
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/car:/data:ro"
     profiles: ["routing"]
     # osrm-routed binds :5000 only after its graph is loaded; a successful
     # TCP connect therefore means the profile is ready to serve.
@@ -150,7 +152,7 @@ services:
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
-      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/bicycle:/data:ro
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/bicycle:/data:ro"
     profiles: ["routing"]
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
@@ -164,7 +166,7 @@ services:
     restart: unless-stopped
     command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
-      - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/foot:/data:ro
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/foot:/data:ro"
     profiles: ["routing"]
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]

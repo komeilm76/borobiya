@@ -46,11 +46,36 @@ def note(message: str) -> None:
     print(f"map-library: {message}", file=sys.stderr)
 
 
+def assert_no_symlink_components(path: Path) -> Path:
+    """Fail closed if any component of an artifact path traverses a symlink."""
+    absolute = Path(os.path.abspath(path))
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise MigrationUnsafe(f"refusing to migrate through a symlink: {current}")
+    return absolute
+
+
+def assert_no_symlinks_tree(path: Path) -> None:
+    """Reject symlinks in a directory tree before moving it into the library."""
+    path = assert_no_symlink_components(path)
+    if not path.exists():
+        return
+    pending = [path]
+    while pending:
+        directory = pending.pop()
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                child = Path(entry.path)
+                if entry.is_symlink():
+                    raise MigrationUnsafe(f"refusing to migrate symlinked artifact: {child}")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(child)
+
+
 def resolve_root(library_root: object) -> Path:
-    root = Path(str(library_root)).expanduser()
-    if not root.is_absolute():
-        root = Path.cwd() / root
-    return root.resolve()
+    return regions.resolve_library_root(library_root)
 
 
 def current_path(root: Path) -> Path:
@@ -58,7 +83,7 @@ def current_path(root: Path) -> Path:
 
 
 def load_current(root: Path) -> dict:
-    path = current_path(root)
+    path = regions.library_member_path(root, current_path(root))
     if not path.is_file():
         return {}
     try:
@@ -70,9 +95,17 @@ def load_current(root: Path) -> dict:
     areas = payload.get("areas")
     dataset_dir = payload.get("datasetDir")
     snapshot_date = payload.get("snapshotDate")
-    if not isinstance(areas, list) or not areas or not dataset_dir or not snapshot_date:
+    if (
+        not isinstance(areas, list)
+        or not areas
+        or any(not isinstance(area, str) for area in areas)
+        or not isinstance(dataset_dir, str)
+        or not dataset_dir
+        or not isinstance(snapshot_date, str)
+        or not snapshot_date
+    ):
         fail(f"map library current pointer is incomplete: {path}")
-    dataset_path = Path(str(dataset_dir)).expanduser()
+    dataset_path = Path(dataset_dir).expanduser()
     if not dataset_path.is_absolute():
         dataset_path = root / dataset_path
     try:
@@ -117,35 +150,60 @@ def write_current(
         "datasetDir": str(target),
         "updatedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
-    regions.write_json_atomically(current_path(root), payload)
 
     datasets_root = root / "datasets"
+    if datasets_root.is_symlink():
+        fail(f"refusing to update the active pointer through a datasets symlink: {datasets_root}")
     datasets_root.mkdir(parents=True, exist_ok=True)
     link = datasets_root / "current"
     if link.exists() and not link.is_symlink():
         fail(f"refusing to replace non-symlink current dataset path: {link}")
     temporary = datasets_root / ".current.tmp"
-    if temporary.is_symlink() or temporary.exists():
+    if temporary.exists() or temporary.is_symlink():
+        if not temporary.is_symlink() and not temporary.is_file():
+            fail(f"refusing to replace non-file current-link staging path: {temporary}")
         temporary.unlink()
     temporary.symlink_to(relative.relative_to("datasets"), target_is_directory=True)
-    temporary.replace(link)
+    try:
+        regions.write_json_atomically(current_path(root), payload)
+        temporary.replace(link)
+    except OSError:
+        if temporary.is_symlink():
+            temporary.unlink()
+        raise
     return payload
 
 
 def command_current(catalog: dict, args: argparse.Namespace) -> None:
-    del catalog
     root = resolve_root(args.library)
     payload = load_current(root)
     if not payload:
         fail(f"no active dataset recorded in map library: {root}")
-    dataset_dir = Path(str(payload["datasetDir"])).expanduser()
+    areas = payload["areas"]
+    if any(not isinstance(area, str) for area in areas):
+        fail(f"map library current pointer contains invalid area IDs: {areas!r}")
+    resolved = regions.resolve_selection(catalog, ",".join(areas))
+    if resolved["ids"] != areas:
+        fail(f"map library current pointer areas are not canonical: {areas!r}")
+    snapshot_date = regions.parse_snapshot_date(
+        payload["snapshotDate"], "current snapshot date"
+    )
+    paths = regions.library_paths(root, snapshot_date, resolved["ids"])
+    dataset_dir = Path(payload["datasetDir"]).expanduser()
     if not dataset_dir.is_absolute():
         dataset_dir = root / dataset_dir
-    paths = regions.library_paths(
-        root,
-        regions.parse_snapshot_date(payload["snapshotDate"], "current snapshot date"),
-        [str(area) for area in payload["areas"]],
-    )
+    if dataset_dir.resolve() != paths["datasetDir"]:
+        fail("map library current pointer does not identify the standardized dataset path")
+    expected_relative = regions.dataset_relative_path(
+        snapshot_date, resolved["ids"]
+    ).as_posix()
+    if (
+        payload.get("datasetRelativePath") != expected_relative
+        or payload.get("datasetFingerprint")
+        != regions.dataset_fingerprint(snapshot_date, resolved["ids"])
+        or payload.get("bbox") != resolved["bbox"]
+    ):
+        fail("map library current pointer does not match its standardized selection metadata")
     regions.emit_shell({
         "ACTIVE_REGION_IDS": ",".join(str(area) for area in payload["areas"]),
         "ACTIVE_SNAPSHOT_DATE": payload["snapshotDate"],
@@ -261,10 +319,14 @@ def prune_library(
     # One active generated dataset bundle. Other bundles can be rebuilt from
     # retained sources/crops, so they are not kept as silent second versions.
     datasets_root = root / "datasets"
+    if datasets_root.is_symlink():
+        fail(f"refusing to prune through a datasets symlink: {datasets_root}")
     if datasets_root.is_dir():
+        assert_under_root(root, datasets_root)
         for date_dir in sorted(datasets_root.iterdir()):
             if date_dir.name == "current" or not date_dir.is_dir() or date_dir.is_symlink():
                 continue
+            assert_under_root(root, date_dir)
             for candidate in sorted(date_dir.iterdir()):
                 if candidate.is_dir() and candidate.resolve() != active_dataset:
                     remove_tree(root, candidate, dry_run, removed)
@@ -289,6 +351,8 @@ def command_prune(catalog: dict, args: argparse.Namespace) -> None:
 
 
 def move_file(source: Path, target: Path) -> bool:
+    source = assert_no_symlink_components(source)
+    target = assert_no_symlink_components(target)
     if not source.is_file():
         return target.is_file()
     if source.resolve() == target.resolve() if target.exists() else False:
@@ -304,6 +368,8 @@ def move_file(source: Path, target: Path) -> bool:
 
 
 def move_tree(source: Path, target: Path) -> bool:
+    source = assert_no_symlink_components(source)
+    target = assert_no_symlink_components(target)
     if not source.exists():
         return target.exists()
     if source.resolve() == target.resolve() if target.exists() else False:
@@ -319,6 +385,8 @@ def move_tree(source: Path, target: Path) -> bool:
 
 
 def link_or_copy(source: Path, target: Path) -> None:
+    source = assert_no_symlink_components(source)
+    target = assert_no_symlink_components(target)
     if target.exists():
         if regions.sha256_file(source) != regions.sha256_file(target):
             raise MigrationUnsafe(f"target already exists with different content: {target}")
@@ -332,12 +400,15 @@ def link_or_copy(source: Path, target: Path) -> None:
 
 def first_existing(paths: list[Path]) -> Path | None:
     for path in paths:
-        if path.is_file() and path.stat().st_size > 0:
-            return path
+        if path.exists() or path.is_symlink():
+            path = assert_no_symlink_components(path)
+            if path.is_file() and path.stat().st_size > 0:
+                return path
     return None
 
 
 def rewrite_artifact_metadata(path: Path, areas: list[str], snapshot_date) -> None:
+    path = assert_no_symlink_components(path)
     if not path.is_file():
         return
     payload = regions.read_json_object(path)
@@ -383,13 +454,27 @@ def migrate_project_library(
         )
 
     legacy_data = repo / "map-server" / "data"
-    legacy_osrm = Path(str(legacy_osrm_dir)).expanduser() if legacy_osrm_dir else repo / "map-server" / "osrm" / "data"
+    expected_legacy_osrm = repo / "map-server" / "osrm" / "data"
+    legacy_osrm = (
+        Path(str(legacy_osrm_dir)).expanduser()
+        if legacy_osrm_dir
+        else expected_legacy_osrm
+    )
     if not legacy_osrm.is_absolute():
         legacy_osrm = repo / legacy_osrm
+    legacy_osrm = Path(os.path.abspath(legacy_osrm))
+    if legacy_osrm != Path(os.path.abspath(expected_legacy_osrm)):
+        raise MigrationUnsafe(
+            "legacy OSRM migration is limited to map-server/osrm/data inside the checkout"
+        )
     legacy_photon = repo / "map-server" / "photon" / "data"
+    for legacy_root in (legacy_data, legacy_osrm, legacy_photon):
+        assert_no_symlink_components(legacy_root)
 
     v2_manifest_path = legacy_data / "borobiya.source.json"
     v1_manifest_path = legacy_data / "tehran.source.json"
+    assert_no_symlink_components(v2_manifest_path)
+    assert_no_symlink_components(v1_manifest_path)
     is_v1 = False
     if v2_manifest_path.is_file():
         old = regions.read_json_object(v2_manifest_path)
@@ -428,6 +513,31 @@ def migrate_project_library(
     if merged_sha != expected_merged_sha:
         raise MigrationUnsafe("legacy merged dataset PBF does not match its manifest SHA-256")
 
+    # Validate the legacy manifest's claimed provenance before trusting its
+    # source/crop hashes. In particular, a v1 `region=tehran` label alone is
+    # not proof that its crop used the catalog Tehran bbox/strategy.
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            if is_v1:
+                regions.validate_legacy_v1_manifest(catalog, old, merged_source)
+            else:
+                regions.command_verify_manifest(
+                    catalog,
+                    argparse.Namespace(
+                        manifest=str(old_manifest_path),
+                        pbf=str(merged_source),
+                        selection=",".join(resolved["ids"]),
+                        bbox=None,
+                        snapshot="pinned",
+                        snapshot_date=snapshot_date.isoformat(),
+                        library=str(root),
+                    ),
+                )
+    except SystemExit as error:
+        raise MigrationUnsafe(
+            "legacy manifest does not prove the selected pinned dataset; rebuild instead"
+        ) from error
+
     old_sources = {}
     if is_v1:
         old_source = old.get("source", {}) if isinstance(old.get("source"), dict) else {}
@@ -457,8 +567,15 @@ def migrate_project_library(
             raise MigrationUnsafe(f"legacy manifest has no source entry for {source_id}")
         candidates = [target]
         legacy_file = entry.get("file")
-        if legacy_file:
-            candidates.append(legacy_data / "source" / str(legacy_file))
+        if legacy_file is not None:
+            if legacy_file == descriptor["file"]:
+                candidates.append(legacy_data / "source" / descriptor["file"])
+            elif source_id == "iran" and legacy_file == "iran-latest.osm.pbf":
+                candidates.append(legacy_data / "source" / "iran-latest.osm.pbf")
+            else:
+                raise MigrationUnsafe(
+                    f"legacy source {source_id} filename is not a supported project-local name"
+                )
         candidates.append(legacy_data / "source" / descriptor["file"])
         if source_id == "iran":
             candidates.append(legacy_data / "source" / "iran-latest.osm.pbf")
@@ -481,7 +598,7 @@ def migrate_project_library(
         if area["kind"] == "country":
             continue
         relative = regions.crop_relative_path(area, snapshot_date)
-        target = root / relative
+        target = regions.library_path(root, relative)
         if is_v1:
             crop_plan[area["id"]] = (merged_source, target, {"sha256": merged_sha})
             continue
@@ -501,16 +618,28 @@ def migrate_project_library(
     # Optional generated artifacts: fail before moving anything if a target
     # directory already contains a different generated bundle.
     legacy_pmtiles = legacy_data / ("tehran.pmtiles" if is_v1 else "borobiya.pmtiles")
+    legacy_tiles_meta = legacy_data / (
+        "tehran.metadata.json" if is_v1 else "borobiya.metadata.json"
+    )
+    legacy_stamp = legacy_photon / ".borobiya-pbf.sha256"
+    for legacy_file in (legacy_pmtiles, legacy_tiles_meta, legacy_stamp):
+        assert_no_symlink_components(legacy_file)
     if legacy_pmtiles.is_file() and paths["pmtiles"].is_file():
         if regions.sha256_file(legacy_pmtiles) != regions.sha256_file(paths["pmtiles"]):
             raise MigrationUnsafe("target PMTiles already exists with different content")
     for profile in ("car", "bicycle", "foot"):
         legacy_profile = legacy_osrm / profile
-        target_profile = paths["osrmDataDir"] / profile
+        assert_no_symlinks_tree(legacy_profile)
+        target_profile = regions.library_path(
+            root, paths["osrmDataDir"].relative_to(root) / profile
+        )
         if legacy_profile.is_dir() and target_profile.exists() and any(target_profile.iterdir()):
             raise MigrationUnsafe(f"target OSRM profile already exists: {target_profile}")
     legacy_photon_index = legacy_photon / "photon_data"
-    target_photon_index = paths["photonDataDir"] / "photon_data"
+    assert_no_symlinks_tree(legacy_photon_index)
+    target_photon_index = regions.library_path(
+        root, paths["photonDataDir"].relative_to(root) / "photon_data"
+    )
     if legacy_photon_index.is_dir() and target_photon_index.exists() and any(target_photon_index.iterdir()):
         raise MigrationUnsafe(f"target Photon index already exists: {target_photon_index}")
 
@@ -558,14 +687,15 @@ def migrate_project_library(
 
     if legacy_pmtiles.is_file():
         move_file(legacy_pmtiles, paths["pmtiles"])
-    legacy_tiles_meta = legacy_data / ("tehran.metadata.json" if is_v1 else "borobiya.metadata.json")
     if legacy_tiles_meta.is_file():
         move_file(legacy_tiles_meta, paths["tilesMetadata"])
         rewrite_artifact_metadata(paths["tilesMetadata"], resolved["ids"], snapshot_date)
 
     for profile in ("car", "bicycle", "foot"):
         legacy_profile = legacy_osrm / profile
-        target_profile = paths["osrmDataDir"] / profile
+        target_profile = regions.library_path(
+            root, paths["osrmDataDir"].relative_to(root) / profile
+        )
         if not legacy_profile.is_dir():
             continue
         if is_v1:
@@ -587,7 +717,6 @@ def migrate_project_library(
 
     if legacy_photon_index.is_dir():
         move_tree(legacy_photon_index, target_photon_index)
-    legacy_stamp = legacy_photon / ".borobiya-pbf.sha256"
     if legacy_stamp.is_file():
         move_file(legacy_stamp, paths["photonStamp"])
     elif target_photon_index.is_dir():

@@ -15,14 +15,25 @@ MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-}"
 MAP_SNAPSHOT_DATE="${MAP_SNAPSHOT_DATE:-$MAP_DATA_VERSION}"
-if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR"
+elif [[ -n "${XDG_DATA_HOME:-}" ]]; then
+  if [[ "$XDG_DATA_HOME" != /* ]]; then
+    printf 'generate-tiles: XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly or correct XDG_DATA_HOME\n' >&2
+    exit 1
+  fi
   DEFAULT_MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
 elif [[ -n "${HOME:-}" ]]; then
+  if [[ "$HOME" != /* ]]; then
+    printf 'generate-tiles: HOME must be absolute to derive the external map library; set MAP_LIBRARY_DIR explicitly\n' >&2
+    exit 1
+  fi
   DEFAULT_MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
 else
-  DEFAULT_MAP_LIBRARY_DIR="$REPO_ROOT/map-server/data"
+  printf 'generate-tiles: HOME and XDG_DATA_HOME are unset; set MAP_LIBRARY_DIR to an external absolute path\n' >&2
+  exit 1
 fi
-MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-$DEFAULT_MAP_LIBRARY_DIR}"
+MAP_LIBRARY_DIR="$DEFAULT_MAP_LIBRARY_DIR"
 # shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
 case "$MAP_LIBRARY_DIR" in
   "~") MAP_LIBRARY_DIR="${HOME:-}" ;;
@@ -121,29 +132,37 @@ fi
 mkdir -p "$(dirname -- "$PLANETILER_JAR")"
 if [[ ! -f "$PLANETILER_JAR" && -s "$LEGACY_PLANETILER_JAR" ]] && \
    [[ "$(sha256_file "$LEGACY_PLANETILER_JAR")" == "$PLANETILER_SHA256" ]]; then
-  cp -- "$LEGACY_PLANETILER_JAR" "$PLANETILER_JAR.part"
-  mv -- "$PLANETILER_JAR.part" "$PLANETILER_JAR"
+  legacy_tmp_dir="$(mktemp -d "$(dirname -- "$PLANETILER_JAR")/.planetiler-copy.XXXXXX")"
+  legacy_tmp="$legacy_tmp_dir/planetiler.jar"
+  trap 'rm -rf -- "${legacy_tmp_dir:-}"' EXIT
+  cp -- "$LEGACY_PLANETILER_JAR" "$legacy_tmp"
+  mv -- "$legacy_tmp" "$PLANETILER_JAR"
+  rmdir -- "$legacy_tmp_dir"
+  trap - EXIT
   printf 'Copied verified legacy Planetiler JAR to the project tool cache: %s\n' "$PLANETILER_JAR"
 fi
 
 # Fetch the pinned JAR only if it is absent or fails the published checksum.
 if [[ ! -f "$PLANETILER_JAR" ]] || [[ "$(sha256_file "$PLANETILER_JAR")" != "$PLANETILER_SHA256" ]]; then
-  jar_tmp="$PLANETILER_JAR.part"
-  trap 'rm -f "${jar_tmp:-}"' EXIT
+  jar_tmp_dir="$(mktemp -d "$(dirname -- "$PLANETILER_JAR")/.planetiler-download.XXXXXX")"
+  jar_tmp="$jar_tmp_dir/planetiler.jar"
+  trap 'rm -rf -- "${jar_tmp_dir:-}"' EXIT
   printf 'Downloading Planetiler %s...\n' "$PLANETILER_VERSION"
   curl -fL --retry 2 "$PLANETILER_URL" -o "$jar_tmp"
   actual_sha256="$(sha256_file "$jar_tmp")"
   [[ "$actual_sha256" == "$PLANETILER_SHA256" ]] || fail "Planetiler JAR checksum mismatch: $actual_sha256"
-  mv "$jar_tmp" "$PLANETILER_JAR"
+  mv -- "$jar_tmp" "$PLANETILER_JAR"
+  rmdir -- "$jar_tmp_dir"
   trap - EXIT
 fi
 
 [[ "$(sha256_file "$PLANETILER_JAR")" == "$PLANETILER_SHA256" ]] || fail 'Planetiler JAR checksum verification failed'
 
 # Keep temporary artifacts outside Martin's source directory until a complete build is ready.
-temp_output="$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.$$.pmtiles"
-metadata_tmp="$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.$$.metadata.json"
-trap 'rm -f "${temp_output:-}" "${metadata_tmp:-}"' EXIT
+temp_dir="$(mktemp -d "$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.XXXXXX")"
+temp_output="$temp_dir/$MAP_REGION.pmtiles"
+metadata_tmp="$temp_dir/$MAP_REGION.metadata.json"
+trap 'rm -rf -- "${temp_dir:-}"' EXIT
 printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
   "$OUTPUT" "$MAP_DATA_VERSION" "$map_min_zoom" "$map_max_zoom" "$MAP_BBOX" "$MAP_PBF"
 (
@@ -184,6 +203,7 @@ with open(output, "w", encoding="utf-8") as metadata_file:
 PYEOF
 mv -f "$temp_output" "$OUTPUT"
 mv -f "$metadata_tmp" "$METADATA"
+rmdir -- "$temp_dir"
 trap - EXIT
 printf 'Created %s (%s bytes)\n' "$OUTPUT" "$(wc -c < "$OUTPUT" | tr -d ' ')"
 printf 'Wrote build metadata %s\n' "$METADATA"

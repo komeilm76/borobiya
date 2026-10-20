@@ -11,14 +11,25 @@ MAP_REGION="${MAP_REGION:-borobiya}"
 MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
 MAP_SNAPSHOT_DATE="${MAP_SNAPSHOT_DATE:-}"
-if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR"
+elif [[ -n "${XDG_DATA_HOME:-}" ]]; then
+  if [[ "$XDG_DATA_HOME" != /* ]]; then
+    printf 'build-routing: XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly or correct XDG_DATA_HOME\n' >&2
+    exit 1
+  fi
   DEFAULT_MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
 elif [[ -n "${HOME:-}" ]]; then
+  if [[ "$HOME" != /* ]]; then
+    printf 'build-routing: HOME must be absolute to derive the external map library; set MAP_LIBRARY_DIR explicitly\n' >&2
+    exit 1
+  fi
   DEFAULT_MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
 else
-  DEFAULT_MAP_LIBRARY_DIR="$REPO_ROOT/map-server/data"
+  printf 'build-routing: HOME and XDG_DATA_HOME are unset; set MAP_LIBRARY_DIR to an external absolute path\n' >&2
+  exit 1
 fi
-MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-$DEFAULT_MAP_LIBRARY_DIR}"
+MAP_LIBRARY_DIR="$DEFAULT_MAP_LIBRARY_DIR"
 # shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
 case "$MAP_LIBRARY_DIR" in
   "~") MAP_LIBRARY_DIR="${HOME:-}" ;;

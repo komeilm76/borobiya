@@ -22,6 +22,72 @@ SNAPSHOT_DATE = regions.catalog_snapshot_date(CATALOG)
 
 
 class CurrentAndPruneTests(unittest.TestCase):
+    def test_current_rejects_symlinked_pointer_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            root = base / "library"
+            root.mkdir()
+            outside = base / "current.json"
+            outside.write_text("{}", encoding="utf-8")
+            (root / "current.json").symlink_to(outside)
+
+            with self.assertRaises(SystemExit):
+                map_library.load_current(root)
+
+    def test_current_rejects_nonstandard_dataset_pointer(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "library"
+            paths = regions.library_paths(root, SNAPSHOT_DATE, ["ir-tehran"])
+            paths["datasetDir"].mkdir(parents=True)
+            map_library.write_current(
+                CATALOG,
+                root,
+                "ir-tehran",
+                SNAPSHOT_DATE.isoformat(),
+                "pinned",
+                paths["datasetDir"],
+            )
+            pointer_path = root / "current.json"
+            pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+            pointer["datasetDir"] = str(root / "datasets" / "other")
+            pointer_path.write_text(json.dumps(pointer), encoding="utf-8")
+
+            with self.assertRaises(SystemExit):
+                map_library.command_current(
+                    CATALOG, argparse.Namespace(library=str(root))
+                )
+
+    def test_current_link_preflight_does_not_advance_pointer_on_conflict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "library"
+            paths = regions.library_paths(root, SNAPSHOT_DATE, ["ir-tehran"])
+            paths["datasetDir"].mkdir(parents=True)
+            map_library.write_current(
+                CATALOG,
+                root,
+                "ir-tehran",
+                SNAPSHOT_DATE.isoformat(),
+                "pinned",
+                paths["datasetDir"],
+            )
+            current_file = root / "current.json"
+            previous_pointer = current_file.read_bytes()
+            current_link = root / "datasets" / "current"
+            current_link.unlink()
+            current_link.mkdir()
+
+            with self.assertRaises(SystemExit):
+                map_library.write_current(
+                    CATALOG,
+                    root,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    "pinned",
+                    paths["datasetDir"],
+                )
+
+            self.assertEqual(current_file.read_bytes(), previous_pointer)
+
     def test_write_current_and_prune_to_one_release(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "library"
@@ -82,7 +148,12 @@ class ProjectMigrationTests(unittest.TestCase):
         return catalog
 
     def write_legacy_tehran(
-        self, repo: Path, catalog: dict, *, source_matches: bool = True
+        self,
+        repo: Path,
+        catalog: dict,
+        *,
+        source_matches: bool = True,
+        crop_bbox: list[float] | None = None,
     ) -> tuple[bytes, bytes]:
         data = repo / "map-server" / "data"
         source_dir = data / "source"
@@ -110,7 +181,7 @@ class ProjectMigrationTests(unittest.TestCase):
             },
             "crop": {
                 "file": str(data / "tehran.osm.pbf"),
-                "bbox": [51.0, 35.5, 51.7, 35.9],
+                "bbox": crop_bbox if crop_bbox is not None else [51.0, 35.5, 51.7, 35.9],
                 "strategy": "smart",
                 "osmiumToolVersion": "1.16.0",
                 "sha256": hashlib.sha256(crop_bytes).hexdigest(),
@@ -212,6 +283,214 @@ class ProjectMigrationTests(unittest.TestCase):
                     library=str(library),
                 ),
             )
+
+    def test_migration_rejects_legacy_source_filename_path_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            library = base / "library"
+            source_bytes = b"fake legacy Iran source"
+            catalog = self.make_catalog(source_bytes)
+            self.write_legacy_tehran(repo, catalog)
+            outside = base / "outside.osm.pbf"
+            outside.write_bytes(source_bytes)
+            manifest_path = repo / "map-server" / "data" / "tehran.source.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["source"]["file"] = "../../outside.osm.pbf"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            paths = regions.library_paths(library, SNAPSHOT_DATE, ["ir-tehran"])
+
+            with self.assertRaises(map_library.MigrationUnsafe):
+                map_library.migrate_project_library(
+                    catalog,
+                    repo,
+                    library,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    paths["datasetDir"],
+                    repo / "map-server" / "osrm" / "data",
+                )
+
+            self.assertEqual(outside.read_bytes(), source_bytes)
+            self.assertTrue(
+                (repo / "map-server" / "data" / "source" / "iran-latest.osm.pbf").is_file()
+            )
+            self.assertFalse(paths["pbf"].exists())
+
+    def test_migration_refuses_external_legacy_osrm_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            library = base / "library"
+            source_bytes = b"fake legacy Iran source"
+            catalog = self.make_catalog(source_bytes)
+            self.write_legacy_tehran(repo, catalog)
+            external_osrm = base / "external-osrm"
+            external_profile = external_osrm / "car"
+            external_profile.mkdir(parents=True)
+            external_graph = external_profile / "graph.osrm"
+            external_graph.write_bytes(b"user graph")
+            paths = regions.library_paths(library, SNAPSHOT_DATE, ["ir-tehran"])
+
+            with self.assertRaises(map_library.MigrationUnsafe):
+                map_library.migrate_project_library(
+                    catalog,
+                    repo,
+                    library,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    paths["datasetDir"],
+                    external_osrm,
+                )
+
+            self.assertEqual(external_graph.read_bytes(), b"user graph")
+            self.assertTrue(
+                (repo / "map-server" / "data" / "source" / "iran-latest.osm.pbf").is_file()
+            )
+            self.assertFalse(paths["pbf"].exists())
+
+    def test_migration_rejects_symlinked_legacy_artifacts_before_moving_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            library = base / "library"
+            source_bytes = b"fake legacy Iran source"
+            catalog = self.make_catalog(source_bytes)
+            self.write_legacy_tehran(repo, catalog)
+            outside = base / "outside.graph"
+            outside.write_bytes(b"external graph")
+            profile = repo / "map-server" / "osrm" / "data" / "car"
+            (profile / "external.graph").symlink_to(outside)
+            paths = regions.library_paths(library, SNAPSHOT_DATE, ["ir-tehran"])
+
+            with self.assertRaises(map_library.MigrationUnsafe):
+                map_library.migrate_project_library(
+                    catalog,
+                    repo,
+                    library,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    paths["datasetDir"],
+                    repo / "map-server" / "osrm" / "data",
+                )
+
+            self.assertTrue((repo / "map-server" / "data" / "tehran.osm.pbf").is_file())
+            self.assertTrue((repo / "map-server" / "data" / "tehran.source.json").is_file())
+            self.assertTrue((profile / "external.graph").is_symlink())
+            self.assertEqual(outside.read_bytes(), b"external graph")
+            self.assertFalse(paths["pbf"].exists())
+
+    def test_v1_migration_rejects_wrong_crop_bbox_before_moving_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            library = base / "library"
+            source_bytes = b"fake legacy Iran source"
+            catalog = self.make_catalog(source_bytes)
+            self.write_legacy_tehran(
+                repo,
+                catalog,
+                crop_bbox=[51.1, 35.5, 51.7, 35.9],
+            )
+            paths = regions.library_paths(library, SNAPSHOT_DATE, ["ir-tehran"])
+            legacy_source = repo / "map-server" / "data" / "source" / "iran-latest.osm.pbf"
+            legacy_crop = repo / "map-server" / "data" / "tehran.osm.pbf"
+
+            with self.assertRaises(map_library.MigrationUnsafe):
+                map_library.migrate_project_library(
+                    catalog,
+                    repo,
+                    library,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    paths["datasetDir"],
+                    repo / "map-server" / "osrm" / "data",
+                )
+
+            self.assertEqual(legacy_source.read_bytes(), source_bytes)
+            self.assertTrue(legacy_crop.is_file())
+            source_target = library / regions.source_relative_path(
+                catalog, "iran", SNAPSHOT_DATE
+            )
+            self.assertFalse(source_target.exists())
+            self.assertFalse(paths["pbf"].exists())
+
+    def test_v2_migration_rejects_wrong_crop_bbox_before_moving_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            repo = base / "repo"
+            library = base / "library"
+            data = repo / "map-server" / "data"
+            source_dir = data / "source"
+            crop_dir = data / "crops"
+            source_dir.mkdir(parents=True)
+            crop_dir.mkdir(parents=True)
+
+            source_bytes = b"legacy Iran source for v2"
+            crop_bytes = b"legacy Tehran crop for v2"
+            merged_bytes = b"legacy merged Tehran dataset for v2"
+            catalog = self.make_catalog(source_bytes)
+            source_path = source_dir / "iran-latest.osm.pbf"
+            crop_path = crop_dir / "ir-tehran.osm.pbf"
+            merged_path = data / "borobiya.osm.pbf"
+            source_path.write_bytes(source_bytes)
+            crop_path.write_bytes(crop_bytes)
+            merged_path.write_bytes(merged_bytes)
+            snapshot = catalog["snapshot"]
+            pinned = catalog["sources"]["iran"]
+            manifest = {
+                "version": 2,
+                "dataset": "borobiya",
+                "areas": ["ir-tehran"],
+                "bbox": [51.0, 35.5, 51.7, 35.9],
+                "sources": [{
+                    "id": "iran",
+                    "provider": snapshot["provider"],
+                    "url": pinned["url"],
+                    "dataDate": snapshot["dataDate"],
+                    "dataTimestamp": snapshot["dataTimestamp"],
+                    "file": source_path.name,
+                    "bytes": len(source_bytes),
+                    "md5": pinned["md5"],
+                    "sha256": hashlib.sha256(source_bytes).hexdigest(),
+                    "license": snapshot["license"],
+                }],
+                "crops": [{
+                    "area": "ir-tehran",
+                    "file": str(crop_path),
+                    "bbox": [51.1, 35.5, 51.7, 35.9],
+                    "strategy": "smart",
+                    "sha256": hashlib.sha256(crop_bytes).hexdigest(),
+                }],
+                "merged": {
+                    "file": str(merged_path),
+                    "sha256": hashlib.sha256(merged_bytes).hexdigest(),
+                    "osmiumToolVersion": "1.16.0",
+                },
+            }
+            manifest_path = data / "borobiya.source.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            paths = regions.library_paths(library, SNAPSHOT_DATE, ["ir-tehran"])
+            source_target = library / regions.source_relative_path(
+                catalog, "iran", SNAPSHOT_DATE
+            )
+
+            with self.assertRaises(map_library.MigrationUnsafe):
+                map_library.migrate_project_library(
+                    catalog,
+                    repo,
+                    library,
+                    "ir-tehran",
+                    SNAPSHOT_DATE.isoformat(),
+                    paths["datasetDir"],
+                    repo / "map-server" / "osrm" / "data",
+                )
+
+            self.assertTrue(source_path.is_file())
+            self.assertTrue(crop_path.is_file())
+            self.assertTrue(merged_path.is_file())
+            self.assertFalse(source_target.exists())
+            self.assertFalse(paths["pbf"].exists())
 
     def test_migration_skips_without_moving_when_legacy_source_differs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

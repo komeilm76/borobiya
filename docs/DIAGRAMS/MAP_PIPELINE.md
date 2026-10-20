@@ -90,7 +90,19 @@ Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint
 ```bash
 # Prepare and verify the shared library dataset (once)
 set -a; source .env; set +a
-export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+if [[ -z "${MAP_LIBRARY_DIR:-}" ]]; then
+  if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    [[ "$XDG_DATA_HOME" == /* ]] || { echo 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly.' >&2; exit 1; }
+    MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
+  elif [[ -n "${HOME:-}" && "$HOME" == /* ]]; then
+    MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
+  else
+    echo 'Set MAP_LIBRARY_DIR to an external absolute path (or set absolute HOME/XDG_DATA_HOME).' >&2
+    exit 1
+  fi
+fi
+[[ "$MAP_LIBRARY_DIR" == /* ]] || { echo 'MAP_LIBRARY_DIR must be absolute.' >&2; exit 1; }
+export MAP_LIBRARY_DIR
 eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" --source-policy "${MAP_SOURCE_POLICY:-cache-first}" --library "$MAP_LIBRARY_DIR")"
 ./map-server/scripts/prepare-regions-pbf.sh
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"

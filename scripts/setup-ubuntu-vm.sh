@@ -74,7 +74,7 @@ Options:
 
 Env: SETUP_REGIONS, SETUP_SNAPSHOT, SETUP_SOURCE_POLICY, SETUP_MAP_LIBRARY,
      SETUP_FORCE_FORM=1 (force prompts without a TTY),
-     SETUP_NOMINATIM_TIMEOUT_MIN (default 90)
+     SETUP_NOMINATIM_TIMEOUT_MIN (minutes, 1-720; default 90)
 EOF
 }
 
@@ -104,6 +104,12 @@ while (( $# > 0 )); do
   esac
 done
 
+[[ "$NOMINATIM_TIMEOUT_MIN" =~ ^[0-9]{1,3}$ ]] || \
+  fail "SETUP_NOMINATIM_TIMEOUT_MIN must be an integer from 1 to 720 (minutes), got '$NOMINATIM_TIMEOUT_MIN'"
+NOMINATIM_TIMEOUT_MIN=$((10#$NOMINATIM_TIMEOUT_MIN))
+(( NOMINATIM_TIMEOUT_MIN >= 1 && NOMINATIM_TIMEOUT_MIN <= 720 )) || \
+  fail "SETUP_NOMINATIM_TIMEOUT_MIN must be between 1 and 720 minutes, got '$NOMINATIM_TIMEOUT_MIN'"
+
 # Interactive input: prefer the terminal even when stdin is redirected.
 INPUT_FD=0
 if { exec 3</dev/tty; } 2>/dev/null; then INPUT_FD=3; fi
@@ -130,11 +136,13 @@ expand_home_path() {
 
 default_map_library_dir() {
   if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    [[ "$XDG_DATA_HOME" == /* ]] || fail "XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly or correct XDG_DATA_HOME"
     printf '%s' "$XDG_DATA_HOME/borobiya/map-library"
   elif [[ -n "${HOME:-}" ]]; then
+    [[ "$HOME" == /* ]] || fail "HOME must be absolute to derive the external map library; set MAP_LIBRARY_DIR explicitly"
     printf '%s' "$HOME/.local/share/borobiya/map-library"
   else
-    printf '%s' "$REPO_ROOT/map-server/data"
+    fail "HOME and XDG_DATA_HOME are unset; set MAP_LIBRARY_DIR to an external absolute path"
   fi
 }
 
@@ -143,6 +151,8 @@ canonical_library_dir() {
   path="$(expand_home_path "$1")"
   [[ "$path" != *$'\n'* && "$path" != *[[:space:]]* ]] || \
     fail "map library path must not contain whitespace (it is persisted in .env): $path"
+  [[ "$path" =~ ^[[:alnum:]_./@+-]+$ ]] || \
+    fail "map library path contains characters unsafe for .env and Compose volume storage; use letters, digits, and / . _ @ + -: $path"
   if [[ "$path" != /* ]]; then
     path="$REPO_ROOT/$path"
   fi
@@ -190,6 +200,7 @@ free_gb="$(df -BG --output=avail . | tail -1 | tr -dc '0-9')"
 log "Environment (.env)"
 generated_admin_password=0
 FRESH_ENV_FROM_EXAMPLE=0
+EXPLICIT_ADMIN_SEED_PASSWORD="${ADMIN_SEED_PASSWORD:-}"
 set_env() {
   local key="$1" value="$2"
   if (( DRY_RUN )); then note "would set ${key}=${value} in .env"; return 0; fi
@@ -238,6 +249,57 @@ else
   source .env; set +a
 fi
 
+if [[ -f .env ]] && grep -q '^ADMIN_SEED_PASSWORD=' .env && [[ -n "${ADMIN_SEED_PASSWORD:-}" ]]; then
+  ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
+  if (( DRY_RUN )); then
+    note "would migrate the legacy ADMIN_SEED_PASSWORD .env entry to ADMIN_SEED_PASSWORD_B64"
+  else
+    set_env ADMIN_SEED_PASSWORD_B64 "$ADMIN_SEED_PASSWORD_B64"
+    sed -i '/^ADMIN_SEED_PASSWORD=/d' .env
+    note "migrated the legacy ADMIN_SEED_PASSWORD .env entry to ADMIN_SEED_PASSWORD_B64"
+  fi
+fi
+
+if [[ -n "$EXPLICIT_ADMIN_SEED_PASSWORD" ]]; then
+  ADMIN_SEED_PASSWORD="$EXPLICIT_ADMIN_SEED_PASSWORD"
+  export ADMIN_SEED_PASSWORD
+fi
+unset EXPLICIT_ADMIN_SEED_PASSWORD
+
+# The setup-managed password is base64 in .env so Bash and Compose parse it
+# literally, including Unicode and punctuation. Preserve an explicitly exported
+# ADMIN_SEED_PASSWORD over the saved value.
+if [[ -z "${ADMIN_SEED_PASSWORD:-}" && -n "${ADMIN_SEED_PASSWORD_B64:-}" ]]; then
+  if ! ADMIN_SEED_PASSWORD="$(python3 - "$ADMIN_SEED_PASSWORD_B64" <<'PYEOF'
+import base64, sys
+try:
+    value = base64.b64decode(sys.argv[1], validate=True).decode("utf-8")
+    if any(ord(character) in (0, 10, 13) for character in value):
+        raise ValueError("control character")
+except (ValueError, UnicodeDecodeError):
+    raise SystemExit(1)
+sys.stdout.write(value)
+PYEOF
+  )"; then
+    fail "ADMIN_SEED_PASSWORD_B64 in .env is not valid base64-encoded UTF-8"
+  fi
+  export ADMIN_SEED_PASSWORD
+fi
+
+valid_admin_password() {
+  python3 - "$1" <<'PYEOF'
+import sys, unicodedata
+password = sys.argv[1]
+try:
+    length = len(password.encode("utf-16-le")) // 2
+except UnicodeEncodeError:
+    raise SystemExit(1)
+has_letter = any(unicodedata.category(character).startswith("L") for character in password)
+has_decimal = any(unicodedata.category(character) == "Nd" for character in password)
+sys.exit(0 if 8 <= length <= 1024 and has_letter and has_decimal else 1)
+PYEOF
+}
+
 # The containerized seed (NODE_ENV=production) requires an explicit admin
 # password. Offer a prompt interactively; otherwise generate and persist
 # one so the admin login always works.
@@ -249,27 +311,33 @@ if [[ -z "${ADMIN_SEED_PASSWORD:-}" ]]; then
       IFS= read -r -s -u "$INPUT_FD" chosen_admin_password || chosen_admin_password=""
       printf '\n'
       [[ -z "$chosen_admin_password" ]] && break
-      if (( ${#chosen_admin_password} >= 8 )) && [[ "$chosen_admin_password" =~ [A-Za-z] && "$chosen_admin_password" =~ [0-9] ]]; then
+      if valid_admin_password "$chosen_admin_password"; then
         break
       fi
-      printf '    Password must be at least 8 characters and contain a letter and a digit; try again (or Enter to generate).\n' >&2
+      printf '    Password must be 8–1024 characters and contain a Unicode letter and decimal digit; try again (or Enter to generate).\n' >&2
     done
   fi
   if [[ -n "$chosen_admin_password" ]]; then
     ADMIN_SEED_PASSWORD="$chosen_admin_password"
     unset chosen_admin_password
-    set_env ADMIN_SEED_PASSWORD "$ADMIN_SEED_PASSWORD"
+    ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
+    set_env ADMIN_SEED_PASSWORD_B64 "$ADMIN_SEED_PASSWORD_B64"
     export ADMIN_SEED_PASSWORD
-    note "stored your admin password as ADMIN_SEED_PASSWORD in .env (used at seed time below)"
+    note "stored your admin password as base64 in ADMIN_SEED_PASSWORD_B64 in .env (used at seed time below)"
   elif (( DRY_RUN )); then
-    note "would generate ADMIN_SEED_PASSWORD into .env (used at seed time)"
+    note "would generate ADMIN_SEED_PASSWORD_B64 into .env (used at seed time)"
   else
     ADMIN_SEED_PASSWORD="Admin-$(openssl rand -hex 12)"
-    set_env ADMIN_SEED_PASSWORD "$ADMIN_SEED_PASSWORD"
+    ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
+    set_env ADMIN_SEED_PASSWORD_B64 "$ADMIN_SEED_PASSWORD_B64"
     export ADMIN_SEED_PASSWORD
     generated_admin_password=1
-    note "generated ADMIN_SEED_PASSWORD into .env (used at seed time below)"
+    note "generated ADMIN_SEED_PASSWORD and stored its base64 value in .env (used at seed time below)"
   fi
+fi
+
+if [[ -n "${ADMIN_SEED_PASSWORD:-}" ]] && ! valid_admin_password "$ADMIN_SEED_PASSWORD"; then
+  fail "ADMIN_SEED_PASSWORD must be 8–1024 characters and contain a Unicode letter and decimal digit"
 fi
 
 expected_osmium="${MAP_OSMIUM_VERSION:-1.16.0}"
@@ -371,7 +439,8 @@ run_selection_form() {
         while :; do
           read_form_line "  Snapshot date (YYYY-MM-DD): "
           case "${FORM_REPLY,,}" in q|quit) fail "aborted by user" ;; esac
-          if python3 -c 'import datetime,sys; datetime.date.fromisoformat(sys.argv[1])' "$FORM_REPLY" >/dev/null 2>&1; then
+          if [[ "$FORM_REPLY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] && \
+             python3 -c 'import datetime,sys; datetime.date.fromisoformat(sys.argv[1])' "$FORM_REPLY" >/dev/null 2>&1; then
             FORM_SNAPSHOT="$FORM_REPLY"
             break
           fi
@@ -463,7 +532,9 @@ run_selection_form() {
 
 # Resolve the map library and recover an already-installed selection/snapshot
 # when .env has none yet (for example on the first run after upgrading).
-LEGACY_OSRM_DATA_DIR="${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}"
+# Migration may inspect only the historical project-local directory; never
+# treat a user-configured external MAP_OSRM_DATA_DIR as disposable legacy data.
+LEGACY_OSRM_DATA_DIR="$REPO_ROOT/map-server/osrm/data"
 MAP_LIBRARY_DIR="$(canonical_library_dir "${ARG_MAP_LIBRARY:-${SETUP_MAP_LIBRARY:-${MAP_LIBRARY_DIR:-$(default_map_library_dir)}}}")"
 
 library_current_selection=""
@@ -651,6 +722,11 @@ if (( DRY_RUN )); then
     note "dataset PBF:   missing/stale -> prepare stage would RUN (downloads/crops/merge)"
     plan_sha=""
   fi
+  if ! dry_source_rows="$(python3 "$REGIONS_PY" sources "$REGION_IDS" \
+      --snapshot "$SNAPSHOT_DATE" --source-policy "$SOURCE_POLICY" \
+      --library "$MAP_LIBRARY_DIR")"; then
+    fail "could not resolve source rows for the dry-run plan (see above)"
+  fi
   while IFS=$'\t' read -r _sid _surl sfile _smd5 _sbytes _sapprox _continent _country _relative spath _sdate; do
     if [[ -s "$spath" ]]; then
       if [[ "$SOURCE_POLICY" == "refresh" ]]; then
@@ -665,9 +741,7 @@ if (( DRY_RUN )); then
     else
       note "  source $sfile: would download"
     fi
-  done < <(python3 "$REGIONS_PY" sources "$REGION_IDS" \
-    --snapshot "$SNAPSHOT_DATE" --source-policy "$SOURCE_POLICY" \
-    --library "$MAP_LIBRARY_DIR")
+  done <<< "$dry_source_rows"
   if [[ -s map-server/data/tehran.source.json || -s "map-server/data/${DATASET}.source.json" ]]; then
     note "legacy project-local map artifacts: present -> migration into the map library would be attempted"
   fi
@@ -777,7 +851,9 @@ if (( osrm_fresh )); then
 else
   if (( osrm_any )); then
     stale_backup="${OSRM_DATA_DIR}/.stale-$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$stale_backup"
+    [[ ! -e "$stale_backup" && ! -L "$stale_backup" ]] || \
+      fail "stale OSRM backup staging path already exists: $stale_backup; inspect it before continuing"
+    mkdir -- "$stale_backup"
     for profile in car bicycle foot; do
       [[ -e "${OSRM_DATA_DIR}/${profile}" ]] && mv -- "${OSRM_DATA_DIR}/${profile}" "$stale_backup/"
     done
@@ -799,12 +875,25 @@ reset_nominatim_volume() {
     docker compose --profile geocoding-import rm -f nominatim >/dev/null 2>&1 || true
   fi
   if [[ -z "$volume" ]]; then
+    local compose_project="" volume_list=""
+    if ! compose_project="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"; then
+      fail "could not determine the Compose project name; refusing to search/delete a Nominatim volume globally. Inspect this project's volumes manually."
+    fi
+    [[ -n "$compose_project" ]] || \
+      fail "Compose did not report a project name; refusing to search/delete a Nominatim volume globally. Inspect this project's volumes manually."
+    if ! volume_list="$(docker volume ls -q \
+        --filter "label=com.docker.compose.project=$compose_project" \
+        --filter 'label=com.docker.compose.volume=nominatim-data')"; then
+      fail "could not list Nominatim volumes for Compose project $compose_project"
+    fi
     local -a candidates=()
-    mapfile -t candidates < <(docker volume ls -q | grep -E '(^|_)nominatim-data$' || true)
+    if [[ -n "$volume_list" ]]; then
+      mapfile -t candidates <<< "$volume_list"
+    fi
     if (( ${#candidates[@]} == 1 )); then
       volume="${candidates[0]}"
     elif (( ${#candidates[@]} > 1 )); then
-      fail "multiple Nominatim volumes found (${candidates[*]}); remove this project's one manually (docker volume rm <name>) after stopping nominatim, delete $MAP_PHOTON_DATA_DIR/photon_data and $PHOTON_STAMP, then re-run."
+      fail "multiple Nominatim volumes found for Compose project $compose_project (${candidates[*]}); inspect them and remove this project's obsolete volume manually."
     fi
   fi
   if [[ -n "$volume" ]]; then
@@ -906,13 +995,13 @@ note "map library: $MAP_LIBRARY_DIR"
 note "active dataset: $MAP_DATASET_DIR"
 cat <<EOF
   Admin login (web client):  username "admin"
-    password: ${generated_admin_password:+the ADMIN_SEED_PASSWORD generated into .env during this run}
+    password: ${generated_admin_password:+the ADMIN_SEED_PASSWORD generated during this run}
 EOF
 if (( ! generated_admin_password )); then
-  note "password: the ADMIN_SEED_PASSWORD value in .env — but only if the seed created the admin with it."
+  note "password: the ADMIN_SEED_PASSWORD used at seed time (when setup saved it, .env stores it as ADMIN_SEED_PASSWORD_B64)."
   note "If admin login fails, reset it: docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts '<new-password>'"
 else
-  note "password (also in .env): ${ADMIN_SEED_PASSWORD}"
+  note "password (stored base64 as ADMIN_SEED_PASSWORD_B64 in .env): ${ADMIN_SEED_PASSWORD}"
 fi
 cat <<'EOF'
 

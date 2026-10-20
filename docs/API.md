@@ -347,7 +347,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`; `GET /_public/health`, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, and `POST /_admin/users` are currently marked `implemented`.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, and admin user list/detail/create/status; SOS, live-location, mission, and most search operations remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 

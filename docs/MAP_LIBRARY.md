@@ -86,7 +86,10 @@ The catalog's continent assignment is explicit in `map-server/regions.json`.
 Regional Geofabrik extracts remain regional files: “one version per country”
 means one release date for that country, not an inefficient requirement to
 download a whole-country PBF when a smaller official regional extract covers
-the selected city.
+the selected city. The library root must be outside the repository checkout;
+the setup form also requires an absolute, whitespace-free path using safe
+`.env`/Compose characters (`A-Z`, `a-z`, digits, `/`, `.`, `_`, `@`, `+`, `-`).
+
 
 The dataset fingerprint is derived from the snapshot date and canonical area
 selection. Runtime paths are persisted in `.env`:
@@ -105,9 +108,11 @@ MAP_DATA_VERSION=2026-10-18
 ```
 
 Compose mounts `MAP_DATASET_DIR` for Martin/Nominatim,
-`MAP_OSRM_DATA_DIR` for OSRM, and `MAP_PHOTON_DATA_DIR` for Photon. The old
-project-local paths remain only as Compose fallbacks for a checkout that has
-not run the new setup yet.
+`MAP_OSRM_DATA_DIR` for OSRM, and `MAP_PHOTON_DATA_DIR` for Photon. Before setup
+writes those paths, Compose uses isolated empty placeholders under the external
+library's `.compose-unconfigured/` directory. This avoids creating project-local
+map data or occupying `datasets/current` and the standard routing/geocoding
+paths before the library is initialized.
 
 ## 3. Normal setup and updates
 
@@ -164,7 +169,19 @@ cd ~/borobiya
 set -a
 source .env
 set +a
-export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+if [[ -z "${MAP_LIBRARY_DIR:-}" ]]; then
+  if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    [[ "$XDG_DATA_HOME" == /* ]] || { echo 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly.' >&2; exit 1; }
+    MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
+  elif [[ -n "${HOME:-}" && "$HOME" == /* ]]; then
+    MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
+  else
+    echo 'Set MAP_LIBRARY_DIR to an external absolute path (or set absolute HOME/XDG_DATA_HOME).' >&2
+    exit 1
+  fi
+fi
+[[ "$MAP_LIBRARY_DIR" == /* ]] || { echo 'MAP_LIBRARY_DIR must be absolute.' >&2; exit 1; }
+export MAP_LIBRARY_DIR
 eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" \
   --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" \
   --source-policy "${MAP_SOURCE_POLICY:-cache-first}" \
@@ -205,12 +222,15 @@ map-server/osrm/data/
 map-server/photon/data/
 ```
 
-For a pinned Tehran-only or catalog-era `borobiya` dataset, it checks the
-manifest hashes before moving anything. Sources, crops, merged PBF, PMTiles,
-OSRM graphs, Photon index, and stamps are moved into the standardized
-library; a version-3 provenance manifest is generated there. The historical
-Iran `iran-latest` filename is accepted only when its MD5, byte count, data
-date, and timestamp prove it is exactly the pinned dated snapshot.
+For a pinned Tehran-only or catalog-era `borobiya` dataset, migration checks
+the manifest's selection, snapshot, bounds, crop strategy, and content hashes
+before moving anything. In particular, a Tehran v1 manifest must prove the
+catalog Tehran bbox and `smart` crop strategy; its crop hash alone is not
+accepted as provenance. Sources, crops, merged PBF, PMTiles, OSRM graphs,
+Photon index, and stamps are moved into the standardized library; a version-3
+provenance manifest is generated there. The historical Iran `iran-latest`
+filename is accepted only when its MD5, byte count, data date, and timestamp
+prove it is exactly the pinned dated snapshot.
 
 If legacy hashes do not prove the dataset, migration is skipped without
 deleting the old files and the normal library build proceeds.
@@ -228,6 +248,7 @@ deleting the old files and the normal library build proceeds.
   fingerprint, source/crop library paths, and merged SHA-256.
 - PMTiles and OSRM metadata record the dataset PBF SHA-256 and snapshot date.
 - The Photon stamp records the exact dataset SHA-256 used for its index.
+- A setup fast-path re-hashes library sources/crops, checks source MD5/size and metadata, and requires city-crop metadata to match the installed Osmium version; missing or altered cache files are rebuilt instead of being accepted by existence alone.
 
 Do not edit catalog checksums to accept a mismatched download. Delete or
 replace the bad library file and download the official dated file again.

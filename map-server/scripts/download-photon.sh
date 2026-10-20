@@ -30,13 +30,15 @@ if [[ -s "$PHOTON_JAR" ]] && [[ "$(sha256_file "$PHOTON_JAR")" == "$PHOTON_SHA25
   exit 0
 fi
 
-temp_jar="$PHOTON_JAR.part"
-trap 'rm -f "${temp_jar:-}"' EXIT
+temp_dir="$(mktemp -d "$(dirname -- "$PHOTON_JAR")/.photon-download.XXXXXX")"
+temp_jar="$temp_dir/photon.jar"
+trap 'rm -rf -- "${temp_dir:-}"' EXIT
 printf 'Downloading Photon %s...\n' "$PHOTON_VERSION"
 curl -fL --retry 3 --retry-delay 2 "$PHOTON_URL" -o "$temp_jar"
 actual_sha256="$(sha256_file "$temp_jar")"
 [[ "$actual_sha256" == "$PHOTON_SHA256" ]] || \
   fail "Photon JAR checksum mismatch: expected $PHOTON_SHA256, received $actual_sha256"
 mv -- "$temp_jar" "$PHOTON_JAR"
+rmdir -- "$temp_dir"
 trap - EXIT
 printf 'Verified Photon JAR: %s (SHA-256 %s)\n' "$PHOTON_JAR" "$actual_sha256"

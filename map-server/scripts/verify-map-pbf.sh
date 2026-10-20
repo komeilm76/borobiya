@@ -14,14 +14,18 @@ fail() {
   exit 1
 }
 
-if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR"
+elif [[ -n "${XDG_DATA_HOME:-}" ]]; then
+  [[ "$XDG_DATA_HOME" == /* ]] || fail 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly or correct XDG_DATA_HOME'
   DEFAULT_MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
 elif [[ -n "${HOME:-}" ]]; then
+  [[ "$HOME" == /* ]] || fail 'HOME must be absolute to derive the external map library; set MAP_LIBRARY_DIR explicitly'
   DEFAULT_MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
 else
-  DEFAULT_MAP_LIBRARY_DIR="$REPO_ROOT/map-server/data"
+  fail 'HOME and XDG_DATA_HOME are unset; set MAP_LIBRARY_DIR to an external absolute path'
 fi
-MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-$DEFAULT_MAP_LIBRARY_DIR}"
+MAP_LIBRARY_DIR="$DEFAULT_MAP_LIBRARY_DIR"
 # shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
 case "$MAP_LIBRARY_DIR" in
   "~") MAP_LIBRARY_DIR="${HOME:-}" ;;

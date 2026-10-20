@@ -29,15 +29,18 @@ borobiya/
 │
 ├── packages/
 │   ├── shared/               # Zod schemas + API contracts
-│   ├── server/               # Fastify API skeleton; Dockerfile lives here
-│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse scaffold
+│   ├── server/               # Fastify API with database-backed auth/account routes
+│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse + MapLibre
 │
 ├── map-server/
-│   ├── README.md             # Runtime data location and current asset limitations
-│   └── data/                 # (gitignored; created/populated locally) Martin tile sources
+│   ├── README.md             # map-server setup and runtime-data status
+│   ├── scripts/              # region catalog, source/crop pipeline, library manager, verifiers
+│   ├── routing-gateway/      # route/geocoding adapter and map-config endpoint
+│   ├── styles/, sprites/, fonts/ # committed MapLibre assets
+│   └── photon/               # Photon Dockerfile; release JAR is ignored
 │
-├── docker-compose.yml        # api, postgres, map-server, nginx
-├── nginx.conf                # local HTTP gateway for /api, /docs, and /map
+├── docker-compose.yml        # API, PostGIS, map stack, and local gateway
+├── nginx.conf                # local HTTP gateway for /api, /docs, /map, and map APIs
 ├── .dockerignore
 ├── .env.example
 ├── .env                      # (gitignored) local secrets/config
@@ -251,13 +254,15 @@ map-server/
 ├── styles/                   # committed light/dark MapLibre styles
 ├── sprites/                  # committed SVG source artwork for Martin sprites
 ├── fonts/                    # licensed TTFs and provenance
-├── scripts/                  # tile, routing, and asset verification/build scripts
-├── routing-gateway/          # project POST /route adapter and tests
-├── data/                     # local generated PMTiles; ignored by Git
-└── osrm/data/                # local car/bicycle/foot OSRM graphs; ignored by Git
+├── scripts/                  # region catalog, source/crop pipeline, library manager, verifiers
+├── routing-gateway/          # route/geocoding adapter, public map config, and tests
+└── photon/                   # Photon Dockerfile; versioned JAR is ignored
+
+# Runtime map content is stored outside the checkout by default:
+<MAP_LIBRARY_DIR>/              # sources, crops, merged dataset, PMTiles, OSRM, Photon index
 ```
 
-Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount and PostGIS. Committed light/dark styles, SVG sprite sources, Noto Sans/Noto Naskh Arabic fonts, and `martin.yaml` configure the style runtime. The ignored PMTiles archive is not generated. Compose also defines three optional OSRM profile services plus a project-contract routing gateway; the OSRM graphs are not generated, and the real offline route test remains pending an approved PBF and Docker/OSRM runtime. See [`MAP_SERVER.md`](./MAP_SERVER.md) for the design and runbook; Photon is not configured yet.
+Compose runs Martin 1.16.1 from the read-only active dataset directory in `MAP_DATASET_DIR`, with committed styles, SVG sprites, licensed fonts, and `martin.yaml`. Routing gateway, three optional OSRM profile services, Photon, and the import-only Nominatim service are configured; generated PMTiles, graphs, and Photon index are intentionally not committed and are built in the external map library. The original Tehran pipeline passed tile/routing/geocoding acceptance on the target VM on 2026-10-20. VM migration/offline acceptance for the current standardized-library refactor is still required before PR #2 is merged. See [`MAP_SERVER.md`](./MAP_SERVER.md) and [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 
 ---
 
@@ -275,7 +280,7 @@ Compose runs Martin 1.16.1 against the read-only `map-server/data/` bind mount a
 
 `.env.example` includes API validation settings plus these Compose variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `API_PORT`, `MAP_SERVER_PORT`, and `NGINX_PORT`. The sample JWT/Postgres values are placeholders and must be changed outside local scaffolding.
 
-Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup. Registration queries open database connections on demand; migrations and seeds are not automatic.
+Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup. Auth, recovery, session, onboarding, and user/admin account routes use the database on demand; migrations and seeds are explicit operations, not automatic startup steps.
 
 ---
 
@@ -283,7 +288,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
 - Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
-- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations, and `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup; runtime database access currently supports registration and login sessions.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations; `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup. Database-backed routes include registration/login, refresh/logout, recovery, onboarding, and user/admin account management; SOS, live-location, and mission persistence remain future work.
 
 ---
 
@@ -345,14 +350,14 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 
 ## 12. Foundation Status
 
-- [x] Bun workspaces, shared contracts, Fastify skeleton, and Vue client scaffold
-- [x] Root `bun run dev` orchestration for API + client
-- [x] Docker Compose services (`api`, `postgres`, `map-server`, `nginx`) and local gateway config
-- [x] `.env.example`, `.gitignore`, and Docker build exclusions
-- [x] Drizzle/Postgres.js decision, schema/migrations, seed data, and Argon2id bootstrap
-- [x] Registration handler with database-backed persistence and Argon2id hashes
-- [x] Login handler with Argon2id verification, 15m/7d JWT issuance, session persistence, and rate limiting
-- [ ] Refresh/logout, recovery, and remaining auth/domain handlers
-- [ ] Map tile/style/routing/geocoding data and generation pipeline
+- [x] Bun workspaces, shared contracts, Fastify API, Vue client, and root `bun run dev`
+- [x] Compose API/PostGIS/Martin/routing gateway/Nginx plus optional OSRM, Photon, and Nominatim profiles
+- [x] Drizzle/Postgres.js schema, checked-in migrations, explicit seeding, Argon2id passwords, and runtime migrator
+- [x] Registration/login, refresh/logout, recovery, security-question onboarding, session authorization, and admin account-management routes
+- [x] MapLibre canvas, local styles/sprites/fonts, runtime map config, light/dark switching, and map-resource cache fallback
+- [x] Selectable-area PBF pipeline, pinned/latest/specific snapshots, source policies, external map library, migration, activation, and pruning code/tests
+- [x] Original Tehran tile/routing/geocoding acceptance on the target VM (2026-10-20)
+- [ ] VM migration/offline acceptance for the current standardized-library refactor before PR #2 is merged
+- [ ] SOS, live-location sharing, mission workflows, route/search UI, and Android/Capacitor integration
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 
