@@ -219,7 +219,7 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 
 ### 6.3 Versioning & Update
 
-- Martin exposes each PMTiles archive by its filename-derived source ID, e.g. `/tehran/{z}/{x}/{y}`; versioned archives can use distinct source IDs. A separate `X-Map-Data-Version` response header remains a future update-pipeline feature.
+- Martin exposes each PMTiles archive by its filename-derived source ID; the map dataset is always published as `/borobiya/{z}/{x}/{y}` whatever areas it contains, so area changes never rename the source. A separate `X-Map-Data-Version` response header remains a future update-pipeline feature.
 - Update pipeline: `bun run map:update --region=iran` → download PBF → generate → stage → admin approves promote → symlink swap (zero downtime).
 
 ### 6.4 Offline Guarantees
@@ -390,7 +390,7 @@ Same `docker-compose.yml` behind nginx TLS + Let's Encrypt, VM: Ubuntu 22.04/24.
 
 ### Dev Windows
 
-Bun + Postgres local + Martin binary → `data/maps/tehran.pmtiles`; no Docker.
+Bun + Postgres local + Martin binary → `data/maps/borobiya.pmtiles`; no Docker.
 
 ---
 

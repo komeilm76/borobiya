@@ -6,7 +6,6 @@ export type MapCanvasRuntimeConfig = Pick<MapConfig, "bbox" | "minZoom" | "maxZo
 export const DEFAULT_MAP_STYLE = "/map/style/light";
 export const DEFAULT_DARK_MAP_STYLE = "/map/style/dark";
 export const DEFAULT_MAP_ZOOM = 11;
-export const DEFAULT_TEHRAN_CENTER: [number, number] = [51.389, 35.6892];
 export const DEFAULT_MAP_BOUNDS: [number, number, number, number] = [51.0, 35.5, 51.7, 35.9];
 export const MAP_TILE_CACHE_ZOOM_LEVELS = 8;
 
@@ -15,6 +14,19 @@ const FALLBACK_RUNTIME_CONFIG: MapCanvasRuntimeConfig = {
   minZoom: 0,
   maxZoom: 14
 };
+
+/** Center of a [west, south, east, north] bbox as [lng, lat]. */
+export function bboxCenter(bbox: readonly [number, number, number, number]): [number, number] {
+  return [(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2];
+}
+
+/** Whether a [lng, lat] point lies inside a [west, south, east, north] bbox. */
+export function lngLatInBbox(
+  lngLat: readonly [number, number],
+  bbox: readonly [number, number, number, number]
+): boolean {
+  return lngLat[0] >= bbox[0] && lngLat[0] <= bbox[2] && lngLat[1] >= bbox[1] && lngLat[1] <= bbox[3];
+}
 
 export interface MapCanvasDisplayOptions {
   styleUrl?: string;
@@ -39,7 +51,7 @@ export function switchMapStyle(map: Pick<MapLibreMap, "setStyle">, styleUrl?: st
   return nextStyleUrl;
 }
 
-/** Build a same-origin, Tehran-centered MapLibre setup from the public map settings. */
+/** Build a same-origin MapLibre setup centered on the configured bounds. */
 export function createMapCanvasOptions(
   config: MapCanvasRuntimeConfig | null = FALLBACK_RUNTIME_CONFIG,
   display: MapCanvasDisplayOptions = {}
@@ -52,7 +64,7 @@ export function createMapCanvasOptions(
 
   return {
     style: resolveMapStyleUrl(display.styleUrl),
-    center: display.center ?? DEFAULT_TEHRAN_CENTER,
+    center: display.center ?? bboxCenter(runtimeConfig.bbox),
     zoom,
     minZoom,
     maxZoom,

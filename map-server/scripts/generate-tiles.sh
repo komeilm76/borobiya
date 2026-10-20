@@ -4,13 +4,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
-MAP_REGION="${MAP_REGION:-tehran}"
+# MAP_REGION is the stable dataset slug (PMTiles/Martin source name);
+# MAP_REGION_IDS carries the selected areas from regions.json.
+MAP_REGION="${MAP_REGION:-borobiya}"
+MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-2026-10-18}"
 MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
 MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
-# The canonical prepared crop is the default; explicit paths remain available for audited local setups.
-MAP_PBF="${MAP_PBF:-${TEHRAN_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}}"
+# The canonical merged dataset PBF is the default; explicit paths remain available for audited local setups.
+MAP_PBF="${MAP_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}"
 PLANETILER_VERSION="0.10.2"
 PLANETILER_SHA256="f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d"
 PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
@@ -31,7 +34,7 @@ sha256_file() {
   fi
 }
 
-[[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION must be a lowercase region slug'
+[[ "$MAP_REGION" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || fail 'MAP_REGION (dataset slug) must be a lowercase slug'
 [[ "$MAP_DATA_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || fail 'MAP_DATA_VERSION must be a 1-64 character version slug'
 [[ "$MAP_MIN_ZOOM" =~ ^[0-9]+$ ]] || fail 'MAP_MIN_ZOOM must be an integer from 0 to 16'
 [[ "$MAP_MAX_ZOOM" =~ ^[0-9]+$ ]] || fail 'MAP_MAX_ZOOM must be an integer from 0 to 16'
@@ -57,7 +60,7 @@ awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
 if [[ "$MAP_PBF" != /* ]]; then
   MAP_PBF="$PWD/$MAP_PBF"
 fi
-[[ -s "$MAP_PBF" ]] || fail "cropped PBF is missing or empty: $MAP_PBF; run scripts/prepare-tehran-pbf.sh first"
+[[ -s "$MAP_PBF" ]] || fail "dataset PBF is missing or empty: $MAP_PBF; run map-server/scripts/prepare-regions-pbf.sh first"
 
 command -v java >/dev/null 2>&1 || fail 'Java 21+ is required (Planetiler 0.10.2)'
 command -v curl >/dev/null 2>&1 || fail 'curl is required'
@@ -67,7 +70,7 @@ if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1
 fi
 mkdir -p "$MAP_DATA_DIR"
 MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
-MAP_DATA_DIR="$MAP_DATA_DIR" MAP_REGION="$MAP_REGION" MAP_BBOX="$MAP_BBOX" \
+MAP_DATA_DIR="$MAP_DATA_DIR" MAP_REGION="$MAP_REGION" MAP_REGION_IDS="$MAP_REGION_IDS" MAP_BBOX="$MAP_BBOX" \
   "$SCRIPT_DIR/verify-map-pbf.sh" "$MAP_PBF"
 PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
 OUTPUT="$MAP_DATA_DIR/$MAP_REGION.pmtiles"
@@ -114,12 +117,29 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
 )
 [[ -s "$temp_output" ]] || fail 'Planetiler did not produce a non-empty PMTiles archive'
 
-bbox_json="$(awk -v west="$west" -v south="$south" -v east="$east" -v north="$north" \
-  'BEGIN { printf "[%.15g,%.15g,%.15g,%.15g]", west, south, east, north }')"
-printf '{"region":"%s","dataVersion":"%s","bbox":%s,"minZoom":%d,"maxZoom":%d,"sourcePbfSha256":"%s","sourceManifestSha256":"%s","pmtilesSha256":"%s"}\n' \
-  "$MAP_REGION" "$MAP_DATA_VERSION" "$bbox_json" "$map_min_zoom" "$map_max_zoom" \
+python3 - "$metadata_tmp" "$MAP_REGION" "$MAP_REGION_IDS" "$MAP_DATA_VERSION" \
+  "$west" "$south" "$east" "$north" "$map_min_zoom" "$map_max_zoom" \
   "$(sha256_file "$MAP_PBF")" "$(sha256_file "$MAP_DATA_DIR/$MAP_REGION.source.json")" \
-  "$(sha256_file "$temp_output")" > "$metadata_tmp"
+  "$(sha256_file "$temp_output")" <<'PYEOF'
+import json
+import sys
+
+(output, region, region_ids, data_version, west, south, east, north,
+ min_zoom, max_zoom, pbf_sha256, manifest_sha256, pmtiles_sha256) = sys.argv[1:]
+metadata = {
+    "region": region,
+    "areas": [area for area in region_ids.split(",") if area],
+    "dataVersion": data_version,
+    "bbox": [float(west), float(south), float(east), float(north)],
+    "minZoom": int(min_zoom),
+    "maxZoom": int(max_zoom),
+    "sourcePbfSha256": pbf_sha256,
+    "sourceManifestSha256": manifest_sha256,
+    "pmtilesSha256": pmtiles_sha256,
+}
+with open(output, "w", encoding="utf-8") as metadata_file:
+    metadata_file.write(json.dumps(metadata, separators=(",", ":")) + "\n")
+PYEOF
 mv -f "$temp_output" "$OUTPUT"
 mv -f "$metadata_tmp" "$METADATA"
 trap - EXIT

@@ -3,7 +3,7 @@
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
-      aria-label="نقشهٔ تعاملی تهران"
+      aria-label="نقشهٔ تعاملی"
     />
 
     <header class="user-map-view__toolbar">

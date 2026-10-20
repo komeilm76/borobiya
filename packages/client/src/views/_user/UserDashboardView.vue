@@ -46,7 +46,7 @@
         <div class="user-dashboard__map-preview">
           <MapCanvas
             :style-url="mapStyleUrl"
-            aria-label="پیش‌نمایش نقشهٔ تعاملی تهران"
+            aria-label="پیش‌نمایش نقشهٔ تعاملی"
           />
         </div>
 

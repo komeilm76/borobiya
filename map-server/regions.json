@@ -1,0 +1,1001 @@
+{
+  "version": 1,
+  "snapshot": {
+    "provider": "Geofabrik",
+    "license": "ODbL-1.0",
+    "dataDate": "2026-10-18",
+    "dataTimestamp": "2026-10-18T20:25:06Z"
+  },
+  "sources": {
+    "iran": {
+      "url": "https://download.geofabrik.de/asia/iran-261018.osm.pbf",
+      "md5": "a23eb2f21e426677bd243b2712ec1bc8",
+      "bytes": 229852435,
+      "approxSizeMb": 219
+    },
+    "turkey": {
+      "url": "https://download.geofabrik.de/europe/turkey-261018.osm.pbf",
+      "md5": "41b8063045f92652318cbea61c75a254",
+      "bytes": null,
+      "approxSizeMb": 620
+    },
+    "germany": {
+      "url": "https://download.geofabrik.de/europe/germany-261018.osm.pbf",
+      "md5": "79ba167c47f69615d1f3a2f846932db1",
+      "bytes": 4864295061,
+      "approxSizeMb": 4639
+    },
+    "hessen": {
+      "url": "https://download.geofabrik.de/europe/germany/hessen-261018.osm.pbf",
+      "md5": "ad69e7af6c2843afb0a0f719c18e1fae",
+      "bytes": null,
+      "approxSizeMb": 330
+    },
+    "berlin": {
+      "url": "https://download.geofabrik.de/europe/germany/berlin-261018.osm.pbf",
+      "md5": "674e076e406a176497a8bc87573fedd8",
+      "bytes": null,
+      "approxSizeMb": 95
+    },
+    "bayern": {
+      "url": "https://download.geofabrik.de/europe/germany/bayern-261018.osm.pbf",
+      "md5": "88b80911c59b7493b4ef49169817863a",
+      "bytes": null,
+      "approxSizeMb": 815
+    },
+    "hamburg": {
+      "url": "https://download.geofabrik.de/europe/germany/hamburg-261018.osm.pbf",
+      "md5": "77b5e73ba3146757f77d78cc8f54a9fb",
+      "bytes": null,
+      "approxSizeMb": 51
+    },
+    "nordrhein-westfalen": {
+      "url": "https://download.geofabrik.de/europe/germany/nordrhein-westfalen-261018.osm.pbf",
+      "md5": "2ecb3cf47fae39b89f6219944eedce44",
+      "bytes": null,
+      "approxSizeMb": 872
+    },
+    "baden-wuerttemberg": {
+      "url": "https://download.geofabrik.de/europe/germany/baden-wuerttemberg-261018.osm.pbf",
+      "md5": "ddfd96ade0205cf8353041aeda3b99cb",
+      "bytes": null,
+      "approxSizeMb": 620
+    },
+    "france": {
+      "url": "https://download.geofabrik.de/europe/france-261018.osm.pbf",
+      "md5": "b4d11d257ec8fe262a243bd9e0a5059d",
+      "bytes": null,
+      "approxSizeMb": 4900
+    },
+    "ile-de-france": {
+      "url": "https://download.geofabrik.de/europe/france/ile-de-france-261018.osm.pbf",
+      "md5": "01c96e1ecfa7db9aeb61f74bbfa48724",
+      "bytes": null,
+      "approxSizeMb": 323
+    },
+    "rhone-alpes": {
+      "url": "https://download.geofabrik.de/europe/france/rhone-alpes-261018.osm.pbf",
+      "md5": "e77f2c8da0e778bb978c5a003186ba7a",
+      "bytes": null,
+      "approxSizeMb": 506
+    },
+    "provence-alpes-cote-d-azur": {
+      "url": "https://download.geofabrik.de/europe/france/provence-alpes-cote-d-azur-261018.osm.pbf",
+      "md5": "4993af690d601bfd3221bf15072bde55",
+      "bytes": null,
+      "approxSizeMb": 372
+    },
+    "united-kingdom": {
+      "url": "https://download.geofabrik.de/europe/united-kingdom-261018.osm.pbf",
+      "md5": "1ef0d1e9bf580d1dd5266f0073a68267",
+      "bytes": null,
+      "approxSizeMb": 2100
+    },
+    "greater-london": {
+      "url": "https://download.geofabrik.de/europe/united-kingdom/england/greater-london-261018.osm.pbf",
+      "md5": "6fecc5781ecea23cfa68f274e972fe86",
+      "bytes": null,
+      "approxSizeMb": 123
+    },
+    "greater-manchester": {
+      "url": "https://download.geofabrik.de/europe/united-kingdom/england/greater-manchester-261018.osm.pbf",
+      "md5": "0ea32b7a75d2c401addd918744cb802a",
+      "bytes": null,
+      "approxSizeMb": 49
+    },
+    "netherlands": {
+      "url": "https://download.geofabrik.de/europe/netherlands-261018.osm.pbf",
+      "md5": "d8f4e1c059650150f9666fc5d622bddf",
+      "bytes": 1407159918,
+      "approxSizeMb": 1342
+    },
+    "noord-holland": {
+      "url": "https://download.geofabrik.de/europe/netherlands/noord-holland-261018.osm.pbf",
+      "md5": "b6158dccd3a3c7cb7968bfb606b921c7",
+      "bytes": null,
+      "approxSizeMb": 181
+    },
+    "zuid-holland": {
+      "url": "https://download.geofabrik.de/europe/netherlands/zuid-holland-261018.osm.pbf",
+      "md5": "733881b62702b39a9561854ec1284ffb",
+      "bytes": null,
+      "approxSizeMb": 202
+    },
+    "utrecht": {
+      "url": "https://download.geofabrik.de/europe/netherlands/utrecht-261018.osm.pbf",
+      "md5": "3204343f757d2989c083c39c863fbfd2",
+      "bytes": null,
+      "approxSizeMb": 94
+    }
+  },
+  "countries": [
+    {
+      "id": "ir",
+      "name": "Iran",
+      "localName": "ایران",
+      "language": "fa",
+      "source": "iran",
+      "bbox": [
+        43.5,
+        24.8,
+        63.4,
+        39.9
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "tehran",
+          "name": "Tehran",
+          "localName": "تهران",
+          "bbox": [
+            51.0,
+            35.5,
+            51.7,
+            35.9
+          ],
+          "center": [
+            51.389,
+            35.6892
+          ],
+          "verify": {
+            "routeFrom": [
+              51.38,
+              35.68
+            ],
+            "routeTo": [
+              51.41,
+              35.7
+            ],
+            "geocodeQuery": "Azadi Square"
+          }
+        },
+        {
+          "id": "karaj",
+          "name": "Karaj",
+          "localName": "کرج",
+          "bbox": [
+            50.78,
+            35.72,
+            50.99,
+            35.88
+          ],
+          "center": [
+            50.939,
+            35.84
+          ],
+          "verify": {
+            "routeFrom": [
+              50.92,
+              35.83
+            ],
+            "routeTo": [
+              50.95,
+              35.85
+            ],
+            "geocodeQuery": "Karaj"
+          }
+        },
+        {
+          "id": "mashhad",
+          "name": "Mashhad",
+          "localName": "مشهد",
+          "bbox": [
+            59.43,
+            36.2,
+            59.78,
+            36.42
+          ],
+          "center": [
+            59.606,
+            36.298
+          ],
+          "verify": {
+            "routeFrom": [
+              59.59,
+              36.29
+            ],
+            "routeTo": [
+              59.62,
+              36.31
+            ],
+            "geocodeQuery": "Imam Reza Shrine"
+          }
+        },
+        {
+          "id": "isfahan",
+          "name": "Isfahan",
+          "localName": "اصفهان",
+          "bbox": [
+            51.52,
+            32.53,
+            51.85,
+            32.78
+          ],
+          "center": [
+            51.678,
+            32.653
+          ],
+          "verify": {
+            "routeFrom": [
+              51.66,
+              32.64
+            ],
+            "routeTo": [
+              51.69,
+              32.66
+            ],
+            "geocodeQuery": "Naqsh-e Jahan Square"
+          }
+        },
+        {
+          "id": "shiraz",
+          "name": "Shiraz",
+          "localName": "شیراز",
+          "bbox": [
+            52.38,
+            29.53,
+            52.68,
+            29.72
+          ],
+          "center": [
+            52.532,
+            29.61
+          ],
+          "verify": {
+            "routeFrom": [
+              52.51,
+              29.6
+            ],
+            "routeTo": [
+              52.54,
+              29.62
+            ],
+            "geocodeQuery": "Eram Garden"
+          }
+        },
+        {
+          "id": "tabriz",
+          "name": "Tabriz",
+          "localName": "تبریز",
+          "bbox": [
+            46.18,
+            38.01,
+            46.42,
+            38.14
+          ],
+          "center": [
+            46.292,
+            38.08
+          ],
+          "verify": {
+            "routeFrom": [
+              46.27,
+              38.07
+            ],
+            "routeTo": [
+              46.31,
+              38.09
+            ],
+            "geocodeQuery": "Tabriz Bazaar"
+          }
+        },
+        {
+          "id": "qom",
+          "name": "Qom",
+          "localName": "قم",
+          "bbox": [
+            50.8,
+            34.58,
+            50.97,
+            34.7
+          ],
+          "center": [
+            50.876,
+            34.64
+          ],
+          "verify": {
+            "routeFrom": [
+              50.86,
+              34.63
+            ],
+            "routeTo": [
+              50.89,
+              34.65
+            ],
+            "geocodeQuery": "Fatima Masumeh Shrine"
+          }
+        },
+        {
+          "id": "ahvaz",
+          "name": "Ahvaz",
+          "localName": "اهواز",
+          "bbox": [
+            48.58,
+            31.26,
+            48.77,
+            31.39
+          ],
+          "center": [
+            48.671,
+            31.318
+          ],
+          "verify": {
+            "routeFrom": [
+              48.65,
+              31.31
+            ],
+            "routeTo": [
+              48.68,
+              31.33
+            ],
+            "geocodeQuery": "Ahvaz"
+          }
+        }
+      ]
+    },
+    {
+      "id": "de",
+      "name": "Germany",
+      "localName": "Deutschland",
+      "language": "de",
+      "source": "germany",
+      "bbox": [
+        5.87,
+        47.27,
+        15.04,
+        55.06
+      ],
+      "wholeCountryHeavy": true,
+      "cities": [
+        {
+          "id": "frankfurt",
+          "name": "Frankfurt am Main",
+          "localName": "Frankfurt am Main",
+          "source": "hessen",
+          "bbox": [
+            8.44,
+            50.01,
+            8.81,
+            50.23
+          ],
+          "center": [
+            8.682,
+            50.111
+          ],
+          "verify": {
+            "routeFrom": [
+              8.66,
+              50.1
+            ],
+            "routeTo": [
+              8.69,
+              50.12
+            ],
+            "geocodeQuery": "Frankfurt am Main Hauptbahnhof"
+          }
+        },
+        {
+          "id": "wiesbaden",
+          "name": "Wiesbaden",
+          "localName": "Wiesbaden",
+          "source": "hessen",
+          "bbox": [
+            8.19,
+            50.04,
+            8.33,
+            50.13
+          ],
+          "center": [
+            8.24,
+            50.082
+          ],
+          "verify": {
+            "routeFrom": [
+              8.22,
+              50.07
+            ],
+            "routeTo": [
+              8.25,
+              50.09
+            ],
+            "geocodeQuery": "Wiesbaden Hauptbahnhof"
+          }
+        },
+        {
+          "id": "berlin",
+          "name": "Berlin",
+          "localName": "Berlin",
+          "source": "berlin",
+          "bbox": [
+            13.09,
+            52.34,
+            13.76,
+            52.68
+          ],
+          "center": [
+            13.405,
+            52.52
+          ],
+          "verify": {
+            "routeFrom": [
+              13.38,
+              52.51
+            ],
+            "routeTo": [
+              13.42,
+              52.53
+            ],
+            "geocodeQuery": "Brandenburger Tor"
+          }
+        },
+        {
+          "id": "munich",
+          "name": "Munich",
+          "localName": "München",
+          "source": "bayern",
+          "bbox": [
+            11.36,
+            48.06,
+            11.73,
+            48.25
+          ],
+          "center": [
+            11.576,
+            48.137
+          ],
+          "verify": {
+            "routeFrom": [
+              11.56,
+              48.13
+            ],
+            "routeTo": [
+              11.59,
+              48.15
+            ],
+            "geocodeQuery": "Marienplatz München"
+          }
+        },
+        {
+          "id": "hamburg",
+          "name": "Hamburg",
+          "localName": "Hamburg",
+          "source": "hamburg",
+          "bbox": [
+            9.73,
+            53.4,
+            10.33,
+            53.74
+          ],
+          "center": [
+            9.993,
+            53.551
+          ],
+          "verify": {
+            "routeFrom": [
+              9.97,
+              53.54
+            ],
+            "routeTo": [
+              10.01,
+              53.56
+            ],
+            "geocodeQuery": "Hamburg Hauptbahnhof"
+          }
+        },
+        {
+          "id": "cologne",
+          "name": "Cologne",
+          "localName": "Köln",
+          "source": "nordrhein-westfalen",
+          "bbox": [
+            6.83,
+            50.83,
+            7.1,
+            51.09
+          ],
+          "center": [
+            6.96,
+            50.938
+          ],
+          "verify": {
+            "routeFrom": [
+              6.94,
+              50.93
+            ],
+            "routeTo": [
+              6.97,
+              50.95
+            ],
+            "geocodeQuery": "Kölner Dom"
+          }
+        },
+        {
+          "id": "dusseldorf",
+          "name": "Düsseldorf",
+          "localName": "Düsseldorf",
+          "source": "nordrhein-westfalen",
+          "bbox": [
+            6.69,
+            51.15,
+            6.87,
+            51.3
+          ],
+          "center": [
+            6.776,
+            51.228
+          ],
+          "verify": {
+            "routeFrom": [
+              6.76,
+              51.22
+            ],
+            "routeTo": [
+              6.79,
+              51.24
+            ],
+            "geocodeQuery": "Düsseldorf Hauptbahnhof"
+          }
+        },
+        {
+          "id": "dortmund",
+          "name": "Dortmund",
+          "localName": "Dortmund",
+          "source": "nordrhein-westfalen",
+          "bbox": [
+            7.36,
+            51.45,
+            7.58,
+            51.6
+          ],
+          "center": [
+            7.466,
+            51.514
+          ],
+          "verify": {
+            "routeFrom": [
+              7.45,
+              51.51
+            ],
+            "routeTo": [
+              7.48,
+              51.52
+            ],
+            "geocodeQuery": "Dortmund Hauptbahnhof"
+          }
+        },
+        {
+          "id": "stuttgart",
+          "name": "Stuttgart",
+          "localName": "Stuttgart",
+          "source": "baden-wuerttemberg",
+          "bbox": [
+            9.04,
+            48.69,
+            9.32,
+            48.87
+          ],
+          "center": [
+            9.182,
+            48.776
+          ],
+          "verify": {
+            "routeFrom": [
+              9.17,
+              48.77
+            ],
+            "routeTo": [
+              9.19,
+              48.79
+            ],
+            "geocodeQuery": "Stuttgart Hauptbahnhof"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tr",
+      "name": "Turkey",
+      "localName": "Türkiye",
+      "language": "tr",
+      "source": "turkey",
+      "bbox": [
+        25.66,
+        35.82,
+        44.83,
+        42.11
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "istanbul",
+          "name": "Istanbul",
+          "localName": "İstanbul",
+          "bbox": [
+            28.69,
+            40.8,
+            29.46,
+            41.31
+          ],
+          "center": [
+            28.979,
+            41.013
+          ],
+          "verify": {
+            "routeFrom": [
+              28.96,
+              41.0
+            ],
+            "routeTo": [
+              28.99,
+              41.03
+            ],
+            "geocodeQuery": "Hagia Sophia"
+          }
+        },
+        {
+          "id": "ankara",
+          "name": "Ankara",
+          "localName": "Ankara",
+          "bbox": [
+            32.58,
+            39.73,
+            33.08,
+            40.08
+          ],
+          "center": [
+            32.854,
+            39.921
+          ],
+          "verify": {
+            "routeFrom": [
+              32.83,
+              39.91
+            ],
+            "routeTo": [
+              32.86,
+              39.93
+            ],
+            "geocodeQuery": "Anıtkabir"
+          }
+        },
+        {
+          "id": "izmir",
+          "name": "Izmir",
+          "localName": "İzmir",
+          "bbox": [
+            26.98,
+            38.3,
+            27.32,
+            38.56
+          ],
+          "center": [
+            27.142,
+            38.424
+          ],
+          "verify": {
+            "routeFrom": [
+              27.12,
+              38.41
+            ],
+            "routeTo": [
+              27.15,
+              38.43
+            ],
+            "geocodeQuery": "Izmir Clock Tower"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fr",
+      "name": "France",
+      "localName": "France",
+      "language": "fr",
+      "source": "france",
+      "bbox": [
+        -5.14,
+        41.33,
+        9.56,
+        51.09
+      ],
+      "wholeCountryHeavy": true,
+      "cities": [
+        {
+          "id": "paris",
+          "name": "Paris",
+          "localName": "Paris",
+          "source": "ile-de-france",
+          "bbox": [
+            2.12,
+            48.78,
+            2.56,
+            48.95
+          ],
+          "center": [
+            2.352,
+            48.857
+          ],
+          "verify": {
+            "routeFrom": [
+              2.33,
+              48.85
+            ],
+            "routeTo": [
+              2.36,
+              48.87
+            ],
+            "geocodeQuery": "Eiffel Tower"
+          }
+        },
+        {
+          "id": "lyon",
+          "name": "Lyon",
+          "localName": "Lyon",
+          "source": "rhone-alpes",
+          "bbox": [
+            4.74,
+            45.69,
+            4.96,
+            45.83
+          ],
+          "center": [
+            4.835,
+            45.758
+          ],
+          "verify": {
+            "routeFrom": [
+              4.82,
+              45.75
+            ],
+            "routeTo": [
+              4.85,
+              45.77
+            ],
+            "geocodeQuery": "Place Bellecour Lyon"
+          }
+        },
+        {
+          "id": "marseille",
+          "name": "Marseille",
+          "localName": "Marseille",
+          "source": "provence-alpes-cote-d-azur",
+          "bbox": [
+            5.31,
+            43.24,
+            5.49,
+            43.36
+          ],
+          "center": [
+            5.37,
+            43.296
+          ],
+          "verify": {
+            "routeFrom": [
+              5.35,
+              43.29
+            ],
+            "routeTo": [
+              5.38,
+              43.31
+            ],
+            "geocodeQuery": "Vieux-Port Marseille"
+          }
+        }
+      ]
+    },
+    {
+      "id": "gb",
+      "name": "United Kingdom",
+      "localName": "United Kingdom",
+      "language": "en",
+      "source": "united-kingdom",
+      "bbox": [
+        -8.65,
+        49.86,
+        1.77,
+        60.86
+      ],
+      "wholeCountryHeavy": true,
+      "cities": [
+        {
+          "id": "london",
+          "name": "London",
+          "localName": "London",
+          "source": "greater-london",
+          "bbox": [
+            -0.51,
+            51.28,
+            0.34,
+            51.69
+          ],
+          "center": [
+            -0.118,
+            51.509
+          ],
+          "verify": {
+            "routeFrom": [
+              -0.13,
+              51.5
+            ],
+            "routeTo": [
+              -0.1,
+              51.52
+            ],
+            "geocodeQuery": "Tower Bridge"
+          }
+        },
+        {
+          "id": "manchester",
+          "name": "Manchester",
+          "localName": "Manchester",
+          "source": "greater-manchester",
+          "bbox": [
+            -2.33,
+            53.44,
+            -2.17,
+            53.51
+          ],
+          "center": [
+            -2.242,
+            53.481
+          ],
+          "verify": {
+            "routeFrom": [
+              -2.25,
+              53.47
+            ],
+            "routeTo": [
+              -2.23,
+              53.49
+            ],
+            "geocodeQuery": "Manchester Piccadilly"
+          }
+        }
+      ]
+    },
+    {
+      "id": "nl",
+      "name": "Netherlands",
+      "localName": "Nederland",
+      "language": "nl",
+      "source": "netherlands",
+      "bbox": [
+        3.36,
+        50.75,
+        7.23,
+        53.47
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "amsterdam",
+          "name": "Amsterdam",
+          "localName": "Amsterdam",
+          "source": "noord-holland",
+          "bbox": [
+            4.73,
+            52.28,
+            5.03,
+            52.43
+          ],
+          "center": [
+            4.904,
+            52.368
+          ],
+          "verify": {
+            "routeFrom": [
+              4.89,
+              52.36
+            ],
+            "routeTo": [
+              4.91,
+              52.38
+            ],
+            "geocodeQuery": "Amsterdam Centraal"
+          }
+        },
+        {
+          "id": "rotterdam",
+          "name": "Rotterdam",
+          "localName": "Rotterdam",
+          "source": "zuid-holland",
+          "bbox": [
+            4.39,
+            51.87,
+            4.58,
+            51.96
+          ],
+          "center": [
+            4.478,
+            51.924
+          ],
+          "verify": {
+            "routeFrom": [
+              4.46,
+              51.91
+            ],
+            "routeTo": [
+              4.49,
+              51.93
+            ],
+            "geocodeQuery": "Rotterdam Centraal"
+          }
+        },
+        {
+          "id": "the-hague",
+          "name": "The Hague",
+          "localName": "Den Haag",
+          "source": "zuid-holland",
+          "bbox": [
+            4.24,
+            52.04,
+            4.36,
+            52.12
+          ],
+          "center": [
+            4.3,
+            52.078
+          ],
+          "verify": {
+            "routeFrom": [
+              4.29,
+              52.07
+            ],
+            "routeTo": [
+              4.31,
+              52.09
+            ],
+            "geocodeQuery": "Den Haag Centraal"
+          }
+        },
+        {
+          "id": "utrecht",
+          "name": "Utrecht",
+          "localName": "Utrecht",
+          "source": "utrecht",
+          "bbox": [
+            5.05,
+            52.06,
+            5.18,
+            52.13
+          ],
+          "center": [
+            5.109,
+            52.092
+          ],
+          "verify": {
+            "routeFrom": [
+              5.1,
+              52.08
+            ],
+            "routeTo": [
+              5.12,
+              52.1
+            ],
+            "geocodeQuery": "Utrecht Centraal"
+          }
+        }
+      ]
+    }
+  ]
+}

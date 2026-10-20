@@ -61,8 +61,8 @@ gantt
 
 ### M1.3 Map Server (Independent)
 - [x] Choose and pin **Martin + Planetiler + OSRM + Photon** (T1.4.1)
-- [ ] Generate `tehran.pmtiles` from a reuse-approved Tehran PBF and verify Martin's `/{sourceID}/{z}/{x}/{y}` MVT route (T1.4.2)
-- [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; static validation complete, real-server check pending)
+- [x] Generate the `borobiya.pmtiles` dataset archive from reuse-approved pinned PBFs (default Tehran) and verify Martin's `/{sourceID}/{z}/{x}/{y}` MVT route (T1.4.2)
+- [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; verified live incl. browser rendering 2026-10-20)
 - [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas

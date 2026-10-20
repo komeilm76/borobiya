@@ -80,7 +80,7 @@ services:
       # Keep the PBF outside /nominatim (PROJECT_DIR): the mediagis entrypoint
       # recursively chowns that directory under `bash -e`, so a read-only
       # mount inside it makes startup exit 1 ("Read-only file system").
-      PBF_PATH: /osm/${MAP_REGION:-tehran}.osm.pbf
+      PBF_PATH: /osm/${MAP_REGION:-borobiya}.osm.pbf
       NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-change-me}
       IMPORT_STYLE: ${NOMINATIM_IMPORT_STYLE:-full}
       IMPORT_WIKIPEDIA: "false"
@@ -114,7 +114,7 @@ services:
     restart: unless-stopped
     environment:
       JAVA_TOOL_OPTIONS: "${PHOTON_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1536m}"
-    command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "fa"]
+    command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "${PHOTON_DEFAULT_LANGUAGE:-fa}"]
     volumes:
       - ./map-server/photon/data:/var/lib/photon
     ports:
@@ -132,7 +132,7 @@ services:
   osrm-car:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/car:/data:ro
     profiles: ["routing"]
@@ -148,7 +148,7 @@ services:
   osrm-bicycle:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/bicycle:/data:ro
     profiles: ["routing"]
@@ -162,7 +162,7 @@ services:
   osrm-foot:
     image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
     restart: unless-stopped
-    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-tehran}.osrm"]
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
     volumes:
       - ${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}/foot:/data:ro
     profiles: ["routing"]
@@ -180,7 +180,7 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: 3000
-      MAP_REGION: ${MAP_REGION:-tehran}
+      MAP_REGION: ${MAP_REGION:-borobiya}
       MAP_BBOX: ${MAP_BBOX:-51.0,35.5,51.7,35.9}
       MAP_DATA_VERSION: ${MAP_DATA_VERSION:-2026-10-18}
       MAP_MIN_ZOOM: ${MAP_MIN_ZOOM:-0}

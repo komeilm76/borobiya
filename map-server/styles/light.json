@@ -2,10 +2,10 @@
   "version": 8,
   "name": "Borobiya Light",
   "sources": {
-    "tehran": {
+    "borobiya": {
       "type": "vector",
       "tiles": [
-        "/tehran/{z}/{x}/{y}"
+        "/borobiya/{z}/{x}/{y}"
       ],
       "minzoom": 0,
       "maxzoom": 14,
@@ -30,7 +30,7 @@
     {
       "id": "landcover",
       "type": "fill",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "landcover",
       "filter": [
         "has",
@@ -95,7 +95,7 @@
     {
       "id": "landuse",
       "type": "fill",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "landuse",
       "filter": [
         "has",
@@ -156,7 +156,7 @@
     {
       "id": "parks",
       "type": "fill",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "park",
       "paint": {
         "fill-color": "#c7dfbd",
@@ -166,7 +166,7 @@
     {
       "id": "water",
       "type": "fill",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "water",
       "paint": {
         "fill-color": "#a9d6e5"
@@ -175,7 +175,7 @@
     {
       "id": "waterways",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "waterway",
       "paint": {
         "line-color": "#82bfd5",
@@ -203,7 +203,7 @@
     {
       "id": "boundaries",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "boundary",
       "filter": [
         "has",
@@ -235,7 +235,7 @@
     {
       "id": "aeroways",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "aeroway",
       "filter": [
         "match",
@@ -271,7 +271,7 @@
     {
       "id": "buildings",
       "type": "fill",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "building",
       "minzoom": 13,
       "paint": {
@@ -283,7 +283,7 @@
     {
       "id": "road-casing",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -338,7 +338,7 @@
     {
       "id": "roads-local",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -388,7 +388,7 @@
     {
       "id": "roads-secondary",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -429,7 +429,7 @@
     {
       "id": "roads-primary",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -469,7 +469,7 @@
     {
       "id": "roads-highway",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -510,7 +510,7 @@
     {
       "id": "railways",
       "type": "line",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation",
       "filter": [
         "match",
@@ -550,7 +550,7 @@
     {
       "id": "water-labels-point",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "water_name",
       "filter": [
         "all",
@@ -614,7 +614,7 @@
     {
       "id": "water-labels-line",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "water_name",
       "filter": [
         "all",
@@ -680,7 +680,7 @@
     {
       "id": "house-numbers",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "housenumber",
       "filter": [
         "has",
@@ -707,7 +707,7 @@
     {
       "id": "poi-icons",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "poi",
       "filter": [
         "match",
@@ -814,7 +814,7 @@
     {
       "id": "poi-labels",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "poi",
       "filter": [
         "has",
@@ -861,7 +861,7 @@
     {
       "id": "road-labels",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "transportation_name",
       "filter": [
         "all",
@@ -937,7 +937,7 @@
     {
       "id": "place-labels",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "place",
       "filter": [
         "has",
@@ -1005,7 +1005,7 @@
     {
       "id": "aerodrome-labels",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "aerodrome_label",
       "filter": [
         "has",
@@ -1047,7 +1047,7 @@
     {
       "id": "mountain-peak-labels",
       "type": "symbol",
-      "source": "tehran",
+      "source": "borobiya",
       "source-layer": "mountain_peak",
       "filter": [
         "has",

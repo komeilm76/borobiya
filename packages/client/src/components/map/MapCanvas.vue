@@ -26,8 +26,9 @@ import { registerMapCacheWorker } from "@/services/map-cache";
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
-  DEFAULT_TEHRAN_CENTER,
+  bboxCenter,
   createMapCanvasOptions,
+  lngLatInBbox,
   resolveMapStyleUrl,
   switchMapStyle
 } from "./map-canvas-options";
@@ -44,9 +45,8 @@ const props = withDefaults(defineProps<{
   ariaLabel?: string;
 }>(), {
   styleUrl: DEFAULT_MAP_STYLE,
-  center: () => [...DEFAULT_TEHRAN_CENTER] as [number, number],
   zoom: DEFAULT_MAP_ZOOM,
-  ariaLabel: "نقشهٔ تعاملی تهران"
+  ariaLabel: "نقشهٔ تعاملی"
 });
 
 const emit = defineEmits<{
@@ -171,6 +171,17 @@ async function initializeMap(controller: AbortController): Promise<void> {
     map.value.setMinZoom(config.minZoom);
     map.value.setMaxZoom(config.maxZoom);
     map.value.setMaxBounds(config.bbox);
+    // The map starts on the built-in fallback bounds until this config
+    // arrives. When the deployment serves different areas (see
+    // MAP_REGION_IDS) and the caller did not request an explicit center,
+    // move once to the configured bounds instead of stranding the camera
+    // outside them.
+    if (!props.center) {
+      const current = map.value.getCenter();
+      if (!lngLatInBbox([current.lng, current.lat], config.bbox)) {
+        map.value.jumpTo({ center: bboxCenter(config.bbox) });
+      }
+    }
   }).catch((error: unknown) => {
     if (controller.signal.aborted) return;
     reportConfigError(error);

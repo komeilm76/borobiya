@@ -115,7 +115,7 @@ Map Server is a **completely separate service** responsible for:
 
 | Service | Tool Examples (Choose one, document choice) | Endpoint Example |
 |---|---|---|
-| **Vector Tile Serving** | Martin 1.16.1 (PMTiles) | `GET /tehran/{z}/{x}/{y}` (source ID from archive name) |
+| **Vector Tile Serving** | Martin 1.16.1 (PMTiles) | `GET /borobiya/{z}/{x}/{y}` (source ID from archive name) |
 | **Tile Data Generation** | Tippecanoe, Planetiler, OpenMapTiles | Build pipeline |
 | **Style Hosting** | Martin-served JSON + dynamic fonts/sprites | `GET /style/dark`, `GET /style/light` |
 | **Routing** | OSRM, Valhalla, GraphHopper (self-hosted) | `POST /route`, `POST /route/multi` |
@@ -144,7 +144,8 @@ Map Server is a **completely separate service** responsible for:
 ### 3.5. Geographic Coverage of Offline Data
 - **Configurable via ENV / Config File:**
   ```env
-  MAP_REGION=tehran
+  MAP_REGION_IDS=ir-tehran # areas from map-server/regions.json
+  MAP_REGION=borobiya
   MAP_BBOX=51.0,35.5,51.7,35.9 # west,south,east,north
   MAP_DATA_VERSION=development
   MAP_MIN_ZOOM=0
@@ -1036,7 +1037,8 @@ RATE_LIMIT_MAX=100
 
 # Map Server
 MAP_SERVER_URL=http://localhost:8000
-MAP_REGION=tehran
+MAP_REGION_IDS=ir-tehran
+MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=development
 MAP_MIN_ZOOM=0

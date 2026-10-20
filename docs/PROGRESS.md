@@ -82,6 +82,14 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Selectable map areas: country/city form in setup, multi-area dataset
+
+- **Area catalog:** `map-server/regions.json` + `map-server/scripts/regions.py` (15 unit tests). Six countries (Iran, Germany, Turkey, France, UK, Netherlands), 29 cities + whole-country areas; every Geofabrik source pinned to the 2026-10-18 dated snapshot with its official MD5 (verified against Geofabrik's live index/sidecars). Resolver enforces: known IDs, whole-country supersedes its cities, non-overlapping crop rectangles, union bbox, per-selection Photon languages, download estimates, heavy-build flags.
+- **Pipeline generalized:** `prepare-tehran-pbf.sh` → `prepare-regions-pbf.sh` (per-area verified crops under `data/crops/` + `osmium merge` into the single shared dataset, version-2 provenance manifest), `verify-tehran-tiles.sh` → `verify-tiles.sh`; routing/geocoding acceptance is per-area from catalog test points. Dataset slug is now the constant `borobiya` (styles/Martin/Nginx/Vite proxy follow it; Vite derives the tile prefix from the validated map config), so changing areas is data-only. Single-source `MAP_SOURCE_*` env vars retired in favor of `MAP_REGION_IDS` + catalog pins; Photon default language is configurable (`PHOTON_DEFAULT_LANGUAGE`).
+- **Setup script form:** `setup-ubuntu-vm.sh` now asks for countries then cities (multi-select, whole-country option, summary + confirm, optional admin-password prompt) and also supports `--regions`, `--list-regions`, `--reselect`, `--yes`, `--dry-run`. Stage skipping is checksum-based (PMTiles/OSRM metadata + Photon stamp vs dataset SHA-256); changing the selection rebuilds only stale stages (stale OSRM graphs moved aside; Nominatim volume + Photon index reset). Pre-catalog Tehran-only installs migrate in place (`tehran.*` → `borobiya.*`, v1→v2 manifest conversion) instead of rebuilding.
+- **Client:** the map now centers on the configured areas' bounds (bbox center + one-time recenter when the fallback start lies outside the served bounds) instead of a hard-coded Tehran center; `/map-config` default region is the dataset slug.
+- Docs updated across runbook (form + steps 7–13), MAP_SERVER, DEVELOPMENT, ARCHITECTURE, DIAGRAMS, README(s), TASKS/ROADMAP (incl. stale acceptance notes). Validation: shared 32, server 146, client 49, gateway 19, regions 15, all typechecks, ShellCheck, style verifier, catalog validator, 33 runbook bash blocks, synthetic manifest/migration round-trips, dry-run + piped form end-to-end.
+
 ### 2026-10-20 — One-command VM setup script, admin password reset tool, repo re-scan
 
 - **Live map confirmed on the VM** (Tehran renders in the LAN browser after the worker fix).

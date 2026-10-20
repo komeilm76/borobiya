@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 const config = {
-  region: "tehran",
+  region: "borobiya",
   bbox: [51, 35.5, 51.7, 35.9] as [number, number, number, number],
   dataVersion: "development",
   minZoom: 0,

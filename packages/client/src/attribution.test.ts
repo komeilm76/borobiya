@@ -15,7 +15,7 @@ describe("OpenStreetMap attribution", () => {
 
   it("keeps clickable OpenStreetMap attribution in both MapLibre styles", () => {
     for (const style of [lightStyle, darkStyle]) {
-      const attribution = style.sources.tehran.attribution as string;
+      const attribution = style.sources.borobiya.attribution as string;
       expect(attribution).toContain("©");
       expect(attribution).toContain("OpenStreetMap contributors");
       expect(attribution).toContain("https://www.openstreetmap.org/copyright");

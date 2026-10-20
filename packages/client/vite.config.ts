@@ -49,7 +49,7 @@ export default defineConfig(({ mode }) => {
   // Only the proxy process reads service targets; browser code uses same-origin /api, /map, /map-config, /route, /geocode, /reverse, and Martin resource paths.
   const env = loadEnv(mode, repositoryRoot, "");
   // Validate the same public MAP_* settings that the routing gateway exposes at /map-config.
-  parseMapConfig(env);
+  const mapConfig = parseMapConfig(env);
   const apiPrefix = proxyPrefix(env.VITE_API_URL, "/api");
   const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
   const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
@@ -61,7 +61,9 @@ export default defineConfig(({ mode }) => {
   // reaches the dev server through another name/IP, and the map then fails
   // to load. Nginx already preserves the public Host the same way.
   const mapResourceProxy = Object.fromEntries(
-    ["/tehran/", "/sprite/", "/font/"].map((prefix) => [
+    // The tile prefix is the dataset slug from the validated map config
+    // (MAP_REGION); styles reference it root-relative as /<slug>/<z>/<x>/<y>.
+    [`/${mapConfig.region}/`, "/sprite/", "/font/"].map((prefix) => [
       prefix,
       { target: mapServerTarget, changeOrigin: false }
     ])

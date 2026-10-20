@@ -58,8 +58,8 @@ def main() -> None:
     for key in ("sources", "sprite", "glyphs", "transition"):
         if light.get(key) != dark.get(key):
             fail(f"light and dark styles must share {key}")
-    if light["sources"].get("tehran", {}).get("type") != "vector":
-        fail("styles must define the tehran vector source")
+    if light["sources"].get("borobiya", {}).get("type") != "vector":
+        fail("styles must define the borobiya vector source")
     if light.get("sprite") != "/sprite/borobiya" or light.get("glyphs") != "/font/{fontstack}/{range}":
         fail("styles must use the configured local sprite and glyph endpoints")
 

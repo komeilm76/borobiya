@@ -1,6 +1,6 @@
 # Borobiya — Map Server (Offline Vector)
 
-> TL;DR: the offline target self-hosts **Martin 1.16.1**, **OSRM 26.10.0**, and **Photon 1.3.0**. The approved source is Geofabrik's date-pinned Iran OSM snapshot (ODbL 1.0). `prepare-tehran-pbf.sh` verifies it and clips one `MAP_BBOX` PBF for Planetiler, all OSRM profiles, and Nominatim→Photon. Generator/import/proxy smoke tests are scripted; live tile, route, and geocode acceptance remains open until the local Docker/Java 21 run succeeds. For the 4-vCPU/6-GiB Ubuntu 24.04 VM, follow [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md).
+> TL;DR: the offline target self-hosts **Martin 1.16.1**, **OSRM 26.10.0**, and **Photon 1.3.0**. Map areas are selectable (whole countries and/or cities) from the pinned catalog in `map-server/regions.json` — every Geofabrik source is date-pinned to the 2026-10-18 snapshot with its official MD5 (ODbL 1.0); the default selection is Tehran (`ir-tehran`). `prepare-regions-pbf.sh` downloads/verifies the needed extracts, crops each city, and merges them into one shared dataset PBF for Planetiler, all OSRM profiles, and Nominatim→Photon. Live acceptance passed on the target Ubuntu VM on 2026-10-20 (real MVT tile, car/bicycle/foot routes, and forward/reverse geocoding for the Tehran dataset); see `docs/PROGRESS.md`. For the 4-vCPU/6-GiB Ubuntu 24.04 VM, follow [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md).
 
 ---
 
@@ -24,24 +24,24 @@ Clients use:
 ## 2. Architecture
 
 ```
-Geofabrik Iran snapshot (ODbL 1.0)
-              │ download + verify official MD5
+Geofabrik snapshots per selected area (ODbL 1.0, regions.json)
+              │ download + verify official MD5s
               ▼
-       Osmium smart crop (MAP_BBOX)
-              │ map-server/data/tehran.osm.pbf (single shared input)
+       Osmium smart crops + merge
+              │ map-server/data/borobiya.osm.pbf (single shared input)
      ┌────────┼──────────────────┐
      │        │                  │
      ▼        ▼                  ▼
 Planetiler  OSRM extract       Nominatim import
      │      car/bicycle/foot       │
      ▼        │                    ▼
- tehran.pmtiles │           Nominatim PostgreSQL
+borobiya.pmtiles │           Nominatim PostgreSQL
      │        ▼                    │ Photon import
      ▼    OSRM MLD services         ▼
 Martin       │                 Photon 1.3.0
      │        │                    │
      └────────┴──── gateway ───────┘
-         /tehran/{z}/{x}/{y}
+         /borobiya/{z}/{x}/{y}
          POST /route
          GET /geocode and /reverse
 ```
@@ -57,7 +57,7 @@ The following latest stable (non-prerelease) releases were selected from the pro
 | Capability | Selected release | Pinned artifact | Rationale / source |
 |------------|------------------|-----------------|--------------------|
 | Tile serving | **Martin 1.16.1** | `ghcr.io/maplibre/martin:1.16.1` | Official Martin image; serves PMTiles, MBTiles, and PostGIS sources. [Release](https://github.com/maplibre/martin/releases/tag/martin-v1.16.1). |
-| Region crop | **Osmium Tool 1.16.0** | `osmium extract --strategy=smart --bbox=... --set-bounds` | Produces a reference-complete crop for the configured WGS84 box; the manifest records the installed Osmium version. `smart` preserves intersecting multipolygon relations for Nominatim address/country context. Pinned to Ubuntu 24.04's `osmium-tool` package so the target VM needs no override; `prepare-tehran-pbf.sh` fails closed on any other installed version until `MAP_OSMIUM_VERSION` is deliberately changed. [Manual](https://docs.osmcode.org/osmium/latest/osmium-extract.html). |
+| Region crop | **Osmium Tool 1.16.0** | `osmium extract --strategy=smart --bbox=... --set-bounds` | Produces a reference-complete crop for the configured WGS84 box; the manifest records the installed Osmium version. `smart` preserves intersecting multipolygon relations for Nominatim address/country context. Pinned to Ubuntu 24.04's `osmium-tool` package so the target VM needs no override; `prepare-regions-pbf.sh` fails closed on any other installed version until `MAP_OSMIUM_VERSION` is deliberately changed. [Manual](https://docs.osmcode.org/osmium/latest/osmium-extract.html). |
 | Tile generation | **Planetiler 0.10.2** | [`planetiler.jar`](https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar); SHA-256 `f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d` | Produces PMTiles from the shared cropped PBF; Java 21+ is required for the JAR. [Release](https://github.com/onthegomap/planetiler/releases/tag/v0.10.2). |
 | Routing | **OSRM 26.10.0** | `ghcr.io/project-osrm/osrm-backend:v26.10.0-debian` | Official GHCR image; upstream publishes only suffixed version tags (`-debian` is the multi-arch manifest—there is no bare `v26.10.0` tag). The release includes car, bicycle, and foot Lua profiles. [Release](https://github.com/Project-OSRM/osrm-backend/releases/tag/v26.10.0). |
 | Nominatim import | **Nominatim 5.3** | `mediagis/nominatim:5.3-2026-06-23T09-03` | Imports the *same cropped PBF* through local `PBF_PATH` into a local PostGIS database. No replication feed or online lookup is configured. [Project](https://github.com/mediagis/nominatim-docker). |
@@ -70,46 +70,50 @@ The versions are pinned for this pipeline. Upgrade them deliberately: review rel
 
 ## 4. Data Pipeline
 
-### 4.1 Approved canonical source
+### 4.1 Approved canonical sources (region catalog)
 
-The project-approved input is Geofabrik's **Iran snapshot dated 2026-10-18**. The immutable archive was listed at 229,852,435 bytes; do not substitute the moving `iran-latest` URL without recording a new snapshot and checksum.
+All approved inputs live in **`map-server/regions.json`**: selectable areas (whole countries and city crops for Iran, Germany, Turkey, France, the United Kingdom, and the Netherlands) mapped to Geofabrik extracts that are all pinned to the same immutable **2026-10-18 snapshot** — dated `*-261018.osm.pbf` URLs with the official MD5 from each file's `.md5` sidecar. Do not substitute moving `*-latest` URLs; to adopt a newer snapshot, update every URL + MD5 in the catalog together and rebuild. `python3 map-server/scripts/regions.py list` prints the catalog; `validate-catalog` checks its integrity (it runs in the setup script's preflight and in `test_regions.py`).
+
+Default area example (Tehran, `ir-tehran`):
 
 | Item | Value |
 |------|-------|
 | Provider / data license | Geofabrik GmbH / OpenStreetMap data, ODbL 1.0 |
-| Data timestamp | `2026-10-18T20:25:06Z` |
-| Exact PBF URL | [`https://download.geofabrik.de/asia/iran-261018.osm.pbf`](https://download.geofabrik.de/asia/iran-261018.osm.pbf) |
+| Data timestamp (all catalog sources) | `2026-10-18T20:25:06Z` |
+| Exact PBF URL | [`https://download.geofabrik.de/asia/iran-261018.osm.pbf`](https://download.geofabrik.de/asia/iran-261018.osm.pbf) (229,852,435 bytes) |
 | Official Geofabrik MD5 | `a23eb2f21e426677bd243b2712ec1bc8` (sidecar: `https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5`) |
-| Source PBF SHA-256 | Computed by `prepare-tehran-pbf.sh` on first download and stored in the ignored `map-server/data/tehran.source.json`; record the value here after the user's local download. The PBF is not present in this checkout. |
+| Source PBF SHA-256 | Computed on first download and stored per source in the ignored version-2 manifest `map-server/data/borobiya.source.json`. PBFs are not present in this checkout. |
 | Attribution | `© OpenStreetMap contributors` → [ODbL/copyright information](https://www.openstreetmap.org/copyright) |
 
-The data file is Git-ignored and must not be committed. Keep the source URL, data date, MD5, and computed SHA-256 with any externally distributed derived data. Both MapLibre styles and the app footer expose the linked attribution.
+Selection rules (enforced by `regions.py resolve`): IDs are `<country>` or `<country>-<city>`; a whole country supersedes its cities; selected crop rectangles must not overlap (overlaps would duplicate OSM objects in the merged PBF). To add an area, extend `regions.json` with a pinned source (if new) and a city bbox/center/verify points, then run `validate-catalog` and the unit tests.
 
-### 4.2 One verified crop for all pipelines
+Data files are Git-ignored and must not be committed. Keep the source URLs, data date, MD5s, and computed SHA-256 values (the manifest records them) with any externally distributed derived data. Both MapLibre styles and the app footer expose the linked attribution.
 
-Set the project environment and prepare the data once. `MAP_BBOX` is west,south,east,north in WGS84; Osmium's `smart` strategy creates one reference-aware crop and preserves intersecting multipolygon relations needed by Nominatim. This exact `tehran.osm.pbf` is the only allowed input to Planetiler, OSRM, and Nominatim (the Photon import reads the resulting Nominatim database).
+### 4.2 One verified merged dataset for all pipelines
+
+Set the project environment and prepare the data once. `MAP_REGION_IDS` selects the areas; `MAP_BBOX` is their union bounds in WGS84 west,south,east,north form; `MAP_REGION` is the fixed dataset slug (`borobiya`) that names the merged PBF, the PMTiles/Martin source, and the OSRM graphs. Osmium's `smart` strategy creates reference-aware city crops and preserves intersecting multipolygon relations needed by Nominatim; `osmium merge` combines the crops (whole-country areas merge straight from their extract) into the single `borobiya.osm.pbf` that is the only allowed input to Planetiler, OSRM, and Nominatim (the Photon import reads the resulting Nominatim database). `scripts/setup-ubuntu-vm.sh` keeps `MAP_REGION_IDS`/`MAP_BBOX` in sync; the manual equivalent is:
 
 ```bash
 # From the repository root. For local use, copy .env.example to .env first.
 set -a; source .env; set +a
 
-# Downloads the date-pinned source, verifies its official MD5, crops MAP_BBOX,
-# records source/crop SHA-256 values, and writes the provenance manifest.
-./map-server/scripts/prepare-tehran-pbf.sh
+# Downloads the date-pinned sources, verifies official MD5s, crops + merges
+# the selected areas, and writes the version-2 provenance manifest.
+./map-server/scripts/prepare-regions-pbf.sh
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
 
-# Planetiler 0.10.2: creates tehran.pmtiles + checksum/settings metadata.
+# Planetiler 0.10.2: creates borobiya.pmtiles + checksum/settings metadata.
 ./map-server/scripts/generate-tiles.sh
 
 # OSRM 26.10.0: creates all three MLD graphs + source hash metadata.
 ./map-server/scripts/build-routing.sh
 
-# The same cropped PBF is mounted as Nominatim's local PBF_PATH for the Photon import; see §7.
+# The same merged PBF is mounted as Nominatim's local PBF_PATH for the Photon import; see §7.
 ```
 
-Prerequisites for preparation are `curl`, Osmium Tool, Python 3, and SHA-256/MD5 utilities. The manifest records the exact installed Osmium version. Install with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script and `.env.example` both pin `MAP_OSMIUM_VERSION=1.16.0`, the Ubuntu 24.04 archive version on the target VM. If `osmium --version` reports a different release, set `MAP_OSMIUM_VERSION` to that reviewed installed version in `.env` and reload it (`set -a; source .env; set +a`) before running the script; the exact checked version is recorded in provenance. If downloads need a host proxy, see the Proxy section in [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md). Planetiler uses a conservative 3 GiB Java heap by default (`PLANETILER_HEAP=3g`) for 6 GiB machines; it additionally needs Java 21+. The routing build needs Docker and defaults to two OSRM build threads. To deliberately regenerate an existing crop after changing `MAP_BBOX`, set `MAP_CROP_OVERWRITE=1` after reviewing the data directory. `verify-map-pbf.sh` checks the crop hash, region, bbox, ODbL record, and strategy before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
+Prerequisites for preparation are `curl`, Osmium Tool, Python 3, and SHA-256/MD5 utilities. The manifest records the exact installed Osmium version. Install with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script and `.env.example` both pin `MAP_OSMIUM_VERSION=1.16.0`, the Ubuntu 24.04 archive version on the target VM. If `osmium --version` reports a different release, set `MAP_OSMIUM_VERSION` to that reviewed installed version in `.env` and reload it (`set -a; source .env; set +a`) before running the script; the exact checked version is recorded in provenance. If downloads need a host proxy, see the Proxy section in [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md). Planetiler uses a conservative 3 GiB Java heap by default (`PLANETILER_HEAP=3g`) for 6 GiB machines; it additionally needs Java 21+. The routing build needs Docker and defaults to two OSRM build threads. Re-running preparation with the same selection is a verified no-op; changing `MAP_REGION_IDS`/`MAP_BBOX` re-merges from cached downloads/crops (`MAP_CROP_OVERWRITE=1` is only for replacing a manifest-less leftover dataset file). `verify-map-pbf.sh` checks the merged hash, selected areas, union bbox, per-source pins, and ODbL record before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
 
-`map-server/scripts/generate-tiles.sh` verifies Planetiler 0.10.2 by SHA-256 and writes `<region>.pmtiles` plus a manifest containing the cropped-PBF hash. `build-routing.sh` uses that same verified crop for each profile and records the input/manifest hashes beside each graph. `verify-tehran-tiles.sh`, `verify-routing.sh`, and `verify-geocoding.sh` are live service smoke tests. No map service or data build has yet been accepted against the user's local Docker/Java runtime; keep T1.4.2, T1.4.4, and T1.4.5 open until those commands pass.
+`map-server/scripts/generate-tiles.sh` verifies Planetiler 0.10.2 by SHA-256 and writes `borobiya.pmtiles` plus metadata containing the dataset-PBF hash and area list. `build-routing.sh` uses that same verified dataset for each profile and records the input/manifest hashes beside each graph. `verify-tiles.sh`, `verify-routing.sh`, and `verify-geocoding.sh` are live per-area smoke tests driven by the catalog's test points. Live acceptance passed on the target Ubuntu VM on 2026-10-20 (real MVT tile, car/bicycle/foot routes, and forward/reverse geocoding for the Tehran dataset); see `docs/PROGRESS.md`.
 
 ### 4.3 Styles, sprites, and glyphs
 
@@ -120,14 +124,14 @@ The committed styles are MapLibre Style Spec v8 documents with the same vector s
 
 Martin serves these as `/style/light` and `/style/dark`. Through the Compose Nginx gateway, use `/map/style/light` and `/map/style/dark`.
 
-The style resources use root-relative URLs, not hard-coded hosts. This works both when a browser loads the style through `/map/style/light` and when it loads the style directly from Martin. The Vite dev proxy and Nginx gateway forward `/tehran/`, `/sprite/`, and `/font/` to Martin on the same origin:
+The style resources use root-relative URLs, not hard-coded hosts. This works both when a browser loads the style through `/map/style/light` and when it loads the style directly from Martin. The Vite dev proxy and Nginx gateway forward `/borobiya/`, `/sprite/`, and `/font/` to Martin on the same origin:
 
 ```json
 {
   "sources": {
-    "tehran": {
+    "borobiya": {
       "type": "vector",
-      "tiles": ["/tehran/{z}/{x}/{y}"],
+      "tiles": ["/borobiya/{z}/{x}/{y}"],
       "minzoom": 0,
       "maxzoom": 14
     }
@@ -163,7 +167,7 @@ fonts:
     Borobiya Sans: [Noto Sans Regular, Noto Naskh Arabic Regular]
 ```
 
-The actual file is `map-server/martin.yaml`. Martin discovers PMTiles sources from `/data`; when the archive is named `tehran.pmtiles`, its source ID is `tehran` and its MVT route is `/tehran/{z}/{x}/{y}` (an optional `.pbf` suffix redirects). `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. Martin is deliberately **not connected to PostgreSQL**: it publishes no database tile sources, so the connection contributed only failure modes (Martin exited whenever application-database credentials drifted) and risk—Martin's default auto-publish would otherwise expose spatial application tables, including private `users.last_location` data, as public tile sources. If a reviewed public Postgres tile source is ever needed, add it explicitly with `auto_publish: false` and named tables/functions only.
+The actual file is `map-server/martin.yaml`. Martin discovers PMTiles sources from `/data`; the dataset archive is always named `borobiya.pmtiles`, so its source ID is `borobiya` and its MVT route is `/borobiya/{z}/{x}/{y}` (an optional `.pbf` suffix redirects) regardless of which areas the dataset contains — the committed styles therefore never change when the selection does. `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. Martin is deliberately **not connected to PostgreSQL**: it publishes no database tile sources, so the connection contributed only failure modes (Martin exited whenever application-database credentials drifted) and risk—Martin's default auto-publish would otherwise expose spatial application tables, including private `users.last_location` data, as public tile sources. If a reviewed public Postgres tile source is ever needed, add it explicitly with `auto_publish: false` and named tables/functions only.
 
 Start Martin (no database dependency):
 
@@ -181,14 +185,14 @@ curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
 curl http://localhost:8080/map/style/dark | jq .name
 ```
 
-After `tehran.pmtiles` has been generated, verify a real MVT response:
+After `borobiya.pmtiles` has been generated, verify a real MVT response (defaults to the first selected area; pass an area ID to check another):
 
 ```bash
-./map-server/scripts/verify-tehran-tiles.sh
-MARTIN_URL=http://localhost:8080/map ./map-server/scripts/verify-tehran-tiles.sh
+./map-server/scripts/verify-tiles.sh
+MARTIN_URL=http://localhost:8080/map ./map-server/scripts/verify-tiles.sh de-Frankfurt
 ```
 
-This checkout's styles and assets are statically validated, but this environment has not run Martin or produced the PMTiles archive.
+Styles and assets are statically validated in this checkout; the generated archive itself is a local build artifact (see the live-acceptance note in §4.2).
 
 ---
 
@@ -198,14 +202,14 @@ OSRM chooses a transport profile while building the graph with `osrm-extract`; a
 
 ### Build graphs
 
-`build-routing.sh` defaults to `MAP_PBF=map-server/data/${MAP_REGION}.osm.pbf` and refuses to proceed unless the provenance manifest verifies the same `MAP_REGION`, `MAP_BBOX`, crop hash, and ODbL source record. From the repository root, load the same `.env` used for tile generation and build all three profiles:
+`build-routing.sh` defaults to `MAP_PBF=map-server/data/${MAP_REGION}.osm.pbf` and refuses to proceed unless the provenance manifest verifies the selected areas (`MAP_REGION_IDS`), union `MAP_BBOX`, merged-PBF hash, catalog source pins, and ODbL record. From the repository root, load the same `.env` used for tile generation and build all three profiles:
 
 ```bash
 set -a; source .env; set +a
 ./map-server/scripts/build-routing.sh
 ```
 
-It runs the pinned `ghcr.io/project-osrm/osrm-backend:v26.10.0-debian` image against that exact cropped PBF, extracts and prepares MLD graphs for car, bicycle, and foot **sequentially** (never concurrently), then publishes them to `map-server/osrm/data/{car,bicycle,foot}/<MAP_REGION>.osrm`. `OSRM_BUILD_THREADS` defaults to 2 and is passed to extract/partition/customize for the 6 GiB VM. Each profile directory also records the cropped-PBF SHA-256, source-manifest SHA-256, and build thread count. The output directory is Git-ignored. To build to a different location, set `MAP_OSRM_DATA_DIR` both for this command and in the Compose `.env`.
+It runs the pinned `ghcr.io/project-osrm/osrm-backend:v26.10.0-debian` image against that exact merged dataset PBF, extracts and prepares MLD graphs for car, bicycle, and foot **sequentially** (never concurrently), then publishes them to `map-server/osrm/data/{car,bicycle,foot}/<MAP_REGION>.osrm`. `OSRM_BUILD_THREADS` defaults to 2 and is passed to extract/partition/customize for the 6 GiB VM. Each profile directory also records the dataset-PBF SHA-256, source-manifest SHA-256, area list, and build thread count. The output directory is Git-ignored. To build to a different location, set `MAP_OSRM_DATA_DIR` both for this command and in the Compose `.env`.
 
 After successful graph generation, start the local Compose stack with routing enabled:
 
@@ -244,24 +248,24 @@ After the approved graphs and OSRM services are running, the real offline smoke 
 ./map-server/scripts/verify-routing.sh
 ```
 
-T1.4.4 remains open until that real service check succeeds using the `MAP_BBOX`-verified crop.
+That live check passed on the target VM on 2026-10-20 for all three profiles (see `docs/PROGRESS.md`).
 
 ---
 
-## 7. Photon Setup (Nominatim import from the shared crop)
+## 7. Photon Setup (Nominatim import from the shared dataset)
 
 Photon 1.3.0 does **not** accept raw `.osm.pbf` input. The configured reproducible path is: the Nominatim 5.3 container imports `map-server/data/${MAP_REGION}.osm.pbf` through local `PBF_PATH`; Photon then imports that Nominatim PostgreSQL database using the pinned Photon 1.3.0 JAR. No online Photon service, replication feed, or remote search is used at runtime.
 
 ### Import once
 
-The following commands assume the shared crop has already been prepared and verified in §4. The Nominatim service is in an opt-in profile and binds its database only to loopback; do not expose port 5433 publicly.
+The following commands assume the shared dataset has already been prepared and verified in §4. The Nominatim service is in an opt-in profile and binds its database only to loopback; do not expose port 5433 publicly.
 
 ```bash
 set -a; source .env; set +a
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
 ./map-server/scripts/download-photon.sh
 
-# Start Nominatim; its PBF_PATH is the same cropped file used by Planetiler and OSRM.
+# Start Nominatim; its PBF_PATH is the same merged dataset file used by Planetiler and OSRM.
 # First startup performs the import. Wait for the health check to report healthy.
 docker compose --profile geocoding-import up -d nominatim
 docker compose --profile geocoding-import ps nominatim
@@ -295,28 +299,24 @@ MAP_GEOCODE_URL=http://localhost:8080/geocode MAP_REVERSE_URL=http://localhost:8
   ./map-server/scripts/verify-geocoding.sh
 ```
 
-The smoke test checks non-empty forward search for `Azadi Square` and reverse lookup near central Tehran. It also verifies GeoJSON shape, not just HTTP 200. The gateway returns 503 if the optional Photon service is not running. The Nominatim database and Photon index are local ignored data; a clean import may take time and needs adequate free disk and memory. If changing the source PBF or `MAP_BBOX`, do not reuse an old Nominatim or Photon index—rebuild both from the newly verified crop.
+The smoke test checks a non-empty forward search and reverse lookup using the selected area's catalog test points (Tehran default: `Azadi Square`). It also verifies GeoJSON shape, not just HTTP 200. The gateway returns 503 if the optional Photon service is not running. The Nominatim database and Photon index are local ignored data; a clean import may take time and needs adequate free disk and memory. If the area selection changes, do not reuse an old Nominatim database or Photon index—rebuild both from the newly verified dataset (Photon's import `-languages` and serve `-default-language` follow the selection; `scripts/setup-ubuntu-vm.sh` automates the reset and stamps the index with the dataset checksum).
 
-The shared query contract defaults forward geocoding to five results (maximum 20). Bounding boxes use `west,south,east,north`; reverse coordinates are validated against WGS84 ranges. T1.4.5 remains open until the live `/geocode` and `/reverse` checks succeed offline.
+The shared query contract defaults forward geocoding to five results (maximum 20). Bounding boxes use `west,south,east,north`; reverse coordinates are validated against WGS84 ranges. The live `/geocode` and `/reverse` checks passed offline on the target VM on 2026-10-20 (see `docs/PROGRESS.md`).
 
 ---
 
 ## 8. ENV Configuration
 
 ```env
-MAP_REGION=tehran
-MAP_BBOX=51.0,35.5,51.7,35.9  # west,south,east,north in WGS84; shared by crop and map config
-MAP_DATA_VERSION=2026-10-18
+MAP_REGION_IDS=ir-tehran     # selected areas from map-server/regions.json (comma-separated)
+MAP_REGION=borobiya          # fixed dataset slug (archive/graph names, map config)
+MAP_BBOX=51.0,35.5,51.7,35.9  # union of selected areas, west,south,east,north WGS84
+MAP_DATA_VERSION=2026-10-18  # catalog snapshot date
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14              # Planetiler 0.10.2 supports up to 16
-MAP_SOURCE_URL=https://download.geofabrik.de/asia/iran-261018.osm.pbf
-MAP_SOURCE_DATE=2026-10-18
-MAP_SOURCE_DATA_TIMESTAMP=2026-10-18T20:25:06Z
-MAP_SOURCE_MD5=a23eb2f21e426677bd243b2712ec1bc8
-MAP_SOURCE_BYTES=229852435
 MAP_OSMIUM_VERSION=1.16.0  # must match `osmium --version`; Ubuntu 24.04 apt version
-MAP_SOURCE_PBF=./map-server/data/source/iran-261018.osm.pbf
-MAP_PBF=./map-server/data/tehran.osm.pbf
+MAP_PBF=./map-server/data/borobiya.osm.pbf
+PHOTON_DEFAULT_LANGUAGE=fa   # follows the first selected area's country
 PLANETILER_HEAP=3g
 OSRM_BUILD_THREADS=2
 OSRM_RUNTIME_THREADS=1
@@ -342,7 +342,7 @@ PHOTON_PORT=2322
 PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
 
-**Geographic coverage:** Defaults target Tehran. `prepare-tehran-pbf.sh` creates the shared crop from the approved Iran snapshot using `MAP_BBOX`; Planetiler, each OSRM profile, and Nominatim use that same PBF. Generated tile/route manifests store its SHA-256, while `MAP_DATA_VERSION` records the source snapshot. For another region, provide a matching approved source and update the Compose environment/volumes. The committed MapLibre styles still name the Tehran source, so changing `MAP_REGION` alone is not a complete region switch.
+**Geographic coverage:** The default selection is Tehran (`ir-tehran`); any catalog areas can be combined (cities and/or whole countries, non-overlapping). `prepare-regions-pbf.sh` builds the one shared merged dataset for the selection; Planetiler bounds, `/map-config` bounds, OSRM graphs, and the Nominatim→Photon import all derive from it, and generated tile/route metadata store its SHA-256 + area list while `MAP_DATA_VERSION` records the catalog snapshot. Switching areas is a data operation, not a code change: update `MAP_REGION_IDS` (+ union `MAP_BBOX`) and rebuild tiles/graphs/geocoding from the new dataset — `scripts/setup-ubuntu-vm.sh` does exactly this, including the Nominatim/Photon reset. Styles, Martin config, and Compose are selection-independent because the dataset slug (`borobiya`) never changes. Note that very distant multi-city selections enlarge the union bbox Planetiler processes (more download/compute for natural-earth/water data), and whole large countries are heavy builds on a 6 GiB VM.
 
 Disk/RAM guide:
 
@@ -357,7 +357,7 @@ The graph estimates are per profile; this Compose design runs three separate OSR
 
 ## 9. Client Integration (MapLibre)
 
-`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, starts at Tehran (`[51.389, 35.6892]`, zoom 11), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config`. If configuration is unavailable, it starts with the documented Tehran defaults and shows a non-blocking toast. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount. Its `styleUrl` prop is reactive: changing it to `/map/style/dark` or `/map/style/light` calls `map.setStyle(url, { diff: true })` on the existing map, preserving the current camera transform and DOM-backed markers; `setStyle(url)` is also exposed for imperative callers.
+`packages/client/src/components/map/MapCanvas.vue` is the reusable MapLibre initializer. It loads the same-origin `/map/style/light` style, centers on the configured bounds (the selected areas' union from `/map-config`; the initial fallback bounds are Tehran's), displays style-source attribution plus navigation and metric-scale controls, and applies validated zoom bounds and geographic bounds from `/map-config` — including a one-time recenter when the fallback starting point lies outside the served areas (unless the caller passed an explicit center). If configuration is unavailable, it starts with the documented Tehran fallback bounds and shows a non-blocking toast. The component also imports MapLibre's local CSS and removes the map instance/aborts config fetch on unmount. Its `styleUrl` prop is reactive: changing it to `/map/style/dark` or `/map/style/light` calls `map.setStyle(url, { diff: true })` on the existing map, preserving the current camera transform and DOM-backed markers; `setStyle(url)` is also exposed for imperative callers.
 
 A map view can compose it directly:
 

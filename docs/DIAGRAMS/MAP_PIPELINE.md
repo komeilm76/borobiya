@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> The pinned Geofabrik source and shared `MAP_BBOX` crop, tile/routing builders, Nominatim→Photon import path, and local proxies are configured. Live acceptance and generated runtime data remain pending.
+> Selectable areas (whole countries/cities from the pinned `map-server/regions.json` catalog; default Tehran) are cropped and merged into one shared dataset for the tile/routing builders and the Nominatim→Photon import path; local proxies are configured. Live acceptance passed on the target Ubuntu VM on 2026-10-20 (see `../PROGRESS.md`); generated runtime data stays local and Git-ignored.
 
 ---
 
@@ -8,14 +8,14 @@
 
 ```mermaid
 flowchart TD
-  A[Geofabrik Iran snapshot<br/>2026-10-18 / ODbL 1.0]
+  A[Geofabrik snapshots for selected areas<br/>regions.json, 2026-10-18 / ODbL 1.0]
   A --> B[Download + official MD5 verification]
-  B --> C[Osmium smart extract<br/>configured MAP_BBOX]
-  C --> D[One shared tehran.osm.pbf<br/>+ source/crop hash manifest]
+  B --> C[Osmium smart crops per city<br/>+ merge]
+  C --> D[One shared borobiya.osm.pbf<br/>+ v2 provenance manifest]
   D --> E1[Planetiler 0.10.2<br/>MAP_BBOX + zoom range]
   D --> E2[OSRM 26.10.0<br/>car / bicycle / foot]
   D --> E3[Nominatim 5.3 import<br/>local PBF_PATH]
-  E1 --> F1[tehran.pmtiles<br/>+ hash manifest]
+  E1 --> F1[borobiya.pmtiles<br/>+ hash metadata]
   E2 --> F2[car/bicycle/foot<br/>MLD graphs + hashes]
   E3 --> G1[Nominatim PostgreSQL]
   G1 --> G2[Photon 1.3.0 import]
@@ -29,7 +29,7 @@ flowchart TD
   M[GET /map-config<br/>region, bbox, version, zoom] --> K
 ```
 
-`prepare-tehran-pbf.sh` downloads and verifies the pinned source, then creates the only permitted shared crop. Tile/routing builders verify its manifest before using it; Nominatim mounts that same output as local `PBF_PATH`. `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser uses same-origin `/map-config`, `/route`, `/geocode`, and `/reverse` paths and does not receive service URLs.
+`prepare-regions-pbf.sh` downloads and verifies the pinned sources for the selected areas, crops/merges them into the only permitted shared dataset, and writes its provenance manifest. Tile/routing builders verify that manifest before using it; Nominatim mounts that same output as local `PBF_PATH`. `MAP_REGION` (dataset slug), `MAP_BBOX` (area union), `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser uses same-origin `/map-config`, `/route`, `/geocode`, and `/reverse` paths and does not receive service URLs.
 
 ---
 
@@ -38,8 +38,8 @@ flowchart TD
 ```mermaid
 flowchart LR
   A[Pinned Geofabrik source] --> B[Download + verify MD5]
-  B --> C[Osmium crop with MAP_BBOX]
-  C --> D[Shared PBF + source/crop SHA-256 manifest]
+  B --> C[Osmium crops + merge]
+  C --> D[Shared dataset PBF + provenance manifest]
   D --> E1[Planetiler → PMTiles]
   D --> E2[OSRM → car/bicycle/foot]
   D --> E3[Nominatim → Photon index]
@@ -51,7 +51,7 @@ flowchart LR
   H --> I
 ```
 
-The pinned source downloader, hash manifest, crop, import, and service-start paths are scripted. Automated replication/update feeds, staged promotion, and zero-downtime activation are not implemented. The three real-data checks remain pending local Docker/Java execution.
+The pinned source downloader, hash manifest, crops/merge, import, and service-start paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with an area-selection form). Automated replication/update feeds, staged promotion, and zero-downtime activation are not implemented. The three real-data checks passed live on the target VM (2026-10-20).
 
 ---
 
@@ -59,15 +59,14 @@ The pinned source downloader, hash manifest, crop, import, and service-start pat
 
 ```mermaid
 flowchart LR
-  T[Tehran starter bbox] --> I[Other region]
-  I --> C[Custom bbox]
-  T & I & C -.-> ENV
-  ENV[MAP_REGION<br/>MAP_BBOX<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
+  T[Area catalog: countries + cities<br/>regions.json] --> SEL[MAP_REGION_IDS selection<br/>default ir-tehran]
+  SEL -.-> ENV
+  ENV[MAP_REGION (dataset slug)<br/>MAP_BBOX (area union)<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
   ENV --> CFG[GET /map-config]
   CFG --> CLIENT[Client validates shared MapConfig schema]
 ```
 
-The defaults target Tehran: region `tehran`, WGS84 bbox `51.0,35.5,51.7,35.9`, source version `2026-10-18`, and zoom range 0–14. The single crop uses `MAP_BBOX`; Planetiler and all OSRM profiles consume that PBF, as does Nominatim before Photon import. A region change also requires matching data and runtime style/client source wiring; the committed MapLibre styles currently use the Tehran source.
+The default selection targets Tehran: area `ir-tehran`, union bbox `51.0,35.5,51.7,35.9`, catalog snapshot `2026-10-18`, zoom range 0–14, dataset slug `borobiya`. Planetiler and all OSRM profiles consume the merged dataset PBF, as does Nominatim before Photon import. Changing areas needs no style/client wiring changes — the dataset slug (and thus the Martin source) is constant; only the data builders rerun (the setup script detects staleness by dataset checksum).
 
 Disk estimates are preliminary and OSRM values are per profile; this deployment runs three separate OSRM processes. Runtime memory has not been benchmarked.
 
@@ -77,12 +76,12 @@ Disk estimates are preliminary and OSRM values are per profile; this deployment 
 
 ```
 map-server/styles/light.json
-map-server/styles/dark.json  ─┐ same sources.tiles = /tehran/{z}/{x}/{y}
+map-server/styles/dark.json  ─┐ same sources.tiles = /borobiya/{z}/{x}/{y}
 map-server/sprites/borobiya/*.svg ─┤ Martin creates sprite PNG/JSON on demand
 map-server/fonts/*.ttf       ─┘ Martin creates glyph PBF ranges on demand
 ```
 
-Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint. The region source in both committed styles is currently `tehran`.
+Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint. The dataset source in both committed styles is `borobiya`.
 
 ---
 
@@ -91,11 +90,11 @@ Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint
 ```bash
 # Prepare and verify the shared crop (once)
 set -a; source .env; set +a
-./map-server/scripts/prepare-tehran-pbf.sh
+./map-server/scripts/prepare-regions-pbf.sh
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
 
 # Tiles (after generating the archive and starting Martin)
-./map-server/scripts/verify-tehran-tiles.sh
+./map-server/scripts/verify-tiles.sh
 # Style and runtime-generated assets
 curl http://localhost:8000/style/light | jq .sources
 curl http://localhost:8000/sprite/borobiya.json | jq
