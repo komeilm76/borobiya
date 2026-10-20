@@ -77,7 +77,7 @@ docker compose up --build -d
 bun --filter @borobiya/client dev
 ```
 
-The Vite dev proxy reads `API_PROXY_TARGET` and `MAP_SERVER_URL` from the root `.env` and defaults to the Compose-published host ports. It proxies `/map` for Martin styles/catalog endpoints and root-relative `/tehran/`, `/sprite/`, and `/font/` requests used by the styles. `bun run dev` and a Compose API cannot both bind host port `3000` at the same time.
+The Vite dev proxy reads `API_PROXY_TARGET` and `MAP_SERVER_URL` from the root `.env` and defaults to the Compose-published host ports. Martin-bound proxy entries preserve the browser-facing `Host` header (`changeOrigin: false`) because Martin expands style asset URLs to absolute URLs built from that Host; rewriting it breaks map loading from any non-localhost origin. It proxies `/map` for Martin styles/catalog endpoints and root-relative `/tehran/`, `/sprite/`, and `/font/` requests used by the styles. `bun run dev` and a Compose API cannot both bind host port `3000` at the same time.
 
 Useful commands:
 

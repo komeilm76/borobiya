@@ -82,6 +82,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-20 — Fixed LAN-dev map loading and session persistence (Vite Host preservation, conditional Secure cookie)
+
+- Found during live client E2E (`bun run dev`, browser on another LAN host): **(1) Map failed to load** — Martin expands the relative sprite/glyph/tile URLs in served styles to absolute URLs built from the request `Host` header (verified in Martin 1.16.1 `maplibre_style.rs`/`srv/styles.rs`), and the Vite dev proxy's `changeOrigin: true` rewrote that Host to `localhost:8000`, sending LAN browsers to their own machine. Martin-bound Vite proxies (`/map`, `/tehran/`, `/sprite/`, `/font/`) now use `changeOrigin: false` — the same Host preservation Nginx already had — and the map service-worker cache was bumped to `v2` so browsers discard style JSON cached with poisoned URLs. **(2) Reload always demanded a fresh login** (`POST /_auth/refresh` → 401) — the refresh cookie was unconditionally `Secure`, which browsers silently drop over plain HTTP on non-localhost origins. `refreshTokenCookie`/`expiredRefreshTokenCookie` now take a per-request option (`refreshCookieOptionsForRequest`: `Secure` only when `request.protocol` is HTTPS, incl. trusted `X-Forwarded-Proto`); login/refresh/logout call sites and SECURITY.md updated.
+- Validation: server 146/146 tests (3 new cookie unit tests; HTTP inject suites now assert no `Secure` on plain HTTP) + typecheck; client 48/48 + typecheck; live Vite smoke test against a stub Martin proved the forwarded Host now stays `172.16.20.32:5199` (LAN-style origin) instead of the proxy target.
+
 ### 2026-10-20 — Live map acceptance passed on the Ubuntu VM: T1.4.2, T1.4.4, T1.4.5 complete
 
 - Runbook step 13 acceptance passed end-to-end on the Ubuntu 24.04 VMware VM (4 vCPU / 6 GiB / 50 GB), against the shared Geofabrik crop built through steps 7–12:

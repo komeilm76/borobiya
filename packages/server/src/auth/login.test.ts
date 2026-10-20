@@ -135,7 +135,7 @@ describe("POST /_auth/login", () => {
 
     const cookie = response.headers["set-cookie"] as string;
     expect(cookie).toContain("HttpOnly");
-    expect(cookie).toContain("Secure");
+    expect(cookie).not.toContain("Secure");
     expect(cookie).toContain("SameSite=Lax");
     expect(calls.sessions).toHaveLength(1);
     expect(calls.sessions[0]).toMatchObject({

@@ -4,7 +4,7 @@ import { loginSchema } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
 import { hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
 import { usernameRateLimitKey } from "./rate-limit";
-import { refreshTokenCookie } from "./cookies";
+import { refreshCookieOptionsForRequest, refreshTokenCookie } from "./cookies";
 import { DUMMY_ARGON2ID_HASH, verifyPassword as argon2VerifyPassword } from "../security/password";
 import type { UserLoginStore } from "../db/login-store";
 
@@ -113,7 +113,7 @@ export async function registerLoginRoute(
     // Browser requests carry Origin and keep the refresh JWT exclusively in an HttpOnly cookie.
     // Native clients omit Origin and receive it in the body for secure platform storage.
     if (request.headers.origin !== undefined) {
-      return response.header("set-cookie", refreshTokenCookie(refreshToken)).send(responseBody);
+      return response.header("set-cookie", refreshTokenCookie(refreshToken, refreshCookieOptionsForRequest(request))).send(responseBody);
     }
     return response.send({ ...responseBody, refreshToken });
   });

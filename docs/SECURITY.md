@@ -70,14 +70,14 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 | Token | Lifetime | Storage | Usage |
 |-------|----------|---------|-------|
 | `accessToken` | 15 min | Memory (JS var) + `Authorization: Bearer` | Every API call |
-| `refreshToken` | 7 days | HttpOnly, Secure, SameSite=Lax cookie (web) or platform Secure Storage (native) | `/_auth/refresh` |
+| `refreshToken` | 7 days | HttpOnly, SameSite=Lax cookie with `Secure` on HTTPS (web) or platform Secure Storage (native) | `/_auth/refresh` |
 | `resetToken` | 10 min | One-time in body | Forgot reset |
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
 - Access and refresh JWTs use HS256 with separate `JWT_SECRET` and `JWT_REFRESH_SECRET`; login issues a 15-minute access token and 7-day refresh token.
 - Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. Verifiers require an unexpired `exp` claim and valid user/session UUIDs, and temporarily accept legacy T1.2.2 JWTs where `jti` held the session ID.
 - `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token and has a unique index. Refresh validates signature, expiry, session/user/device claims, and current account status, then uses a conditional update on the current hash to rotate it atomically; concurrent reuse cannot return two usable tokens.
-- Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; Secure; SameSite=Lax` cookie. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
+- Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; SameSite=Lax` cookie carrying `Secure` whenever the request arrived over HTTPS (`X-Forwarded-Proto` honored from trusted proxies). `Secure` is omitted on plain-HTTP development origins, where browsers would otherwise silently drop the cookie and break session restore; production deployments must serve HTTPS. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
 - Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. User/admin authorization checks reject access JWTs backed by that revoked session immediately. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
 
 ### 2.2 Sessions & Devices

@@ -172,7 +172,7 @@ describe("POST /_auth/refresh", () => {
     });
     expect(state.currentTokenHash).toBe(hashRefreshToken(nextToken));
     expect(response.headers["set-cookie"]).toContain("HttpOnly");
-    expect(response.headers["set-cookie"]).toContain("Secure");
+    expect(response.headers["set-cookie"]).not.toContain("Secure");
     expect(response.headers["set-cookie"]).toContain("SameSite=Lax");
   });
 

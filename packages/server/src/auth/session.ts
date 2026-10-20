@@ -8,7 +8,7 @@ import {
   signRefreshToken,
   verifyRefreshToken
 } from "../security/tokens";
-import { expiredRefreshTokenCookie, refreshTokenCookie } from "./cookies";
+import { expiredRefreshTokenCookie, refreshCookieOptionsForRequest, refreshTokenCookie } from "./cookies";
 
 export interface SessionRouteDependencies {
   store: UserLoginStore;
@@ -41,7 +41,7 @@ function invalidRefreshReply(reply: FastifyReply) {
 }
 
 function clearCookieOnBrowserResponse(reply: FastifyReply, request: FastifyRequest): FastifyReply {
-  return isBrowserRequest(request) ? reply.header("set-cookie", expiredRefreshTokenCookie()) : reply;
+  return isBrowserRequest(request) ? reply.header("set-cookie", expiredRefreshTokenCookie(refreshCookieOptionsForRequest(request))) : reply;
 }
 
 export async function registerSessionRoutes(
@@ -109,7 +109,7 @@ export async function registerSessionRoutes(
 
     const response = reply.code(200).header("cache-control", "no-store").header("vary", "Origin");
     if (isBrowserRequest(request)) {
-      return response.header("set-cookie", refreshTokenCookie(nextRefreshToken)).send({ accessToken });
+      return response.header("set-cookie", refreshTokenCookie(nextRefreshToken, refreshCookieOptionsForRequest(request))).send({ accessToken });
     }
     return response.send({ accessToken, refreshToken: nextRefreshToken });
   });
@@ -143,7 +143,7 @@ export async function registerSessionRoutes(
     return reply
       .code(200)
       .header("cache-control", "no-store")
-      .header("set-cookie", expiredRefreshTokenCookie())
+      .header("set-cookie", expiredRefreshTokenCookie(refreshCookieOptionsForRequest(request)))
       .send({ ok: true });
   });
 }

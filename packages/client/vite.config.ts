@@ -28,10 +28,16 @@ export default defineConfig(({ mode }) => {
   const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
   const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
   const routingTarget = new URL(env.MAP_ROUTING_URL || "http://127.0.0.1:8001/route").origin;
+  // Martin expands the relative sprite/glyph/tile URLs in served styles to
+  // absolute URLs built from the request Host. changeOrigin must therefore
+  // stay false for every Martin-bound proxy: rewriting Host to the target
+  // (e.g. localhost:8000) poisons the generated URLs for any browser that
+  // reaches the dev server through another name/IP, and the map then fails
+  // to load. Nginx already preserves the public Host the same way.
   const mapResourceProxy = Object.fromEntries(
     ["/tehran/", "/sprite/", "/font/"].map((prefix) => [
       prefix,
-      { target: mapServerTarget, changeOrigin: true }
+      { target: mapServerTarget, changeOrigin: false }
     ])
   );
 
@@ -74,7 +80,7 @@ export default defineConfig(({ mode }) => {
         },
         [mapPrefix]: {
           target: mapServerTarget,
-          changeOrigin: true,
+          changeOrigin: false,
           rewrite: stripPrefix(mapPrefix)
         },
         ...mapResourceProxy

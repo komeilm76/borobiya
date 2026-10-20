@@ -1,4 +1,4 @@
-const CACHE_NAME = "borobiya-map-runtime-v1";
+const CACHE_NAME = "borobiya-map-runtime-v2";
 const MAX_CACHE_ENTRIES = 512;
 
 function isMapResource(pathname) {
