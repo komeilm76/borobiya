@@ -11,10 +11,14 @@
 #
 # Map areas are selectable: whole countries and/or cities from
 # map-server/regions.json (e.g. ir-tehran, de-Frankfurt, gb). Interactively
-# you get a form (countries first, then cities per country — multiple of
-# each); non-interactively use --regions or SETUP_REGIONS. The selection is
-# stored in .env (MAP_REGION_IDS) so re-runs keep it; use --reselect to
-# change it later (stale stages then rebuild automatically).
+# you get a form (map library, snapshot, source policy, countries, then
+# cities per country — multiple of each); non-interactively use --regions,
+# --snapshot, --source-policy, and --map-library (or the SETUP_* env forms).
+# Map content is stored in a project-independent library, by default
+# ~/.local/share/borobiya/map-library, organized by continent/country/
+# city or source/snapshot date. The active selection, snapshot, policy, and
+# dataset paths are stored in .env so re-runs keep them; use --reselect to
+# change areas later (stale stages then rebuild automatically).
 #
 # Safe to re-run: stages whose output still matches the current dataset
 # PBF checksum are skipped. Existing .env secrets and database passwords
@@ -26,12 +30,15 @@ REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 REGIONS_PY="map-server/scripts/regions.py"
+MAP_LIBRARY_PY="map-server/scripts/map_library.py"
 NOMINATIM_TIMEOUT_MIN="${SETUP_NOMINATIM_TIMEOUT_MIN:-90}"
 DATASET="borobiya"
-MAP_PBF_PATH="./map-server/data/${DATASET}.osm.pbf"
-PHOTON_STAMP="map-server/photon/data/.borobiya-pbf.sha256"
 
 ARG_REGIONS=""
+ARG_SNAPSHOT=""
+ARG_SOURCE_POLICY=""
+ARG_MAP_LIBRARY=""
+UPDATE_MAP=0
 RESELECT=0
 ASSUME_YES=0
 DRY_RUN=0
@@ -47,23 +54,44 @@ Usage: scripts/setup-ubuntu-vm.sh [options]
 Options:
   --regions <ids>   Comma-separated area IDs (skip the selection form),
                     e.g. --regions ir-tehran,de-Frankfurt  (or SETUP_REGIONS)
-  --reselect        Ask for areas again even if .env already has a selection
+  --snapshot <spec> Map snapshot: pinned, latest, or YYYY-MM-DD
+                    (or SETUP_SNAPSHOT; default: saved/pinned)
+  --source-policy <p>
+                    cache-first (default), refresh, or offline
+                    (or SETUP_SOURCE_POLICY)
+  --refresh-sources Shortcut for --source-policy refresh
+  --offline         Shortcut for --source-policy offline
+  --update-map      Resolve/download the latest common snapshot online
+  --map-library <p> External map library root (or SETUP_MAP_LIBRARY);
+                    default: ~/.local/share/borobiya/map-library
+  --reselect        Ask for areas/snapshot/policy again even if saved
   --list-regions    Print the area catalog and exit
-  --yes             Non-interactive: no prompts (uses --regions/SETUP_REGIONS,
-                    the saved selection, or the ir-tehran default)
-  --dry-run         Resolve the selection and print the stage plan only;
-                    writes nothing and downloads nothing
+  --yes             Non-interactive: no prompts (uses CLI/env inputs,
+                    the saved configuration, or safe defaults)
+  --dry-run         Resolve the configuration and print the stage plan only;
+                    writes nothing and downloads no map data
   -h, --help        This help
 
-Env: SETUP_REGIONS, SETUP_FORCE_FORM=1 (force prompts without a TTY),
+Env: SETUP_REGIONS, SETUP_SNAPSHOT, SETUP_SOURCE_POLICY, SETUP_MAP_LIBRARY,
+     SETUP_FORCE_FORM=1 (force prompts without a TTY),
      SETUP_NOMINATIM_TIMEOUT_MIN (default 90)
 EOF
 }
 
 while (( $# > 0 )); do
+  # shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
   case "$1" in
     --regions) [[ $# -ge 2 ]] || fail "--regions requires a value"; ARG_REGIONS="$2"; shift 2 ;;
     --regions=*) ARG_REGIONS="${1#*=}"; shift ;;
+    --snapshot) [[ $# -ge 2 ]] || fail "--snapshot requires a value"; ARG_SNAPSHOT="$2"; shift 2 ;;
+    --snapshot=*) ARG_SNAPSHOT="${1#*=}"; shift ;;
+    --source-policy) [[ $# -ge 2 ]] || fail "--source-policy requires a value"; ARG_SOURCE_POLICY="$2"; shift 2 ;;
+    --source-policy=*) ARG_SOURCE_POLICY="${1#*=}"; shift ;;
+    --refresh-sources) ARG_SOURCE_POLICY="refresh"; shift ;;
+    --offline) ARG_SOURCE_POLICY="offline"; shift ;;
+    --update-map) UPDATE_MAP=1; ARG_SNAPSHOT="latest"; shift ;;
+    --map-library) [[ $# -ge 2 ]] || fail "--map-library requires a value"; ARG_MAP_LIBRARY="$2"; shift 2 ;;
+    --map-library=*) ARG_MAP_LIBRARY="${1#*=}"; shift ;;
     --reselect) RESELECT=1; shift ;;
     --list-regions)
       command -v python3 >/dev/null 2>&1 || fail "python3 is required to read the region catalog"
@@ -89,6 +117,39 @@ read_form_line() {
   # $1 = prompt; result in FORM_REPLY
   printf '%s' "$1"
   IFS= read -r -u "$INPUT_FD" FORM_REPLY || fail "input closed; re-run with --regions <ids> for a non-interactive setup"
+}
+
+expand_home_path() {
+  # shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
+  case "$1" in
+    "~") printf '%s' "${HOME:-}" ;;
+    "~/"*) printf '%s/%s' "${HOME:-}" "${1#~/}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+default_map_library_dir() {
+  if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    printf '%s' "$XDG_DATA_HOME/borobiya/map-library"
+  elif [[ -n "${HOME:-}" ]]; then
+    printf '%s' "$HOME/.local/share/borobiya/map-library"
+  else
+    printf '%s' "$REPO_ROOT/map-server/data"
+  fi
+}
+
+canonical_library_dir() {
+  local path
+  path="$(expand_home_path "$1")"
+  [[ "$path" != *$'\n'* && "$path" != *[[:space:]]* ]] || \
+    fail "map library path must not contain whitespace (it is persisted in .env): $path"
+  if [[ "$path" != /* ]]; then
+    path="$REPO_ROOT/$path"
+  fi
+  while [[ "$path" == */ && "$path" != "/" ]]; do
+    path="${path%/}"
+  done
+  printf '%s' "$path"
 }
 
 # ---------- 0. Prerequisites (runbook Phase A must already be done) ----------
@@ -128,6 +189,7 @@ free_gb="$(df -BG --output=avail . | tail -1 | tr -dc '0-9')"
 # ---------- 1. Environment + secrets (runbook A6) ----------
 log "Environment (.env)"
 generated_admin_password=0
+FRESH_ENV_FROM_EXAMPLE=0
 set_env() {
   local key="$1" value="$2"
   if (( DRY_RUN )); then note "would set ${key}=${value} in .env"; return 0; fi
@@ -141,6 +203,7 @@ set_env() {
 }
 
 if [[ ! -f .env ]]; then
+  FRESH_ENV_FROM_EXAMPLE=1
   if (( DRY_RUN )); then
     note "would create .env from .env.example with generated secrets"
     set -a; # shellcheck disable=SC1091
@@ -225,16 +288,22 @@ fi
 log "Map area selection"
 
 resolve_selection() {
-  # $1 = csv; evals REGION_IDS/UNION_BBOX/... or fails with catalog guidance
+  # $1 = csv; evals REGION_IDS/UNION_BBOX/snapshot/library paths or fails.
   local output
-  if ! output="$(python3 "$REGIONS_PY" resolve "$1")"; then
-    fail "invalid area selection '$1' (see the message above; list valid areas with: $0 --list-regions)"
+  if ! output="$(python3 "$REGIONS_PY" resolve "$1" \
+      --snapshot "$SNAPSHOT_INPUT" --source-policy "$SOURCE_POLICY_INPUT" \
+      --library "$MAP_LIBRARY_DIR" --dataset "$DATASET")"; then
+    fail "invalid map selection/snapshot (see above; list areas with: $0 --list-regions)"
   fi
   eval "$output"
 }
 
 print_selection_summary() {
   note "areas:            $REGION_IDS"
+  note "snapshot:         $SNAPSHOT_DATE ($SNAPSHOT_MODE; source: $SNAPSHOT_SOURCE)"
+  note "source policy:    $SOURCE_POLICY"
+  note "map library:      $MAP_LIBRARY_DIR"
+  note "dataset:          $MAP_DATASET_DIR"
   note "union bbox:       $UNION_BBOX (written to MAP_BBOX)"
   note "source downloads: $SOURCE_IDS (~${APPROX_DOWNLOAD_MB} MB total, cached after first run)"
   note "geocoding langs:  $PHOTON_LANGUAGES (default: $PHOTON_DEFAULT_LANGUAGE)"
@@ -273,6 +342,71 @@ parse_form_choices() {
 }
 
 run_selection_form() {
+  local pinned_snapshot
+  pinned_snapshot="$(python3 "$REGIONS_PY" pinned-snapshot)"
+
+  printf '\n  Map library (project-independent storage for all map content)\n'
+  while :; do
+    read_form_line "  Library path [Enter = $MAP_LIBRARY_DIR, q = quit]: "
+    case "${FORM_REPLY,,}" in q|quit) fail "aborted by user" ;; esac
+    if [[ -z "$FORM_REPLY" ]]; then
+      FORM_LIBRARY_DIR="$MAP_LIBRARY_DIR"
+      break
+    fi
+    FORM_LIBRARY_DIR="$(canonical_library_dir "$FORM_REPLY")" && break
+  done
+
+  printf '\n  Which Geofabrik snapshot should be installed?\n'
+  printf '    1) Repository-pinned snapshot (%s) [default]\n' "$pinned_snapshot"
+  printf '    2) Latest available common snapshot (online check)\n'
+  printf '    3) Specific date (YYYY-MM-DD)\n'
+  FORM_SNAPSHOT="pinned"
+  while :; do
+    read_form_line "  Snapshot [1]: "
+    case "${FORM_REPLY,,}" in
+      q|quit) fail "aborted by user" ;;
+      ""|1|pinned) FORM_SNAPSHOT="pinned"; break ;;
+      2|latest) FORM_SNAPSHOT="latest"; break ;;
+      3|date|specific)
+        while :; do
+          read_form_line "  Snapshot date (YYYY-MM-DD): "
+          case "${FORM_REPLY,,}" in q|quit) fail "aborted by user" ;; esac
+          if python3 -c 'import datetime,sys; datetime.date.fromisoformat(sys.argv[1])' "$FORM_REPLY" >/dev/null 2>&1; then
+            FORM_SNAPSHOT="$FORM_REPLY"
+            break
+          fi
+          printf '    Please enter a valid YYYY-MM-DD date.\n' >&2
+        done
+        break
+        ;;
+      *) printf '    Please choose 1, 2, or 3.\n' >&2 ;;
+    esac
+  done
+
+  printf '\n  When a selected source already exists in the library:\n'
+  printf '    1) Cache-first: reuse it after checksum verification [default]\n'
+  printf '    2) Refresh: download it again and atomically replace it\n'
+  if [[ "$FORM_SNAPSHOT" != "latest" ]]; then
+    printf '    3) Offline: never download; fail if the library copy is missing\n'
+  fi
+  FORM_SOURCE_POLICY="cache-first"
+  while :; do
+    read_form_line "  Source policy [1]: "
+    case "${FORM_REPLY,,}" in
+      q|quit) fail "aborted by user" ;;
+      ""|1|cache-first|cache) FORM_SOURCE_POLICY="cache-first"; break ;;
+      2|refresh|download) FORM_SOURCE_POLICY="refresh"; break ;;
+      3|offline)
+        if [[ "$FORM_SNAPSHOT" == "latest" ]]; then
+          printf '    Offline cannot resolve the latest snapshot; choose 1 or 2.\n' >&2
+        else
+          FORM_SOURCE_POLICY="offline"; break
+        fi
+        ;;
+      *) printf '    Please choose a listed source policy.\n' >&2 ;;
+    esac
+  done
+
   local -a country_ids=() country_names=()
   local id name local_name city_count
   while IFS=$'\t' read -r id name local_name city_count; do
@@ -327,28 +461,81 @@ run_selection_form() {
   FORM_SELECTION="$(IFS=','; printf '%s' "${chosen_areas[*]}")"
 }
 
-# Recover the selection of an already-built dataset when .env has none yet
-# (e.g. first run after upgrading a pre-catalog checkout), so an unattended
-# re-run keeps serving the areas that are actually on disk.
+# Resolve the map library and recover an already-installed selection/snapshot
+# when .env has none yet (for example on the first run after upgrading).
+LEGACY_OSRM_DATA_DIR="${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}"
+MAP_LIBRARY_DIR="$(canonical_library_dir "${ARG_MAP_LIBRARY:-${SETUP_MAP_LIBRARY:-${MAP_LIBRARY_DIR:-$(default_map_library_dir)}}}")"
+
+library_current_selection=""
+library_current_snapshot=""
+if [[ -s "$MAP_LIBRARY_DIR/current.json" ]]; then
+  if ! library_current_output="$(python3 "$MAP_LIBRARY_PY" current --library "$MAP_LIBRARY_DIR")"; then
+    fail "invalid active map library pointer: $MAP_LIBRARY_DIR/current.json (see above)"
+  fi
+  eval "$library_current_output"
+  library_current_selection="$ACTIVE_REGION_IDS"
+  library_current_snapshot="$ACTIVE_SNAPSHOT_DATE"
+fi
+
+read_manifest_summary() {
+  # $1 = manifest path. Sets MANIFEST_REGION_IDS / MANIFEST_SNAPSHOT_DATE.
+  local summary
+  summary="$(python3 "$REGIONS_PY" manifest-summary --manifest "$1" 2>/dev/null)" || return 1
+  eval "$summary"
+}
+
 existing_selection=""
 existing_source=""
-if [[ -s "map-server/data/${DATASET}.source.json" ]]; then
-  existing_selection="$(python3 - "map-server/data/${DATASET}.source.json" <<'PYEOF' 2>/dev/null || true
-import json, sys
-try:
-    areas = json.load(open(sys.argv[1], encoding="utf-8"))["areas"]
-    if isinstance(areas, list) and areas:
-        print(",".join(areas))
-except Exception:
-    pass
-PYEOF
-)"
-  [[ -n "$existing_selection" ]] && existing_source="existing dataset manifest"
-fi
-if [[ -z "$existing_selection" && -s map-server/data/tehran.osm.pbf && -s map-server/data/tehran.source.json ]]; then
-  existing_selection="ir-tehran"
+existing_snapshot=""
+if [[ -n "$library_current_selection" ]]; then
+  existing_selection="$library_current_selection"
+  existing_source="active map library dataset"
+  existing_snapshot="$library_current_snapshot"
+elif [[ -n "${MAP_DATASET_DIR:-}" && -s "${MAP_DATASET_DIR}/${DATASET}.source.json" ]] && read_manifest_summary "${MAP_DATASET_DIR}/${DATASET}.source.json"; then
+  existing_selection="$MANIFEST_REGION_IDS"
+  existing_source="saved dataset manifest"
+  existing_snapshot="$MANIFEST_SNAPSHOT_DATE"
+elif [[ -s "map-server/data/${DATASET}.source.json" ]] && read_manifest_summary "map-server/data/${DATASET}.source.json"; then
+  existing_selection="$MANIFEST_REGION_IDS"
+  existing_source="existing project-local dataset manifest"
+  existing_snapshot="$MANIFEST_SNAPSHOT_DATE"
+elif [[ -s map-server/data/tehran.osm.pbf && -s map-server/data/tehran.source.json ]] && read_manifest_summary map-server/data/tehran.source.json; then
+  existing_selection="$MANIFEST_REGION_IDS"
   existing_source="existing Tehran install (artifacts will migrate)"
+  existing_snapshot="$MANIFEST_SNAPSHOT_DATE"
 fi
+
+if [[ -n "$ARG_SNAPSHOT" ]]; then
+  SNAPSHOT_INPUT="$ARG_SNAPSHOT"; SNAPSHOT_SOURCE="--snapshot"
+elif (( UPDATE_MAP )); then
+  SNAPSHOT_INPUT="latest"; SNAPSHOT_SOURCE="--update-map"
+elif [[ -n "${SETUP_SNAPSHOT:-}" ]]; then
+  SNAPSHOT_INPUT="$SETUP_SNAPSHOT"; SNAPSHOT_SOURCE="SETUP_SNAPSHOT"
+elif (( ! FRESH_ENV_FROM_EXAMPLE )) && [[ -n "${MAP_SNAPSHOT:-}" && "${MAP_SNAPSHOT,,}" != "latest" ]]; then
+  SNAPSHOT_INPUT="$MAP_SNAPSHOT"; SNAPSHOT_SOURCE="saved .env snapshot"
+elif (( ! FRESH_ENV_FROM_EXAMPLE )) && [[ -n "${MAP_SNAPSHOT_DATE:-}" ]]; then
+  SNAPSHOT_INPUT="$MAP_SNAPSHOT_DATE"; SNAPSHOT_SOURCE="saved .env snapshot"
+elif [[ -n "$existing_snapshot" ]]; then
+  SNAPSHOT_INPUT="$existing_snapshot"; SNAPSHOT_SOURCE="$existing_source"
+elif [[ -n "${MAP_SNAPSHOT:-}" ]]; then
+  SNAPSHOT_INPUT="$MAP_SNAPSHOT"; SNAPSHOT_SOURCE="saved .env snapshot"
+else
+  SNAPSHOT_INPUT="pinned"; SNAPSHOT_SOURCE="repository pin"
+fi
+
+if [[ -n "$ARG_SOURCE_POLICY" ]]; then
+  SOURCE_POLICY_INPUT="$ARG_SOURCE_POLICY"
+elif [[ -n "${SETUP_SOURCE_POLICY:-}" ]]; then
+  SOURCE_POLICY_INPUT="$SETUP_SOURCE_POLICY"
+elif [[ -n "${MAP_SOURCE_POLICY:-}" ]]; then
+  SOURCE_POLICY_INPUT="$MAP_SOURCE_POLICY"
+else
+  SOURCE_POLICY_INPUT="cache-first"
+fi
+case "$SOURCE_POLICY_INPUT" in
+  cache-first|refresh|offline) ;;
+  *) fail "source policy must be cache-first, refresh, or offline (got $SOURCE_POLICY_INPUT)" ;;
+esac
 
 SELECTION_SOURCE=""
 SELECTION_INPUT=""
@@ -356,12 +543,14 @@ if [[ -n "$ARG_REGIONS" ]]; then
   SELECTION_INPUT="$ARG_REGIONS"; SELECTION_SOURCE="--regions"
 elif [[ -n "${SETUP_REGIONS:-}" ]]; then
   SELECTION_INPUT="$SETUP_REGIONS"; SELECTION_SOURCE="SETUP_REGIONS"
-elif (( ! RESELECT )) && [[ -n "${MAP_REGION_IDS:-}" ]]; then
+elif (( ! RESELECT && ! FRESH_ENV_FROM_EXAMPLE )) && [[ -n "${MAP_REGION_IDS:-}" ]]; then
   SELECTION_INPUT="$MAP_REGION_IDS"; SELECTION_SOURCE="saved .env selection"
 elif (( ! RESELECT )) && [[ -n "$existing_selection" ]]; then
   SELECTION_INPUT="$existing_selection"; SELECTION_SOURCE="$existing_source"
 elif (( INTERACTIVE )); then
   SELECTION_SOURCE="selection form"
+elif [[ -n "${MAP_REGION_IDS:-}" ]]; then
+  SELECTION_INPUT="$MAP_REGION_IDS"; SELECTION_SOURCE=".env.example default (non-interactive first run)"
 else
   SELECTION_INPUT="ir-tehran"; SELECTION_SOURCE="default (non-interactive run without a saved selection)"
 fi
@@ -370,8 +559,14 @@ while :; do
   if [[ "$SELECTION_SOURCE" == "selection form" ]]; then
     run_selection_form
     SELECTION_INPUT="$FORM_SELECTION"
+    MAP_LIBRARY_DIR="$FORM_LIBRARY_DIR"
+    SNAPSHOT_INPUT="$FORM_SNAPSHOT"
+    SOURCE_POLICY_INPUT="$FORM_SOURCE_POLICY"
+    SNAPSHOT_SOURCE="selection form"
   fi
   resolve_selection "$SELECTION_INPUT"
+  MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE"
+  MAP_SOURCE_POLICY="$SOURCE_POLICY"
   note "selection source: $SELECTION_SOURCE"
   print_selection_summary
   if (( INTERACTIVE )); then
@@ -401,14 +596,34 @@ if [[ "${MAP_REGION:-}" != "" && "${MAP_REGION:-}" != "$DATASET" ]]; then
   note "MAP_REGION was '${MAP_REGION}'; the dataset slug is now standardized to '${DATASET}'"
   note "(styles/Martin serve exactly one dataset source; your areas live in MAP_REGION_IDS)"
 fi
+if [[ "$SNAPSHOT_MODE" == "pinned" ]]; then
+  PERSISTED_SNAPSHOT="pinned"
+else
+  # A resolved latest/specific snapshot is saved as its concrete date so a
+  # later cache-first rerun does not silently move to a newer release.
+  PERSISTED_SNAPSHOT="$SNAPSHOT_DATE"
+fi
+MAP_PBF_PATH="$MAP_PBF"
+OSRM_DATA_DIR="$MAP_OSRM_DATA_DIR"
+set_env MAP_LIBRARY_DIR "$MAP_LIBRARY_DIR"
+set_env MAP_SNAPSHOT "$PERSISTED_SNAPSHOT"
+set_env MAP_SNAPSHOT_DATE "$SNAPSHOT_DATE"
+set_env MAP_SOURCE_POLICY "$SOURCE_POLICY"
 set_env MAP_REGION_IDS "$REGION_IDS"
 set_env MAP_REGION "$DATASET"
 set_env MAP_BBOX "$UNION_BBOX"
-set_env MAP_PBF "$MAP_PBF_PATH"
+set_env MAP_DATA_VERSION "$SNAPSHOT_DATE"
+set_env MAP_DATASET_DIR "$MAP_DATASET_DIR"
+set_env MAP_DATA_DIR "$MAP_DATA_DIR"
+set_env MAP_OSRM_DATA_DIR "$MAP_OSRM_DATA_DIR"
+set_env MAP_PHOTON_DATA_DIR "$MAP_PHOTON_DATA_DIR"
+set_env MAP_PBF "$MAP_PBF"
 set_env PHOTON_DEFAULT_LANGUAGE "$PHOTON_DEFAULT_LANGUAGE"
-export MAP_REGION_IDS="$REGION_IDS" MAP_REGION="$DATASET" MAP_BBOX="$UNION_BBOX"
-export MAP_PBF="$MAP_PBF_PATH" PHOTON_DEFAULT_LANGUAGE
-OSRM_DATA_DIR="${MAP_OSRM_DATA_DIR:-./map-server/osrm/data}"
+export MAP_LIBRARY_DIR MAP_SNAPSHOT="$PERSISTED_SNAPSHOT" MAP_SNAPSHOT_DATE
+export MAP_SOURCE_POLICY MAP_REGION_IDS="$REGION_IDS" MAP_REGION="$DATASET"
+export MAP_BBOX="$UNION_BBOX" MAP_DATA_VERSION="$SNAPSHOT_DATE"
+export MAP_DATASET_DIR MAP_DATA_DIR MAP_OSRM_DATA_DIR MAP_PHOTON_DATA_DIR
+export MAP_PBF MAP_PBF_MANIFEST PHOTON_DEFAULT_LANGUAGE
 
 metadata_value() {
   # $1 = json file, $2 = key; echoes value or nothing
@@ -428,22 +643,35 @@ file_sha256() {
 
 # ---------- dry-run: print the plan and stop ----------
 if (( DRY_RUN )); then
-  log "Dry-run plan (nothing was written, downloaded, or started)"
-  if [[ -s "$MAP_PBF_PATH" ]] && ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF_PATH" >/dev/null 2>&1; then
+  log "Dry-run plan (nothing was written or started; no map data was downloaded)"
+  if [[ "$SOURCE_POLICY" != "refresh" && -s "$MAP_PBF_PATH" ]] && ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF_PATH" >/dev/null 2>&1; then
     note "dataset PBF:   present and verified for this selection -> prepare stage would SKIP"
     plan_sha="$(file_sha256 "$MAP_PBF_PATH")"
   else
     note "dataset PBF:   missing/stale -> prepare stage would RUN (downloads/crops/merge)"
     plan_sha=""
   fi
-  while IFS=$'\t' read -r _sid _surl sfile _smd5 _sbytes _sapprox; do
-    if [[ -s "map-server/data/source/$sfile" ]]; then
-      note "  source $sfile: cached"
+  while IFS=$'\t' read -r _sid _surl sfile _smd5 _sbytes _sapprox _continent _country _relative spath _sdate; do
+    if [[ -s "$spath" ]]; then
+      if [[ "$SOURCE_POLICY" == "refresh" ]]; then
+        note "  source $sfile: cached (refresh would download it again)"
+      else
+        note "  source $sfile: cached"
+      fi
+    elif [[ -s "map-server/data/source/$sfile" || ( "$_sid" == "iran" && -s map-server/data/source/iran-latest.osm.pbf ) ]]; then
+      note "  source $sfile: would import the verified project-local legacy copy"
+    elif [[ "$SOURCE_POLICY" == "offline" ]]; then
+      note "  source $sfile: MISSING (offline run would fail)"
     else
       note "  source $sfile: would download"
     fi
-  done < <(python3 "$REGIONS_PY" sources "$REGION_IDS")
-  if [[ -n "$plan_sha" && "$(metadata_value "map-server/data/${DATASET}.metadata.json" sourcePbfSha256)" == "$plan_sha" ]]; then
+  done < <(python3 "$REGIONS_PY" sources "$REGION_IDS" \
+    --snapshot "$SNAPSHOT_DATE" --source-policy "$SOURCE_POLICY" \
+    --library "$MAP_LIBRARY_DIR")
+  if [[ -s map-server/data/tehran.source.json || -s "map-server/data/${DATASET}.source.json" ]]; then
+    note "legacy project-local map artifacts: present -> migration into the map library would be attempted"
+  fi
+  if [[ -n "$plan_sha" && "$(metadata_value "$MAP_DATASET_DIR/${DATASET}.metadata.json" sourcePbfSha256)" == "$plan_sha" ]]; then
     note "tiles:         PMTiles matches the dataset checksum -> would SKIP"
   else
     note "tiles:         missing/stale -> Planetiler would RUN"
@@ -458,7 +686,7 @@ if (( DRY_RUN )); then
   else
     note "geocoding:     missing/stale -> Nominatim + Photon import would RUN"
   fi
-  note "then: full stack start, DB migrations + seed, and per-area acceptance checks"
+  note "then: full stack start, DB migrations + seed, per-area acceptance, current-pointer update, and old-release pruning"
   exit 0
 fi
 
@@ -486,81 +714,46 @@ wait_healthy() {
   done
 }
 
-# ---------- legacy Tehran-only artifact migration ----------
-# Installs built before the area catalog used "tehran" artifact names.
-# When the selection is still exactly Tehran, rename them to the dataset
-# names (and convert the v1 manifest) instead of rebuilding everything.
+# ---------- project-local -> standardized map-library migration ----------
+# Older checkouts stored map artifacts under map-server/data, map-server/
+# osrm/data, and map-server/photon/data. Move a verified pinned dataset into
+# the external library once; unsafe/partial legacy sets are left untouched
+# and the normal rebuild stages below create a fresh library dataset.
 legacy_tehran_migrated=0
-rewrite_metadata_region() {
-  # $1 = metadata json path
-  python3 - "$1" "$DATASET" <<'PYEOF'
-import json, sys
-path, dataset = sys.argv[1], sys.argv[2]
-with open(path, encoding="utf-8") as handle:
-    data = json.load(handle)
-data["region"] = dataset
-data["areas"] = ["ir-tehran"]
-with open(path, "w", encoding="utf-8") as handle:
-    json.dump(data, handle, ensure_ascii=False, indent=2)
-    handle.write("\n")
-PYEOF
-}
-
-if [[ "$REGION_IDS" == "ir-tehran" ]]; then
-  data_dir="map-server/data"
-  if [[ ! -e "$data_dir/${DATASET}.osm.pbf" && -s "$data_dir/tehran.osm.pbf" && -s "$data_dir/tehran.source.json" ]]; then
-    log "Migrating legacy Tehran dataset artifacts to '${DATASET}' names"
-    mv -- "$data_dir/tehran.osm.pbf" "$data_dir/${DATASET}.osm.pbf"
-    if python3 "$REGIONS_PY" migrate-manifest-v1 \
-        --input "$data_dir/tehran.source.json" \
-        --output "$data_dir/${DATASET}.source.json" \
-        --pbf "$data_dir/${DATASET}.osm.pbf" --dataset "$DATASET"; then
-      rm -f -- "$data_dir/tehran.source.json"
-      legacy_tehran_migrated=1
-      note "dataset PBF + provenance manifest migrated (no re-crop needed)"
-    else
-      mv -- "$data_dir/${DATASET}.osm.pbf" "$data_dir/tehran.osm.pbf"
-      note "legacy manifest could not be migrated safely; the dataset will be rebuilt instead"
-    fi
-  fi
-  if (( legacy_tehran_migrated )); then
-    if [[ ! -e "$data_dir/${DATASET}.pmtiles" && -s "$data_dir/tehran.pmtiles" ]]; then
-      mv -- "$data_dir/tehran.pmtiles" "$data_dir/${DATASET}.pmtiles"
-      if [[ -s "$data_dir/tehran.metadata.json" ]]; then
-        mv -- "$data_dir/tehran.metadata.json" "$data_dir/${DATASET}.metadata.json"
-        rewrite_metadata_region "$data_dir/${DATASET}.metadata.json"
-      fi
-      note "PMTiles archive renamed (Martin source is now '${DATASET}')"
-    fi
-    for profile in car bicycle foot; do
-      profile_dir="${OSRM_DATA_DIR}/${profile}"
-      if [[ -d "$profile_dir" && ! -e "$profile_dir/${DATASET}.osrm" && -e "$profile_dir/tehran.osrm" ]]; then
-        for legacy_file in "$profile_dir"/tehran.*; do
-          [[ -e "$legacy_file" ]] || continue
-          mv -- "$legacy_file" "$profile_dir/${DATASET}.${legacy_file#"$profile_dir"/tehran.}"
-        done
-        [[ -s "$profile_dir/${DATASET}.metadata.json" ]] && rewrite_metadata_region "$profile_dir/${DATASET}.metadata.json"
-        note "OSRM ${profile} graph renamed"
-      fi
-    done
+project_library_migrated=0
+mkdir -p "$MAP_LIBRARY_DIR" "$MAP_DATASET_DIR" "$MAP_PHOTON_DATA_DIR"
+if [[ -s map-server/data/tehran.source.json || -s "map-server/data/${DATASET}.source.json" ]]; then
+  log "Checking project-local map artifacts for library migration"
+  migration_output="$(python3 "$MAP_LIBRARY_PY" migrate-project \
+    --repo-root "$REPO_ROOT" \
+    --library "$MAP_LIBRARY_DIR" \
+    --selection "$REGION_IDS" \
+    --snapshot-date "$SNAPSHOT_DATE" \
+    --dataset-dir "$MAP_DATASET_DIR" \
+    --legacy-osrm-dir "$LEGACY_OSRM_DATA_DIR")"
+  eval "$migration_output"
+  legacy_tehran_migrated="$PROJECT_LIBRARY_TEHRAN_MIGRATED"
+  project_library_migrated="$PROJECT_LIBRARY_MIGRATED"
+  if (( project_library_migrated )); then
+    note "verified project-local map artifacts migrated into $MAP_LIBRARY_DIR"
+  elif (( PROJECT_LIBRARY_MIGRATION_SKIPPED )); then
+    note "legacy map artifacts were not migrated safely; the library dataset will be rebuilt instead"
   fi
 fi
 
 # ---------- 3. Dataset PBF: sources + crops + merge (runbook steps 7-8) ----------
 log "Dataset PBF (Geofabrik downloads, Osmium crops, merge, manifest verify)"
-if ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF_PATH" >/dev/null 2>&1; then
-  note "existing dataset verified for areas $REGION_IDS — skipping prepare"
-else
-  ./map-server/scripts/prepare-regions-pbf.sh
-  ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF_PATH"
-fi
+# prepare-regions-pbf.sh has its own verified fast path; always calling it
+# also ensures the library source/crop inputs are complete, not just merged.
+./map-server/scripts/prepare-regions-pbf.sh
+./map-server/scripts/verify-map-pbf.sh "$MAP_PBF_PATH"
 pbf_sha="$(file_sha256 "$MAP_PBF_PATH")"
 [[ -n "$pbf_sha" ]] || fail "could not checksum the dataset PBF at $MAP_PBF_PATH"
 
 # ---------- 4. PMTiles (runbook step 9) ----------
 log "PMTiles (Planetiler)"
-if [[ -s "map-server/data/${DATASET}.pmtiles" ]] && \
-   [[ "$(metadata_value "map-server/data/${DATASET}.metadata.json" sourcePbfSha256)" == "$pbf_sha" ]]; then
+if [[ -s "$MAP_DATASET_DIR/${DATASET}.pmtiles" ]] && \
+   [[ "$(metadata_value "$MAP_DATASET_DIR/${DATASET}.metadata.json" sourcePbfSha256)" == "$pbf_sha" ]]; then
   note "existing ${DATASET}.pmtiles matches the dataset checksum — skipping tile build"
 else
   ./map-server/scripts/generate-tiles.sh
@@ -611,18 +804,19 @@ reset_nominatim_volume() {
     if (( ${#candidates[@]} == 1 )); then
       volume="${candidates[0]}"
     elif (( ${#candidates[@]} > 1 )); then
-      fail "multiple Nominatim volumes found (${candidates[*]}); remove this project's one manually (docker volume rm <name>) after stopping nominatim, delete map-server/photon/data/photon_data and $PHOTON_STAMP, then re-run."
+      fail "multiple Nominatim volumes found (${candidates[*]}); remove this project's one manually (docker volume rm <name>) after stopping nominatim, delete $MAP_PHOTON_DATA_DIR/photon_data and $PHOTON_STAMP, then re-run."
     fi
   fi
   if [[ -n "$volume" ]]; then
     docker volume rm "$volume" >/dev/null || \
-      fail "could not remove the Nominatim volume $volume; stop nominatim, remove it manually (docker volume rm $volume), delete map-server/photon/data/photon_data, then re-run."
+      fail "could not remove the Nominatim volume $volume; stop nominatim, remove it manually (docker volume rm $volume), delete $MAP_PHOTON_DATA_DIR/photon_data, then re-run."
     note "removed old Nominatim volume $volume (its database held the previous area selection)"
   fi
 }
 
+mkdir -p "$MAP_PHOTON_DATA_DIR"
 photon_index_present=0
-if [[ -d map-server/photon/data/photon_data ]] && [[ -n "$(ls -A map-server/photon/data/photon_data 2>/dev/null)" ]]; then
+if [[ -d "$MAP_PHOTON_DATA_DIR/photon_data" ]] && [[ -n "$(ls -A "$MAP_PHOTON_DATA_DIR/photon_data" 2>/dev/null)" ]]; then
   photon_index_present=1
 fi
 photon_fresh=0
@@ -630,6 +824,7 @@ if (( photon_index_present )) && [[ -f "$PHOTON_STAMP" ]] && [[ "$(cat "$PHOTON_
   photon_fresh=1
 elif (( photon_index_present && legacy_tehran_migrated )) && [[ ! -f "$PHOTON_STAMP" ]]; then
   # The index was built from the same Tehran PBF that was just migrated.
+  mkdir -p "$(dirname -- "$PHOTON_STAMP")"
   printf '%s\n' "$pbf_sha" > "$PHOTON_STAMP"
   photon_fresh=1
   note "adopted the existing Tehran Photon index for the migrated dataset (wrote checksum stamp)"
@@ -642,15 +837,16 @@ else
     note "Photon index belongs to a different dataset; rebuilding (Nominatim volume + Photon index reset)"
     docker compose --profile geocoding stop photon >/dev/null 2>&1 || true
     reset_nominatim_volume
-    rm -rf -- map-server/photon/data/photon_data
+    rm -rf -- "$MAP_PHOTON_DATA_DIR/photon_data"
     rm -f -- "$PHOTON_STAMP"
   fi
   docker compose --profile geocoding-import up -d nominatim
   note "waiting for Nominatim's first import (can take a long while; timeout ${NOMINATIM_TIMEOUT_MIN}m)..."
   wait_healthy nominatim $(( NOMINATIM_TIMEOUT_MIN * 60 )) --profile geocoding-import
+  mkdir -p "$MAP_PHOTON_DATA_DIR"
   (
-    cd map-server/photon/data
-    java -Xms512m -Xmx2g -jar ../photon-1.3.0.jar import \
+    cd "$MAP_PHOTON_DATA_DIR"
+    java -Xms512m -Xmx2g -jar "$REPO_ROOT/map-server/photon/photon-1.3.0.jar" import \
       -host 127.0.0.1 -port "${NOMINATIM_DB_PORT:-5433}" \
       -database nominatim -user nominatim -password "$NOMINATIM_PASSWORD" \
       -languages "$PHOTON_LANGUAGES"
@@ -662,6 +858,10 @@ fi
 
 # ---------- 7. Full stack + database init (runbook step 12 + migrations/seed) ----------
 log "Starting the full stack (builds local images on first run)"
+# Recreate map services explicitly so bind mounts and loaded files always
+# point at the selected library dataset, even after an in-place refresh.
+docker compose --profile routing --profile geocoding up -d --build --force-recreate \
+  map-server routing-gateway osrm-car osrm-bicycle osrm-foot photon
 docker compose --profile routing --profile geocoding up -d --build
 wait_healthy postgres 180
 log "Applying database migrations and seed (runtime migrator inside the API image)"
@@ -679,14 +879,31 @@ for area in "${selected_area_ids[@]}"; do
   ./map-server/scripts/verify-geocoding.sh "$area"
 done
 
+log "Activating the verified dataset and pruning old map releases"
+python3 "$MAP_LIBRARY_PY" write-current \
+  --library "$MAP_LIBRARY_DIR" \
+  --selection "$REGION_IDS" \
+  --snapshot-date "$SNAPSHOT_DATE" \
+  --snapshot-mode "$SNAPSHOT_MODE" \
+  --dataset-dir "$MAP_DATASET_DIR"
+python3 "$MAP_LIBRARY_PY" prune \
+  --library "$MAP_LIBRARY_DIR" \
+  --selection "$REGION_IDS" \
+  --snapshot-date "$SNAPSHOT_DATE" \
+  --dataset-dir "$MAP_DATASET_DIR"
+if [[ -n "$stale_backup" && -d "$stale_backup" ]]; then
+  rm -rf -- "$stale_backup"
+  note "removed verified-replaced stale OSRM graphs at $stale_backup"
+fi
+
 docker compose --profile routing --profile geocoding ps
 docker stats --no-stream || true
 
 log "Setup complete"
 note "map areas installed: $REGION_IDS (change later with: $0 --reselect)"
-if [[ -n "$stale_backup" ]]; then
-  note "stale OSRM graphs were kept at $stale_backup — delete that directory to reclaim disk."
-fi
+note "snapshot: $SNAPSHOT_DATE ($SNAPSHOT_MODE); source policy: $SOURCE_POLICY"
+note "map library: $MAP_LIBRARY_DIR"
+note "active dataset: $MAP_DATASET_DIR"
 cat <<EOF
   Admin login (web client):  username "admin"
     password: ${generated_admin_password:+the ADMIN_SEED_PASSWORD generated into .env during this run}
@@ -704,5 +921,7 @@ cat <<'EOF'
       (stop the Docker api first so the dev API can bind :3000:
        docker compose stop api   # keep postgres/martin/gateway/osrm/photon running)
     - Or use the gateway directly at http://localhost:8080 (loopback only).
+    - Update maps later: ./scripts/setup-ubuntu-vm.sh --update-map
+    - Re-run without map downloads: ./scripts/setup-ubuntu-vm.sh --offline
     - Re-running this script is safe; up-to-date stages are skipped.
 EOF

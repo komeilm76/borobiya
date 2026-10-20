@@ -3,26 +3,58 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-MAP_DATA_DIR="${MAP_DATA_DIR:-$REPO_ROOT/map-server/data}"
+fail() {
+  printf 'generate-tiles: %s\n' "$*" >&2
+  exit 1
+}
+
 # MAP_REGION is the stable dataset slug (PMTiles/Martin source name);
 # MAP_REGION_IDS carries the selected areas from regions.json.
 MAP_REGION="${MAP_REGION:-borobiya}"
 MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
 MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
-MAP_DATA_VERSION="${MAP_DATA_VERSION:-2026-10-18}"
+MAP_DATA_VERSION="${MAP_DATA_VERSION:-}"
+MAP_SNAPSHOT_DATE="${MAP_SNAPSHOT_DATE:-$MAP_DATA_VERSION}"
+if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
+elif [[ -n "${HOME:-}" ]]; then
+  DEFAULT_MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
+else
+  DEFAULT_MAP_LIBRARY_DIR="$REPO_ROOT/map-server/data"
+fi
+MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-$DEFAULT_MAP_LIBRARY_DIR}"
+# shellcheck disable=SC2088 # Match a literal user-supplied ~/ path, then expand it manually.
+case "$MAP_LIBRARY_DIR" in
+  "~") MAP_LIBRARY_DIR="${HOME:-}" ;;
+  "~/"*) MAP_LIBRARY_DIR="${HOME:-}/${MAP_LIBRARY_DIR#~/}" ;;
+esac
+MAP_DATA_DIR="${MAP_DATA_DIR:-${MAP_DATASET_DIR:-}}"
+if [[ -z "$MAP_DATA_DIR" ]]; then
+  command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to resolve the map library dataset'
+  if ! library_paths="$(python3 "$SCRIPT_DIR/regions.py" resolve "$MAP_REGION_IDS" \
+      --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" --library "$MAP_LIBRARY_DIR" \
+      --dataset "$MAP_REGION")"; then
+    fail 'could not resolve the standardized map library dataset (see above)'
+  fi
+  eval "$library_paths"
+  MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE"
+fi
+if [[ -z "$MAP_SNAPSHOT_DATE" ]]; then
+  command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to resolve the pinned snapshot'
+  MAP_SNAPSHOT_DATE="$(python3 "$SCRIPT_DIR/regions.py" pinned-snapshot)"
+fi
+MAP_DATA_VERSION="${MAP_DATA_VERSION:-$MAP_SNAPSHOT_DATE}"
 MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
 MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
 # The canonical merged dataset PBF is the default; explicit paths remain available for audited local setups.
 MAP_PBF="${MAP_PBF:-$MAP_DATA_DIR/$MAP_REGION.osm.pbf}"
 PLANETILER_VERSION="0.10.2"
 PLANETILER_SHA256="f310bd0413e2e4512b27f4046d418664e8e1d3bf31603c2a70e23de06c167e4d"
-PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
+# Tool binaries are managed separately from map content and stay with the
+# project tooling, not inside the external map library.
+PLANETILER_JAR="${PLANETILER_JAR:-$REPO_ROOT/map-server/tools/planetiler-$PLANETILER_VERSION.jar}"
+LEGACY_PLANETILER_JAR="$REPO_ROOT/map-server/data/planetiler-$PLANETILER_VERSION.jar"
 PLANETILER_URL="https://github.com/onthegomap/planetiler/releases/download/v$PLANETILER_VERSION/planetiler.jar"
-
-fail() {
-  printf 'generate-tiles: %s\n' "$*" >&2
-  exit 1
-}
 
 sha256_file() {
   if command -v sha256sum >/dev/null 2>&1; then
@@ -70,9 +102,10 @@ if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1
 fi
 mkdir -p "$MAP_DATA_DIR"
 MAP_DATA_DIR="$(cd -- "$MAP_DATA_DIR" && pwd)"
-MAP_DATA_DIR="$MAP_DATA_DIR" MAP_REGION="$MAP_REGION" MAP_REGION_IDS="$MAP_REGION_IDS" MAP_BBOX="$MAP_BBOX" \
+MAP_DATA_DIR="$MAP_DATA_DIR" MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR" \
+  MAP_SNAPSHOT_DATE="$MAP_SNAPSHOT_DATE" MAP_REGION="$MAP_REGION" \
+  MAP_REGION_IDS="$MAP_REGION_IDS" MAP_BBOX="$MAP_BBOX" \
   "$SCRIPT_DIR/verify-map-pbf.sh" "$MAP_PBF"
-PLANETILER_JAR="$MAP_DATA_DIR/planetiler-$PLANETILER_VERSION.jar"
 OUTPUT="$MAP_DATA_DIR/$MAP_REGION.pmtiles"
 METADATA="$MAP_DATA_DIR/$MAP_REGION.metadata.json"
 
@@ -83,6 +116,14 @@ if [[ "$java_major" == '1' ]]; then
 fi
 if [[ ! "$java_major" =~ ^[0-9]+$ ]] || (( java_major < 21 )); then
   fail "Java 21+ is required; found '${java_version:-unknown}'"
+fi
+
+mkdir -p "$(dirname -- "$PLANETILER_JAR")"
+if [[ ! -f "$PLANETILER_JAR" && -s "$LEGACY_PLANETILER_JAR" ]] && \
+   [[ "$(sha256_file "$LEGACY_PLANETILER_JAR")" == "$PLANETILER_SHA256" ]]; then
+  cp -- "$LEGACY_PLANETILER_JAR" "$PLANETILER_JAR.part"
+  mv -- "$PLANETILER_JAR.part" "$PLANETILER_JAR"
+  printf 'Copied verified legacy Planetiler JAR to the project tool cache: %s\n' "$PLANETILER_JAR"
 fi
 
 # Fetch the pinned JAR only if it is absent or fails the published checksum.
@@ -117,19 +158,20 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
 )
 [[ -s "$temp_output" ]] || fail 'Planetiler did not produce a non-empty PMTiles archive'
 
-python3 - "$metadata_tmp" "$MAP_REGION" "$MAP_REGION_IDS" "$MAP_DATA_VERSION" \
+python3 - "$metadata_tmp" "$MAP_REGION" "$MAP_REGION_IDS" "$MAP_DATA_VERSION" "$MAP_SNAPSHOT_DATE" \
   "$west" "$south" "$east" "$north" "$map_min_zoom" "$map_max_zoom" \
   "$(sha256_file "$MAP_PBF")" "$(sha256_file "$MAP_DATA_DIR/$MAP_REGION.source.json")" \
   "$(sha256_file "$temp_output")" <<'PYEOF'
 import json
 import sys
 
-(output, region, region_ids, data_version, west, south, east, north,
+(output, region, region_ids, data_version, snapshot_date, west, south, east, north,
  min_zoom, max_zoom, pbf_sha256, manifest_sha256, pmtiles_sha256) = sys.argv[1:]
 metadata = {
     "region": region,
     "areas": [area for area in region_ids.split(",") if area],
     "dataVersion": data_version,
+    "snapshotDate": snapshot_date,
     "bbox": [float(west), float(south), float(east), float(north)],
     "minZoom": int(min_zoom),
     "maxZoom": int(max_zoom),

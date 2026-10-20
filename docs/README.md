@@ -34,6 +34,7 @@
 | [API.md](./API.md) | Route prefixes, auth guards, OpenAPI, examples | Backend, Frontend |
 | [SECURITY.md](./SECURITY.md) | Hashing, rate-limit, suspension, secrets | Backend |
 | [MAP_SERVER.md](./MAP_SERVER.md) | Martin/OSRM/Photon setup, tile pipeline, update | DevOps, Backend |
+| [MAP_LIBRARY.md](./MAP_LIBRARY.md) | External standardized map storage, snapshots, cache/update/offline policy, pruning | DevOps, Backend |
 | [UBUNTU_VM_RUNBOOK.md](./UBUNTU_VM_RUNBOOK.md) | Ubuntu 24.04 / 6 GiB step-by-step installation, builds, and acceptance checks | DevOps, User |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev on Ubuntu (Docker) vs Windows (no Docker) | Dev |
 | [WORKFLOWS.md](./WORKFLOWS.md) | Git hooks, CI/CD, deploy, Android build | DevOps |

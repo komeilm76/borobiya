@@ -1,12 +1,12 @@
 # Ubuntu 24.04 VMware Runbook — Offline Map Pipeline
 
-This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes), and T1.4.5 (Photon geocoding) on the requested VM: **Ubuntu 24.04 LTS, 4 vCPU, 6 GiB RAM, 50 GB disk**. The map areas are selectable — whole countries and/or cities from `map-server/regions.json` (the default selection is Tehran, `ir-tehran`); every command below works off that selection, so the same steps produce a Frankfurt, Berlin + Isfahan, or whole-Iran dataset by changing one `.env` value. It deliberately builds Planetiler, OSRM, and Photon one after another; only the final acceptance phase starts Martin, all three OSRM services, and Photon together. Nominatim has to stay up during the Photon import, then is stopped to free memory.
+This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes), and T1.4.5 (Photon geocoding) on the requested VM: **Ubuntu 24.04 LTS, 4 vCPU, 6 GiB RAM, 50 GB disk**. The map areas are selectable — whole countries and/or cities from `map-server/regions.json` (the default selection is Tehran, `ir-tehran`); every command below works off that selection and the standardized external map library (see [`MAP_LIBRARY.md`](./MAP_LIBRARY.md)), so the same steps produce a Frankfurt, Berlin + Isfahan, or whole-Iran dataset by changing the saved setup configuration. It deliberately builds Planetiler, OSRM, and Photon one after another; only the final acceptance phase starts Martin, all three OSRM services, and Photon together. Nominatim has to stay up during the Photon import, then is stopped to free memory.
 
 > **Resource warning:** 6 GiB is tight for five live map services. The defaults below reduce Java heaps, database memory, and thread counts, but they cannot guarantee the complete stack fits on every dataset/runtime. Check `free -h` and `df -h /` first. If services are killed by the OOM killer, run the live route profiles one at a time or increase the VM to 8 GiB. Keep at least 15–20 GiB free on the filesystem before starting imports.
 
 ## Before you begin: two version/data details
 
-- Every area's source extract is pinned in `map-server/regions.json` to Geofabrik's immutable **2026-10-18 snapshot** (dated `*-261018.osm.pbf` files with their official MD5 checksums, e.g. Iran: 229,852,435 bytes, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, data timestamp `2026-10-18T20:25:06Z`). `prepare-regions-pbf.sh` downloads exactly those files and refuses any checksum mismatch; never substitute a moving `*-latest` URL. To move to a newer snapshot, update the URLs + MD5s in `regions.json` together (sidecars: append `.md5` to any extract URL). [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [dated MD5 sidecar](https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5).
+- The default snapshot is the repository-pinned Geofabrik **2026-10-18 snapshot** in `map-server/regions.json` (dated `*-261018.osm.pbf` files with committed official MD5 checksums, e.g. Iran: 229,852,435 bytes, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, data timestamp `2026-10-18T20:25:06Z`). Setup can instead deliberately resolve the newest common dated snapshot or a specific `YYYY-MM-DD`; non-pinned dates are verified against Geofabrik's official `.md5` sidecars and then stored by concrete date in the map library. Never hand-substitute a moving `*-latest` URL. [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [dated MD5 sidecar](https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5) · [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 - Ubuntu 24.04's standard `osmium-tool` package is **1.16.0**, and the project pins that exact version everywhere (`MAP_OSMIUM_VERSION=1.16.0` in `.env.example`, the `prepare-regions-pbf.sh` default, and this runbook), so no override is needed on this VM. Install the Ubuntu package and keep the pinned value; the preparation script requires an exact match with `osmium --version` and writes it into the crop manifest. Reload `.env` in every new terminal (`set -a; source .env; set +a`), or step 8 sees a stale/empty value. [Ubuntu Noble package](https://packages.ubuntu.com/noble/utils/osmium-tool).
 - If the VM has no direct internet, use the **Proxy** section below before Phase A.
 - `--max-table-size 100` is an OSRM `/table` query-size limit, **not** a general RAM limit. We keep the default cap and set OSRM runtime workers to one. [OSRM command-line options](https://project-osrm.org/docs/v26.4.0/tools).
@@ -21,17 +21,20 @@ After Phase A below (apt packages, Docker, Java, Osmium — the parts needing `s
 ./scripts/setup-ubuntu-vm.sh
 ```
 
-**Choosing your map areas.** On the first interactive run the script opens a short form: first pick one or more **countries**, then for each country pick **the entire country or one or more cities**. It shows a summary (areas, combined bounds, ≈download size, geocoding languages) and asks for confirmation before doing any long work; whole large countries (Germany, France, UK) are flagged HEAVY because their multi-GB builds can exceed this 6 GiB VM. Equivalent non-interactive forms:
+**Choosing your map areas and library.** On the first interactive run the script opens a short form: map-library path, snapshot (**pinned** default, latest, or a specific date), source policy (**cache-first** default, refresh, or offline), one or more **countries**, then for each country **the entire country or one or more cities**. It shows a summary (areas, snapshot, library/dataset paths, combined bounds, ≈download size, geocoding languages) and asks for confirmation before doing any long work; whole large countries (Germany, France, UK) are flagged HEAVY because their multi-GB builds can exceed this 6 GiB VM. Equivalent non-interactive forms:
 
 ```bash
 ./scripts/setup-ubuntu-vm.sh --list-regions                  # show the area catalog
 ./scripts/setup-ubuntu-vm.sh --regions ir-tehran,de-Frankfurt # skip the form
 ./scripts/setup-ubuntu-vm.sh --regions ir                     # a whole country
+./scripts/setup-ubuntu-vm.sh --snapshot 2026-10-18            # a specific dated snapshot
+./scripts/setup-ubuntu-vm.sh --update-map                     # newest common snapshot online
+./scripts/setup-ubuntu-vm.sh --offline                        # use only verified library content
 ./scripts/setup-ubuntu-vm.sh --dry-run                        # resolve + print the plan only
-./scripts/setup-ubuntu-vm.sh --reselect                       # change areas later
+./scripts/setup-ubuntu-vm.sh --reselect                       # change areas/snapshot/policy later
 ```
 
-The selection is saved in `.env` as `MAP_REGION_IDS` (with `MAP_BBOX` kept in sync as the union of the chosen areas), so plain re-runs keep it; if `.env` has no selection yet (e.g. first run after upgrading an older checkout), the script recovers it from the existing dataset manifest instead of asking again. Changing the selection later is supported: the script detects by checksum which of tiles/OSRM/Photon are stale and rebuilds only those (stale OSRM graphs are moved aside to a timestamped `.stale-*` directory; a changed selection also resets the Nominatim database volume and Photon index, because both embed the old areas). An existing pre-catalog Tehran-only install (`tehran.*` artifacts) with the default selection is migrated in place instead of rebuilt.
+The configuration is saved in `.env` (`MAP_REGION_IDS`, snapshot date/policy, `MAP_BBOX`, and absolute map-library paths), so plain re-runs keep it; if `.env` has no selection yet (e.g. first run after upgrading an older checkout), setup recovers it from the library's `current.json` or the existing dataset manifest instead of asking again. All map content is stored under `MAP_LIBRARY_DIR` (default `~/.local/share/borobiya/map-library`) by continent/country/source-or-city/snapshot date, with one complete active dataset bundle for offline launch. Changing the selection or snapshot later is supported: setup detects by checksum which of tiles/OSRM/Photon are stale and rebuilds only those, then—after acceptance—updates the library current pointer and prunes replaced releases/datasets. Existing project-local Tehran/catalog-era artifacts are hash-checked and migrated into the library instead of rebuilt when their provenance proves the pinned snapshot.
 
 It prints the admin login (`admin` + the password you entered at its prompt, or the `ADMIN_SEED_PASSWORD` it generated into `.env`) when it finishes. If admin login ever fails because the admin was seeded with a different password, reset it with `docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts '<new-password>'`. The manual steps below remain the reference for what the script does and how to debug each stage.
 
@@ -214,9 +217,17 @@ cp .env.example .env
 nano .env
 ```
 
-Choose the map areas in `MAP_REGION_IDS` — comma-separated IDs from the catalog (`python3 map-server/scripts/regions.py list`; whole countries like `ir`, cities like `ir-tehran,de-Frankfurt`). `MAP_BBOX` must be the union of the chosen areas' bounds; the values below are the Tehran-only default. If you change `MAP_REGION_IDS` by hand, refresh `MAP_BBOX` from the resolver (`python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS"` prints `UNION_BBOX`) — or simply let `scripts/setup-ubuntu-vm.sh` maintain both, which it does on every run. Keep `MAP_REGION=borobiya` (the fixed dataset slug the styles/Martin use) and the 2026-10-18 snapshot is pinned inside `regions.json`, so no source URL/MD5 belongs in `.env` anymore:
+Choose the map areas in `MAP_REGION_IDS` — comma-separated IDs from the catalog (`python3 map-server/scripts/regions.py list`; whole countries like `ir`, cities like `ir-tehran,de-Frankfurt`). `MAP_BBOX` must be the union of the chosen areas' bounds; the values below are the Tehran-only default. Setup maintains the bbox and writes the resolved absolute library paths on every run, so the blank path values in `.env.example` are intentional. Keep `MAP_REGION=borobiya` (the fixed dataset slug the styles/Martin use). `MAP_SNAPSHOT=pinned` + `MAP_SOURCE_POLICY=cache-first` are the safe defaults; see [`MAP_LIBRARY.md`](./MAP_LIBRARY.md) for latest/specific-date and refresh/offline behavior:
 
 ```env
+MAP_LIBRARY_DIR=
+MAP_DATASET_DIR=
+MAP_DATA_DIR=
+MAP_OSRM_DATA_DIR=
+MAP_PHOTON_DATA_DIR=
+MAP_SNAPSHOT=pinned
+MAP_SNAPSHOT_DATE=2026-10-18
+MAP_SOURCE_POLICY=cache-first
 MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
@@ -248,15 +259,21 @@ sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://borobiya:${DB_PASS}@localho
 unset DB_PASS
 ```
 
-Load the file into this terminal. Do not share `.env` or the password:
+Load the file and standardized library paths into this terminal. Do not share `.env` or the password:
 
 ```bash
 set -a
 source .env
 set +a
+export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" \
+  --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" \
+  --source-policy "${MAP_SOURCE_POLICY:-cache-first}" \
+  --library "$MAP_LIBRARY_DIR")"
+export MAP_DATA_VERSION="$SNAPSHOT_DATE"
 ```
 
-Every new terminal starts *without* these values. If you open a new terminal or reboot, repeat the three lines above before running any map script—several step 8 failures (including the Osmium version error) are just a terminal that never loaded `.env`, or that still holds an old value after `.env` was edited.
+Every new terminal starts *without* these values. If you open a new terminal or reboot, repeat the block above before running any map script or Compose command—several step 8/12 failures are just a terminal that never loaded `.env`, or that still holds an old path/value after `.env` was edited. (After the automated setup has run once, `.env` already contains the absolute library paths; the resolver block is still safe to repeat.)
 
 ---
 
@@ -264,20 +281,18 @@ Every new terminal starts *without* these values. If you open a new terminal or 
 
 ### 7. (Optional) Pre-download the Geofabrik source extracts
 
-Step 8 downloads every source your selection needs and verifies the pinned MD5s automatically, so this step is only for slow/unreliable links where resumable `wget` is more comfortable. The exact URLs/MD5s come from the catalog (`python3 map-server/scripts/regions.py sources "$MAP_REGION_IDS"`). Example for the default Tehran selection:
+Step 8 downloads every source your selection needs into the standardized library path and verifies its MD5 automatically, so this step is only for slow/unreliable links where resumable `wget` is more comfortable. The exact URLs/MD5s and library paths come from the resolver (`python3 map-server/scripts/regions.py sources "$MAP_REGION_IDS" --snapshot "$MAP_SNAPSHOT_DATE" --library "$MAP_LIBRARY_DIR"`). Example for the default pinned Tehran selection (run the A6 resolver block first):
 
 ```bash
-mkdir -p map-server/data/source
-cd map-server/data/source
-wget --continue https://download.geofabrik.de/asia/iran-261018.osm.pbf
-wget -O iran-261018.osm.pbf.md5 \
-  https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5
-md5sum -c iran-261018.osm.pbf.md5
-wc -c iran-261018.osm.pbf
-cd ../../..
+SOURCE_PATH="$MAP_LIBRARY_DIR/sources/asia/ir/iran/2026-10-18/iran-261018.osm.pbf"
+mkdir -p "$(dirname "$SOURCE_PATH")"
+wget --continue -O "$SOURCE_PATH" https://download.geofabrik.de/asia/iran-261018.osm.pbf
+wget -O "$SOURCE_PATH.md5" https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5
+(cd "$(dirname "$SOURCE_PATH")" && md5sum -c "$(basename "$SOURCE_PATH").md5")
+wc -c "$SOURCE_PATH"
 ```
 
-Expect `iran-261018.osm.pbf: OK`, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, and 229,852,435 bytes. A pre-downloaded file whose MD5 differs from the catalog pin is rejected by step 8 — delete it and re-download; never edit the catalog to accept unverified bytes.
+Expect `iran-261018.osm.pbf: OK`, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, and 229,852,435 bytes. A pre-downloaded file whose MD5 differs from the catalog pin (or official sidecar for a chosen non-pinned date) is rejected by step 8 — delete it and re-download; never edit checksums to accept unverified bytes.
 
 ### 8. Crop and merge the selected areas once
 
@@ -288,6 +303,12 @@ cd ~/borobiya
 set -a
 source .env
 set +a
+export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" \
+  --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" \
+  --source-policy "${MAP_SOURCE_POLICY:-cache-first}" \
+  --library "$MAP_LIBRARY_DIR")"
+export MAP_DATA_VERSION="$SNAPSHOT_DATE"
 osmium --version | head -n 1
 echo "MAP_OSMIUM_VERSION=$MAP_OSMIUM_VERSION"
 ./map-server/scripts/prepare-regions-pbf.sh
@@ -299,9 +320,9 @@ The first command prints `osmium version 1.16.0` on Ubuntu 24.04; the next line 
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
 ```
 
-Expect e.g. `OK: .../borobiya.osm.pbf matches areas ir-tehran bbox [51.0, 35.5, 51.7, 35.9] (SHA-256 ...)` (areas/bbox follow your selection). The preparation script rechecks every source MD5, crops each city with Osmium smart extraction (cached under `map-server/data/crops/`), merges all areas into the one shared `map-server/data/borobiya.osm.pbf`, and records full provenance (source/crop/merged SHA-256) in `map-server/data/borobiya.source.json`. Planetiler, OSRM, and Nominatim must all use this exact merged PBF; Photon imports the resulting Nominatim database.
+Expect e.g. `OK: .../borobiya.osm.pbf matches areas ir-tehran bbox [51.0, 35.5, 51.7, 35.9] snapshot 2026-10-18 (SHA-256 ...)` (areas/bbox/snapshot follow your selection). The preparation script rechecks every source MD5, crops each city with Osmium smart extraction (cached under `$MAP_LIBRARY_DIR/crops/<continent>/<country>/<city>/<date>/`), merges all areas into the one shared `$MAP_DATASET_DIR/borobiya.osm.pbf`, and records full provenance (source/crop/merged SHA-256 and library-relative paths) in `$MAP_DATASET_DIR/borobiya.source.json`. Planetiler, OSRM, and Nominatim must all use this exact merged PBF; Photon imports the resulting Nominatim database.
 
-Re-running step 8 with the same selection is a fast no-op ("Dataset already prepared"). Changing `MAP_REGION_IDS` (and `MAP_BBOX`) rebuilds only the merge from cached downloads/crops. `MAP_CROP_OVERWRITE=1` is now only needed to replace a stray dataset PBF that has no provenance manifest — inspect `map-server/data/` first.
+Re-running step 8 with the same selection is a fast no-op ("Dataset already prepared"). Changing `MAP_REGION_IDS` (and `MAP_BBOX`) rebuilds only the merge from cached library downloads/crops. `MAP_CROP_OVERWRITE=1` is now only needed to replace a stray dataset PBF that has no provenance manifest — inspect `$MAP_DATASET_DIR` first.
 
 #### If step 8 fails
 
@@ -314,7 +335,7 @@ set -a; source .env; set +a
 ./map-server/scripts/prepare-regions-pbf.sh
 ```
 
-**`verify-map-pbf: dataset PBF is missing or empty: .../map-server/data/borobiya.osm.pbf`** — this is a knock-on effect, not a second bug. `verify-map-pbf.sh` only checks the dataset that `prepare-regions-pbf.sh` creates; if preparation failed (for example with the version error above) or has not yet succeeded in this checkout, there is nothing to verify. Fix the preparation error first, rerun `prepare-regions-pbf.sh` until it prints `Prepared shared dataset PBF: ...`, and only then run `./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"`.
+**`verify-map-pbf: dataset PBF is missing or empty: .../<map-library>/datasets/.../borobiya.osm.pbf`** — this is a knock-on effect, not a second bug. `verify-map-pbf.sh` only checks the dataset that `prepare-regions-pbf.sh` creates; if preparation failed (for example with the version error above) or has not yet succeeded in this checkout, there is nothing to verify. Fix the preparation error first, rerun `prepare-regions-pbf.sh` until it prints `Prepared shared dataset PBF: ...`, and only then run `./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"`.
 
 ### 9. Generate PMTiles with Planetiler
 
@@ -332,7 +353,7 @@ The script uses `-Xmx3g` by default, checks Java 21+, downloads/verifies Planeti
 OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh
 ```
 
-The script completes `car`, then `bicycle`, then `foot`; each profile's extract/partition/customize commands run in temporary `docker run --rm` containers. It never launches the three graph builds concurrently. Each build uses two threads and records the dataset PBF hash. Allow enough disk for all three generated graphs before beginning. If you changed the area selection after a previous build, `generate-tiles.sh` simply overwrites the archive, but `build-routing.sh` refuses to reuse non-empty profile directories — move `map-server/osrm/data/{car,bicycle,foot}` aside first (the automated setup script does this for you).
+The script completes `car`, then `bicycle`, then `foot`; each profile's extract/partition/customize commands run in temporary `docker run --rm` containers. It never launches the three graph builds concurrently. Each build uses two threads and records the dataset PBF hash. Allow enough disk for all three generated graphs before beginning. If you changed the area selection after a previous build, `generate-tiles.sh` simply overwrites the archive, but `build-routing.sh` refuses to reuse non-empty profile directories — move `$MAP_OSRM_DATA_DIR/{car,bicycle,foot}` aside first (the automated setup script does this for you and prunes them after acceptance).
 
 ### 11. Build the Photon index from Nominatim
 
@@ -353,15 +374,17 @@ If `ps` instead shows `Restarting`, read the first real error in the logs above.
 # -languages must cover every selected country plus en.
 # `python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS"` prints
 # the exact PHOTON_LANGUAGES value (Tehran-only: fa,en; Tehran+Frankfurt: fa,de,en).
-cd map-server/photon/data
-java -Xms512m -Xmx2g -jar ../photon-1.3.0.jar import \
+mkdir -p "$MAP_PHOTON_DATA_DIR"
+cd "$MAP_PHOTON_DATA_DIR"
+java -Xms512m -Xmx2g -jar "$OLDPWD/map-server/photon/photon-1.3.0.jar" import \
   -host 127.0.0.1 -port "$NOMINATIM_DB_PORT" \
   -database nominatim -user nominatim -password "$NOMINATIM_PASSWORD" \
   -languages fa,en
-cd ../../..
+sha256sum "$MAP_PBF" | awk '{print $1}' > "$MAP_PHOTON_DATA_DIR/.borobiya-pbf.sha256"
+cd "$OLDPWD"
 ```
 
-If you change the area selection after this step has run once, the existing Nominatim database and Photon index still describe the old areas. Redo them from scratch (the automated setup script handles this automatically): stop `photon` and `nominatim`, remove this project's `nominatim-data` volume (`docker volume ls | grep nominatim-data`), delete `map-server/photon/data/photon_data`, then repeat this step.
+If you change the area selection after this step has run once, the existing Nominatim database and Photon index still describe the old areas. Redo them from scratch (the automated setup script handles this automatically): stop `photon` and `nominatim`, remove this project's `nominatim-data` volume (`docker volume ls | grep nominatim-data`), delete `$MAP_PHOTON_DATA_DIR/photon_data` and its `.borobiya-pbf.sha256`, then repeat this step.
 
 After a successful import, stop Nominatim to free RAM. Its database volume and the Photon index are preserved:
 
@@ -388,7 +411,7 @@ Expect seven services `Up`, all of them eventually reporting `(healthy)`: `postg
 
 `Interrupted` / `No such image` for several images means **one** pull failed and Compose cancelled the rest—fix only the first `Error response from daemon: ...` line, then rerun the `up -d` command. Known cases:
 
-- `osrm-backend:v26.10.0: not found` — old checkout; upstream has no bare `v26.10.0` tag. The correct tag is `v26.10.0-debian` (already fixed in this repo): `git pull --ff-only`, then rerun. If step 10 never finished (check `ls map-server/osrm/data/car`), rerun step 10 first—it uses the same image.
+- `osrm-backend:v26.10.0: not found` — old checkout; upstream has no bare `v26.10.0` tag. The correct tag is `v26.10.0-debian` (already fixed in this repo): `git pull --ff-only`, then rerun. If step 10 never finished (check `ls "$MAP_OSRM_DATA_DIR/car"`), rerun step 10 first—it uses the same image.
 - `borobiya/photon:1.3.0: No such image` — Photon is built locally, not pulled. Build it once, then rerun `up -d`:
 
 ```bash

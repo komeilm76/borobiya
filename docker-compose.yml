@@ -66,7 +66,7 @@ services:
     command: ["--config", "/martin.yaml"]
     volumes:
       - ./map-server/martin.yaml:/martin.yaml:ro
-      - ./map-server/data:/data:ro
+      - ${MAP_DATASET_DIR:-./map-server/data}:/data:ro
       - ./map-server/styles:/styles:ro
       - ./map-server/sprites:/sprites:ro
       - ./map-server/fonts:/fonts:ro
@@ -91,7 +91,7 @@ services:
       POSTGRES_WORK_MEM: ${NOMINATIM_POSTGRES_WORK_MEM:-32MB}
       POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
     volumes:
-      - ./map-server/data:/osm:ro
+      - ${MAP_DATASET_DIR:-./map-server/data}:/osm:ro
       - nominatim-data:/var/lib/postgresql/16/main
     ports:
       - "127.0.0.1:${NOMINATIM_HTTP_PORT:-8081}:8080"
@@ -116,7 +116,7 @@ services:
       JAVA_TOOL_OPTIONS: "${PHOTON_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1536m}"
     command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "${PHOTON_DEFAULT_LANGUAGE:-fa}"]
     volumes:
-      - ./map-server/photon/data:/var/lib/photon
+      - ${MAP_PHOTON_DATA_DIR:-./map-server/photon/data}:/var/lib/photon
     ports:
       - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
     profiles: ["geocoding"]

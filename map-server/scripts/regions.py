@@ -33,7 +33,10 @@ import json
 import math
 import re
 import sys
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import Request, urlopen
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 CATALOG_PATH = SCRIPT_DIR.parent / "regions.json"
@@ -47,6 +50,18 @@ GEOFABRIK_PREFIX = "https://download.geofabrik.de/"
 # snapshot field below proves that byte identity.
 LEGACY_IRAN_LATEST_URL = "https://download.geofabrik.de/asia/iran-latest.osm.pbf"
 EPSILON = 1e-9
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+SNAPSHOT_TOKEN_RE = re.compile(r"-\d{6}\.osm\.pbf$")
+SOURCE_POLICIES = ("cache-first", "refresh", "offline")
+CONTINENTS = {
+    "africa",
+    "antarctica",
+    "asia",
+    "europe",
+    "north-america",
+    "oceania",
+    "south-america",
+}
 
 
 def fail(message: str) -> None:
@@ -120,6 +135,365 @@ def point_in_bbox(point: object, bbox: list[float]) -> bool:
 
 
 
+def catalog_snapshot_date(catalog: dict) -> date:
+    raw = catalog.get("snapshot", {}).get("dataDate")
+    try:
+        return date.fromisoformat(str(raw))
+    except ValueError:
+        fail(f"catalog snapshot.dataDate must be YYYY-MM-DD, got {raw!r}")
+
+
+def parse_snapshot_date(value: object, label: str = "snapshot date") -> date:
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    text = str(value or "").strip()
+    if not DATE_RE.match(text):
+        fail(f"{label} must use YYYY-MM-DD, got {value!r}")
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        fail(f"{label} is not a valid calendar date: {value!r}")
+
+
+def parse_snapshot_spec(spec: object, catalog: dict) -> tuple[str, date | None]:
+    """Return (mode, concrete date) for pinned/latest/YYYY-MM-DD specs."""
+    normalized = str(spec or "pinned").strip().lower()
+    if normalized == "pinned":
+        return "pinned", catalog_snapshot_date(catalog)
+    if normalized == "latest":
+        return "latest", None
+    return "date", parse_snapshot_date(normalized, "snapshot")
+
+
+def validate_source_policy(policy: object) -> str:
+    normalized = str(policy or "cache-first").strip().lower()
+    if normalized not in SOURCE_POLICIES:
+        fail(
+            "source policy must be one of "
+            + ", ".join(SOURCE_POLICIES)
+            + f"; got {policy!r}"
+        )
+    return normalized
+
+
+def dated_source_url(url: str, snapshot_date: date) -> str:
+    token = snapshot_date.strftime("%y%m%d")
+    updated, replacements = SNAPSHOT_TOKEN_RE.subn(f"-{token}.osm.pbf", url)
+    if replacements != 1:
+        fail(f"catalog source URL does not end with a dated Geofabrik token: {url}")
+    return updated
+
+
+def fetch_text(url: str) -> str | None:
+    """Fetch a tiny text resource (an MD5 sidecar); return None on failure."""
+    request = Request(url, headers={"User-Agent": "Borobiya-Map-Library/1.0"})
+    try:
+        with urlopen(request, timeout=30) as response:  # noqa: S310 - pinned HTTPS host
+            return response.read().decode("utf-8")
+    except (URLError, TimeoutError, UnicodeDecodeError, ValueError):
+        return None
+
+
+def parse_md5_sidecar(text: str | None, expected_filename: str) -> str | None:
+    if not text:
+        return None
+    fields = text.strip().split()
+    if len(fields) < 2:
+        return None
+    checksum = fields[0].lower()
+    filename = fields[1].lstrip("*")
+    if filename != expected_filename or not MD5_RE.match(checksum):
+        return None
+    return checksum
+
+
+def fetch_source_md5(url: str, fetcher=fetch_text) -> str | None:
+    filename = url.rsplit("/", 1)[-1]
+    return parse_md5_sidecar(fetcher(f"{url}.md5"), filename)
+
+
+def source_country_index(catalog: dict) -> dict[str, dict]:
+    """Map every source ID to the one catalog country that owns it."""
+    result: dict[str, dict] = {}
+    for country in catalog.get("countries", []):
+        if not isinstance(country, dict):
+            continue
+        source_ids = {country.get("source")}
+        for city in country.get("cities", []):
+            if isinstance(city, dict):
+                source_ids.add(city.get("source", country.get("source")))
+        for source_id in source_ids:
+            if not source_id:
+                continue
+            existing = result.get(str(source_id))
+            if existing is not None and existing.get("id") != country.get("id"):
+                fail(f"source {source_id!r} is assigned to multiple countries")
+            result[str(source_id)] = country
+    return result
+
+
+def source_relative_path(catalog: dict, source_id: str, snapshot_date: date) -> Path:
+    country = source_country_index(catalog).get(source_id)
+    if country is None:
+        fail(f"source {source_id!r} is not assigned to a catalog country")
+    filename = dated_source_url(catalog["sources"][source_id]["url"], snapshot_date).rsplit("/", 1)[-1]
+    return (
+        Path("sources")
+        / str(country["continent"])
+        / str(country["id"])
+        / source_id
+        / snapshot_date.isoformat()
+        / filename
+    )
+
+
+def crop_relative_path(area: dict, snapshot_date: date) -> Path:
+    if area.get("kind") != "city":
+        fail(f"crop path requires a city area, got {area.get('id')!r}")
+    return (
+        Path("crops")
+        / str(area["continent"])
+        / str(area["countryId"])
+        / str(area["cityId"])
+        / snapshot_date.isoformat()
+        / f"{area['id']}.osm.pbf"
+    )
+
+
+def dataset_fingerprint(snapshot_date: date, area_ids: list[str]) -> str:
+    payload = json.dumps(
+        {"snapshotDate": snapshot_date.isoformat(), "areas": area_ids},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def dataset_relative_path(snapshot_date: date, area_ids: list[str]) -> Path:
+    return Path("datasets") / snapshot_date.isoformat() / dataset_fingerprint(snapshot_date, area_ids)
+
+
+def library_paths(
+    library_root: object,
+    snapshot_date: date,
+    area_ids: list[str],
+    dataset: str = "borobiya",
+) -> dict[str, Path]:
+    root = Path(str(library_root)).expanduser()
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    root = root.resolve()
+    dataset_dir = root / dataset_relative_path(snapshot_date, area_ids)
+    return {
+        "libraryDir": root,
+        "datasetDir": dataset_dir,
+        "dataDir": dataset_dir,
+        "pbf": dataset_dir / f"{dataset}.osm.pbf",
+        "manifest": dataset_dir / f"{dataset}.source.json",
+        "pmtiles": dataset_dir / f"{dataset}.pmtiles",
+        "tilesMetadata": dataset_dir / f"{dataset}.metadata.json",
+        "osrmDataDir": dataset_dir / "routing",
+        "photonDataDir": dataset_dir / "geocoding",
+        "photonStamp": dataset_dir / "geocoding" / ".borobiya-pbf.sha256",
+    }
+
+
+def source_metadata_path(target: Path) -> Path:
+    return target.with_name("source.json")
+
+
+def source_sidecar_path(target: Path) -> Path:
+    return Path(f"{target}.md5")
+
+
+def read_json_object(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def read_source_metadata(target: Path) -> dict:
+    return read_json_object(source_metadata_path(target))
+
+
+def write_json_atomically(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def effective_source(
+    catalog: dict,
+    source_id: str,
+    snapshot_date: date,
+    library_root: object | None = None,
+    policy: str = "cache-first",
+    fetcher=fetch_text,
+) -> dict:
+    """Resolve one source for a concrete snapshot date.
+
+    The repository-pinned date always uses the catalog MD5. Other dates use
+    trusted library metadata/sidecars first (except in refresh mode) and then
+    Geofabrik's official sidecar. In offline mode an unknown MD5 remains
+    None so the caller can fail without touching the network.
+    """
+    policy = validate_source_policy(policy)
+    pinned = catalog["sources"][source_id]
+    pinned_date = catalog_snapshot_date(catalog)
+    url = dated_source_url(pinned["url"], snapshot_date)
+    filename = url.rsplit("/", 1)[-1]
+    relative = source_relative_path(catalog, source_id, snapshot_date)
+    target = None
+    if library_root is not None:
+        root = Path(str(library_root)).expanduser()
+        if not root.is_absolute():
+            root = Path.cwd() / root
+        target = root.resolve() / relative
+
+    md5: str | None = None
+    byte_count: int | None = None
+    if snapshot_date == pinned_date:
+        md5 = str(pinned["md5"]).lower()
+        byte_count = pinned.get("bytes")
+    else:
+        metadata = read_source_metadata(target) if target is not None else {}
+        if policy != "refresh" and metadata.get("url") == url:
+            candidate = str(metadata.get("md5", "")).lower()
+            if MD5_RE.match(candidate):
+                md5 = candidate
+                if isinstance(metadata.get("bytes"), int):
+                    byte_count = metadata["bytes"]
+        if md5 is None and policy != "refresh" and target is not None:
+            sidecar = source_sidecar_path(target)
+            if sidecar.is_file():
+                md5 = parse_md5_sidecar(sidecar.read_text(encoding="utf-8"), filename)
+        if md5 is None and policy != "offline":
+            md5 = fetch_source_md5(url, fetcher)
+            if md5 is None:
+                fail(
+                    f"snapshot {snapshot_date.isoformat()} is unavailable for source "
+                    f"{source_id}: official MD5 sidecar not found at {url}.md5"
+                )
+
+    country = source_country_index(catalog)[source_id]
+    return {
+        "id": source_id,
+        "url": url,
+        "file": filename,
+        "md5": md5,
+        "bytes": byte_count,
+        "approxSizeMb": pinned.get("approxSizeMb"),
+        "continent": country["continent"],
+        "countryId": country["id"],
+        "relativePath": relative,
+        "path": target,
+        "snapshotDate": snapshot_date,
+    }
+
+
+def effective_sources(
+    catalog: dict,
+    source_ids: list[str],
+    snapshot_date: date,
+    library_root: object | None = None,
+    policy: str = "cache-first",
+    fetcher=fetch_text,
+) -> list[dict]:
+    return [
+        effective_source(catalog, source_id, snapshot_date, library_root, policy, fetcher)
+        for source_id in source_ids
+    ]
+
+
+def snapshot_date_for_spec(
+    catalog: dict,
+    spec: object,
+    source_ids: list[str],
+    policy: str = "cache-first",
+    fetcher=fetch_text,
+    today: date | None = None,
+) -> tuple[str, date]:
+    mode, requested = parse_snapshot_spec(spec, catalog)
+    current_day = today or datetime.now(timezone.utc).date()
+    if mode == "pinned":
+        return mode, catalog_snapshot_date(catalog)
+    if mode == "date":
+        assert requested is not None
+        if requested > current_day:
+            fail(f"snapshot date {requested.isoformat()} is in the future")
+        return mode, requested
+
+    policy = validate_source_policy(policy)
+    if policy == "offline":
+        fail("snapshot 'latest' requires an online check; choose pinned or a specific date in offline mode")
+    for offset in range(32):
+        candidate = current_day - timedelta(days=offset)
+        available = True
+        for source_id in source_ids:
+            url = dated_source_url(catalog["sources"][source_id]["url"], candidate)
+            if fetch_source_md5(url, fetcher) is None:
+                available = False
+                break
+        if available:
+            return mode, candidate
+    fail("could not find a common Geofabrik snapshot for all selected sources in the last 32 days")
+
+
+def write_source_metadata(
+    catalog: dict,
+    library_root: object,
+    source_id: str,
+    snapshot_date: date,
+    *,
+    md5: str | None = None,
+    sha256: str | None = None,
+    data_timestamp: str | None = None,
+) -> dict:
+    descriptor = effective_source(
+        catalog, source_id, snapshot_date, library_root, policy="offline"
+    )
+    target = descriptor["path"]
+    assert target is not None
+    if not target.is_file() or target.stat().st_size == 0:
+        fail(f"source PBF is missing or empty: {target}")
+    actual_md5 = (md5 or md5_file(target)).lower()
+    if not MD5_RE.match(actual_md5):
+        fail(f"invalid MD5 for source {source_id}: {actual_md5!r}")
+    expected_md5 = descriptor.get("md5")
+    if expected_md5 and actual_md5 != expected_md5:
+        fail(
+            f"source {source_id} MD5 mismatch: expected {expected_md5}, got {actual_md5}"
+        )
+    actual_sha256 = (sha256 or sha256_file(target)).lower()
+    if not SHA256_RE.match(actual_sha256):
+        fail(f"invalid SHA-256 for source {source_id}: {actual_sha256!r}")
+    existing = read_source_metadata(target)
+    timestamp = data_timestamp or existing.get("dataTimestamp")
+    if timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
+        timestamp = catalog["snapshot"].get("dataTimestamp")
+    metadata = {
+        "version": 1,
+        "id": source_id,
+        "provider": catalog["snapshot"]["provider"],
+        "license": catalog["snapshot"]["license"],
+        "continent": descriptor["continent"],
+        "countryId": descriptor["countryId"],
+        "snapshotDate": snapshot_date.isoformat(),
+        "dataTimestamp": timestamp,
+        "url": descriptor["url"],
+        "file": descriptor["file"],
+        "bytes": target.stat().st_size,
+        "md5": actual_md5,
+        "sha256": actual_sha256,
+        "libraryRelativePath": descriptor["relativePath"].as_posix(),
+    }
+    write_json_atomically(source_metadata_path(target), metadata)
+    return metadata
+
+
 def validate_catalog(catalog: dict) -> list[str]:
     problems: list[str] = []
     if catalog.get("version") != 1:
@@ -127,6 +501,12 @@ def validate_catalog(catalog: dict) -> list[str]:
     snapshot = catalog.get("snapshot")
     if not isinstance(snapshot, dict) or snapshot.get("provider") != "Geofabrik" or snapshot.get("license") != "ODbL-1.0":
         problems.append("snapshot must identify Geofabrik and the ODbL-1.0 license")
+    snapshot_date: date | None = None
+    if isinstance(snapshot, dict):
+        try:
+            snapshot_date = date.fromisoformat(str(snapshot.get("dataDate")))
+        except ValueError:
+            problems.append("snapshot.dataDate must be a valid YYYY-MM-DD date")
 
     sources = catalog.get("sources")
     if not isinstance(sources, dict) or not sources:
@@ -143,6 +523,10 @@ def validate_catalog(catalog: dict) -> list[str]:
             problems.append(f"source {source_id!r} url must be an HTTPS Geofabrik .osm.pbf URL")
         if not MD5_RE.match(str(source.get("md5", ""))):
             problems.append(f"source {source_id!r} md5 must be 32 lowercase hex characters")
+        if snapshot_date is not None and not str(url).endswith(
+            f"-{snapshot_date.strftime('%y%m%d')}.osm.pbf"
+        ):
+            problems.append(f"source {source_id!r} url must use the pinned snapshot date token")
         size = source.get("bytes")
         if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size <= 0):
             problems.append(f"source {source_id!r} bytes must be null or a positive integer")
@@ -152,6 +536,7 @@ def validate_catalog(catalog: dict) -> list[str]:
         problems.append("countries must be a non-empty list")
         countries = []
     seen_areas: set[str] = set()
+    source_assignments: dict[str, set[str]] = {}
     for country in countries:
         if not isinstance(country, dict):
             problems.append("every country must be an object")
@@ -165,6 +550,10 @@ def validate_catalog(catalog: dict) -> list[str]:
         seen_areas.add(str(country_id))
         if country.get("source") not in sources:
             problems.append(f"{label} references unknown source {country.get('source')!r}")
+        elif isinstance(country.get("source"), str):
+            source_assignments.setdefault(country["source"], set()).add(str(country_id))
+        if country.get("continent") not in CONTINENTS:
+            problems.append(f"{label} continent must be one of: {', '.join(sorted(CONTINENTS))}")
         if not re.match(r"^[a-z]{2}$", str(country.get("language", ""))):
             problems.append(f"{label} language must be a two-letter code")
         problem = bbox_problem(country.get("bbox"))
@@ -189,6 +578,8 @@ def validate_catalog(catalog: dict) -> list[str]:
             source_id = city.get("source", country.get("source"))
             if source_id not in sources:
                 problems.append(f"{city_label} references unknown source {source_id!r}")
+            elif isinstance(source_id, str):
+                source_assignments.setdefault(source_id, set()).add(str(country_id))
             problem = bbox_problem(city.get("bbox"))
             if problem:
                 problems.append(f"{city_label} bbox {problem}")
@@ -205,6 +596,12 @@ def validate_catalog(catalog: dict) -> list[str]:
                     problems.append(f"{city_label} verify.{key} must be inside its bbox")
             if not str(verify.get("geocodeQuery", "")).strip():
                 problems.append(f"{city_label} verify.geocodeQuery must be non-empty")
+    for source_id in sources:
+        owners = source_assignments.get(source_id, set())
+        if len(owners) != 1:
+            problems.append(
+                f"source {source_id!r} must be assigned to exactly one country; got {sorted(owners)!r}"
+            )
     return problems
 
 
@@ -219,6 +616,8 @@ def area_index(catalog: dict) -> dict[str, dict]:
             "kind": "country",
             "name": country["name"],
             "localName": country.get("localName", country["name"]),
+            "continent": country["continent"],
+            "cityId": None,
             "source": country["source"],
             "bbox": [float(value) for value in country["bbox"]],
             "heavy": bool(country.get("wholeCountryHeavy")),
@@ -233,6 +632,8 @@ def area_index(catalog: dict) -> dict[str, dict]:
                 "kind": "city",
                 "name": city["name"],
                 "localName": city.get("localName", city["name"]),
+                "continent": country["continent"],
+                "cityId": city["id"],
                 "source": city.get("source", country["source"]),
                 "bbox": [float(value) for value in city["bbox"]],
                 "center": [float(value) for value in city["center"]],
@@ -368,19 +769,53 @@ def command_menu_areas(catalog: dict, args: argparse.Namespace) -> None:
 
 def command_resolve(catalog: dict, args: argparse.Namespace) -> None:
     resolved = resolve_selection(catalog, args.selection)
-    if args.json:
-        print(json.dumps({
-            "areas": resolved["ids"],
-            "primary": resolved["primary"],
-            "bbox": resolved["bbox"],
-            "sourceIds": resolved["sourceIds"],
-            "languages": resolved["languages"],
-            "defaultLanguage": resolved["defaultLanguage"],
-            "approxDownloadMb": resolved["approxDownloadMb"],
-            "heavy": resolved["heavy"],
-        }, ensure_ascii=False))
+    snapshot_spec = getattr(args, "snapshot", "pinned")
+    policy = validate_source_policy(getattr(args, "source_policy", "cache-first"))
+    snapshot_mode, snapshot_date = snapshot_date_for_spec(
+        catalog,
+        snapshot_spec,
+        resolved["sourceIds"],
+        policy=policy,
+    )
+    payload = {
+        "areas": resolved["ids"],
+        "primary": resolved["primary"],
+        "bbox": resolved["bbox"],
+        "sourceIds": resolved["sourceIds"],
+        "languages": resolved["languages"],
+        "defaultLanguage": resolved["defaultLanguage"],
+        "approxDownloadMb": resolved["approxDownloadMb"],
+        "heavy": resolved["heavy"],
+        "snapshotMode": snapshot_mode,
+        "snapshotDate": snapshot_date.isoformat(),
+        "sourcePolicy": policy,
+    }
+    paths = None
+    if getattr(args, "library", None):
+        paths = library_paths(
+            args.library,
+            snapshot_date,
+            resolved["ids"],
+            dataset=getattr(args, "dataset", "borobiya"),
+        )
+        payload["library"] = {
+            "root": str(paths["libraryDir"]),
+            "datasetDir": str(paths["datasetDir"]),
+            "datasetRelativePath": dataset_relative_path(snapshot_date, resolved["ids"]).as_posix(),
+            "datasetFingerprint": dataset_fingerprint(snapshot_date, resolved["ids"]),
+            "pbf": str(paths["pbf"]),
+            "manifest": str(paths["manifest"]),
+            "pmtiles": str(paths["pmtiles"]),
+            "tilesMetadata": str(paths["tilesMetadata"]),
+            "osrmDataDir": str(paths["osrmDataDir"]),
+            "photonDataDir": str(paths["photonDataDir"]),
+            "photonStamp": str(paths["photonStamp"]),
+        }
+    if getattr(args, "json", False):
+        print(json.dumps(payload, ensure_ascii=False))
         return
-    emit_shell({
+
+    pairs: dict[str, object] = {
         "REGION_IDS": ",".join(resolved["ids"]),
         "PRIMARY_AREA": resolved["primary"],
         "UNION_BBOX": format_bbox(resolved["bbox"]),
@@ -389,23 +824,137 @@ def command_resolve(catalog: dict, args: argparse.Namespace) -> None:
         "PHOTON_DEFAULT_LANGUAGE": resolved["defaultLanguage"],
         "APPROX_DOWNLOAD_MB": resolved["approxDownloadMb"],
         "SELECTION_HEAVY": "1" if resolved["heavy"] else "0",
-    })
+        "SNAPSHOT_MODE": snapshot_mode,
+        "SNAPSHOT_DATE": snapshot_date.isoformat(),
+        "SOURCE_POLICY": policy,
+    }
+    if paths is not None:
+        pairs.update({
+            "MAP_LIBRARY_DIR": paths["libraryDir"],
+            "MAP_DATASET_DIR": paths["datasetDir"],
+            "MAP_DATA_DIR": paths["dataDir"],
+            "MAP_PBF": paths["pbf"],
+            "MAP_PBF_MANIFEST": paths["manifest"],
+            "MAP_OSRM_DATA_DIR": paths["osrmDataDir"],
+            "MAP_PHOTON_DATA_DIR": paths["photonDataDir"],
+            "PHOTON_STAMP": paths["photonStamp"],
+            "DATASET_FINGERPRINT": dataset_fingerprint(snapshot_date, resolved["ids"]),
+        })
+    emit_shell(pairs)
 
 
 def command_sources(catalog: dict, args: argparse.Namespace) -> None:
     resolved = resolve_selection(catalog, args.selection)
-    for source_id in resolved["sourceIds"]:
-        source = catalog["sources"][source_id]
-        file_name = source["url"].rsplit("/", 1)[-1]
-        size = source.get("bytes")
-        print(f"{source_id}\t{source['url']}\t{file_name}\t{source['md5']}\t{size if size is not None else ''}\t{source.get('approxSizeMb', '')}")
+    policy = validate_source_policy(getattr(args, "source_policy", "cache-first"))
+    _mode, snapshot_date = snapshot_date_for_spec(
+        catalog,
+        getattr(args, "snapshot", "pinned"),
+        resolved["sourceIds"],
+        policy=policy,
+    )
+    descriptors = effective_sources(
+        catalog,
+        resolved["sourceIds"],
+        snapshot_date,
+        getattr(args, "library", None),
+        policy,
+    )
+    for descriptor in descriptors:
+        target = descriptor["path"]
+        print(
+            f"{descriptor['id']}\t{descriptor['url']}\t{descriptor['file']}\t"
+            f"{descriptor['md5'] or ''}\t"
+            f"{descriptor['bytes'] if descriptor['bytes'] is not None else ''}\t"
+            f"{descriptor['approxSizeMb'] or ''}\t{descriptor['continent']}\t"
+            f"{descriptor['countryId']}\t{descriptor['relativePath'].as_posix()}\t"
+            f"{target if target is not None else ''}\t{snapshot_date.isoformat()}"
+        )
 
 
 def command_areas(catalog: dict, args: argparse.Namespace) -> None:
     resolved = resolve_selection(catalog, args.selection)
+    policy = validate_source_policy(getattr(args, "source_policy", "cache-first"))
+    _mode, snapshot_date = snapshot_date_for_spec(
+        catalog,
+        getattr(args, "snapshot", "pinned"),
+        resolved["sourceIds"],
+        policy=policy,
+    )
+    library_root = None
+    if getattr(args, "library", None):
+        library_root = library_paths(args.library, snapshot_date, resolved["ids"])["libraryDir"]
     for area in resolved["areas"]:
         bbox = "ALL" if area["kind"] == "country" else format_bbox(area["bbox"])
-        print(f"{area['id']}\t{area['countryId']}\t{area['source']}\t{bbox}\t{area['name']}")
+        if area["kind"] == "city":
+            relative = crop_relative_path(area, snapshot_date)
+            crop_path = library_root / relative if library_root is not None else ""
+        else:
+            relative = Path()
+            crop_path = ""
+        print(
+            f"{area['id']}\t{area['countryId']}\t{area['source']}\t{bbox}\t{area['name']}\t"
+            f"{area['continent']}\t{area['cityId'] or ''}\t"
+            f"{relative.as_posix() if str(relative) != '.' else ''}\t{crop_path}"
+        )
+
+
+def command_pinned_snapshot(catalog: dict, _args: argparse.Namespace) -> None:
+    print(catalog_snapshot_date(catalog).isoformat())
+
+
+def command_manifest_library_ready(catalog: dict, args: argparse.Namespace) -> None:
+    """Check that every source/crop named by a v3 manifest exists in the library."""
+    del catalog
+    manifest = read_json_object(Path(args.manifest))
+    if manifest.get("version") != 3:
+        raise SystemExit(1)
+    root = Path(str(args.library)).expanduser().resolve()
+    relatives: list[str] = []
+    for entry in manifest.get("sources", []):
+        if isinstance(entry, dict) and entry.get("libraryRelativePath"):
+            relatives.append(str(entry["libraryRelativePath"]))
+    for entry in manifest.get("crops", []):
+        if isinstance(entry, dict) and entry.get("libraryRelativePath"):
+            relatives.append(str(entry["libraryRelativePath"]))
+    if not relatives:
+        raise SystemExit(1)
+    missing = [relative for relative in relatives if not (root / relative).is_file()]
+    if missing:
+        print(
+            "regions: map library is incomplete; missing " + ", ".join(missing),
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+    print(f"OK: map library contains all {len(relatives)} source/crop inputs for {args.manifest}")
+
+
+def command_manifest_summary(catalog: dict, args: argparse.Namespace) -> None:
+    manifest = read_json_object(Path(args.manifest))
+    if not manifest:
+        fail(f"invalid or missing manifest: {args.manifest}")
+    version = manifest.get("version")
+    if version in (2, 3):
+        areas = manifest.get("areas")
+        snapshot = manifest.get("snapshot", {}) if isinstance(manifest.get("snapshot"), dict) else {}
+        snapshot_date = snapshot.get("date")
+        if not snapshot_date:
+            sources = manifest.get("sources", [])
+            if sources and isinstance(sources[0], dict):
+                snapshot_date = sources[0].get("dataDate")
+    elif manifest.get("region") == "tehran":
+        version = 1
+        areas = ["ir-tehran"]
+        source = manifest.get("source", {}) if isinstance(manifest.get("source"), dict) else {}
+        snapshot_date = source.get("dataDate")
+    else:
+        fail(f"unsupported manifest format: {args.manifest}")
+    if not isinstance(areas, list) or not areas:
+        fail(f"manifest has no areas: {args.manifest}")
+    emit_shell({
+        "MANIFEST_VERSION": version,
+        "MANIFEST_REGION_IDS": ",".join(str(area) for area in areas),
+        "MANIFEST_SNAPSHOT_DATE": snapshot_date or "",
+    })
 
 
 def command_verify_point(catalog: dict, args: argparse.Namespace) -> None:
@@ -435,30 +984,76 @@ def command_verify_point(catalog: dict, args: argparse.Namespace) -> None:
     })
 
 
-def source_file(data_dir: Path, catalog: dict, source_id: str) -> Path:
-    return data_dir / "source" / catalog["sources"][source_id]["url"].rsplit("/", 1)[-1]
+def source_file(
+    library_root: object | None,
+    catalog: dict,
+    source_id: str,
+    snapshot_date: date,
+) -> Path:
+    relative = source_relative_path(catalog, source_id, snapshot_date)
+    if library_root is None:
+        return relative
+    root = Path(str(library_root)).expanduser()
+    if not root.is_absolute():
+        root = Path.cwd() / root
+    return root.resolve() / relative
 
 
-def command_write_crop_meta(catalog: dict, args: argparse.Namespace) -> None:
+def write_crop_metadata(
+    catalog: dict,
+    meta_path: Path,
+    crop_path: Path,
+    area_id: str,
+    source_sha256: str,
+    osmium_version: str,
+    snapshot_date: date | None = None,
+    library_root: object | None = None,
+) -> dict:
     index = area_index(catalog)
-    area = index.get(args.area.lower())
+    area = index.get(area_id.lower())
     if area is None or area["kind"] != "city":
-        fail(f"crop metadata requires a city area id, got {args.area!r}")
-    crop_path = Path(args.crop)
+        fail(f"crop metadata requires a city area id, got {area_id!r}")
     if not crop_path.is_file() or crop_path.stat().st_size == 0:
         fail(f"crop PBF is missing or empty: {crop_path}")
-    if not SHA256_RE.match(args.source_sha256):
+    if not SHA256_RE.match(source_sha256):
         fail("--source-sha256 must be 64 lowercase hex characters")
     meta = {
         "area": area["id"],
         "source": area["source"],
-        "sourceSha256": args.source_sha256,
+        "sourceSha256": source_sha256,
         "bbox": area["bbox"],
         "strategy": "smart",
-        "osmiumToolVersion": args.osmium_version,
+        "osmiumToolVersion": osmium_version,
         "sha256": sha256_file(crop_path),
     }
-    Path(args.meta).write_text(json.dumps(meta, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    if snapshot_date is not None:
+        meta["snapshotDate"] = snapshot_date.isoformat()
+    if library_root is not None:
+        root = Path(str(library_root)).expanduser().resolve()
+        try:
+            meta["libraryRelativePath"] = crop_path.resolve().relative_to(root).as_posix()
+        except ValueError:
+            pass
+    write_json_atomically(meta_path, meta)
+    return meta
+
+
+def command_write_crop_meta(catalog: dict, args: argparse.Namespace) -> None:
+    snapshot_date = (
+        parse_snapshot_date(args.snapshot_date, "--snapshot-date")
+        if getattr(args, "snapshot_date", None)
+        else None
+    )
+    write_crop_metadata(
+        catalog,
+        Path(args.meta),
+        Path(args.crop),
+        args.area,
+        args.source_sha256,
+        args.osmium_version,
+        snapshot_date,
+        getattr(args, "library", None),
+    )
     print(f"Wrote crop metadata: {args.meta}")
 
 
@@ -475,6 +1070,16 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
     crop_path = Path(args.crop)
     if not crop_path.is_file() or crop_path.stat().st_size == 0:
         raise SystemExit(1)
+    snapshot_arg = getattr(args, "snapshot_date", None)
+    if snapshot_arg:
+        expected_snapshot = parse_snapshot_date(snapshot_arg, "--snapshot-date").isoformat()
+        meta_snapshot = meta.get("snapshotDate")
+        legacy_pinned_meta = (
+            meta_snapshot is None
+            and expected_snapshot == catalog_snapshot_date(catalog).isoformat()
+        )
+        if meta_snapshot != expected_snapshot and not legacy_pinned_meta:
+            raise SystemExit(1)
     if (
         meta.get("area") != area["id"]
         or meta.get("source") != area["source"]
@@ -487,6 +1092,21 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
     print(f"OK: reusing verified crop for {area['id']}")
 
 
+def command_write_source_meta(catalog: dict, args: argparse.Namespace) -> None:
+    snapshot_date = parse_snapshot_date(args.snapshot_date, "--snapshot-date")
+    metadata = write_source_metadata(
+        catalog,
+        args.library,
+        args.source,
+        snapshot_date,
+        md5=getattr(args, "md5", None),
+        sha256=getattr(args, "sha256", None),
+        data_timestamp=getattr(args, "data_timestamp", None),
+    )
+    target = source_file(args.library, catalog, args.source, snapshot_date)
+    print(f"Wrote source metadata: {source_metadata_path(target)} ({metadata['sha256']})")
+
+
 def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
     data_dir = Path(args.data_dir).resolve()
     merged = Path(args.merged).resolve()
@@ -494,47 +1114,101 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
         fail(f"merged PBF is missing or empty: {merged}")
     resolved = resolve_selection(catalog, args.selection)
     snapshot = catalog["snapshot"]
+    snapshot_spec = getattr(args, "snapshot", "pinned")
+    policy = validate_source_policy(getattr(args, "source_policy", "cache-first"))
+    if getattr(args, "snapshot_date", None):
+        snapshot_date = parse_snapshot_date(args.snapshot_date, "--snapshot-date")
+        snapshot_mode, _requested = parse_snapshot_spec(snapshot_spec, catalog)
+    else:
+        snapshot_mode, snapshot_date = snapshot_date_for_spec(
+            catalog, snapshot_spec, resolved["sourceIds"], policy=policy
+        )
 
+    library_arg = getattr(args, "library", None)
+    if library_arg:
+        paths = library_paths(library_arg, snapshot_date, resolved["ids"], args.dataset)
+        library_root = paths["libraryDir"]
+    elif len(data_dir.parts) >= 3 and data_dir.parts[-3] == "datasets":
+        library_root = data_dir.parents[2]
+        paths = library_paths(library_root, snapshot_date, resolved["ids"], args.dataset)
+    else:
+        fail("--library is required when --data-dir is not a library dataset directory")
+    if data_dir != paths["datasetDir"]:
+        fail(
+            f"--data-dir {data_dir} does not match the standardized library dataset "
+            f"directory {paths['datasetDir']}"
+        )
+
+    descriptors = {
+        descriptor["id"]: descriptor
+        for descriptor in effective_sources(
+            catalog,
+            resolved["sourceIds"],
+            snapshot_date,
+            library_root,
+            policy,
+        )
+    }
     sources: list[dict] = []
     source_sha: dict[str, str] = {}
+    source_timestamps: list[str] = []
     for source_id in resolved["sourceIds"]:
-        source = catalog["sources"][source_id]
-        path = source_file(data_dir, catalog, source_id)
+        descriptor = descriptors[source_id]
+        path = descriptor["path"]
+        assert path is not None
         if not path.is_file() or path.stat().st_size == 0:
             fail(f"source PBF is missing or empty: {path}")
         actual_md5 = md5_file(path)
-        if actual_md5 != source["md5"]:
-            fail(f"source {source_id} MD5 mismatch: expected {source['md5']}, got {actual_md5}")
-        expected_bytes = source.get("bytes")
+        expected_md5 = descriptor.get("md5")
+        if not expected_md5:
+            fail(
+                f"no trusted MD5 metadata for source {source_id} on "
+                f"{snapshot_date.isoformat()}; run online once or restore its source metadata"
+            )
+        if actual_md5 != expected_md5:
+            fail(f"source {source_id} MD5 mismatch: expected {expected_md5}, got {actual_md5}")
+        expected_bytes = descriptor.get("bytes")
         actual_bytes = path.stat().st_size
         if expected_bytes is not None and actual_bytes != expected_bytes:
             fail(f"source {source_id} size mismatch: expected {expected_bytes}, got {actual_bytes}")
         source_sha[source_id] = sha256_file(path)
+        source_meta = read_source_metadata(path)
+        data_timestamp = source_meta.get("dataTimestamp")
+        if data_timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
+            data_timestamp = snapshot.get("dataTimestamp")
+        if isinstance(data_timestamp, str) and data_timestamp:
+            source_timestamps.append(data_timestamp)
         sources.append({
             "id": source_id,
             "provider": snapshot["provider"],
-            "url": source["url"],
-            "dataDate": snapshot["dataDate"],
-            "dataTimestamp": snapshot["dataTimestamp"],
+            "url": descriptor["url"],
+            "dataDate": snapshot_date.isoformat(),
+            "dataTimestamp": data_timestamp,
             "file": path.name,
             "bytes": actual_bytes,
             "md5": actual_md5,
             "sha256": source_sha[source_id],
             "license": snapshot["license"],
+            "libraryRelativePath": descriptor["relativePath"].as_posix(),
         })
 
     crops: list[dict] = []
     for area in resolved["areas"]:
+        descriptor = descriptors[area["source"]]
         if area["kind"] == "country":
+            path = descriptor["path"]
+            assert path is not None
             crops.append({
                 "area": area["id"],
-                "file": str(source_file(data_dir, catalog, area["source"])),
+                "file": str(path),
                 "bbox": None,
                 "strategy": "whole-source",
                 "sha256": source_sha[area["source"]],
+                "libraryRelativePath": descriptor["relativePath"].as_posix(),
             })
         else:
-            crop_path = data_dir / "crops" / f"{area['id']}.osm.pbf"
+            relative = crop_relative_path(area, snapshot_date)
+            crop_path = library_root / relative
             if not crop_path.is_file() or crop_path.stat().st_size == 0:
                 fail(f"crop PBF is missing or empty: {crop_path}")
             crops.append({
@@ -543,11 +1217,29 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
                 "bbox": area["bbox"],
                 "strategy": "smart",
                 "sha256": sha256_file(crop_path),
+                "libraryRelativePath": relative.as_posix(),
             })
 
+    common_timestamp = (
+        source_timestamps[0]
+        if source_timestamps and len(set(source_timestamps)) == 1
+        else None
+    )
     manifest = {
-        "version": 2,
+        "version": 3,
         "dataset": args.dataset,
+        "snapshot": {
+            "provider": snapshot["provider"],
+            "license": snapshot["license"],
+            "mode": snapshot_mode,
+            "date": snapshot_date.isoformat(),
+            "dataTimestamp": common_timestamp,
+        },
+        "storage": {
+            "librarySchemaVersion": 1,
+            "datasetFingerprint": dataset_fingerprint(snapshot_date, resolved["ids"]),
+            "datasetRelativePath": dataset_relative_path(snapshot_date, resolved["ids"]).as_posix(),
+        },
         "areas": resolved["ids"],
         "bbox": resolved["bbox"],
         "sources": sources,
@@ -556,14 +1248,15 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
             "file": str(merged),
             "sha256": sha256_file(merged),
             "osmiumToolVersion": args.osmium_version,
+            "libraryRelativePath": (
+                dataset_relative_path(snapshot_date, resolved["ids"]) / merged.name
+            ).as_posix(),
         },
         "attribution": "© OpenStreetMap contributors",
         "attributionUrl": "https://www.openstreetmap.org/copyright",
     }
     output = data_dir / f"{args.dataset}.source.json"
-    temporary = output.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(output)
+    write_json_atomically(output, manifest)
     print(f"Wrote provenance manifest: {output}")
 
 
@@ -576,14 +1269,56 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         fail(f"invalid provenance manifest {manifest_path}: {error}")
-    if manifest.get("version") != 2:
+    version = manifest.get("version")
+    if version not in (2, 3):
         fail(
-            f"{manifest_path} is not a version-2 (multi-area) manifest. "
+            f"{manifest_path} is not a version-2 or version-3 (multi-area) manifest. "
             "Rebuild the dataset with prepare-regions-pbf.sh, or let "
             "scripts/setup-ubuntu-vm.sh migrate a Tehran-only install."
         )
 
     resolved = resolve_selection(catalog, args.selection)
+    pinned_date = catalog_snapshot_date(catalog)
+    snapshot_spec = getattr(args, "snapshot", None)
+    if getattr(args, "snapshot_date", None):
+        expected_snapshot_date = parse_snapshot_date(args.snapshot_date, "--snapshot-date")
+    elif snapshot_spec:
+        spec_mode, spec_date = parse_snapshot_spec(snapshot_spec, catalog)
+        if spec_mode == "latest":
+            manifest_snapshot = manifest.get("snapshot", {}) if version == 3 else {}
+            raw_date = manifest_snapshot.get("date") if isinstance(manifest_snapshot, dict) else None
+            expected_snapshot_date = (
+                parse_snapshot_date(raw_date, "manifest snapshot date") if raw_date else pinned_date
+            )
+        else:
+            expected_snapshot_date = spec_date or pinned_date
+    elif version == 3:
+        manifest_snapshot = manifest.get("snapshot", {})
+        raw_date = manifest_snapshot.get("date") if isinstance(manifest_snapshot, dict) else None
+        if not raw_date:
+            fail("version-3 manifest snapshot block must carry a date")
+        expected_snapshot_date = parse_snapshot_date(raw_date, "manifest snapshot date")
+    else:
+        expected_snapshot_date = pinned_date
+    if version == 2 and expected_snapshot_date != pinned_date:
+        fail("version-2 manifests only describe the repository-pinned snapshot; rebuild for another date")
+    if version == 3:
+        manifest_snapshot = manifest.get("snapshot")
+        if not isinstance(manifest_snapshot, dict):
+            fail("version-3 manifest must carry a snapshot block")
+        if manifest_snapshot.get("provider") != catalog["snapshot"]["provider"] or manifest_snapshot.get("license") != catalog["snapshot"]["license"]:
+            fail("version-3 manifest snapshot must identify Geofabrik and the ODbL-1.0 license")
+        if manifest_snapshot.get("date") != expected_snapshot_date.isoformat():
+            fail(
+                f"manifest snapshot date {manifest_snapshot.get('date')!r} does not match "
+                f"expected {expected_snapshot_date.isoformat()!r}"
+            )
+        storage = manifest.get("storage")
+        if isinstance(storage, dict) and storage.get("datasetFingerprint"):
+            expected_fingerprint = dataset_fingerprint(expected_snapshot_date, resolved["ids"])
+            if storage["datasetFingerprint"] != expected_fingerprint:
+                fail("manifest storage fingerprint does not match its snapshot/selection")
+
     if sorted(manifest.get("areas", [])) != sorted(resolved["ids"]):
         fail(
             f"manifest areas {manifest.get('areas')!r} do not match selected areas "
@@ -620,8 +1355,19 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         pinned = catalog["sources"][source_id]
         if entry.get("provider") != snapshot["provider"] or entry.get("license") != snapshot["license"]:
             fail(f"manifest source {source_id} must identify Geofabrik and the ODbL-1.0 license")
-        if entry.get("url") != pinned["url"] or entry.get("md5") != pinned["md5"] or entry.get("dataDate") != snapshot["dataDate"]:
-            fail(f"manifest source {source_id} does not match the pinned catalog snapshot")
+        expected_url = dated_source_url(pinned["url"], expected_snapshot_date)
+        if entry.get("url") != expected_url or entry.get("dataDate") != expected_snapshot_date.isoformat():
+            fail(f"manifest source {source_id} does not match the expected snapshot {expected_snapshot_date.isoformat()}")
+        if expected_snapshot_date == pinned_date and entry.get("md5") != pinned["md5"]:
+            fail(f"manifest source {source_id} does not match the pinned catalog MD5")
+        if not MD5_RE.match(str(entry.get("md5", ""))):
+            fail(f"manifest source {source_id} has an invalid md5")
+        if not isinstance(entry.get("bytes"), int) or isinstance(entry.get("bytes"), bool) or entry["bytes"] <= 0:
+            fail(f"manifest source {source_id} has an invalid byte count")
+        if version == 3 and "libraryRelativePath" in entry:
+            expected_relative = source_relative_path(catalog, source_id, expected_snapshot_date).as_posix()
+            if entry["libraryRelativePath"] != expected_relative:
+                fail(f"manifest source {source_id} library path does not match the standardized layout")
         if not SHA256_RE.match(str(entry.get("sha256", ""))):
             fail(f"manifest source {source_id} has an invalid sha256")
 
@@ -636,6 +1382,14 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
             fail(f"manifest crop {crop['area']} strategy must be {expected_strategy}")
         if area["kind"] == "city" and not bbox_matches(crop.get("bbox"), area["bbox"]):
             fail(f"manifest crop {crop['area']} bbox does not match the catalog")
+        if version == 3 and "libraryRelativePath" in crop:
+            expected_relative = (
+                source_relative_path(catalog, area["source"], expected_snapshot_date)
+                if area["kind"] == "country"
+                else crop_relative_path(area, expected_snapshot_date)
+            ).as_posix()
+            if crop["libraryRelativePath"] != expected_relative:
+                fail(f"manifest crop {crop['area']} library path does not match the standardized layout")
         if not SHA256_RE.match(str(crop.get("sha256", ""))):
             fail(f"manifest crop {crop['area']} has an invalid sha256")
 
@@ -647,7 +1401,8 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         fail(f"merged PBF SHA-256 {actual_sha256} does not match manifest {merged['sha256']!r}")
     print(
         f"OK: {pbf_path} matches areas {','.join(resolved['ids'])} "
-        f"bbox {resolved['bbox']!r} (SHA-256 {actual_sha256})"
+        f"bbox {resolved['bbox']!r} snapshot {expected_snapshot_date.isoformat()} "
+        f"(SHA-256 {actual_sha256})"
     )
 
 
@@ -737,11 +1492,41 @@ def command_migrate_manifest_v1(catalog: dict, args: argparse.Namespace) -> None
     }
     if source["url"] != pinned["url"]:
         manifest["sources"][0]["migratedFromUrl"] = source["url"]
+    library_arg = getattr(args, "library", None)
+    if library_arg:
+        snapshot_date = (
+            parse_snapshot_date(args.snapshot_date, "--snapshot-date")
+            if getattr(args, "snapshot_date", None)
+            else catalog_snapshot_date(catalog)
+        )
+        if snapshot_date != catalog_snapshot_date(catalog):
+            fail("v1 Tehran migration only describes the repository-pinned snapshot")
+        paths = library_paths(library_arg, snapshot_date, ["ir-tehran"], args.dataset)
+        manifest["version"] = 3
+        manifest["snapshot"] = {
+            "provider": snapshot["provider"],
+            "license": snapshot["license"],
+            "mode": "pinned",
+            "date": snapshot_date.isoformat(),
+            "dataTimestamp": snapshot["dataTimestamp"],
+        }
+        manifest["storage"] = {
+            "librarySchemaVersion": 1,
+            "datasetFingerprint": dataset_fingerprint(snapshot_date, ["ir-tehran"]),
+            "datasetRelativePath": dataset_relative_path(snapshot_date, ["ir-tehran"]).as_posix(),
+        }
+        manifest["sources"][0]["libraryRelativePath"] = source_relative_path(
+            catalog, "iran", snapshot_date
+        ).as_posix()
+        crop_relative = crop_relative_path(tehran, snapshot_date)
+        manifest["crops"][0]["file"] = str(paths["libraryDir"] / crop_relative)
+        manifest["crops"][0]["libraryRelativePath"] = crop_relative.as_posix()
+        manifest["merged"]["libraryRelativePath"] = (
+            dataset_relative_path(snapshot_date, ["ir-tehran"]) / pbf_path.name
+        ).as_posix()
     output = Path(args.output)
-    temporary = output.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(output)
-    print(f"Migrated v1 Tehran manifest to version 2: {output}")
+    write_json_atomically(output, manifest)
+    print(f"Migrated v1 Tehran manifest to version {manifest['version']}: {output}")
 
 
 def main() -> None:
@@ -758,11 +1543,28 @@ def main() -> None:
     resolve = subparsers.add_parser("resolve")
     resolve.add_argument("selection")
     resolve.add_argument("--json", action="store_true")
+    resolve.add_argument("--snapshot", default="pinned")
+    resolve.add_argument("--source-policy", default="cache-first")
+    resolve.add_argument("--library")
+    resolve.add_argument("--dataset", default="borobiya")
 
     sources = subparsers.add_parser("sources")
     sources.add_argument("selection")
+    sources.add_argument("--snapshot", default="pinned")
+    sources.add_argument("--source-policy", default="cache-first")
+    sources.add_argument("--library")
     areas = subparsers.add_parser("areas")
     areas.add_argument("selection")
+    areas.add_argument("--snapshot", default="pinned")
+    areas.add_argument("--source-policy", default="cache-first")
+    areas.add_argument("--library")
+
+    subparsers.add_parser("pinned-snapshot")
+    manifest_summary = subparsers.add_parser("manifest-summary")
+    manifest_summary.add_argument("--manifest", required=True)
+    manifest_library_ready = subparsers.add_parser("manifest-library-ready")
+    manifest_library_ready.add_argument("--manifest", required=True)
+    manifest_library_ready.add_argument("--library", required=True)
 
     verify_point = subparsers.add_parser("verify-point")
     verify_point.add_argument("area")
@@ -773,12 +1575,23 @@ def main() -> None:
     write_crop_meta.add_argument("--area", required=True)
     write_crop_meta.add_argument("--source-sha256", required=True)
     write_crop_meta.add_argument("--osmium-version", required=True)
+    write_crop_meta.add_argument("--snapshot-date")
+    write_crop_meta.add_argument("--library")
 
     verify_crop = subparsers.add_parser("verify-crop")
     verify_crop.add_argument("--meta", required=True)
     verify_crop.add_argument("--crop", required=True)
     verify_crop.add_argument("--area", required=True)
     verify_crop.add_argument("--source-sha256", required=True)
+    verify_crop.add_argument("--snapshot-date")
+
+    write_source_meta = subparsers.add_parser("write-source-meta")
+    write_source_meta.add_argument("--library", required=True)
+    write_source_meta.add_argument("--source", required=True)
+    write_source_meta.add_argument("--snapshot-date", required=True)
+    write_source_meta.add_argument("--md5")
+    write_source_meta.add_argument("--sha256")
+    write_source_meta.add_argument("--data-timestamp")
 
     write_manifest = subparsers.add_parser("write-manifest")
     write_manifest.add_argument("--data-dir", required=True)
@@ -786,18 +1599,27 @@ def main() -> None:
     write_manifest.add_argument("--selection", required=True)
     write_manifest.add_argument("--merged", required=True)
     write_manifest.add_argument("--osmium-version", required=True)
+    write_manifest.add_argument("--library")
+    write_manifest.add_argument("--snapshot", default="pinned")
+    write_manifest.add_argument("--snapshot-date")
+    write_manifest.add_argument("--source-policy", default="cache-first")
 
     verify_manifest = subparsers.add_parser("verify-manifest")
     verify_manifest.add_argument("--manifest", required=True)
     verify_manifest.add_argument("--pbf", required=True)
     verify_manifest.add_argument("--selection", required=True)
     verify_manifest.add_argument("--bbox")
+    verify_manifest.add_argument("--snapshot")
+    verify_manifest.add_argument("--snapshot-date")
+    verify_manifest.add_argument("--library")
 
     migrate = subparsers.add_parser("migrate-manifest-v1")
     migrate.add_argument("--input", required=True)
     migrate.add_argument("--output", required=True)
     migrate.add_argument("--pbf", required=True)
     migrate.add_argument("--dataset", default="borobiya")
+    migrate.add_argument("--library")
+    migrate.add_argument("--snapshot-date")
 
     args = parser.parse_args()
     catalog = load_catalog(args.catalog)
@@ -809,9 +1631,13 @@ def main() -> None:
         "resolve": command_resolve,
         "sources": command_sources,
         "areas": command_areas,
+        "pinned-snapshot": command_pinned_snapshot,
+        "manifest-summary": command_manifest_summary,
+        "manifest-library-ready": command_manifest_library_ready,
         "verify-point": command_verify_point,
         "write-crop-meta": command_write_crop_meta,
         "verify-crop": command_verify_crop,
+        "write-source-meta": command_write_source_meta,
         "write-manifest": command_write_manifest,
         "verify-manifest": command_verify_manifest,
         "migrate-manifest-v1": command_migrate_manifest_v1,

@@ -50,6 +50,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 - [x] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline — completed 2026-10-20 on the VM: `verify-routing.sh` passes for car (6,643 m / 609 s), bicycle (5,090 m / 1,489 s), and foot (4,803 m / 3,464 s), each with alternatives
 - [x] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse` — completed 2026-10-20 on the VM: `verify-geocoding.sh` passes (`/geocode?q=Azadi Square` → 5 features, first «میدان آزادی»; `/reverse` at 35.70,51.40 → «هادی خداپرست»)
 - [x] **T1.4.6** Wire `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MIN_ZOOM`, and `MAP_MAX_ZOOM` through Compose, validated public `/map-config`, client/schema, tile/routing scripts, and pipeline documentation — completed 2026-10-19; offline tests/typechecks/build/YAML/shell checks pass
+- [ ] **T1.4.7** Standardized project-independent map library: continent/country/city/date-organized sources+crops, pinned/latest/specific snapshots, cache-first/refresh/offline policies, complete active dataset bundle, current pointer, one-release pruning, and verified legacy migration — code/tests/docs complete 2026-10-20; VM migration + Tehran/Frankfurt offline acceptance still required before PR #2 merge
 
 ### 1.5 Client Map & Theming
 

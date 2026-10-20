@@ -21,6 +21,7 @@ map-server/tiles/
 map-server/osrm/data/
 map-server/photon/data/
 map-server/photon/*.jar
+map-server/tools/*.jar
 *.pmtiles
 *.mbtiles
 *.osm.pbf

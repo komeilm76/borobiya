@@ -133,26 +133,30 @@ Map Server is a **completely separate service** responsible for:
   4.  Build search index: Import to Nominatim/Photon DB
   5.  Deploy to Map Server volume / object storage
 - **Update Mechanism (Must be documented):**
-  - Manual trigger: Admin uploads new `region.osm.pbf` or admin runs `bun run map:update --region=iran`
+  - Manual trigger: operator runs `./scripts/setup-ubuntu-vm.sh` (area/snapshot/policy form) or `--update-map` for the newest common dated snapshot
   - Semi-automatic: Cron job checks for new dump weekly/monthly, builds in staging, admin approves promotion to production.
-  - Versioning: publish versioned PMTiles files under distinct source IDs (e.g. `/tehran-2025-05-01/{z}/{x}/{y}`); a response version header is future work
-  - Zero-downtime switch via symlink/volume swap.
+  - Versioning: the Martin source ID stays `borobiya`; the installed snapshot date is exposed as `/map-config` `dataVersion` and recorded in the dataset provenance manifest
+  - Build a fingerprinted dataset in the external map library, verify it, recreate map services on it, then update the library current pointer and prune the replaced release (not claimed zero-downtime).
 - **Distribution:**
-  - In Docker: Map Server volume (`map-data:/data`)
+  - In Docker: active dataset bind-mounted from the external map library (`MAP_DATASET_DIR:/data`)
   - On Windows Dev (without Docker): Local `data/maps/` folder + local Martin/Valhalla binary.
 
 ### 3.5. Geographic Coverage of Offline Data
 - **Configurable via ENV / Config File:**
   ```env
+  MAP_LIBRARY_DIR= # blank: ~/.local/share/borobiya/map-library
+  MAP_SNAPSHOT=pinned # pinned | latest | YYYY-MM-DD
+  MAP_SNAPSHOT_DATE=2026-10-18
+  MAP_SOURCE_POLICY=cache-first # cache-first | refresh | offline
   MAP_REGION_IDS=ir-tehran # areas from map-server/regions.json
   MAP_REGION=borobiya
   MAP_BBOX=51.0,35.5,51.7,35.9 # west,south,east,north
-  MAP_DATA_VERSION=development
+  MAP_DATA_VERSION=2026-10-18
   MAP_MIN_ZOOM=0
   MAP_MAX_ZOOM=14              # Planetiler supports up to 16
   ```
 - Initial dev can use **single city/province** to keep size small (e.g., Tehran, 1-2GB).
-- Target: **horizontally scalable** coverage without a code change. The current pipeline accepts region settings, but the committed map styles/client source wiring still names `tehran`; a non-Tehran runtime switch needs matching source wiring (see [`docs/MAP_SERVER.md`](docs/MAP_SERVER.md)).
+- Target: **horizontally scalable** coverage without a code change. The pipeline accepts catalog areas and snapshot dates while committed styles/client wiring uses the constant `borobiya` dataset source, so a non-Tehran switch is a data/setup operation (see [`docs/MAP_SERVER.md`](docs/MAP_SERVER.md) and [`docs/MAP_LIBRARY.md`](docs/MAP_LIBRARY.md)).
 - Document disk/RAM requirements per region.
 
 ### 3.6. Map Features to Support
@@ -892,6 +896,7 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 | `SECURITY.md` | Hashing, rate-limit, suspension, no-delete policy, env secrets |
 | `API.md` | Link to OpenAPI `/docs`, plus route prefix rules |
 | `MAP_SERVER.md` | How to setup Martin/OSRM/Photon, generate tiles, update data |
+| `MAP_LIBRARY.md` | External standardized map storage, snapshots, cache/update/offline policies |
 | `WORKFLOWS.md` | Git hooks, deploy, android build |
 | `USER_MANUAL.md` | Step-by-step for end-user: register, share location, SOS, rescue (with screenshots) |
 | `DEVELOPMENT.md` | Windows without Docker vs Ubuntu with Docker |
@@ -1037,16 +1042,21 @@ RATE_LIMIT_MAX=100
 
 # Map Server
 MAP_SERVER_URL=http://localhost:8000
+MAP_LIBRARY_DIR=
+MAP_SNAPSHOT=pinned
+MAP_SNAPSHOT_DATE=2026-10-18
+MAP_SOURCE_POLICY=cache-first
 MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
-MAP_DATA_VERSION=development
+MAP_DATA_VERSION=2026-10-18
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
 MAP_ROUTING_URL=http://localhost:8001/route
-MAP_GEOCODE_URL=http://localhost:8000/geocode
+MAP_GEOCODE_URL=http://localhost:8001/geocode
+MAP_REVERSE_URL=http://localhost:8001/reverse
 
 # Browser-facing paths (forwarded by Vite/Nginx)
 VITE_API_URL=/api

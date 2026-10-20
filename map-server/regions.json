@@ -133,6 +133,7 @@
       "id": "ir",
       "name": "Iran",
       "localName": "ایران",
+      "continent": "asia",
       "language": "fa",
       "source": "iran",
       "bbox": [
@@ -357,6 +358,7 @@
       "id": "de",
       "name": "Germany",
       "localName": "Deutschland",
+      "continent": "europe",
       "language": "de",
       "source": "germany",
       "bbox": [
@@ -616,6 +618,7 @@
       "id": "tr",
       "name": "Turkey",
       "localName": "Türkiye",
+      "continent": "asia",
       "language": "tr",
       "source": "turkey",
       "bbox": [
@@ -710,6 +713,7 @@
       "id": "fr",
       "name": "France",
       "localName": "France",
+      "continent": "europe",
       "language": "fr",
       "source": "france",
       "bbox": [
@@ -807,6 +811,7 @@
       "id": "gb",
       "name": "United Kingdom",
       "localName": "United Kingdom",
+      "continent": "europe",
       "language": "en",
       "source": "united-kingdom",
       "bbox": [
@@ -877,6 +882,7 @@
       "id": "nl",
       "name": "Netherlands",
       "localName": "Nederland",
+      "continent": "europe",
       "language": "nl",
       "source": "netherlands",
       "bbox": [

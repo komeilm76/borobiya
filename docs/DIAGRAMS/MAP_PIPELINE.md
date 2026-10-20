@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> Selectable areas (whole countries/cities from the pinned `map-server/regions.json` catalog; default Tehran) are cropped and merged into one shared dataset for the tile/routing builders and the Nominatim→Photon import path; local proxies are configured. Live acceptance passed on the target Ubuntu VM on 2026-10-20 (see `../PROGRESS.md`); generated runtime data stays local and Git-ignored.
+> Selectable areas and snapshots (whole countries/cities from `map-server/regions.json`; pinned default Tehran/2026-10-18) are cropped and merged into one shared dataset in the standardized external map library for the tile/routing builders and the Nominatim→Photon import path; local proxies are configured. Live acceptance of the original Tehran pipeline passed on the target Ubuntu VM on 2026-10-20; the library refactor's VM migration/offline acceptance is the remaining pre-merge gate (see `../PROGRESS.md`).
 
 ---
 
@@ -8,10 +8,10 @@
 
 ```mermaid
 flowchart TD
-  A[Geofabrik snapshots for selected areas<br/>regions.json, 2026-10-18 / ODbL 1.0]
+  A[Geofabrik snapshots for selected areas<br/>pinned, latest, or specific date / ODbL 1.0]
   A --> B[Download + official MD5 verification]
   B --> C[Osmium smart crops per city<br/>+ merge]
-  C --> D[One shared borobiya.osm.pbf<br/>+ v2 provenance manifest]
+  C --> D[External map library active dataset<br/>borobiya.osm.pbf + v3 provenance manifest]
   D --> E1[Planetiler 0.10.2<br/>MAP_BBOX + zoom range]
   D --> E2[OSRM 26.10.0<br/>car / bicycle / foot]
   D --> E3[Nominatim 5.3 import<br/>local PBF_PATH]
@@ -29,7 +29,7 @@ flowchart TD
   M[GET /map-config<br/>region, bbox, version, zoom] --> K
 ```
 
-`prepare-regions-pbf.sh` downloads and verifies the pinned sources for the selected areas, crops/merges them into the only permitted shared dataset, and writes its provenance manifest. Tile/routing builders verify that manifest before using it; Nominatim mounts that same output as local `PBF_PATH`. `MAP_REGION` (dataset slug), `MAP_BBOX` (area union), `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser uses same-origin `/map-config`, `/route`, `/geocode`, and `/reverse` paths and does not receive service URLs.
+`prepare-regions-pbf.sh` downloads/caches and verifies the selected snapshot sources in the standardized map library, crops/merges them into the only permitted shared dataset, and writes its provenance manifest. Tile/routing builders verify that manifest before using it; Nominatim mounts that same output as local `PBF_PATH`. `MAP_REGION` (dataset slug), `MAP_BBOX` (area union), `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser uses same-origin `/map-config`, `/route`, `/geocode`, and `/reverse` paths and does not receive service URLs.
 
 ---
 
@@ -51,7 +51,7 @@ flowchart LR
   H --> I
 ```
 
-The pinned source downloader, hash manifest, crops/merge, import, and service-start paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with an area-selection form). Automated replication/update feeds, staged promotion, and zero-downtime activation are not implemented. The three real-data checks passed live on the target VM (2026-10-20).
+The snapshot downloader/cache, hash manifest, crops/merge, import, service-start, current-pointer activation, and post-acceptance pruning paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with a library/snapshot/policy/area form). Continuous replication feeds and zero-downtime activation are not implemented. The original three real-data checks passed live on the target VM (2026-10-20); library migration/offline acceptance remains to be repeated there.
 
 ---
 
@@ -61,12 +61,12 @@ The pinned source downloader, hash manifest, crops/merge, import, and service-st
 flowchart LR
   T[Area catalog: countries + cities<br/>regions.json] --> SEL[MAP_REGION_IDS selection<br/>default ir-tehran]
   SEL -.-> ENV
-  ENV[MAP_REGION (dataset slug)<br/>MAP_BBOX (area union)<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
+  ENV[MAP_LIBRARY_DIR + MAP_DATASET_DIR<br/>MAP_SNAPSHOT_DATE + MAP_SOURCE_POLICY<br/>MAP_REGION (dataset slug)<br/>MAP_BBOX (area union)<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
   ENV --> CFG[GET /map-config]
   CFG --> CLIENT[Client validates shared MapConfig schema]
 ```
 
-The default selection targets Tehran: area `ir-tehran`, union bbox `51.0,35.5,51.7,35.9`, catalog snapshot `2026-10-18`, zoom range 0–14, dataset slug `borobiya`. Planetiler and all OSRM profiles consume the merged dataset PBF, as does Nominatim before Photon import. Changing areas needs no style/client wiring changes — the dataset slug (and thus the Martin source) is constant; only the data builders rerun (the setup script detects staleness by dataset checksum).
+The default selection targets Tehran: area `ir-tehran`, union bbox `51.0,35.5,51.7,35.9`, repository-pinned snapshot `2026-10-18`, cache-first source policy, zoom range 0–14, dataset slug `borobiya`, and the external map library under `~/.local/share/borobiya/map-library`. Planetiler and all OSRM profiles consume the merged dataset PBF, as does Nominatim before Photon import. Changing areas needs no style/client wiring changes — the dataset slug (and thus the Martin source) is constant; only the data builders rerun (the setup script detects staleness by dataset checksum).
 
 Disk estimates are preliminary and OSRM values are per profile; this deployment runs three separate OSRM processes. Runtime memory has not been benchmarked.
 
@@ -88,8 +88,10 @@ Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint
 ## 5. Verification Commands
 
 ```bash
-# Prepare and verify the shared crop (once)
+# Prepare and verify the shared library dataset (once)
 set -a; source .env; set +a
+export MAP_LIBRARY_DIR="${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/map-library}"
+eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" --source-policy "${MAP_SOURCE_POLICY:-cache-first}" --library "$MAP_LIBRARY_DIR")"
 ./map-server/scripts/prepare-regions-pbf.sh
 ./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
 
@@ -113,7 +115,8 @@ curl http://localhost:8080/map-config | jq
 
 | Task | Status |
 |------|--------|
-| Generate Tehran PMTiles and verify Martin MVT route | T1.4.2 open: pinned source/crop and builder configured; local data generation and MVT smoke test pending |
-| Build three OSRM graphs and verify a real offline route | T1.4.4 open: shared-crop graphs and `POST /route` check configured; local route smoke test pending |
-| Configure Photon and test geocode/reverse | T1.4.5 open: Nominatim→Photon import and proxy configured; local index and geocode/reverse checks pending |
+| Generate PMTiles and verify Martin MVT route | T1.4.2 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
+| Build three OSRM graphs and verify a real offline route | T1.4.4 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
+| Configure Photon and test geocode/reverse | T1.4.5 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
 | Wire map settings through pipeline/runtime and document | T1.4.6 complete; checks recorded in `docs/PROGRESS.md` |
+| Standardized external map library, snapshot/cache policies, migration, pruning | T1.4.7 code/tests complete; VM migration + offline acceptance pending before PR merge |

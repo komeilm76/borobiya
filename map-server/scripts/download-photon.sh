@@ -24,7 +24,7 @@ sha256_file() {
 }
 
 command -v curl >/dev/null 2>&1 || fail 'curl is required to download the Photon release JAR'
-mkdir -p "$(dirname -- "$PHOTON_JAR")" "$REPO_ROOT/map-server/photon/data"
+mkdir -p "$(dirname -- "$PHOTON_JAR")"
 if [[ -s "$PHOTON_JAR" ]] && [[ "$(sha256_file "$PHOTON_JAR")" == "$PHOTON_SHA256" ]]; then
   printf 'Photon %s JAR already present and verified: %s\n' "$PHOTON_VERSION" "$PHOTON_JAR"
   exit 0

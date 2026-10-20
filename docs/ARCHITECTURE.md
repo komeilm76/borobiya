@@ -209,7 +209,7 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 | Routing | **OSRM** (C++, fastest), Valhalla (more profiles), GraphHopper | OSRM for dev (prebuilt profiles) |
 | Geocoding | **Photon** (ES-backed, light), Nominatim (heavier), Pelias | Photon for dev, Nominatim for prod scale |
 | Style hosting | Martin `/style/{id}` plus runtime SVG sprite and TTF glyph generation | Martin 1.16.1 |
-| Data storage | PMTiles single file + OSRM graph + Photon index on host volume | Docker volume `map-data:/data` |
+| Data storage | PMTiles single file + OSRM graph + Photon index | Project-independent map library active dataset, bind-mounted into the map services (see `MAP_LIBRARY.md`) |
 
 ### 6.2 Why Separate
 
@@ -220,7 +220,7 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 ### 6.3 Versioning & Update
 
 - Martin exposes each PMTiles archive by its filename-derived source ID; the map dataset is always published as `/borobiya/{z}/{x}/{y}` whatever areas it contains, so area changes never rename the source. A separate `X-Map-Data-Version` response header remains a future update-pipeline feature.
-- Update pipeline: `bun run map:update --region=iran` → download PBF → generate → stage → admin approves promote → symlink swap (zero downtime).
+- Update pipeline: `setup-ubuntu-vm.sh --update-map` (or a specific `--snapshot YYYY-MM-DD`) → download/verify into the map library → build a fingerprinted dataset bundle → run acceptance checks → update `current.json`/`datasets/current` → prune the replaced release. Service recreation is explicit; this is not claimed to be zero-downtime.
 
 ### 6.4 Offline Guarantees
 

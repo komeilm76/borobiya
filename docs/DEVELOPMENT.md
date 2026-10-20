@@ -116,7 +116,7 @@ bun install
 bun run dev   # API and Vite client concurrently
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline for the areas selected in `map-server/regions.json` (`MAP_REGION_IDS`, default `ir-tehran`; whole countries and/or cities); `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`, including the area-selection form (`--list-regions`, `--regions`, `--reselect`, `--dry-run`). Docker is optional for working on the current API/client scaffold.
+The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration and login queries use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline for the areas/snapshot selected from `map-server/regions.json` (`MAP_REGION_IDS`, default `ir-tehran`; whole countries and/or cities; `MAP_SNAPSHOT=pinned|latest|YYYY-MM-DD`). All sources, crops, and generated dataset artifacts live in the standardized external map library (`MAP_LIBRARY_DIR`, default `~/.local/share/borobiya/map-library`; see `docs/MAP_LIBRARY.md`). `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`, including the library/snapshot/policy/area form (`--list-regions`, `--regions`, `--update-map`, `--offline`, `--reselect`, `--dry-run`). Docker is optional for working on the current API/client scaffold.
 
 ### 3.3 Windows Caveats
 
@@ -161,19 +161,24 @@ MISSION_STATUS_TIMEOUT_HOURS=6
 
 # Independent Map Server (server-to-server URLs for local development)
 MAP_SERVER_URL=http://localhost:8000
+MAP_LIBRARY_DIR=
+MAP_DATASET_DIR=
+MAP_SNAPSHOT=pinned
+MAP_SNAPSHOT_DATE=2026-10-18
+MAP_SOURCE_POLICY=cache-first
 MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
-MAP_DATA_VERSION=development
+MAP_DATA_VERSION=2026-10-18
 MAP_MAX_ZOOM=14
 MAP_MIN_ZOOM=0
 MAP_STYLE_LIGHT=http://localhost:8000/style/light
 MAP_STYLE_DARK=http://localhost:8000/style/dark
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_ROUTING_PORT=8001
-MAP_OSRM_DATA_DIR=./map-server/osrm/data
-MAP_GEOCODE_URL=http://localhost:8000/geocode
-MAP_REVERSE_URL=http://localhost:8000/reverse
+MAP_OSRM_DATA_DIR=
+MAP_GEOCODE_URL=http://localhost:8001/geocode
+MAP_REVERSE_URL=http://localhost:8001/reverse
 
 # Browser-facing paths stay same-origin; Vite and the production proxy forward them.
 VITE_API_URL=/api
@@ -207,7 +212,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 | `bun run db:setup` | server | Not wired yet |
 | `bun --filter @borobiya/server db:seed` | root | Idempotently seeds reference data and the bootstrap admin; run after `db:migrate` |
 | `bun run map:dev` | root | Planned; local Martin scripts are not wired yet |
-| `bun run map:update --region=iran` | map-server | Planned; see MAP_SERVER.md §4 |
+| `./scripts/setup-ubuntu-vm.sh --update-map` | root | Resolve/download the latest common map snapshot into the external library, rebuild/verify the active dataset, then prune the replaced release |
 | `bun --filter @borobiya/client generate:api` | root | Fetches `/docs/json` from the running API and writes Zopia modules to `packages/client/src/generated/api/` |
 
 ---
