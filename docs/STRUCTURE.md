@@ -262,7 +262,7 @@ map-server/
 <MAP_LIBRARY_DIR>/              # sources, crops, merged dataset, PMTiles, OSRM, Photon index
 ```
 
-Compose runs Martin 1.16.1 from the read-only active dataset directory in `MAP_DATASET_DIR`, with committed styles, SVG sprites, licensed fonts, and `martin.yaml`. Routing gateway, three optional OSRM profile services, Photon, and the import-only Nominatim service are configured; generated PMTiles, graphs, and Photon index are intentionally not committed and are built in the external map library. T1.4.7's cache/reuse, safe cache-clear, and whole-country/city-crop selection implementation is complete. The original Tehran pipeline passed tile/routing/geocoding acceptance on the target VM on 2026-10-20; separate migration/offline acceptance for the external-library setup remains required before PR #2 is merged. See [`MAP_SERVER.md`](./MAP_SERVER.md) and [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
+Compose runs Martin 1.16.1 from the read-only active dataset directory in `MAP_DATASET_DIR`, with committed styles, SVG sprites, licensed fonts, and `martin.yaml`. Routing gateway, three optional OSRM profile services, Photon, and the import-only Nominatim service are configured; generated PMTiles, graphs, and Photon index are intentionally not committed and are built in the external map library. T1.4.7's cache/reuse, safe cache-clear, and whole-country/city-crop selection implementation is complete. The original Tehran pipeline passed tile/routing/geocoding acceptance on the target VM on 2026-10-20; the user reports successful setup and core app/map tests on Ubuntu 24.04 on 2026-10-21. A dedicated external-Internet-offline library acceptance run remains a non-blocking operational follow-up per the user's decision; see [`PROGRESS.md`](./PROGRESS.md), [`MAP_SERVER.md`](./MAP_SERVER.md), and [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 
 ---
 
@@ -357,7 +357,7 @@ The explicit aliases map one workspace at a time; a broad `@/*` mapping is inten
 - [x] MapLibre canvas, local styles/sprites/fonts, runtime map config, light/dark switching, and map-resource cache fallback
 - [x] T1.4.7 map-data cache/reuse, safe cache removal, and whole-country/city-crop area selection (with associated library code/tests)
 - [x] Original Tehran tile/routing/geocoding acceptance on the target VM (2026-10-20)
-- [ ] VM migration/offline acceptance for the current standardized-library refactor before PR #2 is merged
+- [ ] P1-G1: external-library Internet-offline acceptance (non-blocking follow-up per user decision 2026-10-21)
 - [ ] SOS, live-location sharing, mission workflows, route/search UI, and Android/Capacitor integration
 - [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

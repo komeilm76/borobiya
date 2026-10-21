@@ -4,16 +4,21 @@
 
 ---
 
-## Overall: 24% — Phase 1 Foundation underway (2026-10-21)
+## Overall project estimate: 24% — Phase 1 core human acceptance reported; follow-ups non-blocking (2026-10-21)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1–T1.4.7 map-server implementation tasks (including cached map data, safe cache removal, and whole-country/city-crop selection), and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL sources, selected-area crops merged into one PBF, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks have now passed on the user's Ubuntu 24.04 VM (runbook step 13 acceptance, 2026-10-20). Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection.
 
-| Area | % | Status |
-|------|---|--------|
+The separate external-Internet-offline map-library run, live browser outage simulation, extended database-flow evidence, and style-switch timing remain follow-ups. The user explicitly confirmed on 2026-10-21 that these remaining checks do not block the Phase 1 release or starting Phase 2. Record them as known follow-ups, not release/Phase 2 gates; do not claim the untested behavior passed. The agent workspace cannot reproduce the user's VM/browser/database checks. The 24% figure is a whole-project planning estimate, not a Phase 1 completion percentage.
+
+Phase 1 runtime scope includes the shared contracts/scaffold, authentication and account-management flows, map-server pipeline, and client map/theme views. The Phase 1 auth/account endpoints are implemented; other contract-only user/admin domain operations map to later-phase work (T2–T4), not unnamed Phase 1 leftovers. See the handler-scope note below.
+
+| Area | Implementation | Status / open evidence |
+|------|----------------|------------------------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
-| Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 100% | ✅ T1.4.1–T1.4.7 implementation complete, including map-data caching, safe cache removal, and whole-country/city-crop selection; original-stack live VM acceptance passed 2026-10-20. The external-library migration/offline VM check remains a separate pre-merge gate. |
+| Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
+| Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
+| Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -24,14 +29,54 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 
 ## Phase Scoreboard
 
-### Phase 1 — Foundation (Auth & Map) — 20%
+### Phase 1 — Foundation (Auth & Map)
 
-| Milestone | % | Notes |
-|-----------|---|-------|
-| Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
-| Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 100% | T1.4.1–T1.4.7 implementation complete: pins, styles/assets, shared-crop pipeline, cache/reuse, safe cache clearing, whole-country/city-crop selection, PMTiles, OSRM, Nominatim→Photon, and gateway proxies. Original stack verified live 2026-10-20; separate external-library migration/offline VM gate remains before merge. |
-| Client Map canvas | 75% | 🟡 T1.5.1–T1.5.5 reusable MapLibre canvas, theme-aware light/dark switching, outage fallback, full map route, and dashboard map widget are implemented; live map-data rendering and location/search/routing integrations remain pending |
+**Implementation status:** every named T1.0–T1.5 task in `TASKS.md` is checked complete. **Core human acceptance:** the user reports the Ubuntu 24.04 smoke tests below passed. **Release/Phase 2 decision:** remaining P1 follow-ups are explicitly non-blocking per the user's 2026-10-21 direction.
+
+| Milestone | Implementation status | Human acceptance / follow-up |
+|-----------|-----------------------|-------------------------------|
+| Monorepo + Contracts | Complete (T1.0.1–T1.0.7) | No additional manual acceptance listed |
+| Auth & account foundation | Complete (T1.1–T1.3) | Core user/admin flows passed per report; extended DB flow coverage remains P1-A2 |
+| Map Server | Complete (T1.4.1–T1.4.7) | Setup reported successful; strict external-Internet-offline library run remains P1-G1 |
+| Client Map canvas | Complete (T1.5.1–T1.5.5) | Theme/map interactions passed per report; outage fallback P1-A1 and timing P1-M1 remain |
+
+### Phase 1 human acceptance
+
+**Source:** user-reported manual tests on Ubuntu 24.04, 2026-10-21. The agent did not independently access the VM. These results are recorded as passed without inventing logs, browser versions, regions, or timing data.
+
+| Manual check | Result reported |
+|--------------|-----------------|
+| Set up the project on Ubuntu 24.04 | Pass |
+| Log in with the admin account | Pass |
+| Register a user and log in with that user | Pass |
+| Switch between light, dark, and system theme | Pass |
+| View the user list in the admin panel | Pass |
+| Open the map in the panel, zoom in/out, and use fullscreen | Pass |
+| Deactivate an account as admin; verify that account can no longer log in | Pass |
+
+This smoke test supports the Phase 1 release decision. It does not claim a cold-cache/offline service-worker test, an HTTP 5xx outage test, an external-Internet-disconnected map-library run, every recovery/session endpoint, or a measured style-switch latency.
+
+### Phase 1 acceptance follow-ups
+
+These follow-ups track additional evidence, not missing feature implementation. Their checkboxes are mirrored in [`TASKS.md`](./TASKS.md#phase-1-acceptance-follow-ups-separate-from-implementation-tasks); all remain non-blocking for release/Phase 2 per the user decision.
+
+#### P1-G1 — External map-library migration and offline acceptance — **OPEN / non-blocking follow-up**
+
+The earlier live check validated the original Tehran layout. This follow-up checks that the newer project-independent library layout works on the actual Ubuntu VM: the active pointer and manifest agree, existing project-local data migrates only when its provenance is verified (otherwise the old files are preserved and setup safely rebuilds), and the prepared dataset can be used without downloading map sources from Geofabrik. Before disconnecting external Internet, stage the required Docker images, Java, Osmium, Planetiler/Photon JARs, verified sources/crops, PMTiles, OSRM graphs, and Photon index. Then run setup with `--offline` and the tile, car/bicycle/foot routing, and forward/reverse geocoding checks for each selected area while LAN access remains available. Record the selection/snapshot, migration result or “not applicable,” and sanitized command results. Local code-side checks are green: 50 map-server tests passed, including simulated manifest migration/offline-cache cases. A safe `./scripts/setup-ubuntu-vm.sh --dry-run --offline --yes --regions ir-tehran` also showed this sandbox lacks Docker, Java, Osmium, and cached source/PBF/PMTiles/OSRM/Photon artifacts; it made no changes. This confirms the agent cannot perform the real VM migration/offline run. The tests do not prove the real VM library pointer, mounted artifacts, or services work offline. The user reports the Ubuntu 24.04 setup succeeded, but did not explicitly report disconnecting external Internet or testing the library migration path. Per the user's 2026-10-21 decision, P1-G1 remains an operational follow-up and does not block the Phase 1 release or Phase 2; it is not part of T1.4.7.
+
+#### P1-A1 — Live browser map-outage fallback — **OPEN / non-blocking follow-up**
+
+The worker's unit tests cover cache writes, cached responses on network errors and 5xx, cold-cache failure, and request scoping. A real browser run is still needed to prove worker registration/control, Cache Storage, MapLibre rendering, and the user-visible retry/toast work together. On HTTPS (or localhost), first load the map while online to warm the cache, then test an actual network failure and a map-server 5xx. Confirm cached map style/tile/sprite/glyph resources continue to render; with an empty cache, confirm a clean recoverable error rather than a crash. Confirm API/configuration/routing/geocoding requests are not served from this map cache. Plain-HTTP LAN cannot use Service Workers and only has the in-memory MapLibre fallback; record the origin and do not claim persistent offline support for that case. Local validation is green: all 49 client tests passed, including the 5 service-worker cache/fallback tests; those tests do not exercise an actual browser registration or MapLibre rendering. The user-reported human test did not include a map-server outage/5xx or browser-offline scenario; P1-A1 remains non-blocking by the user's decision.
+
+#### P1-A2 — Extended PostgreSQL/account-flow evidence — **PARTIAL / non-blocking follow-up**
+
+Most server tests use injected stores, so they validate handler logic but do not prove that Drizzle migrations, SQL queries, constraints, transactions, and session revocation work against a real PostgreSQL instance. On a disposable or safely backed-up application database, confirm Postgres health, apply migrations, run the seed twice to confirm idempotence, then exercise registration/login/refresh/logout/recovery, `GET /_user/me` and onboarding, and admin create/list/detail/status. Verify expected rows persist and revoked sessions stop authorizing access. Capture sanitized pass/fail results only; never share `.env`/`DATABASE_URL` and never remove the existing `postgres-data` volume as a shortcut. Local validation is green: 149 server tests and the server typecheck passed, but the route tests use injected stores and are not live PostgreSQL integration tests. A prior VM migration attempt returned `28P01`. The user later reported a successful Ubuntu 24.04 setup and passed registration/login, admin listing/deactivation, and deactivated-account login rejection; see the human-acceptance table. Explicit migration/seed output and refresh/logout/recovery/onboarding/admin-create/detail results were not reported, so P1-A2 is partial rather than fully evidenced. These remaining checks are non-blocking for release/Phase 2 per the user's decision.
+
+#### P1-M1 — Live light/dark switch latency — **UNMEASURED / non-blocking**
+
+The implementation and 150 ms paint-transition configuration are tested, Tehran rendered in the target VM browser, and the user reports light/dark/system mode switching works. No timing results were supplied. The 150 ms value describes the paint transition, not the total time from a theme action until the new map style is visible. With local map data loaded and caches warm, time at least 10 light↔dark switches in the target browser and report the median/p95 plus browser/device/cache state. No total-latency SLA is documented, so this is a useful baseline, not a pass/fail gate.
+
+**Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
 ### Phase 2 — Location Sharing — 0%
 
@@ -65,28 +110,47 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 
 ## Checklist Against Spec §23 (Summary)
 
-See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) for per-item tracking. The 39 product requirements remain unchecked until their acceptance criteria are implemented and verified.
+See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) for the 39 requirement-level acceptance checks. That table is broader than the T1 implementation checklist: a T1 checkbox can be complete while a combined product requirement remains unchecked pending live acceptance or later-phase work. Keep the two trackers distinct; do not use the 39-item summary as a count of unfinished T1 tasks.
 
 ---
 
-## Blockers & Risks
+## Environment follow-ups & risks
 
 | # | Issue | Impact | Owner | Status |
 |---|-------|--------|-------|--------|
-| 1 | Docker/Compose, Java 21+, and the 230 MB Geofabrik PBF are unavailable in the agent workspace; the user can run Docker and Java locally | Source/license are approved and official MD5 is pinned, but the source/crop SHA-256 and live Martin/OSRM/Nominatim/Photon checks require the user's local run | Environment / data provenance | 🟡 Validation limitation |
+| 1 | Target VM, Docker/Compose, Java 21+, and a real browser are unavailable in the agent workspace | The user reports Ubuntu 24.04 setup and core app/map flows passed. The agent cannot independently reproduce that run or test the separate external-Internet-offline library path and service-worker outage path. | User VM / environment | 🟡 P1-G1 and P1-A1 remain non-blocking follow-ups |
 | 2 | Map data size — Iran PBF is large | Start with a Tehran subset; full pipeline later | TBD | 🟡 Mitigated via configurable `MAP_REGION` |
-| 3 | No live PostgreSQL is available in the current agent environment | Registration, login, refresh/logout, recovery, admin user list/detail/create/status, and onboarding are tested with injected stores; Drizzle persistence queries and migrations cannot be exercised against a live database here | Environment | 🟡 Validation limitation; apply migrations and smoke-test auth/admin/onboarding flows with PostgreSQL |
+| 3 | No live PostgreSQL is available in the agent environment | User reports successful account registration/login and admin deactivation behavior on Ubuntu 24.04. Automated server tests use injected stores; explicit migration/seed output and extended refresh/logout/recovery/onboarding/admin-create/detail checks remain unrecorded. | User VM / database | 🟡 P1-A2 partial, non-blocking; never reset the existing volume for testing |
 | 4 | No Ubuntu VPS provisioned yet | Deployment pipeline cannot be tested against production infrastructure | TBD | 🔵 Pending procurement |
 
 ---
 
 ## Changelog
 
+### 2026-10-21 — Ubuntu 24.04 human acceptance reported; Phase 2 unblocked
+
+- The user reports successful setup on Ubuntu 24.04; admin login; user registration/login; light, dark, and system themes; admin user listing; map display, zoom, and fullscreen; and deactivation with subsequent login rejection.
+- Recorded those exact manual checks as passed without claiming unreported service-worker outage, external-Internet-offline, or latency results.
+- Per the user's explicit decision, P1-G1, P1-A1, P1-A2 extended evidence, and P1-M1 are follow-ups and do not block the Phase 1 release or Phase 2. T1.4.7's scope remains unchanged.
+
+### 2026-10-21 — Reconciled Phase 1 implementation and acceptance tracking
+
+- Replaced the stale Phase 1 `20%`, Auth `42%`, and Client Map `75%` figures with separate implementation-complete and acceptance-open statuses for the named T1.0–T1.5 scope.
+- Added P1-G1 (external-library target-VM migration/offline check), P1-A1 (real browser map-outage test), P1-A2 (live PostgreSQL/account-flow evidence), and P1-M1 (non-blocking style-switch latency baseline), with concrete evidence criteria and boundaries. At that point the VM check was tracked as a gate; the user's later 2026-10-21 decision explicitly made these remaining follow-ups non-blocking.
+- Clarified that Phase 1 account/auth handlers are implemented; contract-only location, SOS, mission, search, and other domain handlers map to T2–T4 rather than an unnamed Phase 1 backlog. T1.4.7 remains complete and unchanged.
+
+### 2026-10-21 — Re-ran Phase 1 local implementation checks
+
+- Test suites passed: shared 32, server 149, client 49, map-server scripts 50, safe cache-clear 5.
+- All three TypeScript checks passed. The client production build passed with existing Rollup annotation/chunk-size warnings.
+- Region catalog validation reported 18 countries, 59 selectable areas, and 32 sources; setup's region list also ran successfully. A safe offline setup dry-run made no changes and confirmed the sandbox lacks Docker/Java/Osmium and cached map artifacts.
+- These checks validate implementation in the repository, not target-VM migration/offline behavior, a real browser outage, or PostgreSQL-backed persistence. P1-G1, P1-A1, and P1-A2 therefore remain open; P1-M1 is still unmeasured.
+
 ### 2026-10-21 — T1.4.7 complete: map caching, safe cache removal, and crop selection
 
 - Clarified T1.4.7's scope as three user-facing features only: reuse cached map data, safely remove map-data caches, and choose whole-country or city-cropped areas in setup. Marked the task complete after checking the implementation and tests.
 - Confirmed the implementation in the external map library and setup flow, plus `scripts/clear-map-cache.sh` (dry-run by default, explicit apply confirmation, symlink/root safeguards, and preservation of app Postgres, Docker image/build cache, OS packages, Java, Osmium, and tool JARs). The region catalog now exposes 18 countries and 59 selectable areas, including the 12 requested country additions.
-- Validation: 50 map-server region/library tests, 5 safe-cache-clear tests, catalog validation, setup region-list output, Bash syntax, and Python compilation passed. The target-VM migration/offline check remains a separate pre-merge gate, not part of T1.4.7's feature scope; Phase 2 and PR #2 remain gated.
+- Validation: 50 map-server region/library tests, 5 safe-cache-clear tests, catalog validation, setup region-list output, Bash syntax, and Python compilation passed. At the time of this entry, the target-VM migration/offline check was tracked as a separate pre-merge gate, not part of T1.4.7's scope. The user later explicitly made this follow-up non-blocking for release/Phase 2; it remains documented as P1-G1.
 
 ### 2026-10-20 — Standardized external map library, selectable snapshots, and offline cache policies
 
@@ -99,7 +163,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 - Corrected the resolver's unnecessary overlap rejection. The official Osmium merge behavior emits an object found in multiple sorted inputs only once, and every catalog source comes from the same pinned snapshot; adjacent whole countries (for example Germany + Netherlands + France) and overlapping city/country bounds now resolve. Regression tests cover `de,nl` and selecting all six whole countries together.
 - Setup now recovers an existing selection from the dataset manifest (or from legacy Tehran artifacts) when an upgraded checkout's `.env` has no `MAP_REGION_IDS`, avoiding a surprise form or needless rebuild; `--reselect` bypasses recovery. `regions.py menu-areas` also accepts country IDs case-insensitively. The v1 migration additionally accepts the historical `iran-latest` source URL only when its provider/license/MD5/byte-count/date/timestamp fields prove byte identity with the dated pin, matching the actual pre-catalog VM manifest.
-- Review pass over docs, scripts, commands, environments, and Compose interpolation found no other blockers: Photon language interpolation and the `$$` healthcheck escape, OSRM/Nominatim dataset paths, gateway defaults, script environment usage, and command error paths were rechecked. Live VM execution remains the acceptance gate before PR #2 is merged.
+- Review pass over docs, scripts, commands, environments, and Compose interpolation found no other blockers: Photon language interpolation and the `$$` healthcheck escape, OSRM/Nominatim dataset paths, gateway defaults, script environment usage, and command error paths were rechecked. At the time, live VM execution was tracked as the PR #2 acceptance gate; the user's later 2026-10-21 decision made the remaining VM/offline follow-up non-blocking.
 
 ### 2026-10-20 — Selectable map areas: country/city form in setup, multi-area dataset
 

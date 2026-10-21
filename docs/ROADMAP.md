@@ -70,15 +70,15 @@ gantt
 
 ### M1.4 Client Map Canvas
 - [x] MapLibre GL JS init, configured bounds, attribution, and runtime map config (T1.5.1; Tehran rendered in the LAN browser on the target VM 2026-10-20)
-- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2; live theme-switch latency benchmark remains unmeasured)
+- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2 implementation complete; live switch latency is unmeasured, tracked as informational P1-M1)
 - [x] Preserve camera and DOM-backed markers by diffing styles on the existing map instance (T1.5.2)
 - [x] Gesture-friendly pan/zoom controls; preserve camera state (including pitch, bearing, and zoom) when switching styles
 - [x] App-wide Vuetify/Tailwind theme selection, `system`/`light`/`dark` persistence, OS preference updates, and pre-paint initialization (T1.5.3)
-- [x] Graceful fallback if Map Server down (toast + cached tiles); real offline/5xx outage behavior still needs a separate VM/browser acceptance run
+- [x] Graceful fallback if Map Server down (toast + cached tiles); implementation/tests complete, with live offline/5xx browser acceptance tracked separately as P1-A1
 
-**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled. The original Tehran stack passed on the target VM; separate migration/offline acceptance for the external-library setup is still required before this phase is considered fully closed.
+**Exit criteria:** All numbered T1.0–T1.5 implementation tasks are checked complete. The user reported the core Phase 1 human tests passing on Ubuntu 24.04 on 2026-10-21: setup, admin login, user registration/login, light/dark/system theme, admin user list/deactivation, map display/zoom/fullscreen, and denied login after deactivation (see [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance)). The release proceeds with the remaining P1-G1 external-Internet-offline library run, P1-A1 live outage test, P1-A2 extended database-flow evidence, and P1-M1 latency measurement documented as non-blocking follow-ups. Their untested behavior is not claimed as passed.
 
-**Phase gate:** Phase 2 (location sharing) remains unstarted until the repository audit and separate target-VM migration/offline checks are complete and confirmed. These operational checks remain a pre-merge/phase gate; they are not part of T1.4.7's map-cache, cache-removal, and area-selection implementation scope.
+**Phase gate:** Phase 2 is unblocked. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the v0.1.0 release or Phase 2; begin Phase 2 at T2.1.1. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope. PR #2 is to be retargeted to `main` and merged for the Phase 1 release.
 
 ---
 

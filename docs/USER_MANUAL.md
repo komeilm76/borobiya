@@ -117,7 +117,7 @@ If admin created you (`mustCompleteSecurityQuestions` flag):
 
 - Use the theme menu in the top bar to choose **System**, **Light**, or **Dark**.
 - The app and MapLibre view follow the resolved theme; style changes retain the current map instance and camera.
-- The preference is stored in local browser storage. The configured 150ms style transition has not yet been benchmarked against live map data.
+- The preference is stored in local browser storage. Tehran rendered on the target VM, but total light/dark switch latency has not been measured in a live browser. The configured 150ms value is the paint transition, not an end-to-end SLA; see P1-M1 in [`PROGRESS.md`](./PROGRESS.md#phase-1-acceptance-follow-ups).
 
 [Screenshot: Theme menu + light and dark map]
 

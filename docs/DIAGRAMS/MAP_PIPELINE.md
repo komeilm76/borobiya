@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> T1.4.7's map-data cache/reuse, safe cache clearing, and whole-country/city-crop selection are implemented. Selected areas from `map-server/regions.json` are cropped/merged into one shared external-library dataset for tiles, routing, and Nominatim→Photon. Live acceptance of the original Tehran pipeline passed on the target Ubuntu VM on 2026-10-20; separate VM migration/offline acceptance for the library remains a pre-merge gate (see `../PROGRESS.md`).
+> T1.4.7's map-data cache/reuse, safe cache clearing, and whole-country/city-crop selection are implemented. Selected areas from `map-server/regions.json` are cropped/merged into one shared external-library dataset for tiles, routing, and Nominatim→Photon. The original Tehran pipeline passed target-VM checks on 2026-10-20; on 2026-10-21 the user reported Ubuntu 24.04 setup and core app/map acceptance. A dedicated external-Internet-offline library run remains an operational follow-up, now non-blocking for Phase 2/release by user decision (see `../PROGRESS.md`).
 
 ---
 
@@ -51,7 +51,7 @@ flowchart LR
   H --> I
 ```
 
-The snapshot downloader/cache, hash manifest, crops/merge, import, service-start, current-pointer activation, and post-acceptance pruning paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with a library/snapshot/policy/area form). Continuous replication feeds and zero-downtime activation are not implemented. The original three real-data checks passed live on the target VM (2026-10-20); a separate standardized-library migration/offline acceptance run remains before merge, independent of T1.4.7's completed cache/clear/selection scope.
+The snapshot downloader/cache, hash manifest, crops/merge, import, service-start, current-pointer activation, and post-acceptance pruning paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with a library/snapshot/policy/area form). Continuous replication feeds and zero-downtime activation are not implemented. The original three real-data checks passed live on the target VM (2026-10-20), and the user reports current Ubuntu 24.04 setup and core app/map interactions passed (2026-10-21). A separate standardized-library external-Internet-offline acceptance run remains an operational follow-up, explicitly non-blocking for release/Phase 2 and independent of T1.4.7's completed cache/clear/selection scope.
 
 ---
 
@@ -131,4 +131,4 @@ curl http://localhost:8080/map-config | jq
 | Build three OSRM graphs and verify a real offline route | T1.4.4 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
 | Configure Photon and test geocode/reverse | T1.4.5 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
 | Wire map settings through pipeline/runtime and document | T1.4.6 complete; checks recorded in `docs/PROGRESS.md` |
-| Cache/reuse map data, safely remove map caches, and choose whole-country/city-cropped areas | T1.4.7 complete: implementation/tests/docs verified; separate VM migration/offline check remains a pre-merge gate |
+| Cache/reuse map data, safely remove map caches, and choose whole-country/city-cropped areas | T1.4.7 complete: implementation/tests/docs verified; separate external-library offline acceptance remains a non-blocking follow-up |

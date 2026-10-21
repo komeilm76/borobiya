@@ -135,7 +135,7 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Runtime status is incremental: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token, current admin account state, and an unrevoked matching session; the `/_user` hook checks access-token validity, current user role/account state, the persisted session, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. Other admin handlers remain pending.
+The target policy is enforced at **both** layers (fail-closed). Phase 1 runtime status: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token, current admin account state, and an unrevoked matching session; the `/_user` hook checks access-token validity, current user role/account state, the persisted session, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. These Phase 1 account handlers are implemented; domain-level admin handlers for incidents/categories and dispatch are future Phase 3 work (T3.1/T3.3), while location/device user handlers are Phase 2 (T2). They are not missing Phase 1 account-management endpoints.
 
 **Backend policy sketch (shared hooks for future route groups):**
 
