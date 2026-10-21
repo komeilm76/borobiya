@@ -4,6 +4,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import { safeMigrationErrorDetails } from "./migration-error";
 
 const packageRoot = resolve(fileURLToPath(new URL(".", import.meta.url)), "../..");
 loadDotEnv({ path: resolve(packageRoot, "../../.env"), quiet: true });
@@ -33,7 +34,13 @@ async function migrateDatabase(): Promise<void> {
   }
 }
 
-migrateDatabase().catch(() => {
-  console.error("Database migration failed. Check DATABASE_URL and database availability; no credentials were logged.");
+migrateDatabase().catch((error: unknown) => {
+  console.error("Database migration failed. Sanitized cause details follow; credentials were redacted.");
+  const details = safeMigrationErrorDetails(error, process.env.DATABASE_URL);
+  if (details.length === 0) {
+    console.error("  No safe error details were available.");
+  } else {
+    for (const detail of details) console.error(`  ${detail}`);
+  }
   process.exitCode = 1;
 });
