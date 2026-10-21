@@ -87,8 +87,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 2.2 History Sharing & Retention
 
-- [ ] **T2.2.1** Table `location_history` (userId, lat, lon, accuracy, timestamp) + PostGIS index + optional月 partition
-- [ ] **T2.2.2** Table `location_history_shares` (ownerId,targetUserId, from, to)
+- [x] **T2.2.1** Table `location_history` (userId, lat, lon, accuracy, timestamp) + index — completed 2026-10-21 with T2.2.2 in Drizzle migration `0007_brief_hedge_knight.sql`: `bigserial` id, `user_id` FK with `ON DELETE CASCADE`, `double precision` lat/lon/accuracy, `timestamptz` observation timestamp plus `created_at`, ±90/±180 and non-negative-accuracy checks, and the composite `(user_id, timestamp)` index that serves every windowed read. Deviation, deliberately recorded: no GiST geography index (history is only ever read per user over a time range, never by radius) and no monthly partitioning — that item is optional in the ERD/ARCHITECTURE §8.3 and would remove the plain FK/migration story while retention is a `DELETE` job; revisit when row counts make the prune expensive.
+- [x] **T2.2.2** Table `location_history_shares` (ownerId,targetUserId, from, to) — completed 2026-10-21 in the same migration: UUID id with `gen_random_uuid()`, non-cascading owner/target FKs, `from_time`/`to_time`, no-self-share and `to_time > from_time` checks, a unique `(owner_id, target_user_id, from_time, to_time)` grant, and owner/target indexes on `(…, from_time)`
 - [ ] **T2.2.3** `POST /_user/location/history/share` {targetUserIds, from, to, maxPoints?} — validate `to-from <= MAX_SHARE_DAYS`
 - [ ] **T2.2.4** Receiver: fetch polyline + time slider (downsample if maxPoints)
 - [ ] **T2.2.5** ENV `LOCATION_HISTORY_RETENTION_DAYS=90`, `LOCATION_HISTORY_MAX_SHARE_DAYS=30` + daily prune cron

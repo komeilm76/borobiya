@@ -294,8 +294,8 @@ Requires GiST index on `last_location`. For large scale, add `ST_DWithin` radius
 
 ### 8.3 Retention & Pruning
 
-- `location_history` partitioned by month (optional for scale).
-- Daily cron: `DELETE FROM location_history WHERE created_at < NOW() - INTERVAL 'RETENTION_DAYS days'`
+- `location_history` exists since T2.2.1 as plain `lat`/`lon` rows indexed by `(user_id, timestamp)`; partitioning by month stays optional for scale and is not used yet.
+- Daily cron (T2.2.5, not yet implemented): `DELETE FROM location_history WHERE created_at < NOW() - INTERVAL 'RETENTION_DAYS days'`
 
 ---
 

@@ -4,7 +4,7 @@
 
 ---
 
-## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.1.4 (2026-10-21)
+## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.2.1/T2.2.2 (2026-10-21)
 
 All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, and T2.1.2 adds the first share handler — `POST /_user/location/share`. Share revocation/listing, realtime `location:update`, expiry processing, history sharing, and multi-device behavior remain unstarted and are not claimed complete. The 24% whole-project estimate is unchanged; it is a planning figure rather than a per-task measurement.
 
@@ -19,7 +19,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
 | Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
-| Location Sharing | 21% (4/19 tasks) | ✅ T2.1.1 schema/migration and the T2.1.2–T2.1.4 share create/revoke/list API complete; realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
+| Location Sharing | 32% (6/19 tasks) | ✅ T2.1.1 schema/migration, T2.1.2–T2.1.4 share create/revoke/list API, and T2.2.1/T2.2.2 history + history-share tables complete; realtime behavior, expiry/retention jobs, history APIs/UI, and device-priority behavior remain unstarted |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
 | UI/UX & a11y | 0% | ⬜ Not started |
@@ -78,12 +78,12 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 
 **Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
-### Phase 2 — Location Sharing — 21% (4/19 tasks)
+### Phase 2 — Location Sharing — 32% (6/19 tasks)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Live share + expiry | 57% (4/7 tasks) | T2.1.1 schema/migration, T2.1.2 share creation (recipient checks, timed/permanent expiry, idempotent reuse), T2.1.3 owner-only revoke, and T2.1.4 active share lists complete; live updates and the expiry job remain |
-| History share + retention | 0% | Not started |
+| History share + retention | 33% (2/6 tasks) | T2.2.1 `location_history` and T2.2.2 `location_history_shares` exist in migration `0007_brief_hedge_knight.sql`; there is still no writer, share/read API, retention env wiring, prune job, or playback UI |
 | Multi-device priority | 0% | Not started |
 
 ### Phase 3 — SOS Rescue — 0%
@@ -127,12 +127,19 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-21 — T2.2.1/T2.2.2 location history storage
+
+- Added `location_history` and `location_history_shares` to the Drizzle schema in one migration (`0007_brief_hedge_knight.sql`), because both tables belong to the same history-sharing slice and one migration keeps the applied-migration story simple.
+- `location_history`: `bigserial` id, cascading `user_id` FK, `double precision` lat/lon/accuracy, `timestamptz` observation timestamp plus `created_at`, latitude/longitude/accuracy checks, and the composite `(user_id, timestamp)` index. Deliberate, documented deviations: no geography column or GiST index (reads are user- and time-scoped, never radius queries) and no monthly partitioning (optional in the ERD/ARCHITECTURE, and it would complicate the FK/migration path while retention is still a `DELETE` job).
+- `location_history_shares`: non-cascading owner/target FKs, `to_time > from_time` and no-self-share checks, a unique `(owner_id, target_user_id, from_time, to_time)` grant so a repeated identical request cannot stack duplicates, and owner/target `(…, from_time)` indexes.
+- Validation: server 177/177 (3 new schema/migration assertions), server/shared/client typechecks, shared 35/35 and client 49/49 tests pass; a repeat `db:generate` reported no further schema changes. These tables are storage only: no writer, reader, or retention job exists yet (T2.1.5, T2.2.3–T2.2.5), and nothing here was executed against live PostgreSQL.
+
 ### 2026-10-21 — T2.1.4 active share lists
 
 - Implemented `GET /_user/location/shares`: two owner-scoped queries return only active shares (unrevoked and either permanent or still inside `expiresAt`), newest first and capped at 100 rows per list.
 - Received shares are joined to `users` so each item carries `owner.username` and the owner's PostGIS `last_location` (`ST_Y`/`ST_X` as `lat`/`lon`, `null` when unknown), which removes the need for a second request to draw a peer marker. The shared response schema gained `LocationShareOwner`/`ReceivedLocationShare` types.
 - OpenAPI marks `locationListShares` implemented; `docs/API.md` §5.3 documents the list semantics.
-- Validation: shared 35/35, server 174/174, client 49/49, and all three package typechecks passed. The `ST_X/ST_Y` cast is reviewed SQL but not yet executed against live PostGIS.
+- Validation: shared 35/35, server 174/174, client 49/49, and all three package typechecks passed. The `ST_Y/ST_X` cast is reviewed SQL but not yet executed against live PostGIS.
 
 ### 2026-10-21 — T2.1.3 live-share revocation
 

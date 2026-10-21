@@ -3,6 +3,8 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
   adminAuditLog,
+  locationHistory,
+  locationHistoryShares,
   locationShares,
   passwordResetChallenges,
   passwordResetTokens,
@@ -167,5 +169,73 @@ describe("users database schema", () => {
     expect(extensionPosition).toBeGreaterThanOrEqual(0);
     expect(geographyPosition).toBeGreaterThan(extensionPosition);
     expect(migrationSql).not.toContain('"geography(Point,4326)"');
+  });
+});
+
+describe("location history schema (T2.2.1/T2.2.2)", () => {
+  it("stores bounded fixes with a user/time index and cascade deletes", () => {
+    const config = getTableConfig(locationHistory);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("id")?.getSQLType()).toBe("bigserial");
+    expect(columns.get("user_id")?.notNull).toBe(true);
+    expect(columns.get("lat")?.getSQLType()).toBe("double precision");
+    expect(columns.get("lon")?.getSQLType()).toBe("double precision");
+    expect(columns.get("accuracy")?.notNull).toBe(false);
+    expect(columns.get("timestamp")?.notNull).toBe(true);
+    expect(config.foreignKeys).toHaveLength(1);
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "location_history_lat_check",
+      "location_history_lon_check",
+      "location_history_accuracy_check"
+    ]);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name)).toEqual([
+      "idx_location_history_user_time"
+    ]);
+  });
+
+  it("grants one bounded, non-self window per owner/target pair", () => {
+    const config = getTableConfig(locationHistoryShares);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("from_time")?.notNull).toBe(true);
+    expect(columns.get("to_time")?.notNull).toBe(true);
+    expect(config.foreignKeys).toHaveLength(2);
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "location_history_shares_owner_target_check",
+      "location_history_shares_window_check"
+    ]);
+    expect(
+      config.uniqueConstraints.some(({ name }) => name === "location_history_shares_owner_target_window_unique")
+    ).toBe(true);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name)).toEqual([
+      "location_history_shares_owner_idx",
+      "location_history_shares_target_idx"
+    ]);
+  });
+
+  it("creates both tables, indexes, and constraints in the T2.2 migration", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0007_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationName = migrationNames[0];
+    if (!migrationName) throw new Error("The location-history migration is missing.");
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationName}`, import.meta.url), "utf8");
+
+    expect(migrationSql).toContain('CREATE TABLE "location_history" (\n\t"id" bigserial PRIMARY KEY NOT NULL');
+    expect(migrationSql).toContain('CREATE TABLE "location_history_shares"');
+    expect(migrationSql).toContain('"lat" double precision NOT NULL');
+    expect(migrationSql).toContain('"accuracy" double precision');
+    expect(migrationSql).toContain('CONSTRAINT "location_history_lat_check" CHECK ("lat" BETWEEN -90 AND 90)');
+    expect(migrationSql).toContain('CONSTRAINT "location_history_shares_window_check" CHECK ("to_time" > "from_time")');
+    expect(migrationSql).toContain(
+      'CONSTRAINT "location_history_shares_owner_target_window_unique" UNIQUE("owner_id","target_user_id","from_time","to_time")'
+    );
+    expect(migrationSql).toContain('CREATE INDEX "idx_location_history_user_time" ON "location_history" USING btree ("user_id","timestamp")');
+    // History rows follow the account away; share grants must survive until their own retention pass.
+    expect((migrationSql.match(/ON DELETE cascade/g) ?? [])).toHaveLength(1);
+    expect(migrationSql).not.toContain("DROP TABLE");
+    expect(migrationSql).not.toContain("ALTER TABLE \"users\"");
   });
 });

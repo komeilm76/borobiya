@@ -159,7 +159,7 @@ packages/server/
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
-    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit tables
+    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit, and location share/history tables
     │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
     │   ├── seed.ts           # transactional, idempotent reference/admin seeder
     │   ├── seed-config.ts    # production-safe bootstrap password policy
