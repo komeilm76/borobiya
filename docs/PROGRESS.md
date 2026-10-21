@@ -21,7 +21,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
 | Location Sharing | 79% (15/19 tasks) | ✅ T2.1.1 schema, T2.1.2–T2.1.4 share create/revoke/list API, T2.2.1/T2.2.2 history tables, T2.1.5 + T2.3.4 realtime broadcast with the priority-device rule, T2.1.6/T2.2.5 expiry + retention jobs with validated ENV wiring, the T2.3.3 server-side device-selection rule, T2.2.3 bounded history-share grant creation, and the T2.2.4 history reads/lists/delete are complete; share-UI screens, history playback, and the selection dialog remain. Every case so far runs on injected stores; the SQL has been submitted through the real driver (no database to answer, P2-A1, P2-A2) |
 | SOS Rescue | 0% | ⬜ Not started |
-| Search & Routing | 0% | ⬜ Not started |
+| Search & Routing | 0% (one read path live early) | ⏳ `GET /_user/users/search` answers partial-username/rating/online queries for the share picker (T4.1.1's server read, landed early); place search, geocoding, and routing remain |
 | UI/UX & a11y | 0% | ⬜ Not started |
 | CI/CD & Android | 0% | ⬜ Not started |
 
@@ -102,7 +102,7 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Rating + history | 0% | — |
-| Search + geocode | 0% | — |
+| Search + geocode | 0% | ⏳ The username search read behind T4.1.1 is live (term-bounded, with rating/online filters and `SEARCH_FILTER_UNSUPPORTED` for the category filters that have no tables yet); the milestone's own tasks remain open |
 | UI/UX + perf | 0% | — |
 | Deploy + Android | 0% | — |
 
@@ -126,6 +126,23 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-22 — username search, so the share dialog has something to pick from
+
+**Why now.** T2.1.7's recipient picker needs `GET /_user/users/search`, which belongs to T4.1.1 (Phase 4, unstarted). Rather than build a dialog against a 404, the server read landed early as its own slice; T4.1.1 stays open with the parts that belong to Phase 4.
+
+**Decisions worth the reasoning.**
+
+- **Refuse, never ignore.** `category` and `incidentType` have no tables (category membership is explicitly later domain work), and a list returned "filtered" while the filter was dropped is worse than an error — the picker would show accounts that don't match what the user asked for. So they answer `400 SEARCH_FILTER_UNSUPPORTED` with `issues[0].filters`, and an empty `category=` (a cleared control) is treated as absent, the same tolerance `lat`/`lon`/`minRating` already had.
+- **`q` is required, at least 2 characters.** Enforced in the route, not the contract: the descriptor must stay satisfiable when T4.1.1 implements term-free browsing, and a 1-character `ILIKE '%x%'` on an unindexed `username` returns most of the account table for a scan every keystroke would repeat. Trigram/prefix indexing is recorded as T4.1.1's job rather than done half-way here.
+- **`LIKE` wildcards are escaped** (`%`, `_`, `\`) because usernames are `[a-z0-9_]` — an unescaped `field_responder` term would also match `fieldXresponder`, which is a wrong result a user cannot notice.
+- **Liveness and rating have one definition each.** `online` is "a session still holds a refresh token" — the same rule as the device list — and `minRating` treats `NULL` as 0, so an unrated account doesn't satisfy a quality floor by having no data.
+- **Distance is kilometres, one decimal, and NULL is not an exclusion.** `ST_Distance` on geography returns metres and `NULL` when either side lacks a position; the read divides by 1000 and sorts `NULLS LAST, username ASC`, so an account whose phone never reported a fix is still findable, just last. The reference point is `lat`/`lon` when given, otherwise the caller's own `users.last_location`, resolved in a scalar subquery so the whole read stays one statement.
+- **The total is a second statement, not `count(*) OVER ()`.** Here the opposite trade from the history read: a page beyond the end has no rows to carry a windowed count, and a search that reports `total: 0` for page 4 of 40 makes a client stop paginating early. The pair is deliberately not transactional — on a busy instance the total can be off by whoever signed up in between, which is what a search count means.
+
+**Verification.** Server **302/302** (+18: 10 route cases in `src/users/search.test.ts` — 401 before any lookup, `q_required`/`q_too_short`, refused vs. cleared filters, exact store input, coordinate pairing, `false` distinct from absent, empty page, positionless rows; and SQL-shape cases in `src/db/user-search-store.test.ts` pinning the escaped pattern parameter, the longitude-before-latitude parameter order, the `coalesce(avg_rating, 0)` floor, `exists`/`not exists` sessions, the `round(ST_Distance(...) / 1000.0, 1)` projection, and `limit/offset` math). Shared gained the empty-id tolerance cases; `app.test.ts` pins `userSearch` as `implemented` with 200/400/401/403 and adds `/_user/users/search` to the fail-closed `/_user` probe list. `docs/API.md` §5.2 now states exactly what is honored and what is refused, §9 gained the new 400 code, and the shared search descriptor carries a `description` so a generated client sees the limits.
+
+**Still not verified:** that PostgreSQL accepts the `round(ST_Distance(geography, geography) / 1000.0, 1)` ordering form and that `NULLS LAST` behaves as reasoned (P2-A2), and the query cost against a real account table.
 
 ### 2026-10-22 — T2.2.4 the history read path: windowed reads, grant lists, and a real delete
 

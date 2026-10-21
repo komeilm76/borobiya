@@ -123,7 +123,7 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, onboarding, and live-share creation are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, onboarding, user search, and the live-location surface are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
@@ -158,6 +158,9 @@ packages/server/
     │   ├── live.test.ts      # service rules and REST fallback status/ack tests
     │   ├── jobs.ts           # in-process maintenance timers: expire overdue shares and repair stale priority pins (1m) and prune history past retention (daily, batched)
     │   └── jobs.test.ts      # batching, cadence, failure isolation, and no-overlap tests
+    ├── users/
+    │   ├── search.ts         # GET /_user/users/search: term-bounded username search with the filters this build can honor, and a refusal for the ones it cannot
+    │   └── search.test.ts    # required term, refused filters, cleared controls, filter mapping, coordinate pairing, and page/total mapping
     ├── realtime/
     │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
     │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests
@@ -172,6 +175,8 @@ packages/server/
     │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
     │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
+    │   ├── user-search-store.ts # partial username match over reachable accounts with rating/online filters, session-derived liveness, and PostGIS distance in kilometres
+    │   ├── user-search-store.test.ts # escaped patterns, parameter order, the position fallback, and page/count mapping
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
@@ -191,7 +196,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining user/admin/domain handlers, share-UI endpoints, and SOS/mission persistence are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, and location share/history stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (SOS, missions, geocoding and the rest of search) are not.
 
 ---
 

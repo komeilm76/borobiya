@@ -209,6 +209,15 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 
 `online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting may use the authenticated user's last known location.
 
+**Live for the share picker (T2.1.7's prerequisite; T4.1.1's first slice).** This build answers a term-bounded search and refuses the rest rather than quietly ignoring filters:
+- `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and no index backs `ILIKE '%x%'` yet — trigram/prefix indexing and index-backed term-free browsing belong to T4.1.1.
+- `minRating` and `online` are honored: unrated accounts count as 0 (a quality floor should not be satisfied by an absence of data), and liveness is the same rule the device list uses — a session still holding a refresh token.
+- `category` and `incidentType` answer `400 SEARCH_FILTER_UNSUPPORTED` listing the offending names, because category membership and incident specialty have no tables yet. An empty-string `category=` is treated as absent.
+- `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix. `total` counts the filtered set in its own statement: page and total are not read in one transaction, so on a busy instance they can differ by whoever signed up in between.
+- `sort` accepts only `distance`, so it needs no refusal; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
+
+`Cache-Control: no-store`, because the answer depends on who is asking and where they last were.
+
 ### 5.3 Location Sharing
 
 ```
@@ -385,7 +394,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and most search operations remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding/devices, partial-username user search, admin user list/detail/create/status, and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and the remaining search operations (place search, reverse geocode) remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -432,6 +441,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
 | 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
+| 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter with no backing table yet (`category`, `incidentType`); `issues[0].filters` lists them |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |

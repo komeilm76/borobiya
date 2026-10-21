@@ -142,6 +142,7 @@ describe("Fastify server skeleton", () => {
     const historyShareList = paths["/_user/location/history/shares"]?.get;
     const revokeHistoryShare = paths["/_user/location/history/share/{shareId}"]?.delete;
     const listDevices = paths["/_user/devices"]?.get;
+    const userSearch = paths["/_user/users/search"]?.get;
     const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
@@ -301,6 +302,15 @@ describe("Fastify server skeleton", () => {
     expect(restLocationUpdate?.deprecated).toBe(true);
     expect(listShares?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(listDevices?.["x-borobiya-runtime-status"]).toBe("implemented");
+    // The share picker reads accounts, so search is live too — with the filters it refuses declared.
+    expect(userSearch?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(userSearch?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object)
+    });
+    expect(userSearch?.description ?? "").not.toBe("");
     expect(listDevices?.["x-borobiya-access"]).toBe("authenticated");
     expect(listDevices?.security).toEqual([{ bearerAuth: [] }]);
     expect(listDevices?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
@@ -424,6 +434,7 @@ describe("Fastify server skeleton", () => {
     // stored positions is the most sensitive path in this feature, so it fails closed on the same hook.
     for (const probe of [
       { method: "GET" as const, url: `/_user/location/history?from=2026-10-14T00:00:00.000Z&to=2026-10-21T00:00:00.000Z` },
+      { method: "GET" as const, url: "/_user/users/search?q=field_responder" },
       { method: "GET" as const, url: "/_user/location/history/shares" },
       { method: "GET" as const, url: "/_user/location/history/shared/00000000-0000-4000-8000-000000000001" },
       { method: "DELETE" as const, url: "/_user/location/history/share/00000000-0000-4000-8000-000000000001" }

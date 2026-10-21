@@ -183,6 +183,7 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 4.1 Search & Geocoding
 
 - [ ] **T4.1.1** `GET /_user/users/search?q&category&incidentType&minRating&sort=distance` + pagination, debounced 300ms, autocomplete
+  - **Partial (server read, 2026-10-22):** the endpoint is registered and answers a term-bounded search, pulled forward as the location-share picker's dependency. `q` (≥2 chars, case-insensitive partial username match, `LIKE` wildcards escaped) over accounts a share can actually reach; `minRating` (unrated = 0) and `online` (a session still holding a refresh token, the same rule as the device list) are honored; `distance` is kilometres to `lat`/`lon` or the caller's last stored position, positionless accounts sorted last; shared pagination bounds apply, with the total counted in its own statement so an out-of-range page still reports it. `category`/`incidentType` return `400 SEARCH_FILTER_UNSUPPORTED` instead of being ignored, because the domain tables do not exist yet. Still open here: term-free browsing with an index to back it (no trigram/prefix index on `users.username` yet), category/incident filters, radius limits, and the client's debounced autocomplete.
 - [ ] **T4.1.2** Place search via Map Server: `GET /geocode?q=&limit=5&bbox=` → Photon/Nominatim
 - [ ] **T4.1.3** Reverse: `GET /reverse?lat=&lon=` on map click/long-press → bottom sheet copyable address
 - [ ] **T4.1.4** Frontend: search bar + result list + “fly to” on select
