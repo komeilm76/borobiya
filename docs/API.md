@@ -212,7 +212,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
 → 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
 DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
-GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
+GET    /_user/location/shares            → { owned: LocationShare[], sharedWithMe: (LocationShare & { owner })[] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
 → 201 { shareId }
@@ -221,6 +221,8 @@ GET    /_user/location/history/shared/:shareId → polyline for receiver
 
 POST   /_user/location/update            deprecated in favor of Socket location:update; REST fallback
 ```
+
+**`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Responses are `Cache-Control: no-store`.
 
 **`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
 

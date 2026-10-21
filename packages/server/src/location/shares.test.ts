@@ -13,6 +13,7 @@ const ownerId = randomUUID();
 const targetId = randomUUID();
 const otherTargetId = randomUUID();
 const createdAt = new Date("2026-10-21T09:00:00.000Z");
+const listLimit = 100;
 
 const apps: FastifyInstance[] = [];
 
@@ -95,7 +96,17 @@ async function makeApp(options: {
     return { shares, createdShareIds: shares.map((share) => share.id), reusedShareIds: [] };
   });
   const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async () => "revoked");
-  const store: LocationShareStore = { assessShareTargets, createShares, revokeShare, ...options.shareStore };
+  const listActiveShares = vi.fn<LocationShareStore["listActiveShares"]>(async () => ({
+    owned: [],
+    sharedWithMe: []
+  }));
+  const store: LocationShareStore = {
+    assessShareTargets,
+    createShares,
+    revokeShare,
+    listActiveShares,
+    ...options.shareStore
+  };
 
   const app = Fastify({ logger: false });
   await registerUserSecurityQuestionsRoute(app, {
@@ -104,7 +115,7 @@ async function makeApp(options: {
   });
   await registerLocationShareRoutes(app, { store });
   apps.push(app);
-  return { app, assessShareTargets, createShares, revokeShare };
+  return { app, assessShareTargets, createShares, revokeShare, listActiveShares };
 }
 
 async function authorizedHeaders() {
@@ -312,5 +323,71 @@ describe("DELETE /_user/location/share/:shareId", () => {
     expect(unauthorized.statusCode).toBe(401);
     expect(unauthorized.json()).toMatchObject({ code: "UNAUTHORIZED" });
     expect(revokeShare).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /_user/location/shares", () => {
+  it("lists active owned and received shares with owner position data", async () => {
+    const listActiveShares = vi.fn<LocationShareStore["listActiveShares"]>(async () => ({
+      owned: [shareRow({ note: "night shift" })],
+      sharedWithMe: [{
+        ...shareRow({ id: otherTargetId, ownerId: targetId, mode: "permanent", expiresAt: null }),
+        owner: {
+          id: targetId,
+          username: "dispatch_lead",
+          lastLocation: { lat: 35.6997, lon: 51.3379 }
+        }
+      }]
+    }));
+    const { app } = await makeApp({
+      shareStore: {
+        listActiveShares
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/_user/location/shares",
+      headers: await authorizedHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(listActiveShares.mock.calls[0]![0]).toEqual({ userId: ownerId, limit: listLimit });
+    expect(response.json()).toMatchObject({
+      owned: [expect.objectContaining({
+        ownerId,
+        targetUserId: targetId,
+        mode: "timed",
+        note: "night shift",
+        expiresAt: "2026-10-21T10:00:00.000Z",
+        createdAt: "2026-10-21T09:00:00.000Z"
+      })],
+      sharedWithMe: [expect.objectContaining({
+        id: otherTargetId,
+        mode: "permanent",
+        expiresAt: null,
+        owner: {
+          id: targetId,
+          username: "dispatch_lead",
+          lastLocation: { lat: 35.6997, lon: 51.3379 }
+        }
+      })]
+    });
+  });
+
+  it("returns empty lists when the account has no active shares and requires a token", async () => {
+    const { app } = await makeApp();
+    const authorized = await app.inject({
+      method: "GET",
+      url: "/_user/location/shares",
+      headers: await authorizedHeaders()
+    });
+    expect(authorized.statusCode).toBe(200);
+    expect(authorized.json()).toEqual({ owned: [], sharedWithMe: [] });
+
+    const unauthorized = await app.inject({ method: "GET", url: "/_user/location/shares" });
+    expect(unauthorized.statusCode).toBe(401);
+    expect(unauthorized.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 });

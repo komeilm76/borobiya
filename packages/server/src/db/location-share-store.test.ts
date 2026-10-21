@@ -13,10 +13,11 @@ type Mutation = { type: "insert" | "update"; values: Record<string, unknown> };
  * scripted row set, and writes are captured so call order is observable.
  */
 class FakeQuery implements PromiseLike<unknown> {
+  readonly innerJoin = vi.fn(() => this);
+  readonly limit = vi.fn(() => this);
   readonly from = vi.fn(() => this);
   readonly where = vi.fn(() => this);
   readonly orderBy = vi.fn(() => this);
-  readonly limit = vi.fn(() => this);
   readonly returning = vi.fn(() => this);
   readonly set = vi.fn((values: Record<string, unknown>) => {
     this.mutations.push({ type: "update", values });
@@ -182,5 +183,53 @@ describe("DrizzleLocationShareStore", () => {
     expect(result.shares[0]!.expiresAt).toEqual(new Date("2026-10-21T18:00:00.000Z"));
     expect(result.reusedShareIds).toEqual([extended.id]);
     expect(result.createdShareIds).toEqual([]);
+  });
+});
+
+describe("DrizzleLocationShareStore.listActiveShares", () => {
+  it("reads owned shares first and maps the received owner position", async () => {
+    const ownedRow = shareRow();
+    const receivedRow = {
+      ...shareRow({ mode: "permanent", expiresAt: null }),
+      ownerUsername: "dispatch_lead",
+      ownerLat: "35.6997",
+      ownerLon: "51.3379"
+    };
+    const fake = makeDatabase([[ownedRow], [receivedRow]]);
+
+    const result = await fake.store.listActiveShares({ userId: ownerId, limit: 100 });
+
+    expect(result.owned).toEqual([ownedRow]);
+    expect(result.sharedWithMe).toEqual([{
+      id: receivedRow.id,
+      ownerId: receivedRow.ownerId,
+      targetUserId: receivedRow.targetUserId,
+      mode: receivedRow.mode,
+      expiresAt: receivedRow.expiresAt,
+      isRevoked: receivedRow.isRevoked,
+      priorityDeviceId: receivedRow.priorityDeviceId,
+      note: receivedRow.note,
+      createdAt: receivedRow.createdAt,
+      owner: {
+        id: ownerId,
+        username: "dispatch_lead",
+        lastLocation: { lat: 35.6997, lon: 51.3379 }
+      }
+    }]);
+  });
+
+  it("reports no position when the owner has never shared a fix", async () => {
+    const receivedRow = {
+      ...shareRow(),
+      ownerUsername: "offline_user",
+      ownerLat: null,
+      ownerLon: null
+    };
+    const fake = makeDatabase([[], [receivedRow]]);
+
+    const result = await fake.store.listActiveShares({ userId: targetId, limit: 100 });
+
+    expect(result.owned).toEqual([]);
+    expect(result.sharedWithMe[0]!.owner.lastLocation).toBeNull();
   });
 });

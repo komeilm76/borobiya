@@ -4,6 +4,7 @@ import {
   MAX_LOCATION_SHARE_TARGETS,
   historyShareSchema,
   locationShareCreatedSchema,
+  locationSharesResponseSchema,
   locationUpdateSchema,
   shareSchema
 } from "./location";
@@ -66,6 +67,30 @@ describe("location schemas", () => {
       reusedShareIds: []
     });
     expect(locationShareCreatedSchema.safeParse({ shares: [] }).success).toBe(false);
+  });
+
+  it("lists active shares and annotates received rows with the owner", () => {
+    const share = {
+      id: targetId,
+      ownerId: otherTargetId,
+      targetUserId: targetId,
+      mode: "timed" as const,
+      expiresAt: to,
+      isRevoked: false,
+      priorityDeviceId: null,
+      note: null,
+      createdAt: from
+    };
+    expect(locationSharesResponseSchema.safeParse({ owned: [share], sharedWithMe: [] }).success).toBe(true);
+    expect(
+      locationSharesResponseSchema.safeParse({
+        owned: [],
+        sharedWithMe: [{ ...share, owner: { id: otherTargetId, username: "dispatch_lead", lastLocation: { lat: 35.7, lon: 51.4 } } }]
+      }).success
+    ).toBe(true);
+    // Received rows must carry an owner; a bare share row is not enough to render a marker.
+    expect(locationSharesResponseSchema.safeParse({ owned: [], sharedWithMe: [share] }).success).toBe(false);
+    expect(locationSharesResponseSchema.safeParse({ owned: [share], sharedWithMe: [], extra: 1 }).success).toBe(false);
   });
 
   it("validates geographic bounds and location update metadata", () => {

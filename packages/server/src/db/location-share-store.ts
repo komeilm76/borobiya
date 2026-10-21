@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
 import { locationShares, users } from "./schema";
@@ -42,6 +42,15 @@ export interface CreatedLocationShares {
 
 export type LocationShareRevocation = "revoked" | "already-revoked" | "not-found";
 
+/** A received share plus the owner's identity and last known position. */
+export interface ReceivedLocationShareRecord extends LocationShareRecord {
+  owner: {
+    id: string;
+    username: string;
+    lastLocation: { lat: number; lon: number } | null;
+  };
+}
+
 export interface LocationShareStore {
   /** Classifies the requested recipients against the current user table. */
   assessShareTargets(input: {
@@ -58,6 +67,14 @@ export interface LocationShareStore {
    * and a share owned by someone else is indistinguishable from a missing one (`not-found`).
    */
   revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation>;
+  /**
+   * Active shares only (not revoked and not past `expiresAt`), newest first and capped per
+   * list. Receivers additionally see the owner's username and last server-known position.
+   */
+  listActiveShares(input: {
+    userId: string;
+    limit: number;
+  }): Promise<{ owned: LocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }>;
 }
 
 const locationShareSelection = {
@@ -168,6 +185,61 @@ export class DrizzleLocationShareStore implements LocationShareStore {
 
       return { shares, createdShareIds, reusedShareIds };
     });
+  }
+
+  async listActiveShares(input: {
+    userId: string;
+    limit: number;
+  }): Promise<{ owned: LocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }> {
+    const activeConditions = [
+      eq(locationShares.isRevoked, false),
+      sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
+    ];
+
+    const owned = await this.db
+      .select(locationShareSelection)
+      .from(locationShares)
+      .where(and(eq(locationShares.ownerId, input.userId), ...activeConditions))
+      .orderBy(desc(locationShares.createdAt))
+      .limit(input.limit);
+
+    const receivedRows = await this.db
+      .select({
+        ...locationShareSelection,
+        ownerUsername: users.username,
+        // PostGIS stores X as longitude and Y as latitude.
+        ownerLat: sql<string | null>`ST_Y(${users.lastLocation}::geometry)`,
+        ownerLon: sql<string | null>`ST_X(${users.lastLocation}::geometry)`
+      })
+      .from(locationShares)
+      .innerJoin(users, eq(users.id, locationShares.ownerId))
+      .where(and(eq(locationShares.targetUserId, input.userId), ...activeConditions))
+      .orderBy(desc(locationShares.createdAt))
+      .limit(input.limit);
+
+    return {
+      owned,
+      sharedWithMe: receivedRows.map((row) => {
+        const lat = row.ownerLat === null ? Number.NaN : Number(row.ownerLat);
+        const lon = row.ownerLon === null ? Number.NaN : Number(row.ownerLon);
+        return {
+          id: row.id,
+          ownerId: row.ownerId,
+          targetUserId: row.targetUserId,
+          mode: row.mode,
+          expiresAt: row.expiresAt,
+          isRevoked: row.isRevoked,
+          priorityDeviceId: row.priorityDeviceId,
+          note: row.note,
+          createdAt: row.createdAt,
+          owner: {
+            id: row.ownerId,
+            username: row.ownerUsername,
+            lastLocation: Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null
+          }
+        };
+      })
+    };
   }
 
   async revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation> {

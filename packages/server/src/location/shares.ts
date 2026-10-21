@@ -1,5 +1,5 @@
 import { apiRoutes, sharePathParamsSchema } from "@borobiya/shared/api";
-import { createLocationShareSchema } from "@borobiya/shared";
+import { createLocationShareSchema, MAX_LOCATION_SHARE_LIST_ITEMS } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
@@ -62,6 +62,7 @@ export async function registerLocationShareRoutes(
 ): Promise<void> {
   const createRoute = apiRoutes.location.createShare;
   const revokeRoute = apiRoutes.location.revokeShare;
+  const listRoute = apiRoutes.location.listShares;
 
   app.post(createRoute.url, async (request, reply) => {
     const user = currentUserIdentity(request);
@@ -171,5 +172,29 @@ export async function registerLocationShareRoutes(
 
     // An already-revoked id repeats the successful outcome so a retried revoke stays idempotent.
     return reply.code(200).header("cache-control", "no-store").send();
+  });
+
+  app.get(listRoute.url, async (request, reply) => {
+    const user = currentUserIdentity(request);
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const { owned, sharedWithMe } = await dependencies.store.listActiveShares({
+      userId: user.userId,
+      limit: MAX_LOCATION_SHARE_LIST_ITEMS
+    });
+
+    return reply.code(200).header("cache-control", "no-store").send({
+      owned: owned.map(sharePayload),
+      sharedWithMe: sharedWithMe.map((share) => ({
+        ...sharePayload(share),
+        owner: {
+          id: share.owner.id,
+          username: share.owner.username,
+          lastLocation: share.owner.lastLocation
+        }
+      }))
+    });
   });
 }

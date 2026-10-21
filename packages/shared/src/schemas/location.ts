@@ -13,6 +13,8 @@ export const MAX_LOCATION_SHARE_TARGETS = 50;
 /** Timed shares must end within 30 days; longer-lived visibility uses `permanent` mode. */
 export const MAX_LOCATION_SHARE_MINUTES = 30 * 24 * 60;
 export const MAX_LOCATION_SHARE_NOTE_LENGTH = 500;
+/** Caps one user's share list so `GET /_user/location/shares` stays a small payload. */
+export const MAX_LOCATION_SHARE_LIST_ITEMS = 100;
 
 const uniqueUserIdsSchema = z
   .array(idSchema)
@@ -95,9 +97,26 @@ export const locationHistoryShareCreatedSchema = z.strictObject({
 });
 export type LocationHistoryShareCreated = z.infer<typeof locationHistoryShareCreatedSchema>;
 
+/** The share owner's identity and last server-side known position, shown to receivers. */
+export const locationShareOwnerSchema = z.strictObject({
+  id: idSchema,
+  username: z.string().min(1),
+  lastLocation: coordinatesSchema.nullable()
+});
+export type LocationShareOwner = z.infer<typeof locationShareOwnerSchema>;
+
+export const receivedLocationShareSchema = locationShareSchema.extend({
+  owner: locationShareOwnerSchema
+});
+export type ReceivedLocationShare = z.infer<typeof receivedLocationShareSchema>;
+
+/**
+ * Active shares only: revoked rows and timed rows past `expiresAt` are excluded from both
+ * lists. Each list is capped at `MAX_LOCATION_SHARE_LIST_ITEMS` newest rows.
+ */
 export const locationSharesResponseSchema = z.strictObject({
-  owned: z.array(locationShareSchema),
-  sharedWithMe: z.array(locationShareSchema)
+  owned: z.array(locationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  sharedWithMe: z.array(receivedLocationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
 });
 export type LocationSharesResponse = z.infer<typeof locationSharesResponseSchema>;
 
