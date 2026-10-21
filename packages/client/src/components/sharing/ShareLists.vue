@@ -140,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type {
   LocationHistoryShare,
   LocationShare,
@@ -221,8 +221,29 @@ const names = computed(() => {
   return buildShareNameMap(entries);
 });
 
+/**
+ * The wall clock every row computed reads. Vue caches a computed whose only time source was
+ * `new Date()` inside its own body, so without this ref the countdowns render once and freeze: a share
+ * that has already closed would keep saying "۵ دقیقه مانده" and stay in the "active" section for as long
+ * as the tab stayed open — the one thing this panel exists to answer honestly. 30 seconds is finer than
+ * any resolution these rows show, and the tick is deliberately unconditional: gating it on "are there
+ * rows yet" would need re-checking at every place rows change, which is how leaked timers happen.
+ */
+const nowMs = ref(Date.now());
+let clock: ReturnType<typeof setInterval> | undefined;
+
+onMounted(() => {
+  clock = setInterval(() => {
+    nowMs.value = Date.now();
+  }, 30_000);
+});
+onBeforeUnmount(() => {
+  if (clock !== undefined) clearInterval(clock);
+  clock = undefined;
+});
+
 const ownedRows = computed<LiveRowView[]>(() => {
-  const now = new Date();
+  const now = new Date(nowMs.value);
   return owned.value.map((share) => {
     const described = describeLiveShareRow(share, now);
     return {
@@ -234,7 +255,7 @@ const ownedRows = computed<LiveRowView[]>(() => {
 });
 
 const receivedRows = computed<ReceivedView[]>(() => {
-  const now = new Date();
+  const now = new Date(nowMs.value);
   return received.value.map((share) => {
     const described = describeLiveShareRow(share, now);
     return {
@@ -249,7 +270,7 @@ const receivedRows = computed<ReceivedView[]>(() => {
 });
 
 const historyRows = computed<HistoryRowView[]>(() => {
-  const now = new Date();
+  const now = new Date(nowMs.value);
   return ownedHistory.value.map((share) => {
     const described = describeHistoryShareRow(share, now);
     return {
@@ -265,6 +286,9 @@ async function refresh(): Promise<void> {
   if (!token) return;
   loading.value = true;
   loadError.value = null;
+  // Re-read the clock with the data, so a manual refresh never shows a countdown measured against the
+  // last tick (up to 30 s stale).
+  nowMs.value = Date.now();
   try {
     // Both lists in parallel, but a failure of the history call must not blank the live one — the
     // privacy question ("who can see me right now") is the answer the user came here for.

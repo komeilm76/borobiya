@@ -49,6 +49,16 @@ describe("userSearchQueries", () => {
     expect(query.sql).toContain('"users"."username" ilike $');
     expect(query.sql).toContain('"is_active" = $');
     expect(query.sql).toContain('"is_suspended" = $');
+    // The caller's own account is not a shareable recipient (`self_target` on the POST), so the picker
+    // never sees it — the dialog cannot be tricked into offering it by a profile fetch that failed.
+    expect(query.sql).toContain('"users"."id" <> $');
+    expect(query.params).toContain(callerId);
+    expect(query.sql).not.toContain(callerId);
+    // Both statements of the page carry the same reachability clause, or a filtered-out row would still
+    // be counted in the total and the client would page through a list that never shows it.
+    const count = userSearchQueries(offlineDb, searchInput()).count.toSQL();
+    expect(count.sql).toContain('"users"."id" <> $');
+    expect(count.params).toContain(callerId);
     // The term is a parameter, never inline text, and it arrives as a contains-pattern.
     // The underscore is a single-character wildcard in LIKE, so it reaches the driver escaped;
     // usernames are `[a-z0-9_]`, and an unescaped `field_responder` term would also match `fieldXresponder`.

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
 import { locationShares, userSessions, users } from "./schema";
@@ -71,8 +71,9 @@ export interface LocationShareStore {
     targetUserIds: readonly string[];
   }): Promise<ShareTargetAssessment>;
   /**
-   * Creates one active share per target, reusing (and extending, for timed shares)
-   * an existing active share for the same owner/target/mode so a repeated request is idempotent.
+   * Creates one active share per target, reusing (and extending, for timed shares) an existing active
+   * share for the same owner/target so a repeated request is idempotent — and re-pointing it when the
+   * request changes the arrangement, because "one hour" must not leave a permanent row underneath.
    */
   createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares>;
   /**
@@ -103,6 +104,88 @@ export interface LocationShareStore {
     userId: string;
     limit: number;
   }): Promise<{ owned: LocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }>;
+}
+
+/**
+ * A (owner, target) pair holds at most one active row per mode under the reuse rule below, so this
+ * cap is headroom for rows written before the rule existed: a pair that somehow holds more converges
+ * on the next request instead of being refused or silently left doubled.
+ */
+const MAX_ACTIVE_SHARE_ROWS_PER_PAIR = 4;
+
+/** The stored state a reuse decision reads. */
+export interface ShareReuseCandidate {
+  mode: LocationShareMode;
+  expiresAt: Date | null;
+  priorityDeviceId: string | null;
+}
+
+/** What the caller asked for, in the same shape the row is stored in. */
+export interface ShareReuseRequest {
+  mode: LocationShareMode;
+  expiresAt: Date | null;
+  note: string | null;
+  priorityDeviceId: string | null;
+}
+
+/** The columns to write over an existing row; empty means the existing row already says this. */
+export interface ShareReusePatch {
+  mode?: LocationShareMode;
+  expiresAt?: Date | null;
+  note?: string;
+  priorityDeviceId?: string;
+}
+
+/**
+ * Decides what a repeated share request does to the active row it found for that recipient.
+ *
+ * - **A different mode replaces the arrangement.** This is the case that used to be a bug: the reuse
+ *   lookup filtered on `mode`, so asking for one hour while a permanent share was open inserted a
+ *   *second* row, the picker reported one share created, and the recipient kept seeing the owner
+ *   forever. Narrowing has to actually narrow.
+ * - **The same mode extends only forward** for timed shares (a shorter window from a repeat request
+ *   must not silently un-share someone mid-operation; the way to shorten is a revoke, or the mode
+ *   switch above), and never shortens a permanent row's expiry because it has none.
+ * - **`note` travels with a change to the window**, as before: a no-op repeat must not blank it.
+ * - **The device pin is orthogonal** to the window, so it is applied in every branch — that is what
+ *   lets re-choosing a device take effect without revoking and re-creating every share.
+ *
+ * Pure, because the interesting part is the decision and the row-writing around it is mechanics.
+ */
+export function planShareReuse(
+  existing: ShareReuseCandidate,
+  request: ShareReuseRequest
+): ShareReusePatch {
+  const patch: ShareReusePatch = {};
+
+  if (existing.mode !== request.mode && request.mode === "timed" && request.expiresAt === null) {
+    // `location_shares_expiry_mode_check` refuses a timed row without an expiry, so this would die in
+    // the middle of the transaction with a constraint error. The route cannot produce it (the schema
+    // pairs `timed` with a positive duration); failing here says which assumption broke.
+    throw new Error("A timed share needs an expiry before it can replace another mode.");
+  }
+
+  if (existing.mode !== request.mode) {
+    patch.mode = request.mode;
+    patch.expiresAt = request.expiresAt;
+    if (request.note !== null) patch.note = request.note;
+  } else if (
+    request.mode === "timed" &&
+    request.expiresAt !== null &&
+    (existing.expiresAt === null || request.expiresAt.getTime() > existing.expiresAt.getTime())
+  ) {
+    patch.expiresAt = request.expiresAt;
+    if (request.note !== null) patch.note = request.note;
+  }
+
+  if (
+    request.priorityDeviceId !== null &&
+    request.priorityDeviceId !== existing.priorityDeviceId
+  ) {
+    patch.priorityDeviceId = request.priorityDeviceId;
+  }
+
+  return patch;
 }
 
 const locationShareSelection = {
@@ -204,48 +287,56 @@ export class DrizzleLocationShareStore implements LocationShareStore {
       const reusedShareIds: string[] = [];
 
       for (const targetUserId of input.targetUserIds) {
-        const [existing] = await transaction
+        // Deliberately not filtered by `mode`: one recipient has one active arrangement, and the
+        // request redefines it. `order by expires_at desc` puts a permanent row (`NULL`) first, which
+        // is the wider of the two, so reusing it and overwriting its window can only narrow.
+        const active = await transaction
           .select(locationShareSelection)
           .from(locationShares)
           .where(and(
             eq(locationShares.ownerId, input.ownerId),
             eq(locationShares.targetUserId, targetUserId),
-            eq(locationShares.mode, input.mode),
             eq(locationShares.isRevoked, false),
-            input.mode === "timed"
-              ? gt(locationShares.expiresAt, new Date())
-              : isNull(locationShares.expiresAt)
+            sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
           ))
           .orderBy(desc(locationShares.expiresAt))
-          .limit(1);
+          .limit(MAX_ACTIVE_SHARE_ROWS_PER_PAIR);
 
-        if (existing) {
-          // A longer timed request extends the current share instead of stacking duplicates.
-          const extendTo = input.mode === "timed" &&
-            input.expiresAt !== null &&
-            (existing.expiresAt === null || input.expiresAt.getTime() > existing.expiresAt.getTime())
-            ? input.expiresAt
-            : undefined;
-          const patch: { expiresAt?: Date; note?: string; priorityDeviceId?: string } = {};
-          if (extendTo) {
-            patch.expiresAt = extendTo;
-            if (input.note !== null) patch.note = input.note;
-          }
-          // A device change is orthogonal to the sharing window, so permanent shares get it too.
-          if (input.priorityDeviceId !== null && input.priorityDeviceId !== existing.priorityDeviceId) {
-            patch.priorityDeviceId = input.priorityDeviceId;
-          }
+        const keeper = active.find((row) => row.mode === input.mode) ?? active[0];
+        const siblings = keeper ? active.filter((row) => row.id !== keeper.id) : [];
+        if (siblings.length > 0) {
+          // Retire the other active rows for this pair rather than leave a second arrangement live
+          // behind the one the caller just described. This also cleans up the duplicates the
+          // previous mode-filtered lookup created.
+          await transaction
+            .update(locationShares)
+            .set({ isRevoked: true })
+            .where(inArray(locationShares.id, siblings.map((row) => row.id)));
+        }
+
+        if (keeper) {
+          const patch = planShareReuse(keeper, {
+            mode: input.mode,
+            expiresAt: input.expiresAt,
+            note: input.note,
+            priorityDeviceId: input.priorityDeviceId
+          });
           const [updated] = Object.keys(patch).length > 0
             ? await transaction
                 .update(locationShares)
                 .set(patch)
-                .where(eq(locationShares.id, existing.id))
+                .where(eq(locationShares.id, keeper.id))
                 .returning(locationShareSelection)
-            : [existing];
+            : [keeper];
 
-          const reused = updated ?? existing;
-          shares.push(reused);
-          reusedShareIds.push(reused.id);
+          if (!updated) {
+            // Same stance as the insert below: a write that answers with no row means the row is gone
+            // (the only writer that can take it is the account's `on delete cascade`), and reporting the
+            // stale `keeper` as reused would tell the caller their extension landed when nothing exists.
+            throw new Error("Location share update returned no row.");
+          }
+          shares.push(updated);
+          reusedShareIds.push(updated.id);
           continue;
         }
 

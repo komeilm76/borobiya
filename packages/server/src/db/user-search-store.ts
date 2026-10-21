@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, sql, type SQLWrapper } from "drizzle-orm";
+import { and, asc, eq, gte, ilike, ne, sql, type SQLWrapper } from "drizzle-orm";
 import type { Database } from "./client";
 import { userSessions, users } from "./schema";
 
@@ -62,11 +62,15 @@ export interface UserSearchStore {
   searchUsers(input: UserSearchInput): Promise<UserSearchPage>;
 }
 
-/** Accounts a share could actually reach. */
-function reachableUserConditions() {
+/** Accounts a share could actually reach, given who is asking. */
+function reachableUserConditions(callerId: string) {
   // `POST /_user/location/share` refuses a deactivated or suspended recipient, so the picker must not
   // offer one: an "unreachable account" result would become a 400 the user cannot fix.
-  return [eq(users.isActive, true), eq(users.isSuspended, false)];
+  // The caller's own account is excluded here rather than only greyed out in the dialog, because that
+  // disable depends on a profile fetched separately: while it is in flight or failed, every row would
+  // be a clickable "share with yourself" the POST then refuses. Filtering where the rule is enforced
+  // is the difference between a confusing error and no error at all.
+  return [eq(users.isActive, true), eq(users.isSuspended, false), ne(users.id, callerId)];
 }
 
 /**
@@ -81,7 +85,7 @@ function reachableUserConditions() {
 export function userSearchQueries(db: Database, input: UserSearchInput) {
   const conditions: SQLWrapper[] = [
     ilike(users.username, `%${escapeLikePattern(input.term)}%`),
-    ...reachableUserConditions()
+    ...reachableUserConditions(input.callerId)
   ];
 
   if (input.minRating !== null) {

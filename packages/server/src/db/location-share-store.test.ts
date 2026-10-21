@@ -8,6 +8,7 @@ import { locationHistory, locationShares, userSessions, users } from "./schema";
 import {
   DrizzleLocationShareStore,
   expireOverdueSharesQuery,
+  planShareReuse,
   repairStaleSharePinsQuery,
   type LocationShareRecord
 } from "./location-share-store";
@@ -136,6 +137,141 @@ describe("DrizzleLocationShareStore", () => {
       missing: [missingId],
       unavailable: [inactiveId, suspendedId]
     });
+  });
+
+  describe("planShareReuse", () => {
+    const device = randomUUID();
+    const request = (overrides: Partial<Parameters<typeof planShareReuse>[1]> = {}) => ({
+      mode: "timed" as const,
+      expiresAt: new Date("2026-10-21T11:00:00.000Z"),
+      note: null,
+      priorityDeviceId: device,
+      ...overrides
+    });
+
+    it("narrows a permanent share when the caller asks for an hour", () => {
+      // The bug this pins: the reuse lookup used to filter by mode, so this request inserted a second
+      // active row and the recipient kept seeing the owner forever while the UI reported one share.
+      expect(
+        planShareReuse({ mode: "permanent", expiresAt: null, priorityDeviceId: device }, request())
+      ).toEqual({ mode: "timed", expiresAt: new Date("2026-10-21T11:00:00.000Z") });
+    });
+
+    it("widens a timed share into a permanent one by clearing the expiry", () => {
+      expect(
+        planShareReuse(
+          { mode: "timed", expiresAt: new Date("2026-10-21T11:00:00.000Z"), priorityDeviceId: device },
+          request({ mode: "permanent", expiresAt: null })
+        )
+      ).toEqual({ mode: "permanent", expiresAt: null });
+    });
+
+    it("extends a timed share only forward, because a repeat must not un-share someone mid-operation", () => {
+      const existing = { mode: "timed" as const, expiresAt: new Date("2026-10-21T12:00:00.000Z"), priorityDeviceId: device };
+      expect(planShareReuse(existing, request({ expiresAt: new Date("2026-10-21T13:00:00.000Z") })))
+        .toEqual({ expiresAt: new Date("2026-10-21T13:00:00.000Z") });
+      // A shorter window is a revoke-and-re-share, decided by the caller, not a silent side effect.
+      expect(planShareReuse(existing, request({ expiresAt: new Date("2026-10-21T11:00:00.000Z") })))
+        .toEqual({});
+    });
+
+    it("moves the note only with a change to the window", () => {
+      const existing = { mode: "timed" as const, expiresAt: new Date("2026-10-21T12:00:00.000Z"), priorityDeviceId: device };
+      expect(planShareReuse(existing, request({ expiresAt: new Date("2026-10-21T13:00:00.000Z"), note: "longer" })))
+        .toEqual({ expiresAt: new Date("2026-10-21T13:00:00.000Z"), note: "longer" });
+      expect(planShareReuse(existing, request({ note: "ignored on a no-op repeat" })))
+        .toEqual({});
+    });
+
+    it("carries a device change into every branch", () => {
+      const otherDevice = randomUUID();
+      expect(
+        planShareReuse({ mode: "permanent", expiresAt: null, priorityDeviceId: device }, request({ mode: "timed", priorityDeviceId: otherDevice }))
+      ).toEqual({ mode: "timed", expiresAt: new Date("2026-10-21T11:00:00.000Z"), priorityDeviceId: otherDevice });
+    });
+
+    it("leaves an untouched row alone and re-points only a real device change", () => {
+      const existing = { mode: "permanent" as const, expiresAt: null, priorityDeviceId: device };
+      expect(planShareReuse(existing, request({ mode: "permanent", expiresAt: null, priorityDeviceId: device })))
+        .toEqual({});
+      expect(planShareReuse(existing, request({ mode: "permanent", expiresAt: null, priorityDeviceId: null })))
+        .toEqual({});
+      expect(planShareReuse(existing, request({ mode: "permanent", expiresAt: null, priorityDeviceId: randomUUID() })))
+        .not.toEqual({});
+    });
+
+    it("refuses to write a timed row without an expiry rather than meeting a constraint error", () => {
+      expect(() =>
+        planShareReuse({ mode: "permanent", expiresAt: null, priorityDeviceId: null }, request({ expiresAt: null }))
+      ).toThrow(/needs an expiry/);
+    });
+  });
+
+  it("reuses the active row of the other mode instead of inserting a second one", async () => {
+    const existingPermanent = shareRow({ mode: "permanent", expiresAt: null, priorityDeviceId: callerDeviceId });
+    const narrowed = { ...existingPermanent, mode: "timed" as const, expiresAt: new Date("2026-10-21T11:00:00.000Z") };
+    const fake = makeDatabase([[existingPermanent], [narrowed]]);
+
+    const result = await fake.store.createShares({
+      ownerId,
+      targetUserIds: [targetId],
+      mode: "timed",
+      expiresAt: new Date("2026-10-21T11:00:00.000Z"),
+      note: "برای یک ساعت",
+      priorityDeviceId: callerDeviceId
+    });
+
+    expect(result.createdShareIds).toEqual([]);
+    expect(result.reusedShareIds).toEqual([existingPermanent.id]);
+    expect(result.shares).toEqual([narrowed]);
+    expect(fake.mutations).toEqual([
+      {
+        type: "update",
+        values: {
+          mode: "timed",
+          expiresAt: new Date("2026-10-21T11:00:00.000Z"),
+          note: "برای یک ساعت"
+        }
+      }
+    ]);
+  });
+
+  it("fails rather than reporting a reuse of a row that vanished mid-transaction", async () => {
+    const existing = shareRow({ mode: "permanent", expiresAt: null });
+    const fake = makeDatabase([[existing], []]);
+
+    await expect(
+      fake.store.createShares({
+        ownerId,
+        targetUserIds: [targetId],
+        mode: "timed",
+        expiresAt: new Date("2026-10-21T11:00:00.000Z"),
+        note: null,
+        priorityDeviceId: null
+      })
+    ).rejects.toThrow(/update returned no row/);
+  });
+
+  it("retires a sibling row the old mode-filtered lookup left behind", async () => {
+    const strayPermanent = shareRow({ id: randomUUID(), mode: "permanent", expiresAt: null });
+    const liveTimed = shareRow({ id: randomUUID(), mode: "timed", expiresAt: new Date("2026-10-21T14:00:00.000Z") });
+    // Read order: the pair's active rows (permanent first, as `order by expires_at desc` yields), then
+    // the sibling retirement, which returns nothing.
+    const fake = makeDatabase([[strayPermanent, liveTimed], []]);
+
+    const result = await fake.store.createShares({
+      ownerId,
+      targetUserIds: [targetId],
+      mode: "timed",
+      expiresAt: new Date("2026-10-21T14:00:00.000Z"),
+      note: null,
+      priorityDeviceId: null
+    });
+
+    // The same-mode row is kept as-is and the wider one is retired, so one recipient has one arrangement.
+    expect(result.reusedShareIds).toEqual([liveTimed.id]);
+    expect(result.createdShareIds).toEqual([]);
+    expect(fake.mutations).toEqual([{ type: "update", values: { isRevoked: true } }]);
   });
 
   it("inserts one row per target with the caller's mode and expiry", async () => {
