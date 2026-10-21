@@ -21,6 +21,8 @@ export interface AdminUserRecord {
 
 export interface AdminUserDeviceRecord {
   id: string;
+  /** Same value `GET /_user/devices` exposes, so an admin can see which device a share pins. */
+  deviceId: string;
   deviceName: string | null;
   ip: string | null;
   isCurrentDevice: boolean;
@@ -148,6 +150,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
     const sessions = await this.db
       .select({
         id: userSessions.id,
+        deviceId: userSessions.deviceId,
         deviceName: userSessions.deviceName,
         ip: userSessions.ip,
         lastActiveAt: userSessions.lastActiveAt,

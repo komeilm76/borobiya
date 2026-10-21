@@ -135,6 +135,10 @@ packages/server/
     ├── auth/
     │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
     │   ├── login.test.ts     # token/session/account-status regression tests
+    │   ├── devices.ts        # GET /_user/devices: live-session device list for the Active Devices table
+    │   ├── devices.test.ts   # payload mapping, fail-closed guard, empty list, and cap tests
+    │   ├── device-label.ts   # human device labels: client-supplied name, User-Agent summary, bounds
+    │   ├── device-label.test.ts # browser/platform recognition and truncation cases
     │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
     │   ├── register.test.ts  # registration behavior/rate-limit regression tests
     │   ├── rate-limit.ts     # bounded per-IP+username limiter key generation
@@ -159,6 +163,7 @@ packages/server/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
+    │   ├── device-store.ts   # live-session reads for the Active Devices table (never selects the token hash)
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
     │   ├── location-history-store.ts # one transaction per fix: PostGIS users.last_location upsert + location_history insert

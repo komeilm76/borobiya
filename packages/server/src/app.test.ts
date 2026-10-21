@@ -136,6 +136,7 @@ describe("Fastify server skeleton", () => {
     const createShare = paths["/_user/location/share"]?.post;
     const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
     const listShares = paths["/_user/location/shares"]?.get;
+    const listDevices = paths["/_user/devices"]?.get;
     const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
@@ -294,6 +295,12 @@ describe("Fastify server skeleton", () => {
     expect(restLocationUpdate?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(restLocationUpdate?.deprecated).toBe(true);
     expect(listShares?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(listDevices?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(listDevices?.["x-borobiya-access"]).toBe("authenticated");
+    expect(listDevices?.security).toEqual([{ bearerAuth: [] }]);
+    expect(listDevices?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
+    // The Active Devices row carries the device identity the priority-device rule pins (T2.3.3).
+    expect(listDevices?.responses).toHaveProperty("200.content.application/json.schema.items.properties.deviceId");
     expect(listShares?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
     expect(sharePath?.responses).toMatchObject({
       200: expect.any(Object),
@@ -364,6 +371,10 @@ describe("Fastify server skeleton", () => {
     const missingUserProfileToken = await app.inject({ method: "GET", url: "/_user/me" });
     expect(missingUserProfileToken.statusCode).toBe(401);
     expect(missingUserProfileToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingDevicesToken = await app.inject({ method: "GET", url: "/_user/devices" });
+    expect(missingDevicesToken.statusCode).toBe(401);
+    expect(missingDevicesToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
 
     // The `/_user` authorization hook is app-scoped, so newly added Phase 2 user routes
     // must fail closed on the same token/session checks.

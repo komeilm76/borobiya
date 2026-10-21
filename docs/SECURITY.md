@@ -82,13 +82,15 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 
 ### 2.2 Sessions & Devices
 
-- `user_sessions(id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)`.
-- Until the login contract accepts a client-stable device ID, each successful login creates a server-generated session/device UUID; the user-agent is saved as the session's `deviceName`. A future client device ID can make the identifier stable across logins.
-- `GET /_user/devices` returns active table; user can revoke others (optional).
+- `user_sessions(id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)` — all eight columns exist since migration `0000_wide_garia.sql`. Login inserts them, refresh rotation swaps the hash and bumps `lastActiveAt`/`isOnline`, and logout or an admin status change clears the hash and sets `isOnline=false`.
+- A "device" is a **live session**. Until the login contract accepts a client-stable device ID, each successful login mints a fresh session/device UUID pair, so signing in twice on one laptop lists two devices; `sessionId` stays stable across refresh rotations, which is what makes `isCurrentDevice` unambiguous. A client-supplied device identity (T2.3.6) is what would make it survive re-login.
+- `deviceName` is a bounded human label, never the raw `User-Agent`: a client-supplied `deviceName` (1–100 characters, trimmed — what a Capacitor build can report) wins, otherwise the UA is summarized (`Chrome on Windows`, `Safari on iPhone`, `Samsung Internet on Android`), and an unrecognizable UA stores `null`. Raw UA strings are not retained because the device list is user-visible text, and a label is truncated rather than rejected when it is too long.
+- `GET /_user/devices` returns the account's live sessions only (`refresh_token_hash is not null`), newest activity first, capped at 50, with `Cache-Control: no-store`. It exposes `id`, `deviceId`, `deviceName`, `ip`, `isCurrentDevice`, `lastActiveAt`, and `isOnline` — never the token hash. Revoked and logged-out rows are excluded instead of accumulating as history, since sessions have no retention job of their own. Self-service revocation of *another* device is not implemented; the spec keeps this endpoint read-only and admin suspension revokes every session of the account.
+- `ip` and `lastActiveAt` reflect the last credential exchange (login or refresh), so for a live client they are at most one 15-minute access-token TTL stale. `isOnline` mirrors refresh-token liveness until socket presence drives it separately.
 
 ### 2.3 Multi-Device Priority
 
-- When `activeDevices>1` and starting live share/SOS, client must collect `priorityDeviceId` via modal.
+- When `activeDevices>1` and starting live share/SOS, client must collect `priorityDeviceId` via modal. `GET /_user/devices` (T2.3.2) is the list whose length decides that condition, and its `deviceId` values are what the picker offers.
 - Server stores in `location_shares.priorityDeviceId` and ignores GPS from other devices (log warning, return 409).
 
 ---

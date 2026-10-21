@@ -207,11 +207,13 @@ describe("GET /_admin/users/:id", () => {
 
   it("returns a user's profile, devices, and missions", async () => {
     const sessionId = randomUUID();
+    const deviceUuid = "71e5295a-9381-4bc5-844c-3cf0f52df30e";
     const detail: AdminUserDetailRecord = {
       ...defaultCreatedUser,
       id: targetId,
       devices: [{
         id: sessionId,
+        deviceId: deviceUuid,
         deviceName: "Firefox on Linux",
         ip: "192.0.2.4",
         isCurrentDevice: false,
@@ -252,6 +254,7 @@ describe("GET /_admin/users/:id", () => {
       createdAt: createdAt.toISOString(),
       devices: [{
         id: sessionId,
+        deviceId: deviceUuid,
         deviceName: "Firefox on Linux",
         ip: "192.0.2.4",
         isCurrentDevice: false,

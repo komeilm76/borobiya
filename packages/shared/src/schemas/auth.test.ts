@@ -83,6 +83,15 @@ describe("auth schemas", () => {
     expect(loginSchema.safeParse({ username: "rescue_user1", password: "x".repeat(1025) }).success).toBe(false);
   });
 
+  it("accepts an optional, bounded device name for the Active Devices table", () => {
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy", deviceName: "Samsung S23" }).success).toBe(true);
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy", deviceName: "  Samsung S23  " }).data?.deviceName).toBe("Samsung S23");
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy", deviceName: "d".repeat(100) }).success).toBe(true);
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy", deviceName: "d".repeat(101) }).success).toBe(false);
+    // An empty label must not be storable as a blank device name; the server falls back to the UA.
+    expect(loginSchema.safeParse({ username: "rescue_user1", password: "legacy", deviceName: "   " }).success).toBe(false);
+  });
+
   it("requires exactly three unique answers in the forgot-password verification step", () => {
     const valid = {
       username: "rescue_user1",

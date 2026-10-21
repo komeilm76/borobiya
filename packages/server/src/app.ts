@@ -15,6 +15,8 @@ import {
   type UserSecurityQuestionsStore
 } from "./db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "./auth/user-security-questions";
+import { DrizzleUserDeviceStore, type UserDeviceStore } from "./db/device-store";
+import { registerUserDevicesRoute } from "./auth/devices";
 import { registerAdminUserRoutes } from "./admin/users";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
 import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
@@ -51,6 +53,8 @@ export interface FastifyAppDependencies {
   adminUserStore?: AdminUserStore;
   /** Override user authorization/onboarding persistence in tests. */
   securityQuestionsStore?: UserSecurityQuestionsStore;
+  /** Override the Active Devices read path in tests. */
+  userDeviceStore?: UserDeviceStore;
   /** Override live-location share persistence in tests. */
   locationShareStore?: LocationShareStore;
   /** Override live-location fix persistence in tests. */
@@ -92,6 +96,7 @@ export async function createFastifyApp(
     dependencies.recoveryStore,
     dependencies.adminUserStore,
     dependencies.securityQuestionsStore,
+    dependencies.userDeviceStore,
     dependencies.locationShareStore,
     dependencies.locationHistoryStore
   ].some((store) => store === undefined);
@@ -101,6 +106,7 @@ export async function createFastifyApp(
   const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   const adminUserStore = dependencies.adminUserStore ?? new DrizzleAdminUserStore(database!.db);
   const securityQuestionsStore = dependencies.securityQuestionsStore ?? new DrizzleUserSecurityQuestionsStore(database!.db);
+  const userDeviceStore = dependencies.userDeviceStore ?? new DrizzleUserDeviceStore(database!.db);
   const locationShareStore = dependencies.locationShareStore ?? new DrizzleLocationShareStore(database!.db);
   const locationHistoryStore = dependencies.locationHistoryStore ?? new DrizzleLocationHistoryStore(database!.db);
   const liveLocationService = createLiveLocationService({
@@ -112,6 +118,9 @@ export async function createFastifyApp(
     jwtSecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword
   });
+  // Registered after the `/_user` authorization hook so the device list inherits the access-token,
+  // account-state, onboarding, and live-session checks and can trust `request.authenticatedUser`.
+  await registerUserDevicesRoute(app, { store: userDeviceStore });
   await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
   await registerLoginRoute(app, {
     store: loginStore,

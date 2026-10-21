@@ -263,7 +263,7 @@ Events (full list in API.md § Realtime):
 ```
 
 **Disconnection:**
-- Heartbeat `ping` 25s → server `pong` timeout 10s → mark `user_sessions.isOnline=false`.
+- Heartbeat `ping` 25s → server `pong` timeout 10s → mark `user_sessions.isOnline=false`. Runtime status: the heartbeat pair is live since T2.1.5/T2.3.4 (the server drops a silent connection), but the drop is **not** yet written to `user_sessions`; until it is, `GET /_user/devices` reports `isOnline` from refresh-token liveness (login/refresh set it, logout/revocation clear it).
 - Grace period 5 min before auto-cancel consideration (no auto-cancel in v1, just badge).
 - Reconnect: refresh JWT if needed, rejoin rooms, `GET /_user/sync?since=lastDisconnectAt` for missed events.
 

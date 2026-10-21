@@ -197,6 +197,7 @@ describe("DrizzleAdminUserStore", () => {
     const sessionId = "81e5295a-9381-4bc5-844c-3cf0f52df30e";
     const session = {
       id: sessionId,
+      deviceId: "71e5295a-9381-4bc5-844c-3cf0f52df30e",
       deviceName: "Firefox on Linux",
       ip: "192.0.2.4",
       lastActiveAt: createdUser.createdAt,

@@ -81,7 +81,7 @@ The handler verifies the five question IDs against the seeded catalog, hashes th
 ### 3.2 POST `/_auth/login`
 
 ```text
-Request: { username, password }
+Request: { username, password, deviceName? }
 Browser (Origin header) 200: { accessToken, user } + Set-Cookie refreshToken
 Native (no Origin header) 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
 400: { code: "VALIDATION_ERROR" }
@@ -90,7 +90,8 @@ Native (no Origin header) 200: { accessToken, refreshToken, user } (store refres
 429: { code: "RATE_LIMITED" }
 ```
 
-The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login accepts existing credentials without reapplying the new-password letter/digit rule, but caps the submitted password at 1024 characters. It returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
+The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login accepts existing credentials without reapplying the new-password letter/digit rule, but caps the submitted password at 1024 characters.
+`deviceName` (1–100 characters, trimmed) is an optional platform label for the Active Devices table — a Capacitor build can send `"Samsung S23"`. Web clients omit it and the server summarizes the `User-Agent` instead (`"Chrome on Windows"`, `"Safari on iPhone"`, `"Microsoft Edge on Windows"`); a UA that matches no known browser or platform stores `null`, because the column is user-visible text, not an archive of client detail. It returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
 
 Rate: 5/15m per `ip+username`.
 
@@ -191,11 +192,13 @@ No auth required; may include `X-User-Id` personalization if token present (opti
 ```
 GET    /_user/me                         → { id, username, role, isActive, avgRating, mustComplete..., createdAt }
 PATCH  /_user/me                         Body { username? } // limited fields
-GET    /_user/devices                    → [{ id, deviceName, ip, isCurrentDevice, lastActiveAt, isOnline }]
+GET    /_user/devices                    → [{ id, deviceId, deviceName, ip, isCurrentDevice, lastActiveAt, isOnline }]
 POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ```
 
 `POST /_user/complete-security-questions` requires an access JWT backed by a matching unrevoked session, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The same hook returns `401 INVALID_ACCESS_TOKEN` when logout, password reset, or admin action revoked the persisted session, immediately invalidating any access JWT from it. `GET /_user/me` returns the current profile with `Cache-Control: no-store` after onboarding; incomplete accounts receive the security-question gate response. Other `_user` operations shown here remain contract-only.
+
+**`GET /_user/devices` (T2.3.2, live).** Returns the caller's **live sessions** — rows of `user_sessions` that still hold a refresh token — newest `lastActiveAt` first, capped at `MAX_USER_DEVICE_LIST_ITEMS` (50), with `Cache-Control: no-store`. `id` is the session row and `deviceId` is the value `location_shares.priorityDeviceId` pins, so this is the list the priority-device picker (T2.3.3) reads; exactly one row has `isCurrentDevice: true` because the `/_user` hook already rejects a revoked or missing session. `deviceName` is the label described in §3.2 and `ip` is the address seen at the last credential exchange (login or refresh rotation). Logged-out and admin-revoked sessions are excluded rather than listed as offline history, since sessions have no retention job of their own; `isOnline` still mirrors session liveness and will only differentiate once socket presence (T2.1.5) drives it.
 
 ### 5.2 User Search
 
@@ -299,7 +302,7 @@ PATCH /_admin/users/:id/unsuspend
 
 `PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin and unrevoked-session authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` (including a revoked session), `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; both `/_user` and `/_admin` authorization checks require a matching session with a non-null refresh-token hash, so outstanding access JWTs are invalidated immediately. Reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
 
-The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. Category assignment tables are not part of the current database schema yet, so current users are all unassigned: `hasCategory=true` returns an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records; `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
+The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. Category assignment tables are not part of the current database schema yet, so current users are all unassigned: `hasCategory=true` returns an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
 
 ### 6.2 Incidents & Categories
 

@@ -26,6 +26,7 @@ const implementedOperationIds = new Set([
   "adminCreateUser",
   "adminUpdateUserStatus",
   "userCompleteSecurityQuestions",
+  "userListDevices",
   "locationCreateShare",
   "locationRevokeShare",
   "locationListShares",
