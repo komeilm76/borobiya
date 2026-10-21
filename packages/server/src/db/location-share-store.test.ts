@@ -142,6 +142,19 @@ describe("DrizzleLocationShareStore", () => {
     expect(result.shares).toEqual([existing]);
   });
 
+  it("revokes an owned active share and distinguishes missing from already-revoked ids", async () => {
+    const revoked = makeDatabase([[{ id: targetId }]]);
+    expect(await revoked.store.revokeShare({ ownerId, shareId: targetId })).toBe("revoked");
+    expect(revoked.mutations).toHaveLength(1);
+    expect(revoked.mutations[0]).toMatchObject({ type: "update", values: { isRevoked: true } });
+
+    const already = makeDatabase([[], [{ id: targetId }]]);
+    expect(await already.store.revokeShare({ ownerId, shareId: targetId })).toBe("already-revoked");
+
+    const missing = makeDatabase([[], []]);
+    expect(await missing.store.revokeShare({ ownerId, shareId: randomUUID() })).toBe("not-found");
+  });
+
   it("extends an active timed share only when the new expiry is later", async () => {
     const existing = shareRow({ expiresAt: new Date("2026-10-21T12:00:00.000Z") });
     const extended = shareRow({ expiresAt: new Date("2026-10-21T18:00:00.000Z") });

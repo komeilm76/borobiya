@@ -94,7 +94,8 @@ async function makeApp(options: {
     }));
     return { shares, createdShareIds: shares.map((share) => share.id), reusedShareIds: [] };
   });
-  const store: LocationShareStore = { assessShareTargets, createShares, ...options.shareStore };
+  const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async () => "revoked");
+  const store: LocationShareStore = { assessShareTargets, createShares, revokeShare, ...options.shareStore };
 
   const app = Fastify({ logger: false });
   await registerUserSecurityQuestionsRoute(app, {
@@ -103,7 +104,7 @@ async function makeApp(options: {
   });
   await registerLocationShareRoutes(app, { store });
   apps.push(app);
-  return { app, assessShareTargets, createShares };
+  return { app, assessShareTargets, createShares, revokeShare };
 }
 
 async function authorizedHeaders() {
@@ -253,5 +254,63 @@ describe("POST /_user/location/share", () => {
     expect(gated.statusCode).toBe(403);
     expect(gated.json()).toMatchObject({ code: "SECURITY_QUESTIONS_REQUIRED" });
     expect(onboarding.createShares).not.toHaveBeenCalled();
+  });
+});
+
+describe("DELETE /_user/location/share/:shareId", () => {
+  it("revokes the caller's share immediately with an empty body", async () => {
+    const { app, revokeShare } = await makeApp();
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/_user/location/share/${targetId}`,
+      headers: await authorizedHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe("");
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(revokeShare.mock.calls[0]![0]).toEqual({ ownerId, shareId: targetId });
+  });
+
+  it("treats an already-revoked share as a successful repeat revoke", async () => {
+    const { app } = await makeApp({ shareStore: { revokeShare: async () => "already-revoked" } });
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/_user/location/share/${targetId}`,
+      headers: await authorizedHeaders()
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.body).toBe("");
+  });
+
+  it("returns 404 for an unknown or foreign share id without leaking ownership", async () => {
+    const { app } = await makeApp({ shareStore: { revokeShare: async () => "not-found" } });
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/_user/location/share/${otherTargetId}`,
+      headers: await authorizedHeaders()
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: "SHARE_NOT_FOUND" });
+    expect(response.json().message).not.toContain("another");
+  });
+
+  it("validates the path parameter and access token", async () => {
+    const { app, revokeShare } = await makeApp();
+    const invalid = await app.inject({
+      method: "DELETE",
+      url: "/_user/location/share/not-a-uuid",
+      headers: await authorizedHeaders()
+    });
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json()).toMatchObject({ code: "VALIDATION_ERROR", issues: [expect.any(Object)] });
+    expect(revokeShare).not.toHaveBeenCalled();
+
+    const unauthorized = await app.inject({ method: "DELETE", url: `/_user/location/share/${targetId}` });
+    expect(unauthorized.statusCode).toBe(401);
+    expect(unauthorized.json()).toMatchObject({ code: "UNAUTHORIZED" });
+    expect(revokeShare).not.toHaveBeenCalled();
   });
 });

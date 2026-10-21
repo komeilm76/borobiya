@@ -4,7 +4,7 @@
 
 ---
 
-## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.1.2 (2026-10-21)
+## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.1.3 (2026-10-21)
 
 All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, and T2.1.2 adds the first share handler — `POST /_user/location/share`. Share revocation/listing, realtime `location:update`, expiry processing, history sharing, and multi-device behavior remain unstarted and are not claimed complete. The 24% whole-project estimate is unchanged; it is a planning figure rather than a per-task measurement.
 
@@ -19,7 +19,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
 | Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
-| Location Sharing | 11% (2/19 tasks) | ✅ T2.1.1 schema/migration and T2.1.2 `POST /_user/location/share` complete; share revocation/listing, realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
+| Location Sharing | 16% (3/19 tasks) | ✅ T2.1.1 schema/migration, T2.1.2 `POST /_user/location/share`, and T2.1.3 share revocation complete; share listing, realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
 | UI/UX & a11y | 0% | ⬜ Not started |
@@ -78,11 +78,11 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 
 **Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
-### Phase 2 — Location Sharing — 11% (2/19 tasks)
+### Phase 2 — Location Sharing — 16% (3/19 tasks)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Live share + expiry | 29% (2/7 tasks) | T2.1.1 `location_shares` schema/migration and T2.1.2 share creation (recipient checks, timed/permanent expiry, idempotent reuse) complete; revoke/list handlers, live updates, and the expiry job remain |
+| Live share + expiry | 43% (3/7 tasks) | T2.1.1 schema/migration, T2.1.2 share creation (recipient checks, timed/permanent expiry, idempotent reuse), and T2.1.3 owner-only revoke complete; the list handler, live updates, and the expiry job remain |
 | History share + retention | 0% | Not started |
 | Multi-device priority | 0% | Not started |
 
@@ -126,6 +126,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-21 — T2.1.3 live-share revocation
+
+- Implemented `DELETE /_user/location/share/:shareId`: a single owner-scoped `UPDATE ... WHERE is_revoked = false` flips `isRevoked`, and a follow-up owner-scoped read distinguishes an already-revoked id from a missing one.
+- Unknown ids and ids owned by another account both return `404 SHARE_NOT_FOUND` with one shared message; already-revoked ids return `200` with an empty body so client retries stay idempotent. The contract gained the documented 404 response and `locationRevokeShare` is now marked implemented in OpenAPI.
+- Validation: shared 34/34, server 170/170 (5 new revoke cases), client 49/49, and all three package typechecks passed. Share revocation is not yet pushed to receivers over realtime (T2.1.5), so a peer's marker clears on the next list/update cycle.
 
 ### 2026-10-21 — T2.1.2 live-share creation
 

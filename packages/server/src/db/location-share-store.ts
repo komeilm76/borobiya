@@ -40,6 +40,8 @@ export interface CreatedLocationShares {
   reusedShareIds: string[];
 }
 
+export type LocationShareRevocation = "revoked" | "already-revoked" | "not-found";
+
 export interface LocationShareStore {
   /** Classifies the requested recipients against the current user table. */
   assessShareTargets(input: {
@@ -51,6 +53,11 @@ export interface LocationShareStore {
    * an existing active share for the same owner/target/mode so a repeated request is idempotent.
    */
   createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares>;
+  /**
+   * Revokes one owned share immediately. Revoking a share that is already revoked is a no-op,
+   * and a share owned by someone else is indistinguishable from a missing one (`not-found`).
+   */
+  revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation>;
 }
 
 const locationShareSelection = {
@@ -161,5 +168,27 @@ export class DrizzleLocationShareStore implements LocationShareStore {
 
       return { shares, createdShareIds, reusedShareIds };
     });
+  }
+
+  async revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation> {
+    const [revoked] = await this.db
+      .update(locationShares)
+      .set({ isRevoked: true })
+      .where(and(
+        eq(locationShares.id, input.shareId),
+        eq(locationShares.ownerId, input.ownerId),
+        eq(locationShares.isRevoked, false)
+      ))
+      .returning({ id: locationShares.id });
+    if (revoked) return "revoked";
+
+    // Only a still-owned active or revoked row may report success; anything else is 404 so the
+    // endpoint never reveals whether another account owns the requested id.
+    const [existing] = await this.db
+      .select({ id: locationShares.id })
+      .from(locationShares)
+      .where(and(eq(locationShares.id, input.shareId), eq(locationShares.ownerId, input.ownerId)))
+      .limit(1);
+    return existing ? "already-revoked" : "not-found";
   }
 }

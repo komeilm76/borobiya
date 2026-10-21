@@ -146,15 +146,15 @@ packages/server/
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
     ├── location/
-    │   ├── shares.ts         # POST /_user/location/share recipient checks, timed/permanent persistence
-    │   └── shares.test.ts    # share creation, validation, idempotence, and guard tests
+    │   ├── shares.ts         # POST /_user/location/share recipient checks and DELETE revoke handler
+    │   └── shares.test.ts    # creation, validation, idempotence, revoke, and guard tests
     ├── db/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
-    │   ├── location-share-store.ts # share-target classification and atomic share creation/reuse
+    │   ├── location-share-store.ts # share-target classification, atomic creation/reuse, and owner-only revocation
     │   ├── location-share-store.test.ts # classification, insert, reuse, and timed-extension assertions
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions

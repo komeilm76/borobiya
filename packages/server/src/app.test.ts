@@ -98,6 +98,7 @@ describe("Fastify server skeleton", () => {
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
     const createShare = paths["/_user/location/share"]?.post;
+    const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
@@ -251,6 +252,13 @@ describe("Fastify server skeleton", () => {
     expect(publicSecurityQuestions?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(publicSecurityQuestions?.responses).toHaveProperty("200");
     expect(createShare?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(sharePath?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(sharePath?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      404: expect.any(Object)
+    });
     expect(createShare?.["x-borobiya-access"]).toBe("authenticated");
     expect(createShare?.responses).toMatchObject({
       201: expect.any(Object),
@@ -324,6 +332,13 @@ describe("Fastify server skeleton", () => {
     });
     expect(missingShareToken.statusCode).toBe(401);
     expect(missingShareToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingRevokeToken = await app.inject({
+      method: "DELETE",
+      url: "/_user/location/share/00000000-0000-4000-8000-000000000001"
+    });
+    expect(missingRevokeToken.statusCode).toBe(401);
+    expect(missingRevokeToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("does not expose DELETE /_admin/users/:id", async () => {

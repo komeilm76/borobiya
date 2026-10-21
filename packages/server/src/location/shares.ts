@@ -1,4 +1,4 @@
-import { apiRoutes } from "@borobiya/shared/api";
+import { apiRoutes, sharePathParamsSchema } from "@borobiya/shared/api";
 import { createLocationShareSchema } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
@@ -61,6 +61,7 @@ export async function registerLocationShareRoutes(
   dependencies: LocationSharesRouteDependencies
 ): Promise<void> {
   const createRoute = apiRoutes.location.createShare;
+  const revokeRoute = apiRoutes.location.revokeShare;
 
   app.post(createRoute.url, async (request, reply) => {
     const user = currentUserIdentity(request);
@@ -134,5 +135,41 @@ export async function registerLocationShareRoutes(
         createdShareIds: result.createdShareIds,
         reusedShareIds: result.reusedShareIds
       });
+  });
+
+  // TODO (T2.1.5): once Socket.IO fan-out exists, notify the affected targets that sharing
+  // stopped so their markers clear without waiting for the next list refresh.
+  app.delete(revokeRoute.url, async (request, reply) => {
+    const user = currentUserIdentity(request);
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const parsedParams = sharePathParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return sendError(
+        reply,
+        400,
+        "VALIDATION_ERROR",
+        "Path parameter validation failed.",
+        parsedParams.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      );
+    }
+
+    const outcome = await dependencies.store.revokeShare({
+      ownerId: user.userId,
+      shareId: parsedParams.data.shareId
+    });
+    if (outcome === "not-found") {
+      return sendError(
+        reply,
+        404,
+        "SHARE_NOT_FOUND",
+        "No share with that id belongs to this account."
+      );
+    }
+
+    // An already-revoked id repeats the successful outcome so a retried revoke stays idempotent.
+    return reply.code(200).header("cache-control", "no-store").send();
   });
 }

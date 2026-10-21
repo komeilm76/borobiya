@@ -211,7 +211,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 ```
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
 → 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
-DELETE /_user/location/share/:shareId    → 200 (immediate revoke)
+DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
 GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
@@ -221,6 +221,8 @@ GET    /_user/location/history/shared/:shareId → polyline for receiver
 
 POST   /_user/location/update            deprecated in favor of Socket location:update; REST fallback
 ```
+
+**`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
 
 Retain ENV limits: `from-to <= MAX_SHARE_DAYS`, else `400 SHARE_RANGE_TOO_LARGE`.
 
@@ -349,7 +351,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, and `POST /_user/location/share`; the remaining live-location endpoints, SOS, mission, and most search operations remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, `POST /_user/location/share`, and `DELETE /_user/location/share/:shareId`; the remaining live-location endpoints, SOS, mission, and most search operations remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -403,6 +405,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
+| 404 | `SHARE_NOT_FOUND` | Location share id is unknown or owned by another account |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |

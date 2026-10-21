@@ -40,7 +40,9 @@ export const locationRoutes = {
     },
     meta: {
       operationId: "locationRevokeShare",
-      summary: "Revoke a live location share",
+      summary: "Revoke a live location share immediately",
+      description:
+        "Only the share owner may revoke. Revoking an unknown id or one owned by another account returns 404 SHARE_NOT_FOUND; an already-revoked id returns 200 so retries stay idempotent.",
       tags: ["location"],
       access: "authenticated"
     }
