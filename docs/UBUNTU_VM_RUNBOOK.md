@@ -6,7 +6,7 @@ This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes
 
 ## Before you begin: two version/data details
 
-- The default snapshot is the repository-pinned Geofabrik **2026-10-18 snapshot** in `map-server/regions.json` (dated `*-261018.osm.pbf` files with committed official MD5 checksums, e.g. Iran: 229,852,435 bytes, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, data timestamp `2026-10-18T20:25:06Z`). Setup can instead deliberately resolve the newest common dated snapshot or a specific `YYYY-MM-DD`; non-pinned dates are verified against Geofabrik's official `.md5` sidecars and then stored by concrete date in the map library. Never hand-substitute a moving `*-latest` URL. [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [dated MD5 sidecar](https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5) · [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
+- The default snapshot is the repository-pinned Geofabrik **2026-10-18 snapshot** in `map-server/regions.json` (dated `*-261018.osm.pbf` files; checksums are verified against committed MD5s where available and otherwise against Geofabrik's official `.md5` sidecars). For example, Iran is 229,852,435 bytes, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, data timestamp `2026-10-18T20:25:06Z`. The added Afghanistan, Armenia, Azerbaijan, Iraq, Pakistan, Turkmenistan, Saudi Arabia, Oman, Bahrain, Kuwait, Qatar, and UAE sources resolve their official pinned-date sidecars on first online use; the verified MD5 and file metadata are cached in the external map library for offline reuse. Setup can instead deliberately resolve the newest common dated snapshot or a specific `YYYY-MM-DD`; those sources are also verified against Geofabrik sidecars. Never hand-substitute a moving `*-latest` URL. [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [dated MD5 sidecar](https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5) · [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 - Ubuntu 24.04's standard `osmium-tool` package is **1.16.0**, and the project pins that exact version everywhere (`MAP_OSMIUM_VERSION=1.16.0` in `.env.example`, the `prepare-regions-pbf.sh` default, and this runbook), so no override is needed on this VM. Install the Ubuntu package and keep the pinned value; the preparation script requires an exact match with `osmium --version` and writes it into the crop manifest. Reload `.env` in every new terminal (`set -a; source .env; set +a`), or step 8 sees a stale/empty value. [Ubuntu Noble package](https://packages.ubuntu.com/noble/utils/osmium-tool).
 - If the VM has no direct internet, use the **Proxy** section below before Phase A.
 - `--max-table-size 100` is an OSRM `/table` query-size limit, **not** a general RAM limit. We keep the default cap and set OSRM runtime workers to one. [OSRM command-line options](https://project-osrm.org/docs/v26.4.0/tools).
@@ -21,7 +21,7 @@ After Phase A below (apt packages, Docker, Java, Osmium — the parts needing `s
 ./scripts/setup-ubuntu-vm.sh
 ```
 
-**Choosing your map areas and library.** On the first interactive run the script opens a short form: map-library path, snapshot (**pinned** default, latest, or a specific date), source policy (**cache-first** default, refresh, or offline), one or more **countries**, then for each country **the entire country or one or more cities**. It shows a summary (areas, snapshot, library/dataset paths, combined bounds, ≈download size, geocoding languages) and asks for confirmation before doing any long work; whole large countries (Germany, France, UK) are flagged HEAVY because their multi-GB builds can exceed this 6 GiB VM. Equivalent non-interactive forms:
+**Choosing your map areas and library.** On the first interactive run the script opens a short form: map-library path, snapshot (**pinned** default, latest, or a specific date), source policy (**cache-first** default, refresh, or offline), one or more **countries**, then for each country **the entire country or one or more cities**. It shows a summary (areas, snapshot, library/dataset paths, combined bounds, known/unknown download-size estimate, geocoding languages) and asks for confirmation before doing any long work; whole large countries (Germany, France, UK) are flagged HEAVY because their multi-GB builds can exceed this 6 GiB VM. Equivalent non-interactive forms:
 
 ```bash
 ./scripts/setup-ubuntu-vm.sh --list-regions                  # show the area catalog
@@ -313,7 +313,7 @@ wget -O "$SOURCE_PATH.md5" https://download.geofabrik.de/asia/iran-261018.osm.pb
 wc -c "$SOURCE_PATH"
 ```
 
-Expect `iran-261018.osm.pbf: OK`, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, and 229,852,435 bytes. A pre-downloaded file whose MD5 differs from the catalog pin (or official sidecar for a chosen non-pinned date) is rejected by step 8 — delete it and re-download; never edit checksums to accept unverified bytes.
+Expect `iran-261018.osm.pbf: OK`, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, and 229,852,435 bytes. A pre-downloaded file whose MD5 differs from its committed catalog pin or the official sidecar resolved for that source/snapshot is rejected by step 8 — delete it and re-download; never edit checksums to accept unverified bytes. The setup summary marks unestimated source sizes as unknown rather than counting them as zero.
 
 ### 8. Crop and merge the selected areas once
 

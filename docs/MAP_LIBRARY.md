@@ -20,7 +20,7 @@ avoids mixing object versions in the merged PBF.
 
 | Value | Meaning |
 |---|---|
-| `pinned` | The repository-reviewed date and MD5 checksums in `map-server/regions.json` (default). |
+| `pinned` | The repository-reviewed date in `map-server/regions.json` (default). Sources with committed MD5s use those pins; sidecar-backed sources resolve the official MD5 on first online use and cache it in the library. |
 | `latest` | Resolve the newest common dated snapshot available for every selected source. Setup searches back up to 32 UTC days and then persists the concrete resolved date. |
 | `YYYY-MM-DD` | A specific dated Geofabrik snapshot. It is accepted only when the official `.md5` sidecar exists for every selected source, or when trusted library metadata already proves that date in offline mode. |
 
@@ -237,7 +237,7 @@ deleting the old files and the normal library build proceeds.
 
 ## 6. Integrity and provenance
 
-- Pinned sources use MD5 values committed in `regions.json`.
+- Pinned sources use committed catalog MD5s where available; sidecar-backed pinned sources use Geofabrik's official `.md5` sidecars and cache the verified checksum in library metadata.
 - Specific/latest snapshots use Geofabrik's official `.md5` sidecars.
 - Each source directory also contains `source.json` with URL, snapshot date,
   data timestamp (when present in the PBF header), byte count, MD5, SHA-256,

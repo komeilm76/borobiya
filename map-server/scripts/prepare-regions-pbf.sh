@@ -176,8 +176,18 @@ elif [[ -e "$merged_pbf" && ! -s "$manifest" && "${MAP_CROP_OVERWRITE:-0}" != '1
   fail "a dataset PBF without a provenance manifest already exists; inspect it, or set MAP_CROP_OVERWRITE=1 to replace it: $merged_pbf"
 fi
 
-printf 'Selected areas: %s (union bbox %s, ~%s MB of source downloads)\n' \
-  "$MAP_REGION_IDS" "$UNION_BBOX" "$APPROX_DOWNLOAD_MB"
+if [[ "$APPROX_DOWNLOAD_SIZE_UNKNOWN" == "1" ]]; then
+  if (( APPROX_DOWNLOAD_MB > 0 )); then
+    printf 'Selected areas: %s (union bbox %s, ~%s MB of known source downloads; other sizes unknown)\n' \
+      "$MAP_REGION_IDS" "$UNION_BBOX" "$APPROX_DOWNLOAD_MB"
+  else
+    printf 'Selected areas: %s (union bbox %s, source download sizes unknown)\n' \
+      "$MAP_REGION_IDS" "$UNION_BBOX"
+  fi
+else
+  printf 'Selected areas: %s (union bbox %s, ~%s MB of source downloads)\n' \
+    "$MAP_REGION_IDS" "$UNION_BBOX" "$APPROX_DOWNLOAD_MB"
+fi
 if ! sources_output="$(python3 "$SCRIPT_DIR/regions.py" sources "$MAP_REGION_IDS" \
     --snapshot "$MAP_SNAPSHOT_DATE" --source-policy "$MAP_SOURCE_POLICY" \
     --library "$MAP_LIBRARY_DIR")"; then

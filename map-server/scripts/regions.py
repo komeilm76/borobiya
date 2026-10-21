@@ -2,9 +2,9 @@
 """Region catalog resolver for the Borobiya map pipeline.
 
 Single source of truth for *where* map data comes from. The catalog
-(map-server/regions.json) pins every Geofabrik source extract to one dated,
-MD5-verified snapshot and describes selectable areas: whole countries and
-city crops. Shell scripts call this module to
+(map-server/regions.json) pins every Geofabrik source extract to one dated
+snapshot with trusted MD5 verification and describes selectable areas: whole
+countries and city crops. Shell scripts call this module to
 
   * validate the catalog itself            (validate-catalog)
   * render selection menus                   (menu-countries, menu-areas, list)
@@ -408,10 +408,11 @@ def effective_source(
 ) -> dict:
     """Resolve one source for a concrete snapshot date.
 
-    The repository-pinned date always uses the catalog MD5. Other dates use
-    trusted library metadata/sidecars first (except in refresh mode) and then
-    Geofabrik's official sidecar. In offline mode an unknown MD5 remains
-    None so the caller can fail without touching the network.
+    Sources with a catalog MD5 use that immutable checksum at the pinned date.
+    Newer or explicitly sidecar-backed sources use matching library metadata or
+    sidecars first (except in refresh mode), then Geofabrik's official sidecar.
+    In offline mode an unknown MD5 remains None so the caller can fail without
+    touching the network.
     """
     policy = validate_source_policy(policy)
     pinned = catalog["sources"][source_id]
@@ -433,9 +434,13 @@ def effective_source(
 
     md5: str | None = None
     byte_count: int | None = None
-    if snapshot_date == pinned_date:
-        md5 = str(pinned["md5"]).lower()
-        byte_count = pinned.get("bytes")
+    catalog_md5 = pinned.get("md5")
+    has_catalog_md5 = isinstance(catalog_md5, str) and MD5_RE.match(catalog_md5) is not None
+    if snapshot_date == pinned_date and has_catalog_md5:
+        md5 = catalog_md5.lower()
+        candidate_bytes = pinned.get("bytes")
+        if isinstance(candidate_bytes, int) and not isinstance(candidate_bytes, bool) and candidate_bytes > 0:
+            byte_count = candidate_bytes
     else:
         metadata = read_json_object(metadata_path) if metadata_path is not None else {}
         if policy != "refresh" and metadata.get("url") == url:
@@ -556,7 +561,11 @@ def write_source_metadata(
         fail(f"invalid SHA-256 for source {source_id}: {actual_sha256!r}")
     existing = read_source_metadata(target, library_root)
     timestamp = data_timestamp or existing.get("dataTimestamp")
-    if timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
+    if (
+        timestamp is None
+        and snapshot_date == catalog_snapshot_date(catalog)
+        and catalog["sources"][source_id].get("md5") is not None
+    ):
         timestamp = catalog["snapshot"].get("dataTimestamp")
     metadata = {
         "version": 1,
@@ -608,8 +617,16 @@ def validate_catalog(catalog: dict) -> list[str]:
         url = source.get("url", "")
         if not (isinstance(url, str) and url.startswith(GEOFABRIK_PREFIX) and url.endswith(".osm.pbf")):
             problems.append(f"source {source_id!r} url must be an HTTPS Geofabrik .osm.pbf URL")
-        if not MD5_RE.match(str(source.get("md5", ""))):
-            problems.append(f"source {source_id!r} md5 must be 32 lowercase hex characters")
+        source_md5 = source.get("md5")
+        if source_md5 is None:
+            if source.get("md5Source") != "geofabrik-sidecar":
+                problems.append(
+                    f"source {source_id!r} without a catalog md5 must declare md5Source='geofabrik-sidecar'"
+                )
+        elif not isinstance(source_md5, str) or not MD5_RE.match(source_md5):
+            problems.append(f"source {source_id!r} md5 must be 32 lowercase hex characters or null")
+        elif source.get("md5Source") not in (None, "catalog"):
+            problems.append(f"source {source_id!r} md5Source must be catalog or geofabrik-sidecar")
         if snapshot_date is not None and not str(url).endswith(
             f"-{snapshot_date.strftime('%y%m%d')}.osm.pbf"
         ):
@@ -617,6 +634,15 @@ def validate_catalog(catalog: dict) -> list[str]:
         size = source.get("bytes")
         if size is not None and (isinstance(size, bool) or not isinstance(size, int) or size <= 0):
             problems.append(f"source {source_id!r} bytes must be null or a positive integer")
+        approx_size = source.get("approxSizeMb")
+        if approx_size is not None and (
+            isinstance(approx_size, bool)
+            or not isinstance(approx_size, int)
+            or approx_size <= 0
+        ):
+            problems.append(
+                f"source {source_id!r} approxSizeMb must be null or a positive integer"
+            )
 
     countries = catalog.get("countries")
     if not isinstance(countries, list) or not countries:
@@ -775,7 +801,9 @@ def resolve_selection(catalog: dict, selection_text: str) -> dict:
             languages.append(language)
     if "en" not in languages:
         languages.append("en")
-    approx_mb = sum(int(catalog["sources"][source_id].get("approxSizeMb") or 0) for source_id in source_ids)
+    source_sizes = [catalog["sources"][source_id].get("approxSizeMb") for source_id in source_ids]
+    approx_mb = sum(int(size) for size in source_sizes if isinstance(size, int) and not isinstance(size, bool))
+    approx_size_unknown = any(size is None for size in source_sizes)
 
     return {
         "areas": areas,
@@ -786,6 +814,7 @@ def resolve_selection(catalog: dict, selection_text: str) -> dict:
         "languages": languages,
         "defaultLanguage": areas[0]["country"]["language"],
         "approxDownloadMb": approx_mb,
+        "approxDownloadSizeUnknown": approx_size_unknown,
         "heavy": any(area["heavy"] for area in areas),
     }
 
@@ -819,18 +848,20 @@ def command_validate_catalog(catalog: dict, _args: argparse.Namespace) -> None:
             print(f"regions: catalog: {problem}", file=sys.stderr)
         raise SystemExit(1)
     index = area_index(catalog)
-    print(f"OK: catalog valid ({len(catalog['countries'])} countries, {len(index)} selectable areas, {len(catalog['sources'])} pinned sources)")
+    print(f"OK: catalog valid ({len(catalog['countries'])} countries, {len(index)} selectable areas, {len(catalog['sources'])} sources)")
 
 
 def command_list(catalog: dict, _args: argparse.Namespace) -> None:
     snapshot = catalog["snapshot"]
-    print(f"Borobiya map areas — Geofabrik snapshot {snapshot['dataDate']} (ODbL-1.0, MD5-pinned)")
+    print(f"Borobiya map areas — Geofabrik snapshot {snapshot['dataDate']} (ODbL-1.0, official MD5 verification)")
     print("Select whole countries, individual cities, or any mix (including adjacent countries).\n")
     for country in catalog["countries"]:
         source = catalog["sources"][country["source"]]
         heavy = "  [HEAVY: multi-GB build]" if country.get("wholeCountryHeavy") else ""
+        size_mb = source.get("approxSizeMb")
+        size_label = f"~{size_mb} MB" if isinstance(size_mb, int) else "size unknown"
         print(f"{country['name']} ({country['localName']})")
-        print(f"  {country['id']:<24} entire country (source {country['source']}, ~{source.get('approxSizeMb', '?')} MB){heavy}")
+        print(f"  {country['id']:<24} entire country (source {country['source']}, {size_label}){heavy}")
         for city in country["cities"]:
             area_id = f"{country['id']}-{city['id']}"
             source_id = city.get("source", country["source"])
@@ -849,7 +880,9 @@ def command_menu_areas(catalog: dict, args: argparse.Namespace) -> None:
         fail(f"unknown country {args.country!r}; valid: {', '.join(entry['id'] for entry in catalog['countries'])}")
     source = catalog["sources"][country["source"]]
     heavy = " [HEAVY: multi-GB download and build]" if country.get("wholeCountryHeavy") else ""
-    print(f"{country['id']}\tEntire country (~{source.get('approxSizeMb', '?')} MB download){heavy}")
+    size_mb = source.get("approxSizeMb")
+    size_label = f"~{size_mb} MB download" if isinstance(size_mb, int) else "download size unknown"
+    print(f"{country['id']}\tEntire country ({size_label}){heavy}")
     for city in country["cities"]:
         print(f"{country['id']}-{city['id']}\t{city['name']} ({city['localName']})")
 
@@ -872,6 +905,7 @@ def command_resolve(catalog: dict, args: argparse.Namespace) -> None:
         "languages": resolved["languages"],
         "defaultLanguage": resolved["defaultLanguage"],
         "approxDownloadMb": resolved["approxDownloadMb"],
+        "approxDownloadSizeUnknown": resolved["approxDownloadSizeUnknown"],
         "heavy": resolved["heavy"],
         "snapshotMode": snapshot_mode,
         "snapshotDate": snapshot_date.isoformat(),
@@ -910,6 +944,7 @@ def command_resolve(catalog: dict, args: argparse.Namespace) -> None:
         "PHOTON_LANGUAGES": ",".join(resolved["languages"]),
         "PHOTON_DEFAULT_LANGUAGE": resolved["defaultLanguage"],
         "APPROX_DOWNLOAD_MB": resolved["approxDownloadMb"],
+        "APPROX_DOWNLOAD_SIZE_UNKNOWN": "1" if resolved["approxDownloadSizeUnknown"] else "0",
         "SELECTION_HEAVY": "1" if resolved["heavy"] else "0",
         "SNAPSHOT_MODE": snapshot_mode,
         "SNAPSHOT_DATE": snapshot_date.isoformat(),
@@ -1430,7 +1465,11 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
         source_sha[source_id] = sha256_file(path)
         source_meta = read_source_metadata(path, library_root)
         data_timestamp = source_meta.get("dataTimestamp")
-        if data_timestamp is None and snapshot_date == catalog_snapshot_date(catalog):
+        if (
+            data_timestamp is None
+            and snapshot_date == catalog_snapshot_date(catalog)
+            and catalog["sources"][source_id].get("md5") is not None
+        ):
             data_timestamp = snapshot.get("dataTimestamp")
         if isinstance(data_timestamp, str) and data_timestamp:
             source_timestamps.append(data_timestamp)
@@ -1478,7 +1517,9 @@ def command_write_manifest(catalog: dict, args: argparse.Namespace) -> None:
 
     common_timestamp = (
         source_timestamps[0]
-        if source_timestamps and len(set(source_timestamps)) == 1
+        if len(source_timestamps) == len(resolved["sourceIds"])
+        and source_timestamps
+        and len(set(source_timestamps)) == 1
         else None
     )
     manifest = {
@@ -1655,7 +1696,8 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
         if entry.get("url") != expected_url or entry.get("dataDate") != expected_snapshot_date.isoformat():
             fail(f"manifest source {source_id} does not match the expected snapshot {expected_snapshot_date.isoformat()}")
         if expected_snapshot_date == pinned_date:
-            if entry.get("md5") != pinned["md5"]:
+            pinned_md5 = pinned.get("md5")
+            if pinned_md5 is not None and entry.get("md5") != pinned_md5:
                 fail(f"manifest source {source_id} does not match the pinned catalog MD5")
             pinned_bytes = pinned.get("bytes")
             if pinned_bytes is not None and entry.get("bytes") != pinned_bytes:

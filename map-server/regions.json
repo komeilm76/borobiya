@@ -19,6 +19,90 @@
       "bytes": null,
       "approxSizeMb": 620
     },
+    "afghanistan": {
+      "url": "https://download.geofabrik.de/asia/afghanistan-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "armenia": {
+      "url": "https://download.geofabrik.de/asia/armenia-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "azerbaijan": {
+      "url": "https://download.geofabrik.de/asia/azerbaijan-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "iraq": {
+      "url": "https://download.geofabrik.de/asia/iraq-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "pakistan": {
+      "url": "https://download.geofabrik.de/asia/pakistan-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "turkmenistan": {
+      "url": "https://download.geofabrik.de/asia/turkmenistan-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "saudi-arabia": {
+      "url": "https://download.geofabrik.de/asia/saudi-arabia-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "oman": {
+      "url": "https://download.geofabrik.de/asia/oman-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "bahrain": {
+      "url": "https://download.geofabrik.de/asia/bahrain-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "kuwait": {
+      "url": "https://download.geofabrik.de/asia/kuwait-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "qatar": {
+      "url": "https://download.geofabrik.de/asia/qatar-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
+    "united-arab-emirates": {
+      "url": "https://download.geofabrik.de/asia/united-arab-emirates-261018.osm.pbf",
+      "md5": null,
+      "md5Source": "geofabrik-sidecar",
+      "bytes": null,
+      "approxSizeMb": null
+    },
     "germany": {
       "url": "https://download.geofabrik.de/europe/germany-261018.osm.pbf",
       "md5": "79ba167c47f69615d1f3a2f846932db1",
@@ -705,6 +789,522 @@
               38.43
             ],
             "geocodeQuery": "Izmir Clock Tower"
+          }
+        }
+      ]
+    },
+    {
+      "id": "af",
+      "name": "Afghanistan",
+      "localName": "افغانستان",
+      "continent": "asia",
+      "language": "fa",
+      "source": "afghanistan",
+      "bbox": [
+        60.5,
+        29.3,
+        74.9,
+        38.5
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "kabul",
+          "name": "Kabul",
+          "localName": "کابل",
+          "bbox": [
+            69.1,
+            34.45,
+            69.3,
+            34.65
+          ],
+          "center": [
+            69.2075,
+            34.5553
+          ],
+          "verify": {
+            "routeFrom": [
+              69.17,
+              34.54
+            ],
+            "routeTo": [
+              69.23,
+              34.57
+            ],
+            "geocodeQuery": "کابل"
+          }
+        }
+      ]
+    },
+    {
+      "id": "am",
+      "name": "Armenia",
+      "localName": "Հայաստան",
+      "continent": "asia",
+      "language": "hy",
+      "source": "armenia",
+      "bbox": [
+        43.4,
+        38.8,
+        46.7,
+        41.3
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "yerevan",
+          "name": "Yerevan",
+          "localName": "Երևան",
+          "bbox": [
+            44.42,
+            40.1,
+            44.6,
+            40.25
+          ],
+          "center": [
+            44.5152,
+            40.1792
+          ],
+          "verify": {
+            "routeFrom": [
+              44.49,
+              40.17
+            ],
+            "routeTo": [
+              44.54,
+              40.19
+            ],
+            "geocodeQuery": "Երևան"
+          }
+        }
+      ]
+    },
+    {
+      "id": "az",
+      "name": "Azerbaijan",
+      "localName": "Azərbaycan",
+      "continent": "asia",
+      "language": "az",
+      "source": "azerbaijan",
+      "bbox": [
+        44.7,
+        38.4,
+        50.7,
+        41.9
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "baku",
+          "name": "Baku",
+          "localName": "Bakı",
+          "bbox": [
+            49.78,
+            40.3,
+            49.94,
+            40.45
+          ],
+          "center": [
+            49.8671,
+            40.4093
+          ],
+          "verify": {
+            "routeFrom": [
+              49.84,
+              40.4
+            ],
+            "routeTo": [
+              49.89,
+              40.42
+            ],
+            "geocodeQuery": "Bakı"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iq",
+      "name": "Iraq",
+      "localName": "العراق",
+      "continent": "asia",
+      "language": "ar",
+      "source": "iraq",
+      "bbox": [
+        38.8,
+        29.0,
+        48.6,
+        37.4
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "baghdad",
+          "name": "Baghdad",
+          "localName": "بغداد",
+          "bbox": [
+            44.25,
+            33.2,
+            44.5,
+            33.45
+          ],
+          "center": [
+            44.3661,
+            33.3152
+          ],
+          "verify": {
+            "routeFrom": [
+              44.34,
+              33.3
+            ],
+            "routeTo": [
+              44.39,
+              33.33
+            ],
+            "geocodeQuery": "بغداد"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pk",
+      "name": "Pakistan",
+      "localName": "پاکستان",
+      "continent": "asia",
+      "language": "ur",
+      "source": "pakistan",
+      "bbox": [
+        60.8,
+        23.6,
+        77.8,
+        37.1
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "islamabad",
+          "name": "Islamabad",
+          "localName": "اسلام آباد",
+          "bbox": [
+            72.9,
+            33.55,
+            73.15,
+            33.8
+          ],
+          "center": [
+            73.0479,
+            33.6844
+          ],
+          "verify": {
+            "routeFrom": [
+              73.02,
+              33.67
+            ],
+            "routeTo": [
+              73.08,
+              33.69
+            ],
+            "geocodeQuery": "اسلام آباد"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tm",
+      "name": "Turkmenistan",
+      "localName": "Türkmenistan",
+      "continent": "asia",
+      "language": "tk",
+      "source": "turkmenistan",
+      "bbox": [
+        52.4,
+        35.1,
+        66.7,
+        42.8
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "ashgabat",
+          "name": "Ashgabat",
+          "localName": "Aşgabat",
+          "bbox": [
+            58.2,
+            37.85,
+            58.45,
+            38.05
+          ],
+          "center": [
+            58.3261,
+            37.9601
+          ],
+          "verify": {
+            "routeFrom": [
+              58.3,
+              37.95
+            ],
+            "routeTo": [
+              58.35,
+              37.97
+            ],
+            "geocodeQuery": "Aşgabat"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sa",
+      "name": "Saudi Arabia",
+      "localName": "السعودية",
+      "continent": "asia",
+      "language": "ar",
+      "source": "saudi-arabia",
+      "bbox": [
+        34.5,
+        16.3,
+        55.7,
+        32.2
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "riyadh",
+          "name": "Riyadh",
+          "localName": "الرياض",
+          "bbox": [
+            46.55,
+            24.6,
+            46.82,
+            24.84
+          ],
+          "center": [
+            46.6753,
+            24.7136
+          ],
+          "verify": {
+            "routeFrom": [
+              46.65,
+              24.7
+            ],
+            "routeTo": [
+              46.7,
+              24.73
+            ],
+            "geocodeQuery": "الرياض"
+          }
+        }
+      ]
+    },
+    {
+      "id": "om",
+      "name": "Oman",
+      "localName": "عُمان",
+      "continent": "asia",
+      "language": "ar",
+      "source": "oman",
+      "bbox": [
+        52.0,
+        16.6,
+        59.9,
+        26.5
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "muscat",
+          "name": "Muscat",
+          "localName": "مسقط",
+          "bbox": [
+            58.25,
+            23.45,
+            58.55,
+            23.72
+          ],
+          "center": [
+            58.4059,
+            23.588
+          ],
+          "verify": {
+            "routeFrom": [
+              58.38,
+              23.57
+            ],
+            "routeTo": [
+              58.43,
+              23.6
+            ],
+            "geocodeQuery": "مسقط"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bh",
+      "name": "Bahrain",
+      "localName": "البحرين",
+      "continent": "asia",
+      "language": "ar",
+      "source": "bahrain",
+      "bbox": [
+        50.3,
+        25.7,
+        50.9,
+        26.4
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "manama",
+          "name": "Manama",
+          "localName": "المنامة",
+          "bbox": [
+            50.48,
+            26.15,
+            50.7,
+            26.32
+          ],
+          "center": [
+            50.586,
+            26.2235
+          ],
+          "verify": {
+            "routeFrom": [
+              50.56,
+              26.21
+            ],
+            "routeTo": [
+              50.61,
+              26.24
+            ],
+            "geocodeQuery": "المنامة"
+          }
+        }
+      ]
+    },
+    {
+      "id": "kw",
+      "name": "Kuwait",
+      "localName": "الكويت",
+      "continent": "asia",
+      "language": "ar",
+      "source": "kuwait",
+      "bbox": [
+        46.5,
+        28.5,
+        48.5,
+        30.1
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "kuwait-city",
+          "name": "Kuwait City",
+          "localName": "مدينة الكويت",
+          "bbox": [
+            47.85,
+            29.25,
+            48.1,
+            29.48
+          ],
+          "center": [
+            47.9774,
+            29.3759
+          ],
+          "verify": {
+            "routeFrom": [
+              47.95,
+              29.36
+            ],
+            "routeTo": [
+              48.0,
+              29.39
+            ],
+            "geocodeQuery": "مدينة الكويت"
+          }
+        }
+      ]
+    },
+    {
+      "id": "qa",
+      "name": "Qatar",
+      "localName": "قطر",
+      "continent": "asia",
+      "language": "ar",
+      "source": "qatar",
+      "bbox": [
+        50.7,
+        24.5,
+        52.0,
+        26.2
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "doha",
+          "name": "Doha",
+          "localName": "الدوحة",
+          "bbox": [
+            51.4,
+            25.2,
+            51.65,
+            25.4
+          ],
+          "center": [
+            51.531,
+            25.2854
+          ],
+          "verify": {
+            "routeFrom": [
+              51.5,
+              25.27
+            ],
+            "routeTo": [
+              51.55,
+              25.3
+            ],
+            "geocodeQuery": "الدوحة"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ae",
+      "name": "United Arab Emirates",
+      "localName": "الإمارات العربية المتحدة",
+      "continent": "asia",
+      "language": "ar",
+      "source": "united-arab-emirates",
+      "bbox": [
+        51.5,
+        22.5,
+        56.5,
+        26.2
+      ],
+      "wholeCountryHeavy": false,
+      "cities": [
+        {
+          "id": "abu-dhabi",
+          "name": "Abu Dhabi",
+          "localName": "أبو ظبي",
+          "bbox": [
+            54.25,
+            24.32,
+            54.55,
+            24.6
+          ],
+          "center": [
+            54.3773,
+            24.4539
+          ],
+          "verify": {
+            "routeFrom": [
+              54.35,
+              24.43
+            ],
+            "routeTo": [
+              54.4,
+              24.47
+            ],
+            "geocodeQuery": "أبو ظبي"
           }
         }
       ]

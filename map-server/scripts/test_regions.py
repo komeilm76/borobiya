@@ -26,9 +26,48 @@ class CatalogTests(unittest.TestCase):
     def test_catalog_is_valid(self) -> None:
         self.assertEqual(regions.validate_catalog(CATALOG), [])
 
-    def test_every_source_is_pinned_to_the_snapshot(self) -> None:
+    def test_every_source_uses_the_pinned_snapshot(self) -> None:
         for source in CATALOG["sources"].values():
             self.assertIn("-261018.osm.pbf", source["url"])
+
+    def test_only_the_requested_twelve_countries_were_added(self) -> None:
+        expected_sources = {
+            "af": "afghanistan",
+            "am": "armenia",
+            "az": "azerbaijan",
+            "iq": "iraq",
+            "pk": "pakistan",
+            "tm": "turkmenistan",
+            "sa": "saudi-arabia",
+            "om": "oman",
+            "bh": "bahrain",
+            "kw": "kuwait",
+            "qa": "qatar",
+            "ae": "united-arab-emirates",
+        }
+        existing_ids = {"ir", "de", "tr", "fr", "gb", "nl"}
+        added = {
+            country["id"]: country["source"]
+            for country in CATALOG["countries"]
+            if country["id"] not in existing_ids
+        }
+        self.assertEqual(added, expected_sources)
+        self.assertEqual(len(CATALOG["countries"]), 18)
+        for source_id in expected_sources.values():
+            source = CATALOG["sources"][source_id]
+            self.assertIsNone(source["md5"])
+            self.assertEqual(source["md5Source"], "geofabrik-sidecar")
+            self.assertIsNone(source["approxSizeMb"])
+
+    def test_unknown_source_size_is_valid_but_malformed_size_is_rejected(self) -> None:
+        catalog = copy.deepcopy(CATALOG)
+        catalog["sources"]["afghanistan"]["approxSizeMb"] = None
+        self.assertEqual(regions.validate_catalog(catalog), [])
+        catalog["sources"]["afghanistan"]["approxSizeMb"] = "unknown"
+        self.assertTrue(any(
+            "approxSizeMb must be null or a positive integer" in problem
+            for problem in regions.validate_catalog(catalog)
+        ))
 
 
 class ResolveTests(unittest.TestCase):
@@ -95,6 +134,25 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(resolved["bbox"], [-8.65, 24.8, 63.4, 60.86])
         self.assertEqual(resolved["languages"], ["fa", "de", "tr", "fr", "en", "nl"])
         self.assertTrue(resolved["heavy"])
+
+    def test_requested_middle_east_and_nearby_countries_are_selectable(self) -> None:
+        selection = "af,am,az,iq,pk,tm,sa,om,bh,kw,qa,ae"
+        resolved = regions.resolve_selection(CATALOG, selection)
+        self.assertEqual(resolved["ids"], selection.split(","))
+        self.assertEqual(resolved["bbox"], [34.5, 16.3, 77.8, 42.8])
+        self.assertEqual(resolved["sourceIds"], [
+            "afghanistan", "armenia", "azerbaijan", "iraq", "pakistan",
+            "turkmenistan", "saudi-arabia", "oman", "bahrain", "kuwait",
+            "qatar", "united-arab-emirates",
+        ])
+        self.assertTrue(resolved["approxDownloadSizeUnknown"])
+        self.assertEqual(resolved["approxDownloadMb"], 0)
+        self.assertFalse(resolved["heavy"])
+
+    def test_known_download_sizes_remain_separate_from_unknown_sizes(self) -> None:
+        resolved = regions.resolve_selection(CATALOG, "ir,af")
+        self.assertEqual(resolved["approxDownloadMb"], 219)
+        self.assertTrue(resolved["approxDownloadSizeUnknown"])
 
     def test_case_insensitive_ids(self) -> None:
         self.assertEqual(
@@ -189,6 +247,78 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
         self.assertTrue(descriptor["url"].endswith("iran-261017.osm.pbf"))
         self.assertEqual(descriptor["md5"], expected_md5)
         self.assertIsNone(descriptor["bytes"])
+
+    def test_pinned_new_source_uses_official_sidecar_md5(self) -> None:
+        expected_md5 = "c" * 32
+        fetched_urls: list[str] = []
+
+        def fake_fetch(url: str) -> str:
+            fetched_urls.append(url)
+            filename = url.removesuffix(".md5").rsplit("/", 1)[-1]
+            return f"{expected_md5} {filename}"
+
+        descriptor = regions.effective_source(
+            CATALOG,
+            "afghanistan",
+            date(2026, 10, 18),
+            library_root="/tmp/example-library",
+            policy="cache-first",
+            fetcher=fake_fetch,
+        )
+        self.assertTrue(descriptor["url"].endswith("afghanistan-261018.osm.pbf"))
+        self.assertEqual(descriptor["md5"], expected_md5)
+        self.assertEqual(fetched_urls, [descriptor["url"] + ".md5"])
+
+    def test_pinned_new_source_uses_cached_official_md5_offline(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot_date = date(2026, 10, 18)
+            source_url = regions.dated_source_url(
+                CATALOG["sources"]["afghanistan"]["url"], snapshot_date
+            )
+            target = root / regions.source_relative_path(
+                CATALOG, "afghanistan", snapshot_date
+            )
+            target.parent.mkdir(parents=True)
+            expected_md5 = "d" * 32
+            regions.write_json_atomically(
+                regions.source_metadata_path(target),
+                {"url": source_url, "md5": expected_md5, "bytes": 456},
+            )
+
+            descriptor = regions.effective_source(
+                CATALOG,
+                "afghanistan",
+                snapshot_date,
+                library_root=root,
+                policy="offline",
+                fetcher=lambda _url: self.fail("offline source lookup must not use network"),
+            )
+
+            self.assertEqual(descriptor["md5"], expected_md5)
+            self.assertEqual(descriptor["bytes"], 456)
+
+    def test_sidecar_backed_source_does_not_inherit_unknown_data_timestamp(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            snapshot_date = date(2026, 10, 18)
+            target = root / regions.source_relative_path(
+                CATALOG, "afghanistan", snapshot_date
+            )
+            target.parent.mkdir(parents=True)
+            source_bytes = b"new country extract"
+            target.write_bytes(source_bytes)
+
+            metadata = regions.write_source_metadata(
+                CATALOG,
+                root,
+                "afghanistan",
+                snapshot_date,
+                md5=hashlib.md5(source_bytes).hexdigest(),
+                sha256=hashlib.sha256(source_bytes).hexdigest(),
+            )
+
+            self.assertIsNone(metadata["dataTimestamp"])
 
     def test_sources_table_keeps_unknown_optional_fields_rectangular(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -357,6 +487,63 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
             meta_path.symlink_to(outside_meta)
             with self.assertRaises(SystemExit):
                 regions.command_verify_crop(CATALOG, args)
+
+    def test_v2_manifest_accepts_pinned_sidecar_checksum_for_new_country(self) -> None:
+        catalog = copy.deepcopy(CATALOG)
+        snapshot_date = regions.catalog_snapshot_date(catalog)
+        source_id = "afghanistan"
+        source_url = catalog["sources"][source_id]["url"]
+        source_bytes = b"fake pinned Afghanistan source"
+        source_md5 = hashlib.md5(source_bytes).hexdigest()
+        source_sha = hashlib.sha256(source_bytes).hexdigest()
+        area_bbox = regions.area_index(catalog)["af"]["bbox"]
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            pbf_path = root / "borobiya.osm.pbf"
+            pbf_bytes = b"fake merged Afghanistan dataset"
+            pbf_path.write_bytes(pbf_bytes)
+            manifest_path = root / "borobiya.source.json"
+            manifest = {
+                "version": 2,
+                "areas": ["af"],
+                "bbox": area_bbox,
+                "sources": [{
+                    "id": source_id,
+                    "provider": catalog["snapshot"]["provider"],
+                    "license": catalog["snapshot"]["license"],
+                    "url": source_url,
+                    "dataDate": snapshot_date.isoformat(),
+                    "file": source_url.rsplit("/", 1)[-1],
+                    "bytes": len(source_bytes),
+                    "md5": source_md5,
+                    "sha256": source_sha,
+                }],
+                "crops": [{
+                    "area": "af",
+                    "strategy": "whole-source",
+                    "sha256": source_sha,
+                }],
+                "merged": {
+                    "file": str(pbf_path),
+                    "sha256": hashlib.sha256(pbf_bytes).hexdigest(),
+                    "osmiumToolVersion": "1.16.0",
+                },
+            }
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            regions.command_verify_manifest(
+                catalog,
+                argparse.Namespace(
+                    manifest=str(manifest_path),
+                    pbf=str(pbf_path),
+                    selection="af",
+                    bbox=",".join(str(value) for value in area_bbox),
+                    snapshot="pinned",
+                    snapshot_date=snapshot_date.isoformat(),
+                    library=None,
+                ),
+            )
 
     def test_write_and_verify_manifest_v3(self) -> None:
         catalog = copy.deepcopy(CATALOG)

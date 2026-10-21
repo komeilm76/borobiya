@@ -424,7 +424,15 @@ print_selection_summary() {
   note "map library:      $MAP_LIBRARY_DIR"
   note "dataset:          $MAP_DATASET_DIR"
   note "union bbox:       $UNION_BBOX (written to MAP_BBOX)"
-  note "source downloads: $SOURCE_IDS (~${APPROX_DOWNLOAD_MB} MB total, cached after first run)"
+  if [[ "$APPROX_DOWNLOAD_SIZE_UNKNOWN" == "1" ]]; then
+    if (( APPROX_DOWNLOAD_MB > 0 )); then
+      note "source downloads: $SOURCE_IDS (~${APPROX_DOWNLOAD_MB} MB known; other source sizes unknown, cached after first run)"
+    else
+      note "source downloads: $SOURCE_IDS (size unknown, cached after first run)"
+    fi
+  else
+    note "source downloads: $SOURCE_IDS (~${APPROX_DOWNLOAD_MB} MB total, cached after first run)"
+  fi
   note "geocoding langs:  $PHOTON_LANGUAGES (default: $PHOTON_DEFAULT_LANGUAGE)"
   if [[ "$SELECTION_HEAVY" == "1" ]]; then
     note "WARNING: a whole large country is selected — expect multi-GB downloads and long"

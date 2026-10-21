@@ -72,20 +72,20 @@ The versions are pinned for this pipeline. Upgrade them deliberately: review rel
 
 ### 4.1 Approved canonical sources (region catalog)
 
-All approved inputs live in **`map-server/regions.json`**: selectable areas (whole countries and city crops for Iran, Germany, Turkey, France, the United Kingdom, and the Netherlands) mapped to Geofabrik extracts. The committed default is the immutable **2026-10-18 snapshot** — dated `*-261018.osm.pbf` URLs with the official MD5 from each file's `.md5` sidecar. Setup can instead resolve the latest common dated snapshot or a specific date; non-pinned dates are verified against the official sidecars and stored by concrete date in the map library. Never hand-substitute a moving `*-latest` URL. `python3 map-server/scripts/regions.py list` prints the catalog; `validate-catalog` checks its integrity (it runs in the setup script's preflight and in `test_regions.py`).
+All approved inputs live in **`map-server/regions.json`**: selectable whole-country and city areas for Iran, Turkey, Afghanistan, Armenia, Azerbaijan, Iraq, Pakistan, Turkmenistan, Saudi Arabia, Oman, Bahrain, Kuwait, Qatar, the United Arab Emirates, Germany, France, the United Kingdom, and the Netherlands, mapped to Geofabrik extracts. The committed default is the immutable **2026-10-18 snapshot** — dated `*-261018.osm.pbf` URLs. Sources with committed checksums use their catalog MD5; the twelve added country sources resolve their official pinned-date `.md5` sidecars on first online use and cache verified metadata in the external map library. Setup can instead resolve the latest common dated snapshot or a specific date; these are also verified against official sidecars and stored by concrete date in the library. Never hand-substitute a moving `*-latest` URL. `python3 map-server/scripts/regions.py list` prints the catalog; `validate-catalog` checks its integrity (it runs in the setup script's preflight and in `test_regions.py`).
 
 Default area example (Tehran, `ir-tehran`):
 
 | Item | Value |
 |------|-------|
 | Provider / data license | Geofabrik GmbH / OpenStreetMap data, ODbL 1.0 |
-| Data timestamp (all catalog sources) | `2026-10-18T20:25:06Z` |
+| Iran source data timestamp (catalogued example) | `2026-10-18T20:25:06Z` |
 | Exact PBF URL | [`https://download.geofabrik.de/asia/iran-261018.osm.pbf`](https://download.geofabrik.de/asia/iran-261018.osm.pbf) (229,852,435 bytes) |
 | Official Geofabrik MD5 | `a23eb2f21e426677bd243b2712ec1bc8` (sidecar: `https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5`) |
 | Source PBF SHA-256 | Computed on first download and stored per source in its external-library `source.json` plus the active dataset's version-3 manifest. PBFs are not present in this checkout. |
 | Attribution | `© OpenStreetMap contributors` → [ODbL/copyright information](https://www.openstreetmap.org/copyright) |
 
-Selection rules (enforced by `regions.py resolve`): IDs are `<country>` or `<country>-<city>`; a whole country supersedes its cities; bounding boxes may overlap, including adjacent whole countries, because all extracts in one build use the same selected snapshot date and `osmium merge` emits an object found in multiple inputs only once. To add an area, extend `regions.json` with a pinned source (if new) and a city bbox/center/verify points, then run `validate-catalog` and the unit tests.
+Selection rules (enforced by `regions.py resolve`): IDs are `<country>` or `<country>-<city>`; a whole country supersedes its cities; bounding boxes may overlap, including adjacent whole countries, because all extracts in one build use the same selected snapshot date and `osmium merge` emits an object found in multiple inputs only once. To add an area, extend `regions.json` with a pinned source URL and either its reviewed catalog MD5 or an explicit official-sidecar checksum policy (if new), plus city bbox/center/verify points; then run `validate-catalog` and the unit tests.
 
 Data files live outside the checkout in the map library by default and must not be committed. Keep the source URLs, data date, MD5s, and computed SHA-256 values (the manifest records them) with any externally distributed derived data. Both MapLibre styles and the app footer expose the linked attribution.
 
