@@ -52,11 +52,13 @@
 
         <div class="user-dashboard__map-caption" role="status">
           <v-icon icon="mdi-information-outline" size="19" />
-          <span>در این نسخه نقشهٔ پایه نمایش داده می‌شود؛ اشتراک موقعیت و نشانگرهای همراهان در گام‌های بعدی اضافه می‌شوند.</span>
+          <span>در این نسخه نقشهٔ پایه نمایش داده می‌شود؛ نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند.</span>
         </div>
       </v-card>
 
       <aside class="user-dashboard__side" aria-label="وضعیت امکانات بوروبیا">
+        <ShareLists ref="shareLists" @create="shareOpen = true" />
+
         <v-card class="user-dashboard__feature-card" elevation="0" rounded="xl">
           <v-chip class="user-dashboard__coming-soon" color="secondary" variant="tonal" size="small">
             در حال آماده‌سازی
@@ -66,14 +68,9 @@
           </div>
           <h2>همراهی، وقتی مهم است</h2>
           <p>
-            ابزارهای اشتراک امن موقعیت و هماهنگی امدادی به‌تدریج به این پیشخوان اضافه می‌شوند.
+            اشتراک موقعیت از همین‌جا باز می‌شود؛ درخواست و پیگیری امداد در گام بعدی اضافه می‌شود.
           </p>
           <div class="user-dashboard__feature-list">
-            <div>
-              <v-icon icon="mdi-crosshairs-gps" size="19" />
-              <span>اشتراک‌گذاری موقعیت</span>
-              <span class="user-dashboard__feature-state">به‌زودی</span>
-            </div>
             <div>
               <v-icon icon="mdi-ambulance" size="19" />
               <span>درخواست و پیگیری امداد</span>
@@ -86,17 +83,21 @@
           <v-icon icon="mdi-shield-check-outline" size="23" />
           <div>
             <h2>حریم خصوصی در اولویت است</h2>
-            <p>تا زمان فعال‌شدن اشتراک‌ها، هیچ موقعیت زنده‌ای در این نقشه نمایش داده نمی‌شود.</p>
+            <p>تا وقتی خودتان اشتراکی باز نکنید، هیچ موقعیت زنده‌ای دیده نمی‌شود. فهرست بالا همیشه از همین سرور خوانده می‌شود، نه از حافظهٔ مرورگر.</p>
           </div>
         </v-card>
       </aside>
     </div>
+
+    <ShareDialog v-model="shareOpen" @shared="onShared" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import ShareDialog from "@/components/sharing/ShareDialog.vue";
+import ShareLists from "@/components/sharing/ShareLists.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -105,6 +106,13 @@ const auth = useAuthStore();
 const theme = useThemeStore();
 const username = computed(() => auth.user?.username ?? "همراه");
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
+const shareOpen = ref(false);
+const shareLists = ref<InstanceType<typeof ShareLists> | null>(null);
+
+/** The dialog reports success after a 201; the lists re-read rather than patch local state. */
+function onShared(): void {
+  void shareLists.value?.refresh();
+}
 </script>
 
 <style scoped>

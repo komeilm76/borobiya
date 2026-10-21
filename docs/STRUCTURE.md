@@ -224,11 +224,17 @@ packages/client/
     │   ├── http.test.ts
     │   ├── error-message.ts  # localized auth/API errors
     │   ├── security-questions.ts # cached public question catalog
-    │   └── map-config.ts     # same-origin validated map settings
+    │   ├── map-config.ts     # same-origin validated map settings
+    │   ├── admin-users.ts    # typed admin user list and status calls
+    │   ├── location.ts       # share create/revoke/list, history grants, picker search
+    │   └── location.test.ts
     ├── components/
-    │   └── map/
-    │       ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
-    │       └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    │   ├── map/
+    │   │   ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
+    │   │   └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    │   └── sharing/
+    │       ├── ShareDialog.vue # recipient picker, timed/permanent modes, device chooser
+    │       └── ShareLists.vue  # My Shares / Shared With Me / history grants, confirm-to-revoke
     ├── router/
     │   ├── index.ts          # namespaced routes and auth-guard wiring
     │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
@@ -250,7 +256,12 @@ packages/client/
     │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
     │   ├── location-broadcast.test.ts
     │   ├── device-identity.ts # this session's deviceId read from its own access token
-    │   └── useLiveLocationBroadcast.ts # geolocation watch + throttled location:update over Socket.IO
+    │   ├── useLiveLocationBroadcast.ts # geolocation watch + throttled location:update over Socket.IO
+    │   ├── use-target-search.ts # 300ms picker debounce, aborts, and stale-response guard
+    │   └── use-target-search.test.ts
+    ├── sharing/
+    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, row timing
+    │   └── share-form.test.ts
     ├── theme/
     │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
     │   ├── theme-preference.test.ts
@@ -274,7 +285,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. Search, routing, live locations, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Routing, live companion markers on the map, history playback, and Android packaging remain future work.
 
 ---
 

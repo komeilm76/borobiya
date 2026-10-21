@@ -7,10 +7,12 @@ const localizedApiErrors: Record<string, string> = {
   INVALID_CREDENTIALS: "نام کاربری یا گذرواژه درست نیست.",
   INVALID_REFRESH: "نشست شما پایان یافته است؛ دوباره وارد شوید.",
   INVALID_RESET_TOKEN: "پیوند بازیابی معتبر نیست یا زمان آن به پایان رسیده است.",
+  PRIORITY_DEVICE_REQUIRED: "برای این اشتراک باید مشخص کنید کدام دستگاه زنده موقعیت بفرستد.",
   RATE_LIMITED: "درخواست‌های زیادی ارسال شده است. کمی بعد دوباره تلاش کنید.",
   RECOVERY_UNAVAILABLE: "بازیابی گذرواژه موقتاً در دسترس نیست.",
   SECURITY_QUESTIONS_ALREADY_COMPLETED: "پرسش‌های امنیتی این حساب قبلاً تکمیل شده‌اند.",
   SECURITY_QUESTIONS_REQUIRED: "برای ادامه، ابتدا پرسش‌های امنیتی را تکمیل کنید.",
+  SHARE_NOT_FOUND: "این اشتراک دیگر وجود ندارد؛ فهرست را تازه کنید.",
   USERNAME_TAKEN: "این نام کاربری قبلاً انتخاب شده است.",
   VALIDATION_ERROR: "اطلاعات واردشده را بررسی کنید.",
   WRONG_ANSWERS: "پاسخ‌ها با پرسش‌های این حساب مطابقت ندارند."

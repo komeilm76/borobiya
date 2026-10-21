@@ -92,7 +92,8 @@ gantt
 - [x] `POST /_user/location/share` (timed/permanent) + `DELETE /.../:shareId` — T2.1.2/T2.1.3
 - [x] Socket `location:update` (3-5s throttled) → broadcast to targets — T2.1.5 with T2.3.4, client pacing at 4s
 - [x] Cron: expire timed shares every minute — T2.1.6 (readers also filter `expiresAt`, so a deadline holds between sweeps)
-- [ ] Frontend: share dialog (pick users, timed slider), “My Shares” list, live markers on map
+- [x] Frontend: share dialog (user search, timed/permanent, duration slider), “My Shares” + “Shared With Me” lists — T2.1.7 (2026-10-22); the priority-device chooser rides along with the `409`
+- [ ] Live companion markers on the map (peer positions from the socket)
 
 ### M2.2 History Sharing
 - [x] `location_history` table + insert on each update — T2.2.1 with the writer inside `location:update`; deliberately one insert per accepted fix, since a 4s floor gives batching nothing to save
