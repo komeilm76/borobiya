@@ -197,7 +197,8 @@ export class DrizzleLocationShareStore implements LocationShareStore {
       // on, so two clients of one account (a double-tapped share button, a retried request) could each
       // find nothing and create a second active row for the same recipient. One transaction-scoped
       // advisory lock per owner serializes those decisions — across API replicas too, since the lock
-      // lives in the database — and is released by the commit.
+      // lives in the database — and is released by the commit. (`hashtextextended` needs PostgreSQL
+      // 11+, and `docker-compose.yml` pins the PostGIS 16 image.)
       await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${input.ownerId}, 0))`);
 
       const shares: LocationShareRecord[] = [];

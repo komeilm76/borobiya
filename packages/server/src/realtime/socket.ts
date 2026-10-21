@@ -232,7 +232,14 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
 
     socket.on(LOCATION_UPDATE_EVENT, async (payload: unknown, ack?: (response: LocationUpdateAck) => void) => {
       const response = await handleLocationUpdate(socket as unknown as UpdateSender, payload, dependencies);
-      if (typeof ack === "function") ack(response);
+      if (typeof ack !== "function") return;
+      try {
+        ack(response);
+      } catch (error) {
+        // Delivering an ack to a socket that vanished mid-update must not outlive the process, and
+        // there is no reply object left to fail here.
+        dependencies.logger?.warn({ err: error }, "location update ack failed");
+      }
     });
   });
 
