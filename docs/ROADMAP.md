@@ -65,7 +65,7 @@ gantt
 - [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; verified live incl. browser rendering 2026-10-20)
 - [x] Configure car/bicycle/foot OSRM profiles and offline route adapter (T1.4.4; target-VM checks passed 2026-10-20)
 - [x] Configure Nominatim import + Photon index and offline geocoding adapter (T1.4.5; target-VM checks passed 2026-10-20)
-- [ ] Standardized external map library with selectable snapshots and cache/update/offline policies (T1.4.7; code/tests/docs complete, VM migration/offline acceptance pending before PR #2 merge)
+- [x] T1.4.7 — cache/reuse map data, safely remove map caches, and select whole-country or city-cropped areas through setup — implementation/tests/docs complete 2026-10-21
 - [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas
@@ -76,9 +76,9 @@ gantt
 - [x] App-wide Vuetify/Tailwind theme selection, `system`/`light`/`dark` persistence, OS preference updates, and pre-paint initialization (T1.5.3)
 - [x] Graceful fallback if Map Server down (toast + cached tiles); real offline/5xx outage behavior still needs a separate VM/browser acceptance run
 
-**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled. The original Tehran stack passed on the target VM; the current external-library refactor still needs its migration/offline acceptance before this phase is considered fully closed.
+**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled. The original Tehran stack passed on the target VM; separate migration/offline acceptance for the external-library setup is still required before this phase is considered fully closed.
 
-**Phase gate:** Phase 2 (location sharing) remains unstarted until the repository audit and the required target-VM migration/offline checks for T1.4.7 are complete and confirmed.
+**Phase gate:** Phase 2 (location sharing) remains unstarted until the repository audit and separate target-VM migration/offline checks are complete and confirmed. These operational checks remain a pre-merge/phase gate; they are not part of T1.4.7's map-cache, cache-removal, and area-selection implementation scope.
 
 ---
 

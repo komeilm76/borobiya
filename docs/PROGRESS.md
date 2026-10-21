@@ -4,16 +4,16 @@
 
 ---
 
-## Overall: 24% — Phase 1 Foundation underway (2026-10-20)
+## Overall: 24% — Phase 1 Foundation underway (2026-10-21)
 
-The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1/T1.4.3/T1.4.6 map-server pins/styles/assets/settings tasks, and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL source, single `MAP_BBOX` crop, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks have now passed on the user's Ubuntu 24.04 VM (runbook step 13 acceptance, 2026-10-20). Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
+The documentation baseline, first seven foundation tasks, initial Drizzle schema/migration/seeds/user-state tasks, T1.2.1–T1.2.7 auth/session/recovery/onboarding/client tasks, T1.3.1–T1.3.4 admin user-management tasks, T1.4.1–T1.4.7 map-server implementation tasks (including cached map data, safe cache removal, and whole-country/city-crop selection), and T1.5.1–T1.5.5 MapLibre initialization, style switching, app-wide themes, map-outage fallback, and user map/dashboard views are implemented. The approved Geofabrik ODbL sources, selected-area crops merged into one PBF, tile/OSRM builders, Nominatim→Photon import path, linked OSM attribution, and gateway proxies are now scripted/configured; the real Martin, OSRM, and Photon runtime checks have now passed on the user's Ubuntu 24.04 VM (runbook step 13 acceptance, 2026-10-20). Shared schemas, route contracts, Fastify/OpenAPI infrastructure, a Persian-first Vue client, root API/client orchestration, and a local Compose service stack now exist. Health, auth/session/recovery handlers, the public security-question catalog, admin user list/detail/create/status handlers and searchable account-management UI, authenticated profile/onboarding routes with persisted-session revocation checks, and client auth pages/guards are live. Live-PostgreSQL verification, remaining user/admin/domain handlers, verified generated map artifacts, feature views, and other product functionality are still pending. Percentages are milestone estimates, not a count of source lines.
 
 | Area | % | Status |
 |------|---|--------|
 | Documentation (`docs/`) | 100% | ✅ 12 docs + 4 diagrams authored; manual screenshots remain placeholders |
 | Monorepo scaffold | 100% | ✅ T1.0.1–T1.0.7 complete; root dev orchestration and local Compose service scaffold are in place |
 | Auth & Users | 42% | 🟡 Registration, login, refresh/logout, recovery, audited admin user status, persisted-session revocation checks, no-delete regression coverage, searchable/paginated admin user management, onboarding, frontend auth flows, and guards are implemented; remaining user/admin handlers remain |
-| Map Server | 100% | ✅ T1.4.1–T1.4.6 complete; live VM acceptance passed 2026-10-20 (Martin MVT tile, OSRM car/bicycle/foot routes, Photon forward/reverse geocoding) |
+| Map Server | 100% | ✅ T1.4.1–T1.4.7 implementation complete, including map-data caching, safe cache removal, and whole-country/city-crop selection; original-stack live VM acceptance passed 2026-10-20. The external-library migration/offline VM check remains a separate pre-merge gate. |
 | Location Sharing | 0% | ⬜ Not started |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
@@ -30,7 +30,7 @@ The documentation baseline, first seven foundation tasks, initial Drizzle schema
 |-----------|---|-------|
 | Monorepo + Contracts | 100% | T1.0.1–T1.0.7 root config, shared contracts, Fastify shell, Vue/Vuetify client scaffold, OpenAPI/Zopia wiring, root dev orchestration, and Compose service scaffold done |
 | Auth system | 42% | T1.2.1–T1.2.7 and T1.3.1–T1.3.4 complete: Argon2id registration/login/recovery/admin-created users and onboarding answers, audited status changes, paginated admin user search/detail and status-management UI, tested no-delete invariant, immediate access-token revocation via persisted session checks, 15m/7d tokens, atomic refresh rotation/logout, single-use password reset, current-admin authorization, Persian auth/recovery/onboarding views, cookie-backed session restoration, and mandatory onboarding guards; remaining user/admin handlers remain |
-| Map Server | 100% | T1.4.1–T1.4.6 complete: pins, styles/assets, shared-crop pipeline, PMTiles generation, OSRM graphs, Nominatim→Photon index, and gateway proxies all verified live on the Ubuntu VM (2026-10-20) |
+| Map Server | 100% | T1.4.1–T1.4.7 implementation complete: pins, styles/assets, shared-crop pipeline, cache/reuse, safe cache clearing, whole-country/city-crop selection, PMTiles, OSRM, Nominatim→Photon, and gateway proxies. Original stack verified live 2026-10-20; separate external-library migration/offline VM gate remains before merge. |
 | Client Map canvas | 75% | 🟡 T1.5.1–T1.5.5 reusable MapLibre canvas, theme-aware light/dark switching, outage fallback, full map route, and dashboard map widget are implemented; live map-data rendering and location/search/routing integrations remain pending |
 
 ### Phase 2 — Location Sharing — 0%
@@ -81,6 +81,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-21 — T1.4.7 complete: map caching, safe cache removal, and crop selection
+
+- Clarified T1.4.7's scope as three user-facing features only: reuse cached map data, safely remove map-data caches, and choose whole-country or city-cropped areas in setup. Marked the task complete after checking the implementation and tests.
+- Confirmed the implementation in the external map library and setup flow, plus `scripts/clear-map-cache.sh` (dry-run by default, explicit apply confirmation, symlink/root safeguards, and preservation of app Postgres, Docker image/build cache, OS packages, Java, Osmium, and tool JARs). The region catalog now exposes 18 countries and 59 selectable areas, including the 12 requested country additions.
+- Validation: 50 map-server region/library tests, 5 safe-cache-clear tests, catalog validation, setup region-list output, Bash syntax, and Python compilation passed. The target-VM migration/offline check remains a separate pre-merge gate, not part of T1.4.7's feature scope; Phase 2 and PR #2 remain gated.
 
 ### 2026-10-20 — Standardized external map library, selectable snapshots, and offline cache policies
 

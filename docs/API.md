@@ -9,7 +9,7 @@
 ```
 API:  http://localhost:3000            (Fastify)
 Maps: http://localhost:8000            (Martin) — see MAP_SERVER.md
-Route: http://localhost:8001/route      (OSRM adapter; graphs not yet generated)
+Route: http://localhost:8001/route      (OSRM adapter; graphs are built locally from the selected map dataset)
 Map config: GET /map-config              (region, bounds, version, and zoom range)
 Swagger UI:   GET /docs
 OpenAPI JSON: GET /docs/json
