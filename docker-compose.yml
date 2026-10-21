@@ -43,6 +43,10 @@ services:
       TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.30.0.0/24}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      # Retention window for location history (pruned daily) and the widest history
+      # window one account may grant another. The share window must stay inside retention.
+      LOCATION_HISTORY_RETENTION_DAYS: ${LOCATION_HISTORY_RETENTION_DAYS:-90}
+      LOCATION_HISTORY_MAX_SHARE_DAYS: ${LOCATION_HISTORY_MAX_SHARE_DAYS:-30}
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
     ports:

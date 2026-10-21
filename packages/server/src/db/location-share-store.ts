@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
 import { locationShares, users } from "./schema";
@@ -69,6 +69,12 @@ export interface LocationShareStore {
    */
   createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares>;
   /**
+   * Marks every timed share whose window has closed as inactive and returns how many rows
+   * changed. Rows are kept for audit, and revocation is the same inactive flag, so readers
+   * that forgot an expiry filter still cannot see expired shares after this job has run.
+   */
+  expireOverdueShares(input: { now: Date }): Promise<number>;
+  /**
    * Revokes one owned share immediately. Revoking a share that is already revoked is a no-op,
    * and a share owned by someone else is indistinguishable from a missing one (`not-found`).
    */
@@ -96,6 +102,20 @@ const locationShareSelection = {
   note: locationShares.note,
   createdAt: locationShares.createdAt
 };
+
+/**
+ * One statement that retires every timed share whose window has closed. Permanent shares keep a
+ * null expiry and are therefore untouched. Exported so the SQL shape is testable on its own.
+ */
+export function expireOverdueSharesQuery(db: Database, now: Date) {
+  return db
+    .update(locationShares)
+    .set({ isRevoked: true })
+    .where(and(
+      eq(locationShares.isRevoked, false),
+      and(isNotNull(locationShares.expiresAt), lte(locationShares.expiresAt, now))
+    ));
+}
 
 /** Persists live-location shares and classifies candidate recipients. */
 export class DrizzleLocationShareStore implements LocationShareStore {
@@ -267,6 +287,11 @@ export class DrizzleLocationShareStore implements LocationShareStore {
         };
       })
     };
+  }
+
+  async expireOverdueShares(input: { now: Date }): Promise<number> {
+    const expired = await expireOverdueSharesQuery(this.db, input.now).returning({ id: locationShares.id });
+    return expired.length;
   }
 
   async revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation> {

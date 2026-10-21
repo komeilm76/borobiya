@@ -22,8 +22,31 @@ describe("server environment validation", () => {
       corsOrigins: ["http://localhost:5173", "http://localhost:3000"],
       trustedProxyIps: [],
       rateLimitWindowMs: 60_000,
-      rateLimitMax: 100
+      rateLimitMax: 100,
+      locationHistoryRetentionDays: 90,
+      locationHistoryMaxShareDays: 30
     });
+  });
+
+  it("keeps the history-share window inside the retention window", () => {
+    expect(() => parseServerEnv({
+      ...validEnv,
+      LOCATION_HISTORY_RETENTION_DAYS: "7",
+      LOCATION_HISTORY_MAX_SHARE_DAYS: "30"
+    })).toThrow(/LOCATION_HISTORY_MAX_SHARE_DAYS: Must not exceed LOCATION_HISTORY_RETENTION_DAYS \(7\)/);
+
+    expect(parseServerEnv({
+      ...validEnv,
+      LOCATION_HISTORY_RETENTION_DAYS: "30",
+      LOCATION_HISTORY_MAX_SHARE_DAYS: "30"
+    })).toMatchObject({ locationHistoryRetentionDays: 30, locationHistoryMaxShareDays: 30 });
+
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_RETENTION_DAYS: "0" })).toThrow(
+      /LOCATION_HISTORY_RETENTION_DAYS/
+    );
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_RETENTION_DAYS: "1.5" })).toThrow(
+      /LOCATION_HISTORY_RETENTION_DAYS/
+    );
   });
 
   it("rejects weak or reused JWT secrets without echoing their values", () => {

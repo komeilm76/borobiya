@@ -63,7 +63,11 @@ const rawServerEnvSchema = z.object({
   CORS_ORIGINS: z.string().trim().min(1),
   TRUSTED_PROXY_IPS: z.string().default(""),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1).max(2_147_483_647).default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000_000).default(100)
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000_000).default(100),
+  // Retention window for `location_history`; the daily prune job deletes rows older than this.
+  LOCATION_HISTORY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3_650).default(90),
+  // Largest history window one account may hand to another in a single share.
+  LOCATION_HISTORY_MAX_SHARE_DAYS: z.coerce.number().int().min(1).max(365).default(30)
 }).superRefine((env, context) => {
   if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
     context.addIssue({
@@ -110,6 +114,15 @@ const rawServerEnvSchema = z.object({
     }
   });
 
+  if (env.LOCATION_HISTORY_MAX_SHARE_DAYS > env.LOCATION_HISTORY_RETENTION_DAYS) {
+    // A share wider than the retention window would silently promise points that no longer exist.
+    context.addIssue({
+      code: "custom",
+      path: ["LOCATION_HISTORY_MAX_SHARE_DAYS"],
+      message: `Must not exceed LOCATION_HISTORY_RETENTION_DAYS (${env.LOCATION_HISTORY_RETENTION_DAYS}).`
+    });
+  }
+
   const trustedProxyIps = splitTrustedProxyIps(env.TRUSTED_PROXY_IPS);
   trustedProxyIps.forEach((ip, index) => {
     if (!isValidTrustedProxyIp(ip)) {
@@ -133,7 +146,9 @@ export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
   corsOrigins: splitCorsOrigins(env.CORS_ORIGINS),
   trustedProxyIps: splitTrustedProxyIps(env.TRUSTED_PROXY_IPS),
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
-  rateLimitMax: env.RATE_LIMIT_MAX
+  rateLimitMax: env.RATE_LIMIT_MAX,
+  locationHistoryRetentionDays: env.LOCATION_HISTORY_RETENTION_DAYS,
+  locationHistoryMaxShareDays: env.LOCATION_HISTORY_MAX_SHARE_DAYS
 }));
 
 export type ServerConfig = z.output<typeof serverEnvSchema>;

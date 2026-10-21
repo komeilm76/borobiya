@@ -1,9 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { allApiRoutes, apiRoutes } from "@borobiya/shared/api";
 import type { SecurityQuestion } from "@borobiya/shared";
 import type { UserRecoveryStore } from "./db/recovery-store";
 import { createFastifyApp, type FastifyAppDependencies } from "./app";
+import { JOB_TICK_INTERVAL_MS } from "./location/jobs";
+import type { LocationHistoryStore } from "./db/location-history-store";
+import type { LocationShareStore } from "./db/location-share-store";
 import { parseServerEnv } from "./config/env";
 
 const serverConfig = parseServerEnv({
@@ -51,6 +54,39 @@ describe("Fastify server skeleton", () => {
     expect(response.json().uptime).toEqual(expect.any(Number));
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("catches up on expired shares once the API owns the maintenance timers", async () => {
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 3);
+    const pruneOlderThan = vi.fn(async () => 0);
+    const app = await makeApp({}, {
+      locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
+      locationHistoryStore: { pruneOlderThan } as unknown as LocationHistoryStore,
+      startMaintenanceJobs: true
+    });
+
+    // `inject` implies `ready`, which is what triggers the startup pass.
+    expect((await app.inject({ method: "GET", url: "/_public/health" })).statusCode).toBe(200);
+    await vi.waitFor(() => expect(expireOverdueShares).toHaveBeenCalledTimes(1));
+    expect(pruneOlderThan).toHaveBeenCalledTimes(1);
+    expect(expireOverdueShares.mock.calls[0]?.[0]).toEqual({ now: expect.any(Date) });
+  });
+
+  it("starts no maintenance interval for apps that do not own the timers", async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 0);
+
+    const app = await makeApp({}, {
+      locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
+      locationHistoryStore: { pruneOlderThan: async () => 0 } as unknown as LocationHistoryStore
+    });
+    await app.inject({ method: "GET", url: "/_public/health" });
+    await app.close();
+
+    expect(expireOverdueShares).not.toHaveBeenCalled();
+    const scheduledDelays = setIntervalSpy.mock.calls.map((call) => (call as unknown as unknown[])[1]);
+    expect(scheduledDelays).not.toContain(JOB_TICK_INTERVAL_MS);
+    setIntervalSpy.mockRestore();
   });
 
   it("serves the public security-question catalog for registration and onboarding", async () => {

@@ -158,6 +158,22 @@ sequenceDiagram
 
 Multi-device conflict resolution is **mandatory**: only `priorityDeviceId`'s GPS accepted.
 
+Share expiry and retention are **in-process timers** (`packages/server/src/location/jobs.ts`), not a
+system crontab, so one container is all a deployment needs:
+
+- `runLocationJobs` runs the two statements in order — `expireOverdueShares({ now })` retires every
+  timed share whose window closed, `pruneOlderThan({ olderThan, limit })` deletes history older than
+  `LOCATION_HISTORY_RETENTION_DAYS` in bounded batches. Each is isolated: a failing job is logged and
+  retried on the next tick, and never blocks the other one.
+- `startLocationJobs` checks the schedule every 15s, keeps the 60s expiry cadence and the daily prune
+  cadence, and skips a pass while the previous one is still in flight. Both statements are idempotent,
+  so running them from several API replicas costs wasted work rather than correctness; a dedicated
+  worker or an advisory lock only becomes necessary if that waste matters.
+- The timers are started by `server.ts` through `createFastifyApp(config, { startMaintenanceJobs: true })`
+  and stopped in an `onClose` hook, after one `tick({ runAll: true })` catch-up pass in `onReady`. Route
+  tests therefore never create intervals, and a restarted API does not keep serving a share whose window
+  closed while it was down.
+
 ---
 
 ## 5. Data Flow — SOS Rescue
@@ -295,7 +311,26 @@ Requires GiST index on `last_location`. For large scale, add `ST_DWithin` radius
 ### 8.3 Retention & Pruning
 
 - `location_history` exists since T2.2.1 as plain `lat`/`lon` rows indexed by `(user_id, timestamp)`; partitioning by month stays optional for scale and is not used yet.
-- Daily cron (T2.2.5, not yet implemented): `DELETE FROM location_history WHERE created_at < NOW() - INTERVAL 'RETENTION_DAYS days'`
+- Daily prune (T2.2.5, implemented in `src/location/jobs.ts`) — the batched shape Drizzle emits
+  (`pruneLocationHistoryQuery`), so a first run after a long outage never holds one long lock:
+
+```sql
+DELETE FROM location_history
+WHERE created_at < $retention_cutoff
+  AND id IN (
+    SELECT id FROM location_history
+    WHERE created_at < $retention_cutoff
+    ORDER BY id ASC
+    LIMIT 5000          -- repeated at most 40 times per pass
+  );
+```
+
+- Share expiry runs every minute in the same scheduler:
+  `UPDATE location_shares SET is_revoked = true WHERE is_revoked = false AND expires_at IS NOT NULL AND expires_at <= now`.
+  Marking rather than deleting keeps revocation history auditable, and readers already filter on
+  `expires_at > now`, so an expired row is never active even in the seconds before the sweep sees it.
+- `LOCATION_HISTORY_MAX_SHARE_DAYS` (same commit) is validated at startup to stay inside retention and
+  is applied to the requested window by `POST /_user/location/history/share` (T2.2.3).
 
 ---
 

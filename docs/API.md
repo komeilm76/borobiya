@@ -228,6 +228,22 @@ POST   /_user/location/update            deprecated REST fallback for Socket `lo
 
 Retain ENV limits: `from-to <= MAX_SHARE_DAYS`, else `400 SHARE_RANGE_TOO_LARGE`.
 
+**Expiry & retention (T2.1.6 + T2.2.5, live).** No HTTP surface: a maintenance timer inside the API process retires
+`location_shares` rows with `expiresAt <= now` by setting `isRevoked = true` (checked every 15s, at least once a minute,
+plus one catch-up pass on startup). Clients see no new status or error code — a share stops being readable the moment its
+`expiresAt` passes, because every reader filters on `expiresAt > now`, and the sweep only makes that state permanent and
+visible in the table. Practical consequences for clients:
+
+- `GET /_user/location/shares` stops listing the row at the deadline itself, not at the sweep — the list has always filtered on `expiresAt > now`.
+- `DELETE /_user/location/share/:shareId` on an expired id still answers `200` (the row exists and stays owner-addressable, only already inactive).
+- Re-sharing with the same target after expiry creates a **new** row (`createdShareIds`) instead of reusing the retired one, because reuse only considers active shares.
+
+History retention is enforced by the same scheduler once a day: `location_history` rows with
+`created_at < now - LOCATION_HISTORY_RETENTION_DAYS` are deleted in batches of 5,000 (max 40 batches per pass), so a window
+requested near the retention edge can legitimately return fewer points than expected. `LOCATION_HISTORY_MAX_SHARE_DAYS` is
+validated at startup to be ≤ `LOCATION_HISTORY_RETENTION_DAYS`; the per-request `400 SHARE_RANGE_TOO_LARGE` check above is
+part of T2.2.3.
+
 **`POST /_user/location/share` (T2.1.2, live).** Requires the same verified `/_user` access token, active account, and completed-onboarding state as every other user route. Limits: 1-50 unique recipients, `durationMinutes` an integer from 1 to 43200 (30 days, required only for `timed`), and `note` up to 500 characters. Recipients are validated as a batch: the owner's own account, unknown ids, and inactive or suspended accounts are rejected with `400 VALIDATION_ERROR` and `issues[].code` of `self_target`, `unknown_target`, or `unavailable_target`; nothing is written when any recipient is rejected. On success all rows are written in one transaction and each response `shares[]` item follows `LocationShare` (`id`, `ownerId`, `targetUserId`, `mode`, `expiresAt`, `isRevoked`, `priorityDeviceId`, `note`, `createdAt`). A repeated request for the same owner/target/mode reuses the existing active share instead of stacking duplicates (`reusedShareIds`) and only extends a timed expiry when the new one is later (`createdShareIds` otherwise). Responses are `Cache-Control: no-store`. Selecting a priority device for multi-device accounts is T2.3.3 and is not part of this payload.
 
 ### 5.4 SOS — Requester Side

@@ -19,6 +19,7 @@ import { registerAdminUserRoutes } from "./admin/users";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
 import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
 import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
+import { startLocationJobs } from "./location/jobs";
 import { attachRealtime, PEER_UPDATE_EVENT, userRoom } from "./realtime/socket";
 import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
@@ -60,6 +61,11 @@ export interface FastifyAppDependencies {
   verifyPassword?: PasswordVerifier;
   /** Override recovery-answer verification in tests; production uses Argon2id. */
   verifySecurityAnswer?: SecurityAnswerVerifier;
+  /**
+   * Start the in-process maintenance timers (share expiry, history retention prune). Only the API
+   * entrypoint sets this: `app.inject()` tests build apps that must not own intervals.
+   */
+  startMaintenanceJobs?: boolean;
 }
 
 export async function createFastifyApp(
@@ -151,6 +157,23 @@ export async function createFastifyApp(
   app.addHook("onClose", async () => {
     await realtime.close();
   });
+
+  if (dependencies.startMaintenanceJobs) {
+    const jobs = startLocationJobs({
+      shareStore: locationShareStore,
+      historyStore: locationHistoryStore,
+      retentionDays: config.locationHistoryRetentionDays,
+      logger: app.log
+    });
+    // One catch-up pass per listener turn: shares whose window closed while the API was down are
+    // expired before the first request is served, and nothing is awaited on the hot startup path.
+    app.addHook("onReady", async () => {
+      void jobs.tick({ runAll: true });
+    });
+    app.addHook("onClose", async () => {
+      jobs.stop();
+    });
+  }
 
   if (database) {
     app.addHook("onClose", async () => {

@@ -211,9 +211,12 @@ fastify.register(cors, {
 
 ## 10. Retention & Pruning
 
-- `LOCATION_HISTORY_RETENTION_DAYS=90` → daily cron deletes old rows.
-- `SOS_REQUEST_AUTO_EXPIRE_HOURS=24` → pending without dispatch → `expired`, notify requester.
-- `MISSION_STATUS_TIMEOUT_HOURS=6` → `on_the_way` too long → alert admin.
+- `LOCATION_HISTORY_RETENTION_DAYS=90` → the API's daily maintenance pass deletes `location_history` rows whose `created_at` is older than the cutoff, in batches of 5,000 rows and at most 40 batches per pass, so a first run after an outage cannot hold one long lock. `server.ts` runs one catch-up pass at startup.
+- A timed live share stops at its deadline without waiting for any job: every reader of `location_shares` (the active lists and the fan-out list used by `location:update`) filters `expiresAt > now()`. The minute sweep (`expireOverdueShares`, `is_revoked = true`) only makes that state durable and auditable instead of deleting the row.
+- `LOCATION_HISTORY_MAX_SHARE_DAYS=30` is validated at startup to stay within retention (otherwise a grant could promise points that were already pruned); the per-request range check lands with `POST /_user/location/history/share` in T2.2.3.
+- Retention deletes history only. Share rows are retired with a flag rather than removed, and no user-initiated purge/export of `location_history` exists yet.
+- `SOS_REQUEST_AUTO_EXPIRE_HOURS=24` → pending without dispatch → `expired`, notify requester (Phase 3, not implemented).
+- `MISSION_STATUS_TIMEOUT_HOURS=6` → `on_the_way` too long → alert admin (Phase 3, not implemented).
 
 ---
 

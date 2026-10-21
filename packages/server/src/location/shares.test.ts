@@ -97,6 +97,7 @@ async function makeApp(options: {
   });
   const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async () => "revoked");
   const listActiveOutgoingShares = vi.fn<LocationShareStore["listActiveOutgoingShares"]>(async () => []);
+  const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 0);
   const listActiveShares = vi.fn<LocationShareStore["listActiveShares"]>(async () => ({
     owned: [],
     sharedWithMe: []
@@ -107,6 +108,7 @@ async function makeApp(options: {
     revokeShare,
     listActiveOutgoingShares,
     listActiveShares,
+    expireOverdueShares,
     ...options.shareStore
   };
 

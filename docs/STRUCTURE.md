@@ -149,7 +149,9 @@ packages/server/
     │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location
     │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
     │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
-    │   └── live.test.ts      # service rules and REST fallback status/ack tests
+    │   ├── live.test.ts      # service rules and REST fallback status/ack tests
+    │   ├── jobs.ts           # in-process maintenance timers: expire overdue shares (1m) and prune history past retention (daily, batched)
+    │   └── jobs.test.ts      # batching, cadence, failure isolation, and no-overlap tests
     ├── realtime/
     │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
     │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests

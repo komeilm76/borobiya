@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import type { Database } from "./client";
-import { DrizzleLocationShareStore, type LocationShareRecord } from "./location-share-store";
+import { locationHistory, locationShares, users } from "./schema";
+import {
+  DrizzleLocationShareStore,
+  expireOverdueSharesQuery,
+  type LocationShareRecord
+} from "./location-share-store";
+
+// A driver is only needed to build SQL; no connection is opened until a query runs.
+const offlineDb = drizzle(postgres("postgresql://borobiya:unused@127.0.0.1:5432/unused"), {
+  schema: { locationShares, locationHistory, users }
+}) as unknown as Database;
 
 const ownerId = randomUUID();
 const targetId = randomUUID();
@@ -231,5 +243,19 @@ describe("DrizzleLocationShareStore.listActiveShares", () => {
 
     expect(result.owned).toEqual([]);
     expect(result.sharedWithMe[0]!.owner.lastLocation).toBeNull();
+  });
+});
+
+describe("expireOverdueSharesQuery", () => {
+  it("retires only timed shares whose window has closed", () => {
+    const built = expireOverdueSharesQuery(offlineDb, new Date("2026-10-21T09:00:00.000Z")).toSQL();
+    const sql = built.sql.replace(/\s+/g, " ");
+
+    expect(sql).toContain('update "location_shares" set "is_revoked" = $1');
+    expect(sql).toContain('"location_shares"."is_revoked" = $2');
+    expect(sql).toContain('"location_shares"."expires_at" is not null');
+    expect(sql).toContain('"location_shares"."expires_at" <= $3');
+    // Booleans and the bound cutoff are parameters, never inlined SQL text.
+    expect(built.params).toEqual([true, false, "2026-10-21T09:00:00.000Z"]);
   });
 });
