@@ -123,7 +123,7 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, and onboarding handlers are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, onboarding, and live-share creation are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
@@ -145,12 +145,17 @@ packages/server/
     │   ├── forgot-password.ts # server-selected recovery challenges and reset flow
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
+    ├── location/
+    │   ├── shares.ts         # POST /_user/location/share recipient checks, timed/permanent persistence
+    │   └── shares.test.ts    # share creation, validation, idempotence, and guard tests
     ├── db/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
+    │   ├── location-share-store.ts # share-target classification and atomic share creation/reuse
+    │   ├── location-share-store.test.ts # classification, insert, reuse, and timed-extension assertions
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
@@ -170,7 +175,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, and onboarding stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The onboarding auth hook is ready for future `/_user` handlers; remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 

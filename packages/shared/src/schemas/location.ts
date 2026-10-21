@@ -8,25 +8,41 @@ import {
 } from "./common";
 import { locationShareModeSchema } from "../types/enums";
 
-const uniqueUserIdsSchema = z.array(idSchema).min(1).superRefine((ids, context) => {
-  const seen = new Set<string>();
-  ids.forEach((id, index) => {
-    if (seen.has(id)) {
-      context.addIssue({
-        code: "custom",
-        path: [index],
-        message: "Target user IDs must be unique."
-      });
-    }
-    seen.add(id);
+/** Upper bounds that keep one share request inside a sane, reviewable payload. */
+export const MAX_LOCATION_SHARE_TARGETS = 50;
+/** Timed shares must end within 30 days; longer-lived visibility uses `permanent` mode. */
+export const MAX_LOCATION_SHARE_MINUTES = 30 * 24 * 60;
+export const MAX_LOCATION_SHARE_NOTE_LENGTH = 500;
+
+const uniqueUserIdsSchema = z
+  .array(idSchema)
+  .min(1)
+  .max(MAX_LOCATION_SHARE_TARGETS)
+  .superRefine((ids, context) => {
+    const seen = new Set<string>();
+    ids.forEach((id, index) => {
+      if (seen.has(id)) {
+        context.addIssue({
+          code: "custom",
+          path: [index],
+          message: "Target user IDs must be unique."
+        });
+      }
+      seen.add(id);
+    });
   });
-});
 
 export const shareSchema = z.strictObject({
   targetUserIds: uniqueUserIdsSchema,
   mode: locationShareModeSchema,
-  durationMinutes: z.number().int().positive().nullable().optional(),
-  note: z.string().trim().optional()
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1, "A timed share must last at least one minute.")
+    .max(MAX_LOCATION_SHARE_MINUTES, `Timed location sharing must not exceed ${MAX_LOCATION_SHARE_MINUTES} minutes. Use permanent mode for longer visibility.`)
+    .nullable()
+    .optional(),
+  note: z.string().trim().max(MAX_LOCATION_SHARE_NOTE_LENGTH).optional()
 }).superRefine((share, context) => {
   if (share.mode === "timed" && (share.durationMinutes === undefined || share.durationMinutes === null)) {
     context.addIssue({
@@ -61,9 +77,16 @@ export const locationShareSchema = z.strictObject({
 });
 export type LocationShare = z.infer<typeof locationShareSchema>;
 
+/**
+ * One `POST /_user/location/share` call can target several users, so the created
+ * shares are returned in full (each row carries its own `expiresAt`). A repeated
+ * request reuses the caller's existing active share for a target and only extends a
+ * timed expiry, so `createdShareIds` and `reusedShareIds` explain what changed.
+ */
 export const locationShareCreatedSchema = z.strictObject({
-  shareId: idSchema,
-  expiresAt: timestampSchema.nullable().optional()
+  shares: z.array(locationShareSchema).min(1).max(MAX_LOCATION_SHARE_TARGETS),
+  createdShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([]),
+  reusedShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([])
 });
 export type LocationShareCreated = z.infer<typeof locationShareCreatedSchema>;
 

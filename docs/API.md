@@ -210,7 +210,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 
 ```
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
-→ 201 { shareId, expiresAt? }
+→ 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
 DELETE /_user/location/share/:shareId    → 200 (immediate revoke)
 GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
 
@@ -223,6 +223,8 @@ POST   /_user/location/update            deprecated in favor of Socket location:
 ```
 
 Retain ENV limits: `from-to <= MAX_SHARE_DAYS`, else `400 SHARE_RANGE_TOO_LARGE`.
+
+**`POST /_user/location/share` (T2.1.2, live).** Requires the same verified `/_user` access token, active account, and completed-onboarding state as every other user route. Limits: 1-50 unique recipients, `durationMinutes` an integer from 1 to 43200 (30 days, required only for `timed`), and `note` up to 500 characters. Recipients are validated as a batch: the owner's own account, unknown ids, and inactive or suspended accounts are rejected with `400 VALIDATION_ERROR` and `issues[].code` of `self_target`, `unknown_target`, or `unavailable_target`; nothing is written when any recipient is rejected. On success all rows are written in one transaction and each response `shares[]` item follows `LocationShare` (`id`, `ownerId`, `targetUserId`, `mode`, `expiresAt`, `isRevoked`, `priorityDeviceId`, `note`, `createdAt`). A repeated request for the same owner/target/mode reuses the existing active share instead of stacking duplicates (`reusedShareIds`) and only extends a timed expiry when the new one is later (`createdShareIds` otherwise). Responses are `Cache-Control: no-store`. Selecting a priority device for multi-device accounts is T2.3.3 and is not part of this payload.
 
 ### 5.4 SOS — Requester Side
 
@@ -347,7 +349,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, and admin user list/detail/create/status; SOS, live-location, mission, and most search operations remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, and `POST /_user/location/share`; the remaining live-location endpoints, SOS, mission, and most search operations remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -386,7 +388,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
+| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, or an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`) |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |

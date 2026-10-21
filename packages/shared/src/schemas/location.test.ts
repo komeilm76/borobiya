@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_LOCATION_SHARE_MINUTES,
+  MAX_LOCATION_SHARE_TARGETS,
   historyShareSchema,
+  locationShareCreatedSchema,
   locationUpdateSchema,
   shareSchema
 } from "./location";
@@ -26,6 +29,43 @@ describe("location schemas", () => {
     const valid = { targetUserIds: [targetId, otherTargetId], from, to, maxPoints: 500 };
     expect(historyShareSchema.safeParse(valid).success).toBe(true);
     expect(historyShareSchema.safeParse({ ...valid, from: to, to: from }).success).toBe(false);
+  });
+
+  it("bounds the timed duration, note length, and recipient count", () => {
+    const validTimed = { targetUserIds: [targetId], mode: "timed", durationMinutes: 60 };
+    expect(shareSchema.safeParse(validTimed).success).toBe(true);
+    expect(shareSchema.safeParse({ ...validTimed, durationMinutes: 0 }).success).toBe(false);
+    expect(shareSchema.safeParse({ ...validTimed, durationMinutes: MAX_LOCATION_SHARE_MINUTES }).success).toBe(true);
+    expect(shareSchema.safeParse({ ...validTimed, durationMinutes: MAX_LOCATION_SHARE_MINUTES + 1 }).success).toBe(false);
+    expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "permanent", note: "x".repeat(501) }).success).toBe(false);
+    expect(
+      shareSchema.safeParse({
+        targetUserIds: Array.from({ length: MAX_LOCATION_SHARE_TARGETS + 1 }, (_, index) =>
+          `00000000-0000-4000-8000-0000000000${String(index).padStart(2, "0")}`
+        ),
+        mode: "permanent"
+      }).success
+    ).toBe(false);
+  });
+
+  it("reports every created share and defaults the id lists to empty", () => {
+    const share = {
+      id: targetId,
+      ownerId: otherTargetId,
+      targetUserId: targetId,
+      mode: "permanent" as const,
+      expiresAt: null,
+      isRevoked: false,
+      priorityDeviceId: null,
+      note: null,
+      createdAt: from
+    };
+    expect(locationShareCreatedSchema.parse({ shares: [share] })).toEqual({
+      shares: [share],
+      createdShareIds: [],
+      reusedShareIds: []
+    });
+    expect(locationShareCreatedSchema.safeParse({ shares: [] }).success).toBe(false);
   });
 
   it("validates geographic bounds and location update metadata", () => {

@@ -25,7 +25,8 @@ const implementedOperationIds = new Set([
   "adminGetUser",
   "adminCreateUser",
   "adminUpdateUserStatus",
-  "userCompleteSecurityQuestions"
+  "userCompleteSecurityQuestions",
+  "locationCreateShare"
 ]);
 
 interface JsonObjectSchema {
@@ -230,7 +231,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.1.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, and authenticated profile/onboarding routes are implemented at runtime; remaining operations are contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, authenticated profile/onboarding, and live-location share creation are implemented at runtime; remaining operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

@@ -4,9 +4,9 @@
 
 ---
 
-## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 started at T2.1.1 (2026-10-21)
+## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.1.2 (2026-10-21)
 
-All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, but no share handlers or live-sharing behavior are claimed complete.
+All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, and T2.1.2 adds the first share handler — `POST /_user/location/share`. Share revocation/listing, realtime `location:update`, expiry processing, history sharing, and multi-device behavior remain unstarted and are not claimed complete. The 24% whole-project estimate is unchanged; it is a planning figure rather than a per-task measurement.
 
 The separate external-Internet-offline map-library run, live browser outage simulation, extended database-flow evidence, and style-switch timing remain follow-ups. The user explicitly confirmed on 2026-10-21 that these remaining checks do not block the Phase 1 release or starting Phase 2. Record them as known follow-ups, not release/Phase 2 gates; do not claim the untested behavior passed. The agent workspace cannot reproduce the user's VM/browser/database checks. The 24% figure is a whole-project planning estimate, not a Phase 1 completion percentage, and has not been recalculated for the initial Phase 2 schema task.
 
@@ -19,7 +19,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
 | Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
-| Location Sharing | 5% (1/19 tasks) | ✅ T2.1.1 schema/migration complete; all share handlers, realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
+| Location Sharing | 11% (2/19 tasks) | ✅ T2.1.1 schema/migration and T2.1.2 `POST /_user/location/share` complete; share revocation/listing, realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
 | UI/UX & a11y | 0% | ⬜ Not started |
@@ -70,7 +70,7 @@ The worker's unit tests cover cache writes, cached responses on network errors a
 
 #### P1-A2 — Extended PostgreSQL/account-flow evidence — **PARTIAL / non-blocking follow-up**
 
-Most server tests use injected stores, so they validate handler logic but do not prove that Drizzle migrations, SQL queries, constraints, transactions, and session revocation work against a real PostgreSQL instance. On a disposable or safely backed-up application database, confirm Postgres health, apply migrations, run the seed twice to confirm idempotence, then exercise registration/login/refresh/logout/recovery, `GET /_user/me` and onboarding, and admin create/list/detail/status. Verify expected rows persist and revoked sessions stop authorizing access. Capture sanitized pass/fail results only; never share `.env`/`DATABASE_URL` and never remove the existing `postgres-data` volume as a shortcut. Local validation is green: 149 server tests and the server typecheck passed, but the route tests use injected stores and are not live PostgreSQL integration tests. A prior VM migration attempt returned `28P01`. The user later reported a successful Ubuntu 24.04 setup and passed registration/login, admin listing/deactivation, and deactivated-account login rejection; see the human-acceptance table. Explicit migration/seed output and refresh/logout/recovery/onboarding/admin-create/detail results were not reported, so P1-A2 is partial rather than fully evidenced. These remaining checks are non-blocking for release/Phase 2 per the user's decision.
+Most server tests use injected stores, so they validate handler logic but do not prove that Drizzle migrations, SQL queries, constraints, transactions, and session revocation work against a real PostgreSQL instance. On a disposable or safely backed-up application database, confirm Postgres health, apply migrations, run the seed twice to confirm idempotence, then exercise registration/login/refresh/logout/recovery, `GET /_user/me` and onboarding, and admin create/list/detail/status. Verify expected rows persist and revoked sessions stop authorizing access. Capture sanitized pass/fail results only; never share `.env`/`DATABASE_URL` and never remove the existing `postgres-data` volume as a shortcut. Local validation is green: 165 server tests (150 before T2.1.2) and the server typecheck passed, but the route tests use injected stores and are not live PostgreSQL integration tests. A prior VM migration attempt returned `28P01`. The user later reported a successful Ubuntu 24.04 setup and passed registration/login, admin listing/deactivation, and deactivated-account login rejection; see the human-acceptance table. Explicit migration/seed output and refresh/logout/recovery/onboarding/admin-create/detail results were not reported, so P1-A2 is partial rather than fully evidenced. These remaining checks are non-blocking for release/Phase 2 per the user's decision.
 
 #### P1-M1 — Live light/dark switch latency — **UNMEASURED / non-blocking**
 
@@ -78,11 +78,11 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 
 **Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
-### Phase 2 — Location Sharing — 5% (1/19 tasks)
+### Phase 2 — Location Sharing — 11% (2/19 tasks)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Live share + expiry | 14% (1/7 tasks) | T2.1.1 `location_shares` schema/migration complete; creation/revoke/list handlers, live updates, and expiry job remain |
+| Live share + expiry | 29% (2/7 tasks) | T2.1.1 `location_shares` schema/migration and T2.1.2 share creation (recipient checks, timed/permanent expiry, idempotent reuse) complete; revoke/list handlers, live updates, and the expiry job remain |
 | History share + retention | 0% | Not started |
 | Multi-device priority | 0% | Not started |
 
@@ -126,6 +126,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-21 — T2.1.2 live-share creation
+
+- Implemented `POST /_user/location/share`: shared Zod bounds (1-50 unique recipients, `durationMinutes` 1-43200, `note` <= 500), batched recipient checks that reject self/unknown/inactive/suspended targets with structured `400 VALIDATION_ERROR` issue codes, and one transaction that writes or reuses `location_shares` rows.
+- Repeat requests are idempotent per owner/target/mode: an active permanent share is reused, and a timed share is only extended when the new expiry is later. The response now reports `shares`, `createdShareIds`, and `reusedShareIds` instead of the placeholder `shareId` shape, and `docs/API.md` §5.3 was updated to match.
+- Reuse of the app-scoped `/_user` hook means share creation requires a verified access token backed by an active, unsuspended, onboarding-complete account; the OpenAPI operation is now marked `implemented`.
+- Validation: shared 34/34, server 165/165, client 49/49, and all three package typechecks passed. Tests use injected stores; the constraint/transaction behavior is not yet proven against live PostgreSQL (see P1-A2-style follow-up evidence rules).
 
 ### 2026-10-21 — Phase 1 v0.1.0 released; Phase 2 T2.1.1 started
 

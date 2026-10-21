@@ -16,6 +16,8 @@ import {
 } from "./db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "./auth/user-security-questions";
 import { registerAdminUserRoutes } from "./admin/users";
+import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
+import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
 import { registerSwagger } from "./plugins/swagger";
@@ -45,6 +47,8 @@ export interface FastifyAppDependencies {
   adminUserStore?: AdminUserStore;
   /** Override user authorization/onboarding persistence in tests. */
   securityQuestionsStore?: UserSecurityQuestionsStore;
+  /** Override live-location share persistence in tests. */
+  locationShareStore?: LocationShareStore;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
@@ -74,13 +78,15 @@ export async function createFastifyApp(
     dependencies.loginStore !== undefined &&
     dependencies.recoveryStore !== undefined &&
     dependencies.adminUserStore !== undefined &&
-    dependencies.securityQuestionsStore !== undefined;
+    dependencies.securityQuestionsStore !== undefined &&
+    dependencies.locationShareStore !== undefined;
   const database = hasInjectedStores ? undefined : createDatabase(config.databaseUrl);
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
   const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
   const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   const adminUserStore = dependencies.adminUserStore ?? new DrizzleAdminUserStore(database!.db);
   const securityQuestionsStore = dependencies.securityQuestionsStore ?? new DrizzleUserSecurityQuestionsStore(database!.db);
+  const locationShareStore = dependencies.locationShareStore ?? new DrizzleLocationShareStore(database!.db);
   await registerUserSecurityQuestionsRoute(app, {
     store: securityQuestionsStore,
     jwtSecret: config.jwtSecret,
@@ -109,6 +115,9 @@ export async function createFastifyApp(
     jwtSecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword
   });
+  // Registered after the `/_user` authorization hook so share routes inherit the
+  // access-token, account-state, and onboarding checks.
+  await registerLocationShareRoutes(app, { store: locationShareStore });
 
   if (database) {
     app.addHook("onClose", async () => {

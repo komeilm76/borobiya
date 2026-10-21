@@ -78,7 +78,7 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 2.1 Live Sharing
 
 - [x] **T2.1.1** Table `location_shares` with owner/target FKs, mode/expiry and no-self-share checks, revocation/device/note fields, and owner/target/expiry indexes — Drizzle migration `0006_quiet_old_lace.sql`; completed 2026-10-21
-- [ ] **T2.1.2** `POST /_user/location/share` {targetUserIds, mode, durationMinutes, note} → timed/permanent
+- [x] **T2.1.2** `POST /_user/location/share` {targetUserIds, mode, durationMinutes, note} → timed/permanent — completed 2026-10-21: transactional creation for 1-50 verified recipients (self/unknown/inactive/suspended rejected as a batch, nothing partially written), timed expiry bounded to 30 days, idempotent reuse that only extends a timed expiry, shared `LocationShare[]` response, and the app-scoped `/_user` auth/onboarding guard covered by 15 new route/store/schema tests
 - [ ] **T2.1.3** `DELETE /_user/location/share/:shareId` — immediate revoke
 - [ ] **T2.1.4** `GET /_user/location/shares` (mine + shared-with-me)
 - [ ] **T2.1.5** Socket `location:update` every 3-5s (client throttled), server verify `priorityDeviceId`, upsert `users.lastLocation`, insert `location_history`

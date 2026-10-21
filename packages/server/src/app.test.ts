@@ -97,6 +97,7 @@ describe("Fastify server skeleton", () => {
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
+    const createShare = paths["/_user/location/share"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
@@ -249,6 +250,15 @@ describe("Fastify server skeleton", () => {
     });
     expect(publicSecurityQuestions?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(publicSecurityQuestions?.responses).toHaveProperty("200");
+    expect(createShare?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(createShare?.["x-borobiya-access"]).toBe("authenticated");
+    expect(createShare?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -304,6 +314,16 @@ describe("Fastify server skeleton", () => {
     const missingUserProfileToken = await app.inject({ method: "GET", url: "/_user/me" });
     expect(missingUserProfileToken.statusCode).toBe(401);
     expect(missingUserProfileToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    // The `/_user` authorization hook is app-scoped, so newly added Phase 2 user routes
+    // must fail closed on the same token/session checks.
+    const missingShareToken = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      payload: { targetUserIds: ["00000000-0000-4000-8000-000000000001"], mode: "permanent" }
+    });
+    expect(missingShareToken.statusCode).toBe(401);
+    expect(missingShareToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("does not expose DELETE /_admin/users/:id", async () => {
