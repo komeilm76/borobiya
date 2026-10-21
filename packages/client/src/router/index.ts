@@ -93,12 +93,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_user/devices",
     name: "user-devices",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "دستگاه‌ها",
-      description: "مدیریت دستگاه‌های متصل و دستگاه اولویت‌دار در این بخش انجام می‌شود.",
-      icon: "mdi-devices"
-    }
+    component: () => import("@client/views/_user/UserDevicesView.vue")
   },
   {
     path: "/_admin/dashboard",

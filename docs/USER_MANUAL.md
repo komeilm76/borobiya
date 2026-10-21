@@ -196,9 +196,14 @@ If you are logged in on **two devices** (e.g., phone + laptop):
 2. Choose a device (e.g., “Samsung S23”) → **Confirm**.
 3. Only that device’s GPS is used; the other is ignored.
 
-Manage at **Settings → Active Devices** — table with `deviceName, lastActiveAt, IP` + change priority anytime.
+Manage at **`/_user/devices`** (linked from the dashboard card «دستگاه پخش‌کننده»): a table of the account's **live sessions** — device label, online/offline, minutes since last activity, IP, and how many of your shares each one is currently broadcasting — plus a chooser per share and an “apply to all” action.
 
 [Screenshot: Priority device modal + Devices table]
+
+Two things this screen will not do, both of them deliberate:
+
+- **It does not extend a share.** Changing the device of a timed share keeps the expiry exactly where it is; if it were to run out in under a minute, the change is refused and you are told to open a fresh share instead.
+- **It lists live sessions only.** A device you have logged out of is absent rather than shown as “offline”, and a share still pinned to a device that just left keeps showing that id as “no longer in the list” until the server re-points it (or you choose a new one).
 
 ---
 

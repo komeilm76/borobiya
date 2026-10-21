@@ -79,7 +79,18 @@
           </div>
         </v-card>
 
-        <v-card class="user-dashboard__privacy-card" elevation="0" rounded="xl">
+        <v-card class="user-dashboard__note-card user-dashboard__devices-card" elevation="0" rounded="xl">
+          <v-icon icon="mdi-devices" size="23" />
+          <div>
+            <h2>دستگاه پخش‌کننده</h2>
+            <p>اگر با دو دستگاه وارد شده‌اید، مشخص کنید کدام موقعیت بفرستد — و هر وقت خواستید عوضش کنید.</p>
+          </div>
+          <v-btn class="user-dashboard__devices-link" size="small" variant="tonal" color="primary" to="/_user/devices">
+            دستگاه‌ها
+          </v-btn>
+        </v-card>
+
+        <v-card class="user-dashboard__note-card" elevation="0" rounded="xl">
           <v-icon icon="mdi-shield-check-outline" size="23" />
           <div>
             <h2>حریم خصوصی در اولویت است</h2>
@@ -175,7 +186,7 @@ function onShared(): void {
 
 .user-dashboard__map-card,
 .user-dashboard__feature-card,
-.user-dashboard__privacy-card {
+.user-dashboard__note-card {
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
   box-shadow: 0 12px 34px rgba(25, 53, 54, 0.055);
@@ -197,7 +208,7 @@ function onShared(): void {
 
 .user-dashboard__card-header h2,
 .user-dashboard__feature-card h2,
-.user-dashboard__privacy-card h2 {
+.user-dashboard__note-card h2 {
   margin: 0;
   color: #193536;
   font-size: 1.08rem;
@@ -308,7 +319,7 @@ function onShared(): void {
   white-space: nowrap;
 }
 
-.user-dashboard__privacy-card {
+.user-dashboard__note-card {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
@@ -317,16 +328,21 @@ function onShared(): void {
   background: rgba(52, 124, 97, 0.07);
 }
 
-.user-dashboard__privacy-card > .v-icon {
+.user-dashboard__devices-link {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.user-dashboard__note-card > .v-icon {
   flex: 0 0 auto;
   margin-top: 0.1rem;
 }
 
-.user-dashboard__privacy-card h2 {
+.user-dashboard__note-card h2 {
   font-size: 0.87rem;
 }
 
-.user-dashboard__privacy-card p {
+.user-dashboard__note-card p {
   margin: 0.25rem 0 0;
   color: #627a7a;
   font-size: 0.76rem;
@@ -341,7 +357,7 @@ function onShared(): void {
 :global(:root.dark) .user-dashboard h1,
 :global(:root.dark) .user-dashboard__card-header h2,
 :global(:root.dark) .user-dashboard__feature-card h2,
-:global(:root.dark) .user-dashboard__privacy-card h2 {
+:global(:root.dark) .user-dashboard__note-card h2 {
   color: #edf5f2;
 }
 
@@ -349,7 +365,7 @@ function onShared(): void {
 :global(:root.dark) .user-dashboard__card-header p,
 :global(:root.dark) .user-dashboard__feature-card > p,
 :global(:root.dark) .user-dashboard__map-caption,
-:global(:root.dark) .user-dashboard__privacy-card p {
+:global(:root.dark) .user-dashboard__note-card p {
   color: #a0b6b2;
 }
 
@@ -376,12 +392,12 @@ function onShared(): void {
   color: #c1d2cd;
 }
 
-:global(:root.dark) .user-dashboard__privacy-card {
+:global(:root.dark) .user-dashboard__note-card {
   color: #6bbe93;
   background: rgba(107, 190, 147, 0.1);
 }
 
-:global(:root.dark) .user-dashboard__privacy-card p {
+:global(:root.dark) .user-dashboard__note-card p {
   color: #a0b6b2;
 }
 

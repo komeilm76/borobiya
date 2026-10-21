@@ -270,6 +270,7 @@ import {
   DURATION_PRESET_MINUTES,
   formatDuration,
   nameShareRejections,
+  rejectionText,
   needsPriorityDevice,
   priorityDeviceIds,
   recipientLabels,
@@ -445,30 +446,6 @@ async function submit(): Promise<void> {
         : friendlyErrorMessage(error, "اشتراک ثبت نشد. دوباره تلاش کنید."));
   } finally {
     submitting.value = false;
-  }
-}
-
-/**
- * Copy for one refusal from `POST /_user/location/share`. Codes the client cannot explain return null so
- * the generic path still runs — a silently dropped refusal would be worse than a vague message.
- */
-function rejectionText(rejection: { code: string; label: string | null } | undefined): string | null {
-  if (!rejection) return null;
-  switch (rejection.code) {
-    case "self_target":
-      return "نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید.";
-    case "unknown_target":
-      return rejection.label
-        ? `حساب «${rejection.label}» دیگر وجود ندارد.`
-        : "یک یا چند نفر از انتخاب‌ها پیدا نشدند.";
-    case "unavailable_target":
-      return rejection.label
-        ? `«${rejection.label}» غیرفعال یا محدود شده و نمی‌تواند اشتراک بگیرد.`
-        : "یک یا چند نفر از انتخاب‌ها نمی‌توانند اشتراک بگیرند.";
-    case "unknown_priority_device":
-      return "دستگاه انتخابی دیگر زنده نیست. فهرست دستگاه‌ها را تازه کنید و دوباره انتخاب کنید.";
-    default:
-      return null;
   }
 }
 

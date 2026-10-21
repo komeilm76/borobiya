@@ -192,6 +192,32 @@ export function shareRejections(error: unknown): ShareRejection[] {
 }
 
 /** Ordered as the server sent them; the first entry is the one worth showing. */
+/**
+ * Copy for one refusal from `POST /_user/location/share`, shared by the share dialog and the device
+ * settings screen because both write through that endpoint: two switches over the same server codes drift
+ * the first time a code is added. Codes the client cannot explain return `null` so the caller's generic
+ * path still runs — a silently dropped refusal would be worse than a vague message.
+ */
+export function rejectionText(rejection: { code: string; label: string | null } | undefined): string | null {
+  if (!rejection) return null;
+  switch (rejection.code) {
+    case "self_target":
+      return "نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید.";
+    case "unknown_target":
+      return rejection.label
+        ? `حساب «${rejection.label}» دیگر وجود ندارد.`
+        : "یک یا چند نفر از انتخاب‌ها پیدا نشدند.";
+    case "unavailable_target":
+      return rejection.label
+        ? `«${rejection.label}» غیرفعال یا محدود شده و نمی‌تواند اشتراک بگیرد.`
+        : "یک یا چند نفر از انتخاب‌ها نمی‌توانند اشتراک بگیرند.";
+    case "unknown_priority_device":
+      return "دستگاه انتخابی دیگر زنده نیست. فهرست دستگاه‌ها را تازه کنید و دوباره انتخاب کنید.";
+    default:
+      return null;
+  }
+}
+
 export function nameShareRejections(
   rejections: readonly ShareRejection[],
   labels: readonly string[]

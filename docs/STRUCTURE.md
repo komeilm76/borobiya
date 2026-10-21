@@ -229,12 +229,16 @@ packages/client/
     │   ├── map-config.ts     # same-origin validated map settings
     │   ├── admin-users.ts    # typed admin user list and status calls
     │   ├── location.ts       # share create/revoke/list, history grants, both history reads, picker search
-    │   └── location.test.ts
+    │   ├── location.test.ts
+    │   ├── devices.ts        # GET /_user/devices, the only ids the priority rule accepts
+    │   └── devices.test.ts
     ├── components/
     │   ├── map/
     │   │   ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
     │   │   ├── HistoryPlaybackPanel.vue # range presets, hand-typed window, transport, scrub slider
     │   │   └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    │   ├── settings/
+    │   │   └── DevicePriorityPanel.vue # live-session table + per-share priority chooser
     │   └── sharing/
     │       ├── ShareDialog.vue # recipient picker, timed/permanent modes, device chooser
     │       └── ShareLists.vue  # My Shares / Shared With Me / history grants, confirm-to-revoke
@@ -257,6 +261,8 @@ packages/client/
     ├── composables/
     │   ├── use-history-playback.ts # window, cursor, transport loop, and the two history reads
     │   ├── use-history-playback.test.ts
+    │   ├── use-device-settings.ts # the two lists, per-minute clock, and the re-pin posts
+    │   ├── use-device-settings.test.ts
     │   ├── useSystemTheme.ts # reactive prefers-color-scheme signal
     │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
     │   ├── location-broadcast.test.ts
@@ -269,8 +275,11 @@ packages/client/
     │   ├── playback.test.ts
     │   ├── playback-map-sync.ts # what maplibre must be told, as a plan rather than as calls
     │   └── playback-map-sync.test.ts
+    ├── settings/
+    │   ├── priority-device.ts # repin bodies that cannot extend an expiry, device rows, refusal copy
+    │   └── priority-device.test.ts
     ├── sharing/
-    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, duration words
+    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, refusal + duration words
     │   └── share-form.test.ts
     ├── theme/
     │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
@@ -290,12 +299,13 @@ packages/client/
         ├── _public/PlaceholderView.vue
         ├── _user/CompleteSecurityQuestionsView.vue
         ├── _user/UserDashboardView.vue # responsive dashboard with map widget
+        ├── _user/UserDevicesView.vue   # Active Devices and the priority-device chooser (spec §7.3)
         ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view + playback wiring
         ├── _user/PlaceholderView.vue
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). Routing, live companion markers on the map, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. Routing, live companion markers on the map, and Android packaging remain future work.
 
 ---
 

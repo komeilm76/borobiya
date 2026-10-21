@@ -544,6 +544,7 @@ curl -X PATCH http://localhost:3000/_user/missions/MISSION_ID/status -H "Authori
 | `/_auth/register` | `GET /_public/security-questions` + `POST /_auth/register` |
 | `/_auth/forgot-password` | 3-step forgot |
 | `/_user/dashboard` | `GET /_user/me`, `GET /_user/location/shares`, `GET /_user/location/history/shares`, `DELETE /_user/location/share/:shareId`, plus the share dialog's `GET /_user/users/search` and `POST /_user/location/share`; live socket |
+| `/_user/devices` | `GET /_user/devices`, `GET /_user/location/shares`; changing a priority device re-posts `POST /_user/location/share` for that one recipient (reuse re-points the row; the expiry cannot move) |
 | `/_user/map` | Map Server tiles/styles via `/map-config`; history playback reads `GET /_user/location/history?from&to` for one's own track and `GET /_user/location/history/shared/:shareId` (no query — the grant fixes range and density) for a companion's, with the grant list from `GET /_user/location/history/shares` |
 | `/_user/sos/history` | `GET /_user/sos/requests` + `missions` |
 | `/_admin/users` | `GET /_admin/users`, `PATCH .../status` |

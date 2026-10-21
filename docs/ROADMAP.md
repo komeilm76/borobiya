@@ -104,9 +104,9 @@ gantt
 
 ### M2.3 Multi-Device Priority
 - [x] `user_sessions` table + `GET /_user/devices` + deviceName detection — T2.3.1/T2.3.2 (the label is a bounded human summary of the UA, not the raw header)
-- [ ] Warning modal if `activeDevices>1` on share start: “Select broadcasting device”
+- [x] Warning modal if `activeDevices>1` on share start: “Select broadcasting device” — the `409 PRIORITY_DEVICE_REQUIRED` list opens the chooser inside the share dialog (T2.3.3's client half, landed with T2.1.7)
 - [x] Server only accepts GPS from `priorityDeviceId` — T2.3.4, with T2.3.3 choosing the pin on share creation
-- [ ] Settings page: Active Devices Table
+- [x] Settings page: Active Devices Table + change-the-priority-anytime — T2.3.5 (2026-10-22) at `/_user/devices`, reached from the dashboard; the write reuses `POST /_user/location/share` with a body that cannot move the expiry
 
 **Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline. — the second half has its implementation (T2.2.6: grant → sampled polyline on the receiver's map, opened on the last 7 days) and is now measured by the browser run, not by code: P2-A1 covers both halves of the first clause and the playback panel's live behavior (fit-to-track, theme swap, scrub), so neither can be claimed from unit tests.
 
