@@ -158,9 +158,10 @@ export const historyShareSchema = z.strictObject({
   from: timestampSchema,
   to: timestampSchema,
   /**
-   * Downsample target for receivers. Deliberately not range-bounded here: the largest shareable window
-   * is `LOCATION_HISTORY_MAX_SHARE_DAYS`, which is server configuration (spec §7.2), so the API layer
-   * owns that check and answers `400 SHARE_RANGE_TOO_LARGE`.
+   * Downsample target, stored on the grant so every receiver of this window reads it at the same
+   * density. Bounded here because it is a fixed response-size ceiling; the *window* bound next to it
+   * is not, because `LOCATION_HISTORY_MAX_SHARE_DAYS` is server configuration (spec §7.2), so the API
+   * layer owns that check and answers `400 SHARE_RANGE_TOO_LARGE`.
    */
   maxPoints: z
     .number()

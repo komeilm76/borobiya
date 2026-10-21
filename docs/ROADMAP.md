@@ -89,22 +89,22 @@ gantt
 **Goal:** Users share live & history locations, manage shares, multi-device aware.
 
 ### M2.1 Live Sharing
-- [ ] `POST /_user/location/share` (timed/permanent) + `DELETE /.../:shareId`
-- [ ] Socket `location:update` (3-5s throttled) → broadcast to targets
-- [ ] Cron: expire timed shares every minute
+- [x] `POST /_user/location/share` (timed/permanent) + `DELETE /.../:shareId` — T2.1.2/T2.1.3
+- [x] Socket `location:update` (3-5s throttled) → broadcast to targets — T2.1.5 with T2.3.4, client pacing at 4s
+- [x] Cron: expire timed shares every minute — T2.1.6 (readers also filter `expiresAt`, so a deadline holds between sweeps)
 - [ ] Frontend: share dialog (pick users, timed slider), “My Shares” list, live markers on map
 
 ### M2.2 History Sharing
-- [ ] `location_history` table + insert on each update (batched)
+- [x] `location_history` table + insert on each update — T2.2.1 with the writer inside `location:update`; deliberately one insert per accepted fix, since a 4s floor gives batching nothing to save
 - [x] `POST /_user/location/history/share` (from/to, maxPoints stored on the grant) — done 2026-10-22; the read-side downsample lands with the receiver polyline task below
 - [ ] Receiver: polyline + time slider on map
-- [ ] ENV retention 90d + maxShare 30d, daily prune cron
+- [x] ENV retention 90d + maxShare 30d, daily prune cron — T2.2.5 (validated at startup, batched delete, catch-up pass on boot)
 - [ ] Frontend: date range picker + polyline playback
 
 ### M2.3 Multi-Device Priority
-- [ ] `user_sessions` table + `GET /_user/devices` + deviceName detection
+- [x] `user_sessions` table + `GET /_user/devices` + deviceName detection — T2.3.1/T2.3.2 (the label is a bounded human summary of the UA, not the raw header)
 - [ ] Warning modal if `activeDevices>1` on share start: “Select broadcasting device”
-- [ ] Server only accepts GPS from `priorityDeviceId`
+- [x] Server only accepts GPS from `priorityDeviceId` — T2.3.4, with T2.3.3 choosing the pin on share creation
 - [ ] Settings page: Active Devices Table
 
 **Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline.
