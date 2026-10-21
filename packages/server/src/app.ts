@@ -146,7 +146,7 @@ export async function createFastifyApp(
   });
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks.
-  await registerLocationShareRoutes(app, { store: locationShareStore });
+  await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
 
   const realtime = attachRealtime(app.server, {
     jwtSecret: config.jwtSecret,

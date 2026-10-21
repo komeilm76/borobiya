@@ -150,11 +150,11 @@ packages/server/
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
     ├── location/
-    │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location
+    │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location, plus priority-device resolution against the live sessions
     │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
     │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
     │   ├── live.test.ts      # service rules and REST fallback status/ack tests
-    │   ├── jobs.ts           # in-process maintenance timers: expire overdue shares (1m) and prune history past retention (daily, batched)
+    │   ├── jobs.ts           # in-process maintenance timers: expire overdue shares and repair stale priority pins (1m) and prune history past retention (daily, batched)
     │   └── jobs.test.ts      # batching, cadence, failure isolation, and no-overlap tests
     ├── realtime/
     │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
@@ -167,7 +167,7 @@ packages/server/
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
     │   ├── location-history-store.ts # one transaction per fix: PostGIS users.last_location upsert + location_history insert
-    │   ├── location-share-store.ts # share-target classification, atomic creation/reuse, owner-only revocation, and active share lists
+    │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions

@@ -1,13 +1,20 @@
 import { apiRoutes, sharePathParamsSchema } from "@borobiya/shared/api";
-import { createLocationShareSchema, MAX_LOCATION_SHARE_LIST_ITEMS } from "@borobiya/shared";
+import {
+  createLocationShareSchema,
+  MAX_LOCATION_SHARE_LIST_ITEMS,
+  MAX_USER_DEVICE_LIST_ITEMS
+} from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
+import type { UserDeviceStore } from "../db/device-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 
 const MINUTE_MS = 60_000;
 
 export interface LocationSharesRouteDependencies {
   store: LocationShareStore;
+  /** Live sessions of the caller, i.e. the `activeDevices` set spec §7.3 counts. */
+  devices: Pick<UserDeviceStore, "listDevices">;
 }
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -49,12 +56,49 @@ function currentUserIdentity(request: FastifyRequest): AuthenticatedUserContext 
 }
 
 /**
- * Live-location share creation (T2.1.2).
+ * Which device may broadcast to the shares of one request (spec §7.3).
+ *
+ * The rule is deliberately per-request rather than account-wide: a share row pins one device, so an
+ * account with a phone and a laptop can have the car-nav share follow the phone and the dispatch
+ * share follow the laptop. `location:update` (T2.3.4) then accepts a fix only for the shares whose
+ * pin matches the connection's own session device.
+ */
+export type PriorityDeviceResolution =
+  | { status: "pinned"; deviceId: string }
+  /** More than one live device and the caller named none — the client must ask the user. */
+  | { status: "required"; deviceIds: string[] }
+  /** The named device is not a live session of this account (logged out, revoked, or invented). */
+  | { status: "unknown"; deviceId: string };
+
+export function resolvePriorityDevice(input: {
+  requested: string | undefined;
+  devices: readonly { deviceId: string }[];
+  currentDeviceId: string;
+}): PriorityDeviceResolution {
+  if (input.devices.length === 0) {
+    // Unreachable through the `/_user` hook (it requires a live session). The fallback may only ever
+    // pin the caller's own device, so a store disagreement cannot widen who is allowed to broadcast.
+    if (input.requested !== undefined && input.requested !== input.currentDeviceId) {
+      return { status: "unknown", deviceId: input.requested };
+    }
+    return { status: "pinned", deviceId: input.currentDeviceId };
+  }
+  if (input.requested === undefined) {
+    if (input.devices.length > 1) {
+      return { status: "required", deviceIds: input.devices.map((device) => device.deviceId) };
+    }
+    return { status: "pinned", deviceId: input.devices[0]!.deviceId };
+  }
+  return input.devices.some((device) => device.deviceId === input.requested)
+    ? { status: "pinned", deviceId: input.requested }
+    : { status: "unknown", deviceId: input.requested };
+}
+
+/**
+ * Live-location share creation (T2.1.2) with the multi-device priority rule (T2.3.3).
  *
  * TODO: Privacy v2 — the receiver of a share may read the owner's live position for the
  * whole share window; allowlists/blocklists and finer windows remain out of scope (spec §7.4).
- * TODO: T2.3.3 — when the account has more than one active device, the client must collect a
- * `priorityDeviceId` and the server must require/reject updates from other devices (T2.3.4).
  */
 export async function registerLocationShareRoutes(
   app: FastifyInstance,
@@ -116,6 +160,41 @@ export async function registerLocationShareRoutes(
       );
     }
 
+    // Resolved after recipient validation (both are the caller's to fix) and before any write, so a
+    // multi-device account never ends up with shares that no device is allowed to feed.
+    const devices = await dependencies.devices.listDevices({
+      userId: user.userId,
+      currentSessionId: user.sessionId,
+      limit: MAX_USER_DEVICE_LIST_ITEMS
+    });
+    const priority = resolvePriorityDevice({
+      requested: parsed.data.priorityDeviceId,
+      devices,
+      currentDeviceId: user.deviceId
+    });
+    if (priority.status === "required") {
+      return sendError(
+        reply,
+        409,
+        "PRIORITY_DEVICE_REQUIRED",
+        "This account is active on multiple devices. Choose which one broadcasts your location.",
+        [{ code: "multiple_active_devices", deviceIds: priority.deviceIds, path: ["priorityDeviceId"] }]
+      );
+    }
+    if (priority.status === "unknown") {
+      return sendError(
+        reply,
+        400,
+        "VALIDATION_ERROR",
+        "Request body validation failed.",
+        [{
+          code: "unknown_priority_device",
+          message: "That device is not a live session of this account. Refresh the device list and choose again.",
+          path: ["priorityDeviceId"]
+        }]
+      );
+    }
+
     const expiresAt = mode === "timed"
       ? new Date(Date.now() + (durationMinutes ?? 0) * MINUTE_MS)
       : null;
@@ -125,7 +204,8 @@ export async function registerLocationShareRoutes(
       targetUserIds: assessment.eligible,
       mode,
       expiresAt,
-      note: note ?? null
+      note: note ?? null,
+      priorityDeviceId: priority.deviceId
     });
 
     return reply
@@ -138,8 +218,8 @@ export async function registerLocationShareRoutes(
       });
   });
 
-  // TODO (T2.1.5): once Socket.IO fan-out exists, notify the affected targets that sharing
-  // stopped so their markers clear without waiting for the next list refresh.
+  // TODO (T2.1.5 follow-up): the Socket.IO fan-out exists now, but there is no share-state event
+  // yet, so a revoked share's marker clears on the receiver's next list refresh rather than at once.
   app.delete(revokeRoute.url, async (request, reply) => {
     const user = currentUserIdentity(request);
     if (!user) {

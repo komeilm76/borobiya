@@ -198,7 +198,7 @@ POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 
 `POST /_user/complete-security-questions` requires an access JWT backed by a matching unrevoked session, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The same hook returns `401 INVALID_ACCESS_TOKEN` when logout, password reset, or admin action revoked the persisted session, immediately invalidating any access JWT from it. `GET /_user/me` returns the current profile with `Cache-Control: no-store` after onboarding; incomplete accounts receive the security-question gate response. Other `_user` operations shown here remain contract-only.
 
-**`GET /_user/devices` (T2.3.2, live).** Returns the caller's **live sessions** — rows of `user_sessions` that still hold a refresh token — newest `lastActiveAt` first, capped at `MAX_USER_DEVICE_LIST_ITEMS` (50), with `Cache-Control: no-store`. `id` is the session row and `deviceId` is the value `location_shares.priorityDeviceId` pins, so this is the list the priority-device picker (T2.3.3) reads; exactly one row has `isCurrentDevice: true` because the `/_user` hook already rejects a revoked or missing session. `deviceName` is the label described in §3.2 and `ip` is the address seen at the last credential exchange (login or refresh rotation). Logged-out and admin-revoked sessions are excluded rather than listed as offline history, since sessions have no retention job of their own; `isOnline` still mirrors session liveness and will only differentiate once socket presence (T2.1.5) drives it.
+**`GET /_user/devices` (T2.3.2, live).** Returns the caller's **live sessions** — rows of `user_sessions` that still hold a refresh token — newest `lastActiveAt` first, capped at `MAX_USER_DEVICE_LIST_ITEMS` (50), with `Cache-Control: no-store`. `id` is the session row and `deviceId` is the value `location_shares.priorityDeviceId` pins (T2.3.3), so the picker offers exactly the ids the server accepts; exactly one row has `isCurrentDevice: true` because the `/_user` hook already rejects a revoked or missing session. `deviceName` is the label described in §3.2 and `ip` is the address seen at the last credential exchange (login or refresh rotation). Logged-out and admin-revoked sessions are excluded rather than listed as offline history, since sessions have no retention job of their own; `isOnline` still mirrors session liveness and will only differentiate once socket presence (T2.1.5) drives it.
 
 ### 5.2 User Search
 
@@ -212,7 +212,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 ### 5.3 Location Sharing
 
 ```
-POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
+POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note?, priorityDeviceId?: string }
 → 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
 DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
 GET    /_user/location/shares            → { owned: LocationShare[], sharedWithMe: (LocationShare & { owner })[] }
@@ -247,7 +247,9 @@ requested near the retention edge can legitimately return fewer points than expe
 validated at startup to be ≤ `LOCATION_HISTORY_RETENTION_DAYS`; the per-request `400 SHARE_RANGE_TOO_LARGE` check above is
 part of T2.2.3.
 
-**`POST /_user/location/share` (T2.1.2, live).** Requires the same verified `/_user` access token, active account, and completed-onboarding state as every other user route. Limits: 1-50 unique recipients, `durationMinutes` an integer from 1 to 43200 (30 days, required only for `timed`), and `note` up to 500 characters. Recipients are validated as a batch: the owner's own account, unknown ids, and inactive or suspended accounts are rejected with `400 VALIDATION_ERROR` and `issues[].code` of `self_target`, `unknown_target`, or `unavailable_target`; nothing is written when any recipient is rejected. On success all rows are written in one transaction and each response `shares[]` item follows `LocationShare` (`id`, `ownerId`, `targetUserId`, `mode`, `expiresAt`, `isRevoked`, `priorityDeviceId`, `note`, `createdAt`). A repeated request for the same owner/target/mode reuses the existing active share instead of stacking duplicates (`reusedShareIds`) and only extends a timed expiry when the new one is later (`createdShareIds` otherwise). Responses are `Cache-Control: no-store`. Selecting a priority device for multi-device accounts is T2.3.3 and is not part of this payload.
+**`POST /_user/location/share` (T2.1.2, live).** Requires the same verified `/_user` access token, active account, and completed-onboarding state as every other user route. Limits: 1-50 unique recipients, `durationMinutes` an integer from 1 to 43200 (30 days, required only for `timed`), and `note` up to 500 characters. Recipients are validated as a batch: the owner's own account, unknown ids, and inactive or suspended accounts are rejected with `400 VALIDATION_ERROR` and `issues[].code` of `self_target`, `unknown_target`, or `unavailable_target`; nothing is written when any recipient is rejected. On success all rows are written in one transaction and each response `shares[]` item follows `LocationShare` (`id`, `ownerId`, `targetUserId`, `mode`, `expiresAt`, `isRevoked`, `priorityDeviceId`, `note`, `createdAt`). A repeated request for the same owner/target/mode reuses the existing active share instead of stacking duplicates (`reusedShareIds`) and only extends a timed expiry when the new one is later (`createdShareIds` otherwise). Responses are `Cache-Control: no-store`.
+
+**Priority device (T2.3.3, live).** `priorityDeviceId` names the device that will broadcast the position for these shares. When the account has exactly one device with a live session the server pins it itself, so a single-device account never has to choose and an omitted field is never a rejection. When it has more than one, the field is required: a share request without it is `409 PRIORITY_DEVICE_REQUIRED` with `issues: [{ code: "multiple_active_devices", deviceIds, path: ["priorityDeviceId"] }]` and nothing is written, so the client can open the chooser from that list and retry. An id that is not one of the caller's live devices is `400 VALIDATION_ERROR` with the issue code `unknown_priority_device`; a malformed id is rejected by `shareSchema` before any device lookup. The pin is stored per share row, and a repeated request for an existing share re-points it whenever the requested device differs — including on a permanent share, which otherwise never changes; `note` is still only rewritten together with an extension. The same rule applies to `location:update` (section 8) and, from T2.2.3 on, to history shares. Only devices with a live session can be pinned: signing out of the last one stops broadcasts by design, and because the expiry sweep re-points a share whose pinned device no longer has a session, a share is never stranded on a signed-out device while the account has exactly one live device left.
 
 ### 5.4 SOS — Requester Side
 
@@ -417,7 +419,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, or an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`) |
+| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |
@@ -436,7 +438,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
-| 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection |
+| 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection; `issues[0].deviceIds` carries the live devices for the chooser |
 | 429 | `RATE_LIMITED` | Too many req |
 | 503 | `RECOVERY_UNAVAILABLE` | Security-question catalog or recovery challenge storage is unavailable |
 | 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |

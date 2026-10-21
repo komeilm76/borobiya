@@ -44,7 +44,14 @@ export const shareSchema = z.strictObject({
     .max(MAX_LOCATION_SHARE_MINUTES, `Timed location sharing must not exceed ${MAX_LOCATION_SHARE_MINUTES} minutes. Use permanent mode for longer visibility.`)
     .nullable()
     .optional(),
-  note: z.string().trim().max(MAX_LOCATION_SHARE_NOTE_LENGTH).optional()
+  note: z.string().trim().max(MAX_LOCATION_SHARE_NOTE_LENGTH).optional(),
+  /**
+   * Which of the owner's live sessions should broadcast to these recipients (spec §7.3), i.e. the
+   * value stored in `location_shares.priority_device_id`. Omitted when the account has exactly one
+   * live device, because then there is nothing to choose; with several, the server answers
+   * `409 PRIORITY_DEVICE_REQUIRED` until one is named.
+   */
+  priorityDeviceId: idSchema.optional()
 }).superRefine((share, context) => {
   if (share.mode === "timed" && (share.durationMinutes === undefined || share.durationMinutes === null)) {
     context.addIssue({

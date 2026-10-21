@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
-import { locationShares, users } from "./schema";
+import { locationShares, userSessions, users } from "./schema";
 
 export interface LocationShareRecord {
   id: string;
@@ -32,6 +32,12 @@ export interface CreateLocationSharesInput {
   mode: LocationShareMode;
   expiresAt: Date | null;
   note: string | null;
+  /**
+   * The device allowed to feed these shares (spec §7.3). Resolved by the route — never trusted from
+   * the client verbatim — and applied to reused shares too, so re-choosing a device can take effect
+   * without revoking and re-creating every share.
+   */
+  priorityDeviceId: string | null;
 }
 
 export interface CreatedLocationShares {
@@ -75,6 +81,13 @@ export interface LocationShareStore {
    */
   expireOverdueShares(input: { now: Date }): Promise<number>;
   /**
+   * Re-points the active shares of accounts that now have exactly one live device, when the device
+   * they pin has no live session left. Returns how many rows were re-pointed. Without this, logging
+   * out of the only broadcasting device would leave every share pinned to a dead device, and
+   * `location:update` (T2.3.4) would reject every fix — the marker would freeze silently.
+   */
+  repairStaleSharePins(input: { now: Date }): Promise<number>;
+  /**
    * Revokes one owned share immediately. Revoking a share that is already revoked is a no-op,
    * and a share owned by someone else is indistinguishable from a missing one (`not-found`).
    */
@@ -102,6 +115,29 @@ const locationShareSelection = {
   note: locationShares.note,
   createdAt: locationShares.createdAt
 };
+
+/**
+ * Moves the active shares of single-device accounts onto their only live device, but only while the
+ * pinned device has no live session left. Accounts with two or more live devices are deliberately
+ * untouched: there the choice belongs to the user, and the next `POST /_user/location/share` asks for
+ * it again (`409 PRIORITY_DEVICE_REQUIRED`). Exported so the statement is testable on its own.
+ */
+export function repairStaleSharePinsQuery(db: Database, now: Date) {
+  // One correlated fragment, reused three times: the account's live sessions.
+  const liveSessionsOfOwner = sql`from ${userSessions} where ${userSessions.userId} = ${locationShares.ownerId} and ${userSessions.refreshTokenHash} is not null`;
+
+  return db
+    .update(locationShares)
+    .set({ priorityDeviceId: sql`(select min(${userSessions.deviceId}) ${liveSessionsOfOwner})` })
+    .where(and(
+      eq(locationShares.isRevoked, false),
+      sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > ${now})`,
+      isNotNull(locationShares.priorityDeviceId),
+      // Exactly one live device, so re-pointing is not a guess between alternatives.
+      sql`(select count(*) ${liveSessionsOfOwner}) = 1`,
+      sql`not exists (select 1 ${liveSessionsOfOwner} and ${userSessions.deviceId} = ${locationShares.priorityDeviceId})`
+    ));
+}
 
 /**
  * One statement that retires every timed share whose window has closed. Permanent shares keep a
@@ -180,10 +216,19 @@ export class DrizzleLocationShareStore implements LocationShareStore {
             (existing.expiresAt === null || input.expiresAt.getTime() > existing.expiresAt.getTime())
             ? input.expiresAt
             : undefined;
-          const [updated] = extendTo
+          const patch: { expiresAt?: Date; note?: string; priorityDeviceId?: string } = {};
+          if (extendTo) {
+            patch.expiresAt = extendTo;
+            if (input.note !== null) patch.note = input.note;
+          }
+          // A device change is orthogonal to the sharing window, so permanent shares get it too.
+          if (input.priorityDeviceId !== null && input.priorityDeviceId !== existing.priorityDeviceId) {
+            patch.priorityDeviceId = input.priorityDeviceId;
+          }
+          const [updated] = Object.keys(patch).length > 0
             ? await transaction
                 .update(locationShares)
-                .set({ expiresAt: extendTo, ...(input.note !== null ? { note: input.note } : {}) })
+                .set(patch)
                 .where(eq(locationShares.id, existing.id))
                 .returning(locationShareSelection)
             : [existing];
@@ -201,7 +246,8 @@ export class DrizzleLocationShareStore implements LocationShareStore {
             targetUserId,
             mode: input.mode,
             expiresAt: input.expiresAt,
-            note: input.note
+            note: input.note,
+            priorityDeviceId: input.priorityDeviceId
           })
           .returning(locationShareSelection);
         if (!created) {
@@ -292,6 +338,11 @@ export class DrizzleLocationShareStore implements LocationShareStore {
   async expireOverdueShares(input: { now: Date }): Promise<number> {
     const expired = await expireOverdueSharesQuery(this.db, input.now).returning({ id: locationShares.id });
     return expired.length;
+  }
+
+  async repairStaleSharePins(input: { now: Date }): Promise<number> {
+    const repaired = await repairStaleSharePinsQuery(this.db, input.now).returning({ id: locationShares.id });
+    return repaired.length;
   }
 
   async revokeShare(input: { ownerId: string; shareId: string }): Promise<LocationShareRevocation> {

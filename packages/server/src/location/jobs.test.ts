@@ -22,11 +22,13 @@ function makeLogger(): LocationJobLogger & { info: ReturnType<typeof vi.fn>; war
 
 function makeStores(overrides: {
   expireOverdueShares?: LocationShareStore["expireOverdueShares"];
+  repairStaleSharePins?: LocationShareStore["repairStaleSharePins"];
   pruneOlderThan?: LocationHistoryStore["pruneOlderThan"];
 } = {}) {
   return {
     shareStore: {
-      expireOverdueShares: overrides.expireOverdueShares ?? (async () => 0)
+      expireOverdueShares: overrides.expireOverdueShares ?? (async () => 0),
+      repairStaleSharePins: overrides.repairStaleSharePins ?? (async () => 0)
     } as unknown as LocationShareStore,
     historyStore: {
       pruneOlderThan: overrides.pruneOlderThan ?? (async () => 0)
@@ -41,22 +43,30 @@ afterEach(() => {
 describe("runLocationJobs", () => {
   it("expires overdue shares and prunes history older than the retention window", async () => {
     const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 7);
+    const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => 2);
     const pruneOlderThan = vi.fn<LocationHistoryStore["pruneOlderThan"]>(async () => 120);
     const logger = makeLogger();
 
     const outcome = await runLocationJobs({
-      ...makeStores({ expireOverdueShares, pruneOlderThan }),
+      ...makeStores({ expireOverdueShares, repairStaleSharePins, pruneOlderThan }),
       now: () => NOW,
       retentionDays: 90,
       logger
     });
 
     expect(expireOverdueShares).toHaveBeenCalledWith({ now: NOW });
+    expect(repairStaleSharePins).toHaveBeenCalledWith({ now: NOW });
     expect(pruneOlderThan).toHaveBeenCalledWith({
       olderThan: new Date(NOW.getTime() - 90 * DAY_MS),
       limit: HISTORY_PRUNE_BATCH_ROWS
     });
-    expect(outcome).toEqual({ expiredShares: 7, prunedHistoryRows: 120, prunedBatches: 1, failures: [] });
+    expect(outcome).toEqual({
+      expiredShares: 7,
+      repairedPins: 2,
+      prunedHistoryRows: 120,
+      prunedBatches: 1,
+      failures: []
+    });
     expect(logger.info).toHaveBeenCalledTimes(2);
     expect(logger.warn).not.toHaveBeenCalled();
   });
@@ -71,8 +81,35 @@ describe("runLocationJobs", () => {
       logger
     });
 
-    expect(outcome).toEqual({ expiredShares: 0, prunedHistoryRows: 0, prunedBatches: 1, failures: [] });
+    expect(outcome).toEqual({
+      expiredShares: 0,
+      repairedPins: 0,
+      prunedHistoryRows: 0,
+      prunedBatches: 1,
+      failures: []
+    });
     expect(logger.info).not.toHaveBeenCalled();
+  });
+
+  it("still reports the shares it expired when the pin repair fails", async () => {
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 4);
+    const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => {
+      throw new Error("device list unavailable");
+    });
+    const logger = makeLogger();
+
+    const outcome = await runLocationJobs({
+      ...makeStores({ expireOverdueShares, repairStaleSharePins }),
+      now: () => NOW,
+      retentionDays: 90,
+      logger
+    });
+
+    // The expiry statement already committed, so its count is kept and the repair retries next tick.
+    expect(outcome.expiredShares).toBe(4);
+    expect(outcome.repairedPins).toBe(0);
+    expect(outcome.failures).toEqual(["share-expiry"]);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 
   it("keeps batching until the batch is not full and stops at the cap", async () => {
@@ -104,10 +141,16 @@ describe("runLocationJobs", () => {
       logger
     });
 
-    expect(outcome).toEqual({ expiredShares: 0, prunedHistoryRows: 3, prunedBatches: 1, failures: ["share-expiry"] });
+    expect(outcome).toEqual({
+      expiredShares: 0,
+      repairedPins: 0,
+      prunedHistoryRows: 3,
+      prunedBatches: 1,
+      failures: ["share-expiry"]
+    });
     expect(pruneOlderThan).toHaveBeenCalledTimes(1);
     expect(logger.warn).toHaveBeenCalledTimes(1);
-    expect(logger.warn.mock.calls[0]?.[1]).toBe("location share expiry sweep failed");
+    expect(logger.warn.mock.calls[0]?.[1]).toBe("location share state sweep failed");
   });
 });
 

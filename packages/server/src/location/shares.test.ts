@@ -4,9 +4,10 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
 import { MAX_LOCATION_SHARE_MINUTES, MAX_LOCATION_SHARE_TARGETS } from "@borobiya/shared";
 import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
+import type { UserDeviceRecord, UserDeviceStore } from "../db/device-store";
 import type { SecurityQuestionsUserRecord, UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "../auth/user-security-questions";
-import { registerLocationShareRoutes } from "./shares";
+import { registerLocationShareRoutes, resolvePriorityDevice } from "./shares";
 
 const jwtSecret = "a".repeat(48);
 const ownerId = randomUUID();
@@ -14,6 +15,8 @@ const targetId = randomUUID();
 const otherTargetId = randomUUID();
 const createdAt = new Date("2026-10-21T09:00:00.000Z");
 const listLimit = 100;
+/** The signed test tokens carry this device claim, so it is the caller's own live device. */
+const callerDeviceId = randomUUID();
 
 const apps: FastifyInstance[] = [];
 
@@ -25,7 +28,7 @@ async function accessToken(overrides: Record<string, unknown> = {}) {
   const issuedAt = Math.floor(Date.now() / 1000);
   return new SignJWT({
     role: "user",
-    deviceId: randomUUID(),
+    deviceId: callerDeviceId,
     sessionId: randomUUID(),
     tokenUse: "access",
     ...overrides
@@ -76,9 +79,24 @@ function makeSecurityStore(user: SecurityQuestionsUserRecord) {
   return store;
 }
 
+/** A device row per id, with the caller's own session first so `isCurrentDevice` stays honest. */
+function deviceRows(deviceIds: string[], currentSessionId: string): UserDeviceRecord[] {
+  return deviceIds.map((deviceId, index) => ({
+    id: index === 0 ? currentSessionId : randomUUID(),
+    deviceId,
+    deviceName: `Device ${index + 1}`,
+    ip: null,
+    lastActiveAt: createdAt,
+    isOnline: true,
+    isCurrentDevice: index === 0
+  }));
+}
+
 async function makeApp(options: {
   user?: SecurityQuestionsUserRecord;
   shareStore?: Partial<LocationShareStore>;
+  /** Live sessions the device store reports for this account: one entry per active device. */
+  deviceIds?: string[];
 } = {}) {
   const assessShareTargets = vi.fn<LocationShareStore["assessShareTargets"]>(async ({ targetUserIds }) => ({
     eligible: [...targetUserIds],
@@ -91,13 +109,15 @@ async function makeApp(options: {
       targetUserId,
       mode: input.mode,
       expiresAt: input.expiresAt,
-      note: input.note
+      note: input.note,
+      priorityDeviceId: input.priorityDeviceId
     }));
     return { shares, createdShareIds: shares.map((share) => share.id), reusedShareIds: [] };
   });
   const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async () => "revoked");
   const listActiveOutgoingShares = vi.fn<LocationShareStore["listActiveOutgoingShares"]>(async () => []);
   const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 0);
+  const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => 0);
   const listActiveShares = vi.fn<LocationShareStore["listActiveShares"]>(async () => ({
     owned: [],
     sharedWithMe: []
@@ -109,22 +129,56 @@ async function makeApp(options: {
     listActiveOutgoingShares,
     listActiveShares,
     expireOverdueShares,
+    repairStaleSharePins,
     ...options.shareStore
   };
+  const deviceIds = options.deviceIds ?? [callerDeviceId];
+  const listDevices = vi.fn<UserDeviceStore["listDevices"]>(async ({ currentSessionId }) =>
+    deviceRows(deviceIds, currentSessionId));
 
   const app = Fastify({ logger: false });
   await registerUserSecurityQuestionsRoute(app, {
     store: makeSecurityStore(options.user ?? userRow()),
     jwtSecret
   });
-  await registerLocationShareRoutes(app, { store });
+  await registerLocationShareRoutes(app, { store, devices: { listDevices } });
   apps.push(app);
-  return { app, assessShareTargets, createShares, revokeShare, listActiveShares };
+  return { app, assessShareTargets, createShares, revokeShare, listActiveShares, listDevices };
 }
 
 async function authorizedHeaders() {
   return { authorization: `Bearer ${await accessToken()}` };
 }
+
+describe("resolvePriorityDevice", () => {
+  const first = randomUUID();
+  const second = randomUUID();
+
+  it("pins the only live device without asking the client", () => {
+    expect(resolvePriorityDevice({ requested: undefined, devices: [{ deviceId: first }], currentDeviceId: second }))
+      .toEqual({ status: "pinned", deviceId: first });
+  });
+
+  it("demands a choice as soon as a second device is live", () => {
+    expect(resolvePriorityDevice({ requested: undefined, devices: [{ deviceId: first }, { deviceId: second }], currentDeviceId: first }))
+      .toEqual({ status: "required", deviceIds: [first, second] });
+  });
+
+  it("accepts any live device, including a different one than the caller's", () => {
+    expect(resolvePriorityDevice({ requested: second, devices: [{ deviceId: first }, { deviceId: second }], currentDeviceId: first }))
+      .toEqual({ status: "pinned", deviceId: second });
+    expect(resolvePriorityDevice({ requested: "not-a-session", devices: [{ deviceId: first }], currentDeviceId: first }))
+      .toEqual({ status: "unknown", deviceId: "not-a-session" });
+  });
+
+  it("falls back to the caller's own device when the store reports none", () => {
+    // The `/_user` hook requires a live session, so this only happens if the two stores disagree.
+    expect(resolvePriorityDevice({ requested: undefined, devices: [], currentDeviceId: first }))
+      .toEqual({ status: "pinned", deviceId: first });
+    expect(resolvePriorityDevice({ requested: second, devices: [], currentDeviceId: first }))
+      .toEqual({ status: "unknown", deviceId: second });
+  });
+});
 
 describe("POST /_user/location/share", () => {
   it("creates a timed share with a computed expiry", async () => {
@@ -142,6 +196,8 @@ describe("POST /_user/location/share", () => {
     expect(input.ownerId).toBe(ownerId);
     expect(input.mode).toBe("timed");
     expect(input.note).toBe("on shift");
+    // The account has one live device, so the server pins it without being told (T2.3.3).
+    expect(input.priorityDeviceId).toBe(callerDeviceId);
     const seconds = (input.expiresAt!.getTime() - Date.now()) / 1000;
     expect(seconds).toBeGreaterThan(59 * 60);
     expect(seconds).toBeLessThanOrEqual(60 * 60 + 5);
@@ -153,11 +209,83 @@ describe("POST /_user/location/share", () => {
         targetUserId: targetId,
         mode: "timed",
         isRevoked: false,
-        priorityDeviceId: null
+        priorityDeviceId: callerDeviceId
       })],
       createdShareIds: [expect.any(String)],
       reusedShareIds: []
     });
+  });
+
+  it("requires an explicit device choice when the account is live on several devices", async () => {
+    const secondDevice = randomUUID();
+    const { app, createShares, listDevices } = await makeApp({ deviceIds: [callerDeviceId, secondDevice] });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      headers: await authorizedHeaders(),
+      payload: { targetUserIds: [targetId], mode: "permanent" }
+    });
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      code: "PRIORITY_DEVICE_REQUIRED",
+      issues: [{ code: "multiple_active_devices", deviceIds: [callerDeviceId, secondDevice], path: ["priorityDeviceId"] }]
+    });
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(listDevices).toHaveBeenCalledWith({ userId: ownerId, currentSessionId: expect.any(String), limit: 50 });
+    // Nothing is half-written while the choice is outstanding.
+    expect(createShares).not.toHaveBeenCalled();
+  });
+
+  it("accepts a multi-device request that names one of its live devices", async () => {
+    const secondDevice = randomUUID();
+    const { app, createShares } = await makeApp({ deviceIds: [callerDeviceId, secondDevice] });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      headers: await authorizedHeaders(),
+      payload: { targetUserIds: [targetId], mode: "permanent", priorityDeviceId: secondDevice }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(createShares.mock.calls[0]![0].priorityDeviceId).toBe(secondDevice);
+    expect(response.json().shares[0]).toMatchObject({ priorityDeviceId: secondDevice });
+  });
+
+  it("refuses a priority device that is not a live session of the account", async () => {
+    const { app, createShares } = await makeApp({ deviceIds: [callerDeviceId] });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      headers: await authorizedHeaders(),
+      payload: { targetUserIds: [targetId], mode: "permanent", priorityDeviceId: randomUUID() }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      issues: [{ code: "unknown_priority_device", path: ["priorityDeviceId"] }]
+    });
+    expect(createShares).not.toHaveBeenCalled();
+  });
+
+  it("rejects a malformed priority device before the device list is read", async () => {
+    const { app, listDevices, createShares } = await makeApp({ deviceIds: [callerDeviceId, randomUUID()] });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      headers: await authorizedHeaders(),
+      payload: { targetUserIds: [targetId], mode: "permanent", priorityDeviceId: "laptop-1" }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().issues[0]).toMatchObject({ path: ["priorityDeviceId"] });
+    expect(listDevices).not.toHaveBeenCalled();
+    expect(createShares).not.toHaveBeenCalled();
   });
 
   it("creates a permanent share without an expiry and reports reused shares", async () => {

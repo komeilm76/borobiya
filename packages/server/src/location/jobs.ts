@@ -22,7 +22,7 @@ export interface LocationJobLogger {
 }
 
 export interface LocationJobDependencies {
-  shareStore: Pick<LocationShareStore, "expireOverdueShares">;
+  shareStore: Pick<LocationShareStore, "expireOverdueShares" | "repairStaleSharePins">;
   historyStore: Pick<LocationHistoryStore, "pruneOlderThan">;
   /** `LOCATION_HISTORY_RETENTION_DAYS` (spec §17.2). */
   retentionDays: number;
@@ -32,6 +32,8 @@ export interface LocationJobDependencies {
 
 export interface LocationJobOutcome {
   expiredShares: number;
+  /** Shares whose pinned device is gone and that were re-pointed to the only remaining device. */
+  repairedPins: number;
   prunedHistoryRows: number;
   prunedBatches: number;
   /** A job that threw is reported here instead of rejecting the whole pass. */
@@ -60,16 +62,23 @@ export async function runLocationJobs(
   const failures: string[] = [];
 
   let expiredShares = 0;
+  let repairedPins = 0;
   try {
     if (selection.expiry) {
       expiredShares = await dependencies.shareStore.expireOverdueShares({ now });
-      if (expiredShares > 0) {
-        logger?.info({ expiredShares, now: now.toISOString() }, "location share expiry sweep ran");
+      // Same cadence and the same table: a share pinned to a device that just logged out would
+      // otherwise reject every incoming fix (T2.3.4) until the owner noticed the frozen marker.
+      repairedPins = await dependencies.shareStore.repairStaleSharePins({ now });
+      if (expiredShares > 0 || repairedPins > 0) {
+        logger?.info(
+          { expiredShares, repairedPins, now: now.toISOString() },
+          "location share state sweep ran"
+        );
       }
     }
   } catch (error) {
     failures.push("share-expiry");
-    logger?.warn({ err: error }, "location share expiry sweep failed");
+    logger?.warn({ err: error }, "location share state sweep failed");
   }
 
   let prunedHistoryRows = 0;
@@ -102,7 +111,7 @@ export async function runLocationJobs(
     }
   }
 
-  return { expiredShares, prunedHistoryRows, prunedBatches, failures };
+  return { expiredShares, repairedPins, prunedHistoryRows, prunedBatches, failures };
 }
 
 export interface LocationJobHandle {

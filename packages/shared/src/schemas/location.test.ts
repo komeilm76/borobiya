@@ -25,6 +25,15 @@ describe("location schemas", () => {
     expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "permanent", durationMinutes: 60 }).success).toBe(false);
   });
 
+  it("takes an optional priority device as a device id only", () => {
+    const deviceId = "00000000-0000-4000-8000-000000000030";
+    expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "permanent", priorityDeviceId: deviceId }).success).toBe(true);
+    expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "permanent", priorityDeviceId: "laptop-1" }).success).toBe(false);
+    // A share must always name a real device or none at all; clearing a pin is not part of this payload.
+    expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "permanent", priorityDeviceId: null }).success).toBe(false);
+    expect(shareSchema.safeParse({ targetUserIds: [targetId], mode: "timed", durationMinutes: 60, priorityDeviceId: deviceId }).success).toBe(true);
+  });
+
   it("requires unique recipients and increasing history-share dates", () => {
     expect(shareSchema.safeParse({ targetUserIds: [targetId, targetId], mode: "permanent" }).success).toBe(false);
     const valid = { targetUserIds: [targetId, otherTargetId], from, to, maxPoints: 500 };

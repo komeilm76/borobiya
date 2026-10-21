@@ -3,19 +3,21 @@ import { randomUUID } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type { Database } from "./client";
-import { locationHistory, locationShares, users } from "./schema";
+import { locationHistory, locationShares, userSessions, users } from "./schema";
 import {
   DrizzleLocationShareStore,
   expireOverdueSharesQuery,
+  repairStaleSharePinsQuery,
   type LocationShareRecord
 } from "./location-share-store";
 
 // A driver is only needed to build SQL; no connection is opened until a query runs.
 const offlineDb = drizzle(postgres("postgresql://borobiya:unused@127.0.0.1:5432/unused"), {
-  schema: { locationShares, locationHistory, users }
+  schema: { locationShares, locationHistory, userSessions, users }
 }) as unknown as Database;
 
 const ownerId = randomUUID();
+const callerDeviceId = randomUUID();
 const targetId = randomUUID();
 
 type Mutation = { type: "insert" | "update"; values: Record<string, unknown> };
@@ -124,7 +126,8 @@ describe("DrizzleLocationShareStore", () => {
       targetUserIds: [targetId, otherTarget],
       mode: "timed",
       expiresAt,
-      note: "night shift"
+      note: "night shift",
+      priorityDeviceId: callerDeviceId
     });
 
     // Each target performs an existing-share read followed by its write.
@@ -133,7 +136,7 @@ describe("DrizzleLocationShareStore", () => {
     expect(result.reusedShareIds).toEqual([]);
     expect(fake.mutations).toHaveLength(2);
     expect(fake.mutations.every(({ type }) => type === "insert")).toBe(true);
-    expect(fake.mutations[0]!.values).toMatchObject({ ownerId, targetUserId: targetId, mode: "timed", expiresAt, note: "night shift" });
+    expect(fake.mutations[0]!.values).toMatchObject({ ownerId, targetUserId: targetId, mode: "timed", expiresAt, note: "night shift", priorityDeviceId: callerDeviceId });
     expect(fake.mutations[1]!.values.targetUserId).toBe(otherTarget);
   });
 
@@ -146,7 +149,8 @@ describe("DrizzleLocationShareStore", () => {
       targetUserIds: [targetId],
       mode: "permanent",
       expiresAt: null,
-      note: "still sharing"
+      note: "still sharing",
+      priorityDeviceId: null
     });
 
     expect(fake.mutations).toEqual([]);
@@ -179,14 +183,16 @@ describe("DrizzleLocationShareStore", () => {
       targetUserIds: [targetId],
       mode: "timed",
       expiresAt: new Date("2026-10-21T11:00:00.000Z"),
-      note: null
+      note: null,
+      priorityDeviceId: null
     });
     const result = await longer.store.createShares({
       ownerId,
       targetUserIds: [targetId],
       mode: "timed",
       expiresAt: new Date("2026-10-21T18:00:00.000Z"),
-      note: "extended"
+      note: "extended",
+      priorityDeviceId: null
     });
 
     expect(shorter.mutations).toEqual([]);
@@ -195,6 +201,44 @@ describe("DrizzleLocationShareStore", () => {
     expect(result.shares[0]!.expiresAt).toEqual(new Date("2026-10-21T18:00:00.000Z"));
     expect(result.reusedShareIds).toEqual([extended.id]);
     expect(result.createdShareIds).toEqual([]);
+  });
+
+  it("re-points an existing share when the account chooses another device", async () => {
+    const previousDevice = randomUUID();
+    const existingPermanent = shareRow({ mode: "permanent", expiresAt: null, priorityDeviceId: previousDevice });
+    const repointed = shareRow({ mode: "permanent", expiresAt: null, priorityDeviceId: callerDeviceId });
+    const permanent = makeDatabase([[existingPermanent], [repointed]]);
+
+    const result = await permanent.store.createShares({
+      ownerId,
+      targetUserIds: [targetId],
+      mode: "permanent",
+      expiresAt: null,
+      note: null,
+      priorityDeviceId: callerDeviceId
+    });
+
+    // Only the pin changes: the sharing window and note are left untouched.
+    expect(permanent.mutations).toEqual([{ type: "update", values: { priorityDeviceId: callerDeviceId } }]);
+    expect(result.reusedShareIds).toEqual([repointed.id]);
+    expect(result.shares[0]!.priorityDeviceId).toBe(callerDeviceId);
+
+    // An identical pin on a timed extension is not rewritten twice.
+    const existingTimed = shareRow({ expiresAt: new Date("2026-10-21T12:00:00.000Z"), priorityDeviceId: callerDeviceId });
+    const extended = shareRow({ expiresAt: new Date("2026-10-21T20:00:00.000Z"), priorityDeviceId: callerDeviceId });
+    const timed = makeDatabase([[existingTimed], [extended]]);
+
+    await timed.store.createShares({
+      ownerId,
+      targetUserIds: [targetId],
+      mode: "timed",
+      expiresAt: new Date("2026-10-21T20:00:00.000Z"),
+      note: null,
+      priorityDeviceId: callerDeviceId
+    });
+
+    expect(timed.mutations).toHaveLength(1);
+    expect(timed.mutations[0]!.values).toEqual({ expiresAt: new Date("2026-10-21T20:00:00.000Z") });
   });
 });
 
@@ -243,6 +287,30 @@ describe("DrizzleLocationShareStore.listActiveShares", () => {
 
     expect(result.owned).toEqual([]);
     expect(result.sharedWithMe[0]!.owner.lastLocation).toBeNull();
+  });
+});
+
+describe("repairStaleSharePinsQuery", () => {
+  it("moves only single-device accounts off a device that has no live session", () => {
+    const built = repairStaleSharePinsQuery(offlineDb, new Date("2026-10-21T09:00:00.000Z"))
+      .returning({ id: locationShares.id })
+      .toSQL();
+    const sql = built.sql.replace(/\s+/g, " ");
+
+    // The replacement value is the account's only live device, correlated to the share's owner.
+    expect(sql).toContain('set "priority_device_id" = (select min("user_sessions"."device_id") from "user_sessions"');
+    expect(sql).toContain('"user_sessions"."user_id" = "location_shares"."owner_id"');
+    expect(sql).toContain('"user_sessions"."refresh_token_hash" is not null');
+    // Only active shares that actually pin a device are considered.
+    expect(sql).toContain('"location_shares"."is_revoked" = $1');
+    expect(sql).toContain('"location_shares"."expires_at" IS NULL OR "location_shares"."expires_at" > $2');
+    expect(sql).toContain('"location_shares"."priority_device_id" is not null');
+    // Exactly one live device, and the pinned one is not live: otherwise the user must choose again.
+    expect(sql).toContain('"user_sessions" where "user_sessions"."user_id" = "location_shares"."owner_id" and "user_sessions"."refresh_token_hash" is not null) = 1');
+    expect(sql).toContain("not exists (select 1");
+    expect(sql).toContain('"user_sessions"."device_id" = "location_shares"."priority_device_id"');
+    expect(built.params[0]).toBe(false);
+    expect(built.params[1]).toEqual(new Date("2026-10-21T09:00:00.000Z"));
   });
 });
 

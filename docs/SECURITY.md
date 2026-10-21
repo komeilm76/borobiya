@@ -90,8 +90,11 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 
 ### 2.3 Multi-Device Priority
 
-- When `activeDevices>1` and starting live share/SOS, client must collect `priorityDeviceId` via modal. `GET /_user/devices` (T2.3.2) is the list whose length decides that condition, and its `deviceId` values are what the picker offers.
-- Server stores in `location_shares.priorityDeviceId` and ignores GPS from other devices (log warning, return 409).
+- The server is the only authority on which device may broadcast a share. `POST /_user/location/share` (T2.3.3) decides it from `listDevices` — the live sessions of `GET /_user/devices` (T2.3.2), the same source the client UI reads, so a chooser can never offer an id the server would reject.
+- Exactly one live device pins itself; more than one make `priorityDeviceId` required, and a share request without it is `409 PRIORITY_DEVICE_REQUIRED` carrying `issues[0].deviceIds` for the chooser with nothing written. An id outside the live sessions is `400 VALIDATION_ERROR` (`unknown_priority_device`), so neither a stranger's device nor a signed-out one can be pinned.
+- The pin lives on `location_shares.priority_device_id` per row and applies from the moment the share exists.
+- `location:update` honours it twice (T2.3.4): the payload device must equal the device the connection is authenticated as, and a fix is accepted only by the shares pinning that device or pinning nothing. A fix from another device of the same account is therefore ignored with an error ack; SOS dispatch is the one documented reader that still falls back to `users.last_location` whatever its device (Phase 3).
+- Signing out of the pinned device stops broadcasts by design. The maintenance sweep re-points an active share only when the account is left with exactly one live device; with two or more the choice returns to the user on the next share request.
 
 ---
 
