@@ -258,11 +258,18 @@ packages/client/
     │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
     │   ├── auth.test.ts
     │   └── theme.ts          # persisted theme preference and system-change synchronization
+    ├── device/
+    │   ├── capacitor.ts      # the only Capacitor import in the client, behind a lazy platform probe
+    │   ├── capacitor.test.ts
+    │   ├── native-label.ts   # plugin facts → bounded `login.deviceName`, user-assigned name ignored
+    │   └── native-label.test.ts
     ├── composables/
     │   ├── use-history-playback.ts # window, cursor, transport loop, and the two history reads
     │   ├── use-history-playback.test.ts
     │   ├── use-device-settings.ts # the two lists, per-minute clock, and the re-pin posts
     │   ├── use-device-settings.test.ts
+    │   ├── use-priority-device.ts # "am I the broadcasting device?", derived, never enforced
+    │   ├── use-priority-device.test.ts
     │   ├── useSystemTheme.ts # reactive prefers-color-scheme signal
     │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
     │   ├── location-broadcast.test.ts
@@ -305,7 +312,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. Routing, live companion markers on the map, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Device detection lives in `src/device/`: `capacitor.ts` probes the native shell lazily (the only place `@capacitor/core` / `@capacitor/device` are imported, and the plugin itself is loaded only when the shell exists) and `native-label.ts` maps the plugin's facts into the bounded `login.deviceName` the Active Devices table shows, while `composables/use-priority-device.ts` answers the same question for any screen that needs it. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. Routing, live companion markers on the map, and Android packaging remain future work.
 
 ---
 

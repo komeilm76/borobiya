@@ -114,6 +114,7 @@ import { computed, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { loginSchema } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
+import { loginDeviceName } from "../../device/capacitor";
 import { resolvePostLoginDestination } from "../../router/guards";
 import { useAuthStore } from "../../stores/auth";
 
@@ -138,7 +139,13 @@ async function submitLogin(): Promise<void> {
 
   submitting.value = true;
   try {
-    await auth.login(parsed.data);
+    // The device label a native build reports (spec §7.3) is looked up only once the credentials have
+    // parsed, and it can never cost anyone their login: `loginDeviceName()` resolves to `undefined` on
+    // web and swallows any plugin failure, so the body simply omits the field and the server derives its
+    // own short label from the `User-Agent`. The store re-parses the whole body, so a device ROM that
+    // reports something absurd is bounded before it leaves the browser.
+    const deviceName = await loginDeviceName();
+    await auth.login(deviceName ? { ...parsed.data, deviceName } : parsed.data);
     await router.replace(resolvePostLoginDestination(route.query.redirect, auth));
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ورود انجام نشد. دوباره تلاش کنید.");

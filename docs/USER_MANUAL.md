@@ -205,6 +205,8 @@ Two things this screen will not do, both of them deliberate:
 - **It does not extend a share.** Changing the device of a timed share keeps the expiry exactly where it is; if it were to run out in under a minute, the change is refused and you are told to open a fresh share instead.
 - **It lists live sessions only.** A device you have logged out of is absent rather than shown as “offline”, and a share still pinned to a device that just left keeps showing that id as “no longer in the list” until the server re-points it (or you choose a new one).
 
+In a native (Android) build the device column is filled from the platform: brand and model, e.g. `Samsung Galaxy S23`. The name **you** gave your phone in its own settings is never sent — it is personal data, and on recent iOS it is a generic string anyway. If the platform cannot be read at all, nothing is sent and the label is derived from the browser instead, so a login is never refused because a device name could not be read.
+
 ---
 
 ## 14. SOS — Requesting Help
