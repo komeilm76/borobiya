@@ -228,11 +228,12 @@ packages/client/
     │   ├── security-questions.ts # cached public question catalog
     │   ├── map-config.ts     # same-origin validated map settings
     │   ├── admin-users.ts    # typed admin user list and status calls
-    │   ├── location.ts       # share create/revoke/list, history grants, picker search
+    │   ├── location.ts       # share create/revoke/list, history grants, both history reads, picker search
     │   └── location.test.ts
     ├── components/
     │   ├── map/
     │   │   ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
+    │   │   ├── HistoryPlaybackPanel.vue # range presets, hand-typed window, transport, scrub slider
     │   │   └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
     │   └── sharing/
     │       ├── ShareDialog.vue # recipient picker, timed/permanent modes, device chooser
@@ -254,6 +255,8 @@ packages/client/
     │   ├── auth.test.ts
     │   └── theme.ts          # persisted theme preference and system-change synchronization
     ├── composables/
+    │   ├── use-history-playback.ts # window, cursor, transport loop, and the two history reads
+    │   ├── use-history-playback.test.ts
     │   ├── useSystemTheme.ts # reactive prefers-color-scheme signal
     │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
     │   ├── location-broadcast.test.ts
@@ -261,6 +264,11 @@ packages/client/
     │   ├── useLiveLocationBroadcast.ts # geolocation watch + throttled location:update over Socket.IO
     │   ├── use-target-search.ts # 300ms picker debounce, aborts, and stale-response guard
     │   └── use-target-search.test.ts
+    ├── history/
+    │   ├── playback.ts       # frames, interpolation, sampled window rules, GeoJSON + style descriptors
+    │   ├── playback.test.ts
+    │   ├── playback-map-sync.ts # what maplibre must be told, as a plan rather than as calls
+    │   └── playback-map-sync.test.ts
     ├── sharing/
     │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, duration words
     │   └── share-form.test.ts
@@ -282,12 +290,12 @@ packages/client/
         ├── _public/PlaceholderView.vue
         ├── _user/CompleteSecurityQuestionsView.vue
         ├── _user/UserDashboardView.vue # responsive dashboard with map widget
-        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view
+        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view + playback wiring
         ├── _user/PlaceholderView.vue
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Routing, live companion markers on the map, history playback, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). Routing, live companion markers on the map, and Android packaging remain future work.
 
 ---
 

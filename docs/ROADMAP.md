@@ -98,9 +98,9 @@ gantt
 ### M2.2 History Sharing
 - [x] `location_history` table + insert on each update — T2.2.1 with the writer inside `location:update`; deliberately one insert per accepted fix, since a 4s floor gives batching nothing to save
 - [x] `POST /_user/location/history/share` (from/to, maxPoints stored on the grant) — done 2026-10-22; the read-side downsample lands with the receiver polyline task below
-- [ ] Receiver: polyline + time slider on map
+- [x] Receiver: polyline + time slider on map — T2.2.4 (server read) with T2.2.6 (client: sampled polyline, scrub slider, transport)
 - [x] ENV retention 90d + maxShare 30d, daily prune cron — T2.2.5 (validated at startup, batched delete, catch-up pass on boot)
-- [ ] Frontend: date range picker + polyline playback
+- [x] Frontend: date range picker + polyline playback — T2.2.6 (2026-10-22): 1/7/30-day presets with last-7-days as the default, hand-typed local window, playback at 1×/4×/16×/60× on the map
 
 ### M2.3 Multi-Device Priority
 - [x] `user_sessions` table + `GET /_user/devices` + deviceName detection — T2.3.1/T2.3.2 (the label is a bounded human summary of the UA, not the raw header)
@@ -108,7 +108,7 @@ gantt
 - [x] Server only accepts GPS from `priorityDeviceId` — T2.3.4, with T2.3.3 choosing the pin on share creation
 - [ ] Settings page: Active Devices Table
 
-**Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline.
+**Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline. — the second half has its implementation (T2.2.6: grant → sampled polyline on the receiver's map, opened on the last 7 days) and is now measured by the browser run, not by code: P2-A1 covers both halves of the first clause and the playback panel's live behavior (fit-to-track, theme swap, scrub), so neither can be claimed from unit tests.
 
 ---
 
