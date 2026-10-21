@@ -23,6 +23,7 @@ import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/loc
 import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
 import { startLocationJobs } from "./location/jobs";
 import { attachRealtime, PEER_UPDATE_EVENT, userRoom } from "./realtime/socket";
+import { registerLocationHistoryShareRoutes } from "./location/history";
 import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
@@ -147,6 +148,11 @@ export async function createFastifyApp(
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks.
   await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
+  await registerLocationHistoryShareRoutes(app, {
+    store: locationHistoryStore,
+    shares: locationShareStore,
+    maxShareDays: config.locationHistoryMaxShareDays
+  });
 
   const realtime = attachRealtime(app.server, {
     jwtSecret: config.jwtSecret,

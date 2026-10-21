@@ -207,10 +207,13 @@ describe("location history schema (T2.2.1/T2.2.2)", () => {
 
     expect(columns.get("from_time")?.notNull).toBe(true);
     expect(columns.get("to_time")?.notNull).toBe(true);
+    // The requested sampling resolution rides on the grant, nullable because "no preference" is legal.
+    expect(columns.get("max_points")?.notNull).toBe(false);
     expect(config.foreignKeys).toHaveLength(2);
     expect(config.checks.map(({ name }) => name)).toEqual([
       "location_history_shares_owner_target_check",
-      "location_history_shares_window_check"
+      "location_history_shares_window_check",
+      "location_history_shares_max_points_check"
     ]);
     expect(
       config.uniqueConstraints.some(({ name }) => name === "location_history_shares_owner_target_window_unique")
@@ -244,6 +247,21 @@ describe("location history schema (T2.2.1/T2.2.2)", () => {
     expect((migrationSql.match(/ON DELETE cascade/g) ?? [])).toHaveLength(1);
     expect(migrationSql).not.toContain("DROP TABLE");
     expect(migrationSql).not.toContain("ALTER TABLE \"users\"");
+  });
+
+  it("adds max_points to history grants without disturbing existing windows", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0009_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationNames[0]}`, import.meta.url), "utf8");
+
+    expect(migrationSql).toContain('ALTER TABLE "location_history_shares" ADD COLUMN "max_points" integer;');
+    expect(migrationSql).toContain(
+      'ADD CONSTRAINT "location_history_shares_max_points_check" CHECK ("max_points" IS NULL OR "max_points" > 0)'
+    );
+    // A nullable column with a value-free check: no backfill, no rewrite of grants already handed out.
+    expect(migrationSql).not.toMatch(/DROP|DELETE|UPDATE|SET NOT NULL/i);
   });
 
   it("adds the sweep's partial index as an index-only migration", () => {

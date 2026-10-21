@@ -150,7 +150,9 @@ packages/server/
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
     ├── location/
-    │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location, plus priority-device resolution against the live sessions
+    │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location, plus priority-device resolution and the shared recipient-issue mapping
+    │   ├── history.ts        # history-share grant creation: range bound against the ENV ceiling, batched recipient validation, batch response
+    │   ├── history.test.ts   # auth guard, range limit, recipient batch rules, contract bounds, and store call shape
     │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
     │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
     │   ├── live.test.ts      # service rules and REST fallback status/ack tests
@@ -166,9 +168,10 @@ packages/server/
     │   ├── device-store.ts   # live-session reads for the Active Devices table (never selects the token hash)
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
-    │   ├── location-history-store.ts # one transaction per fix: PostGIS users.last_location upsert + location_history insert
+    │   ├── location-history-store.ts # grant creation with the duplicate window rule, fix persistence, and the batched retention prune — one transaction per fix: PostGIS users.last_location upsert + location_history insert
     │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
+    │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
@@ -188,7 +191,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback) and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining user/admin/domain handlers, share-UI endpoints, and SOS/mission persistence are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), history-share grant creation, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining user/admin/domain handlers, share-UI endpoints, and SOS/mission persistence are not.
 
 ---
 
@@ -312,7 +315,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 ## 8. Database Migrations
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
-- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index. Phase 2 adds `location_shares`, then `location_history` and `location_history_shares` (`0007`), and the partial index the maintenance sweep seeks over active pinned shares (`0008`), all under `packages/server/drizzle/`.
+- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index. Phase 2 adds `location_shares`, then `location_history` and `location_history_shares` (`0007`), the partial index the maintenance sweep seeks over active pinned shares (`0008`), and the point cap stored on a history grant (`0009`), all under `packages/server/drizzle/`.
 - `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations; `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup. Database-backed routes include registration/login, refresh/logout, recovery, onboarding, and user/admin account management; SOS, live-location, and mission persistence remain future work.
 
 ---

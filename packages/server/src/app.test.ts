@@ -136,6 +136,7 @@ describe("Fastify server skeleton", () => {
     const createShare = paths["/_user/location/share"]?.post;
     const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
     const listShares = paths["/_user/location/shares"]?.get;
+    const createHistoryShare = paths["/_user/location/history/share"]?.post;
     const listDevices = paths["/_user/devices"]?.get;
     const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
@@ -314,7 +315,18 @@ describe("Fastify server skeleton", () => {
       400: expect.any(Object),
       401: expect.any(Object),
       403: expect.any(Object),
+      409: expect.any(Object),
       429: expect.any(Object)
+    });
+    // The 409 is the multi-device prompt (T2.3.3): declared in the contract, or a generated client
+    // cannot type the response the share dialog has to branch on.
+    expect(createShare?.responses).toHaveProperty("409");
+    expect(createHistoryShare?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(createHistoryShare?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object)
     });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
@@ -392,6 +404,18 @@ describe("Fastify server skeleton", () => {
     });
     expect(missingRevokeToken.statusCode).toBe(401);
     expect(missingRevokeToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingHistoryShareToken = await app.inject({
+      method: "POST",
+      url: "/_user/location/history/share",
+      payload: {
+        targetUserIds: ["00000000-0000-4000-8000-000000000001"],
+        from: "2026-10-14T00:00:00.000Z",
+        to: "2026-10-21T00:00:00.000Z"
+      }
+    });
+    expect(missingHistoryShareToken.statusCode).toBe(401);
+    expect(missingHistoryShareToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("does not expose DELETE /_admin/users/:id", async () => {

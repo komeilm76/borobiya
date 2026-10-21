@@ -5,7 +5,7 @@ import {
   MAX_USER_DEVICE_LIST_ITEMS
 } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
+import type { LocationShareRecord, LocationShareStore, ShareTargetAssessment } from "../db/location-share-store";
 import type { UserDeviceStore } from "../db/device-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 
@@ -32,6 +32,34 @@ function sendError(
     .code(statusCode)
     .header("cache-control", "no-store")
     .send(errorResponse(code, message, issues));
+}
+
+/**
+ * One 400 VALIDATION_ERROR payload per unusable recipient, keyed by the index it appeared at in the
+ * request. Shared with history-share creation so both endpoints refuse the same targets the same way.
+ */
+export function shareRecipientIssues(
+  assessment: ShareTargetAssessment,
+  targetUserIds: readonly string[]
+) {
+  const indexById = new Map(targetUserIds.map((id, index) => [id, index]));
+  return [
+    ...assessment.self.map((id) => ({
+      code: "self_target",
+      message: "You cannot share your location with your own account.",
+      path: [indexById.get(id) ?? 0]
+    })),
+    ...assessment.missing.map((id) => ({
+      code: "unknown_target",
+      message: "One or more recipients do not exist.",
+      path: [indexById.get(id) ?? 0]
+    })),
+    ...assessment.unavailable.map((id) => ({
+      code: "unavailable_target",
+      message: "One or more recipients are inactive or suspended.",
+      path: [indexById.get(id) ?? 0]
+    }))
+  ];
 }
 
 /** Maps a persisted row onto the shared `LocationShare` contract. */
@@ -137,24 +165,7 @@ export async function registerLocationShareRoutes(
       ownerId: user.userId,
       targetUserIds
     });
-    const indexById = new Map(targetUserIds.map((id, index) => [id, index]));
-    const issues = [
-      ...assessment.self.map((id) => ({
-        code: "self_target",
-        message: "You cannot share your location with your own account.",
-        path: [indexById.get(id) ?? 0]
-      })),
-      ...assessment.missing.map((id) => ({
-        code: "unknown_target",
-        message: "One or more recipients do not exist.",
-        path: [indexById.get(id) ?? 0]
-      })),
-      ...assessment.unavailable.map((id) => ({
-        code: "unavailable_target",
-        message: "One or more recipients are inactive or suspended.",
-        path: [indexById.get(id) ?? 0]
-      }))
-    ];
+    const issues = shareRecipientIssues(assessment, targetUserIds);
     // Reject the whole request instead of partially sharing so the caller always learns
     // which recipients were refused.
     if (issues.length > 0) {

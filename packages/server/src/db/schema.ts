@@ -7,6 +7,7 @@ import {
   customType,
   doublePrecision,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -172,11 +173,15 @@ export const locationHistoryShares = pgTable(
       .references(() => users.id),
     fromTime: timestamp("from_time", { withTimezone: true }).notNull(),
     toTime: timestamp("to_time", { withTimezone: true }).notNull(),
+    // The resolution the owner asked for, kept on the grant so every receiver reads the same window
+    // at the same density unless they override it per request (T2.2.4).
+    maxPoints: integer("max_points"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
     check("location_history_shares_owner_target_check", sql`"owner_id" <> "target_user_id"`),
     check("location_history_shares_window_check", sql`"to_time" > "from_time"`),
+    check("location_history_shares_max_points_check", sql`"max_points" IS NULL OR "max_points" > 0`),
     unique("location_history_shares_owner_target_window_unique").on(
       table.ownerId,
       table.targetUserId,

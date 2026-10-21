@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_LOCATION_HISTORY_SHARE_POINTS,
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_TARGETS,
   historyShareSchema,
@@ -39,6 +40,13 @@ describe("location schemas", () => {
     const valid = { targetUserIds: [targetId, otherTargetId], from, to, maxPoints: 500 };
     expect(historyShareSchema.safeParse(valid).success).toBe(true);
     expect(historyShareSchema.safeParse({ ...valid, from: to, to: from }).success).toBe(false);
+    // `maxPoints` is bounded by the contract because it sizes every later read of the grant; the
+    // window itself is bounded in the API layer, where LOCATION_HISTORY_MAX_SHARE_DAYS is known.
+    expect(historyShareSchema.safeParse({ ...valid, maxPoints: 5_000 }).success).toBe(true);
+    expect(historyShareSchema.safeParse({ ...valid, maxPoints: MAX_LOCATION_HISTORY_SHARE_POINTS }).success).toBe(true);
+    expect(historyShareSchema.safeParse({ ...valid, maxPoints: 0 }).success).toBe(false);
+    expect(historyShareSchema.safeParse({ ...valid, maxPoints: MAX_LOCATION_HISTORY_SHARE_POINTS + 1 }).success).toBe(false);
+    expect(historyShareSchema.safeParse({ ...valid, maxPoints: 1.5 }).success).toBe(false);
   });
 
   it("bounds the timed duration, note length, and recipient count", () => {

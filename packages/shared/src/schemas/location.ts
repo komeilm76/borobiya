@@ -99,8 +99,27 @@ export const locationShareCreatedSchema = z.strictObject({
 });
 export type LocationShareCreated = z.infer<typeof locationShareCreatedSchema>;
 
+/** One granted history window for one recipient (`location_history_shares`). */
+export const locationHistoryShareSchema = z.strictObject({
+  id: idSchema,
+  ownerId: idSchema,
+  targetUserId: idSchema,
+  from: timestampSchema,
+  to: timestampSchema,
+  maxPoints: z.number().int().nullable(),
+  createdAt: timestampSchema
+});
+export type LocationHistoryShare = z.infer<typeof locationHistoryShareSchema>;
+
+/**
+ * Like live-share creation, one call can grant the same window to several users and a repeated
+ * request for the identical owner/target/window reuses the existing grant instead of duplicating it,
+ * so the response lists the rows and says which ones were created.
+ */
 export const locationHistoryShareCreatedSchema = z.strictObject({
-  shareId: idSchema
+  shares: z.array(locationHistoryShareSchema).min(1).max(MAX_LOCATION_SHARE_TARGETS),
+  createdShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([]),
+  reusedShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([])
 });
 export type LocationHistoryShareCreated = z.infer<typeof locationHistoryShareCreatedSchema>;
 
@@ -127,11 +146,31 @@ export const locationSharesResponseSchema = z.strictObject({
 });
 export type LocationSharesResponse = z.infer<typeof locationSharesResponseSchema>;
 
+/**
+ * Upper bound on `maxPoints`, the resolution a history share is meant to be viewed at. It bounds the
+ * payload of every later read of the grant (T2.2.4), which is why the ceiling belongs to the contract
+ * rather than to the read handler.
+ */
+export const MAX_LOCATION_HISTORY_SHARE_POINTS = 10_000;
+
 export const historyShareSchema = z.strictObject({
   targetUserIds: uniqueUserIdsSchema,
   from: timestampSchema,
   to: timestampSchema,
-  maxPoints: z.number().int().positive().optional()
+  /**
+   * Downsample target for receivers. Deliberately not range-bounded here: the largest shareable window
+   * is `LOCATION_HISTORY_MAX_SHARE_DAYS`, which is server configuration (spec §7.2), so the API layer
+   * owns that check and answers `400 SHARE_RANGE_TOO_LARGE`.
+   */
+  maxPoints: z
+    .number()
+    .int()
+    .min(1)
+    .max(
+      MAX_LOCATION_HISTORY_SHARE_POINTS,
+      `A shared history window can be sampled to at most ${MAX_LOCATION_HISTORY_SHARE_POINTS} points.`
+    )
+    .optional()
 }).superRefine((share, context) => {
   if (Date.parse(share.to) <= Date.parse(share.from)) {
     context.addIssue({

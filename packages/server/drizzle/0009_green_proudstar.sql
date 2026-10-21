@@ -1,0 +1,2 @@
+ALTER TABLE "location_history_shares" ADD COLUMN "max_points" integer;--> statement-breakpoint
+ALTER TABLE "location_history_shares" ADD CONSTRAINT "location_history_shares_max_points_check" CHECK ("max_points" IS NULL OR "max_points" > 0);

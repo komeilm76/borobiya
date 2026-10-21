@@ -72,6 +72,8 @@ export const locationRoutes = {
     meta: {
       operationId: "locationCreateHistoryShare",
       summary: "Share a bounded range of location history",
+      description:
+        "Grants one fixed window (1-50 recipients per call) from the caller's stored location history. The window must not span more than LOCATION_HISTORY_MAX_SHARE_DAYS, otherwise 400 SHARE_RANGE_TOO_LARGE; recipients are validated as a batch with the same issue codes as live-share creation. A repeated request for the identical owner, target, and window reuses the existing grant and only rewrites maxPoints, so createdShareIds and reusedShareIds explain what changed. No priority device is involved: a history grant replays rows the server already stored, and it lasts until retention prunes them.",
       tags: ["location"],
       access: "authenticated"
     }

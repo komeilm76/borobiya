@@ -28,6 +28,7 @@ const implementedOperationIds = new Set([
   "userCompleteSecurityQuestions",
   "userListDevices",
   "locationCreateShare",
+  "locationCreateHistoryShare",
   "locationRevokeShare",
   "locationListShares",
   "locationUpdateRestFallback"
@@ -235,7 +236,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.1.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, authenticated profile/onboarding, live-location share creation, revocation, listing, and the deprecated REST location-update fallback are implemented at runtime (live `location:update` arrives over Socket.IO); remaining operations are contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, authenticated profile/onboarding, live-location share creation, revocation, listing, history-share creation, and the deprecated REST location-update fallback are implemented at runtime (live `location:update` arrives over Socket.IO); the history read endpoints, SOS, and mission operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

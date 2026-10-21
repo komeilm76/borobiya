@@ -96,7 +96,7 @@ gantt
 
 ### M2.2 History Sharing
 - [ ] `location_history` table + insert on each update (batched)
-- [ ] `POST /_user/location/history/share` (from/to, maxPoints downsample)
+- [x] `POST /_user/location/history/share` (from/to, maxPoints stored on the grant) — done 2026-10-22; the read-side downsample lands with the receiver polyline task below
 - [ ] Receiver: polyline + time slider on map
 - [ ] ENV retention 90d + maxShare 30d, daily prune cron
 - [ ] Frontend: date range picker + polyline playback

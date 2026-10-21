@@ -218,7 +218,7 @@ DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
 GET    /_user/location/shares            → { owned: LocationShare[], sharedWithMe: (LocationShare & { owner })[] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
-→ 201 { shareId }
+→ 201 { shares: LocationHistoryShare[], createdShareIds: string[], reusedShareIds: string[] }
 GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp}] } // own history
 GET    /_user/location/history/shared/:shareId → polyline for receiver
 
@@ -229,7 +229,9 @@ POST   /_user/location/update            deprecated REST fallback for Socket `lo
 
 **`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
 
-Retain ENV limits: `from-to <= MAX_SHARE_DAYS`, else `400 SHARE_RANGE_TOO_LARGE`.
+**`POST /_user/location/history/share` (T2.2.3, live).** Grants one fixed window of the caller's stored history to 1–50 unique recipients. Limits: the window may span at most `LOCATION_HISTORY_MAX_SHARE_DAYS` — checked here rather than in the schema because it is configuration, and over that bound the answer is `400 SHARE_RANGE_TOO_LARGE` with `issues: [{ code: "range_too_large", maxShareDays, requestedDays, path: ["to"] }]` and nothing written — and `maxPoints` is an integer from 1 to `MAX_LOCATION_HISTORY_SHARE_POINTS` (10000), stored on the grant so every receiver reads the same window at the same density unless they override it per request (T2.2.4). Recipients are validated as a batch with the identical live-share rule and issue codes (`self_target`, `unknown_target`, `unavailable_target`); one unusable recipient rejects the whole request. A repeat of the same owner/target/`from`/`to` reuses the existing grant — the unique index over exactly those columns *is* the duplicate rule — and rewrites only `maxPoints`, including back to `null` when the repeat states no preference.
+
+Two properties follow from the shape of a history grant and are worth stating plainly: it needs **no priority device** (it replays rows the server already stored, so there is nothing to broadcast, and `priorityDeviceId` is not part of this payload), and it **does not expire** — it lasts until the retention prune removes the points underneath it, which is also why a window that no longer contains any point is created normally instead of being refused, and reads back as no points. `DELETE /_user/location/history/share/:shareId` is not implemented yet: unlike `location_shares`, this table keeps no `is_revoked` flag, so revocation must be a real `DELETE` and lands with the receiver read path (T2.2.4). Responses are `Cache-Control: no-store`.
 
 **Expiry & retention (T2.1.6 + T2.2.5, live).** No HTTP surface: a maintenance timer inside the API process retires
 `location_shares` rows with `expiresAt <= now` by setting `isRevoked = true` (checked every 15s, at least once a minute,
@@ -420,6 +422,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | HTTP | Code | When |
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
+| 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |

@@ -2,6 +2,7 @@ import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, sql } from "drizzle
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
 import { locationShares, userSessions, users } from "./schema";
+import { ownerAdvisoryLockSql } from "./owner-lock";
 
 export interface LocationShareRecord {
   id: string;
@@ -193,13 +194,10 @@ export class DrizzleLocationShareStore implements LocationShareStore {
 
   async createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares> {
     return this.db.transaction(async (transaction) => {
-      // The reuse-or-insert decision below is a read-then-write with no unique constraint to fall back
-      // on, so two clients of one account (a double-tapped share button, a retried request) could each
-      // find nothing and create a second active row for the same recipient. One transaction-scoped
-      // advisory lock per owner serializes those decisions — across API replicas too, since the lock
-      // lives in the database — and is released by the commit. (`hashtextextended` needs PostgreSQL
-      // 11+, and `docker-compose.yml` pins the PostGIS 16 image.)
-      await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${input.ownerId}, 0))`);
+      // See `ownerAdvisoryLockSql`: the reuse-or-insert decision below is a read-then-write with no
+      // unique constraint to fall back on, so concurrent requests of one account must not each create
+      // an active row for the same recipient.
+      await transaction.execute(ownerAdvisoryLockSql(input.ownerId));
 
       const shares: LocationShareRecord[] = [];
       const createdShareIds: string[] = [];

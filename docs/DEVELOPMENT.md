@@ -219,7 +219,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 
 ### OpenAPI client generation
 
-Start the API first, then run `bun --filter @borobiya/client generate:api`. By default the script fetches `http://localhost:3000/docs/json`; set `API_OPENAPI_URL` to use another server or `ZOPIA_OUTPUT_DIR` to change the output directory. Generated code under `packages/client/src/generated/` is intentionally ignored by Git.
+Start the API first, then run `bun --filter @borobiya/client generate:api`. By default the script fetches `http://localhost:3000/docs/json`; set `API_OPENAPI_URL` to use another server or `ZOPIA_OUTPUT_DIR` to change the output directory. Generated code under `packages/client/src/generated/` is intentionally ignored by Git — run the generator inside the Linux VM, because the pinned `@openapi-zod-client` toolchain needs glibc (`ld-linux-x86-64.so.2`) and cannot start from a Windows/WSL-mounted toolchain; regenerate and delete rather than committing the output.
 
 ---
 
