@@ -399,9 +399,40 @@ docker compose --profile geocoding-import ps nominatim
 docker compose --profile geocoding-import logs --tail=100 nominatim
 ```
 
-Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared dataset PBF and may take a while (much longer for whole countries); `health: starting` during the import is expected—do not restart it. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database.
+Wait until `ps` reports Nominatim as `healthy`. First startup imports the shared dataset PBF and may take a while (much longer for whole countries); `health: starting` during the import is expected—do not restart it. Once healthy, run the Photon import from the host. Keep Nominatim running during this step; Photon reads its local PostgreSQL database. If you opened a new terminal, repeat the environment/resolver block from A6, then reload `.env` so the host-side Photon command uses the same password Compose uses:
+
+```bash
+cd ~/borobiya
+set -a; source .env; set +a
+[[ -n "${NOMINATIM_PASSWORD:-}" ]] || { echo 'NOMINATIM_PASSWORD is empty in .env' >&2; exit 1; }
+```
+
+The automated setup script performs this credential check before launching Photon and stops with a targeted message if the existing database volume rejects the configured password.
 
 If `ps` instead shows `Restarting`, read the first real error in the logs above. `chown: ... Read-only file system` means an old checkout whose Compose file mounted the PBF read-only inside `/nominatim`—`git pull --ff-only`, then `docker compose --profile geocoding-import up -d --force-recreate nominatim`. The half-initialized database volume can stay; the entrypoint drops and re-imports the database from scratch on the next start.
+
+If Photon reports `FATAL: password authentication failed for user "nominatim"`, its host-side password does not match the password stored in the persistent Nominatim database. First reload `.env` as shown above and retry if the new terminal had not loaded it. If the database volume was initialized with an older `NOMINATIM_PASSWORD`, restore that exact value in `.env`; otherwise reset only the project-scoped Nominatim volume below. This re-imports the selected PBF but does not touch the application `postgres-data` volume, map sources, or generated tiles/routes:
+
+```bash
+cd ~/borobiya
+set -a; source .env; set +a
+# If this is a new terminal, repeat the region resolver block from A6
+# so MAP_PHOTON_DATA_DIR matches the selected areas.
+docker compose --profile geocoding stop photon
+docker compose --profile geocoding-import stop nominatim
+docker compose --profile geocoding-import rm -f nominatim
+COMPOSE_PROJECT="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"
+[[ -n "$COMPOSE_PROJECT" ]] || { echo 'Could not determine Compose project; stop and inspect manually.' >&2; exit 1; }
+VOLUME_LIST="$(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT" --filter 'label=com.docker.compose.volume=nominatim-data')"
+[[ -n "$VOLUME_LIST" ]] || { echo 'No labeled Nominatim volume found; stop and inspect manually.' >&2; exit 1; }
+mapfile -t NOMINATIM_VOLUMES <<< "$VOLUME_LIST"
+(( ${#NOMINATIM_VOLUMES[@]} == 1 )) || { echo 'Expected exactly one project Nominatim volume; inspect the list and stop.' >&2; exit 1; }
+docker volume rm "${NOMINATIM_VOLUMES[0]}"
+rm -rf -- "$MAP_PHOTON_DATA_DIR/photon_data"
+rm -f -- "$MAP_PHOTON_DATA_DIR/.borobiya-pbf.sha256"
+```
+
+Then repeat the Nominatim start/wait/Photon import in this step. Never use `docker compose down -v` for this repair.
 
 ```bash
 # -languages must cover every selected country plus en.

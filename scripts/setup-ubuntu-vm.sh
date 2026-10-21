@@ -297,6 +297,9 @@ else
   source .env; set +a
 fi
 
+[[ -n "${NOMINATIM_PASSWORD:-}" ]] || \
+  fail "NOMINATIM_PASSWORD is empty in .env; set a non-empty value before starting the Nominatim import."
+
 if [[ -f .env ]] && grep -q '^ADMIN_SEED_PASSWORD=' .env && [[ -n "${ADMIN_SEED_PASSWORD:-}" ]]; then
   ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
   if (( DRY_RUN )); then
@@ -955,6 +958,21 @@ reset_nominatim_volume() {
   fi
 }
 
+check_nominatim_database_auth() {
+  local result=""
+  if result="$(docker compose --profile geocoding-import exec -T \
+      -e "PGPASSWORD=${NOMINATIM_PASSWORD}" nominatim \
+      psql -h 127.0.0.1 -U nominatim -d nominatim -tAc 'SELECT 1' 2>&1)"; then
+    [[ "${result//[[:space:]]/}" == "1" ]] || \
+      fail "Nominatim database auth probe returned an unexpected result: ${result:-<empty>}"
+    note "Nominatim database authentication verified for the Photon import"
+  elif grep -Fqi 'password authentication failed for user "nominatim"' <<< "$result"; then
+    fail "the existing Nominatim database volume rejects NOMINATIM_PASSWORD from .env. Restore the password used when that volume was initialized, or follow the Nominatim password/volume recovery in docs/UBUNTU_VM_RUNBOOK.md to reset only this Compose project's Nominatim volume and re-import. Do not remove postgres-data."
+  else
+    fail "could not verify Nominatim database authentication before Photon import: ${result:-<no output>}"
+  fi
+}
+
 mkdir -p "$MAP_PHOTON_DATA_DIR"
 photon_index_present=0
 if [[ -d "$MAP_PHOTON_DATA_DIR/photon_data" ]] && [[ -n "$(ls -A "$MAP_PHOTON_DATA_DIR/photon_data" 2>/dev/null)" ]]; then
@@ -984,6 +1002,7 @@ else
   docker compose --profile geocoding-import up -d nominatim
   note "waiting for Nominatim's first import (can take a long while; timeout ${NOMINATIM_TIMEOUT_MIN}m)..."
   wait_healthy nominatim $(( NOMINATIM_TIMEOUT_MIN * 60 )) --profile geocoding-import
+  check_nominatim_database_auth
   mkdir -p "$MAP_PHOTON_DATA_DIR"
   (
     cd "$MAP_PHOTON_DATA_DIR"
