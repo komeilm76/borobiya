@@ -1,7 +1,12 @@
-import { apiRoutes } from "@borobiya/shared/api";
-import { createLocationHistoryShareSchema } from "@borobiya/shared";
+import { apiRoutes, locationHistoryQuerySchema, sharePathParamsSchema } from "@borobiya/shared/api";
+import { createLocationHistoryShareSchema, MAX_LOCATION_SHARE_LIST_ITEMS } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import type { LocationHistoryShareRecord, LocationHistoryStore } from "../db/location-history-store";
+import type {
+  LocationHistoryPointRecord,
+  LocationHistoryShareRecord,
+  LocationHistoryStore,
+  LocationHistoryWindowResult
+} from "../db/location-history-store";
 import type { LocationShareStore } from "../db/location-share-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 import { shareRecipientIssues } from "./shares";
@@ -9,11 +14,19 @@ import { shareRecipientIssues } from "./shares";
 const DAY_MS = 24 * 60 * 60_000;
 
 export interface LocationHistoryRouteDependencies {
-  store: Pick<LocationHistoryStore, "createHistoryShares">;
+  store: Pick<
+    LocationHistoryStore,
+    "createHistoryShares" | "readHistoryWindow" | "findHistoryShare" | "deleteHistoryShare" | "listHistoryShares"
+  >;
   /** Recipient classification is the live-share rule, so both endpoints refuse the same targets. */
   shares: Pick<LocationShareStore, "assessShareTargets">;
   /** `LOCATION_HISTORY_MAX_SHARE_DAYS` (spec §7.2). */
   maxShareDays: number;
+  /**
+   * `LOCATION_HISTORY_READ_POINTS`: the sampling target when a grant stores none, and the target of the
+   * owner's own read, which has no grant to take one from.
+   */
+  defaultReadPoints: number;
 }
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -54,6 +67,30 @@ export function historyShareRangeDays(fromIso: string, toIso: string) {
   return (Date.parse(toIso) - Date.parse(fromIso)) / DAY_MS;
 }
 
+/** One stored point onto the shared `LocationHistoryPoint` contract; the field is absent, not null. */
+export function historyPointPayload(point: LocationHistoryPointRecord) {
+  return {
+    lat: point.lat,
+    lon: point.lon,
+    timestamp: point.timestamp.toISOString(),
+    ...(point.accuracy === null ? {} : { accuracy: point.accuracy })
+  };
+}
+
+/** Both lists of a windowed read, mapped once so the owner's and the receiver's answers match. */
+export function historyWindowPayload(window: LocationHistoryWindowResult) {
+  return { points: window.points.map(historyPointPayload), totalPoints: window.totalPoints };
+}
+
+/**
+ * Which sampling target a read of a given grant uses. A grant that names one keeps it (the owner chose
+ * it, and the write path already bounded it), so the default only applies when the owner expressed no
+ * preference — the server never quietly reduces a resolution somebody asked for.
+ */
+export function historyReadPoints(stored: number | null, defaultReadPoints: number) {
+  return stored ?? defaultReadPoints;
+}
+
 /**
  * History-share creation (T2.2.3, spec §7.2): one fixed window granted to 1–50 recipients.
  *
@@ -62,8 +99,8 @@ export function historyShareRangeDays(fromIso: string, toIso: string) {
  * (T2.2.5). An empty window is not an error, so a range whose points were already pruned creates a
  * grant that reads back as no points rather than a confusing refusal at creation time.
  *
- * TODO: revoking a history grant needs a deletion path; the table keeps no `is_revoked` flag, so
- * removal is a real `DELETE` and belongs with the receiver read API (T2.2.4).
+ * The same registration also serves the read path (T2.2.4): the owner's window, a receiver's window, the
+ * two grant lists, and the delete that retires a grant.
  */
 export async function registerLocationHistoryShareRoutes(
   app: FastifyInstance,
@@ -136,5 +173,126 @@ export async function registerLocationHistoryShareRoutes(
         createdShareIds: result.createdShareIds,
         reusedShareIds: result.reusedShareIds
       });
+  });
+
+  const ownHistoryRoute = apiRoutes.location.getHistory;
+  app.get(ownHistoryRoute.url, async (request, reply) => {
+    const user: AuthenticatedUserContext | null = request.authenticatedUser;
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const parsedQuery = locationHistoryQuerySchema.safeParse(request.query);
+    if (!parsedQuery.success) {
+      return sendError(
+        reply,
+        400,
+        "VALIDATION_ERROR",
+        "Query parameter validation failed.",
+        parsedQuery.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      );
+    }
+
+    const window = await dependencies.store.readHistoryWindow({
+      userId: user.userId,
+      fromTime: new Date(parsedQuery.data.from),
+      toTime: new Date(parsedQuery.data.to),
+      maxPoints: dependencies.defaultReadPoints
+    });
+
+    return reply.code(200).header("cache-control", "no-store").send(historyWindowPayload(window));
+  });
+
+  const sharedHistoryRoute = apiRoutes.location.getSharedHistory;
+  app.get(sharedHistoryRoute.url, async (request, reply) => {
+    const user: AuthenticatedUserContext | null = request.authenticatedUser;
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const parsedParams = sharePathParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return sendError(
+        reply,
+        400,
+        "VALIDATION_ERROR",
+        "Path parameter validation failed.",
+        parsedParams.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      );
+    }
+
+    const shareId = parsedParams.data.shareId;
+    const share = await dependencies.store.findHistoryShare(shareId);
+    // The same answer for "no such grant" and "a grant somebody else received": this endpoint is the
+    // only way to probe whether another account holds a history grant, so it must not confirm either way.
+    if (!share || share.targetUserId !== user.userId) {
+      return sendError(
+        reply,
+        404,
+        "SHARE_NOT_FOUND",
+        "No shared history with that id is available to this account."
+      );
+    }
+
+    const window = await dependencies.store.readHistoryWindow({
+      userId: share.ownerId,
+      fromTime: share.fromTime,
+      toTime: share.toTime,
+      maxPoints: historyReadPoints(share.maxPoints, dependencies.defaultReadPoints)
+    });
+
+    return reply.code(200).header("cache-control", "no-store").send(historyWindowPayload(window));
+  });
+
+  const listHistoryRoute = apiRoutes.location.listHistoryShares;
+  app.get(listHistoryRoute.url, async (request, reply) => {
+    const user: AuthenticatedUserContext | null = request.authenticatedUser;
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const { owned, sharedWithMe } = await dependencies.store.listHistoryShares({
+      userId: user.userId,
+      limit: MAX_LOCATION_SHARE_LIST_ITEMS
+    });
+
+    return reply.code(200).header("cache-control", "no-store").send({
+      owned: owned.map(historySharePayload),
+      sharedWithMe: sharedWithMe.map((share) => ({
+        ...historySharePayload(share),
+        owner: { id: share.owner.id, username: share.owner.username }
+      }))
+    });
+  });
+
+  const revokeHistoryRoute = apiRoutes.location.revokeHistoryShare;
+  app.delete(revokeHistoryRoute.url, async (request, reply) => {
+    const user: AuthenticatedUserContext | null = request.authenticatedUser;
+    if (!user) {
+      return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    }
+
+    const parsedParams = sharePathParamsSchema.safeParse(request.params);
+    if (!parsedParams.success) {
+      return sendError(
+        reply,
+        400,
+        "VALIDATION_ERROR",
+        "Path parameter validation failed.",
+        parsedParams.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+      );
+    }
+
+    const deleted = await dependencies.store.deleteHistoryShare({
+      ownerId: user.userId,
+      shareId: parsedParams.data.shareId
+    });
+    if (!deleted) {
+      // Unknown id or somebody else's grant, answered identically — and unlike a live share there is no
+      // second outcome for "already gone": the row is deleted, so a retry is a 404 from here on.
+      return sendError(reply, 404, "SHARE_NOT_FOUND", "No share with that id belongs to this account.");
+    }
+
+    return reply.code(200).header("cache-control", "no-store").send();
   });
 }

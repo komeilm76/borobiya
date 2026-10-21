@@ -67,7 +67,11 @@ const rawServerEnvSchema = z.object({
   // Retention window for `location_history`; the daily prune job deletes rows older than this.
   LOCATION_HISTORY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3_650).default(90),
   // Largest history window one account may hand to another in a single share.
-  LOCATION_HISTORY_MAX_SHARE_DAYS: z.coerce.number().int().min(1).max(365).default(30)
+  LOCATION_HISTORY_MAX_SHARE_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  // Points a history read returns when the grant itself stores no maxPoints (and for the owner's own
+  // read, which has no grant at all). The ceiling is the contract's sampling bound, so a read can never
+  // answer with more rows than an owner was allowed to ask for on the grant.
+  LOCATION_HISTORY_READ_POINTS: z.coerce.number().int().min(1).max(10_000).default(1_000)
 }).superRefine((env, context) => {
   if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
     context.addIssue({
@@ -148,7 +152,8 @@ export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
   rateLimitMax: env.RATE_LIMIT_MAX,
   locationHistoryRetentionDays: env.LOCATION_HISTORY_RETENTION_DAYS,
-  locationHistoryMaxShareDays: env.LOCATION_HISTORY_MAX_SHARE_DAYS
+  locationHistoryMaxShareDays: env.LOCATION_HISTORY_MAX_SHARE_DAYS,
+  locationHistoryReadPoints: env.LOCATION_HISTORY_READ_POINTS
 }));
 
 export type ServerConfig = z.output<typeof serverEnvSchema>;

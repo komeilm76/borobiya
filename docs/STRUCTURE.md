@@ -151,8 +151,8 @@ packages/server/
     │   └── recovery-decoys.test.ts
     ├── location/
     │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location, plus priority-device resolution and the shared recipient-issue mapping
-    │   ├── history.ts        # history-share grant creation: range bound against the ENV ceiling, batched recipient validation, batch response
-    │   ├── history.test.ts   # auth guard, range limit, recipient batch rules, contract bounds, and store call shape
+    │   ├── history.ts        # the whole `/_user/location/history` surface: grant creation with its ENV range bound and batched recipient rules, the windowed owner and receiver reads, the grant lists, and the delete
+    │   ├── history.test.ts   # auth guard, range limit, recipient batch rules, contract bounds, window resolution, no-leak 404s, and store call shapes
     │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
     │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
     │   ├── live.test.ts      # service rules and REST fallback status/ack tests
@@ -168,7 +168,7 @@ packages/server/
     │   ├── device-store.ts   # live-session reads for the Active Devices table (never selects the token hash)
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
-    │   ├── location-history-store.ts # grant creation with the duplicate window rule, fix persistence, and the batched retention prune — one transaction per fix: PostGIS users.last_location upsert + location_history insert
+    │   ├── location-history-store.ts # grant creation with the duplicate window rule, grant lists and delete, windowed reads sampled inside the query, fix persistence, and the batched retention prune — one transaction per fix: PostGIS users.last_location upsert + location_history insert
     │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
     │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
@@ -191,7 +191,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), history-share grant creation, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining user/admin/domain handlers, share-UI endpoints, and SOS/mission persistence are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, and location-share stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining user/admin/domain handlers, share-UI endpoints, and SOS/mission persistence are not.
 
 ---
 

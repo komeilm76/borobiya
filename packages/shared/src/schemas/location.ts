@@ -123,6 +123,28 @@ export const locationHistoryShareCreatedSchema = z.strictObject({
 });
 export type LocationHistoryShareCreated = z.infer<typeof locationHistoryShareCreatedSchema>;
 
+/**
+ * A grant seen from the receiving side. Unlike a live share, no current position is attached: a
+ * history grant is a read of rows the owner's devices already sent, so the owner's live marker is
+ * irrelevant to it (and would leak a position the owner never shared).
+ */
+export const receivedHistoryShareSchema = locationHistoryShareSchema.extend({
+  owner: z.strictObject({ id: idSchema, username: z.string().min(1) })
+});
+export type ReceivedLocationHistoryShare = z.infer<typeof receivedHistoryShareSchema>;
+
+/**
+ * Both directions of the caller's history grants, newest first. There is nothing to filter here:
+ * a history grant has no expiry and no revocation flag, so it is in force until its owner deletes it
+ * (or retention prunes the points underneath it). Receivers need this list because the shared read
+ * endpoint takes a grant id and there is no other way to learn one.
+ */
+export const locationHistorySharesResponseSchema = z.strictObject({
+  owned: z.array(locationHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  sharedWithMe: z.array(receivedHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
+});
+export type LocationHistorySharesResponse = z.infer<typeof locationHistorySharesResponseSchema>;
+
 /** The share owner's identity and last server-side known position, shown to receivers. */
 export const locationShareOwnerSchema = z.strictObject({
   id: idSchema,
@@ -191,8 +213,15 @@ export const locationHistoryPointSchema = coordinatesSchema.extend({
 });
 export type LocationHistoryPoint = z.infer<typeof locationHistoryPointSchema>;
 
+/**
+ * A window of stored history, oldest point first. `points` is the sampled view the client should draw
+ * and never exceeds the sampling target of the read; `totalPoints` is how many rows the window actually
+ * holds, so a player can tell a sampled view from the complete record and label the difference. The two
+ * numbers satisfy `points.length <= totalPoints`, which the sampled query guarantees by construction.
+ */
 export const locationHistoryResponseSchema = z.strictObject({
-  points: z.array(locationHistoryPointSchema)
+  points: z.array(locationHistoryPointSchema).max(MAX_LOCATION_HISTORY_SHARE_POINTS),
+  totalPoints: z.number().int().nonnegative()
 });
 export type LocationHistoryResponse = z.infer<typeof locationHistoryResponseSchema>;
 

@@ -47,8 +47,8 @@ sequenceDiagram
   API->>DB: insert location_history_shares
   API-->>Owner: 201
   Target->>API: GET /_user/location/history/shared/:shareId
-  API->>DB: query location_history where ownerId & from≤timestamp≤to, downsample if maxPoints
-  API-->>Target: { polyline, points }
+  API->>DB: query location_history where user_id=ownerId and from≤timestamp<to, sampled by row_number()/count(*) over ()
+  API-->>Target: { points, totalPoints }
   Target->>Target: render polyline + time slider playback on map
 ```
 

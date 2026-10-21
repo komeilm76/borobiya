@@ -47,6 +47,7 @@ services:
       # window one account may grant another. The share window must stay inside retention.
       LOCATION_HISTORY_RETENTION_DAYS: ${LOCATION_HISTORY_RETENTION_DAYS:-90}
       LOCATION_HISTORY_MAX_SHARE_DAYS: ${LOCATION_HISTORY_MAX_SHARE_DAYS:-30}
+      LOCATION_HISTORY_READ_POINTS: ${LOCATION_HISTORY_READ_POINTS:-1000}
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
     ports:

@@ -264,6 +264,7 @@ Map Server is a **completely separate service** responsible for:
   ```env
   LOCATION_HISTORY_RETENTION_DAYS=90   # after 90 days, data is pruned
   LOCATION_HISTORY_MAX_SHARE_DAYS=30   # user cannot share >30 days at once
+  LOCATION_HISTORY_READ_POINTS=1000    # points a history read returns when the grant sets no maxPoints
   ```
   - Background job daily prunes `location_history` where `createdAt < now - RETENTION`.
 
@@ -871,6 +872,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 ```env
 LOCATION_HISTORY_RETENTION_DAYS=90
 LOCATION_HISTORY_MAX_SHARE_DAYS=30
+LOCATION_HISTORY_READ_POINTS=1000
 SOS_PHOTO_MAX_SIZE_MB=5
 SOS_REQUEST_AUTO_EXPIRE_HOURS=24  # if no rescuer accepted, auto-expire
 MISSION_STATUS_TIMEOUT_HOURS=6     # if rescuer stuck in on_the_way too long, alert admin

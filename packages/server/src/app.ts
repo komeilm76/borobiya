@@ -151,7 +151,8 @@ export async function createFastifyApp(
   await registerLocationHistoryShareRoutes(app, {
     store: locationHistoryStore,
     shares: locationShareStore,
-    maxShareDays: config.locationHistoryMaxShareDays
+    maxShareDays: config.locationHistoryMaxShareDays,
+    defaultReadPoints: config.locationHistoryReadPoints
   });
 
   const realtime = attachRealtime(app.server, {

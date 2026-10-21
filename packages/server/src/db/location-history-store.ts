@@ -1,4 +1,4 @@
-import { and, asc, eq, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { locationHistory, locationHistoryShares, users } from "./schema";
 import { ownerAdvisoryLockSql } from "./owner-lock";
@@ -39,8 +39,59 @@ export interface CreatedLocationHistoryShares {
   reusedShareIds: string[];
 }
 
+/** One stored observation, as a windowed read returns it. */
+export interface LocationHistoryPointRecord {
+  lat: number;
+  lon: number;
+  accuracy: number | null;
+  timestamp: Date;
+}
+
+export interface ReadLocationHistoryWindowInput {
+  /** Whose rows may be read at all — the grant's owner for a receiver, the caller for their own history. */
+  userId: string;
+  fromTime: Date;
+  toTime: Date;
+  /** Ceiling on returned rows. The caller resolves the grant's stored target (or the server default) first. */
+  maxPoints: number;
+}
+
+export interface LocationHistoryWindowResult {
+  points: LocationHistoryPointRecord[];
+  /** Rows the window holds before sampling, so a client can tell a sampled view from the whole record. */
+  totalPoints: number;
+}
+
+/** A sampled row carries the pre-sampling total on every row; the first one is enough. */
+export interface LocationHistoryWindowRow extends LocationHistoryPointRecord {
+  totalPoints: number;
+}
+
+export interface LocationHistoryShareWithOwner extends LocationHistoryShareRecord {
+  owner: { id: string; username: string };
+}
+
 export interface LocationHistoryStore {
   recordFix(input: LocationFixInput): Promise<void>;
+
+  /**
+   * Reads `fromTime..toTime` for one account, oldest first, sampled evenly down to `maxPoints`. The
+   * sample is even in *position* (one row in every `stride`-th), which keeps the polyline's shape
+   * regardless of how bursty the device's reports were.
+   */
+  readHistoryWindow(input: ReadLocationHistoryWindowInput): Promise<LocationHistoryWindowResult>;
+
+  /** The grant itself, without ownership conditions — the caller decides what the requester may read. */
+  findHistoryShare(shareId: string): Promise<LocationHistoryShareRecord | null>;
+
+  /** Deletes one grant of one owner and reports whether a row was there; the receiver's read starts 404-ing. */
+  deleteHistoryShare(input: { ownerId: string; shareId: string }): Promise<boolean>;
+
+  /** Every grant the account holds in either direction, newest first, capped at `limit` per list. */
+  listHistoryShares(input: {
+    userId: string;
+    limit: number;
+  }): Promise<{ owned: LocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }>;
   /**
    * Grants `fromTime..toTime` to each target, reusing the existing grant when one already covers the
    * identical owner/target/window pair (the unique index that enforces it is also the duplicate rule).
@@ -96,6 +147,55 @@ export function locationFixQueries(db: Database, input: LocationFixInput) {
       accuracy: input.accuracy,
       timestamp: input.timestamp
     })
+  };
+}
+
+/**
+ * One statement that reads a window and samples it, exported for SQL-shape tests.
+ *
+ * The sampling happens in SQL on purpose. `row_number()` and `count(*) OVER ()` are computed over the
+ * window filtered by `(user_id, timestamp)` — the index T2.2.1 added for exactly these reads — so the
+ * database never ships a 30-day firehose to Node just so the route could drop 99% of it. Stride is
+ * `ceil(total / maxPoints)`, integer arithmetic that keeps the first point, aims for `maxPoints` rows,
+ * and degenerates to "everything" when the window already holds fewer.
+ */
+export function historyWindowQuery(db: Database, input: ReadLocationHistoryWindowInput) {
+  const sampled = db.$with("sampled").as(
+    db
+      .select({
+        lat: locationHistory.lat,
+        lon: locationHistory.lon,
+        accuracy: locationHistory.accuracy,
+        timestamp: locationHistory.timestamp,
+        position: sql<number>`row_number() over (order by ${locationHistory.timestamp}, ${locationHistory.id})`
+          .mapWith(Number)
+          .as("position"),
+        totalPoints: sql<number>`count(*) over ()`.mapWith(Number).as("totalPoints")
+      })
+      .from(locationHistory)
+      .where(and(
+        eq(locationHistory.userId, input.userId),
+        gte(locationHistory.timestamp, input.fromTime),
+        lt(locationHistory.timestamp, input.toTime)
+      ))
+  );
+
+  const stride = sql`greatest(1, (${sampled.totalPoints} + ${input.maxPoints} - 1) / ${input.maxPoints})`;
+
+  return db
+    .with(sampled)
+    .select({ lat: sampled.lat, lon: sampled.lon, accuracy: sampled.accuracy, timestamp: sampled.timestamp, totalPoints: sampled.totalPoints })
+    .from(sampled)
+    .where(sql`(${sampled.position} - 1) % ${stride} = 0`)
+    .orderBy(asc(sampled.timestamp));
+}
+
+/** Maps sampled rows onto the window result. Pure, because `totalPoints` coming from row zero is the part worth pinning. */
+export function historyWindowResult(rows: readonly LocationHistoryWindowRow[]): LocationHistoryWindowResult {
+  return {
+    points: rows.map(({ lat, lon, accuracy, timestamp }) => ({ lat, lon, accuracy, timestamp })),
+    // Every row of the same window carries the same count, and an empty window has no rows to read it from.
+    totalPoints: rows[0]?.totalPoints ?? 0
   };
 }
 
@@ -177,6 +277,63 @@ export class DrizzleLocationHistoryStore implements LocationHistoryStore {
 
       return { shares, createdShareIds, reusedShareIds };
     });
+  }
+
+  async readHistoryWindow(input: ReadLocationHistoryWindowInput): Promise<LocationHistoryWindowResult> {
+    return historyWindowResult(await historyWindowQuery(this.db, input));
+  }
+
+  async findHistoryShare(shareId: string): Promise<LocationHistoryShareRecord | null> {
+    const [share] = await this.db
+      .select(historyShareSelection)
+      .from(locationHistoryShares)
+      .where(eq(locationHistoryShares.id, shareId))
+      .limit(1);
+    return share ?? null;
+  }
+
+  async deleteHistoryShare(input: { ownerId: string; shareId: string }): Promise<boolean> {
+    // No advisory lock: this is one statement keyed on the row's own id and owner, so the write itself
+    // is the guard. `createHistoryShares` locks because it decides between reuse and insert by reading.
+    const deleted = await this.db
+      .delete(locationHistoryShares)
+      .where(and(eq(locationHistoryShares.id, input.shareId), eq(locationHistoryShares.ownerId, input.ownerId)))
+      .returning({ id: locationHistoryShares.id });
+    return deleted.length > 0;
+  }
+
+  async listHistoryShares(input: {
+    userId: string;
+    limit: number;
+  }): Promise<{ owned: LocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }> {
+    const owned = await this.db
+      .select(historyShareSelection)
+      .from(locationHistoryShares)
+      .where(eq(locationHistoryShares.ownerId, input.userId))
+      .orderBy(desc(locationHistoryShares.createdAt))
+      .limit(input.limit);
+
+    const receivedRows = await this.db
+      .select({ ...historyShareSelection, ownerUsername: users.username })
+      .from(locationHistoryShares)
+      .innerJoin(users, eq(users.id, locationHistoryShares.ownerId))
+      .where(eq(locationHistoryShares.targetUserId, input.userId))
+      .orderBy(desc(locationHistoryShares.createdAt))
+      .limit(input.limit);
+
+    return {
+      owned,
+      sharedWithMe: receivedRows.map((row) => ({
+        id: row.id,
+        ownerId: row.ownerId,
+        targetUserId: row.targetUserId,
+        fromTime: row.fromTime,
+        toTime: row.toTime,
+        maxPoints: row.maxPoints,
+        createdAt: row.createdAt,
+        owner: { id: row.ownerId, username: row.ownerUsername }
+      }))
+    };
   }
 
   async recordFix(input: LocationFixInput): Promise<void> {

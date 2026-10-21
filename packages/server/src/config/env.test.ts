@@ -24,7 +24,8 @@ describe("server environment validation", () => {
       rateLimitWindowMs: 60_000,
       rateLimitMax: 100,
       locationHistoryRetentionDays: 90,
-      locationHistoryMaxShareDays: 30
+      locationHistoryMaxShareDays: 30,
+      locationHistoryReadPoints: 1_000
     });
   });
 
@@ -46,6 +47,21 @@ describe("server environment validation", () => {
     );
     expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_RETENTION_DAYS: "1.5" })).toThrow(
       /LOCATION_HISTORY_RETENTION_DAYS/
+    );
+  });
+
+  it("samples a history read at the configured target when a grant stores none", () => {
+    expect(parseServerEnv(validEnv)).toMatchObject({ locationHistoryReadPoints: 1_000 });
+    expect(parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "25" })).toMatchObject({
+      locationHistoryReadPoints: 25
+    });
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "0" })).toThrow(
+      /LOCATION_HISTORY_READ_POINTS/
+    );
+    // The ceiling is the same bound a grant may name in the contract, so a default could never ask a
+    // read for more rows than an owner was allowed to ask for.
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "10001" })).toThrow(
+      /LOCATION_HISTORY_READ_POINTS/
     );
   });
 

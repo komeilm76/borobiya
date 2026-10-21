@@ -16,7 +16,9 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    expect(allApiRoutes).toHaveLength(59);
+    // 61 = the 59 documented before Phase 2's history read path plus GET /_user/location/history/shares
+    // and DELETE /_user/location/history/share/:shareId (T2.2.4), which the receiver flow needs.
+    expect(allApiRoutes).toHaveLength(61);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 

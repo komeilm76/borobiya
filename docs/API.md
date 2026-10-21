@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -219,8 +219,10 @@ GET    /_user/location/shares            → { owned: LocationShare[], sharedWit
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
 → 201 { shares: LocationHistoryShare[], createdShareIds: string[], reusedShareIds: string[] }
-GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp}] } // own history
-GET    /_user/location/history/shared/:shareId → polyline for receiver
+GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp,accuracy?}], totalPoints } // own history
+GET    /_user/location/history/shares    → { owned: LocationHistoryShare[], sharedWithMe: (LocationHistoryShare & { owner })[] }
+GET    /_user/location/history/shared/:shareId → the granted window, same shape as above
+DELETE /_user/location/history/share/:shareId → 200 empty body (the grant row is deleted)
 
 POST   /_user/location/update            deprecated REST fallback for Socket `location:update` (live)
 ```
@@ -231,7 +233,14 @@ POST   /_user/location/update            deprecated REST fallback for Socket `lo
 
 **`POST /_user/location/history/share` (T2.2.3, live).** Grants one fixed window of the caller's stored history to 1–50 unique recipients. Limits: the window may span at most `LOCATION_HISTORY_MAX_SHARE_DAYS` — checked here rather than in the schema because it is configuration, and over that bound the answer is `400 SHARE_RANGE_TOO_LARGE` with `issues: [{ code: "range_too_large", maxShareDays, requestedDays, path: ["to"] }]` and nothing written — and `maxPoints` is an integer from 1 to `MAX_LOCATION_HISTORY_SHARE_POINTS` (10000), stored on the grant so every receiver of that window reads it at the same density — the receiver's read takes no sampling parameter, and the owner changes the density by re-posting the same window with a new value, which the reuse path applies. Recipients are validated as a batch with the identical live-share rule and issue codes (`self_target`, `unknown_target`, `unavailable_target`); one unusable recipient rejects the whole request. A repeat of the same owner/target/`from`/`to` reuses the existing grant — the unique index over exactly those columns *is* the duplicate rule — and rewrites only `maxPoints`, including back to `null` when the repeat states no preference.
 
-Two properties follow from the shape of a history grant and are worth stating plainly: it needs **no priority device** (it replays rows the server already stored, so there is nothing to broadcast, and `priorityDeviceId` is not part of this payload), and it **does not expire** — it lasts until the retention prune removes the points underneath it, which is also why a window that no longer contains any point is created normally instead of being refused, and reads back as no points. `DELETE /_user/location/history/share/:shareId` is not implemented yet: unlike `location_shares`, this table keeps no `is_revoked` flag, so revocation must be a real `DELETE` and lands with the receiver read path (T2.2.4). Responses are `Cache-Control: no-store`.
+Two properties follow from the shape of a history grant and are worth stating plainly: it needs **no priority device** (it replays rows the server already stored, so there is nothing to broadcast, and `priorityDeviceId` is not part of this payload), and it **does not expire** — it lasts until the retention prune removes the points underneath it, which is also why a window that no longer contains any point is created normally instead of being refused, and reads back as no points. `DELETE /_user/location/history/share/:shareId` (T2.2.4, live) is that real `DELETE`: unlike `location_shares`, this table keeps no `is_revoked` flag. Responses are `Cache-Control: no-store`.
+
+**History reads (T2.2.4, live).** A window read is `[from, to)` on the observation `timestamp` — the same half-open convention the shared range check uses — and returns at most the grant's `maxPoints` points, oldest first, or `LOCATION_HISTORY_READ_POINTS` when the grant stores none. The ceiling and the total are decided in one statement: `row_number()` and `count(*) OVER ()` are computed over the rows the `(user_id, timestamp)` index already yields, so a 30-day window never travels to Node just to be thrown away; the response's `totalPoints` says how many rows the window holds, which is how a player tells a sampled view from the complete record.
+
+- `GET /_user/location/history` reads the caller's own rows and requires explicit `from`/`to` (a 90-day retention default would silently hide how much was omitted). Sampling uses the configured default, because your own history has no grant to carry a target.
+- `GET /_user/location/history/shared/:shareId` reads one grant the caller *received*. Nothing about the window or the density is a query parameter: the grant fixes both, so a receiver cannot widen what they were given, and every receiver of one grant sees the same view. A grant id that does not exist and one belonging to a different receiver answer identically with `404 SHARE_NOT_FOUND`, since this is the only endpoint that can probe whether another account shares history with anybody.
+- `GET /_user/location/history/shares` lists both directions newest first, capped at `MAX_LOCATION_SHARE_LIST_ITEMS` per list, and is how a receiver learns an id in the first place. Nothing is filtered out: a grant has no expiry and no revoked state, so the list is whatever the account holds. `sharedWithMe` rows carry `owner: { id, username }` — deliberately not `lastLocation`, which a history grant never authorizes.
+- `DELETE /_user/location/history/share/:shareId` is owner-only and immediate: the row goes away and the receiver's next read answers `404`. It does not recall points the receiver already loaded, and repeating the delete answers `404` (unlike the live revoke, which repeats `200`, there is no retained row to be idempotent about).
 
 **Expiry & retention (T2.1.6 + T2.2.5, live).** No HTTP surface: a maintenance timer inside the API process retires
 `location_shares` rows with `expiresAt <= now` by setting `isRevoked = true` (checked every 15s, at least once a minute,
@@ -376,7 +385,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, `POST /_user/location/share`, and `DELETE /_user/location/share/:shareId`; the remaining live-location endpoints, SOS, mission, and most search operations remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, admin user list/detail/create/status, and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and most search operations remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -437,7 +446,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
-| 404 | `SHARE_NOT_FOUND` | Location share id is unknown or owned by another account |
+| 404 | `SHARE_NOT_FOUND` | A live or history share id is unknown, belongs to another account, or (for a received history read) was never granted to the caller |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |

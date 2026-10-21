@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_LOCATION_HISTORY_SHARE_POINTS,
+  MAX_LOCATION_SHARE_LIST_ITEMS,
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_TARGETS,
   historyShareSchema,
+  locationHistoryResponseSchema,
+  locationHistorySharesResponseSchema,
   locationShareCreatedSchema,
   locationSharesResponseSchema,
   locationUpdateSchema,
@@ -108,6 +111,64 @@ describe("location schemas", () => {
     // Received rows must carry an owner; a bare share row is not enough to render a marker.
     expect(locationSharesResponseSchema.safeParse({ owned: [], sharedWithMe: [share] }).success).toBe(false);
     expect(locationSharesResponseSchema.safeParse({ owned: [share], sharedWithMe: [], extra: 1 }).success).toBe(false);
+  });
+
+  it("reads a history window with its sampled total", () => {
+    const point = { lat: 35.7, lon: 51.4, timestamp: from };
+    const grantPoint = { ...point, accuracy: 12 };
+
+    expect(locationHistoryResponseSchema.safeParse({ points: [point, grantPoint], totalPoints: 8_412 }).success).toBe(true);
+    // The total is required: a client that cannot tell a sampled view from the whole record would draw
+    // a 30-day trace from 1,000 points and call it complete.
+    expect(locationHistoryResponseSchema.safeParse({ points: [point] }).success).toBe(false);
+    expect(locationHistoryResponseSchema.safeParse({ points: [point], totalPoints: -1 }).success).toBe(false);
+    expect(locationHistoryResponseSchema.safeParse({ points: [point], totalPoints: 1.5 }).success).toBe(false);
+    expect(locationHistoryResponseSchema.safeParse({ points: [point], totalPoints: 1, extra: 1 }).success).toBe(false);
+    // Accuracy is absent when the device did not report one, never null, so a client does not have to
+    // distinguish "no accuracy" from "zero accuracy".
+    expect(locationHistoryResponseSchema.safeParse({ points: [{ ...point, accuracy: null }], totalPoints: 1 }).success).toBe(false);
+  });
+
+  it("caps a history read at the sampling bound the grant could have asked for", () => {
+    const point = { lat: 35.7, lon: 51.4, timestamp: from };
+    const atLimit = Array.from({ length: MAX_LOCATION_HISTORY_SHARE_POINTS }, () => point);
+    expect(locationHistoryResponseSchema.safeParse({ points: atLimit, totalPoints: 999_999 }).success).toBe(true);
+    expect(
+      locationHistoryResponseSchema.safeParse({ points: [...atLimit, point], totalPoints: 999_999 }).success
+    ).toBe(false);
+  });
+
+  it("lists history grants in both directions without a live position", () => {
+    const grant = {
+      id: targetId,
+      ownerId: otherTargetId,
+      targetUserId: targetId,
+      from,
+      to,
+      maxPoints: 500,
+      createdAt: from
+    };
+    const received = { ...grant, id: otherTargetId, ownerId: targetId, targetUserId: otherTargetId };
+
+    expect(
+      locationHistorySharesResponseSchema.safeParse({
+        owned: [grant],
+        sharedWithMe: [{ ...received, owner: { id: targetId, username: "dispatcher" } }]
+      }).success
+    ).toBe(true);
+    // A received grant must name who granted it, and it carries no current position: sharing a past
+    // window never authorized the receiver to see where the owner is now.
+    expect(locationHistorySharesResponseSchema.safeParse({ owned: [], sharedWithMe: [received] }).success).toBe(false);
+    expect(
+      locationHistorySharesResponseSchema.safeParse({
+        owned: [],
+        sharedWithMe: [{ ...received, owner: { id: targetId, username: "dispatcher", lastLocation: null } }]
+      }).success
+    ).toBe(false);
+
+    const capped = Array.from({ length: MAX_LOCATION_SHARE_LIST_ITEMS }, () => grant);
+    expect(locationHistorySharesResponseSchema.safeParse({ owned: capped, sharedWithMe: [] }).success).toBe(true);
+    expect(locationHistorySharesResponseSchema.safeParse({ owned: [...capped, grant], sharedWithMe: [] }).success).toBe(false);
   });
 
   it("validates geographic bounds and location update metadata", () => {

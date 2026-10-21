@@ -137,6 +137,10 @@ describe("Fastify server skeleton", () => {
     const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
     const listShares = paths["/_user/location/shares"]?.get;
     const createHistoryShare = paths["/_user/location/history/share"]?.post;
+    const ownHistory = paths["/_user/location/history"]?.get;
+    const sharedHistory = paths["/_user/location/history/shared/{shareId}"]?.get;
+    const historyShareList = paths["/_user/location/history/shares"]?.get;
+    const revokeHistoryShare = paths["/_user/location/history/share/{shareId}"]?.delete;
     const listDevices = paths["/_user/devices"]?.get;
     const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
@@ -326,7 +330,35 @@ describe("Fastify server skeleton", () => {
       201: expect.any(Object),
       400: expect.any(Object),
       401: expect.any(Object),
-      403: expect.any(Object)
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // T2.2.4 is what makes a grant usable, so every half of the history path declares its runtime status:
+    // a "contract-only" here would mean the player had nothing to read.
+    for (const [name, operation] of [
+      ["locationGetHistory", ownHistory],
+      ["locationGetSharedHistory", sharedHistory],
+      ["locationListHistoryShares", historyShareList],
+      ["locationRevokeHistoryShare", revokeHistoryShare]
+    ] as const) {
+      expect(operation?.["x-borobiya-runtime-status"], name).toBe("implemented");
+    }
+    expect(sharedHistory?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      404: expect.any(Object)
+    });
+    // A sampled view must not look like the whole record: both reads report how many rows the window holds.
+    expect(ownHistory?.responses).toHaveProperty("200.content.application/json.schema.properties.totalPoints");
+    expect(sharedHistory?.responses).toHaveProperty("200.content.application/json.schema.properties.totalPoints");
+    // The receiver's list is the only way to learn a grant id, and it names the owner without a position.
+    expect(historyShareList?.responses).toHaveProperty(
+      "200.content.application/json.schema.properties.sharedWithMe.items.properties.owner"
+    );
+    expect(revokeHistoryShare?.responses).toHaveProperty("200", {
+      description: "Successful response with no response body."
     });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
@@ -387,6 +419,19 @@ describe("Fastify server skeleton", () => {
     const missingDevicesToken = await app.inject({ method: "GET", url: "/_user/devices" });
     expect(missingDevicesToken.statusCode).toBe(401);
     expect(missingDevicesToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    // Every history route is `/_user`-scoped, including the reads: a windowed read of another account's
+    // stored positions is the most sensitive path in this feature, so it fails closed on the same hook.
+    for (const probe of [
+      { method: "GET" as const, url: `/_user/location/history?from=2026-10-14T00:00:00.000Z&to=2026-10-21T00:00:00.000Z` },
+      { method: "GET" as const, url: "/_user/location/history/shares" },
+      { method: "GET" as const, url: "/_user/location/history/shared/00000000-0000-4000-8000-000000000001" },
+      { method: "DELETE" as const, url: "/_user/location/history/share/00000000-0000-4000-8000-000000000001" }
+    ]) {
+      const unauthenticated = await app.inject(probe);
+      expect(unauthenticated.statusCode, probe.url).toBe(401);
+      expect(unauthenticated.json()).toMatchObject({ code: "UNAUTHORIZED" });
+    }
 
     // The `/_user` authorization hook is app-scoped, so newly added Phase 2 user routes
     // must fail closed on the same token/session checks.

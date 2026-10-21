@@ -6,6 +6,8 @@ import { randomUUID } from "node:crypto";
 import { locationHistory, locationHistoryShares, users } from "./schema";
 import {
   DrizzleLocationHistoryStore,
+  historyWindowQuery,
+  historyWindowResult,
   locationFixQueries,
   pruneLocationHistoryQuery,
   type LocationFixInput,
@@ -75,6 +77,8 @@ class FakeQuery implements PromiseLike<unknown> {
   readonly from = vi.fn(() => this);
   readonly where = vi.fn(() => this);
   readonly limit = vi.fn(() => this);
+  readonly orderBy = vi.fn(() => this);
+  readonly innerJoin = vi.fn(() => this);
   readonly returning = vi.fn(() => this);
   readonly set = vi.fn((values: Record<string, unknown>) => {
     this.mutations.push({ type: "update", values });
@@ -117,6 +121,7 @@ function makeDatabase(scriptedResults: unknown[][]) {
     select: query,
     insert: query,
     update: query,
+    delete: query,
     transaction: vi.fn(async (handler: (tx: typeof transaction) => Promise<unknown>) => handler(transaction))
   } as unknown as Database;
   return { store: new DrizzleLocationHistoryStore(database), mutations, executed };
@@ -225,5 +230,90 @@ describe("pruneLocationHistoryQuery", () => {
     expect(sql).toContain('"location_history"."id" IN ((');
     expect(sql).toContain('select "id" from "location_history" where "location_history"."created_at" < $2 order by "location_history"."id" asc limit $3');
     expect(built.params).toEqual(["2026-07-23T00:00:00.000Z", "2026-07-23T00:00:00.000Z", 5000]);
+  });
+});
+
+describe("historyWindowQuery", () => {
+  it("samples inside the database and reports the unsampled total", () => {
+    const query = historyWindowQuery(offlineDb, {
+      userId: ownerId,
+      fromTime,
+      toTime,
+      maxPoints: 250
+    }).toSQL();
+
+    // The window filter is the (user_id, timestamp) index from 0007, and the row numbering runs over
+    // that filtered set, so a 30-day window never has to leave PostgreSQL to be thrown away.
+    expect(query.sql).toContain('with "sampled" as (select');
+    expect(query.sql).toContain('from "location_history"');
+    expect(query.sql).toContain('row_number() over (order by "timestamp", "id")');
+    expect(query.sql).toContain('count(*) over ()');
+    expect(query.sql).toContain('% greatest(1, ("totalPoints" + $4 - 1) / $5) = 0');
+    expect(query.sql).toContain('order by "sampled"."timestamp" asc');
+    expect(query.params).toEqual([
+      ownerId,
+      "2026-10-14T00:00:00.000Z",
+      "2026-10-21T00:00:00.000Z",
+      250,
+      250
+    ]);
+  });
+
+  it("keeps every point when the window is smaller than the target", () => {
+    // stride = greatest(1, (total + cap - 1) / cap): with total <= cap that is 1, and (position-1) % 1
+    // is 0 for every row, so a short window comes back whole rather than thinned.
+    const rows = Array.from({ length: 3 }, (_, index) => ({
+      lat: 35.7 + index / 10_000,
+      lon: 51.3,
+      accuracy: null,
+      timestamp: new Date(fromTime.getTime() + index * 60_000),
+      totalPoints: 3
+    }));
+    const result = historyWindowResult(rows);
+
+    expect(result.totalPoints).toBe(3);
+    expect(result.points).toHaveLength(3);
+    expect(result.points[0]).not.toHaveProperty("totalPoints");
+  });
+
+  it("reports a zero total for an empty window without an extra count query", () => {
+    expect(historyWindowResult([])).toEqual({ points: [], totalPoints: 0 });
+  });
+});
+
+describe("DrizzleLocationHistoryStore history grant reads and deletes", () => {
+  it("returns the grant when it exists and null when it does not", async () => {
+    const found = makeDatabase([[grantRow()]]);
+    const missing = makeDatabase([[]]);
+
+    await expect(found.store.findHistoryShare(randomUUID())).resolves.toMatchObject({
+      ownerId,
+      targetUserId: targetId,
+      maxPoints: null
+    });
+    await expect(missing.store.findHistoryShare(randomUUID())).resolves.toBeNull();
+  });
+
+  it("deletes one grant of one owner and reports whether a row was there", async () => {
+    const shareKey = randomUUID();
+    const removed = makeDatabase([[{ id: shareKey }]]);
+    const nothing = makeDatabase([[]]);
+
+    await expect(removed.store.deleteHistoryShare({ ownerId, shareId: shareKey })).resolves.toBe(true);
+    await expect(nothing.store.deleteHistoryShare({ ownerId, shareId: shareKey })).resolves.toBe(false);
+  });
+
+  it("lists both directions and names the owner only on received grants", async () => {
+    const ownedRow = grantRow();
+    const received = grantRow({ id: randomUUID(), ownerId: targetId, targetUserId: ownerId, maxPoints: 250 });
+    const fake = makeDatabase([[ownedRow], [{ ...received, ownerUsername: "dispatcher" }]]);
+
+    const { owned, sharedWithMe } = await fake.store.listHistoryShares({ userId: ownerId, limit: 100 });
+
+    expect(owned).toEqual([ownedRow]);
+    expect(sharedWithMe).toEqual([{ ...received, owner: { id: targetId, username: "dispatcher" } }]);
+    // The join column is folded into `owner`, and the receiver-facing row carries no live position.
+    expect(sharedWithMe[0]).not.toHaveProperty("ownerUsername");
+    expect(sharedWithMe[0]).not.toHaveProperty("lastLocation");
   });
 });
