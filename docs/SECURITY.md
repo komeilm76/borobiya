@@ -104,10 +104,11 @@ Via `@fastify/rate-limit`. The current API uses its in-memory store; Redis-backe
 | `_auth/forgot-password/request`, `/verify` | 5 req/15m | `ip+username` |
 | `_auth/forgot-password/reset` | 5 req/15m | `ip` |
 | `POST /_user/sos/requests` | 3 req/min | `userId` |
-| `location:update` | 60 req/min | `deviceId` |
+| `location:update` (Socket.IO) | 60 req/min | one counter per authenticated connection (its session device) |
+| `POST /_user/location/update` (REST fallback) | 100 req/min global default | `ip` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration, login, and the recovery request/verify routes apply 5/15m IP+username limits; reset applies 5/15m per IP. Limiter keys are derived before schema validation, so invalid or overlong usernames (including case variants rejected by the lowercase schema) are mapped to a bounded invalid-input bucket rather than retained as arbitrarily large keys or aliased to a valid username. Feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration, login, and the recovery request/verify routes apply 5/15m IP+username limits; reset applies 5/15m per IP. Limiter keys are derived before schema validation, so invalid or overlong usernames (including case variants rejected by the lowercase schema) are mapped to a bounded invalid-input bucket rather than retained as arbitrarily large keys or aliased to a valid username. Feature-specific limits remain to be added with their handlers. The Socket.IO `location:update` throttle is an in-memory counter on the connection: exceeding 60 updates/minute answers the ack with `RATE_LIMITED` and `retryAfterMs` and skips all database work; sustained `>50/s` auto-suspension still needs the `suspendedUntil`/`suspension_reason` columns and is not implemented. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
 
 ---
 

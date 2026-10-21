@@ -51,6 +51,12 @@ export interface ReceivedLocationShareRecord extends LocationShareRecord {
   };
 }
 
+/** The minimum a realtime fan-out needs to know about one active outgoing share. */
+export interface ActiveOutgoingShare {
+  targetUserId: string;
+  priorityDeviceId: string | null;
+}
+
 export interface LocationShareStore {
   /** Classifies the requested recipients against the current user table. */
   assessShareTargets(input: {
@@ -71,6 +77,8 @@ export interface LocationShareStore {
    * Active shares only (not revoked and not past `expiresAt`), newest first and capped per
    * list. Receivers additionally see the owner's username and last server-known position.
    */
+  /** Active outgoing shares for realtime routing: unrevoked and unexpired, newest first. */
+  listActiveOutgoingShares(userId: string): Promise<ActiveOutgoingShare[]>;
   listActiveShares(input: {
     userId: string;
     limit: number;
@@ -185,6 +193,25 @@ export class DrizzleLocationShareStore implements LocationShareStore {
 
       return { shares, createdShareIds, reusedShareIds };
     });
+  }
+
+  async listActiveOutgoingShares(userId: string): Promise<ActiveOutgoingShare[]> {
+    const rows = await this.db
+      .select({
+        targetUserId: locationShares.targetUserId,
+        priorityDeviceId: locationShares.priorityDeviceId
+      })
+      .from(locationShares)
+      .where(and(
+        eq(locationShares.ownerId, userId),
+        eq(locationShares.isRevoked, false),
+        sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
+      ))
+      .orderBy(desc(locationShares.createdAt));
+    return rows.map((row) => ({
+      targetUserId: row.targetUserId,
+      priorityDeviceId: row.priorityDeviceId ?? null
+    }));
   }
 
   async listActiveShares(input: {

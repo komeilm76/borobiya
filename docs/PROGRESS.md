@@ -4,7 +4,7 @@
 
 ---
 
-## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 at T2.2.1/T2.2.2 (2026-10-21)
+## Overall project estimate: 24% (unchanged planning figure) — Phase 1 v0.1.0 released; Phase 2 at T2.1.5/T2.3.4 (2026-10-21)
 
 All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, and T2.1.2 adds the first share handler — `POST /_user/location/share`. Share revocation/listing, realtime `location:update`, expiry processing, history sharing, and multi-device behavior remain unstarted and are not claimed complete. The 24% whole-project estimate is unchanged; it is a planning figure rather than a per-task measurement.
 
@@ -19,7 +19,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
 | Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
-| Location Sharing | 32% (6/19 tasks) | ✅ T2.1.1 schema/migration, T2.1.2–T2.1.4 share create/revoke/list API, and T2.2.1/T2.2.2 history + history-share tables complete; realtime behavior, expiry/retention jobs, history APIs/UI, and device-priority behavior remain unstarted |
+| Location Sharing | 42% (8/19 tasks) | ✅ T2.1.1 schema, T2.1.2–T2.1.4 share create/revoke/list API, T2.2.1/T2.2.2 history tables, and T2.1.5 + T2.3.4 realtime broadcast with the priority-device rule complete; expiry/retention jobs, share-UI screens, history share/read APIs, and the device-selection flow remain |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
 | UI/UX & a11y | 0% | ⬜ Not started |
@@ -78,13 +78,13 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 
 **Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
-### Phase 2 — Location Sharing — 32% (6/19 tasks)
+### Phase 2 — Location Sharing — 42% (8/19 tasks)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Live share + expiry | 57% (4/7 tasks) | T2.1.1 schema/migration, T2.1.2 share creation (recipient checks, timed/permanent expiry, idempotent reuse), T2.1.3 owner-only revoke, and T2.1.4 active share lists complete; live updates and the expiry job remain |
+| Live share + expiry | 71% (5/7 tasks) | T2.1.1–T2.1.4 share storage/API and T2.1.5 live `location:update` (handshake auth, throttle, PostGIS upsert, history insert, peer fan-out, REST fallback) complete; the expiry cron and the share-dialog/lists UI remain |
 | History share + retention | 33% (2/6 tasks) | T2.2.1 `location_history` and T2.2.2 `location_history_shares` exist in migration `0007_brief_hedge_knight.sql`; there is still no writer, share/read API, retention env wiring, prune job, or playback UI |
-| Multi-device priority | 0% | Not started |
+| Multi-device priority | 17% (1/6 tasks) | T2.3.4 server-side rejection of non-priority devices is live inside the realtime path; the devices API (T2.3.2), the >1-device warning/selection (T2.3.3), settings UI (T2.3.5), and the Capacitor-aware composable (T2.3.6) remain |
 
 ### Phase 3 — SOS Rescue — 0%
 
@@ -126,6 +126,21 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-21 — T2.1.5 + T2.3.4 realtime live location
+
+- Added Socket.IO (`socket.io` on the API, `socket.io-client` on the client) mounted at `/socket.io` on the existing API port; nginx gained a `/api/socket.io/` block that forwards `Upgrade`/`Connection` with 75s read/send timeouts (above `pingInterval` 25s + `pingTimeout` 10s), and the Vite dev proxy gained a matching `ws: true` entry ordered before the generic `/api` proxy.
+- The handshake runs the same checks as the `/_user` REST hook (verified access JWT, existing account with a matching role, active, unsuspended, onboarding complete, persisted live session) and every socket joins `user:{userId}`, admins also `admin`.
+- `location:update` now: throttles 60 updates/min per connection, validates `locationUpdateSchema`, requires the payload's `priorityDeviceId` to equal the connection's session device (T2.3.4 `WRONG_DEVICE`), ignores every share that pins another priority device, then in one transaction upserts `users.last_location` (`ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography`) and inserts `location_history`, and finally emits `location:peer-update` to each accepting target plus an echo to the sender's own room. A fix is stored even with no active share because SOS dispatch (T3.3.1) reads `last_location`; sustained `>50/s` auto-suspend still needs the `suspendedUntil`/`suspension_reason` columns and is not implemented.
+- The deprecated `POST /_user/location/update` REST fallback shares the same service and also fans out to peers, so a polled fix is not silently local-only.
+- Client: `services/socket.ts` (+ `socket-options.ts`) uses the same-origin `/api/socket.io` path, passes the token in `handshake.auth`, re-reads a rotated token on reconnect, and never keeps a socket open after logout; `composables/useLiveLocationBroadcast.ts` watches geolocation with 4s pacing and reads this session's device id from its own access token claims.
+- Validation: shared 35/35, server 199/199 (22 new realtime/service cases), client 58/58, all package typechecks, and the client production build pass. Fixing `io.close()` on non-listening test apps was required so inject-only apps shut down cleanly.
+- Local evidence beyond unit tests: a throwaway script (not committed) ran the real stack on `127.0.0.1` with a genuine Socket.IO WebSocket transport and injected stores — both clients connected, `location:update` acked `{ ok: true, peers: [target] }`, the fix reached the peer room, a payload naming another device acked `WRONG_DEVICE` without persisting, `POST /_user/location/update` returned 200 and also reached the peer, and an unauthenticated handshake was refused with `UNAUTHORIZED`. A temporary local app.close() rejection from `io.close()` on a never-listening server was found and fixed as part of this work.
+- **Still not verified:** live browsers, the nginx/Vite proxy upgrade paths, the target VM, and real PostGIS writes (no PostgreSQL in this workspace). Reconnect/token-rotation behavior is coded but unexercised. See the new P2-A1 follow-up.
+
+#### P2-A1 — Live broadcast acceptance — **OPEN (Phase 2 follow-up)**
+
+Two browsers signed in as the share target and owner on the target VM should show the dot moving within ~5s while the owner walks, confirm the marker stops immediately after revoke, confirm a second device cannot overwrite the priority device, and confirm the polling fallback works when WebSocket is blocked. A local (non-VM, non-browser) real-WebSocket run already proved the server-side handshake/ack/fan-out/rejection path; the remaining gap is the browser, the proxy upgrade, and real PostGIS persistence. Record browser/origin (HTTP LAN has no Service Worker), the observed latency, and sanitized server logs. Nothing here is claimed until that run is reported.
 
 ### 2026-10-21 — T2.2.1/T2.2.2 location history storage
 

@@ -147,13 +147,19 @@ packages/server/
     │   └── recovery-decoys.test.ts
     ├── location/
     │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location
-    │   └── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
+    │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
+    │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
+    │   └── live.test.ts      # service rules and REST fallback status/ack tests
+    ├── realtime/
+    │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
+    │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests
     ├── db/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
+    │   ├── location-history-store.ts # one transaction per fix: PostGIS users.last_location upsert + location_history insert
     │   ├── location-share-store.ts # share-target classification, atomic creation/reuse, owner-only revocation, and active share lists
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
@@ -215,14 +221,21 @@ packages/client/
     │   └── index.test.ts
     ├── services/
     │   ├── map-cache.ts      # Service Worker registration/activation for map requests
-    │   └── map-cache-worker.test.ts
+    │   ├── map-cache-worker.test.ts
+    │   ├── socket-options.ts # same-origin Socket.IO path and handshake auth options
+    │   ├── socket-options.test.ts
+    │   └── socket.ts         # lazily connected realtime client with token rotation and close()
     ├── stores/
     │   ├── index.ts          # Pinia instance
     │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
     │   ├── auth.test.ts
     │   └── theme.ts          # persisted theme preference and system-change synchronization
     ├── composables/
-    │   └── useSystemTheme.ts # reactive prefers-color-scheme signal
+    │   ├── useSystemTheme.ts # reactive prefers-color-scheme signal
+    │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
+    │   ├── location-broadcast.test.ts
+    │   ├── device-identity.ts # this session's deviceId read from its own access token
+    │   └── useLiveLocationBroadcast.ts # geolocation watch + throttled location:update over Socket.IO
     ├── theme/
     │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
     │   ├── theme-preference.test.ts

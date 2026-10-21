@@ -219,7 +219,7 @@ POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, ma
 GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp}] } // own history
 GET    /_user/location/history/shared/:shareId → polyline for receiver
 
-POST   /_user/location/update            deprecated in favor of Socket location:update; REST fallback
+POST   /_user/location/update            deprecated REST fallback for Socket `location:update` (live)
 ```
 
 **`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Responses are `Cache-Control: no-store`.
@@ -362,6 +362,12 @@ flowchart LR
 ## 8. Realtime (Socket.IO)
 
 **Auth:** `io(auth:{token: accessToken})` → server verifies JWT in `handshake`.
+
+Mounted at `/socket.io` on the API port (behind nginx/Vite as `/api/socket.io`, which proxies the WebSocket upgrade and falls back to long polling). The handshake middleware applies the same rules as the `/_user` REST hook — verified access JWT, existing account whose role still matches, active, unsuspended, onboarding-complete, and backed by a persisted session — and closes the connection with `UNAUTHORIZED`, `INVALID_ACCESS_TOKEN`, `ACCOUNT_INACTIVE`, `ACCOUNT_SUSPENDED`, or `SECURITY_QUESTIONS_REQUIRED`. Each socket joins `user:{userId}` and admins additionally join `admin`.
+
+**`location:update` (T2.1.5, live)** — payload `locationUpdateSchema` (`lat`, `lon`, optional `accuracy`, `timestamp`, `priorityDeviceId`). Server order: per-connection throttle (60/min) → payload validation → the reported `priorityDeviceId` must equal the session device of the connection (T2.3.4) → every active outgoing share whose pinned priority device (if any) matches that connection is accepted → the fix is written once in a transaction that updates `users.last_location` (`ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography`) and inserts `location_history` → `location:peer-update { userId, lat, lon, accuracy, timestamp }` is emitted to each accepting target's room and echoed to the sender's own room so other tabs on the account stay in sync. The ack is `{ ok, status, peers? }` or `{ ok: false, code, message, retryAfterMs? }` with codes `VALIDATION_ERROR`, `INVALID_TIMESTAMP` (device clock more than 5 minutes ahead), `WRONG_DEVICE`, `RATE_LIMITED`, and `UNAUTHORIZED`. A fix is stored even when no share is active, because SOS dispatch (T3.3.1) reads `users.last_location` as the last known position.
+
+The deprecated `POST /_user/location/update` fallback runs the identical service path and, when a realtime server is attached, fans the accepted fix out to peers too, so a polled fix is never silently local-only.
 
 **Rooms:** `user:{userId}`, `admin`, `mission:{missionId}`.
 

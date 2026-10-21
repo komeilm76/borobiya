@@ -17,6 +17,9 @@ import {
 import { registerUserSecurityQuestionsRoute } from "./auth/user-security-questions";
 import { registerAdminUserRoutes } from "./admin/users";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
+import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
+import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
+import { attachRealtime, PEER_UPDATE_EVENT, userRoom } from "./realtime/socket";
 import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
@@ -49,6 +52,8 @@ export interface FastifyAppDependencies {
   securityQuestionsStore?: UserSecurityQuestionsStore;
   /** Override live-location share persistence in tests. */
   locationShareStore?: LocationShareStore;
+  /** Override live-location fix persistence in tests. */
+  locationHistoryStore?: LocationHistoryStore;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
@@ -73,20 +78,29 @@ export async function createFastifyApp(
   await registerHttpSecurityPlugins(app, config);
   await registerSwagger(app, config.openApiServerPath);
 
-  const hasInjectedStores =
-    dependencies.registrationStore !== undefined &&
-    dependencies.loginStore !== undefined &&
-    dependencies.recoveryStore !== undefined &&
-    dependencies.adminUserStore !== undefined &&
-    dependencies.securityQuestionsStore !== undefined &&
-    dependencies.locationShareStore !== undefined;
-  const database = hasInjectedStores ? undefined : createDatabase(config.databaseUrl);
+  // A pool is only opened when at least one store still needs the real database; queries
+  // run lazily, so inject-test apps never connect.
+  const needsDatabase = [
+    dependencies.registrationStore,
+    dependencies.loginStore,
+    dependencies.recoveryStore,
+    dependencies.adminUserStore,
+    dependencies.securityQuestionsStore,
+    dependencies.locationShareStore,
+    dependencies.locationHistoryStore
+  ].some((store) => store === undefined);
+  const database = needsDatabase ? createDatabase(config.databaseUrl) : undefined;
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
   const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
   const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   const adminUserStore = dependencies.adminUserStore ?? new DrizzleAdminUserStore(database!.db);
   const securityQuestionsStore = dependencies.securityQuestionsStore ?? new DrizzleUserSecurityQuestionsStore(database!.db);
   const locationShareStore = dependencies.locationShareStore ?? new DrizzleLocationShareStore(database!.db);
+  const locationHistoryStore = dependencies.locationHistoryStore ?? new DrizzleLocationHistoryStore(database!.db);
+  const liveLocationService = createLiveLocationService({
+    shareStore: locationShareStore,
+    historyStore: locationHistoryStore
+  });
   await registerUserSecurityQuestionsRoute(app, {
     store: securityQuestionsStore,
     jwtSecret: config.jwtSecret,
@@ -118,6 +132,25 @@ export async function createFastifyApp(
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks.
   await registerLocationShareRoutes(app, { store: locationShareStore });
+
+  const realtime = attachRealtime(app.server, {
+    jwtSecret: config.jwtSecret,
+    users: securityQuestionsStore,
+    live: liveLocationService,
+    corsOrigins: config.corsOrigins
+  });
+  await registerLocationUpdateRoute(app, {
+    service: liveLocationService,
+    broadcast: (peerIds, update) => {
+      for (const peerId of peerIds) {
+        realtime.io.to(userRoom(peerId)).emit(PEER_UPDATE_EVENT, update);
+      }
+    }
+  });
+
+  app.addHook("onClose", async () => {
+    await realtime.close();
+  });
 
   if (database) {
     app.addHook("onClose", async () => {

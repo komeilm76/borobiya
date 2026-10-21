@@ -99,9 +99,13 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 - [ ] **T2.3.1** `user_sessions` per device: deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline
 - [ ] **T2.3.2** `GET /_user/devices` — Active Devices Table
 - [ ] **T2.3.3** Warning modal if `activeDevices.length>1` on live-share/SOS start: “Select broadcasting device” → store `priorityDeviceId`
-- [ ] **T2.3.4** Server: reject `location:update` if `from != priorityDeviceId` (when set)
+- [x] **T2.3.4** Server: reject `location:update` if `from != priorityDeviceId` (when set) — completed 2026-10-21 with T2.1.5: the connection's session device must equal the payload's reported `priorityDeviceId` (409 `WRONG_DEVICE` on the REST fallback, `ok:false` ack over the socket), every active outgoing share that pins a different priority device ignores the update, and nothing is persisted when all shares reject it
 - [ ] **T2.3.5** Settings page: device list + change priority anytime
 - [ ] **T2.3.6** Frontend composable `usePriorityDevice` + Capacitor device detection
+
+### Phase 2 acceptance follow-ups (separate from implementation tasks)
+
+- [ ] **P2-A1 — Live broadcast acceptance (non-blocking follow-up).** On the target VM, verify with two browsers that the owner's dot moves on the receiver within ~5s while walking, that revoke stops it promptly, that a non-priority device cannot overwrite the priority device, and that the long-polling fallback works when WebSocket is blocked. Record origin (plain-HTTP LAN has no Service Worker), observed latency, and sanitized server logs. The unit tests use injected stores and fake sockets and prove none of this.
 
 ---
 

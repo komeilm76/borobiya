@@ -246,7 +246,7 @@ CREATE TABLE admin_audit_log (
 
 ## Notes
 
-- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, the live `location_shares` table (T2.1.1), and `location_history`/`location_history_shares` (T2.2.1/T2.2.2, `0007_brief_hedge_knight.sql`) — the history tables exist but no writer, reader, or retention job is implemented yet. Category/incident, SOS, and mission tables plus remaining user columns (including `suspended_until`, `suspension_reason`, and `is_on_mission`) remain future tasks.
+- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, the live `location_shares` table (T2.1.1), and `location_history`/`location_history_shares` (T2.2.1/T2.2.2, `0007_brief_hedge_knight.sql`). Socket `location:update` (T2.1.5) now writes one `location_history` row and the `users.last_location` geography per accepted fix; history reads/shares and the retention job (T2.2.3-T2.2.5) are not implemented yet. Category/incident, SOS, and mission tables plus remaining user columns (including `suspended_until`, `suspension_reason`, and `is_on_mission`) remain future tasks.
 - **History storage choice:** `location_history` keeps plain `lat`/`lon` columns with a composite `(user_id, timestamp)` index and no geography column or GiST index; every read is user- and time-scoped. Monthly partitioning stays the documented optional scale-up path (ARCHITECTURE §8.3).
 - **Geospatial:** `last_location` and `sos_requests.location` use `GEOGRAPHY(Point,4326)` for meter-accurate `ST_Distance`.
 - **No delete:** No `deleted_at` — deactivated users stay with `is_active=false` for audit.

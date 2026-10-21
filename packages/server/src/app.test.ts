@@ -100,6 +100,7 @@ describe("Fastify server skeleton", () => {
     const createShare = paths["/_user/location/share"]?.post;
     const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
     const listShares = paths["/_user/location/shares"]?.get;
+    const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
@@ -254,6 +255,8 @@ describe("Fastify server skeleton", () => {
     expect(publicSecurityQuestions?.responses).toHaveProperty("200");
     expect(createShare?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(sharePath?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(restLocationUpdate?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(restLocationUpdate?.deprecated).toBe(true);
     expect(listShares?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(listShares?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
     expect(sharePath?.responses).toMatchObject({
