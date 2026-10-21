@@ -1,0 +1,229 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-borobiya}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-borobiya}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    # Authenticate for real (pg_isready does not log in): if POSTGRES_PASSWORD
+    # was changed after the volume was initialized, this reports unhealthy and
+    # blocks dependents instead of letting them fail with auth errors.
+    healthcheck:
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tAc 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    restart: unless-stopped
+    # Pass only the variables packages/server/src/config/env.ts validates.
+    # Never hand the whole local .env (host DATABASE_URL, unrelated service
+    # passwords) to the container via env_file.
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-borobiya}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-borobiya}
+      # No defaults on purpose: the API must fail closed until .env contains
+      # real, different secrets (see .env.example).
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      # Trust X-Forwarded-* only from peers on the pinned Compose subnet
+      # (the nginx container), so per-client rate limiting sees real client
+      # IPs instead of one shared proxy bucket. Override for other topologies.
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-172.30.0.0/24}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
+    ports:
+      - "127.0.0.1:${API_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/_public/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  map-server:
+    image: ghcr.io/maplibre/martin:1.16.1
+    restart: unless-stopped
+    # No DATABASE_URL and no postgres dependency on purpose: martin.yaml
+    # configures no Postgres sources (see the privacy note there), so Martin
+    # serves tiles even while the application database is down.
+    command: ["--config", "/martin.yaml"]
+    volumes:
+      - ./map-server/martin.yaml:/martin.yaml:ro
+      # Setup pins this to an active release. Before setup, use an isolated
+      # empty fallback so Compose cannot create datasets/current as a directory.
+      - "${MAP_DATASET_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/dataset}:/data:ro"
+      - ./map-server/styles:/styles:ro
+      - ./map-server/sprites:/sprites:ro
+      - ./map-server/fonts:/fonts:ro
+    ports:
+      - "127.0.0.1:${MAP_SERVER_PORT:-8000}:3000"
+
+  nominatim:
+    image: mediagis/nominatim:5.3-2026-06-23T09-03
+    restart: unless-stopped
+    environment:
+      # Keep the PBF outside /nominatim (PROJECT_DIR): the mediagis entrypoint
+      # recursively chowns that directory under `bash -e`, so a read-only
+      # mount inside it makes startup exit 1 ("Read-only file system").
+      PBF_PATH: /osm/${MAP_REGION:-borobiya}.osm.pbf
+      NOMINATIM_PASSWORD: ${NOMINATIM_PASSWORD:-change-me}
+      IMPORT_STYLE: ${NOMINATIM_IMPORT_STYLE:-full}
+      IMPORT_WIKIPEDIA: "false"
+      THREADS: ${NOMINATIM_THREADS:-2}
+      POSTGRES_SHARED_BUFFERS: ${NOMINATIM_POSTGRES_SHARED_BUFFERS:-512MB}
+      POSTGRES_MAINTENANCE_WORK_MEM: ${NOMINATIM_POSTGRES_MAINTENANCE_WORK_MEM:-1GB}
+      POSTGRES_AUTOVACUUM_WORK_MEM: ${NOMINATIM_POSTGRES_AUTOVACUUM_WORK_MEM:-128MB}
+      POSTGRES_WORK_MEM: ${NOMINATIM_POSTGRES_WORK_MEM:-32MB}
+      POSTGRES_EFFECTIVE_CACHE_SIZE: ${NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE:-3GB}
+    volumes:
+      - "${MAP_DATASET_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/dataset}:/osm:ro"
+      - nominatim-data:/var/lib/postgresql/16/main
+    ports:
+      - "127.0.0.1:${NOMINATIM_HTTP_PORT:-8081}:8080"
+      - "127.0.0.1:${NOMINATIM_DB_PORT:-5433}:5432"
+    shm_size: ${NOMINATIM_SHM_SIZE:-1g}
+    profiles: ["geocoding-import"]
+    # Grace covers a slow first import (~70 min) before reporting unhealthy;
+    # the label never stops the import, it only informs `ps`/dependents.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://127.0.0.1:8080/status?format=json' >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 60m
+
+  photon:
+    build:
+      context: ./map-server/photon
+    image: borobiya/photon:1.3.0
+    restart: unless-stopped
+    environment:
+      JAVA_TOOL_OPTIONS: "${PHOTON_JAVA_TOOL_OPTIONS:--Xms256m -Xmx1536m}"
+    command: ["serve", "-listen-ip", "0.0.0.0", "-listen-port", "2322", "-default-language", "${PHOTON_DEFAULT_LANGUAGE:-fa}"]
+    volumes:
+      - "${MAP_PHOTON_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/photon}:/var/lib/photon"
+    ports:
+      - "127.0.0.1:${PHOTON_PORT:-2322}:2322"
+    profiles: ["geocoding"]
+    # The JRE image ships bash but no curl; probe /status over /dev/tcp.
+    # $$ escapes Compose interpolation so bash receives the literal $line.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/2322 && printf 'GET /status HTTP/1.0\\r\\n\\r\\n' >&3 && IFS= read -r line <&3 && case \"$$line\" in *' 200 '*) exit 0;; *) exit 1;; esac"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  osrm-car:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
+    volumes:
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/car:/data:ro"
+    profiles: ["routing"]
+    # osrm-routed binds :5000 only after its graph is loaded; a successful
+    # TCP connect therefore means the profile is ready to serve.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  osrm-bicycle:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
+    volumes:
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/bicycle:/data:ro"
+    profiles: ["routing"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  osrm-foot:
+    image: ghcr.io/project-osrm/osrm-backend:v26.10.0-debian
+    restart: unless-stopped
+    command: ["osrm-routed", "--algorithm", "mld", "--threads", "${OSRM_RUNTIME_THREADS:-1}", "--max-table-size", "100", "/data/${MAP_REGION:-borobiya}.osrm"]
+    volumes:
+      - "${MAP_OSRM_DATA_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/routing}/foot:/data:ro"
+    profiles: ["routing"]
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/5000"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  routing-gateway:
+    build:
+      context: ./map-server/routing-gateway
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      MAP_REGION: ${MAP_REGION:-borobiya}
+      MAP_BBOX: ${MAP_BBOX:-51.0,35.5,51.7,35.9}
+      MAP_DATA_VERSION: ${MAP_DATA_VERSION:-2026-10-18}
+      MAP_MIN_ZOOM: ${MAP_MIN_ZOOM:-0}
+      MAP_MAX_ZOOM: ${MAP_MAX_ZOOM:-14}
+      OSRM_CAR_URL: http://osrm-car:5000/route/v1/car
+      OSRM_BICYCLE_URL: http://osrm-bicycle:5000/route/v1/bike
+      OSRM_FOOT_URL: http://osrm-foot:5000/route/v1/foot
+      PHOTON_GEOCODE_URL: http://photon:2322/api
+      PHOTON_REVERSE_URL: http://photon:2322/reverse
+    ports:
+      - "127.0.0.1:${MAP_ROUTING_PORT:-8001}:3000"
+    healthcheck:
+      test: ["CMD", "bun", "-e", "fetch('http://127.0.0.1:3000/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  nginx:
+    image: nginx:1.30.6-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NGINX_PORT:-8080}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      map-server:
+        condition: service_started
+      routing-gateway:
+        condition: service_healthy
+
+volumes:
+  postgres-data: {}
+  nominatim-data: {}
+
+# Pinned so the API's TRUSTED_PROXY_IPS default (172.30.0.0/24) always matches
+# the network nginx proxies from, instead of Docker's ephemeral 172.x pool.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

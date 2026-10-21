@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> From OSM dump to serving PBF + routing + geocoding offline.
+> T1.4.7's map-data cache/reuse, safe cache clearing, and whole-country/city-crop selection are implemented. Selected areas from `map-server/regions.json` are cropped/merged into one shared external-library dataset for tiles, routing, and Nominatim→Photon. The original Tehran pipeline passed target-VM checks on 2026-10-20; on 2026-10-21 the user reported Ubuntu 24.04 setup and core app/map acceptance. A dedicated external-Internet-offline library run remains an operational follow-up, now non-blocking for Phase 2/release by user decision (see `../PROGRESS.md`).
 
 ---
 
@@ -8,65 +8,67 @@
 
 ```mermaid
 flowchart TD
-  A[Download region.osm.pbf<br/>geofabrik.de / openstreetmap.fr]
-  A --> B1[Generate Tiles<br/>Planetiler / Tippecanoe]
-  A --> B2[Build Routing Graph<br/>osrm-extract + partition + customize]
-  A --> B3[Build Geocode Index<br/>Photon Nominatim import]
-  B1 --> C[tiles.pmtiles / mbtiles]
-  B2 --> D[*.osrm graph + profiles]
-  B3 --> E[Photon ES index]
-  C & D & E --> F[Deploy to Map Server volume<br/>map-data:/data]
-  F --> G[Martin :8000<br/>OSRM :8000/route<br/>Photon :2322/api]
-  G --> H[Clients via MapLibre<br/>tiles/styles/route/geocode]
-  I[ENV MAP_REGION=tehran<br/>MAP_DATA_VERSION=2025-05-01] -.-> A & F & G
-  J[Admin: bun run map:update<br/>or Cron weekly] --> A
-  J --> K[Stage → Admin approve → Symlink swap<br/>Zero downtime]
-  K --> F
+  A[Geofabrik snapshots for selected areas<br/>pinned, latest, or specific date / ODbL 1.0]
+  A --> B[Download + official MD5 verification]
+  B --> C[Osmium smart crops per city<br/>+ merge]
+  C --> D[External map library active dataset<br/>borobiya.osm.pbf + v3 provenance manifest]
+  D --> E1[Planetiler 0.10.2<br/>MAP_BBOX + zoom range]
+  D --> E2[OSRM 26.10.0<br/>car / bicycle / foot]
+  D --> E3[Nominatim 5.3 import<br/>local PBF_PATH]
+  E1 --> F1[borobiya.pmtiles<br/>+ hash metadata]
+  E2 --> F2[car/bicycle/foot<br/>MLD graphs + hashes]
+  E3 --> G1[Nominatim PostgreSQL]
+  G1 --> G2[Photon 1.3.0 import]
+  F1 --> H[Martin :8000]
+  F2 --> I[OSRM services]
+  G2 --> J[Photon :2322]
+  H --> K[Gateway / Nginx :8080]
+  I --> L[Routing gateway :8001<br/>POST /route]
+  J --> L
+  L --> K
+  M[GET /map-config<br/>region, bbox, version, zoom] --> K
 ```
+
+`prepare-regions-pbf.sh` downloads/caches and verifies the selected snapshot sources in the standardized map library, crops/merges them into the only permitted shared dataset, and writes its provenance manifest. Tile/routing builders verify that manifest before using it; Nominatim mounts that same output as local `PBF_PATH`. `MAP_REGION` (dataset slug), `MAP_BBOX` (area union), `MAP_DATA_VERSION`, and the zoom range are validated by the routing gateway and returned as public client settings. The browser uses same-origin `/map-config`, `/route`, `/geocode`, and `/reverse` paths and does not receive service URLs.
 
 ---
 
-## 2. Update Flow (Versioned, Zero-Downtime)
-
-```mermaid
-sequenceDiagram
-  participant Admin
-  participant CLI as bun run map:update
-  participant Staging as /data/staging/v2025-05-08
-  participant Prod as /data/current (symlink)
-  participant Martin
-
-  Admin->>CLI: bun run map:update --region=iran
-  CLI->>CLI: download latest PBF, generate pmtiles, OSRM graph, Photon index
-  CLI->>Staging: write new version files + version.json
-  CLI-->>Admin: "Staging ready: v2025-05-08 — approve via POST /_admin/map/promote"
-  Admin->>Prod: POST /_admin/map/promote {version:"2025-05-08"}
-  Prod->>Prod: ln -sfn /data/staging/v2025-05-08 /data/current
-  Prod->>Martin: SIGHUP / reload config → serves new tiles
-  Martin-->>Admin: 200 {activeVersion:"2025-05-08"}
-  Note over CLI,Prod: Clients send X-Map-Data-Version header for cache bust
-```
-
----
-
-## 3. Geographic Coverage Matrix
+## 2. Update Flow (Build Artifacts)
 
 ```mermaid
 flowchart LR
-  T[Tehran 0.5GB tiles<br/>dev default] --> I[Iran 4GB]
-  I --> M[Middle-East 12GB]
-  M --> C[Custom bbox]
-  I & M & C -.-> ENV
-  ENV[MAP_REGION env<br/>MAP_BBOX, MAP_MAX_ZOOM]
+  A[Pinned Geofabrik source] --> B[Download + verify MD5]
+  B --> C[Osmium crops + merge]
+  C --> D[Shared dataset PBF + provenance manifest]
+  D --> E1[Planetiler → PMTiles]
+  D --> E2[OSRM → car/bicycle/foot]
+  D --> E3[Nominatim → Photon index]
+  E1 --> F[Start Martin]
+  E2 --> G[Start OSRM + gateway]
+  E3 --> H[Start Photon + gateway]
+  F --> I[Run offline MVT/route/geocode checks]
+  G --> I
+  H --> I
 ```
 
-| Region | PBF size | PMTiles | OSRM | Photon | Min RAM |
-|--------|----------|---------|------|--------|---------|
-| Tehran bbox | 100 MB | 0.5 GB | 0.8 GB | 1.2 GB | 2 GB |
-| Iran | 600 MB | 3–5 GB | 2 GB | 4 GB | 4–8 GB |
-| MENA | 2 GB | 12 GB | 6 GB | 10 GB | 16 GB |
+The snapshot downloader/cache, hash manifest, crops/merge, import, service-start, current-pointer activation, and post-acceptance pruning paths are scripted (`scripts/setup-ubuntu-vm.sh` runs them end-to-end with a library/snapshot/policy/area form). Continuous replication feeds and zero-downtime activation are not implemented. The original three real-data checks passed live on the target VM (2026-10-20), and the user reports current Ubuntu 24.04 setup and core app/map interactions passed (2026-10-21). A separate standardized-library external-Internet-offline acceptance run remains an operational follow-up, explicitly non-blocking for release/Phase 2 and independent of T1.4.7's completed cache/clear/selection scope.
 
-Scale without code change — only ENV + volume.
+---
+
+## 3. Geographic Coverage and Settings
+
+```mermaid
+flowchart LR
+  T[Area catalog: countries + cities<br/>regions.json] --> SEL[MAP_REGION_IDS selection<br/>default ir-tehran]
+  SEL -.-> ENV
+  ENV[MAP_LIBRARY_DIR + MAP_DATASET_DIR<br/>MAP_SNAPSHOT_DATE + MAP_SOURCE_POLICY<br/>MAP_REGION (dataset slug)<br/>MAP_BBOX (area union)<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
+  ENV --> CFG[GET /map-config]
+  CFG --> CLIENT[Client validates shared MapConfig schema]
+```
+
+The default selection targets Tehran: area `ir-tehran`, union bbox `51.0,35.5,51.7,35.9`, repository-pinned snapshot `2026-10-18`, cache-first source policy, zoom range 0–14, dataset slug `borobiya`, and the external map library under `~/.local/share/borobiya/map-library`. Planetiler and all OSRM profiles consume the merged dataset PBF, as does Nominatim before Photon import. Changing areas needs no style/client wiring changes — the dataset slug (and thus the Martin source) is constant; only the data builders rerun (the setup script detects staleness by dataset checksum).
+
+Disk estimates are preliminary and OSRM values are per profile; this deployment runs three separate OSRM processes. Runtime memory has not been benchmarked.
 
 ---
 
@@ -74,37 +76,59 @@ Scale without code change — only ENV + volume.
 
 ```
 map-server/styles/light.json
-map-server/styles/dark.json  ─┐ same sources.tiles = /tiles/{z}/{x}/{y}.pbf
-map-server/styles/sprites/   ─┤ served via Martin/nginx
-map-server/styles/glyphs/    ─┘
+map-server/styles/dark.json  ─┐ same sources.tiles = /borobiya/{z}/{x}/{y}
+map-server/sprites/borobiya/*.svg ─┤ Martin creates sprite PNG/JSON on demand
+map-server/fonts/*.ttf       ─┘ Martin creates glyph PBF ranges on demand
 ```
 
-Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint.
+Theme switch: `map.setStyle(newStyle)` — same source, different `layers` paint. The dataset source in both committed styles is `borobiya`.
 
 ---
 
 ## 5. Verification Commands
 
 ```bash
-# Tiles
-curl http://localhost:8000/tiles/5/18/12.pbf -o /tmp/t.pbf && ls -lh /tmp/t.pbf
-# Style
-curl http://localhost:8000/styles/light.json | jq .sources
-# Route
-curl -X POST http://localhost:8000/route -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car"}' -H 'Content-Type: application/json'
-# Geocode
-curl 'http://localhost:2322/api?q=azadi&limit=3' | jq
-curl 'http://localhost:2322/reverse?lat=35.70&lon=51.38' | jq
+# Prepare and verify the shared library dataset (once)
+set -a; source .env; set +a
+if [[ -z "${MAP_LIBRARY_DIR:-}" ]]; then
+  if [[ -n "${XDG_DATA_HOME:-}" ]]; then
+    [[ "$XDG_DATA_HOME" == /* ]] || { echo 'XDG_DATA_HOME must be absolute; set MAP_LIBRARY_DIR explicitly.' >&2; exit 1; }
+    MAP_LIBRARY_DIR="$XDG_DATA_HOME/borobiya/map-library"
+  elif [[ -n "${HOME:-}" && "$HOME" == /* ]]; then
+    MAP_LIBRARY_DIR="$HOME/.local/share/borobiya/map-library"
+  else
+    echo 'Set MAP_LIBRARY_DIR to an external absolute path (or set absolute HOME/XDG_DATA_HOME).' >&2
+    exit 1
+  fi
+fi
+[[ "$MAP_LIBRARY_DIR" == /* ]] || { echo 'MAP_LIBRARY_DIR must be absolute.' >&2; exit 1; }
+export MAP_LIBRARY_DIR
+eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" --snapshot "${MAP_SNAPSHOT_DATE:-pinned}" --source-policy "${MAP_SOURCE_POLICY:-cache-first}" --library "$MAP_LIBRARY_DIR")"
+./map-server/scripts/prepare-regions-pbf.sh
+./map-server/scripts/verify-map-pbf.sh "$MAP_PBF"
+
+# Tiles (after generating the archive and starting Martin)
+./map-server/scripts/verify-tiles.sh
+# Style and runtime-generated assets
+curl http://localhost:8000/style/light | jq .sources
+curl http://localhost:8000/sprite/borobiya.json | jq
+curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
+# Public map settings through the same-origin gateway
+curl http://localhost:8080/map-config | jq
+# Route (after approved OSRM graphs are built)
+./map-server/scripts/verify-routing.sh
+# Photon forward and reverse (after local Nominatim/Photon import)
+./map-server/scripts/verify-geocoding.sh
 ```
 
 ---
 
-## 6. Failure Modes
+## 6. Remaining Data Tasks
 
-| Failure | Symptom | Mitigation |
-|---------|---------|------------|
-| PBF corrupt | Planetiler fails | Checksum (`sha256sum`), re-download |
-| OSRM version mismatch | 500 on route | Rebuild after PBF update, lock OSRM version in Dockerfile |
-| Tile missing at zoom>MAX | Blank tiles | Raise `MAP_MAX_ZOOM`, regenerate |
-| Photon OOM | Index kill | Increase heap `-Xmx8g`, use SSD |
-
+| Task | Status |
+|------|--------|
+| Generate PMTiles and verify Martin MVT route | T1.4.2 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
+| Build three OSRM graphs and verify a real offline route | T1.4.4 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
+| Configure Photon and test geocode/reverse | T1.4.5 complete on the target VM for Tehran; repeat after library migration and for each newly selected area |
+| Wire map settings through pipeline/runtime and document | T1.4.6 complete; checks recorded in `docs/PROGRESS.md` |
+| Cache/reuse map data, safely remove map caches, and choose whole-country/city-cropped areas | T1.4.7 complete: implementation/tests/docs verified; separate external-library offline acceptance remains a non-blocking follow-up |

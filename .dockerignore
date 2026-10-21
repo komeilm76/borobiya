@@ -1,0 +1,20 @@
+.git
+.env
+.env.*
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/.vite
+**/*.tsbuildinfo
+map-server/data
+map-server/tiles
+map-server/osrm/data
+map-server/photon/data
+# The Photon JAR is only needed by map-server/photon's own build context;
+# keep it (and partial downloads) out of the much larger API build context.
+map-server/photon/*.jar*
+*.pmtiles
+*.mbtiles
+*.osm.pbf
+*.osrm*

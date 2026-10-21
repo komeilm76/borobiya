@@ -34,6 +34,8 @@
 | [API.md](./API.md) | Route prefixes, auth guards, OpenAPI, examples | Backend, Frontend |
 | [SECURITY.md](./SECURITY.md) | Hashing, rate-limit, suspension, secrets | Backend |
 | [MAP_SERVER.md](./MAP_SERVER.md) | Martin/OSRM/Photon setup, tile pipeline, update | DevOps, Backend |
+| [MAP_LIBRARY.md](./MAP_LIBRARY.md) | External standardized map storage, snapshots, cache/update/offline policy, pruning | DevOps, Backend |
+| [UBUNTU_VM_RUNBOOK.md](./UBUNTU_VM_RUNBOOK.md) | Ubuntu 24.04 / 6 GiB step-by-step installation, builds, and acceptance checks | DevOps, User |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev on Ubuntu (Docker) vs Windows (no Docker) | Dev |
 | [WORKFLOWS.md](./WORKFLOWS.md) | Git hooks, CI/CD, deploy, Android build | DevOps |
 | [USER_MANUAL.md](./USER_MANUAL.md) | End-user guide with screenshots placeholders | QA, User |
@@ -43,30 +45,28 @@
 
 ## 🚀 Quick Start (30 seconds)
 
-### Docker (Ubuntu — production-like)
+### Docker Compose (local services)
 
 ```bash
 git clone https://github.com/komeilm76/borobiya.git
 cd borobiya
-cp .env.example .env              # fill secrets
-docker compose up -d
-open http://localhost:3000/docs   # Swagger
-open http://localhost:5173        # Client
-open http://localhost:8000/styles/light.json  # Map tiles check
+cp .env.example .env              # replace both JWT placeholders and the Postgres password
+docker compose up --build -d
+bun install
+bun --filter @borobiya/client dev # Vite HMR at http://localhost:5173
 ```
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md#2-docker-ubuntu-recommended) for full steps.
+Open `http://localhost:3000/docs` for Swagger or `http://localhost:8080/docs` through Nginx. Migrations and seed are explicit commands. The default Compose profile starts the API, PostGIS, Martin, routing gateway, and Nginx; OSRM and Photon are optional profiles. Styles/sprites/fonts are committed, but generated PMTiles, OSRM graphs, and the Photon index are intentionally stored outside Git in `MAP_LIBRARY_DIR`; prepare map data with [`MAP_LIBRARY.md`](./MAP_LIBRARY.md) and the [Ubuntu runbook](./UBUNTU_VM_RUNBOOK.md). See [DEVELOPMENT.md](./DEVELOPMENT.md#2-docker-compose-linux-macos-or-windows-with-docker-desktop) for details.
 
-### Without Docker (Windows dev)
+### Without Docker
 
 ```bash
 bun install
-bun run db:setup          # create postgres db + migrate + seed questions
-bun run map:dev            # serve sample tehran.pmtiles via Martin
-bun run dev                # vite + fastify concurrently
+cp .env.example .env              # replace the JWT placeholders
+bun run dev                       # API + Vite client concurrently
 ```
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md#3-windows-without-docker) for prerequisites.
+The API requires valid environment values and a running PostgreSQL/PostGIS database; migrations and seed are not automatic. Auth, recovery/session, onboarding, and user/admin account flows use the database on demand. Map styles and the source/crop/build pipeline are implemented, but map data is generated outside Git in the external library; Docker/Ubuntu is required for the documented OSRM/Photon stack. See [DEVELOPMENT.md](./DEVELOPMENT.md#3-windows-without-docker) for prerequisites.
 
 ---
 
@@ -81,7 +81,7 @@ See [DEVELOPMENT.md](./DEVELOPMENT.md#3-windows-without-docker) for prerequisite
 | Backend | **Fastify** + **PostgreSQL + PostGIS** + **Socket.IO** + **OpenAPI** | — |
 | Contracts | **Zod** + **km-api** + **Zopia** (shared `packages/shared`) | — |
 | Runtime | **Bun** | 1.x |
-| Testing | **Vitest** | 1.x |
+| Testing | **Vitest** | 3.x |
 
 Full rationale & alternatives analysis → [ARCHITECTURE.md](./ARCHITECTURE.md#14-tech-stack-rationale)
 
@@ -90,7 +90,7 @@ Full rationale & alternatives analysis → [ARCHITECTURE.md](./ARCHITECTURE.md#1
 ## 🔑 Core Concepts
 
 1. **Offline Vector Map (PBF, not PNG):** Tiles are `/{z}/{x}/{y}.pbf`, rendered client-side. No `tile.openstreetmap.org` at runtime. LAN-only deployment supported.
-2. **Separate Map Server:** Tile + Routing + Geocoding runs as independent container/service. API server only proxies config.
+2. **Separate Map Server:** Tiles, routing, and geocoding run as independent containers/services. The routing gateway serves public map config and adapts route/geocoding requests; the API remains separate.
 3. **Route Prefixes:** `_auth` (guest-only), `_public` (open), `_user` (authenticated), `_admin` (admin-only) — enforced on both frontend & backend. See [API.md](./API.md).
 4. **Shared Contract:** Zod schemas in `packages/shared` → Fastify validation → OpenAPI → Zopia generates client types. Single source of truth.
 5. **SOS Lifecycle:** `pending → dispatched → accepted → on_the_way → arrived → in_progress → completed` (with cancellations). See [DIAGRAMS/SOS_FLOW.md](./DIAGRAMS/SOS_FLOW.md).
@@ -111,7 +111,8 @@ Full rationale & alternatives analysis → [ARCHITECTURE.md](./ARCHITECTURE.md#1
 
 - `../README.md` — Project Prompt & Technical Specification (original 500-line spec, frozen).
 - `.env.example` — All env vars with comments.
-- `docker-compose.yml` — api + postgres + map-server + nginx.
+- `docker-compose.yml` — API, PostGIS, Martin, routing gateway, Nginx, and optional OSRM/Photon/Nominatim profiles.
+- `MAP_LIBRARY.md` — external map-content library, source/cache policies, activation, migration, and pruning.
 - `packages/` — Monorepo source.
 
 ---
@@ -122,4 +123,4 @@ Full rationale & alternatives analysis → [ARCHITECTURE.md](./ARCHITECTURE.md#1
 - Every feature PR must update `TASKS.md` and `PROGRESS.md`.
 - Diagrams are **Mermaid** — renderable on GitHub.
 
-Last updated: 2025-10-18 | Maintainer: Komeil & AI Assistant
+Last updated: 2026-10-21 | Maintainer: Komeil & AI Assistant

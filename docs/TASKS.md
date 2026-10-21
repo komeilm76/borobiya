@@ -10,54 +10,66 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 ### 1.0 Monorepo & Contracts
 
-- [ ] **T1.0.1** Init root `package.json` (workspaces), `tsconfig.json` strict, `.gitignore`, `.env.example` → *see STRUCTURE.md §7*
-- [ ] **T1.0.2** Create `packages/shared` with Zod schemas: `auth`, `user`, `location`, `sos`, `admin`, `search`, `common` + enums
-- [ ] **T1.0.3** Add `km-api` scaffold in `packages/shared/src/api/*` (method, url, schema, meta)
-- [ ] **T1.0.4** Create `packages/server` Fastify skeleton + `app.ts`, `server.ts`, env validation, helmet, cors, rate-limit plugin shell
-- [ ] **T1.0.5** Create `packages/client` Vite+Vue3+Vuetify+Tailwind+Pinia+VueUse skeleton + `views/_auth/_public/_user/_admin` placeholders
-- [ ] **T1.0.6** Wire OpenAPI: `fastify-swagger` → `/docs` + `/docs/json`; Zopia generation script
-- [ ] **T1.0.7** Root script `bun run dev` (concurrently api+client) + `docker-compose.yml` (api, postgres, map-server, nginx)
+- [x] **T1.0.1** Init root `package.json` (workspaces), `tsconfig.json` strict, `.gitignore`, `.env.example` → *see STRUCTURE.md §7* — completed 2026-10-18
+- [x] **T1.0.2** Create `packages/shared` with Zod schemas: `auth`, `user`, `location`, `sos`, `admin`, `search`, `common` + enums — completed 2026-10-18
+- [x] **T1.0.3** Add `km-api` scaffold in `packages/shared/src/api/*` (method, url, schema, meta) — completed 2026-10-18
+- [x] **T1.0.4** Create `packages/server` Fastify skeleton + `app.ts`, `server.ts`, env validation, helmet, cors, rate-limit plugin shell — completed 2026-10-18
+- [x] **T1.0.5** Create `packages/client` Vite+Vue3+Vuetify+Tailwind+Pinia+VueUse skeleton + `views/_auth/_public/_user/_admin` placeholders — completed 2026-10-18
+- [x] **T1.0.6** Wire OpenAPI: `@fastify/swagger` + Swagger UI → `/docs` + `/docs/json`; Zopia generation script — completed 2026-10-18
+- [x] **T1.0.7** Root script `bun run dev` (concurrently API+client) + Docker Compose (`api`, `postgres`, `map-server`, `nginx`) — completed 2026-10-18
 
 ### 1.1 Database & Seed
 
-- [ ] **T1.1.1** Decide ORM: Drizzle vs Prisma (document in ARCHITECTURE ADR) + init schema
-- [ ] **T1.1.2** Migration: `users`, `security_questions`, `user_security_answers`, `user_sessions` (see ERD)
-- [ ] **T1.1.3** Seed: 15 security questions + cancellation_reasons + default `admin / admin123` (must change)
-- [ ] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users`
+- [x] **T1.1.1** Decide ORM: Drizzle + Postgres.js (document in ARCHITECTURE ADR) + initial account/security/session schema — completed 2026-10-18
+- [x] **T1.1.2** Migration: `users`, `security_questions`, `user_security_answers`, `user_sessions` (see ERD) — completed 2026-10-18
+- [x] **T1.1.3** Add/migrate and seed 15 security questions + 11 scoped cancellation reasons + Argon2id bootstrap admin (`admin / admin123`, local only; must change) — completed 2026-10-18
+- [x] **T1.1.4** Add `mustCompleteSecurityQuestions`, `isActive`, `isSuspended`, `avgRating`, `lastLocation (geography)` to `users` — completed 2026-10-18
 
 ### 1.2 Auth (`_auth`, `_admin` user creation)
 
-- [ ] **T1.2.1** `POST /_auth/register` — 5 questions, unique check, argon2id hash (normalize answer trim+lowercase), 403 if authed → *AI*
-- [ ] **T1.2.2** `POST /_auth/login` — username+password only, rate-limit 5/15m per IP+username, JWT 15m/7d → *AI*
-- [ ] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — httpOnly refresh rotation
-- [ ] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m resetToken) → *AI*
-- [ ] **T1.2.5** `POST /_admin/users` — admin creates user without questions, set `mustCompleteSecurityQuestions=true`
-- [ ] **T1.2.6** `POST /_user/complete-security-questions` — middleware blocks all other `_user` ops until done, returns `SECURITY_QUESTIONS_REQUIRED` code
-- [ ] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions` + guards (guest-only `_auth`, redirect if `mustCompleteSecurityQuestions`)
+- [x] **T1.2.1** `POST /_auth/register` — five existing unique questions, duplicate-username handling, Argon2id password/normalized-answer hashes, atomic persistence, guest-only 403, and 5/15m IP+username limit — completed 2026-10-18
+- [x] **T1.2.2** `POST /_auth/login` — username+password, Argon2id verify, 5/15m per IP+username, access/refresh JWTs (15m/7d), persisted refresh hash, browser HttpOnly cookie/native body — completed 2026-10-18
+- [x] **T1.2.3** `POST /_auth/refresh`, `POST /_auth/logout` — signed refresh verification, session/account matching, atomic hash rotation, browser HttpOnly cookie/native body transport, idempotent logout, account-state checks, and guest-only enforcement — completed 2026-10-18
+- [x] **T1.2.4** Forgot flow: `request` (server picks 3/5 random) → `verify` → `reset` (10m single-use resetToken) — Argon2id answer checks, persisted one-time challenge/token, atomic password reset, session revocation, guest-only enforcement, and rate limits — completed 2026-10-18
+- [x] **T1.2.5** `POST /_admin/users` — active admin access-token authorization, Argon2id password hash, role `user`, optional initial active state, duplicate-username conflict, no question rows, and `mustCompleteSecurityQuestions=true` — completed 2026-10-18
+- [x] **T1.2.6** `POST /_user/complete-security-questions` — validate five unique catalog question IDs, store normalized Argon2id answer hashes, atomically clear `mustCompleteSecurityQuestions`, and gate other `/_user` routes with `403 SECURITY_QUESTIONS_REQUIRED` — completed 2026-10-18
+- [x] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions`, guest-only `_auth` and authenticated user/admin guards, session restoration, and mandatory onboarding redirects — completed 2026-10-18
 
 ### 1.3 Admin User Management (No Delete!)
 
-- [ ] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + audit log `admin_audit_log`
-- [ ] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions)
-- [ ] **T1.3.3** Ensure NO `DELETE /_admin/users/:id` exists (add test that asserts 404 on DELETE)
-- [ ] **T1.3.4** Frontend `_admin/users` table + activate/deactivate toggle + search
+- [x] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + transactional audit log `admin_audit_log`, refresh-session revocation on deactivation, and status/no-op handling — completed 2026-10-18
+- [x] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions) — completed 2026-10-18; category assignments and mission records remain empty until T3.1.1/T3.5.1 add those tables
+- [x] **T1.3.3** Ensure NO `DELETE /_admin/users/:id` exists; runtime regression test asserts `404` and OpenAPI omits the operation — completed 2026-10-19
+- [x] **T1.3.4** Frontend `/_admin/users` searchable, paginated account table with status filtering and activate/deactivate confirmation — completed 2026-10-19
 
 ### 1.4 Map Server (Independent, Offline Vector)
 
-- [ ] **T1.4.1** Pick exact tools: Martin/Planetiler/OSRM/Photon versions + document in MAP_SERVER.md
-- [ ] **T1.4.2** Download Tehran sample PBF + generate `tehran.pmtiles` + verify `/{z}/{x}/{y}.pbf` serves
-- [ ] **T1.4.3** Author `styles/light.json` + `styles/dark.json` (same `sources`, different `layers` paint) + sprites/glyphs
-- [ ] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline
-- [ ] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse`
-- [ ] **T1.4.6** ENV wiring: `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MAX_ZOOM` + update pipeline doc
+- [x] **T1.4.1** Pick exact tools: Martin 1.16.1 / Planetiler 0.10.2 / OSRM 26.10.0 / Photon 1.3.0; document pins in MAP_SERVER.md — completed 2026-10-19
+- [x] **T1.4.2** Build the Tehran PBF→`tehran.pmtiles` pipeline + verify Martin `/tehran/{z}/{x}/{y}` — completed 2026-10-20 on the Ubuntu 24.04 VM: checksum-verified crop → Planetiler → Martin; `verify-tehran-tiles.sh` passes (`/tehran/12/2632/1612` → HTTP 200, `application/x-protobuf`, 222,867 bytes). Later the same day the pipeline was generalized to selectable areas (`map-server/regions.json`, dataset slug `borobiya`, `prepare-regions-pbf.sh`/`verify-tiles.sh`); see PROGRESS.
+- [x] **T1.4.3** Author `styles/light.json` + `styles/dark.json` (same `sources`, different `layers` paint) + Martin-served SVG sprites and dynamic TTF glyphs — completed 2026-10-19; Martin runtime serving these assets verified live on the VM 2026-10-20, including browser rendering of Tehran (after the MapLibre worker-serving fix)
+- [x] **T1.4.4** Configure OSRM routing for `car/bicycle/foot` profiles + test `POST /route` offline — completed 2026-10-20 on the VM: `verify-routing.sh` passes for car (6,643 m / 609 s), bicycle (5,090 m / 1,489 s), and foot (4,803 m / 3,464 s), each with alternatives
+- [x] **T1.4.5** Configure Photon offline index + test `GET /geocode` + `GET /reverse` — completed 2026-10-20 on the VM: `verify-geocoding.sh` passes (`/geocode?q=Azadi Square` → 5 features, first «میدان آزادی»; `/reverse` at 35.70,51.40 → «هادی خداپرست»)
+- [x] **T1.4.6** Wire `MAP_REGION`, `MAP_BBOX`, `MAP_DATA_VERSION`, `MAP_MIN_ZOOM`, and `MAP_MAX_ZOOM` through Compose, validated public `/map-config`, client/schema, tile/routing scripts, and pipeline documentation — completed 2026-10-19; offline tests/typechecks/build/YAML/shell checks pass
+- [x] **T1.4.7** Map-data caching, safe cache removal, and area selection (whole countries or city crops through setup) — implementation, tests, and docs complete 2026-10-21
 
 ### 1.5 Client Map & Theming
 
-- [ ] **T1.5.1** MapLibre init in `components/map/MapCanvas.vue`, center Tehran, attribution, controls
-- [ ] **T1.5.2** Theme switch: `map.setStyle(newStyle)` <200ms, preserve camera/markers, sprites/glyphs work both themes
-- [ ] **T1.5.3** App-wide dark/light: Vuetify theme + Tailwind `dark:` + `localStorage` + `prefers-color-scheme`, no flash
-- [ ] **T1.5.4** Graceful degradation if Map Server down (toast, cached tiles, no crash)
-- [ ] **T1.5.5** Build `views/_user/map` (full-screen map) + `views/_user/dashboard` (map widget)
+- [x] **T1.5.1** Initialize MapLibre in `components/map/MapCanvas.vue` centered on Tehran with local style loading, source attribution, navigation/scale controls, and runtime zoom/bounds config — completed 2026-10-19; option tests, component-entry Vite build, client typecheck pass
+- [x] **T1.5.2** Reactive light/dark style switch via `map.setStyle(newStyle, { diff: true })`; configure a 150ms paint transition, preserve the existing map camera/markers, and share sprite/glyph assets — implementation completed 2026-10-19; 32 client tests, typecheck, and light/dark style parity/SVG validation pass; Tehran rendered in the LAN browser on the target VM 2026-10-20. Live end-to-end switch latency is not yet measured (P1-M1; informational, no total-latency threshold specified).
+- [x] **T1.5.3** App-wide light/dark theme: Vuetify + Tailwind manual `dark:` variant, persisted `system`/`light`/`dark` preference, live OS preference updates, and synchronous pre-paint initialization — completed 2026-10-19; 38 client tests, typecheck, and production build pass
+- [x] **T1.5.4** Graceful degradation if Map Server down (toast, cached tiles, no crash) — implementation completed 2026-10-19; MapCanvas shows configuration/map error toasts with retry, Cache Storage service worker falls back to saved map resources on offline/5xx, and MapLibre retains eight in-memory tile-cache zoom levels; worker tests/typecheck/build pass. Live browser outage acceptance remains unverified (P1-A1).
+- [x] **T1.5.5** Build `views/_user/map` (full-screen map) + `views/_user/dashboard` (map widget) — completed 2026-10-19; both views use the shared MapCanvas and follow the resolved app theme, user routes/navigation are wired, and a privacy-aware dashboard explains that live sharing is not yet available; 46/46 client tests, typecheck, and production build pass. Tehran map-data rendering was confirmed in the LAN browser on the target VM on 2026-10-20; the non-blocking external-library offline follow-up is tracked as P1-G1.
+
+### Phase 1 acceptance follow-ups (separate from implementation tasks)
+
+The numbered T1.0–T1.5 checkboxes above track feature implementation. These follow-ups track target-environment acceptance/evidence; they do not reopen or expand T1.4.7.
+
+- [ ] **P1-G1 — External map-library migration and offline acceptance (non-blocking follow-up).** On the target Ubuntu VM, verify the external library's `current.json`, `datasets/current`, and dataset manifest agree on the active selection/snapshot. If project-local legacy artifacts exist, confirm setup reports a verified migration or safely rebuilds without deleting unverified originals. Before disabling Internet, ensure the VM already has the required Docker images, Java, Osmium, Planetiler/Photon JARs, verified source/crop files, and generated PMTiles/OSRM/Photon artifacts. Then run `./scripts/setup-ubuntu-vm.sh --offline` and `verify-tiles.sh`, `verify-routing.sh`, and `verify-geocoding.sh` for each selected area with external Internet disabled (LAN access remains available). Record the selection, snapshot, migration result (or “not applicable”), and sanitized pass output. See [`MAP_LIBRARY.md`](./MAP_LIBRARY.md) and [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md). The user confirmed Ubuntu 24.04 setup and core app tests on 2026-10-21, but did not report this specific external-Internet-offline run. Per the user's 2026-10-21 decision, this follow-up does not block PR #2, the Phase 1 release, or Phase 2; it remains separate from T1.4.7 acceptance.
+- [ ] **P1-A1 — Live browser acceptance of the map outage fallback (non-blocking follow-up).** On a secure browser origin (HTTPS or localhost), load the map once to warm Cache Storage, then test both a network failure and an HTTP 5xx from the map server. Confirm a cached style/tile/sprite/glyph is served and the fallback toast appears; confirm a cold-cache miss gives a recoverable error/retry rather than a crash, and that API/configuration/routing/geocoding requests are not intercepted. Record browser, origin, and results. Plain-HTTP LAN origins cannot use the service worker and only have the in-memory MapLibre fallback; do not claim persistent offline coverage there.
+- [ ] **P1-A2 — Extended live PostgreSQL migration and account-flow smoke test (partially user-verified; non-blocking follow-up).** On a disposable or safely backed-up application database, confirm PostgreSQL health, apply the checked-in migrations, run the idempotent seed, and exercise the Phase 1 database-backed flows: register/login/refresh/logout/recovery, `GET /_user/me` and onboarding, plus admin user create/list/detail/status. Confirm persisted state and session revocation; record sanitized commands/results only. Never reset or remove an existing `postgres-data` volume as a test shortcut. See [`DEVELOPMENT.md`](./DEVELOPMENT.md) for database commands and [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md) for VM setup/troubleshooting. The agent workspace has no live PostgreSQL; a prior VM migration attempt returned `28P01`, followed by a user report that setup and the core registration/login/admin flows worked. The user-reported results are recorded in [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance); migration/seed logs and refresh/logout/recovery/onboarding/admin-create/detail results were not reported.
+- [ ] **P1-M1 — Measure live theme-switch latency (informational, non-blocking).** With approved local map data loaded in the target browser, time at least 10 warm light↔dark switches from activation to the new style being visibly rendered; report median and p95 with browser/device and cache state. The configured 150 ms paint transition is an animation setting, not a documented end-to-end latency SLA; record the measurement without inventing a pass threshold.
+
+**Phase 1 handler-scope note:** The Phase 1 runtime scope is implemented: public health/security-question catalog; auth registration, login, refresh/logout, recovery; `GET /_user/me` and security-question completion; and admin user list/detail/create/status. Other user/admin route descriptors are contract-only future work, not unspecified Phase 1 leftovers: location sharing/devices/history are Phase 2 (T2.1–T2.3); incidents/categories, SOS, dispatch, proposals, and missions are Phase 3 (T3); search and client routing polish are Phase 4 (T4). If another handler is intended to be Phase 1, add its exact route and acceptance criteria as a named task before counting it as a blocker.
 
 ---
 
@@ -140,7 +152,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
 ### 3.6 Cancellation & Re-dispatch (Critical)
 
-- [ ] **T3.6.1** Seed `cancellation_reasons` (requester 5 + rescuer 6 keys, see spec §11.7C)
+- [x] **T3.6.1** Seed `cancellation_reasons` (requester 5 + rescuer 6 keys, see spec §11.7C) — completed with T1.1.3 on 2026-10-18
 - [ ] **T3.6.2** Requester: `POST /_user/sos/requests/:id/cancel` {cancellationReasonId, customReason?} — must pick reason before accept
 - [ ] **T3.6.3** Rescuer: `POST /_user/missions/:id/cancel` {cancellationReasonId, customReason?} — hidden behind “More→Unable to continue”, confirm, rate-limit 3/h, flag >2/day
 - [ ] **T3.6.4** Server: set `missions.status=cancelled_by_*`, `rescuer.isOnMission=false`, emit `mission:cancelled-by-requester/rescuer`

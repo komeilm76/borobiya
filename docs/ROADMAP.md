@@ -41,35 +41,44 @@ gantt
 **Goal:** User can register/login, recover password via 5Q, see offline vector map with dark/light toggle. Infra: monorepo + Docker + Postgres + Swagger.
 
 ### M1.1 Monorepo & Shared Contract
-- [ ] Init `packages/shared` with all Zod schemas
-- [ ] Init `packages/server` Fastify skeleton + `@borobiya/shared`
-- [ ] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse
-- [ ] Root `docker-compose.yml`, `.env.example`, `tsconfig` strict
-- [ ] OpenAPI at `/docs` + `/docs/json` via `fastify-swagger`
-- [ ] Zopia wired: `bunx zopia --input /docs/json --output generated/`
+- [x] Init `packages/shared` with all Zod schemas — completed 2026-10-18
+- [x] Init `packages/server` Fastify skeleton + `@borobiya/shared` — completed 2026-10-18
+- [x] Init `packages/client` Vite+Vue+Vuetify+Tailwind + Pinia + VueUse — completed 2026-10-18
+- [x] Root `docker-compose.yml` (api, postgres, map-server, nginx), `.env.example`, strict `tsconfig` — completed 2026-10-18
+- [x] OpenAPI at `/docs` + `/docs/json` via `@fastify/swagger` + Swagger UI — completed 2026-10-18
+- [x] Zopia wired: `bun --filter @borobiya/client generate:api` — completed 2026-10-18
+- [x] Select Drizzle ORM + Postgres.js and scaffold initial auth/account schema (ADR-011) — completed 2026-10-18
 
 ### M1.2 Auth System
-- [ ] `security_questions` seed (15), `user_security_answers` table
-- [ ] `POST /_auth/register` — 5 unique Q validation (zod superRefine)
-- [ ] `POST /_auth/login` — username+password only, argon2id, rate-limit 5/15m
-- [ ] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
-- [ ] `POST /_admin/users` (no questions) + `mustCompleteSecurityQuestions` flag + forced redirect
-- [ ] JWT 15m/7d, refresh via httpOnly cookie
-- [ ] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
+- [x] Initial `users`, `security_questions`, `user_security_answers`, and `user_sessions` schema/migration — T1.1.1–T1.1.2 completed 2026-10-18
+- [x] `cancellation_reasons` table/migration + 15 security-question seeds, 11 cancellation reasons, and Argon2id bootstrap admin — T1.1.3 completed 2026-10-18
+- [x] `POST /_auth/register` — 5 unique Q validation (T1.2.1)
+- [x] `POST /_auth/login` — username+password, Argon2id verification, 5/15m limit, access/refresh JWT issuance (T1.2.2)
+- [x] `POST /_auth/refresh` and `POST /_auth/logout` — refresh rotation/revocation via HttpOnly cookie or native body
+- [x] Forgot flow: request → verify (server picks 3/5) → reset (10m token)
+- [x] `POST /_admin/users` (no questions) + `mustCompleteSecurityQuestions` flag + forced redirect
+- [x] Frontend: Login/Register/Forgot/CompleteSecurityQuestions views + guards (`_auth` guest-only)
 
 ### M1.3 Map Server (Independent)
-- [ ] Choose stack: **Martin + Planetiler + OSRM + Photon** (ADR-10)
-- [ ] Download Tehran PBF (sample), generate `tehran.pmtiles` (tippecanoe fallback)
-- [ ] Serve `GET /tiles/{z}/{x}/{y}.pbf` + `GET /styles/{light,dark}.json` + fonts/sprites
-- [ ] Document in `MAP_SERVER.md` with OS choice rationale
+- [x] Choose and pin **Martin + Planetiler + OSRM + Photon** (T1.4.1)
+- [x] Generate the `borobiya.pmtiles` dataset archive from reuse-approved pinned PBFs (default Tehran) and verify Martin's `/{sourceID}/{z}/{x}/{y}` MVT route (T1.4.2)
+- [x] Author light/dark styles and configure Martin to generate SVG sprites and TTF glyph ranges (T1.4.3; verified live incl. browser rendering 2026-10-20)
+- [x] Configure car/bicycle/foot OSRM profiles and offline route adapter (T1.4.4; target-VM checks passed 2026-10-20)
+- [x] Configure Nominatim import + Photon index and offline geocoding adapter (T1.4.5; target-VM checks passed 2026-10-20)
+- [x] T1.4.7 — cache/reuse map data, safely remove map caches, and select whole-country or city-cropped areas through setup — implementation/tests/docs complete 2026-10-21
+- [x] Document the stack, source IDs, style endpoints, and licenses in `MAP_SERVER.md`
 
 ### M1.4 Client Map Canvas
-- [ ] MapLibre GL JS init, center on Tehran, attribution
-- [ ] Dark/Light styles (same source, different paint) with `<200ms` switch via `setStyle`
-- [ ] Gesture-friendly controls, pitch/zoom preserve on style change
-- [ ] Graceful fallback if Map Server down (toast + cached tiles)
+- [x] MapLibre GL JS init, configured bounds, attribution, and runtime map config (T1.5.1; Tehran rendered in the LAN browser on the target VM 2026-10-20)
+- [x] Reactive light/dark style switch via `setStyle(..., { diff: true })` with a 150ms paint transition; styles share sources, layer structure, sprites, and glyphs (T1.5.2 implementation complete; live switch latency is unmeasured, tracked as informational P1-M1)
+- [x] Preserve camera and DOM-backed markers by diffing styles on the existing map instance (T1.5.2)
+- [x] Gesture-friendly pan/zoom controls; preserve camera state (including pitch, bearing, and zoom) when switching styles
+- [x] App-wide Vuetify/Tailwind theme selection, `system`/`light`/`dark` persistence, OS preference updates, and pre-paint initialization (T1.5.3)
+- [x] Graceful fallback if Map Server down (toast + cached tiles); implementation/tests complete, with live offline/5xx browser acceptance tracked separately as P1-A1
 
-**Exit Criteria:** Demo: register as user, login, toggle map theme, run fully on LAN with internet disabled.
+**Exit criteria:** All numbered T1.0–T1.5 implementation tasks are checked complete. The user reported the core Phase 1 human tests passing on Ubuntu 24.04 on 2026-10-21: setup, admin login, user registration/login, light/dark/system theme, admin user list/deactivation, map display/zoom/fullscreen, and denied login after deactivation (see [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance)). The release proceeds with the remaining P1-G1 external-Internet-offline library run, P1-A1 live outage test, P1-A2 extended database-flow evidence, and P1-M1 latency measurement documented as non-blocking follow-ups. Their untested behavior is not claimed as passed.
+
+**Phase gate:** Phase 2 is unblocked. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the v0.1.0 release or Phase 2; begin Phase 2 at T2.1.1. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope. PR #2 is to be retargeted to `main` and merged for the Phase 1 release.
 
 ---
 
@@ -134,7 +143,7 @@ gantt
 - [ ] Live location for all 3 (requester+rescuer+admin) on map
 
 ### M3.6 Cancellation (Critical)
-- [ ] `cancellation_reasons` seed (requester 5 + rescuer 6 keys)
+- [x] `cancellation_reasons` seed (requester 5 + rescuer 6 keys) — completed with T1.1.3 on 2026-10-18
 - [ ] `POST /_user/sos/requests/:id/cancel` (requester, needs reason)
 - [ ] `POST /_user/missions/:id/cancel` (rescuer, hard path, rate-limit 3/h, flag >2/day)
 - [ ] `mission:cancelled-by-rescuer` urgent → admin red flash + “NEEDS REPLACEMENT” + re-dispatch

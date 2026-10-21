@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "user_sessions_refresh_token_hash_unique" ON "user_sessions" USING btree ("refresh_token_hash");

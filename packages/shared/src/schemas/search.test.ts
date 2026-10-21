@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import {
+  boundingBoxQuerySchema,
+  geocodeQuerySchema,
+  reverseGeocodeQuerySchema,
+  userSearchSchema
+} from "./search";
+
+describe("search and common query schemas", () => {
+  it("coerces pagination values and enforces the published maximum", () => {
+    expect(userSearchSchema.parse({ page: "2", limit: "50" })).toMatchObject({ page: 2, limit: 50 });
+    expect(userSearchSchema.parse({})).toMatchObject({ page: 1, limit: 20, sort: "distance" });
+    expect(userSearchSchema.safeParse({ limit: "101" }).success).toBe(false);
+  });
+
+  it("parses boolean query strings without treating false as true", () => {
+    expect(userSearchSchema.parse({ online: "false" }).online).toBe(false);
+    expect(userSearchSchema.parse({ online: "true" }).online).toBe(true);
+    expect(userSearchSchema.safeParse({ online: "sometimes" }).success).toBe(false);
+  });
+
+  it("requires latitude and longitude together and validates coordinate ranges", () => {
+    expect(userSearchSchema.safeParse({ lat: "35.7" }).success).toBe(false);
+    expect(userSearchSchema.parse({ lat: "35.7", lon: "51.4" })).toMatchObject({ lat: 35.7, lon: 51.4 });
+    expect(reverseGeocodeQuerySchema.safeParse({ lat: "91", lon: "51" }).success).toBe(false);
+    expect(reverseGeocodeQuerySchema.safeParse({ lat: "", lon: "51" }).success).toBe(false);
+  });
+
+  it("checks map bounding boxes and geocoding limits", () => {
+    expect(boundingBoxQuerySchema.safeParse("51.0,35.5,51.7,35.9").success).toBe(true);
+    expect(boundingBoxQuerySchema.safeParse("51.7,35.5,51.0,35.9").success).toBe(false);
+    expect(geocodeQuerySchema.parse({ q: "  Azadi Square  " })).toMatchObject({ q: "Azadi Square", limit: 5 });
+    expect(geocodeQuerySchema.safeParse({ q: "", limit: "0" }).success).toBe(false);
+  });
+});

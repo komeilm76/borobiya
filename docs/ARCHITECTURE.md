@@ -48,13 +48,13 @@ graph TB
     REDIS[(Redis<br/>rate-limit + socket adapter<br/>optional for single-instance)]
   end
 
-  subgraph MapServer [Independent Map Server :8000]
+  subgraph MapServer [Independent Map Services]
     direction TB
-    MARTIN[Martin / TileServer-GL<br/>GET /tiles/{z}/{x}/{y}.pbf]
-    STYLE[Styles<br/>/styles/light.json<br/>/styles/dark.json]
-    ROUTING[Routing Engine<br/>OSRM / Valhalla<br/>POST /route]
+    MARTIN[Martin :8000<br/>GET /{sourceID}/{z}/{x}/{y}]
+    STYLE[Styles / assets<br/>/style/{id}<br/>/sprite/{id}.* · /font/{stack}/{range}]
+    ROUTING[Routing gateway :8001<br/>POST /route → local OSRM profiles]
     GEOCODE[Geocoding<br/>Photon / Nominatim<br/>GET /geocode, /reverse]
-    DATA[(Data Volume<br/>pmtiles/mbtiles + OSRM graph + search index)]
+    DATA[(Data Volume<br/>PMTiles + three OSRM graphs + search index)]
   end
 
   A --> NGINX
@@ -109,9 +109,10 @@ sequenceDiagram
   API-->>Client: 201 {user}
   User->>Client: POST /_auth/login {username,password}
   Client->>API: rate-limit 5/15min per IP+username
-  API->>DB: verify hash, check isActive/isSuspended/mustCompleteSecurityQuestions
-  API-->>Client: {accessToken 15m, refreshToken 7d httpOnly}
-  Note over Client: store access in memory, refresh via httpOnly cookie or Capacitor secure storage
+  API->>DB: verify hash, enforce isActive/isSuspended, read mustCompleteSecurityQuestions
+  API-->>Client: {accessToken 15m, user} + HttpOnly refresh cookie (browser)
+  Note over Client: Browser stores refresh in HttpOnly cookie; native clients receive refreshToken in body
+  Note over Client: If mustCompleteSecurityQuestions=true, route to completion; T1.2.6 gates other _user endpoints
 ```
 
 **Forgot Password:**
@@ -121,13 +122,14 @@ sequenceDiagram
   participant Client
   participant API
   Client->>API: POST /_auth/forgot-password/request {username}
-  API->>API: pick 3 random of user's 5 questionIds (server-decided!)
-  API-->>Client: {questionIds, question texts}
+  API->>DB: choose and persist 3 of the user's 5 question IDs for 10 minutes
+  API-->>Client: {questionIds, question texts} (decoys for unknown/unconfigured accounts)
   Client->>API: POST /_auth/forgot-password/verify {username, answers[3]}
-  API->>API: hash compare trimmed+lowercased answers
-  API-->>Client: {resetToken 10min}
+  API->>DB: load active challenge and Argon2id-verify normalized answers
+  API->>DB: consume challenge; store SHA-256 hash of opaque reset token
+  API-->>Client: {resetToken 10min, single-use}
   Client->>API: POST /_auth/forgot-password/reset {resetToken, newPassword}
-  API->>API: verify token, hash new password
+  API->>DB: atomically consume token, update password, revoke refresh sessions
   API-->>Client: 200 ok → redirect to login
 ```
 
@@ -206,8 +208,8 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 | Tile generation | **Planetiler** (JVM, fast) , Tippecanoe | Planetiler → `pmtiles` |
 | Routing | **OSRM** (C++, fastest), Valhalla (more profiles), GraphHopper | OSRM for dev (prebuilt profiles) |
 | Geocoding | **Photon** (ES-backed, light), Nominatim (heavier), Pelias | Photon for dev, Nominatim for prod scale |
-| Style hosting | Static JSON + sprites + glyphs served by Martin/nginx | nginx or Martin static |
-| Data storage | PMTiles single file + OSRM graph + Photon index on host volume | Docker volume `map-data:/data` |
+| Style hosting | Martin `/style/{id}` plus runtime SVG sprite and TTF glyph generation | Martin 1.16.1 |
+| Data storage | PMTiles single file + OSRM graph + Photon index | Project-independent map library active dataset, bind-mounted into the map services (see `MAP_LIBRARY.md`) |
 
 ### 6.2 Why Separate
 
@@ -217,8 +219,8 @@ Detailed setup instructions → [MAP_SERVER.md](./MAP_SERVER.md)
 
 ### 6.3 Versioning & Update
 
-- Tiles versioned via path ` /tiles/v{DATE}/{z}/{x}/{y}.pbf` or header `X-Map-Data-Version`.
-- Update pipeline: `bun run map:update --region=iran` → download PBF → generate → stage → admin approves promote → symlink swap (zero downtime).
+- Martin exposes each PMTiles archive by its filename-derived source ID; the map dataset is always published as `/borobiya/{z}/{x}/{y}` whatever areas it contains, so area changes never rename the source. A separate `X-Map-Data-Version` response header remains a future update-pipeline feature.
+- Update pipeline: `setup-ubuntu-vm.sh --update-map` (or a specific `--snapshot YYYY-MM-DD`) → download/verify into the map library → build a fingerprinted dataset bundle → run acceptance checks → update `current.json`/`datasets/current` → prune the replaced release. Service recreation is explicit; this is not claimed to be zero-downtime.
 
 ### 6.4 Offline Guarantees
 
@@ -388,7 +390,7 @@ Same `docker-compose.yml` behind nginx TLS + Let's Encrypt, VM: Ubuntu 22.04/24.
 
 ### Dev Windows
 
-Bun + Postgres local + Martin binary → `data/maps/tehran.pmtiles`; no Docker.
+Bun + Postgres local + Martin binary → `data/maps/borobiya.pmtiles`; no Docker.
 
 ---
 
@@ -436,6 +438,19 @@ Performance targets: map load <2s LAN, location update <500ms socket, route <1s.
 | 008 | 2025-05-01 | Rescuer cancel = hard path + instant admin alert | Prevent abandonment |
 | 009 | 2025-05-01 | Zod+km-api+Zopia shared contract | Type safety + AI consumption |
 | 010 | 2025-05-02 | Martin + Planetiler + OSRM + Photon for MVP | Lightest viable offline stack |
+| 011 | 2026-10-18 | Drizzle ORM + Postgres.js for PostgreSQL | SQL-first, Bun-friendly schema/migrations, and explicit PostGIS SQL support |
 
-> Add new ADRs as `| 011 | YYYY-MM-DD | ...` — do not remove history.
+### ADR-011 — Drizzle ORM + Postgres.js
+
+**Status:** Accepted (T1.1.1).
+
+**Context:** The API uses Bun and PostgreSQL/PostGIS. The schema needs native PostgreSQL constraints and spatial columns/queries such as `GEOGRAPHY(Point,4326)`, GiST indexes, and `ST_Distance`; T1.1.4 adds the first user-location column and spatial index.
+
+**Decision:** Use Drizzle ORM (`drizzle-orm`) with the Postgres.js driver (`postgres`) and Drizzle Kit for schema-driven, SQL migration generation. Keep the application schema in `packages/server/src/db/schema.ts` and migration output in `packages/server/drizzle/`.
+
+**Rationale:** Drizzle keeps table definitions close to PostgreSQL/SQL, supports TypeScript without a separate generated query-engine client, and leaves PostGIS-specific DDL/queries explicit through custom types and SQL expressions. Prisma was considered but rejected for this scaffold because its abstraction around unsupported native geography types would require raw SQL for central spatial features and introduces an additional generated-client workflow. Drizzle is less opinionated about higher-level relation access and requires migrations to be reviewed; generated SQL will therefore be checked in and hand-edited where necessary.
+
+**Consequences:** The checked-in migrations cover the auth, user-state, security-question, session, cancellation-reason, audit, and PostGIS location schema. Migrations and seed data are applied explicitly (including through the runtime migrator in the API image), not automatically at startup. Fastify creates PostgreSQL clients for the implemented registration/login/session, recovery, onboarding, and user/admin account-management stores; SOS, realtime location sharing, and mission persistence remain later domain work.
+
+> Add new ADRs after this entry as `| 012 | YYYY-MM-DD | ...` — do not remove history.
 

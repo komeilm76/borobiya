@@ -28,32 +28,26 @@ borobiya/
 │       └── MAP_PIPELINE.md
 │
 ├── packages/
-│   ├── shared/               # Zod schemas + TS types — single source of truth
-│   ├── server/               # Fastify API + Socket.IO + PostGIS
-│   └── client/               # Vue + Vuetify + Tailwind + MapLibre + Ionic
+│   ├── shared/               # Zod schemas + API contracts
+│   ├── server/               # Fastify API with database-backed auth/account routes
+│   └── client/               # Vue + Vuetify + Tailwind + Pinia + VueUse + MapLibre
 │
-├── map-server/               # Independent vector tile + routing + geocoding
-│   ├── tiles/                # (gitignored) *.pmtiles / *.mbtiles lives here
-│   ├── styles/               # MapLibre style JSONs (light/dark)
-│   ├── martin-config.yaml
-│   ├── osrm/
-│   └── photon/
+├── map-server/
+│   ├── README.md             # map-server setup and runtime-data status
+│   ├── scripts/              # region catalog, source/crop pipeline, library manager, verifiers
+│   ├── routing-gateway/      # route/geocoding adapter and map-config endpoint
+│   ├── styles/, sprites/, fonts/ # committed MapLibre assets
+│   └── photon/               # Photon Dockerfile; release JAR is ignored
 │
-├── data/                     # (gitignored) local OSM extracts, sample tiles
-│   └── maps/
-│       └── tehran.pmtiles
-│
-├── android/                  # Capacitor output (generated, not committed initially)
-│
-├── docker-compose.yml
-├── docker-compose.override.yml   # local dev overrides
+├── docker-compose.yml        # API, PostGIS, map stack, and local gateway
+├── nginx.conf                # local HTTP gateway for /api, /docs, /map, and map APIs
+├── .dockerignore
 ├── .env.example
-├── .env                      # (gitignored) real secrets
+├── .env                      # (gitignored) local secrets/config
 ├── .gitignore
-├── lefthook.yml / .husky/
-├── package.json              # root (workspaces)
+├── package.json              # Bun workspaces + root `dev` orchestration
 ├── tsconfig.json
-└── README.md                 # Project prompt/spec (frozen source-of-truth)
+└── README.md
 ```
 
 ---
@@ -62,49 +56,48 @@ borobiya/
 
 ```json
 {
+  "name": "borobiya",
   "private": true,
+  "packageManager": "bun@1.4.3",
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "concurrently \"bun --filter server dev\" \"bun --filter client dev\"",
-    "build": "bun --filter '*' build",
-    "test": "vitest run",
-    "lint": "eslint . && vue-tsc --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "map:update": "bun run --filter map-server update",
-    "db:setup": "bun --filter server db:setup",
-    "cap:sync": "bun --filter client build && npx cap copy android"
-  },
-  "packageManager": "bun@1.1.0"
+    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev"
+  }
 }
 ```
 
-Alternative: use `pnpm`/`npm` workspaces — but Bun is mandated, so `bun workspaces` via `workspaces` field.
+The root `dev` script uses Bun's built-in parallel workspace runner; it does not add a third-party concurrency dependency. Root build/lint/database/map scripts are not wired yet.
 
 ---
 
 ## 3. `packages/shared` — Contract Package
 
-**Purpose:** No runtime dependency — only Zod schemas + inferred types + km-api route descriptors.
+**Purpose:** Shared Zod schemas, inferred types, and `km-api` route descriptors; runtime dependencies are Zod and `km-api`. No Fastify, Vue, or database imports—the server adds handler wiring separately.
 
 ```text
 packages/shared/
-├── package.json              # name: "@borobiya/shared"
+├── package.json              # name: "@borobiya/shared"; Zod + km-api runtime dependencies
 ├── src/
 │   ├── schemas/
 │   │   ├── auth.ts           # loginSchema, registerSchema, forgotSchemas, completeSecurityQuestionsSchema
 │   │   ├── user.ts           # userProfileSchema, devicesSchema
 │   │   ├── location.ts       # shareSchema, historyShareSchema, locationUpdateSchema
-│   │   ├── sos.ts            # sosRequestSchema, dispatchSchema, missionStatusSchema, cancellationSchemas
-│   │   ├── admin.ts          # createUserSchema, toggleActiveSchema, categorySchemas, incidentTypeSchemas
-│   │   ├── search.ts         # userSearchSchema, geocodeSchemas
-│   │   ├── common.ts         # paginationSchema, idSchema, errorSchema
+│   │   ├── sos.ts            # sosRequestSchema, dispatchSchema, missionStatusUpdateSchema, cancellationSchemas
+│   │   ├── admin.ts          # user status, category, incident type, and cancellation-reason schemas
+│   │   ├── search.ts         # userSearchSchema, geocodeQuerySchema, reverseGeocodeQuerySchema
+│   │   ├── common.ts         # paginationQuerySchema, idSchema, errorSchema
 │   │   └── index.ts          # barrel export
 │   ├── api/
-│   │   ├── auth.routes.ts    # km-api definitions (method, url, schema, meta)
-│   │   ├── user.routes.ts
-│   │   ├── admin.routes.ts
+│   │   ├── define-route.ts   # method/url/schema/meta adapter to km-api
+│   │   ├── common.ts         # path, query, response, and error helpers
+│   │   ├── auth.routes.ts
 │   │   ├── public.routes.ts
+│   │   ├── user.routes.ts
+│   │   ├── location.routes.ts
 │   │   ├── sos.routes.ts
-│   │   └── index.ts
+│   │   ├── admin.routes.ts
+│   │   ├── index.ts          # grouped descriptors + complete route registry
+│   │   └── index.test.ts
 │   ├── types/
 │   │   ├── enums.ts          # Severity, MissionStatus, CancellationType, IncidentSlug
 │   │   └── models.ts         # Inferred TS types from Zod (or standalone)
@@ -124,141 +117,131 @@ packages/shared/
 
 ```text
 packages/server/
-├── package.json              # name: "@borobiya/server", deps: fastify, pg/postgres, drizzle/prisma, socket.io, zod, argon2
-├── src/
-│   ├── app.ts                # createFastifyApp()
-│   ├── server.ts             # entry: listen
-│   ├── config/
-│   │   ├── env.ts            # zod-validated env (DATABASE_URL, JWT_SECRET, etc.)
-│   │   ├── cors.ts
-│   │   └── rateLimit.ts
-│   ├── plugins/
-│   │   ├── auth.ts           # decorate authenticate + authorize(roles)
-│   │   ├── swagger.ts        # fastify-swagger + zod-to-json-schema
-│   │   ├── socket.ts         # socket.io init + auth middleware
-│   │   └── errorHandler.ts
-│   ├── modules/
-│   │   ├── auth/             # routes, service, repository per domain
-│   │   │   ├── auth.routes.ts      # imports api defs from @borobiya/shared
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.controller.ts
-│   │   │   └── auth.test.ts
-│   │   ├── user/
-│   │   ├── admin/
-│   │   ├── sos/              # requests, proposals, missions, ratings
-│   │   ├── location/
-│   │   ├── search/
-│   │   └── public/
-│   ├── db/
-│   │   ├── schema.ts         # drizzle/prisma schema (PostGIS types)
-│   │   ├── migrate.ts
-│   │   ├── seed.ts           # security_questions (15), cancellation_reasons, admin user
-│   │   └── client.ts         # postgres pool
-│   ├── jobs/
-│   │   ├── cron.ts            # node-cron entry
-│   │   ├── expireShares.ts
-│   │   ├── pruneHistory.ts
-│   │   └── expireSos.ts
-│   ├── realtime/
-│   │   ├── rooms.ts
-│   │   ├── events.ts          # typed emit helpers
-│   │   └── heartbeat.ts
-│   ├── lib/
-│   │   ├── hash.ts           # argon2 wrapper + normalizeAnswer()
-│   │   ├── jwt.ts
-│   │   └── geo.ts            # ST_Distance helpers
-│   └── types/
-│       └── fastify.d.ts      # augment FastifyRequest.user
-├── drizzle.config.ts / prisma/schema.prisma
+├── Dockerfile                # workspace-aware Bun API image
+├── drizzle/                  # checked-in SQL migrations, journal, and schema snapshots
+├── drizzle.config.ts         # Drizzle Kit schema/migration configuration
+├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
-├── vitest.config.ts
-└── Dockerfile
+└── src/
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, and onboarding handlers are live
+    ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
+    ├── server.ts             # validates environment and listens
+    ├── admin/
+    │   ├── users.ts          # current-admin auth, user list/detail/create/status handlers
+    │   └── users.test.ts     # admin auth, list/detail, creation, status, state, and conflict tests
+    ├── config/
+    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
+    │   └── env.test.ts
+    ├── auth/
+    │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
+    │   ├── login.test.ts     # token/session/account-status regression tests
+    │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
+    │   ├── register.test.ts  # registration behavior/rate-limit regression tests
+    │   ├── rate-limit.ts     # bounded per-IP+username limiter key generation
+    │   ├── rate-limit.test.ts # bounded-key regression tests
+    │   ├── session.ts        # refresh rotation and logout routes
+    │   ├── user-security-questions.ts # user auth guard, GET /_user/me, and onboarding completion
+    │   ├── user-security-questions.test.ts # profile, guard, validation, hashing, and completion tests
+    │   ├── forgot-password.ts # server-selected recovery challenges and reset flow
+    │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
+    │   └── recovery-decoys.test.ts
+    ├── db/
+    │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
+    │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
+    │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
+    │   ├── login-store.ts    # credential lookup and persisted refresh sessions
+    │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
+    │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
+    │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
+    │   ├── registration-store.ts # username/question queries and atomic user/answer write
+    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit tables
+    │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
+    │   ├── seed.ts           # transactional, idempotent reference/admin seeder
+    │   ├── seed-config.ts    # production-safe bootstrap password policy
+    │   ├── seed-data.ts      # Persian questions and localized cancellation reasons
+    │   └── seed-data.test.ts
+    ├── security/
+    │   ├── password.ts      # Argon2id hash/verify helpers
+    │   ├── password.test.ts
+    │   ├── tokens.ts        # HS256 access/refresh JWT signing and verification
+    │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
+    └── plugins/
+        ├── security.ts       # Helmet, CORS allowlist, global rate limit
+        └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-**Naming:**
-- Routes: `*.routes.ts` (km-api descriptor + handler wiring).
-- Service: pure logic, takes DB client as arg.
-- Repository: SQL queries (if not using ORM directly).
-- No barrel that hides circular deps — import explicit.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, and onboarding stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The onboarding auth hook is ready for future `/_user` handlers; remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
 
 ---
 
-## 5. `packages/client` — Vue + Ionic
+## 5. `packages/client` — Vue + Vuetify
 
 ```text
 packages/client/
-├── package.json              # name: "@borobiya/client"
-├── src/
-│   ├── main.ts
-│   ├── App.vue
-│   ├── router/
-│   │   └── index.ts          # prefix-based guards (_auth/_public/_user/_admin)
-│   ├── stores/               # Pinia
-│   │   ├── auth.ts
-│   │   ├── theme.ts          # dark/light + map style
-│   │   ├── map.ts
-│   │   ├── location.ts
-│   │   ├── sos.ts
-│   │   └── index.ts
-│   ├── composables/
-│   │   ├── useAuth.ts
-│   │   ├── useMap.ts         # MapLibre init + setStyle + fitBounds
-│   │   ├── useGeolocation.ts # VueUse + Capacitor Geolocation
-│   │   ├── useSocket.ts
-│   │   ├── useNavigation.ts  # pitch/bearing per profile
-│   │   └── usePriorityDevice.ts
-│   ├── views/
-│   │   ├── _auth/
-│   │   │   ├── Login.vue
-│   │   │   ├── Register.vue
-│   │   │   ├── ForgotPassword.vue
-│   │   │   └── CompleteSecurityQuestions.vue
-│   │   ├── _public/
-│   │   │   ├── Landing.vue
-│   │   │   └── Health.vue
-│   │   ├── _user/
-│   │   │   ├── Dashboard.vue
-│   │   │   ├── Map.vue
-│   │   │   ├── LocationShares.vue
-│   │   │   ├── SosHistory.vue
-│   │   │   ├── Settings.vue
-│   │   │   └── Devices.vue
-│   │   └── _admin/
-│   │       ├── Dashboard.vue
-│   │       ├── Users.vue
-│   │       ├── Categories.vue
-│   │       ├── Incidents.vue
-│   │       └── Dispatch.vue
-│   ├── components/
-│   │   ├── common/           # AppBar, BottomSheet, ThemeToggle
-│   │   ├── map/              # MapCanvas.vue, MarkerCluster.vue, RoutePolyline.vue
-│   │   ├── sos/              # SosButton.vue, SosForm.vue, ProposalCard.vue, MissionTimeline.vue
-│   │   └── location/         # ShareDialog.vue, PriorityDeviceModal.vue, TimeSlider.vue
-│   ├── lib/
-│   │   ├── api.ts            # axios/bun fetch wrapper + Zod parse + refresh retry
-│   │   ├── socket.ts         # socket.io-client singleton
-│   │   └── mapStyles.ts      # light/dark import
-│   ├── assets/
-│   │   ├── icons/            # SVG only (vector)
-│   │   └── sprites/
-│   ├── styles/
-│   │   ├── tailwind.css
-│   │   └── vuetify-theme.ts
-│   └── generated/            # (gitignored) zopia output → zod.ts
-├── public/
-│   └── favicon.svg
-├── index.html
-├── vite.config.ts            # vue + vuetify + tailwind + @ path alias + proxy to :3000/:8000
-├── capacitor.config.ts
+├── package.json              # name: "@borobiya/client"; Vue 3, Vuetify, Tailwind, Pinia, VueUse, Zopia
+├── README.md
+├── index.html                # Persian-first RTL document shell
+├── vite.config.ts            # Vue/Vuetify/Tailwind, @/client/shared aliases, same-origin API/map proxies
+├── scripts/
+│   └── generate-api.ts       # fetches /docs/json and runs Zopia
 ├── tsconfig.json
-├── tailwind.config.js
-└── ionic.config.json
+├── public/
+│   ├── favicon.svg
+│   ├── theme-init.js         # synchronous pre-paint theme selection
+│   └── map-cache-worker.js   # network-first cache for same-origin map resources
+└── src/
+    ├── main.ts               # Vue + Pinia + router + theme bootstrap + map cache registration
+    ├── App.vue               # shared shell, session bootstrap, theme menu, and logout control
+    ├── env.d.ts
+    ├── api/
+    │   ├── http.ts           # same-origin JSON requests and structured API errors
+    │   ├── http.test.ts
+    │   ├── error-message.ts  # localized auth/API errors
+    │   ├── security-questions.ts # cached public question catalog
+    │   └── map-config.ts     # same-origin validated map settings
+    ├── components/
+    │   └── map/
+    │       ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
+    │       └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    ├── router/
+    │   ├── index.ts          # namespaced routes and auth-guard wiring
+    │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
+    │   ├── guards.test.ts
+    │   └── index.test.ts
+    ├── services/
+    │   ├── map-cache.ts      # Service Worker registration/activation for map requests
+    │   └── map-cache-worker.test.ts
+    ├── stores/
+    │   ├── index.ts          # Pinia instance
+    │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
+    │   ├── auth.test.ts
+    │   └── theme.ts          # persisted theme preference and system-change synchronization
+    ├── composables/
+    │   └── useSystemTheme.ts # reactive prefers-color-scheme signal
+    ├── theme/
+    │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
+    │   ├── theme-preference.test.ts
+    │   └── theme-init.test.ts # pre-paint bootstrap coverage
+    ├── plugins/
+    │   └── vuetify.ts        # Persian locale, RTL, initial light/dark palette
+    ├── styles/
+    │   ├── tailwind.css      # manual dark variant + app shell light/dark styling
+    │   └── auth.css          # responsive light/dark authentication and onboarding layouts
+    └── views/
+        ├── PlaceholderPage.vue
+        ├── _auth/LoginView.vue
+        ├── _auth/RegisterView.vue
+        ├── _auth/ForgotPasswordView.vue
+        ├── _auth/PlaceholderView.vue
+        ├── _public/PlaceholderView.vue
+        ├── _user/CompleteSecurityQuestionsView.vue
+        ├── _user/UserDashboardView.vue # responsive dashboard with map widget
+        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view
+        ├── _user/PlaceholderView.vue
+        └── _admin/PlaceholderView.vue
 ```
 
-**Ionic specifics:**
-- `capacitor.config.ts` points to `dist/` after `vite build`.
-- Plugins: `@capacitor/geolocation`, `@capacitor/camera`, `@capacitor/preferences` (for tokens).
-- Android folder at `android/` after `npx cap add android` — gitignored initially, committed after first build.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. Search, routing, live locations, and Android packaging remain future work.
 
 ---
 
@@ -266,29 +249,20 @@ packages/client/
 
 ```text
 map-server/
-├── README.md
-├── docker-compose.map.yml    # optional separate compose
-├── martin-config.yaml        # sources: pmtiles/mbtiles + postgis
-├── styles/
-│   ├── light.json            # MapLibre style — same sources, light paint
-│   ├── dark.json
-│   ├── sprites/              # icon sprite sheet + json
-│   └── glyphs/               # font pbf glyphs {fontstack}/{range}.pbf
-├── osrm/
-│   ├── profiles/             # car.lua, bicycle.lua, foot.lua
-│   ├── prepare.sh            # osrm-extract + partition + customize
-│   └── data/                 # (gitignored) *.osrm*
-├── photon/
-│   ├── photon.json
-│   └── data/                 # (gitignored) ES index
-├── scripts/
-│   ├── generate-tiles.sh     # planetiler/tippecanoe pipeline
-│   ├── build-routing.sh
-│   ├── build-geocode.sh
-│   └── update.sh             # orchestrates all + version stamp
-├── Dockerfile                # optional custom Martin image
-└── data/                     # (gitignored) downloaded OSM PBFs
+├── README.md                 # map-server setup and runtime-data status
+├── martin.yaml               # Martin's PMTiles, style, sprite, and font configuration
+├── styles/                   # committed light/dark MapLibre styles
+├── sprites/                  # committed SVG source artwork for Martin sprites
+├── fonts/                    # licensed TTFs and provenance
+├── scripts/                  # region catalog, source/crop pipeline, library manager, verifiers
+├── routing-gateway/          # route/geocoding adapter, public map config, and tests
+└── photon/                   # Photon Dockerfile; versioned JAR is ignored
+
+# Runtime map content is stored outside the checkout by default:
+<MAP_LIBRARY_DIR>/              # sources, crops, merged dataset, PMTiles, OSRM, Photon index
 ```
+
+Compose runs Martin 1.16.1 from the read-only active dataset directory in `MAP_DATASET_DIR`, with committed styles, SVG sprites, licensed fonts, and `martin.yaml`. Routing gateway, three optional OSRM profile services, Photon, and the import-only Nominatim service are configured; generated PMTiles, graphs, and Photon index are intentionally not committed and are built in the external map library. T1.4.7's cache/reuse, safe cache-clear, and whole-country/city-crop selection implementation is complete. The original Tehran pipeline passed tile/routing/geocoding acceptance on the target VM on 2026-10-20; the user reports successful setup and core app/map tests on Ubuntu 24.04 on 2026-10-21. A dedicated external-Internet-offline library acceptance run remains a non-blocking operational follow-up per the user's decision; see [`PROGRESS.md`](./PROGRESS.md), [`MAP_SERVER.md`](./MAP_SERVER.md), and [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 
 ---
 
@@ -296,39 +270,25 @@ map-server/
 
 | File | Purpose |
 |------|---------|
-| `.env.example` | Documented env vars (see Appendix §24.1 of spec) |
-| `docker-compose.yml` | api + postgres + map-server + nginx + optional redis |
-| `.gitignore` | See §10 below |
-| `lefthook.yml` | pre-commit: lint + typecheck; pre-push: test + build |
-| `tsconfig.json` | Root strict config, path alias `@/*` → `packages/*/src` |
-| `package.json` | Workspaces + root scripts |
+| `.env.example` | Local API and Compose environment template; copy to ignored `.env` |
+| `.dockerignore` | Excludes secrets, dependencies, build output, and map datasets from image contexts |
+| `docker-compose.yml` | `api`, `postgres`, `map-server`, routing gateway, optional OSRM profile services, and `nginx`; no Redis service |
+| `nginx.conf` | Local HTTP proxy for `/api/`, `/docs`, `/map/`, `/map-config`, and `/route` |
+| `.gitignore` | Excludes local secrets, generated output, and large map data |
+| `tsconfig.json` | Strict shared TypeScript defaults and explicit workspace aliases |
+| `package.json` | Workspaces + root `dev` script |
 
-`.env.example` must include (per spec §3.5 + §17.2 + §24.1):
+`.env.example` includes API validation settings plus these Compose variables: `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `API_PORT`, `MAP_SERVER_PORT`, and `NGINX_PORT`. The sample JWT/Postgres values are placeholders and must be changed outside local scaffolding.
 
-```env
-NODE_ENV=development
-PORT=3000
-DATABASE_URL=postgresql://borobiya:secret@localhost:5432/borobiya
-JWT_SECRET=
-JWT_REFRESH_SECRET=
-LOCATION_HISTORY_RETENTION_DAYS=90
-LOCATION_HISTORY_MAX_SHARE_DAYS=30
-RATE_LIMIT_WINDOW_MS=900000
-MAP_SERVER_URL=http://localhost:8000
-MAP_REGION=tehran
-MAP_BBOX=44.0,25.0,63.0,39.0
-MAP_DATA_VERSION=2025-05-01
-VITE_API_URL=http://localhost:3000
-VITE_MAP_URL=http://localhost:8000
-```
+Use the root [`.env.example`](../.env.example) as the source of truth for the complete template. The API requires a valid PostgreSQL URL string and distinct non-placeholder JWT secrets at startup. Auth, recovery, session, onboarding, and user/admin account routes use the database on demand; migrations and seeds are explicit operations, not automatic startup steps.
 
 ---
 
 ## 8. Database Migrations
 
-- Tool: **Drizzle Kit** or **Prisma Migrate** (decision logged in ARCHITECTURE ADR).
-- Folder: `packages/server/migrations/` or `prisma/migrations/`.
-- Seed: `packages/server/src/db/seed.ts` — 15 security questions, cancellation reasons, default admin.
+- ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
+- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
+- `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations; `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup. Database-backed routes include registration/login, refresh/logout, recovery, onboarding, and user/admin account management; SOS, live-location, and mission persistence remain future work.
 
 ---
 
@@ -374,25 +334,30 @@ coverage/
 {
   "compilerOptions": {
     "strict": true,
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./packages/*/src/*"],
-      "@shared/*": ["./packages/shared/src/*"],
-      "@client/*": ["./packages/client/src/*"],
-      "@server/*": ["./packages/server/src/*"]
+      "@shared/*": ["packages/shared/src/*"],
+      "@client/*": ["packages/client/src/*"],
+      "@server/*": ["packages/server/src/*"]
     }
   }
 }
 ```
 
-Vite mirrors with `resolve.alias`.
+The explicit aliases map one workspace at a time; a broad `@/*` mapping is intentionally avoided because it is ambiguous. Vite mirrors these aliases with `resolve.alias`.
 
 ---
 
-## 12. Implementation Checklist for Init
+## 12. Foundation Status
 
-- [ ] `mkdir -p packages/{shared,server,client} map-server/{styles,osrm,photon} data/maps docs/DIAGRAMS`
-- [ ] `bun init` at root + each package
-- [ ] Copy `.env.example` from ARCHITECTURE appendix
-- [ ] Add `docker-compose.yml` (4 services)
-- [ ] Commit `docs/` first (this PR)
+- [x] Bun workspaces, shared contracts, Fastify API, Vue client, and root `bun run dev`
+- [x] Compose API/PostGIS/Martin/routing gateway/Nginx plus optional OSRM, Photon, and Nominatim profiles
+- [x] Drizzle/Postgres.js schema, checked-in migrations, explicit seeding, Argon2id passwords, and runtime migrator
+- [x] Registration/login, refresh/logout, recovery, security-question onboarding, session authorization, and admin account-management routes
+- [x] MapLibre canvas, local styles/sprites/fonts, runtime map config, light/dark switching, and map-resource cache fallback
+- [x] T1.4.7 map-data cache/reuse, safe cache removal, and whole-country/city-crop area selection (with associated library code/tests)
+- [x] Original Tehran tile/routing/geocoding acceptance on the target VM (2026-10-20)
+- [ ] P1-G1: external-library Internet-offline acceptance (non-blocking follow-up per user decision 2026-10-21)
+- [ ] SOS, live-location sharing, mission workflows, route/search UI, and Android/Capacitor integration
+- [ ] Root build/lint scripts, CI, and production TLS/deployment hardening
 

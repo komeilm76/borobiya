@@ -1,0 +1,40 @@
+{
+  "name": "@borobiya/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
+    "db:migrate:runtime": "bun src/db/migrate.ts",
+    "db:seed": "bun src/db/seed.ts",
+    "db:reset-admin-password": "bun src/db/reset-admin-password.ts"
+  },
+  "dependencies": {
+    "@borobiya/shared": "workspace:*",
+    "@fastify/cookie": "^11.1.3",
+    "@fastify/cors": "^11.3.1",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/rate-limit": "^11.2.1",
+    "@fastify/swagger": "^9.9.2",
+    "@fastify/swagger-ui": "^6.1.2",
+    "argon2": "0.45.1",
+    "dotenv": "^18.0.8",
+    "drizzle-orm": "0.45.4",
+    "fastify": "^5.12.7",
+    "jose": "^6.2.12",
+    "postgres": "3.4.9",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "drizzle-kit": "0.31.11"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

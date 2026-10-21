@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Route prefixes enforce access: `_auth` (guest-only), `_public` (open), `_user` (authed user), `_admin` (admin). Every request validated by Zod from `packages/shared`. Swagger at `/docs` + `/docs/json` for Zopia codegen.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -8,17 +8,21 @@
 
 ```
 API:  http://localhost:3000            (Fastify)
-Map:  http://localhost:8000            (Martin/OSRM/Photon) — see MAP_SERVER.md
+Maps: http://localhost:8000            (Martin) — see MAP_SERVER.md
+Route: http://localhost:8001/route      (OSRM adapter; graphs are built locally from the selected map dataset)
+Map config: GET /map-config              (region, bounds, version, and zoom range)
 Swagger UI:   GET /docs
 OpenAPI JSON: GET /docs/json
 Health:       GET /_public/health      → { status: "ok", uptime, version }
 ```
 
+The OpenAPI document uses `/` for a directly exposed API and `/api` first when served by Compose through Nginx (with `/` retained as the direct-port alternative). Configure `OPENAPI_SERVER_PATH` when a gateway uses a different prefix.
+
 Headers:
 ```
 Authorization: Bearer <accessToken>   // for _user & _admin
 Content-Type: application/json
-X-Map-Data-Version: 2025-05-01        // optional, from Map Server
+X-Map-Data-Version: development       // reserved optional version pin; not currently enforced
 ```
 
 Error shape (uniform):
@@ -38,8 +42,8 @@ Error shape (uniform):
 |--------|------|-----|--------------|----------------|---------|
 | `/_auth` | **Guest only** | Not logged in | If JWT present → `403 ALREADY_AUTHENTICATED` | `if loggedIn → redirect /_user/dashboard` | `POST /_auth/login` |
 | `/_public` | Open | Everyone | None (optional auth pass-through) | None | `GET /_public/incident-types` |
-| `/_user` | Required `user` | Authed users (+ admin may opt-in) | `authenticate` + `authorize(['user','admin'])` | Require login → `/_auth/login` | `POST /_user/sos/requests` |
-| `/_admin` | Required `admin` | Admins only | `authenticate` + `authorize(['admin'])` | Role check → `403` | `POST /_admin/users` |
+| `/_user` | Required `user` | Authed users (+ admin may opt-in) | Access-JWT verification and current account-state checks; incomplete accounts may only complete security questions | Require login → `/_auth/login`; incomplete account → onboarding | `POST /_user/complete-security-questions` |
+| `/_admin` | Required `admin` | Admins only | Access-JWT verification and role authorization; user creation/status also recheck current role/active/suspended state | Role/state check → `401`/`403` | `POST /_admin/users` |
 
 > Decision to document: Does `admin` role allow `/_user/*`? Spec says “_user — Only authenticated users”; recommended: allow `admin` to call `_user` (useful for debugging), but explicitly document: **Admin can call `_user` endpoints** (since they are users too). Alternatively restrict to `user` only — pick one and keep consistent.
 
@@ -52,13 +56,13 @@ Implementation sketch (see ARCHITECTURE.md §13.3 and SECURITY.md §5).
 ### 3.1 POST `/_auth/register`
 
 ```ts
-Body = z.object({
+Body = z.strictObject({
   username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/),
-  password: z.string().min(8).regex(/^(?=.*[A-Za-z])(?=.*\d).+$/), // 1 letter + 1 number
+  password: z.string().min(8).max(1024).regex(/^(?=.*\p{L})(?=.*\p{Nd}).+$/u), // Unicode letter + decimal digit
   confirmPassword: z.string(),
-  securityQuestions: z.array(z.object({
+  securityQuestions: z.array(z.strictObject({
     questionId: z.string().uuid(),
-    answer: z.string().min(1).max(200)
+    answer: z.string().trim().min(1).max(200)
   })).length(5)
 }).superRefine((d, ctx) => {
   if (d.password !== d.confirmPassword) ctx.addIssue({ path: ["confirmPassword"], ... });
@@ -66,36 +70,53 @@ Body = z.object({
 })
 
 → 201 { user: { id, username, createdAt } }
-→ 400 { code: "VALIDATION_ERROR", issues }
+→ 400 { code: "VALIDATION_ERROR", issues } // invalid body or question IDs not in the catalog
+→ 403 { code: "ALREADY_AUTHENTICATED" }
 → 409 { code: "USERNAME_TAKEN" }
+→ 429 { code: "RATE_LIMITED" }
 ```
 
-Normalize answers: `trim().toLowerCase()` before argon2 hash.
+The handler verifies the five question IDs against the seeded catalog, hashes the password and answers with Argon2id, and writes the user plus all five answer hashes in one transaction. Normalize answers: `trim().toLowerCase()` before hashing. Rate: 5 attempts per 15 minutes per `ip+username`.
 
 ### 3.2 POST `/_auth/login`
 
-```ts
-Body { username, password } → 200 { accessToken, refreshToken, user: { id, username, role, mustCompleteSecurityQuestions } }
-→ 401 { code: "INVALID_CREDENTIALS" }
-→ 403 { code: "ACCOUNT_SUSPENDED", suspendedUntil, reason }
-→ 403 { code: "SECURITY_QUESTIONS_REQUIRED" } // when mustCompleteSecurityQuestions
-→ 429 { code: "RATE_LIMITED" }
+```text
+Request: { username, password }
+Browser (Origin header) 200: { accessToken, user } + Set-Cookie refreshToken
+Native (no Origin header) 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
+400: { code: "VALIDATION_ERROR" }
+401: { code: "INVALID_CREDENTIALS" }
+403: { code: "ALREADY_AUTHENTICATED" | "ACCOUNT_INACTIVE" | "ACCOUNT_SUSPENDED" }
+429: { code: "RATE_LIMITED" }
 ```
+
+The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login accepts existing credentials without reapplying the new-password letter/digit rule, but caps the submitted password at 1024 characters. It returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
 
 Rate: 5/15m per `ip+username`.
 
 ### 3.3 POST `/_auth/refresh`
 
-```ts
-Body { refreshToken } or cookie → 200 { accessToken, refreshToken }
-→ 401 { code: "INVALID_REFRESH" }
+```text
+Request: native body { refreshToken } or web HttpOnly cookie (body may be omitted)
+Web 200: { accessToken } + rotated HttpOnly refresh-token cookie
+Native 200: { accessToken, refreshToken } (store replacement token in secure storage)
+400: { code: "VALIDATION_ERROR" } // malformed body
+401: { code: "INVALID_REFRESH" } // bad/expired JWT, missing persistence, or a lost concurrent rotation
+403: { code: "ALREADY_AUTHENTICATED" | "ACCOUNT_INACTIVE" | "ACCOUNT_SUSPENDED" }
 ```
+
+The handler verifies the refresh-token signature and expiry, matches the JWT's user/device/session claims to the stored session hash, checks current account state, then conditionally replaces the hash. The conditional update allows only one concurrent refresh to succeed. Tokens use distinct random JWT IDs (`jti`) and carry the stable session ID separately; legacy login tokens whose `jti` is the session ID remain accepted while they roll over. Browser responses keep refresh tokens out of JSON; native clients omit `Origin` and store the body token in secure storage.
 
 ### 3.4 POST `/_auth/logout`
 
-```ts
-→ 200 { ok: true }  // invalidate refreshTokenHash in user_sessions
+```text
+Request: web HttpOnly refresh-token cookie or native body { refreshToken }
+200: { ok: true }  // invalidate the session; expire the browser cookie
+400: { code: "VALIDATION_ERROR" } // malformed body
+403: { code: "ALREADY_AUTHENTICATED" }
 ```
+
+Logout is idempotent: missing, invalid, or expired tokens still receive `{ ok: true }` and a cookie-clear response. A verified token revokes only its claimed session; an unverified token can affect a session only if its hash exactly matches the stored hash. Native clients should also clear their platform secure-storage token after a successful response.
 
 ### 3.5 Forgot Password
 
@@ -103,19 +124,28 @@ Body { refreshToken } or cookie → 200 { accessToken, refreshToken }
 
 ```
 POST /_auth/forgot-password/request
-Body { username } → 200 { questionIds: string[3], questions: string[3] }
+Body { username }
+→ 200 { questionIds: string[3], questions: string[3] }
+→ 400 { code: "VALIDATION_ERROR" }
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
+→ 503 { code: "RECOVERY_UNAVAILABLE" }
 ```
-- Server randomly picks 3 of user's 5 (do not allow client choice).
-- Rate-limit 5/15m.
+
+The server randomly chooses three of the account's five saved questions and persists that exact, ten-minute challenge; the client cannot substitute a different set at verification. Unknown accounts and accounts without five saved answers receive three questions from a stable, server-keyed five-question decoy pool for that username, with the same status and response shape. Question answers/hashes are never returned. Request/verify are limited to five attempts per 15 minutes per IP+username.
 
 **Verify**
 
 ```
 POST /_auth/forgot-password/verify
-Body { username, answers: [{questionId, answer}] } // len 3
-→ 200 { resetToken } // JWT, 10m, single-use
-→ 400 { code: "WRONG_ANSWERS" }
+Body { username, answers: [{questionId, answer}] } // exactly 3 unique answers from the active challenge
+→ 200 { resetToken } // opaque, 10m, single-use
+→ 400 { code: "WRONG_ANSWERS" } // same response for unknown users and incorrect/mismatched answers
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
 ```
+
+Answers are normalized with `trim().toLowerCase()` and compared against Argon2id hashes. The reset token is 32 cryptographically random bytes encoded as base64url; only its SHA-256 hash is stored. A successful verification consumes the recovery challenge and replaces any older reset token for that account.
 
 **Reset**
 
@@ -123,15 +153,21 @@ Body { username, answers: [{questionId, answer}] } // len 3
 POST /_auth/forgot-password/reset
 Body { resetToken, newPassword, confirmPassword }
 → 200 { ok: true }
-→ 400 { code: "INVALID_RESET_TOKEN"/"VALIDATION_ERROR" }
+→ 400 { code: "INVALID_RESET_TOKEN" | "VALIDATION_ERROR" }
+→ 403 { code: "ALREADY_AUTHENTICATED" }
+→ 429 { code: "RATE_LIMITED" }
 ```
+
+The server checks token validity before the expensive password hash, then atomically claims the token in the same transaction that updates the password; only one concurrent reset succeeds. A successful reset stores the Argon2id password hash, deletes outstanding reset tokens, consumes recovery challenges, and revokes the user's refresh sessions. Reset attempts are limited to five per 15 minutes per IP because this request has no username field.
 
 ### 3.6 Security Questions Helpers
 
 ```
-GET /_public/security-questions          // open, returns all 15 seeded: {id, text}
-GET /_auth/security-questions            // alias for guest
+GET /_public/security-questions          // open, returns seeded prompts: {id, text}
+GET /_auth/security-questions            // guest alias (contract-only)
 ```
+
+`GET /_public/security-questions` is live and returns the catalog used by registration and onboarding; question prompts are public, but answer hashes are never returned. The guest alias remains contract-only.
 
 ---
 
@@ -140,7 +176,7 @@ GET /_auth/security-questions            // alias for guest
 ```
 GET /_public/health                      // { status:"ok" }
 GET /_public/security-questions
-GET /_public/incident-types              // for SOS form dropdown (also under _user)
+GET /_public/incident-types              // public SOS form dropdown
 GET /_public/map/styles/:theme.json     // proxy or redirect to Map Server styles
 ```
 
@@ -159,19 +195,23 @@ GET    /_user/devices                    → [{ id, deviceName, ip, isCurrentDev
 POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ```
 
+`POST /_user/complete-security-questions` requires an access JWT backed by a matching unrevoked session, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The same hook returns `401 INVALID_ACCESS_TOKEN` when logout, password reset, or admin action revoked the persisted session, immediately invalidating any access JWT from it. `GET /_user/me` returns the current profile with `Cache-Control: no-store` after onboarding; incomplete accounts receive the security-question gate response. Other `_user` operations shown here remain contract-only.
+
 ### 5.2 User Search
 
 ```
-GET /_user/users/search?q=&category=&incidentType=&minRating=&sort=distance&lat=&lon=&page=&limit=
+GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=distance&lat=&lon=&page=&limit=
 → { items: [{ id, username, category, avgRating, isOnline, distance }], total, page, limit }
 ```
+
+`online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting may use the authenticated user's last known location.
 
 ### 5.3 Location Sharing
 
 ```
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
 → 201 { shareId, expiresAt? }
-DELETE /_user/location/share/:id         → 200 (immediate revoke)
+DELETE /_user/location/share/:shareId    → 200 (immediate revoke)
 GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
@@ -227,11 +267,17 @@ GET /_user/sync?since=ISO → { events: [...], location: ..., missions: ... }
 ```
 GET   /_admin/users?q=&isActive=&hasCategory=&page=&limit=   → paginated list
 GET   /_admin/users/:id                                       → detail + devices + missions
-POST  /_admin/users           { username, password, isActive? } // no security questions
+POST  /_admin/users           { username, password, isActive? } → 201 userProfile
 PATCH /_admin/users/:id/status { isActive: boolean }
 PATCH /_admin/users/:id/unsuspend
 // NO DELETE — must not exist
 ```
+
+`POST /_admin/users` requires a signed, unexpired access JWT with the `admin` role, rechecks that the current admin account is still an active, unsuspended admin, and requires that the token's matching persisted session has not been revoked. The password is stored as an Argon2id hash; the new account always has role `user`, defaults to active unless `isActive` is supplied, and is created without any `user_security_answers` rows. Its response sets `mustCompleteSecurityQuestions: true`. It returns `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` for missing or invalid bearer access tokens, `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED` when authorization fails, `400 VALIDATION_ERROR` for invalid bodies, and `409 USERNAME_TAKEN` for a duplicate username.
+
+`PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin and unrevoked-session authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` (including a revoked session), `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; both `/_user` and `/_admin` authorization checks require a matching session with a non-null refresh-token hash, so outstanding access JWTs are invalidated immediately. Reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
+
+The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. Category assignment tables are not part of the current database schema yet, so current users are all unassigned: `hasCategory=true` returns an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records; `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
 
 ### 6.2 Incidents & Categories
 
@@ -263,7 +309,7 @@ GET   /_admin/cancellation-reasons
 POST  /_admin/cancellation-reasons { type:"requester"|"rescuer", key, label, labelFa, requiresCustomText, isActive }
 ```
 
-Seeded on first migration (see SECURITY.md §10).
+Populated by T1.1.3; the table is introduced in a follow-up migration rather than the initial auth-table migration (see SECURITY.md for the reason list).
 
 ---
 
@@ -271,20 +317,39 @@ Seeded on first migration (see SECURITY.md §10).
 
 ```mermaid
 flowchart LR
-  A[packages/shared/schemas/*.ts<br/>loginSchema, sosRequestSchema...]
-  A -->|imported via @borobiya/shared| B[Fastify Server<br/>km-api route defs<br/>zodToJsonSchema → OpenAPI]
+  A[packages/shared schemas + route descriptors<br/>Zod contracts]
+  A -->|imported via @borobiya/shared/api| B[Fastify Swagger plugin<br/>Zod → OpenAPI 3.0 JSON Schema]
   B --> C[GET /docs/json<br/>OpenAPI 3.0]
-  C -->|bunx zopia --input /docs/json --output src/generated/zod.ts| D[Client src/generated/zod.ts<br/>auto Zod schemas + TS types]
-  D --> E[Client api.ts<br/>typed fetch with Zod parse]
+  C -->|bun --filter @borobiya/client generate:api| D[Client src/generated/api<br/>Zopia-generated modules]
+  D --> E[Client API layer<br/>typed contract integration]
 ```
 
 **Adding a new endpoint:**
 
-1. Add `export const mySchema = z.object({...})` in `packages/shared/src/schemas/`.
-2. Add `export const myRoute = defineRoute({ method:'post', url:'/_user/my', schema:{ body:mySchema }, meta:{ tags:['user'] } })` in `packages/shared/src/api/`.
-3. Implement in `packages/server/src/modules/.../*.routes.ts` via `fastify.route(myRoute)`.
-4. Run `bun run docs` → verify Swagger; then on client `bunx zopia --input http://localhost:3000/docs/json`.
-5. Use generated schemas in client form validation.
+1. Add request and response Zod schemas in `packages/shared/src/schemas/`.
+2. Add a descriptor in `packages/shared/src/api/`:
+
+   ```ts
+   import { defineRoute } from "@borobiya/shared/api";
+
+   export const myRoute = defineRoute({
+     method: "POST",
+     url: "/_user/my",
+     schema: { body: mySchema, responses: { 201: myResponseSchema, 400: errorSchema } },
+     meta: {
+       operationId: "userCreateMyResource",
+       summary: "Create a resource",
+       tags: ["user"],
+       access: "authenticated"
+     }
+   });
+   ```
+
+   `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
+3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, and admin user list/detail/create/status; SOS, live-location, mission, and most search operations remain contract-only.
+5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
+6. Use generated modules in client API integration and form validation.
 
 ---
 
@@ -321,19 +386,27 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Zod fail |
-| 401 | `UNAUTHORIZED` | Missing/invalid JWT |
-| 403 | `FORBIDDEN` | Wrong role |
-| 403 | `ALREADY_AUTHENTICATED` | Authed user hits `/_auth/*` |
-| 403 | `ACCOUNT_SUSPENDED` | `isSuspended` |
-| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks `_user` |
+| 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
+| 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
+| 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
+| 401 | `UNAUTHORIZED` | Missing credentials |
+| 401 | `INVALID_ACCESS_TOKEN` | Malformed, invalid-signature, expired, or wrong-use bearer access JWT |
+| 403 | `FORBIDDEN` | Wrong role (generic contract code) |
+| 403 | `ADMIN_REQUIRED` | A verified access token or current account does not have the admin role |
+| 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
+| 403 | `ACCOUNT_INACTIVE` | Login/refresh or authenticated operation for a deactivated account |
+| 403 | `ACCOUNT_SUSPENDED` | Login/refresh or authenticated operation for a suspended account |
+| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks non-onboarding `_user` routes |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
-| 404 | `NOT_FOUND` | Unknown id |
+| 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
+| 404 | `NOT_FOUND` | Unknown id for a generic operation |
+| 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
 | 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection |
 | 429 | `RATE_LIMITED` | Too many req |
+| 503 | `RECOVERY_UNAVAILABLE` | Security-question catalog or recovery challenge storage is unavailable |
 | 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |
 | — | `CANCEL_RATE_LIMITED` | 3 cancels/hour |
 

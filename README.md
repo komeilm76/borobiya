@@ -5,7 +5,7 @@
 > **Type:** Location Sharing & SOS Rescue Platform
 > **Platforms:** Admin Web Panel + User Web App + Android App (Ionic + Vue)
 > **Map Engine:** Self-Hosted Vector Map (PBF / SVG) via MapLibre — Fully Offline Capable
-> **Last Updated:** 2025
+> **Last Updated:** 2026-10-21
 
 ---
 
@@ -115,9 +115,9 @@ Map Server is a **completely separate service** responsible for:
 
 | Service | Tool Examples (Choose one, document choice) | Endpoint Example |
 |---|---|---|
-| **Vector Tile Serving** | Martin, Tegola, TileServer-GL (vector mode) | `GET /tiles/{z}/{x}/{y}.pbf` |
+| **Vector Tile Serving** | Martin 1.16.1 (PMTiles) | `GET /borobiya/{z}/{x}/{y}` (source ID from archive name) |
 | **Tile Data Generation** | Tippecanoe, Planetiler, OpenMapTiles | Build pipeline |
-| **Style Hosting** | Static JSON + Fonts + Sprites | `GET /styles/dark.json`, `GET /styles/light.json` |
+| **Style Hosting** | Martin-served JSON + dynamic fonts/sprites | `GET /style/dark`, `GET /style/light` |
 | **Routing** | OSRM, Valhalla, GraphHopper (self-hosted) | `POST /route`, `POST /route/multi` |
 | **Geocoding** | Nominatim (offline), Photon, Pelias, OpenCage offline | `GET /geocode?q=...`, `GET /reverse?lat=&lon=` |
 | **Data Storage** | PMTiles, MBTiles, PostgreSQL/PostGIS | Internal |
@@ -133,25 +133,30 @@ Map Server is a **completely separate service** responsible for:
   4.  Build search index: Import to Nominatim/Photon DB
   5.  Deploy to Map Server volume / object storage
 - **Update Mechanism (Must be documented):**
-  - Manual trigger: Admin uploads new `region.osm.pbf` or admin runs `bun run map:update --region=iran`
+  - Manual trigger: operator runs `./scripts/setup-ubuntu-vm.sh` (area/snapshot/policy form) or `--update-map` for the newest common dated snapshot
   - Semi-automatic: Cron job checks for new dump weekly/monthly, builds in staging, admin approves promotion to production.
-  - Versioning: `/tiles/v2025.05.01/{z}/{x}/{y}.pbf` or header `X-Map-Data-Version`
-  - Zero-downtime switch via symlink/volume swap.
+  - Versioning: the Martin source ID stays `borobiya`; the installed snapshot date is exposed as `/map-config` `dataVersion` and recorded in the dataset provenance manifest
+  - Build a fingerprinted dataset in the external map library, verify it, recreate map services on it, then update the library current pointer and prune the replaced release (not claimed zero-downtime).
 - **Distribution:**
-  - In Docker: Map Server volume (`map-data:/data`)
+  - In Docker: active dataset bind-mounted from the external map library (`MAP_DATASET_DIR:/data`)
   - On Windows Dev (without Docker): Local `data/maps/` folder + local Martin/Valhalla binary.
 
 ### 3.5. Geographic Coverage of Offline Data
 - **Configurable via ENV / Config File:**
   ```env
-  MAP_REGION=iran           # iran | tehran | middle-east | custom
-  MAP_BBOX=44.0,25.0,63.0,39.0
-  MAP_DATA_VERSION=2025-05-01
-  MAP_MAX_ZOOM=14
+  MAP_LIBRARY_DIR= # blank: ~/.local/share/borobiya/map-library
+  MAP_SNAPSHOT=pinned # pinned | latest | YYYY-MM-DD
+  MAP_SNAPSHOT_DATE=2026-10-18
+  MAP_SOURCE_POLICY=cache-first # cache-first | refresh | offline
+  MAP_REGION_IDS=ir-tehran # areas from map-server/regions.json
+  MAP_REGION=borobiya
+  MAP_BBOX=51.0,35.5,51.7,35.9 # west,south,east,north
+  MAP_DATA_VERSION=2026-10-18
   MAP_MIN_ZOOM=0
+  MAP_MAX_ZOOM=14              # Planetiler supports up to 16
   ```
 - Initial dev can use **single city/province** to keep size small (e.g., Tehran, 1-2GB).
-- Architecture must be **horizontally scalable** to expand to whole country later without code change.
+- Target: **horizontally scalable** coverage without a code change. The pipeline accepts catalog areas and snapshot dates while committed styles/client wiring uses the constant `borobiya` dataset source, so a non-Tehran switch is a data/setup operation (see [`docs/MAP_SERVER.md`](docs/MAP_SERVER.md) and [`docs/MAP_LIBRARY.md`](docs/MAP_LIBRARY.md)).
 - Document disk/RAM requirements per region.
 
 ### 3.6. Map Features to Support
@@ -161,19 +166,25 @@ Map Server is a **completely separate service** responsible for:
 - Offline Geocoding + Reverse Geocoding (address display on click)
 - Offline Routing for 3 profiles
 
+### 3.7. Map Server outage fallback
+- `MapCanvas.vue` reports MapLibre/configuration failures through an accessible toast with a retry action. A failed `/map-config` request does not block map creation; documented Tehran bounds and zoom defaults are used.
+- On secure origins (HTTPS or localhost), the client registers a map-only service worker. It uses a network-first strategy and stores successful same-origin styles, vector tiles, sprites, and glyphs in Cache Storage (up to 512 resources); on a network failure or server 5xx, a cached response is served and the client is notified. It does not cache API/configuration, routing, or geocoding responses.
+- MapLibre also retains eight zoom levels in its in-memory tile cache, preserving already-loaded coverage during the current page session. If service workers are unavailable (for example, plain HTTP on a LAN), that in-memory fallback still applies; persistent browser caching requires a secure origin.
+- The user full-screen map and dashboard map widget share the reusable `MapCanvas` and follow the app's resolved theme. Tehran tiles rendered in the LAN browser, and the user reports Ubuntu 24.04 acceptance for setup, admin/user login, registration, theme modes, admin user listing/deactivation, and map interactions (see [`docs/PROGRESS.md`](docs/PROGRESS.md)). T1.4.7's map-data cache, safe cache-clear, and area-selection features are implemented. A stricter external-library offline run and live map-outage test remain documented follow-ups, now non-blocking for Phase 2 and the Phase 1 release per the user's 2026-10-21 decision. Location sharing, place search, and in-app routing UI remain separate product tasks.
+
 ---
 
 ## 4. Theming — Dark / Light
 
 - **App-Wide Themes:**
   - `light` and `dark` via Vuetify theme + Tailwind `dark:` variant
-  - User preference stored in `localStorage` + backend `user.preferences.theme`
-  - System preference detection via `prefers-color-scheme`
+  - Theme preference (`system`, `light`, or `dark`) stored in `localStorage`; system preference is the default, with backend preference sync left for a later task
+  - Synchronous pre-paint bootstrap prevents a flash of the wrong theme; system preference follows `prefers-color-scheme`
 - **Map Theming:**
-  - Two separate MapLibre Style JSONs: `styles/borobiya-light.json` and `styles/borobiya-dark.json`
-  - Styles share same `sources` (same PBF tiles) but differ in `layers` paint (background, roads, labels, water, buildings).
-  - When user toggles theme, app must call `map.setStyle(newStyle)` and preserve camera position/markers.
-  - Ensure **sprites and glyphs** (fonts) work for both themes (white/black labels).
+  - MapLibre Style JSONs live at `map-server/styles/light.json` and `map-server/styles/dark.json`; Martin serves them through the same-origin `/map/style/light` and `/map/style/dark` paths.
+  - The styles share the same vector source, layer structure, sprite endpoint, and glyph endpoint, with theme-specific paint and a 150ms paint transition.
+  - `MapCanvas.vue` reacts to `styleUrl` changes using `map.setStyle(url, { diff: true })`, preserving the existing camera and DOM-backed markers.
+  - `map-server/scripts/verify-styles.py` validates theme parity, shared assets, referenced SVG sprites, and the sub-200ms paint-transition budget.
 
 ---
 
@@ -285,8 +296,10 @@ Map Server is a **completely separate service** responsible for:
 - **Only:** `username` + `password` — No email, no phone number.
 - Endpoint: `POST /_auth/login`
   ```ts
-  { username: string, password: string } -> { accessToken, refreshToken, user }
+  { username: string, password: string } -> { accessToken, user }
   ```
+  - Web: the refresh token is set only as an HttpOnly cookie, never returned in JSON.
+  - Native: the refresh token may be returned in the body for platform secure storage.
 - Username is **arbitrary unique identifier** (3-30 chars, alphanumeric + underscore, lowercase).
 - Rate-limited: 5 attempts / 15min per IP+username.
 
@@ -308,7 +321,7 @@ Map Server is a **completely separate service** responsible for:
   }
   ```
 - **Rules:**
-  - Password: min 8 chars, at least 1 letter + 1 number (configurable via zod)
+  - Password: 8–1024 chars, at least one Unicode letter + decimal digit
   - 5 security questions from **predefined list** (seeded in DB, e.g., 15 questions)
   - **No duplicate question** allowed — validated via `zod.superRefine` + DB unique check
   - All answers hashed (see 8.4)
@@ -316,11 +329,10 @@ Map Server is a **completely separate service** responsible for:
 ### 8.3. Forgot Password
 - Flow:
   1.  `POST /_auth/forgot-password/request` with `{ username }`
-  2.  Server randomly picks **3 out of the user's 5 questions** and returns **only question texts** (not answers): `{ questionIds: string[], questions: string[] }`
-      - Selection is **server-decided** (random or deterministic via userId hash). Must not be client-chosen.
-  3.  User answers: `POST /_auth/forgot-password/verify` with `{ username, answers: [{questionId, answer}] }`
-  4.  If all 3 correct (hashed compare), server issues `resetToken` (short-lived 10min)
-  5.  `POST /_auth/forgot-password/reset` with `{ resetToken, newPassword, confirmPassword }`
+  2.  Server randomly picks **3 out of the user's 5 questions**, persists that ten-minute challenge, and returns only `{ questionIds, questions }` (never answer hashes). Unknown/unconfigured accounts receive decoy questions with the same response shape.
+  3.  User answers: `POST /_auth/forgot-password/verify` with `{ username, answers: [{questionId, answer}] }`; only the server-selected IDs are accepted, and answers are normalized and Argon2id-verified.
+  4.  If all 3 are correct, server issues a single-use, opaque 32-byte `resetToken` (10-minute expiry; only its SHA-256 hash is stored).
+  5.  `POST /_auth/forgot-password/reset` with `{ resetToken, newPassword, confirmPassword }`; a successful reset invalidates other reset challenges/tokens and revokes all refresh sessions.
 
 ### 8.4. Secure Storage
 - **Passwords:** Hashed with `argon2id` (preferred) or `bcrypt` (cost 12) — never plain, never reversible.
@@ -336,11 +348,10 @@ Map Server is a **completely separate service** responsible for:
   ```
 - Admin **does NOT need to provide security questions**.
 - Created user has flag: `mustCompleteSecurityQuestions: true`
-- On first login, middleware checks this flag and:
-  - Returns `403` with code `SECURITY_QUESTIONS_REQUIRED`
-  - Frontend **forces redirect** to `/_auth/complete-security-questions` (or `/_user/setup-security-questions`)
-  - User **cannot perform any other operation** until 5 questions are completed.
-  - Endpoint: `POST /_user/complete-security-questions` (or `/_auth/...`) with same 5-question payload as register.
+- Login returns an access token and the `mustCompleteSecurityQuestions: true` flag so the user can reach the onboarding endpoint.
+- Frontend **forces redirect** to `/_user/complete-security-questions`.
+- Middleware returns `403 SECURITY_QUESTIONS_REQUIRED` for every other `/_user/*` operation until five questions are completed.
+- Endpoint: `POST /_user/complete-security-questions` with the same five-question payload as registration.
 - Admin's own account **does not require security questions** at all (`isAdmin` bypass).
 
 ### 8.6. Security Questions Data Model
@@ -394,7 +405,7 @@ Server must have:
 - **Other Protections:**
   - Helmet headers, CORS strict allowlist via ENV
   - Input sanitization via Zod (no raw `req.body` usage)
-  - SQL injection prevention via parameterized queries / ORM (Prisma/Drizzle)
+  - SQL injection prevention via parameterized Drizzle queries and reviewed raw SQL
   - No sensitive data in logs
   - JWT: short accessToken (15min) + long refreshToken (7d) stored httpOnly cookie or secure storage (mobile)
 
@@ -565,11 +576,12 @@ Rescuer MUST update status step-by-step via `PATCH /_user/missions/:id/status`:
 Table cancellation_reasons (
   id uuid PK,
   type enum('requester','rescuer'),
-  key string unique, -- e.g., 'physical_inability'
+  key string, -- unique within type; e.g., 'physical_inability' or 'other'
   label string,
   labelFa string,
   requiresCustomText boolean,
-  isActive boolean
+  isActive boolean,
+  UNIQUE(type, key)
 );
 
 Table missions (
@@ -689,7 +701,7 @@ Table missions (
   PATCH /_user/me
   GET  /_user/devices
   POST /_user/location/share
-  DELETE /_user/location/share/:id
+  DELETE /_user/location/share/:shareId
   POST /_user/sos/requests
   GET  /_user/sos/requests
   GET  /_user/sos/missions
@@ -753,8 +765,9 @@ router.beforeEach((to) => {
 | **MapLibre GL JS** | Vector map rendering | Core map lib, no Mapbox fees |
 | **Fastify** | Backend framework | Fast, plugin-based, OpenAPI integration |
 | **PostgreSQL + PostGIS** | Database | For users, missions, + geospatial queries (`ST_Distance`, `GEOGRAPHY`) |
+| **Drizzle ORM + Postgres.js** | TypeScript database access | SQL-first schemas and explicit PostGIS SQL support; see ADR-011 |
 | **Zod** | Schema validation | For all API input/output, shared between client/server |
-| **OpenAPI / Swagger** | API docs | Auto-generated from Fastify + Zod via `fastify-swagger` |
+| **OpenAPI / Swagger** | API docs | Generated from shared Zod route descriptors via `@fastify/swagger` |
 | **JSDoc** | Code docs | For all exported functions/classes |
 | **km-api** | API helper | Helper for structured API definitions (see 15) |
 | **Zopia** | Swagger → Zod generator | Converts OpenAPI to Zod schemas for client (see 15) |
@@ -764,7 +777,6 @@ router.beforeEach((to) => {
 | **VueUse** | Vue composables | `useGeolocation`, `useStorage`, `useDark`, `useWebSocket`, etc. |
 
 **Additional Recommended (Document if used):**
-- Prisma or Drizzle ORM (Postgres)
 - Redis for rate-limit + socket adapter (optional for single-instance dev)
 - Husky/Lefthook for git hooks
 
@@ -782,25 +794,26 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 - Example:
   ```ts
   // shared/schemas/auth.ts
-  export const loginSchema = z.object({
+  export const loginSchema = z.strictObject({
     username: z.string().min(3).max(30).regex(/^[a-z0-9_]+$/),
-    password: z.string().min(8)
+    password: z.string().min(1) // Existing credentials are checked against their stored hash.
   })
   export type LoginInput = z.infer<typeof loginSchema>
   ```
 
 ### 15.2. km-api
-- A helper library (by Komeil) to **structure Fastify routes** with Zod + OpenAPI in one place.
-- Allows defining: `method, url, zod schema, handler, openapi meta` co-located.
-- Reduces boilerplate for `fastify.route({...})` + `schema` + `preHandler`.
+- A helper library (by Komeil) used by `packages/shared/src/api/define-route.ts` to keep route method, path, Zod schemas, and OpenAPI metadata in a shared descriptor.
+- Application handlers remain server-side and are registered separately; a shared contract does not imply a live endpoint.
+- The server's Swagger catalog is built from these descriptors without creating placeholder handlers.
 
 ### 15.3. Zopia
 - **Docs:** https://komeilm76.github.io/zopia/
-- When backend exposes **OpenAPI/Swagger JSON** (`/docs/json`), frontend can run:
+- The Fastify server exposes **Swagger UI** at `/docs` and **OpenAPI JSON** at `/docs/json`. Start the API, then generate client modules with:
   ```bash
-  bunx zopia --input http://localhost:3000/docs/json --output src/shared/generated/zod.ts
+  bun --filter @borobiya/client generate:api
   ```
-- Zopia **auto-generates Zod schemas + TypeScript types** for all API endpoints.
+- The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
+- All shared API contracts appear in OpenAPI. Runtime handlers include `GET /_public/health`, `GET /_public/security-questions`, the registration/login/refresh/logout/forgot-password routes, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` plus `POST /_user/complete-security-questions`. The client includes login, registration, recovery, onboarding, and route guards; remaining operations are marked `contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract
@@ -808,11 +821,11 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 
 ### 15.4. Combined Workflow
 ```
-[ shared/schemas (Zod) ] --km-api--> [ Fastify Server ] --generates--> [ OpenAPI JSON /docs/json ]
-                                                                              |
-                                                                              | zopia
-                                                                              v
-[ Frontend src ] <---- [ Auto-generated Zod schemas + TS types ] <------------
+[ shared Zod schemas + route descriptors ] --> [ Fastify Swagger plugin ] --> [ OpenAPI JSON /docs/json ]
+                                                                                |
+                                                                                | Zopia
+                                                                                v
+[ Client source ] <---------- [ Generated client modules ] <--------------------
 ```
 - Folder `shared/` is symlinked or git-submodule between `server/` and `client/` OR monorepo `packages/shared`.
 
@@ -844,7 +857,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 ## 17. Data Storage & Retention
 
 ### 17.1. Key Tables (PostgreSQL)
-- `users (id, username unique, passwordHash, role enum('user','admin'), isActive, isSuspended, suspendedUntil, avgRating, mustCompleteSecurityQuestions, createdAt)`
+- `users (id, username unique, passwordHash, role enum('user','admin'), isActive, isSuspended, suspendedUntil, avgRating, mustCompleteSecurityQuestions, lastLocation GEOGRAPHY(Point,4326), createdAt)`
 - `security_questions (id, text)`
 - `user_security_answers (id, userId, questionId, answerHash)`
 - `user_sessions (id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)`
@@ -883,6 +896,7 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 | `SECURITY.md` | Hashing, rate-limit, suspension, no-delete policy, env secrets |
 | `API.md` | Link to OpenAPI `/docs`, plus route prefix rules |
 | `MAP_SERVER.md` | How to setup Martin/OSRM/Photon, generate tiles, update data |
+| `MAP_LIBRARY.md` | External standardized map storage, snapshots, cache/update/offline policies |
 | `WORKFLOWS.md` | Git hooks, deploy, android build |
 | `USER_MANUAL.md` | Step-by-step for end-user: register, share location, SOS, rescue (with screenshots) |
 | `DEVELOPMENT.md` | Windows without Docker vs Ubuntu with Docker |
@@ -894,24 +908,29 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 
 ## 19. Workflows & CI/CD
 
-### 19.1. Git Hooks / Gates (Minimum)
-- Use **Husky** or **Lefthook**:
+### 19.1. Git Hooks / Gates (planned)
+- Add **Husky** or **Lefthook**:
   - `pre-commit`: `bun run lint` + `bun run typecheck` (vue-tsc + tsc)
   - `pre-push`: `bun run test` (vitest) + `bun run build` dry-run
 - **Branch protection:** `main` requires PR + 1 review (if team >1) or at least passing CI.
 
+These hooks and gates are recommendations only; no hook config, CI workflow, or root lint/test/build scripts are wired yet.
+
 ### 19.2. Launch / Deploy Workflow
-- **GitHub Actions `deploy.yml`:**
+- **GitHub Actions `deploy.yml` (planned; not present yet):**
   - On push to `main`: build Docker images, push to registry, SSH to Ubuntu server, `docker compose pull && docker compose up -d`
   - Includes: `api`, `postgres`, `map-server`, `nginx` (reverse proxy)
-- **Local launch:**
+- **Local launch (scaffold):**
   ```bash
-  docker compose up -d          # prod-like
-  bun run dev                   # dev without docker (windows)
+  cp .env.example .env          # replace the JWT placeholders and Postgres password
+  docker compose up --build -d  # default profile: API, PostGIS, Martin, routing gateway, and Nginx
+  bun install
+  bun --filter @borobiya/client dev  # Vite client with HMR at :5173
   ```
+  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only). Auth, recovery, session, and user/admin account flows use PostgreSQL after the explicit migrations and seed; SOS/location mission workflows remain planned. Map PBFs, PMTiles, OSRM graphs, and the Photon index are generated outside Git under the external library by the map pipeline; a clean checkout does not contain those large data artifacts.
 
-### 19.3. Android Build Workflow
-- **GitHub Actions `android.yml`:**
+### 19.3. Android Build Workflow (planned)
+- **GitHub Actions `android.yml` (not present yet):**
   - On tag `v*`: `bun run build:web`, `npx cap sync android`, `cd android && ./gradlew assembleRelease`, upload APK/AAB artifact
 - **Local:**
   ```bash
@@ -926,29 +945,18 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 
 ### 20.1. Production (Ubuntu)
 - OS: **Ubuntu 22.04/24.04 LTS**
-- Fully **Dockerized** via `docker-compose.yml`:
-  ```yaml
-  services:
-    api: { build: ./server, ports: ["3000:3000"], env_file: .env, depends_on: [postgres, map-server] }
-    postgres: { image: postgis/postgis:16-3.4, volumes: [pgdata:/var/lib/postgresql/data] }
-    map-server:
-      image: maplibre/martin # or custom
-      volumes: [mapdata:/data]
-      ports: ["8000:8000"]
-    nginx: { image: nginx, ports: ["80:80","443:443"] }
-  ```
-- Secrets via `.env` (never commit).
+- A local **Compose stack** is provided in [`docker-compose.yml`](./docker-compose.yml): API, PostGIS, Martin, routing gateway, and Nginx in the default profile; OSRM and Photon are optional profiles, and Nominatim is an import-only profile. Host ports bind to loopback; Nginx is HTTP-only on port 8080. This is not a production deployment configuration: TLS, domain routing, and production secrets still need deployment-specific setup.
+- Secrets via `.env` (never commit). Database-backed auth/recovery/session and user/admin account operations require the explicit migrations and seed; they do not run at API startup. Setup creates or requests an admin seed password; the local `admin / admin123` fallback is development-only. Map data is generated by the pipeline into the external library (`MAP_LIBRARY_DIR`), not bundled in Git; see [`docs/MAP_LIBRARY.md`](docs/MAP_LIBRARY.md).
 
 ### 20.2. Development (Windows without Docker)
-- Requirements: `Bun`, `PostgreSQL`, `Node 20+`
-- Steps documented in `DEVELOPMENT.md`:
+- Requirements: `Bun`; Node 20+ is a fallback for supported tools. PostgreSQL/PostGIS is needed to apply the checked-in database migrations and run the seed command; registration and login use the configured database after setup.
+- Steps documented in [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md):
   ```bash
   bun install
-  bun run db:setup     # create db, migrate, seed questions
-  bun run map:dev      # run local Martin with sample tiles
-  bun run dev          # vite + fastify concurrently
+  cp .env.example .env   # replace the JWT placeholders
+  bun run dev            # API + Vite concurrently
   ```
-- Map data for dev: small `tehran.pmtiles` (~500MB) in `data/`.
+- Auth, recovery, session, and user/admin account flows use Drizzle-backed PostgreSQL after the checked-in migrations and seed data are applied; migrations/seeds are not run automatically. `db:setup` and `map:dev` are not wired. The map pipeline and styles/sprites/fonts are implemented, but generated regional data is intentionally stored outside the repository in the map library.
 
 ---
 
@@ -1034,15 +1042,25 @@ RATE_LIMIT_MAX=100
 
 # Map Server
 MAP_SERVER_URL=http://localhost:8000
-MAP_REGION=tehran
-MAP_STYLE_LIGHT=http://localhost:8000/styles/light.json
-MAP_STYLE_DARK=http://localhost:8000/styles/dark.json
-MAP_ROUTING_URL=http://localhost:8000/route
-MAP_GEOCODE_URL=http://localhost:8000/geocode
+MAP_LIBRARY_DIR=
+MAP_SNAPSHOT=pinned
+MAP_SNAPSHOT_DATE=2026-10-18
+MAP_SOURCE_POLICY=cache-first
+MAP_REGION_IDS=ir-tehran
+MAP_REGION=borobiya
+MAP_BBOX=51.0,35.5,51.7,35.9
+MAP_DATA_VERSION=2026-10-18
+MAP_MIN_ZOOM=0
+MAP_MAX_ZOOM=14
+MAP_STYLE_LIGHT=http://localhost:8000/style/light
+MAP_STYLE_DARK=http://localhost:8000/style/dark
+MAP_ROUTING_URL=http://localhost:8001/route
+MAP_GEOCODE_URL=http://localhost:8001/geocode
+MAP_REVERSE_URL=http://localhost:8001/reverse
 
-# Android
-VITE_API_URL=http://localhost:3000
-VITE_MAP_URL=http://localhost:8000
+# Browser-facing paths (forwarded by Vite/Nginx)
+VITE_API_URL=/api
+VITE_MAP_URL=/map
 ```
 
 ### 24.2. Folder Structure (Monorepo)
@@ -1051,7 +1069,7 @@ borobiya/
 ├── docs/                 # All markdown docs
 ├── packages/
 │   ├── shared/           # Zod schemas, TS types (used by both)
-│   ├── server/           # Fastify API + Socket.IO + Prisma/Drizzle
+│   ├── server/           # Fastify API + Drizzle (Socket.IO/persistence integration later)
 │   └── client/           # Vue + Vuetify + Tailwind + MapLibre + Ionic
 │       ├── src/
 │       │   ├── views/_auth, _public, _user, _admin

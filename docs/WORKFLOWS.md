@@ -1,6 +1,6 @@
 # Borobiya — Workflows & CI/CD
 
-> TL;DR: **Lefthook/Husky** pre-commit gates, **GitHub Actions** for deploy (`main` → Docker → Ubuntu VPS) and Android build (tag `v*` → APK/AAB). Branch model = `main` protected + `feat/*` PRs, session branch `arena/*`.
+> TL;DR: This document records the **planned** Git/CI/deployment workflows. Lefthook/Husky, GitHub Actions workflows, Android packaging, and production TLS are not configured in the current scaffold. A local Compose stack and root `bun run dev` command are available.
 
 ---
 
@@ -20,7 +20,7 @@
 feat: add SOS dispatch endpoint
 fix: reject location update from non-priority device
 docs: update map setup with photon version
-chore: bump martin to 0.12
+chore: bump Martin to 1.16.1
 refactor: extract priority device composable
 test: add register 5Q uniqueness test
 ```
@@ -99,30 +99,40 @@ Single-dev mode: protection may be relaxed, but CI still mandatory.
 
 ## 3. Local Launch
 
-### 3.1 Prod-like (Docker)
+### 3.1 Compose service scaffold
 
 ```bash
-docker compose up -d
-open http://localhost:3000/docs
+cp .env.example .env              # replace JWT placeholders and Postgres password
+docker compose up --build -d
+open http://localhost:3000/docs   # Swagger through the API port
+open http://localhost:8080/docs   # Swagger through Nginx
+bun install
+bun --filter @borobiya/client dev # Vite client with HMR at :5173
 # Tear down
-docker compose down        # keep volumes
-docker compose down -v     # full reset
+docker compose down               # keep the Postgres volume
+docker compose down -v             # destructive: remove database volume
 ```
+
+This is a local scaffold, not production deployment configuration: Nginx is HTTP-only and loopback-bound. Registration uses the configured PostgreSQL database after migrations and seed data are applied; the API does not apply migrations automatically. Martin has no project tile/style/routing/geocoding assets yet.
 
 ### 3.2 Dev (Bun, with watch)
 
 ```bash
-bun run dev            # api:3000 + client:5173 concurrently
+cp .env.example .env              # replace both JWT placeholders
+bun install
+bun run dev                       # API + Vite concurrently
 # or separately
-bun --filter server dev
-bun --filter client dev
+bun --filter @borobiya/server dev
+bun --filter @borobiya/client dev
 ```
+
+Do not run the root `bun run dev` at the same time as the Compose API: both use host port `3000`.
 
 ---
 
-## 4. CI — GitHub Actions `ci.yml`
+## 4. CI — planned GitHub Actions `ci.yml`
 
-Runs on every PR + push to `main`.
+No CI workflow file is present yet; the example below is a proposal, and several root commands shown there (for example `lint`, `typecheck`, and `build`) are not wired.
 
 ```yaml
 name: CI
@@ -139,7 +149,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
-        with: { bun-version: "1.1.0" }
+        with: { bun-version: "1.4.3" }
       - run: bun install
       - run: bun run lint
       - run: bun run typecheck
@@ -150,12 +160,12 @@ jobs:
 
 ---
 
-## 5. Deploy (`deploy.yml` — on `main`)
+## 5. Planned production deploy (`deploy.yml` — not implemented)
 
 ### 5.1 Target
 
 - **Host:** Ubuntu 22.04/24.04 LTS VPS (4GB RAM for 1k users goal).
-- **Stack:** `docker-compose.yml` with `api`, `postgres`, `map-server`, `nginx` (TLS via Let's Encrypt).
+- **Current local stack:** `docker-compose.yml` with `api`, `postgres`, `map-server`, `routing-gateway`, optional OSRM profile services (`--profile routing`), and `nginx`; loopback-only HTTP. Production TLS/domain routing via Let's Encrypt remains a future deployment task.
 
 ### 5.2 Workflow
 
@@ -208,9 +218,8 @@ cp .env.example .env && nano .env
 # TLS
 sudo apt install nginx certbot python3-certbot-nginx
 sudo certbot --nginx -d borobiya.yourdomain.com -d map.borobiya.yourdomain.com
-# Nginx reverse proxy (or use nginx container)
-# See nginx.conf in repo for /api → :3000, /tiles → :8000
-docker compose up -d
+# The committed nginx.conf is a local HTTP gateway (/api/ and /map/); it has no TLS/domain config.
+docker compose up --build -d
 ```
 
 ### 5.4 Env Secrets Handling

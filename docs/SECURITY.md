@@ -15,14 +15,17 @@
 
 - **Hash:** `argon2id` (preferred, `memoryCost 64MB, timeCost 3, parallelism 1`) or `bcrypt cost 12`.
 - Never store/recover plaintext. Never log.
-- **Policy:** min 8 chars, at least 1 letter + 1 number (Zod refine, configurable via `PASSWORD_POLICY` env if needed).
-- Compare via `argon2.verify()` — timing-safe.
+- **Policy:** 8–1024 characters, at least one Unicode letter + decimal digit (validated by the shared Zod schema).
+- Login accepts legacy passwords without reapplying the creation policy, but caps submitted credentials at 1024 characters to bound Argon2 work.
+- Compare via `argon2.verify()` — timing-safe. A malformed stored hash fails closed as `INVALID_CREDENTIALS` and triggers dummy-hash work rather than surfacing a server error or an account-dependent fast path.
 
 ```ts
-import * as argon2 from "argon2";
-const hash = await argon2.hash(password, { type: argon2.argon2id });
-const ok = await argon2.verify(hash, password);
+import { hashPassword, verifyPassword } from "../packages/server/src/security/password";
+const hash = await hashPassword(password);
+const ok = await verifyPassword(hash, password);
 ```
+
+The database seed hashes the local bootstrap admin credential with the same Argon2id helper. The `admin` / `admin123` fallback is accepted only when `NODE_ENV` is `development` or `test`; change it before exposing the service. Other environments require a unique `ADMIN_SEED_PASSWORD`, reject the fallback, and never overwrite an existing admin password.
 
 ### 1.3 Security Answers (5 Questions)
 
@@ -30,26 +33,33 @@ const ok = await argon2.verify(hash, password);
 - **Hash** same as passwords (argon2id) — store only `answerHash`.
 - **5 unique `questionId`** — validate `new Set(ids).size===5 && ids.length===5` via `zod.superRefine` + DB unique.
 - Table: `user_security_answers (id, userId, questionId, answerHash)` with `UNIQUE(userId, questionId)`.
-- Seed `security_questions` with 15–20 entries (e.g., “What was your first pet’s name?”). IDs are UUIDs, text is public.
+- Seed `security_questions` with the 15 Persian public prompts in `packages/server/src/db/seed-data.ts`. IDs are stable UUIDs; answers are never seeded. `POST /_auth/register` validates selected IDs and persists only normalized Argon2id answer hashes; `POST /_auth/forgot-password/verify` uses the same normalization before comparison.
 
 ### 1.4 Forgot Password Invariants
 
-- **Server picks 3/5** — client must NOT choose. Random or deterministic (`hash(userId+salt) % 5` pick 3).
-- Return only `questionIds + texts`, never answer hashes.
-- Verify: all 3 must pass `argon2.verify`.
-- On success issue `resetToken` (JWT or opaque random string, 10 min expiry, single-use, stored in `password_reset_tokens` with `expiresAt`).
-- `POST /_auth/forgot-password/reset` consumes token → new password + invalidate old tokens.
+- **Server picks 3/5** — client must NOT choose. Select three distinct answers with a cryptographically secure random shuffle and persist the selected IDs as a ten-minute challenge.
+- Return only `questionIds + texts`, never answer hashes. Unknown or unconfigured accounts receive three random questions from a stable, server-keyed five-question decoy pool for that username, so repeated requests do not expose that decoys draw from a larger catalog than a real account's saved five. Responses share the same shape; verification failures use a generic `WRONG_ANSWERS` response.
+- Verify: all three submitted IDs must match the active server-selected challenge and all three normalized answers must pass `argon2.verify`. Always perform three comparisons, using a dummy Argon2id hash for unknown accounts or invalid challenge IDs.
+- On success issue a 32-byte opaque, base64url `resetToken` with a ten-minute expiry. Store only its SHA-256 hash in `password_reset_tokens`; claim it atomically so replay or concurrent reuse cannot reset the password twice.
+- `POST /_auth/forgot-password/reset` consumes the token and updates the Argon2id password in one transaction, invalidates other reset/challenge tokens, and revokes all refresh sessions. Protected routes also require the persisted session to remain unrevoked, so outstanding access JWTs stop working immediately; the user must log in again.
+- Limit request/verify to five attempts per 15 minutes per IP+username; limit reset attempts to five per 15 minutes per IP (the reset body has no username).
 
 ### 1.5 Admin-Created Users
 
-- `POST /_admin/users` skips questions; sets `mustCompleteSecurityQuestions=true`.
-- Middleware on every `/_user/*` request:
-  ```ts
-  if (req.user.mustCompleteSecurityQuestions && req.url !== "/_user/complete-security-questions") {
-    throw { status: 403, code: "SECURITY_QUESTIONS_REQUIRED" };
-  }
-  ```
-- Frontend forces redirect to `/complete-security-questions` if code received.
+- Implemented `POST /_admin/users` accepts only `{ username, password, isActive? }`; strict validation rejects any supplied security-question fields. It stores the password with Argon2id, creates a regular `user` role account, honors `isActive` (default `true`), and creates no `user_security_answers` rows.
+- Every created account has `mustCompleteSecurityQuestions=true`. The handler returns the standard user profile and reports duplicate usernames as `409 USERNAME_TAKEN`.
+- The route verifies a signed, unexpired HS256 access JWT with `tokenUse: "access"`, requires the admin role, then checks the current admin record remains admin, active, and unsuspended and that the token's persisted session has not been revoked. A verified token with an inactive, suspended, demoted, or logged-out session is denied.
+- Login still returns tokens and the `mustCompleteSecurityQuestions` flag so the user can access the completion route; it must not reject login without issuing a usable token.
+- `POST /_user/complete-security-questions` accepts five unique IDs from the seeded catalog, normalizes answers with `trim().toLowerCase()`, stores Argon2id hashes, and atomically clears the flag only after all five rows are stored. Repeated requests do not overwrite completed answers and return `409 SECURITY_QUESTIONS_ALREADY_COMPLETED`.
+- A Fastify `/_user` authorization hook verifies the signed/unexpired access token, current user role/account state, and a matching persisted session whose refresh-token hash is still present. Logout, password reset, and admin revocation therefore invalidate access JWTs on protected routes immediately, not only at access-token expiry. If `mustCompleteSecurityQuestions` is true, it permits only the completion endpoint and returns `403 SECURITY_QUESTIONS_REQUIRED` for other registered `/_user` handlers. Unimplemented contract-only routes remain 404 until handlers are added.
+- The Vue client now exposes login, registration, forgot-password, and completion forms. It keeps the access token in memory, stores only the minimal non-secret user snapshot in `sessionStorage`, and relies on the HttpOnly refresh cookie to restore sessions. The router keeps `/_auth/*` guest-only, protects `/_user/*` and admin routes, and forces every signed-in user with the onboarding flag through `/_user/complete-security-questions` before other pages. `GET /_user/me` refreshes the profile; the `SECURITY_QUESTIONS_REQUIRED` response preserves onboarding status when the profile endpoint is gated.
+
+### 1.6 Admin User Activation/Deactivation
+
+- `PATCH /_admin/users/:id/status` accepts only `{ isActive: boolean }` and applies the same signed access-token and current active/unsuspended admin checks as user creation.
+- The status update, append-only audit insert, and refresh-session invalidation are one database transaction. The audit event uses `user_activated` or `user_deactivated`, `targetType: "user"`, the target ID, and metadata `{ previousIsActive, isActive }`. Requests that repeat the current state return the profile without writing another event.
+- Deactivation sets `users.is_active=false`, clears every `user_sessions.refresh_token_hash` for that user, and marks those sessions offline. Both user and admin authorization checks require the token's matching session to remain persisted and unrevoked, so logout, password reset, or deactivation invalidates outstanding access JWTs immediately. Reactivation does not revive the old session; a fresh login is required.
+- Invalid IDs/bodies receive `400 VALIDATION_ERROR`; a missing target receives `404 USER_NOT_FOUND`. The response is `Cache-Control: no-store`. No user-delete route is registered.
 
 ---
 
@@ -60,17 +70,20 @@ const ok = await argon2.verify(hash, password);
 | Token | Lifetime | Storage | Usage |
 |-------|----------|---------|-------|
 | `accessToken` | 15 min | Memory (JS var) + `Authorization: Bearer` | Every API call |
-| `refreshToken` | 7 days | httpOnly, Secure, SameSite=Lax cookie (web) or `Capacitor Preferences` / Secure Storage (Android) | `/ _auth/refresh` |
+| `refreshToken` | 7 days | HttpOnly, SameSite=Lax cookie with `Secure` on HTTPS (web) or platform Secure Storage (native) | `/_auth/refresh` |
 | `resetToken` | 10 min | One-time in body | Forgot reset |
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
-- Payload: `{ sub: userId, role: 'user'|'admin', deviceId, iat, exp }`.
-- Refresh flow rotates refresh token (invalidate old hash in `user_sessions.refreshTokenHash`).
+- Access and refresh JWTs use HS256 with separate `JWT_SECRET` and `JWT_REFRESH_SECRET`; login issues a 15-minute access token and 7-day refresh token.
+- Payload includes `{ sub: userId, role, deviceId, sessionId, jti, tokenUse, iat, exp }`; `jti` is a unique random UUID per JWT, `sessionId` remains stable across rotations, and access/refresh token uses are distinct. Verifiers require an unexpired `exp` claim and valid user/session UUIDs, and temporarily accept legacy T1.2.2 JWTs where `jti` held the session ID.
+- `user_sessions.refreshTokenHash` stores a SHA-256 hash of the high-entropy signed refresh token and has a unique index. Refresh validates signature, expiry, session/user/device claims, and current account status, then uses a conditional update on the current hash to rotate it atomically; concurrent reuse cannot return two usable tokens.
+- Browser login/refresh responses never expose `refreshToken` in JSON; they set an `HttpOnly; SameSite=Lax` cookie carrying `Secure` whenever the request arrived over HTTPS (`X-Forwarded-Proto` honored from trusted proxies). `Secure` is omitted on plain-HTTP development origins, where browsers would otherwise silently drop the cookie and break session restore; production deployments must serve HTTPS. Native clients omit `Origin`, receive the token in the body, and must store it with platform secure storage.
+- Logout revokes the claimed user session (clears its stored hash and online flag) and expires the cookie. User/admin authorization checks reject access JWTs backed by that revoked session immediately. Missing or invalid tokens are safe/idempotent; a token with an invalid signature cannot revoke an unrelated session.
 
 ### 2.2 Sessions & Devices
 
 - `user_sessions(id, userId, deviceId, deviceName, refreshTokenHash, ip, lastActiveAt, isOnline)`.
-- `deviceId` derived from `userAgent+screen` or explicit client UUID (`crypto.randomUUID()` stored in localStorage).
+- Until the login contract accepts a client-stable device ID, each successful login creates a server-generated session/device UUID; the user-agent is saved as the session's `deviceName`. A future client device ID can make the identifier stable across logins.
 - `GET /_user/devices` returns active table; user can revoke others (optional).
 
 ### 2.3 Multi-Device Priority
@@ -82,18 +95,19 @@ const ok = await argon2.verify(hash, password);
 
 ## 3. Rate Limiting
 
-Via `@fastify/rate-limit` (in-memory dev, Redis `ioredis` prod).
+Via `@fastify/rate-limit`. The current API uses its in-memory store; Redis-backed production storage is a later scaling task.
 
 | Scope | Limit | Key |
 |-------|-------|-----|
 | Global | 100 req/min | `ip` |
 | `_auth/login`, `_auth/register` | 5 req/15m | `ip+username` |
-| `_auth/forgot-password/*` | 5 req/15m | `ip+username` |
+| `_auth/forgot-password/request`, `/verify` | 5 req/15m | `ip+username` |
+| `_auth/forgot-password/reset` | 5 req/15m | `ip` |
 | `POST /_user/sos/requests` | 3 req/min | `userId` |
 | `location:update` | 60 req/min | `deviceId` |
 | `POST /_user/missions/:id/cancel` | 3 req/hour | `userId` (also abused flag) |
 
-Config in `src/config/rateLimit.ts`, wired as Fastify `onRoute` hooks.
+Global defaults are validated in `packages/server/src/config/env.ts` and registered in `packages/server/src/plugins/security.ts`. Registration, login, and the recovery request/verify routes apply 5/15m IP+username limits; reset applies 5/15m per IP. Limiter keys are derived before schema validation, so invalid or overlong usernames (including case variants rejected by the lowercase schema) are mapped to a bounded invalid-input bucket rather than retained as arbitrarily large keys or aliased to a valid username. Feature-specific limits remain to be added with their handlers. When the API is behind a reverse proxy, set `TRUSTED_PROXY_IPS` to the proxy's exact IP/CIDR allowlist so the limiter sees client IPs; do not trust forwarded headers from arbitrary peers.
 
 ---
 
@@ -107,9 +121,10 @@ if (locationUpdatesPerSec > 50)   suspend(24*H, "location_spam");
 if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 ```
 
-- Columns: `users.isSuspended`, `suspendedUntil`, `suspensionReason`.
-- On login, if `isSuspended && now < suspendedUntil` → `403 {code: "ACCOUNT_SUSPENDED", suspendedUntil, reason}`.
-- Message: “Account suspended due to suspicious activity. Contact admin.”
+- `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work.
+- Login and refresh reject an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Refresh also revokes the presented session and clears the browser cookie. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an admin clears it.
+- Login and refresh reject `isActive=false` with `403 {code: "ACCOUNT_INACTIVE"}`; refresh revokes the presented session.
+- Message: “Account suspended. Contact an administrator.”
 
 ### 4.2 Manual
 
@@ -120,9 +135,9 @@ if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
 
 ## 5. Authorization (Route Prefixes)
 
-Enforced at **both** layers (fail-closed):
+The target policy is enforced at **both** layers (fail-closed). Phase 1 runtime status: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token, current admin account state, and an unrevoked matching session; the `/_user` hook checks access-token validity, current user role/account state, the persisted session, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. These Phase 1 account handlers are implemented; domain-level admin handlers for incidents/categories and dispatch are future Phase 3 work (T3.1/T3.3), while location/device user handlers are Phase 2 (T2). They are not missing Phase 1 account-management endpoints.
 
-**Backend (Fastify hooks):**
+**Backend policy sketch (shared hooks for future route groups):**
 
 ```ts
 fastify.register(authRoutes, { prefix: '/_auth' }); // no auth, but if JWT present → 403 ALREADY_AUTHENTICATED
@@ -136,29 +151,16 @@ fastify.register(async (f) => {
 }, { prefix: '/_admin' });
 ```
 
-**Frontend (router guard):**
-
-```ts
-router.beforeEach((to) => {
-  const a = useAuthStore();
-  if (to.path.startsWith('/_auth') && a.isLoggedIn) return '/_user/dashboard';
-  if (to.path.startsWith('/_user') && !a.isLoggedIn) return '/_auth/login';
-  if (to.path.startsWith('/_admin') && a.user?.role !== 'admin') return '/403';
-});
-```
+**Frontend (implemented router guard):** `/_auth/*` pages redirect signed-in users away; protected user/admin pages redirect guests to login with a safe internal return path; non-admin users are sent back to the user dashboard; and a signed-in account with `mustCompleteSecurityQuestions=true` is redirected to onboarding from every route except the completion form. The server hook remains authoritative if client-side state is stale or tampered with.
 
 ### 5.1 `_auth` Guest-Only
 
-If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can redirect cleanly.
+The registration, login, refresh, logout, and all forgot-password handlers fail closed with `403 ALREADY_AUTHENTICATED` whenever an `Authorization` header is supplied, so a signed-in client can redirect cleanly. Refresh/logout accept the refresh credential only through the cookie or native request body, never through the bearer header.
 
 ### 5.2 No Delete Invariant
 
 - No `DELETE /_admin/users/:id` handler may exist.
-- Add a test:
-  ```ts
-  const res = await app.inject({ method: 'DELETE', url: '/_admin/users/xxx', headers });
-  expect(res.statusCode).not.toBe(200);
-  ```
+- A runtime regression test sends `DELETE /_admin/users/:id` to the Fastify app and asserts `404`; the OpenAPI contract also contains no DELETE operation for that path.
 - Only `PATCH /.../status {isActive}` + `PATCH /.../unsuspend`.
 
 ---
@@ -167,7 +169,7 @@ If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can red
 
 - **Zod everywhere:** No raw `req.body`; every route has `schema: { body: zodToJsonSchema(...) }`.
 - Use `km-api` to co-locate schema+handler (see API.md).
-- DB: parameterized queries via Drizzle/Prisma — never interpolate strings.
+- DB: parameterized Drizzle queries and reviewed `sql` fragments — never interpolate untrusted strings.
 - Sanitize HTML: descriptions rendered as plain text or sanitized via `dompurify` if rich.
 
 ---
@@ -176,7 +178,7 @@ If JWT present, reply `403 ALREADY_AUTHENTICATED` (not silent) so client can red
 
 ```ts
 await fastify.register(helmet, {
-  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], connectSrc: ["'self'", process.env.MAP_SERVER_URL] } }
+  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], connectSrc: ["'self'"] } }
 });
 fastify.register(cors, {
   origin: (process.env.CORS_ORIGINS || "").split(","), // strict allowlist, not '*'
@@ -192,8 +194,8 @@ fastify.register(cors, {
 
 - **Never log:** `password`, `answer`, `refreshToken`, `resetToken`, `JWT_SECRET`.
 - Env secrets via `.env` (gitignored) + `.env.example` (documented, no real values).
-- In Docker: `env_file: .env`, secrets not baked into image.
-- Audit table: `admin_audit_log(id, adminId, action, targetType, targetId, meta, createdAt)` — for activate/deactivate/unsuspend/dispatch.
+- In Docker: Compose passes only the API's validated variables through `environment:` interpolation from the local `.env` (no whole-file `env_file` dump); secrets are never baked into the image (`.dockerignore` excludes `.env`).
+- `admin_audit_log(id, adminId, action, targetType, targetId, meta, createdAt)` is now migrated. Status events write `user_activated`/`user_deactivated` with before/after active-state metadata; unsuspend/dispatch audit events await those handlers.
 
 ---
 
