@@ -158,14 +158,17 @@ function buildResponses(route: ApiRouteDefinition): Record<string, OpenApiRespon
     };
   }
 
-  // The server applies a global throttle even when a descriptor does not declare
-  // a route-specific 429 response.
-  responses["429"] ??= {
-    description: responseDescription(429, false),
-    content: {
-      "application/json": { schema: toJsonSchema(apiErrorResponses[429], "output") }
-    }
-  };
+  // The server applies a global throttle even when a descriptor does not declare a route-specific 429
+  // response — except where the descriptor says the route is exempt, because advertising an error the
+  // runtime cannot answer is exactly the drift `rateLimitExempt` exists to prevent.
+  if (route.meta.rateLimitExempt !== true) {
+    responses["429"] ??= {
+      description: responseDescription(429, false),
+      content: {
+        "application/json": { schema: toJsonSchema(apiErrorResponses[429], "output") }
+      }
+    };
+  }
 
   return responses;
 }

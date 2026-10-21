@@ -13,7 +13,7 @@ Route: http://localhost:8001/route      (OSRM adapter; graphs are built locally 
 Map config: GET /map-config              (region, bounds, version, and zoom range)
 Swagger UI:   GET /docs
 OpenAPI JSON: GET /docs/json
-Health:       GET /_public/health      → { status: "ok", uptime, version }
+Health:       GET /_public/health      → { status: "ok", uptime, version }   (the one route the global throttle skips)
 ```
 
 The OpenAPI document uses `/` for a directly exposed API and `/api` first when served by Compose through Nginx (with `/` retained as the direct-port alternative). Configure `OPENAPI_SERVER_PATH` when a gateway uses a different prefix.
@@ -24,6 +24,22 @@ Authorization: Bearer <accessToken>   // for _user & _admin
 Content-Type: application/json
 X-Map-Data-Version: development       // reserved optional version pin; not currently enforced
 ```
+
+Caching and throttling are defaults rather than per-route habits:
+
+- Every response carries `cache-control: no-store`, applied by an `onSend` hook in `plugins/security.ts` so
+  it also covers replies no handler produced — a throttled `429`, Fastify's `404` for an unknown path, and the
+  `401` the `/_user` hook returns before routing. A handler that sets its own `cache-control` still wins, which
+  makes `GET /_public/security-questions` (`public, max-age=3600`) the only deliberately cacheable response in
+  the API. The per-route `no-store` calls elsewhere are kept as documentation of intent, not as the mechanism.
+- The global request throttle (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS`, per client IP once `TRUSTED_PROXY_IPS`
+  is configured) covers every route **except** `GET /_public/health`: an orchestrator must never be able to
+  mistake a busy-but-healthy instance for a dead one, which is what happens when the probe that decides whether
+  to restart a container starts answering `429` during a load spike. The exemption is one descriptor field,
+  `ApiRouteMeta.rateLimitExempt`, read both by `app.ts` (which sets the route's `rateLimit: false`) and by the
+  OpenAPI generator (which then does not attach its implicit `429` to that operation) — so the contract cannot
+  advertise an error the runtime is unable to produce. `/docs` and `/docs/json` remain throttled: they are
+  developer surfaces, not liveness probes.
 
 Error shape (uniform):
 

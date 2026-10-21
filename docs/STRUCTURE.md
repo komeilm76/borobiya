@@ -192,7 +192,7 @@ packages/server/
     │   ├── tokens.ts        # HS256 access/refresh JWT signing and verification
     │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
     └── plugins/
-        ├── security.ts       # Helmet, CORS allowlist, global rate limit
+        ├── security.ts       # Helmet, CORS allowlist, global rate limit, no-store default
         ├── error-envelope.ts # one sanitized envelope for failures no handler answered
         ├── error-envelope.test.ts
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status

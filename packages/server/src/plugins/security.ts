@@ -27,6 +27,16 @@ export async function registerHttpSecurityPlugins(
     credentials: true
   });
 
+  // One default for every response the API sends, including the ones that never reach a handler: a
+  // throttled 429 and Fastify's own 404 for an unknown path. Without it the header depends on 39 route
+  // files each remembering to set it, and the responses most worth not caching are the ones no handler
+  // ever saw. An explicit `cache-control` from the handler still wins, which is what keeps the public
+  // security-question catalog the one cacheable response in the API.
+  app.addHook("onSend", async (_request, reply, payload) => {
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
+    return payload;
+  });
+
   await app.register(rateLimit, {
     global: true,
     max: config.rateLimitMax,

@@ -102,6 +102,47 @@ describe("Fastify server skeleton", () => {
     expect(response.headers["cache-control"]).toBe("public, max-age=3600");
   });
 
+  // The API's caching default is a hook rather than 39 handler lines, so these pin the responses no
+  // handler produced or deliberately annotated — including the one cache that must survive.
+  it("sends no-store on a rate-limited rejection that no handler produced", async () => {
+    const app = await makeApp({ rateLimitMax: 1 }, { recoveryStore: makeRecoveryStore([]) });
+
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(200);
+    const limited = await app.inject({ method: "GET", url: "/_public/security-questions" });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("sends no-store on the responses no handler answered", async () => {
+    const app = await makeApp();
+
+    // An unknown path at all: Fastify's own 404, which never enters a route file that could set a header.
+    const missing = await app.inject({ method: "GET", url: "/not-a-route" });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.headers["cache-control"]).toBe("no-store");
+
+    // An unknown path under `/_user`, rejected by the group's auth hook before routing: a response a
+    // proxy must not hold on to, since it says nothing about whether the caller may reach that path later.
+    const rejected = await app.inject({ method: "GET", url: "/_user/not-a-route" });
+    expect(rejected.statusCode).toBe(401);
+    expect(rejected.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("keeps the health probe reachable past the global request limit", async () => {
+    // The point of the exemption: an instance under load must still answer its own liveness check, and
+    // the limiter must still be live for the routes it does protect — otherwise this test would pass on
+    // a plugin that never registered at all.
+    const app = await makeApp({ rateLimitMax: 1 }, { recoveryStore: makeRecoveryStore([]) });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await app.inject({ method: "GET", url: "/_public/health" })).statusCode).toBe(200);
+    }
+    // And the throttle is live for the routes it does protect, so this is an exemption rather than a
+    // limiter that never registered.
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(429);
+  });
+
   it("serves Swagger UI and documents shared contracts without fake runtime routes", async () => {
     const app = await makeApp();
     const ui = await app.inject({ method: "GET", url: "/docs" });
@@ -153,7 +194,11 @@ describe("Fastify server skeleton", () => {
     expect(operationCount).toBe(allApiRoutes.length);
     expect(document.info.description).toContain("contract-only");
     expect(paths["/_public/health"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
-    expect(paths["/_public/health"]?.get?.responses).toHaveProperty("429");
+    // Health is the one route the global throttle deliberately skips, so the generator must not
+    // advertise an error the runtime cannot answer there — while every other operation keeps the
+    // implicit 429 the throttle really does produce.
+    expect(Object.keys(paths["/_public/health"]?.get?.responses ?? {})).toEqual(["200"]);
+    expect(paths["/_public/security-questions"]?.get?.responses).toHaveProperty("429");
     expect(registration?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(registration?.responses).toMatchObject({
       201: expect.any(Object),
@@ -534,16 +579,19 @@ describe("Fastify server skeleton", () => {
     expect(preflight.headers["access-control-allow-headers"]).toContain("authorization");
   });
 
+  // Probed through `/docs/json` rather than the health check: `/_public/health` is exempt from the
+  // throttle (see `ApiRouteMeta.rateLimitExempt`), so a limiter test that used it would stop testing the
+  // limiter the moment the exemption landed and still pass on status codes alone.
   it("ignores spoofed forwarded IP headers unless the proxy is trusted", async () => {
     const app = await makeApp({ rateLimitMax: 1 });
     const first = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
     const second = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.2" }
     });
 
@@ -556,17 +604,17 @@ describe("Fastify server skeleton", () => {
     const app = await makeApp({ rateLimitMax: 1, trustedProxyIps: ["127.0.0.1"] });
     const firstClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
     const secondClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.2" }
     });
     const repeatedClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
 

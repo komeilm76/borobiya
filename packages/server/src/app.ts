@@ -209,11 +209,21 @@ export async function createFastifyApp(
     });
   }
 
-  app.get(apiRoutes.public.health.url, async () => ({
-    status: "ok" as const,
-    uptime: process.uptime(),
-    version: process.env.npm_package_version ?? "0.1.0"
-  }));
+  // The liveness probe sits deliberately outside the global throttle (see `ApiRouteMeta.rateLimitExempt`).
+  // The limiter protects handlers, and a health check is not a handler worth protecting: under
+  // `RATE_LIMIT_MAX` pressure an orchestrator would restart a healthy-but-busy API precisely during the
+  // load spike that made it look unreachable. The exemption is read from the descriptor rather than
+  // written here, so the contract and the runtime cannot disagree about which routes are limited.
+  const healthRoute = apiRoutes.public.health;
+  app.get(
+    healthRoute.url,
+    healthRoute.meta.rateLimitExempt === true ? { config: { rateLimit: false } } : {},
+    async () => ({
+      status: "ok" as const,
+      uptime: process.uptime(),
+      version: process.env.npm_package_version ?? "0.1.0"
+    })
+  );
   app.get(apiRoutes.public.securityQuestions.url, async (_request, reply) => {
     const questions = await recoveryStore.listSecurityQuestions();
     return reply
