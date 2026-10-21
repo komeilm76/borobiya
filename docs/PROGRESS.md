@@ -4,11 +4,11 @@
 
 ---
 
-## Overall project estimate: 24% — Phase 1 core human acceptance reported; follow-ups non-blocking (2026-10-21)
+## Overall project estimate: 24% — Phase 1 v0.1.0 released; Phase 2 started at T2.1.1 (2026-10-21)
 
-All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection.
+All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 has started at T2.1.1: the `location_shares` schema/migration is complete, but no share handlers or live-sharing behavior are claimed complete.
 
-The separate external-Internet-offline map-library run, live browser outage simulation, extended database-flow evidence, and style-switch timing remain follow-ups. The user explicitly confirmed on 2026-10-21 that these remaining checks do not block the Phase 1 release or starting Phase 2. Record them as known follow-ups, not release/Phase 2 gates; do not claim the untested behavior passed. The agent workspace cannot reproduce the user's VM/browser/database checks. The 24% figure is a whole-project planning estimate, not a Phase 1 completion percentage.
+The separate external-Internet-offline map-library run, live browser outage simulation, extended database-flow evidence, and style-switch timing remain follow-ups. The user explicitly confirmed on 2026-10-21 that these remaining checks do not block the Phase 1 release or starting Phase 2. Record them as known follow-ups, not release/Phase 2 gates; do not claim the untested behavior passed. The agent workspace cannot reproduce the user's VM/browser/database checks. The 24% figure is a whole-project planning estimate, not a Phase 1 completion percentage, and has not been recalculated for the initial Phase 2 schema task.
 
 Phase 1 runtime scope includes the shared contracts/scaffold, authentication and account-management flows, map-server pipeline, and client map/theme views. The Phase 1 auth/account endpoints are implemented; other contract-only user/admin domain operations map to later-phase work (T2–T4), not unnamed Phase 1 leftovers. See the handler-scope note below.
 
@@ -19,7 +19,7 @@ Phase 1 runtime scope includes the shared contracts/scaffold, authentication and
 | Phase 1 Auth & account foundation | 100% (code scope) | ✅ T1.1–T1.3 scope is implemented; user reports setup, registration/login, admin list/deactivation, and denied login after deactivation passed on Ubuntu 24.04. Extended DB evidence remains P1-A2, non-blocking. Later user/admin domain endpoints map to T2–T4. |
 | Map Server | 100% (code scope) | ✅ T1.4.1–T1.4.7 implementation complete; original-stack tile/routing/geocoding VM checks passed 2026-10-20 and user reports current Ubuntu setup passed. Dedicated external-Internet-offline library verification remains P1-G1, non-blocking. |
 | Client Map canvas | 100% (code scope) | ✅ T1.5.1–T1.5.5 implementation complete; user reports map render/zoom/fullscreen and light/dark/system modes passed. Live outage fallback P1-A1 and latency measurement P1-M1 remain non-blocking follow-ups. |
-| Location Sharing | 0% | ⬜ Not started |
+| Location Sharing | 5% (1/19 tasks) | ✅ T2.1.1 schema/migration complete; all share handlers, realtime behavior, expiry processing, history, and device-priority behavior remain unstarted |
 | SOS Rescue | 0% | ⬜ Not started |
 | Search & Routing | 0% | ⬜ Not started |
 | UI/UX & a11y | 0% | ⬜ Not started |
@@ -78,13 +78,13 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 
 **Handler-scope reconciliation:** The Phase 1 runtime handlers are already implemented: public health/security-question catalog; auth register/login/refresh/logout/recovery; `GET /_user/me` and security-question completion; admin user list/detail/create/status. The vague phrase “remaining user/admin handlers” has been removed as a Phase 1 blocker. Contract-only location sharing/devices/history belong to T2; incidents/categories, SOS, dispatch, proposals, and missions belong to T3; search and client routing polish belong to T4. They remain future work, but they are not missing T1 Phase 1 handlers. If another handler is intended for Phase 1, first add its exact route and acceptance criteria as a named task.
 
-### Phase 2 — Location Sharing — 0%
+### Phase 2 — Location Sharing — 5% (1/19 tasks)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Live share + expiry | 0% | — |
-| History share + retention | 0% | — |
-| Multi-device priority | 0% | — |
+| Live share + expiry | 14% (1/7 tasks) | T2.1.1 `location_shares` schema/migration complete; creation/revoke/list handlers, live updates, and expiry job remain |
+| History share + retention | 0% | Not started |
+| Multi-device priority | 0% | Not started |
 
 ### Phase 3 — SOS Rescue — 0%
 
@@ -126,6 +126,13 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-21 — Phase 1 v0.1.0 released; Phase 2 T2.1.1 started
+
+- PR #2 was merged to `main` at `95a88a3`; GitHub release `v0.1.0` was published against that merge commit.
+- Implemented T2.1.1: Drizzle `location_shares` schema and migration, owner/target foreign keys, mode/expiry/self-share constraints, revocation/device/note metadata, and owner/target/expiry indexes.
+- Validation: server tests 150/150, server typecheck, repeat `db:generate` (no schema changes), and `git diff --check` passed. No live PostgreSQL was available, so migration application/runtime constraint behavior remains unverified.
+- This starts storage only; T2.1.2–T2.1.7 share creation, revoke/list APIs, socket updates, expiry processing, and UI remain incomplete. The Phase 1 P1 follow-ups remain separately tracked and non-blocking.
 
 ### 2026-10-21 — Ubuntu 24.04 human acceptance reported; Phase 2 unblocked
 

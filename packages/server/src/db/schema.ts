@@ -1,4 +1,4 @@
-import type { CancellationType, UserRole } from "@borobiya/shared";
+import type { CancellationType, LocationShareMode, UserRole } from "@borobiya/shared";
 import { sql } from "drizzle-orm";
 import {
   boolean,
@@ -90,6 +90,36 @@ export const userSessions = pgTable(
   ]
 );
 
+export const locationShares = pgTable(
+  "location_shares",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetUserId: uuid("target_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    mode: varchar("mode", { length: 10 }).$type<LocationShareMode>().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    isRevoked: boolean("is_revoked").notNull().default(false),
+    priorityDeviceId: text("priority_device_id"),
+    note: text("note"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    check("location_shares_mode_check", sql`"mode" IN ('timed', 'permanent')`),
+    check("location_shares_owner_target_check", sql`"owner_id" <> "target_user_id"`),
+    check(
+      "location_shares_expiry_mode_check",
+      sql`("mode" = 'timed' AND "expires_at" IS NOT NULL) OR ("mode" = 'permanent' AND "expires_at" IS NULL)`
+    ),
+    index("location_shares_owner_created_at_idx").on(table.ownerId, table.createdAt),
+    index("location_shares_target_created_at_idx").on(table.targetUserId, table.createdAt),
+    index("location_shares_expires_at_idx").on(table.expiresAt)
+  ]
+);
+
 export const adminAuditLog = pgTable(
   "admin_audit_log",
   {
@@ -169,6 +199,8 @@ export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
 export type UserSecurityAnswerRow = typeof userSecurityAnswers.$inferSelect;
 export type UserSessionRow = typeof userSessions.$inferSelect;
+export type LocationShareRow = typeof locationShares.$inferSelect;
+export type NewLocationShareRow = typeof locationShares.$inferInsert;
 export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
 export type PasswordResetChallengeRow = typeof passwordResetChallenges.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;

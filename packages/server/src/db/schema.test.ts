@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
   adminAuditLog,
+  locationShares,
   passwordResetChallenges,
   passwordResetTokens,
   userSecurityAnswers,
@@ -84,6 +85,52 @@ describe("users database schema", () => {
     expect(migrationSql).toContain('CREATE TABLE "password_reset_challenges"');
     expect(migrationSql).toContain('CREATE TABLE "password_reset_tokens"');
     expect(migrationSql).toContain('CONSTRAINT "password_reset_tokens_token_hash_unique" UNIQUE("token_hash")');
+  });
+
+  it("stores constrained live location shares with owner, target, and expiry indexes", () => {
+    const config = getTableConfig(locationShares);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+    const checkNames = config.checks.map(({ name }) => name);
+    const indexNames = config.indexes.map(({ config: indexConfig }) => indexConfig.name);
+
+    expect(columns.get("owner_id")?.notNull).toBe(true);
+    expect(columns.get("target_user_id")?.notNull).toBe(true);
+    expect(columns.get("mode")?.notNull).toBe(true);
+    expect(columns.get("expires_at")?.notNull).toBe(false);
+    expect(columns.get("is_revoked")?.notNull).toBe(true);
+    expect(columns.get("is_revoked")?.default).toBe(false);
+    expect(columns.get("priority_device_id")?.notNull).toBe(false);
+    expect(columns.get("note")?.notNull).toBe(false);
+    expect(columns.get("created_at")?.notNull).toBe(true);
+    expect(columns.get("created_at")?.hasDefault).toBe(true);
+    expect(config.foreignKeys).toHaveLength(2);
+    expect(checkNames).toEqual([
+      "location_shares_mode_check",
+      "location_shares_owner_target_check",
+      "location_shares_expiry_mode_check"
+    ]);
+    expect(indexNames).toEqual([
+      "location_shares_owner_created_at_idx",
+      "location_shares_target_created_at_idx",
+      "location_shares_expires_at_idx"
+    ]);
+
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0006_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationName = migrationNames[0];
+    if (!migrationName) throw new Error("The location-shares migration is missing.");
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationName}`, import.meta.url), "utf8");
+
+    expect(migrationSql).toContain(`CREATE TABLE "location_shares"`);
+    expect(migrationSql).toContain(`CONSTRAINT "location_shares_mode_check" CHECK ("mode" IN ('timed', 'permanent'))`);
+    expect(migrationSql).toContain(`CONSTRAINT "location_shares_owner_target_check" CHECK ("owner_id" <> "target_user_id")`);
+    expect(migrationSql).toContain(
+      `CONSTRAINT "location_shares_expiry_mode_check" CHECK (("mode" = 'timed' AND "expires_at" IS NOT NULL) OR ("mode" = 'permanent' AND "expires_at" IS NULL))`
+    );
+    expect((migrationSql.match(/ON DELETE cascade/g) ?? [])).toHaveLength(2);
+    expect(migrationSql).toContain(`CREATE INDEX "location_shares_expires_at_idx"`);
   });
 
   it("persists the admin audit trail with an admin foreign key and query indexes", () => {
