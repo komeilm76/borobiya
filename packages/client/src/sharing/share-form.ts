@@ -127,6 +127,84 @@ export function buildLiveSharePayload(draft: ShareDraft): CreateLocationShareInp
   return payload;
 }
 
+/**
+ * Names of the selected recipients in the order the payload sends their ids.
+ *
+ * Deduplicated exactly as `uniqueRecipientIds` does, first occurrence winning: the server resolves a
+ * refusal's index against that same order, so a map built any other way would name the wrong person for
+ * a list that somehow holds one id twice.
+ */
+export function recipientLabels(recipients: readonly UserSearchResult[]): string[] {
+  const byId = new Map<string, string>();
+  for (const recipient of recipients) {
+    if (!byId.has(recipient.id)) byId.set(recipient.id, recipient.username);
+  }
+  return uniqueRecipientIds(recipients).map((id) => byId.get(id) ?? id);
+}
+
+/**
+ * One refusal from a share creation's `400 VALIDATION_ERROR`, reduced to what the interface can use.
+ *
+ * `POST /_user/location/share` answers a batch with one issue per unusable recipient, so the response
+ * already says *who* failed; `path` is the body path of that element. The dialog used to recompute its
+ * own draft issues instead of reading these, and since a draft that failed client validation never
+ * reaches the network, every server refusal collapsed into "check your input" — on a 30-person request
+ * with no way to find the one person at fault.
+ */
+export interface ShareRejection {
+  code: string;
+  /** Index into the sent `targetUserIds`, or `null` when the issue does not name a recipient. */
+  recipientIndex: number | null;
+}
+
+/** A refusal plus the name of the person it refuses, when the index still resolves. */
+export interface NamedShareRejection extends ShareRejection {
+  label: string | null;
+}
+
+/**
+ * Last numeric segment of an issue path, tolerating the shapes the field has had — `["targetUserIds",
+ * index]` as of this fix, the bare `[index]` a deployed server still answers, and a lone number in case
+ * a serializer collapses a one-element array. A client must not be stricter than the contract it talks
+ * to, and every miss degrades to "one of your selections" rather than to a wrong name.
+ */
+function recipientIndexFromPath(path: unknown): number | null {
+  if (typeof path === "number") return Number.isInteger(path) && path >= 0 ? path : null;
+  if (!Array.isArray(path)) return null;
+  for (let index = path.length - 1; index >= 0; index -= 1) {
+    const segment: unknown = path[index];
+    const numeric = typeof segment === "string" && /^\d+$/.test(segment) ? Number(segment) : segment;
+    if (typeof numeric === "number" && Number.isInteger(numeric) && numeric >= 0) return numeric;
+  }
+  return null;
+}
+
+export function shareRejections(error: unknown): ShareRejection[] {
+  if (!(error instanceof ApiError)) return [];
+  const rejections: ShareRejection[] = [];
+  for (const issue of error.issues) {
+    if (!issue || typeof issue !== "object") continue;
+    const { code, path } = issue as { code?: unknown; path?: unknown };
+    if (typeof code !== "string") continue;
+    rejections.push({ code, recipientIndex: recipientIndexFromPath(path) });
+  }
+  return rejections;
+}
+
+/** Ordered as the server sent them; the first entry is the one worth showing. */
+export function nameShareRejections(
+  rejections: readonly ShareRejection[],
+  labels: readonly string[]
+): NamedShareRejection[] {
+  return rejections.map((rejection) => ({
+    ...rejection,
+    label:
+      rejection.recipientIndex !== null && rejection.recipientIndex < labels.length
+        ? labels[rejection.recipientIndex] ?? null
+        : null
+  }));
+}
+
 export interface HistoryWindow {
   /** ISO instant; the picker sends this explicitly instead of relying on a server-side default. */
   from: string;

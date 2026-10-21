@@ -242,8 +242,8 @@ describe("POST /_user/location/history/share", () => {
       code: "VALIDATION_ERROR",
       message: "Location history sharing requires active recipients that are not your own account.",
       issues: [
-        { code: "self_target", path: [0] },
-        { code: "unknown_target", path: [1] }
+        { code: "self_target", path: ["targetUserIds", 0] },
+        { code: "unknown_target", path: ["targetUserIds", 1] }
       ]
     });
     expect(createHistoryShares).not.toHaveBeenCalled();

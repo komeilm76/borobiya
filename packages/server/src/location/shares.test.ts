@@ -370,6 +370,14 @@ describe("POST /_user/location/share", () => {
     expect(body.issues.map((issue: { code: string }) => issue.code)).toEqual(
       expect.arrayContaining(["self_target", "unknown_target", "unavailable_target"])
     );
+    // Each refusal carries the body path of the recipient it refused, in the order they were sent. The
+    // dialog turns that index into a name, which is how a 30-person request can say who was at fault
+    // instead of "check your input".
+    expect(body.issues.map((issue: { path: unknown[] }) => issue.path)).toEqual([
+      ["targetUserIds", 1],
+      ["targetUserIds", 2],
+      ["targetUserIds", 3]
+    ]);
   });
 
   it.each([

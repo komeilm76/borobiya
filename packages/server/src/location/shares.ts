@@ -37,6 +37,11 @@ function sendError(
 /**
  * One 400 VALIDATION_ERROR payload per unusable recipient, keyed by the index it appeared at in the
  * request. Shared with history-share creation so both endpoints refuse the same targets the same way.
+ *
+ * `path` is a body path (`["targetUserIds", index]`), the same shape the schema's own issues use in
+ * this response — a client that already knows how to point at a rejected field can therefore point at
+ * the rejected array element and name the person, which is the difference between "check your input"
+ * and " Ali was not available" on a 30-recipient request.
  */
 export function shareRecipientIssues(
   assessment: ShareTargetAssessment,
@@ -47,17 +52,17 @@ export function shareRecipientIssues(
     ...assessment.self.map((id) => ({
       code: "self_target",
       message: "You cannot share your location with your own account.",
-      path: [indexById.get(id) ?? 0]
+      path: ["targetUserIds", indexById.get(id) ?? 0]
     })),
     ...assessment.missing.map((id) => ({
       code: "unknown_target",
       message: "One or more recipients do not exist.",
-      path: [indexById.get(id) ?? 0]
+      path: ["targetUserIds", indexById.get(id) ?? 0]
     })),
     ...assessment.unavailable.map((id) => ({
       code: "unavailable_target",
       message: "One or more recipients are inactive or suspended.",
-      path: [indexById.get(id) ?? 0]
+      path: ["targetUserIds", indexById.get(id) ?? 0]
     }))
   ];
 }

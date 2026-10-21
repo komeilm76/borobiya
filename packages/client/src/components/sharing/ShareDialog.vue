@@ -269,10 +269,13 @@ import {
   canSubmitShareDraft,
   DURATION_PRESET_MINUTES,
   formatDuration,
+  nameShareRejections,
   needsPriorityDevice,
   priorityDeviceIds,
+  recipientLabels,
   removeRecipient,
   shareDraftIssues,
+  shareRejections,
   shouldSearch,
   type ShareDraft,
   type ShareMode
@@ -432,12 +435,40 @@ async function submit(): Promise<void> {
         return;
       }
     }
+    // Server refusals first: they name the recipient at fault, which the recomputed draft issues never
+    // can (a draft that failed client-side validation would not have been submitted at all).
+    const [rejection] = nameShareRejections(shareRejections(error), recipientLabels(current.recipients));
     formError.value =
-      error instanceof ApiError && error.code === "VALIDATION_ERROR"
-        ? issueText(issues.value[0]?.code)
-        : friendlyErrorMessage(error, "اشتراک ثبت نشد. دوباره تلاش کنید.");
+      rejectionText(rejection) ??
+      (error instanceof ApiError && error.code === "VALIDATION_ERROR" && issues.value[0]
+        ? issueText(issues.value[0].code)
+        : friendlyErrorMessage(error, "اشتراک ثبت نشد. دوباره تلاش کنید."));
   } finally {
     submitting.value = false;
+  }
+}
+
+/**
+ * Copy for one refusal from `POST /_user/location/share`. Codes the client cannot explain return null so
+ * the generic path still runs — a silently dropped refusal would be worse than a vague message.
+ */
+function rejectionText(rejection: { code: string; label: string | null } | undefined): string | null {
+  if (!rejection) return null;
+  switch (rejection.code) {
+    case "self_target":
+      return "نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید.";
+    case "unknown_target":
+      return rejection.label
+        ? `حساب «${rejection.label}» دیگر وجود ندارد.`
+        : "یک یا چند نفر از انتخاب‌ها پیدا نشدند.";
+    case "unavailable_target":
+      return rejection.label
+        ? `«${rejection.label}» غیرفعال یا محدود شده و نمی‌تواند اشتراک بگیرد.`
+        : "یک یا چند نفر از انتخاب‌ها نمی‌توانند اشتراک بگیرند.";
+    case "unknown_priority_device":
+      return "دستگاه انتخابی دیگر زنده نیست. فهرست دستگاه‌ها را تازه کنید و دوباره انتخاب کنید.";
+    default:
+      return null;
   }
 }
 
@@ -450,7 +481,9 @@ function issueText(code: string | undefined): string {
     case "duration_required":
       return "برای اشتراک مدت‌دار باید مدت را مشخص کنید.";
     case "duration_out_of_range":
-      return `مدت باید عددی صحیح بین ۱ تا ${maxMinutes} دقیقه باشد.`;
+      // The ceiling is phrased in the same units as the chips and the slider, because "43200 دقیقه"
+      // is not a length anybody can judge at a glance.
+      return `مدت باید عددی صحیح بین ۱ دقیقه تا ${durationWords(maxMinutes)} باشد.`;
     case "note_too_long":
       return `یادداشت نمی‌تواند بیشتر از ${maxNote} نویسه باشد.`;
     default:

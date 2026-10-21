@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   MAX_LOCATION_SHARE_MINUTES,
@@ -22,7 +23,10 @@ import {
   MINUTES_PER_HOUR,
   isAbortError,
   isLatestSearch,
+  nameShareRejections,
   needsPriorityDevice,
+  recipientLabels,
+  shareRejections,
   priorityDeviceIds,
   removeRecipient,
   shareDraftIssues,
@@ -358,5 +362,79 @@ describe("picker search helpers", () => {
     expect(splitDuration(60)).toEqual({ days: 0, hours: 1, minutes: 0 });
     expect(splitDuration(1505)).toEqual({ days: 1, hours: 1, minutes: 5 });
     expect(splitDuration(-10)).toEqual({ days: 0, hours: 0, minutes: 0 });
+  });
+});
+
+describe("server refusals", () => {
+  const result = (id: string, username: string): UserSearchResult => ({
+    id,
+    username,
+    category: null,
+    distance: null,
+    avgRating: null,
+    isOnline: false
+  });
+  const refusal = (code: string, path: unknown) =>
+    new ApiError(400, "VALIDATION_ERROR", "Request body validation failed.", [{ code, message: "server text", path }]);
+
+  it("reads the recipient index out of both path shapes the field has had", () => {
+    expect(shareRejections(refusal("unavailable_target", ["targetUserIds", 2]))).toEqual([
+      { code: "unavailable_target", recipientIndex: 2 }
+    ]);
+    expect(shareRejections(refusal("unavailable_target", 3))).toEqual([
+      { code: "unavailable_target", recipientIndex: 3 }
+    ]);
+    expect(shareRejections(refusal("self_target", [1]))).toEqual([{ code: "self_target", recipientIndex: 1 }]);
+    // An issue about a different field names no recipient, and must not be guessed at.
+    expect(shareRejections(refusal("unknown_priority_device", ["priorityDeviceId"]))).toEqual([
+      { code: "unknown_priority_device", recipientIndex: null }
+    ]);
+  });
+
+  it("keeps only issues that actually carry a code, whatever else the envelope holds", () => {
+    const error = new ApiError(400, "VALIDATION_ERROR", "Request body validation failed.", [
+      null,
+      3,
+      {},
+      { code: 7, path: [0] },
+      { code: "unknown_target", path: [0] }
+    ]);
+    expect(shareRejections(error)).toEqual([{ code: "unknown_target", recipientIndex: 0 }]);
+  });
+
+  it("says nothing for an error that is not a structured refusal", () => {
+    expect(shareRejections(new Error("network"))).toEqual([]);
+    expect(shareRejections(undefined)).toEqual([]);
+    expect(shareRejections(new ApiError(429, "RATE_LIMITED", "slow down"))).toEqual([]);
+  });
+
+  it("names the person the server refused, and only when the index still resolves", () => {
+    const labels = ["sara", "hamid", "nazanin"];
+    expect(nameShareRejections(shareRejections(refusal("unknown_target", ["targetUserIds", 1])), labels)).toEqual([
+      { code: "unknown_target", recipientIndex: 1, label: "hamid" }
+    ]);
+    // A list the user edited between the response and the render must not point at the wrong person.
+    expect(nameShareRejections(shareRejections(refusal("unknown_target", ["targetUserIds", 9])), labels)).toEqual([
+      { code: "unknown_target", recipientIndex: 9, label: null }
+    ]);
+  });
+
+  it("labels recipients in the order the payload sends their ids", () => {
+    const first = "5f0a1c6e-0000-4000-8000-000000000001";
+    const second = "5f0a1c6e-0000-4000-8000-000000000002";
+    const recipients = [result(first, "sara"), result(second, "hamid"), result(first, "sara-again")];
+    expect(recipientLabels(recipients)).toEqual(["sara", "hamid"]);
+    // The two orders have to agree, or an index from the server points at the wrong name.
+    expect(recipientLabels(recipients).length).toBe(uniqueRecipientIds(recipients).length);
+  });
+
+  it("phrases the duration ceiling in the same units as the chips", () => {
+    // The dialog is not mounted in tests (repo convention), so this pins its source instead: the
+    // ceiling must reach for the shared formatter rather than interpolating a raw minute count again,
+    // which is the rule the chips, the slider label, and the share lists already follow.
+    const source = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
+    expect(source).toContain("durationWords(maxMinutes)");
+    expect(source).not.toContain("${maxMinutes}");
+    expect(source).toContain("rejectionText(rejection)");
   });
 });

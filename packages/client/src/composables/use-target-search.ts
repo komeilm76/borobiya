@@ -60,6 +60,10 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     controller = new AbortController();
     const signal = controller.signal;
     loading.value = true;
+    // The previous term's failure is not this term's failure: leaving `failed` set until the new
+    // response arrives shows "search failed" above a list that is still loading, and offers a retry
+    // button for a request that has not been made yet.
+    failed.value = false;
 
     const accessToken = options.accessToken.value;
     if (!accessToken) {
