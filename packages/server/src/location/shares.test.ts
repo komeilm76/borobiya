@@ -164,6 +164,16 @@ describe("resolvePriorityDevice", () => {
       .toEqual({ status: "required", deviceIds: [first, second] });
   });
 
+  it("counts distinct devices rather than sessions", () => {
+    // A client that keeps one device id across logins (T2.3.6) holds several sessions of one device.
+    // Counting sessions would either prompt a choice between two identical options or refuse to repair
+    // a pin the account clearly cannot resolve any other way.
+    expect(resolvePriorityDevice({ requested: undefined, devices: [{ deviceId: first }, { deviceId: first }], currentDeviceId: first }))
+      .toEqual({ status: "pinned", deviceId: first });
+    expect(resolvePriorityDevice({ requested: undefined, devices: [{ deviceId: first }, { deviceId: first }, { deviceId: second }], currentDeviceId: first }))
+      .toEqual({ status: "required", deviceIds: [first, second] });
+  });
+
   it("accepts any live device, including a different one than the caller's", () => {
     expect(resolvePriorityDevice({ requested: second, devices: [{ deviceId: first }, { deviceId: second }], currentDeviceId: first }))
       .toEqual({ status: "pinned", deviceId: second });
@@ -252,6 +262,20 @@ describe("POST /_user/location/share", () => {
     expect(response.statusCode).toBe(201);
     expect(createShares.mock.calls[0]![0].priorityDeviceId).toBe(secondDevice);
     expect(response.json().shares[0]).toMatchObject({ priorityDeviceId: secondDevice });
+  });
+
+  it("auto-pins when both live sessions belong to the same device", async () => {
+    const { app, createShares } = await makeApp({ deviceIds: [callerDeviceId, callerDeviceId] });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      headers: await authorizedHeaders(),
+      payload: { targetUserIds: [targetId], mode: "permanent" }
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(createShares.mock.calls[0]![0].priorityDeviceId).toBe(callerDeviceId);
   });
 
   it("refuses a priority device that is not a live session of the account", async () => {

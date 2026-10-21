@@ -152,7 +152,8 @@ export async function createFastifyApp(
     jwtSecret: config.jwtSecret,
     users: securityQuestionsStore,
     live: liveLocationService,
-    corsOrigins: config.corsOrigins
+    corsOrigins: config.corsOrigins,
+    logger: app.log
   });
   await registerLocationUpdateRoute(app, {
     service: liveLocationService,

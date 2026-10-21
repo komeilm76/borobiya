@@ -95,9 +95,12 @@ async function token(overrides: Record<string, unknown> = {}) {
     .sign(new TextEncoder().encode(jwtSecret));
 }
 
+/** Resolves with whatever the middleware reports through `next` — the only channel Socket.IO reads. */
 function authenticate(socket: FakeSocket, users = makeStore(userRecord())): Promise<unknown> {
   const middleware = createAuthMiddleware({ jwtSecret, users, live: {} as LiveLocationService });
-  return Promise.resolve(middleware(socket as never, (error?: Error) => error));
+  return new Promise((resolve) => {
+    void middleware(socket as never, (error?: Error) => resolve(error));
+  });
 }
 
 describe("realtime handshake authentication", () => {
@@ -130,6 +133,27 @@ describe("realtime handshake authentication", () => {
     }
   });
 
+  it("fails the handshake instead of rejecting when the account lookup throws", async () => {
+    // A store that cannot answer must not surface as an unobserved rejection: Node ends the process
+    // on an unhandled rejection, and socket.io never looks at a middleware's returned promise.
+    const warn = vi.fn();
+    const store = {
+      findUserById: async () => {
+        throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+      },
+      hasActiveSession: async () => true
+    } as unknown as UserSecurityQuestionsStore;
+    const socket = makeSocket({ auth: { token: await token() } });
+    const middleware = createAuthMiddleware({ jwtSecret, users: store, live: {} as LiveLocationService, logger: { warn } });
+    const error = await new Promise<unknown>((resolve) => {
+      void middleware(socket as never, (reported?: Error) => resolve(reported));
+    });
+
+    expect(error).toMatchObject({ message: expect.any(String), data: { code: "SERVICE_UNAVAILABLE" } });
+    expect(socket.data.userId).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith({ err: expect.any(Error) }, "realtime handshake failed");
+  });
+
   it("accepts a verified session and exposes only safe identity on socket data", async () => {
     const socket = makeSocket({ auth: { token: await token() } });
     const error = await authenticate(socket);
@@ -139,12 +163,19 @@ describe("realtime handshake authentication", () => {
   });
 });
 
-function makeLive(shares: Awaited<ReturnType<LocationShareStore["listActiveOutgoingShares"]>>): LiveLocationService {
+function makeLive(
+  shares: Awaited<ReturnType<LocationShareStore["listActiveOutgoingShares"]>>,
+  overrides: Partial<Pick<Parameters<typeof createLiveLocationService>[0], "now">> = {}
+): LiveLocationService {
   const shareStore = { listActiveOutgoingShares: async () => shares };
   const historyStore = { recordFix: async () => undefined };
   return createLiveLocationService({
     shareStore: shareStore as unknown as LocationShareStore,
-    historyStore: historyStore as unknown as LocationHistoryStore
+    historyStore: historyStore as unknown as LocationHistoryStore,
+    // The payloads below carry a fixed observation time, so the clock has to be fixed too: against
+    // wall time every case here becomes a stale update the day after the fixture date.
+    now: () => new Date("2026-10-21T09:00:30.000Z"),
+    ...overrides
   });
 }
 
@@ -192,6 +223,23 @@ describe("location:update handling", () => {
 
     expect(ack).toMatchObject({ ok: false, code: "WRONG_DEVICE" });
     expect(socket.emitted).toEqual([]);
+  });
+
+  it("answers an unavailable ack instead of rejecting when persistence throws", async () => {
+    // The listener has no reply object to fail, and Node ends the process on an unawaited rejection.
+    const warn = vi.fn();
+    const socket = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const live = {
+      applyUpdate: async () => {
+        throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+      }
+    } as unknown as LiveLocationService;
+
+    const ack = await handleLocationUpdate(socket as never, updatePayload(), { live, logger: { warn } });
+
+    expect(ack).toMatchObject({ ok: false, status: "rejected", code: "SERVICE_UNAVAILABLE", message: expect.any(String) });
+    expect(socket.emitted).toEqual([]);
+    expect(warn).toHaveBeenCalledWith({ err: expect.any(Error) }, "location update handler failed");
   });
 
   it("throttles sustained broadcasts per connection", async () => {

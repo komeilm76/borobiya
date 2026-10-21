@@ -120,7 +120,9 @@ const locationShareSelection = {
  * Moves the active shares of single-device accounts onto their only live device, but only while the
  * pinned device has no live session left. Accounts with two or more live devices are deliberately
  * untouched: there the choice belongs to the user, and the next `POST /_user/location/share` asks for
- * it again (`409 PRIORITY_DEVICE_REQUIRED`). Exported so the statement is testable on its own.
+ * it again (`409 PRIORITY_DEVICE_REQUIRED`). The two `is_revoked = false and priority_device_id is not
+ * null` conditions exist so this statement can seek `location_shares_active_pinned_idx` (0008) instead
+ * of sequential-scanning a table whose retired rows are kept forever. Exported for SQL-shape tests.
  */
 export function repairStaleSharePinsQuery(db: Database, now: Date) {
   // One correlated fragment, reused three times: the account's live sessions.
@@ -133,8 +135,10 @@ export function repairStaleSharePinsQuery(db: Database, now: Date) {
       eq(locationShares.isRevoked, false),
       sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > ${now})`,
       isNotNull(locationShares.priorityDeviceId),
-      // Exactly one live device, so re-pointing is not a guess between alternatives.
-      sql`(select count(*) ${liveSessionsOfOwner}) = 1`,
+      // Exactly one live *device* (distinct, so several sessions of one client-supplied device id
+      // still count once), which makes re-pointing a certainty rather than a guess between
+      // alternatives.
+      sql`(select count(distinct ${userSessions.deviceId}) ${liveSessionsOfOwner}) = 1`,
       sql`not exists (select 1 ${liveSessionsOfOwner} and ${userSessions.deviceId} = ${locationShares.priorityDeviceId})`
     ));
 }
@@ -189,6 +193,13 @@ export class DrizzleLocationShareStore implements LocationShareStore {
 
   async createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares> {
     return this.db.transaction(async (transaction) => {
+      // The reuse-or-insert decision below is a read-then-write with no unique constraint to fall back
+      // on, so two clients of one account (a double-tapped share button, a retried request) could each
+      // find nothing and create a second active row for the same recipient. One transaction-scoped
+      // advisory lock per owner serializes those decisions — across API replicas too, since the lock
+      // lives in the database — and is released by the commit.
+      await transaction.execute(sql`select pg_advisory_xact_lock(hashtextextended(${input.ownerId}, 0))`);
+
       const shares: LocationShareRecord[] = [];
       const createdShareIds: string[] = [];
       const reusedShareIds: string[] = [];

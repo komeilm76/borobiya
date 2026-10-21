@@ -6,6 +6,15 @@ import type { LocationHistoryStore } from "../db/location-history-store";
 
 /** A device clock ahead of the server by more than this is treated as unusable. */
 export const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60_000;
+/**
+ * An observation older than this is refused rather than applied. The bound exists because
+ * `users.last_location` is not a display detail: it is the position SOS dispatch reads when a
+ * request has no live stream, and a reconnecting client that flushes an offline buffer of stale
+ * fixes would otherwise drag that marker backwards to wherever the device stood hours ago.
+ * Rejecting is visible to the client (and self-heals on the next live fix), while silently keeping
+ * the marker on the older row would freeze it for a device whose clock is simply behind.
+ */
+export const MAX_LIVE_UPDATE_AGE_MS = 24 * 60 * 60_000;
 
 export interface PeerLocationUpdate {
   userId: string;
@@ -74,10 +83,17 @@ export function createLiveLocationService(
       }
 
       const observedAt = new Date(timestamp);
-      if (observedAt.getTime() > now().getTime() + MAX_FUTURE_TIMESTAMP_SKEW_MS) {
+      const receivedAt = now().getTime();
+      if (observedAt.getTime() > receivedAt + MAX_FUTURE_TIMESTAMP_SKEW_MS) {
         return rejected(
           "INVALID_TIMESTAMP",
           "The reported observation time is too far in the future."
+        );
+      }
+      if (receivedAt - observedAt.getTime() > MAX_LIVE_UPDATE_AGE_MS) {
+        return rejected(
+          "INVALID_TIMESTAMP",
+          "The reported observation is too old to broadcast as a live position."
         );
       }
 
@@ -109,12 +125,6 @@ export function createLiveLocationService(
       };
     }
   };
-}
-
-function bearerToken(request: FastifyRequest): string | undefined {
-  const authorization = request.headers.authorization;
-  if (authorization === undefined) return undefined;
-  return /^Bearer\s+([^\s]+)$/i.exec(authorization.trim())?.[1];
 }
 
 /**

@@ -91,6 +91,30 @@ describe("runLocationJobs", () => {
     expect(logger.info).not.toHaveBeenCalled();
   });
 
+  it("keeps the daily prune on its own schedule when only the share sweep fails", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => {
+      throw new Error("column location_shares.priority_device_id does not exist");
+    });
+    const pruneOlderThan = vi.fn<LocationHistoryStore["pruneOlderThan"]>(async () => 0);
+    const { shareStore, historyStore } = makeStores({ expireOverdueShares, pruneOlderThan });
+
+    const jobs = startLocationJobs({ shareStore, historyStore, retentionDays: 90 });
+    await jobs.tick({ runAll: true });
+    expect(pruneOlderThan).toHaveBeenCalledTimes(1);
+
+    // A sweep that fails forever must retry forever, but it must not re-arm the prune's marker too:
+    // sharing one schedule meant a daily batch delete every 15 seconds for as long as the sweep broke.
+    await vi.advanceTimersByTimeAsync(5 * JOB_TICK_INTERVAL_MS);
+    expect(expireOverdueShares.mock.calls.length).toBeGreaterThan(1);
+    expect(pruneOlderThan).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(DAY_MS + JOB_TICK_INTERVAL_MS);
+    expect(pruneOlderThan.mock.calls.length).toBe(2);
+    jobs.stop();
+  });
+
   it("still reports the shares it expired when the pin repair fails", async () => {
     const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 4);
     const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => {

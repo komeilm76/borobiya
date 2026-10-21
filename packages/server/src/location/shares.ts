@@ -70,12 +70,18 @@ export type PriorityDeviceResolution =
   /** The named device is not a live session of this account (logged out, revoked, or invented). */
   | { status: "unknown"; deviceId: string };
 
+/**
+ * Counts distinct device identities, not sessions: a client that keeps one stable device id across
+ * logins (spec §7.3 / T2.3.6) would otherwise look like several devices and be asked to choose
+ * between two identical options.
+ */
 export function resolvePriorityDevice(input: {
   requested: string | undefined;
   devices: readonly { deviceId: string }[];
   currentDeviceId: string;
 }): PriorityDeviceResolution {
-  if (input.devices.length === 0) {
+  const devices = [...new Set(input.devices.map((device) => device.deviceId))];
+  if (devices.length === 0) {
     // Unreachable through the `/_user` hook (it requires a live session). The fallback may only ever
     // pin the caller's own device, so a store disagreement cannot widen who is allowed to broadcast.
     if (input.requested !== undefined && input.requested !== input.currentDeviceId) {
@@ -84,12 +90,13 @@ export function resolvePriorityDevice(input: {
     return { status: "pinned", deviceId: input.currentDeviceId };
   }
   if (input.requested === undefined) {
-    if (input.devices.length > 1) {
-      return { status: "required", deviceIds: input.devices.map((device) => device.deviceId) };
+    if (devices.length > 1) {
+      return { status: "required", deviceIds: devices };
     }
-    return { status: "pinned", deviceId: input.devices[0]!.deviceId };
+    // Exactly one live device, so the server pins it and a single-device account is never prompted.
+    return { status: "pinned", deviceId: devices[0]! };
   }
-  return input.devices.some((device) => device.deviceId === input.requested)
+  return devices.includes(input.requested)
     ? { status: "pinned", deviceId: input.requested }
     : { status: "unknown", deviceId: input.requested };
 }

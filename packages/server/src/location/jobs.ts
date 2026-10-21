@@ -11,6 +11,9 @@ export const JOB_TICK_INTERVAL_MS = 15_000;
 export const HISTORY_PRUNE_BATCH_ROWS = 5_000;
 /** Upper bound on batches per run so one pass can never loop unbounded. */
 export const HISTORY_PRUNE_MAX_BATCHES = 40;
+/** Labels reported in `LocationJobOutcome.failures` when a job throws; the scheduler retries per label. */
+export const SHARE_SWEEP_FAILURE = "share-expiry";
+export const HISTORY_PRUNE_FAILURE = "history-prune";
 
 /** Thrown internally when the prune job is not part of this pass. */
 class SkipJob extends Error {}
@@ -77,7 +80,7 @@ export async function runLocationJobs(
       }
     }
   } catch (error) {
-    failures.push("share-expiry");
+    failures.push(SHARE_SWEEP_FAILURE);
     logger?.warn({ err: error }, "location share state sweep failed");
   }
 
@@ -106,7 +109,7 @@ export async function runLocationJobs(
       // Not due yet: silence, and no retry pressure on the schedule.
       prunedBatches = 0;
     } else {
-      failures.push("history-prune");
+      failures.push(HISTORY_PRUNE_FAILURE);
       logger?.warn({ err: error }, "location history retention prune failed");
     }
   }
@@ -139,11 +142,12 @@ export function startLocationJobs(dependencies: LocationJobDependencies): Locati
 
     const startedAt = now().getTime();
     const pass = runLocationJobs({ ...dependencies, now }, which).then((outcome) => {
-      // Only a clean pass counts for the schedule, so failures retry on the next tick.
-      if (outcome.failures.length === 0) {
-        if (which.expiry) lastExpiryAt = startedAt;
-        if (which.prune) lastPruneAt = startedAt;
-      }
+      // Each job advances the schedule on its own success, so a failure retries on the next tick.
+      // Gating both markers on one clean pass would let a permanently broken statement (a column a
+      // migration never added) re-arm the other forever, running the daily prune every 15 seconds. A
+      // job that was not part of this pass leaves its marker untouched: it tracks the last attempt.
+      if (which.expiry && !outcome.failures.includes(SHARE_SWEEP_FAILURE)) lastExpiryAt = startedAt;
+      if (which.prune && !outcome.failures.includes(HISTORY_PRUNE_FAILURE)) lastPruneAt = startedAt;
       return outcome;
     });
     running = pass.finally(() => {

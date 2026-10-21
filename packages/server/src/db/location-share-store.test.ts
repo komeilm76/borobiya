@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type { Database } from "./client";
@@ -21,6 +22,9 @@ const callerDeviceId = randomUUID();
 const targetId = randomUUID();
 
 type Mutation = { type: "insert" | "update"; values: Record<string, unknown> };
+
+/** Raw statements (the per-owner advisory lock) are recorded apart from row writes. */
+interface ExecutedStatement { sql: string; params: unknown[] }
 
 /**
  * Minimal Drizzle stand-in: every `select`/`insert`/`update` chain resolves the next
@@ -55,12 +59,30 @@ class FakeQuery implements PromiseLike<unknown> {
   }
 }
 
+const dialect = new PgDialect();
+
+/** Raw statements are built by the same dialect the driver uses, so assertions see real SQL text. */
+function statementText(statements: { sql: string }[]) {
+  return statements.map((statement) => statement.sql.replace(/\s+/g, " ").trim());
+}
+
 function makeDatabase(scriptedResults: unknown[][]) {
   const mutations: Mutation[] = [];
+  const executed: ExecutedStatement[] = [];
   let index = 0;
   const next = () => scriptedResults[index++] ?? [];
   const query = () => new FakeQuery(mutations, next);
-  const transaction = { select: query, insert: query, update: query };
+  const transaction = {
+    select: query,
+    insert: query,
+    update: query,
+    // `execute` takes a built statement rather than a chain, so it records the SQL text and params
+    // without consuming a scripted read.
+    execute: vi.fn(async (statement: never) => {
+      executed.push(dialect.sqlToQuery(statement));
+      return [];
+    })
+  };
   const database = {
     select: query,
     insert: query,
@@ -70,6 +92,7 @@ function makeDatabase(scriptedResults: unknown[][]) {
   return {
     store: new DrizzleLocationShareStore(database),
     mutations,
+    executed,
     get reads() { return index; }
   };
 }
@@ -138,6 +161,28 @@ describe("DrizzleLocationShareStore", () => {
     expect(fake.mutations.every(({ type }) => type === "insert")).toBe(true);
     expect(fake.mutations[0]!.values).toMatchObject({ ownerId, targetUserId: targetId, mode: "timed", expiresAt, note: "night shift", priorityDeviceId: callerDeviceId });
     expect(fake.mutations[1]!.values.targetUserId).toBe(otherTarget);
+    // Two targets, one decision lock: it guards the whole read-then-write, not each statement.
+    expect(fake.executed).toHaveLength(1);
+    expect(statementText(fake.executed)).toEqual(["select pg_advisory_xact_lock(hashtextextended($1, 0))"]);
+    expect(fake.executed[0]!.params).toEqual([ownerId]);
+  });
+
+  it("takes the owner lock before reading for reuse, so a retry cannot stack a duplicate", async () => {
+    // Nothing about this share changes (same pin, permanent, so no expiry to extend), so the only
+    // statement is the lock: the decision itself still has to be serialized before the read.
+    const fake = makeDatabase([[shareRow({ mode: "permanent", expiresAt: null, priorityDeviceId: callerDeviceId })]]);
+    const result = await fake.store.createShares({
+      ownerId,
+      targetUserIds: [targetId],
+      mode: "permanent",
+      expiresAt: null,
+      note: null,
+      priorityDeviceId: callerDeviceId
+    });
+
+    expect(result.reusedShareIds).toEqual([expect.any(String)]);
+    expect(fake.mutations).toEqual([]);
+    expect(fake.executed).toHaveLength(1);
   });
 
   it("reuses an active permanent share instead of duplicating it", async () => {
@@ -306,7 +351,8 @@ describe("repairStaleSharePinsQuery", () => {
     expect(sql).toContain('"location_shares"."expires_at" IS NULL OR "location_shares"."expires_at" > $2');
     expect(sql).toContain('"location_shares"."priority_device_id" is not null');
     // Exactly one live device, and the pinned one is not live: otherwise the user must choose again.
-    expect(sql).toContain('"user_sessions" where "user_sessions"."user_id" = "location_shares"."owner_id" and "user_sessions"."refresh_token_hash" is not null) = 1');
+    // Distinct devices, not sessions: two live sessions of one device id are still one choice.
+    expect(sql).toContain('(select count(distinct "user_sessions"."device_id") from "user_sessions" where "user_sessions"."user_id" = "location_shares"."owner_id" and "user_sessions"."refresh_token_hash" is not null) = 1');
     expect(sql).toContain("not exists (select 1");
     expect(sql).toContain('"user_sessions"."device_id" = "location_shares"."priority_device_id"');
     expect(built.params[0]).toBe(false);

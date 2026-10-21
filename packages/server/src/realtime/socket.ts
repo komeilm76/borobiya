@@ -11,10 +11,17 @@ export const PING_TIMEOUT_MS = 10_000;
 export const LOCATION_UPDATES_PER_MINUTE = 60;
 export const LOCATION_UPDATE_WINDOW_MS = 60_000;
 
+/** Ack/handshake code for a dependency failure, so a client retries instead of losing the socket. */
+export const SERVICE_UNAVAILABLE_CODE = "SERVICE_UNAVAILABLE";
 export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
 
 export type SocketError = { message: string; code: string };
+
+/** Structurally satisfied by the Fastify (pino) logger. */
+export interface RealtimeLogger {
+  warn(payload: Record<string, unknown>, message: string): void;
+}
 
 export interface RealtimeSocketData extends SessionTokenIdentity {
   username: string;
@@ -26,6 +33,8 @@ export interface RealtimeDependencies {
   live: LiveLocationService;
   /** Allowed browser origins for the WebSocket handshake; omitted means same-origin only. */
   corsOrigins?: string[];
+  /** Where a swallowed dependency failure is reported; socket handlers have no HTTP reply to fail. */
+  logger?: RealtimeLogger;
   path?: string;
 }
 
@@ -51,37 +60,53 @@ export function createAuthMiddleware(dependencies: RealtimeDependencies) {
     socket: Socket & { data: Partial<RealtimeSocketData> },
     next: (error?: Error) => void
   ): Promise<void> {
-    const supplied = socket.handshake.auth as { token?: unknown } | undefined;
-    const token = typeof supplied?.token === "string" ? supplied.token : "";
-    if (!token) {
-      return next(socketError("UNAUTHORIZED", "A valid access token is required."));
+    try {
+      await authenticateSocket(socket, next, dependencies);
+    } catch (error) {
+      // Socket.IO middleware is callback-based: it never observes the promise this function returns,
+      // so a database that cannot answer would surface as an unhandled rejection — and Node ends the
+      // process on those. Fail this one handshake instead and keep serving everyone else.
+      dependencies.logger?.warn({ err: error }, "realtime handshake failed");
+      next(socketError(SERVICE_UNAVAILABLE_CODE, "Realtime authentication is unavailable. Try again shortly."));
     }
-
-    const identity = await verifyAccessToken(token, dependencies.jwtSecret);
-    if (!identity) {
-      return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
-    }
-
-    const user = await dependencies.users.findUserById(identity.userId);
-    if (!user || user.role !== identity.role) {
-      return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
-    }
-    if (!user.isActive) {
-      return next(socketError("ACCOUNT_INACTIVE", "This account is inactive. Contact an administrator."));
-    }
-    if (user.isSuspended) {
-      return next(socketError("ACCOUNT_SUSPENDED", "This account is suspended. Contact an administrator."));
-    }
-    if (user.mustCompleteSecurityQuestions) {
-      return next(socketError("SECURITY_QUESTIONS_REQUIRED", "Complete your security questions first."));
-    }
-    if (!(await dependencies.users.hasActiveSession(identity))) {
-      return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
-    }
-
-    socket.data = { ...identity, username: user.username };
-    return next();
   };
+}
+
+async function authenticateSocket(
+  socket: Socket & { data: Partial<RealtimeSocketData> },
+  next: (error?: Error) => void,
+  dependencies: RealtimeDependencies
+): Promise<void> {
+  const supplied = socket.handshake.auth as { token?: unknown } | undefined;
+  const token = typeof supplied?.token === "string" ? supplied.token : "";
+  if (!token) {
+    return next(socketError("UNAUTHORIZED", "A valid access token is required."));
+  }
+
+  const identity = await verifyAccessToken(token, dependencies.jwtSecret);
+  if (!identity) {
+    return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
+  }
+
+  const user = await dependencies.users.findUserById(identity.userId);
+  if (!user || user.role !== identity.role) {
+    return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
+  }
+  if (!user.isActive) {
+    return next(socketError("ACCOUNT_INACTIVE", "This account is inactive. Contact an administrator."));
+  }
+  if (user.isSuspended) {
+    return next(socketError("ACCOUNT_SUSPENDED", "This account is suspended. Contact an administrator."));
+  }
+  if (user.mustCompleteSecurityQuestions) {
+    return next(socketError("SECURITY_QUESTIONS_REQUIRED", "Complete your security questions first."));
+  }
+  if (!(await dependencies.users.hasActiveSession(identity))) {
+    return next(socketError("INVALID_ACCESS_TOKEN", "A valid access token is required."));
+  }
+
+  socket.data = { ...identity, username: user.username };
+  return next();
 }
 
 interface UpdateSender {
@@ -106,7 +131,29 @@ export interface LocationUpdateAck {
  * Handles one `location:update` from an authenticated socket: per-connection throttle,
  * priority-device verification, persistence, and fan-out to every accepting peer.
  */
+/**
+ * Handles one update and always resolves: the caller is an event listener with no reply object, and
+ * a rejected promise there would be an unhandled rejection that takes the process down.
+ */
 export async function handleLocationUpdate(
+  sender: UpdateSender,
+  payload: unknown,
+  dependencies: Pick<RealtimeDependencies, "live" | "logger">
+): Promise<LocationUpdateAck> {
+  try {
+    return await locationUpdateAck(sender, payload, dependencies);
+  } catch (error) {
+    dependencies.logger?.warn({ err: error }, "location update handler failed");
+    return {
+      ok: false,
+      status: "rejected",
+      code: SERVICE_UNAVAILABLE_CODE,
+      message: "Location services are unavailable. Retry shortly."
+    };
+  }
+}
+
+async function locationUpdateAck(
   sender: UpdateSender,
   payload: unknown,
   dependencies: Pick<RealtimeDependencies, "live">

@@ -22,11 +22,13 @@ export const locationRoutes = {
     url: "/_user/location/share",
     schema: {
       body: createLocationShareSchema,
-      responses: { 201: locationShareCreatedSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 201: locationShareCreatedSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "locationCreateShare",
       summary: "Share live location with one or more users",
+      description:
+        "Recipients are validated as a batch, so one unusable target rejects the whole request with 400 VALIDATION_ERROR and per-target issue codes. When the account has more than one live device and no priorityDeviceId is supplied, the request is refused with 409 PRIORITY_DEVICE_REQUIRED and issues[0].deviceIds lists the candidates to choose between; an account with a single live device is pinned by the server. The pin decides which device may feed these shares via Socket `location:update`.",
       tags: ["location"],
       access: "authenticated"
     }

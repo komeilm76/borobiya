@@ -118,7 +118,13 @@ export const locationShares = pgTable(
     ),
     index("location_shares_owner_created_at_idx").on(table.ownerId, table.createdAt),
     index("location_shares_target_created_at_idx").on(table.targetUserId, table.createdAt),
-    index("location_shares_expires_at_idx").on(table.expiresAt)
+    index("location_shares_expires_at_idx").on(table.expiresAt),
+    // Partial index for the maintenance sweep over revoked rows: the share table is never truncated
+    // (retired rows stay for audit), so a stale-pin repair that had no index to seek would sequential
+    // scan every share ever created, once a minute, forever.
+    index("location_shares_active_pinned_idx")
+      .on(table.ownerId, table.priorityDeviceId)
+      .where(sql`"is_revoked" = false and "priority_device_id" is not null`)
   ]
 );
 

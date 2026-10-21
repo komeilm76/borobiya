@@ -4,7 +4,12 @@ import { randomUUID } from "node:crypto";
 import type { ActiveOutgoingShare, LocationShareStore } from "../db/location-share-store";
 import type { LocationFixInput, LocationHistoryStore } from "../db/location-history-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
-import { createLiveLocationService, MAX_FUTURE_TIMESTAMP_SKEW_MS, registerLocationUpdateRoute } from "./live";
+import {
+  createLiveLocationService,
+  MAX_FUTURE_TIMESTAMP_SKEW_MS,
+  MAX_LIVE_UPDATE_AGE_MS,
+  registerLocationUpdateRoute
+} from "./live";
 
 const userId = randomUUID();
 const deviceId = "device-owner";
@@ -141,6 +146,39 @@ describe("live location service", () => {
 
     expect(result).toMatchObject({ status: "rejected", code: "INVALID_TIMESTAMP" });
     expect(recordFix).not.toHaveBeenCalled();
+  });
+
+  it("refuses an observation this old instead of dragging the last known position backwards", async () => {
+    // `users.last_location` is what SOS dispatch reads when a request has no live stream, so a
+    // reconnecting client flushing hours of buffered fixes must not move it to where the device
+    // stood yesterday.
+    const { service, recordFix, listActiveOutgoingShares } = makeService({
+      shares: [{ targetUserId: randomUUID(), priorityDeviceId: null }]
+    });
+    const result = await service.applyUpdate({
+      userId,
+      deviceId,
+      payload: payload({ timestamp: new Date(now.getTime() - MAX_LIVE_UPDATE_AGE_MS - 1000).toISOString() })
+    });
+
+    expect(result).toMatchObject({ status: "rejected", code: "INVALID_TIMESTAMP" });
+    expect(recordFix).not.toHaveBeenCalled();
+    // Refused before any write, and before the share lookup it never reaches.
+    expect(listActiveOutgoingShares).not.toHaveBeenCalled();
+  });
+
+  it("accepts a buffered fix from a reconnect inside the staleness bound", async () => {
+    const { service, recorded } = makeService();
+    const observedAt = new Date(now.getTime() - 6 * 60 * 60_000);
+
+    const result = await service.applyUpdate({
+      userId,
+      deviceId,
+      payload: payload({ timestamp: observedAt.toISOString() })
+    });
+
+    expect(result).toMatchObject({ status: "accepted" });
+    expect(recorded[0]?.timestamp).toEqual(observedAt);
   });
 
   it("accepts a small clock skew and omits an absent accuracy", async () => {

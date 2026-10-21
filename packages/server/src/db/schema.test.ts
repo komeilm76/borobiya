@@ -114,8 +114,15 @@ describe("users database schema", () => {
     expect(indexNames).toEqual([
       "location_shares_owner_created_at_idx",
       "location_shares_target_created_at_idx",
-      "location_shares_expires_at_idx"
+      "location_shares_expires_at_idx",
+      "location_shares_active_pinned_idx"
     ]);
+    // Partial index for the maintenance sweeps: retired rows stay for audit, so an unpredicated
+    // scan of this table grows forever.
+    const pinnedIndex = config.indexes.find(
+      ({ config: indexConfig }) => indexConfig.name === "location_shares_active_pinned_idx"
+    );
+    expect(pinnedIndex?.config.where).toBeTruthy();
 
     const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
       /^0006_.*\.sql$/.test(name)
@@ -237,5 +244,21 @@ describe("location history schema (T2.2.1/T2.2.2)", () => {
     expect((migrationSql.match(/ON DELETE cascade/g) ?? [])).toHaveLength(1);
     expect(migrationSql).not.toContain("DROP TABLE");
     expect(migrationSql).not.toContain("ALTER TABLE \"users\"");
+  });
+
+  it("adds the sweep's partial index as an index-only migration", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0008_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationNames[0]}`, import.meta.url), "utf8");
+
+    expect(migrationSql.trim()).toBe(
+      'CREATE INDEX "location_shares_active_pinned_idx" ON "location_shares" USING btree ("owner_id","priority_device_id") WHERE "is_revoked" = false and "priority_device_id" is not null;'
+    );
+    // Nothing but an index: no table rewrite, no data statement, and no drop that could lose a
+    // share row a receiver is still reading.
+    expect(migrationSql.trim().split("\n")).toHaveLength(1);
+    expect(migrationSql).not.toMatch(/DROP|DELETE|UPDATE|ALTER TABLE/i);
   });
 });
