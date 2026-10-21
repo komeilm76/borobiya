@@ -11,12 +11,15 @@ import {
 import { ApiError } from "../api/http";
 import {
   addRecipient,
+  DURATION_PRESET_MINUTES,
+  formatDuration,
   buildHistorySharePayload,
   buildLiveSharePayload,
   buildShareNameMap,
   canSubmitShareDraft,
   describeHistoryShareRow,
   describeLiveShareRow,
+  MINUTES_PER_HOUR,
   isAbortError,
   isLatestSearch,
   needsPriorityDevice,
@@ -27,6 +30,7 @@ import {
   shouldSearch,
   splitDuration,
   uniqueRecipientIds,
+  type DurationUnits,
   type ShareDraft
 } from "./share-form";
 
@@ -252,6 +256,73 @@ describe("share list rows", () => {
     const names = buildShareNameMap([{ id, username: "rescue_dog" }]);
     expect(shareRowLabel(id, names)).toBe("rescue_dog");
     expect(shareRowLabel(id, buildShareNameMap([]))).toBe("dddddddd…");
+  });
+});
+
+describe("duration wording", () => {
+  // Units are injected, so these assertions read as rules rather than as Persian text.
+  const en: DurationUnits = { minute: "min", hour: "h", day: "d", week: "wk", separator: " " };
+
+  it("says minutes only below an hour", () => {
+    expect(formatDuration(1)).toBe("1 دقیقه");
+    expect(formatDuration(15)).toBe("15 دقیقه");
+    expect(formatDuration(59)).toBe("59 دقیقه");
+  });
+
+  it("switches to hours at an hour and keeps only a real remainder", () => {
+    expect(formatDuration(60)).toBe("1 ساعت");
+    expect(formatDuration(360)).toBe("6 ساعت");
+    expect(formatDuration(390)).toBe("6 ساعت و 30 دقیقه");
+    expect(formatDuration(12 * 60)).toBe("12 ساعت");
+  });
+
+  it("switches to days at a day and names the leftover hours and minutes", () => {
+    expect(formatDuration(1440)).toBe("1 روز");
+    expect(formatDuration(3 * 1440)).toBe("3 روز");
+    expect(formatDuration(1505)).toBe("1 روز و 1 ساعت و 5 دقیقه");
+    expect(formatDuration(1445)).toBe("1 روز و 5 دقیقه");
+    expect(formatDuration(MAX_LOCATION_SHARE_MINUTES)).toBe("30 روز");
+  });
+
+  it("prefers weeks for whole weeks", () => {
+    expect(formatDuration(7 * 1440)).toBe("1 هفته");
+    expect(formatDuration(14 * 1440)).toBe("2 هفته");
+    expect(formatDuration(10081)).toBe("7 روز و 1 دقیقه");
+  });
+
+  it("clamps nonsense instead of printing it", () => {
+    expect(formatDuration(0)).toBe("0 دقیقه");
+    expect(formatDuration(-10)).toBe("0 دقیقه");
+    expect(formatDuration(Number.NaN)).toBe("0 دقیقه");
+    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("0 دقیقه");
+    expect(formatDuration(90.7)).toBe("1 ساعت و 30 دقیقه");
+    expect(splitDuration(Number.NaN)).toEqual({ days: 0, hours: 0, minutes: 0 });
+  });
+
+  it("takes its units from the caller, because copy belongs to the components", () => {
+    expect(formatDuration(1440, en)).toBe("1 d");
+    expect(formatDuration(390, en)).toBe("6 h 30 min");
+    expect(formatDuration(10080, en)).toBe("1 wk");
+  });
+
+  it("labels every preset chip by the rule rather than as a raw minute count", () => {
+    // The reported bug: a chip for 1440 minutes read "1440 دقیقه".
+    expect(DURATION_PRESET_MINUTES[0]).toBe(15);
+    expect(DURATION_PRESET_MINUTES).toContain(30);
+    expect(DURATION_PRESET_MINUTES).toEqual([...DURATION_PRESET_MINUTES].sort((a, b) => a - b));
+    expect(new Set(DURATION_PRESET_MINUTES).size).toBe(DURATION_PRESET_MINUTES.length);
+    expect(DURATION_PRESET_MINUTES.every((minutes) => minutes >= 1 && minutes <= MAX_LOCATION_SHARE_MINUTES)).toBe(true);
+
+    for (const minutes of DURATION_PRESET_MINUTES) {
+      const label = formatDuration(minutes);
+      if (minutes < MINUTES_PER_HOUR) {
+        // Below an hour a minute count is the clearest wording there is.
+        expect(label).toBe(`${minutes} دقیقه`);
+        continue;
+      }
+      expect(label).not.toBe(`${minutes} دقیقه`);
+      expect(label).toMatch(/ساعت|روز|هفته/);
+    }
   });
 });
 

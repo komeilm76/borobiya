@@ -236,6 +236,8 @@ DELETE /_user/location/history/share/:shareId → 200 empty body (the grant row 
 POST   /_user/location/update            deprecated REST fallback for Socket `location:update` (live)
 ```
 
+**Client use (T2.1.7, live).** `packages/client/src/api/location.ts` is the only caller of these routes; `ShareDialog.vue` posts a share (with `priorityDeviceId` only while the `409` chooser is open) and `ShareLists.vue` reads both directions, so a browser never guesses at a shape the shared schemas already define.
+
 **`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Responses are `Cache-Control: no-store`.
 
 **`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
@@ -466,8 +468,9 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | — | `SERVICE_UNAVAILABLE` | A storage or account lookup failed under a realtime handshake or `location:update` ack; retry, because nothing was written |
 | 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |
 | — | `CANCEL_RATE_LIMITED` | 3 cancels/hour |
+| 500 | `INTERNAL_ERROR` | A failure no handler answered (a store or serializer error). The detail is logged, never sent; safe to retry |
 
-Use `code` for client i18n and retry logic (never English message).
+Use `code` for client i18n and retry logic (never English message). Framework-level 4xx (an unparseable body, an unsupported content type, a payload over the limit) arrive through one error handler that maps them onto these codes by status, so `FST_ERR_*` names are never part of the contract; a thrown 503 keeps its status and becomes `SERVICE_UNAVAILABLE`.
 
 ---
 

@@ -177,7 +177,8 @@ The registration, login, refresh, logout, and all forgot-password handlers fail 
 
 - **Zod everywhere:** No raw `req.body`; every route has `schema: { body: zodToJsonSchema(...) }`.
 - Use `km-api` to co-locate schema+handler (see API.md).
-- DB: parameterized Drizzle queries and reviewed `sql` fragments — never interpolate untrusted strings.
+- DB: parameterized Drizzle queries and reviewed `sql` fragments — never interpolate untrusted strings. The `LIKE` pattern in user search is a bound parameter with `%`, `_`, and backslash escaped, and its expression has been executed against a real PostgreSQL (a `round(double precision, integer)` overload does not exist, which was silently turning every search into a 500).
+- **Errors do not quote the database:** `plugins/error-envelope.ts` answers any failure no handler caught with `INTERNAL_ERROR` and a fixed message, logging the real error server-side. Before it, Fastify's default body shipped the driver's text (including SQL function signatures) to whoever asked; framework 4xx are mapped onto contract codes rather than passing `FST_ERR_*` names through.
 - Sanitize HTML: descriptions rendered as plain text or sanitized via `dompurify` if rich.
 
 ---

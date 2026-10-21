@@ -193,6 +193,8 @@ packages/server/
     │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit
+        ├── error-envelope.ts # one sanitized envelope for failures no handler answered
+        ├── error-envelope.test.ts
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
@@ -260,7 +262,7 @@ packages/client/
     │   ├── use-target-search.ts # 300ms picker debounce, aborts, and stale-response guard
     │   └── use-target-search.test.ts
     ├── sharing/
-    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, row timing
+    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, duration words
     │   └── share-form.test.ts
     ├── theme/
     │   ├── theme-preference.ts # theme persistence and system/light/dark resolution

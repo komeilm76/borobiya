@@ -29,6 +29,7 @@ import { registerLocationHistoryShareRoutes } from "./location/history";
 import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
+import { registerErrorEnvelope } from "./plugins/error-envelope";
 import { registerSwagger } from "./plugins/swagger";
 
 const sensitiveLogPaths = [
@@ -91,6 +92,9 @@ export async function createFastifyApp(
 
   await app.register(cookie);
   await registerHttpSecurityPlugins(app, config);
+  // Registered before the routes so a store failure anywhere lands as the documented envelope
+  // instead of Fastify's default body, which carried the driver's message to the browser.
+  registerErrorEnvelope(app);
   await registerSwagger(app, config.openApiServerPath);
 
   // A pool is only opened when at least one store still needs the real database; queries

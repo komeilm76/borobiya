@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type { UserSearchRow, UserSearchStore } from "../db/user-search-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 import { registerUserSearchRoute, searchTotalPages } from "./search";
+import { registerErrorEnvelope } from "../plugins/error-envelope";
 
 const callerId = randomUUID();
 const apps: FastifyInstance[] = [];
@@ -38,6 +39,9 @@ async function makeApp(options: { searchUsers?: UserSearchStore["searchUsers"] }
   } as AuthenticatedUserContext;
 
   const app = Fastify({ logger: false });
+  // The real app installs this before its routes, so the route under test answers a thrown store
+  // error the way production does rather than with Fastify's default serialization.
+  registerErrorEnvelope(app);
   app.decorateRequest("authenticatedUser", null);
   app.addHook("preHandler", async (request, reply) => {
     if (request.headers.authorization !== "Bearer test-token") {
@@ -91,6 +95,32 @@ describe("GET /_user/users/search", () => {
     expect(tooShort.statusCode).toBe(400);
     expect(tooShort.json().issues[0].code).toBe("q_too_short");
     expect(searchUsers).not.toHaveBeenCalled();
+  });
+
+  it("answers a store failure with the documented envelope and no description of the failure", async () => {
+    // The shape of the outage this slice shipped with: PostgreSQL refusing an unresolved
+    // `round(double precision, integer)` overload. A 500 must let the client retry, not read our
+    // SQL out loud to whoever asks for a username.
+    const { app } = await makeApp({
+      searchUsers: async () => {
+        throw new Error(
+          'function round(double precision, integer) does not exist while selecting "users"."last_location"'
+        );
+      }
+    });
+
+    const response = await search(app);
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toEqual({
+      error: true,
+      code: "INTERNAL_ERROR",
+      message: "The request could not be completed. Try again shortly.",
+      issues: []
+    });
+    expect(response.body).not.toContain("round");
+    expect(response.body).not.toContain("last_location");
+    expect(response.headers["cache-control"]).toBe("no-store");
   });
 
   it("refuses filters it cannot honor rather than returning an unfiltered list that looks filtered", async () => {

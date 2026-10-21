@@ -50,10 +50,7 @@
                 <bdi dir="ltr">{{ row.label }}</bdi>
                 <span class="share-lists__row-state">{{ stateText(row.kind) }}</span>
               </p>
-              <p class="share-lists__row-sub">
-                {{ timingText(row) }}
-                <template v-if="row.note"> • {{ row.note }}</template>
-              </p>
+              <p class="share-lists__row-sub">{{ detail(row).join(" • ") }}</p>
             </div>
             <v-btn
               size="x-small"
@@ -85,13 +82,7 @@
                 <bdi dir="ltr">{{ row.label }}</bdi>
                 <span class="share-lists__row-state">{{ stateText(row.kind) }}</span>
               </p>
-              <p class="share-lists__row-sub">
-                {{ timingText(row) }}
-                <template v-if="row.lastLocation">
-                  • آخرین موقعیت {{ row.lastLocation.lat.toFixed(3) }}، {{ row.lastLocation.lon.toFixed(3) }}
-                </template>
-                <template v-else>• هنوز موقعیتی نفرستاده است</template>
-              </p>
+              <p class="share-lists__row-sub">{{ receivedDetail(row).join(" • ") }}</p>
             </div>
           </li>
         </ul>
@@ -110,10 +101,7 @@
                 <bdi dir="ltr">{{ row.label }}</bdi>
                 <span class="share-lists__row-state">{{ row.isOpen ? "باز" : "بسته" }}</span>
               </p>
-              <p class="share-lists__row-sub">
-                از {{ formatInstant(row.from) }} تا {{ formatInstant(row.to) }}
-                <template v-if="row.maxPoints !== null"> • سقف {{ row.maxPoints }} نقطه</template>
-              </p>
+              <p class="share-lists__row-sub">{{ historyDetail(row).join(" • ") }}</p>
             </div>
             <v-btn
               size="x-small"
@@ -171,6 +159,7 @@ import {
   buildShareNameMap,
   describeHistoryShareRow,
   describeLiveShareRow,
+  formatDuration,
   shareRowLabel,
   type ShareRowKind
 } from "@/sharing/share-form";
@@ -308,31 +297,35 @@ function stateText(kind: ShareRowKind): string {
   }
 }
 
+/**
+ * Rows share `formatDuration` with the share dialog: one rule for "how long" means a list cannot say
+ * "4320 دقیقه" while the dialog says "3 روز".
+ */
 function timingText(row: LiveRowView): string {
+  if (row.kind === "expired") return "مهلتش به پایان رسیده";
   if (row.remainingMinutes === null) return "بدون مهلت";
-  if (row.remainingMinutes <= 0) return "این دقیقه‌ها تمام می‌شود";
-  const { days, hours, minutes } = splitRemaining(row.remainingMinutes);
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days} روز`);
-  if (hours > 0) parts.push(`${hours} ساعت`);
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes} دقیقه`);
-  return `${parts.join(" و ")} مانده`;
+  return `${formatDuration(row.remainingMinutes)} مانده`;
 }
 
-function splitRemaining(totalMinutes: number) {
-  return {
-    days: Math.floor(totalMinutes / (24 * 60)),
-    hours: Math.floor((totalMinutes % (24 * 60)) / 60),
-    minutes: totalMinutes % 60
-  };
+function detail(row: LiveRowView): string[] {
+  return [timingText(row), row.note ?? ""].filter((part) => part.length > 0);
 }
 
+function receivedDetail(row: ReceivedView): string[] {
+  const position = row.lastLocation
+    ? `آخرین موقعیت ${row.lastLocation.lat.toFixed(3)}، ${row.lastLocation.lon.toFixed(3)}`
+    : "هنوز موقعیتی نفرستاده است";
+  return [timingText(row), position];
+}
+
+function historyDetail(row: HistoryRowView): string[] {
+  const window = `از ${formatInstant(row.from)} تا ${formatInstant(row.to)}`;
+  return row.maxPoints === null ? [window] : [window, `سقف ${row.maxPoints} نقطه`];
+}
+
+/** Local time on purpose: "until 15:30" is what the owner meant, and UTC would read as a lie. */
 function formatInstant(value: string): string {
-  return new Intl.DateTimeFormat("fa-IR", {
-    dateStyle: "short",
-    timeStyle: "short",
-    timeZone: "UTC"
-  }).format(new Date(value));
+  return new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 
 function askRevoke(row: LiveRowView): void {

@@ -7,6 +7,7 @@ import { userSessions, users } from "./schema";
 import {
   DrizzleUserSearchStore,
   escapeLikePattern,
+  readDistanceKm,
   userSearchQueries,
   type UserSearchInput
 } from "./user-search-store";
@@ -65,8 +66,11 @@ describe("userSearchQueries", () => {
       searchInput({ reference: { lat: 35.6997, lon: 51.3379 } })
     ).items.toSQL();
 
-    expect(query.sql).toContain("round(ST_Distance(");
-    expect(query.sql).toContain("/ 1000.0, 1)");
+    // The `::numeric` cast is the difference between a working search and a 500: PostgreSQL has no
+    // two-argument `round` for `double precision`, which is exactly how this slice failed live.
+    expect(query.sql).toContain("round((ST_Distance(");
+    expect(query.sql).toContain("/ 1000.0)::numeric, 1)::float8");
+    expect(query.sql).not.toContain("round(ST_Distance(");
     expect(query.sql).toContain('order by "distanceKm" nulls last');
     expect(query.sql).toContain('"username" asc');
     // PostGIS X is longitude and Y as latitude; swapping them silently moves every distance.
@@ -140,6 +144,23 @@ function fakeDatabase(results: unknown[][]) {
 
   return { store: new DrizzleUserSearchStore(chain as Database) };
 }
+
+describe("readDistanceKm", () => {
+  it("keeps a missing position missing rather than reading as zero kilometres", () => {
+    // `Number(null)` is 0, and 0 km is the *nearest possible* result: an unguarded mapper would put
+    // every account without a fix at the top of a "nearest first" list, labelled "0.0 km away".
+    expect(readDistanceKm(null)).toBeNull();
+    expect(readDistanceKm(undefined)).toBeNull();
+    expect(readDistanceKm(Number.NaN)).toBeNull();
+    expect(readDistanceKm("not a number")).toBeNull();
+  });
+
+  it("accepts the numeric and string forms a driver can return", () => {
+    expect(readDistanceKm(12.45)).toBe(12.45);
+    expect(readDistanceKm("12.4")).toBe(12.4);
+    expect(readDistanceKm(0)).toBe(0);
+  });
+});
 
 describe("DrizzleUserSearchStore.searchUsers", () => {
   it("returns the page and the count of the whole filtered set", async () => {

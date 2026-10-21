@@ -146,14 +146,80 @@ export function buildHistorySharePayload(
   };
 }
 
-/** Slider presets — a share "until the operation ends" is usually hours or days, not 43200. */
-export const DURATION_PRESETS: readonly { minutes: number; label: string }[] = [
-  { minutes: 60, label: "1h" },
-  { minutes: 6 * 60, label: "6h" },
-  { minutes: 24 * 60, label: "1d" },
-  { minutes: 3 * 24 * 60, label: "3d" },
-  { minutes: 7 * 24 * 60, label: "7d" }
+/**
+ * Slider presets, in minutes. A share that outlasts an operation is usually hours or days, so the
+ * short end of the range is minutes and the long end jumps in whole days. The labels are *not*
+ * stored here: a chip that says `1d` is a translation table waiting to drift from the rule below, so
+ * the component formats each value with `formatDuration`.
+ */
+export const DURATION_PRESET_MINUTES: readonly number[] = [
+  15, 30, 60, 180, 360, 720, 24 * 60, 3 * 24 * 60, 7 * 24 * 60
 ];
+
+export const MINUTES_PER_HOUR = 60;
+export const MINUTES_PER_DAY = 24 * 60;
+export const MINUTES_PER_WEEK = 7 * 24 * 60;
+
+export interface DurationUnits {
+  minute: string;
+  hour: string;
+  day: string;
+  week: string;
+  /** Joiner between parts, e.g. "6 hours **and** 30 minutes". */
+  separator: string;
+}
+
+/** The UI renders Persian, so the default labels are Persian. */
+export const PERSIAN_DURATION_UNITS: DurationUnits = {
+  minute: "دقیقه",
+  hour: "ساعت",
+  day: "روز",
+  week: "هفته",
+  separator: " و "
+};
+
+/**
+ * Turns a minute count into the words a person can compare at a glance.
+ *
+ * The rules the interface is held to (and every one of them is tested):
+ * - under an hour: minutes only — `15` → "15 دقیقه";
+ * - an hour or more: hours, plus minutes when there is a remainder — `390` → "6 ساعت و 30 دقیقه",
+ *   and `360` → "6 ساعت" rather than "360 دقیقه";
+ * - a day or more: days with the leftover hours and minutes — `1505` → "1 روز و 1 ساعت و 5 دقیقه";
+ * - an exact number of whole weeks: weeks, because `10080` is a week long before it is 7 days long.
+ *
+ * Zero parts are dropped ("1 day and 0 hours" is noise), and a duration of zero says zero minutes
+ * rather than the empty string. Units are injected because this module must not own copy — and
+ * because Persian has no plural inflection, so the formatter never guesses at one.
+ */
+/** Broken into parts so the component can compose copy without string math. */
+export function splitDuration(totalMinutes: number): DurationParts {
+  const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.trunc(totalMinutes)) : 0;
+  return {
+    days: Math.floor(minutes / MINUTES_PER_DAY),
+    hours: Math.floor((minutes % MINUTES_PER_DAY) / MINUTES_PER_HOUR),
+    minutes: minutes % MINUTES_PER_HOUR
+  };
+}
+
+export function formatDuration(totalMinutes: number, units: DurationUnits = PERSIAN_DURATION_UNITS): string {
+  const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.trunc(totalMinutes)) : 0;
+  if (minutes === 0) return `0 ${units.minute}`;
+  if (minutes >= MINUTES_PER_WEEK && minutes % MINUTES_PER_WEEK === 0) {
+    return `${minutes / MINUTES_PER_WEEK} ${units.week}`;
+  }
+
+  const { days, hours, minutes: remainder } = splitDuration(minutes);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} ${units.day}`);
+  if (hours > 0) parts.push(`${hours} ${units.hour}`);
+  // Under an hour the count *is* the minutes; above it only a leftover is worth naming, so
+  // "6 hours" never renders as "6 hours and 0 minutes".
+  const leftover = days > 0 || hours > 0 ? remainder : minutes;
+  if (leftover > 0) parts.push(`${leftover} ${units.minute}`);
+
+  return parts.join(units.separator);
+}
 
 export interface DurationParts {
   days: number;
@@ -161,15 +227,6 @@ export interface DurationParts {
   minutes: number;
 }
 
-/** Broken into parts so the component can compose Persian copy without string math. */
-export function splitDuration(totalMinutes: number): DurationParts {
-  const minutes = Math.max(0, Math.trunc(totalMinutes));
-  return {
-    days: Math.floor(minutes / (24 * 60)),
-    hours: Math.floor((minutes % (24 * 60)) / 60),
-    minutes: minutes % 60
-  };
-}
 
 /**
  * `409 PRIORITY_DEVICE_REQUIRED` carries the device ids that are currently broadcasting. Reading

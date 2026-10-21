@@ -14,14 +14,28 @@ export function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
+/**
+ * PostgreSQL has no two-argument `round` for `double precision` — `round(x, 1)` only accepts
+ * `numeric` — so the SQL casts before rounding and back to `float8` after it. This mapper is the
+ * other half of that: a driver that hands back a `numeric` as a string still becomes a JSON number,
+ * and a `NULL` stays `NULL` instead of becoming 0 via `Number(null)`. Zero kilometres would put a
+ * positionless account at the top of a "nearest first" list and label it "0.0 km away".
+ */
+export function readDistanceKm(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export interface UserSearchRow {
   id: string;
   username: string;
   avgRating: number | null;
   isOnline: boolean;
   /**
-   * Kilometres from the reference point, `null` when either side has no position. `ST_Distance` yields
-   * `NULL` if either argument is `NULL`, so the missing cases need no special handling.
+   * Kilometres from the reference point, rounded to one decimal, `null` when either side has no
+   * position. `ST_Distance` yields `NULL` if either argument is `NULL`, so a caller or a target
+   * without a fix needs no special handling beyond keeping that `NULL` intact.
    */
   distanceKm: number | null;
 }
@@ -91,7 +105,10 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
     ? sql`ST_SetSRID(ST_MakePoint(${input.reference.lon}, ${input.reference.lat}), 4326)::geography`
     : sql`(select ${users.lastLocation} from ${users} where ${users.id} = ${input.callerId})`;
   // Geography distance is metres; the contract's `distance` is what a list renders as "12.4 km away".
-  const distanceKm = sql`round(ST_Distance(${users.lastLocation}, ${reference}) / 1000.0, 1)`;
+  // `::numeric` before the round is not style: `round(double precision, integer)` is an unresolved
+  // function in PostgreSQL (42883), which turned every search into a 500 until a live instance said
+  // so. `::float8` afterwards keeps the value a driver parses as a number rather than a string.
+  const distanceKm = sql<number | null>`round((ST_Distance(${users.lastLocation}, ${reference}) / 1000.0)::numeric, 1)::float8`;
 
   return {
     items: db
@@ -102,7 +119,7 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
         isOnline: sql<boolean>`exists (${sql`select 1 from ${userSessions} where ${userSessions.userId} = ${users.id} and ${userSessions.refreshTokenHash} is not null`})`
           .mapWith(Boolean)
           .as("isOnline"),
-        distanceKm: distanceKm.mapWith(Number).as("distanceKm")
+        distanceKm: distanceKm.mapWith(readDistanceKm).as("distanceKm")
       })
       .from(users)
       .where(where)

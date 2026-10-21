@@ -150,7 +150,7 @@
 
           <div v-if="mode === 'timed'" class="share-dialog__duration">
             <p class="share-dialog__duration-label">
-              {{ durationLabel }}
+              {{ durationWords(durationMinutes) }}
               <span class="share-dialog__duration-units">{{ durationMinutes }} دقیقه</span>
             </p>
             <v-slider
@@ -162,20 +162,22 @@
               hide-details
               aria-label="مدت اشتراک بر حسب دقیقه"
             />
-            <div class="share-dialog__presets">
-              <v-btn
-                v-for="preset in presets"
-                :key="preset.minutes"
-                size="x-small"
-                variant="tonal"
-                :color="durationMinutes === preset.minutes ? 'primary' : 'default'"
-                @click="durationMinutes = preset.minutes"
+            <div class="share-dialog__presets" role="group" aria-label="میان‌برهای مدت">
+              <button
+                v-for="minutes in presets"
+                :key="minutes"
+                type="button"
+                class="share-dialog__chip"
+                :class="{ 'share-dialog__chip--on': durationMinutes === minutes }"
+                :aria-pressed="durationMinutes === minutes"
+                @click="durationMinutes = minutes"
               >
-                {{ preset.minutes }} دقیقه
-              </v-btn>
+                {{ durationWords(minutes) }}
+              </button>
             </div>
             <p class="share-dialog__hint">
-              سقف {{ maxMinutes }} دقیقه است؛ برای دید کامل‌تر «تا لغو دستی» را انتخاب کنید.
+              سقف {{ durationWords(maxMinutes) }} ({{ maxMinutes }} دقیقه) است؛ برای دید کامل‌تر «تا لغو
+              دستی» را انتخاب کنید.
             </p>
           </div>
         </div>
@@ -265,13 +267,13 @@ import {
   addRecipient,
   buildLiveSharePayload,
   canSubmitShareDraft,
-  DURATION_PRESETS,
+  DURATION_PRESET_MINUTES,
+  formatDuration,
   needsPriorityDevice,
   priorityDeviceIds,
   removeRecipient,
   shareDraftIssues,
   shouldSearch,
-  splitDuration,
   type ShareDraft,
   type ShareMode
 } from "@/sharing/share-form";
@@ -323,7 +325,7 @@ const chosenDeviceId = ref<string | null>(null);
 const maxMinutes = MAX_LOCATION_SHARE_MINUTES;
 const maxNote = MAX_LOCATION_SHARE_NOTE_LENGTH;
 const maxTargets = MAX_LOCATION_SHARE_TARGETS;
-const presets = DURATION_PRESETS;
+const presets = DURATION_PRESET_MINUTES;
 const ratingOptions = [
   { title: "بدون فیلتر امتیاز", value: null },
   { title: "۳ و بالاتر", value: 3 },
@@ -352,14 +354,10 @@ const statusText = computed(() => {
   return parts.join("؛ ");
 });
 
-const durationLabel = computed(() => {
-  const { days, hours, minutes } = splitDuration(durationMinutes.value);
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days} روز`);
-  if (hours > 0) parts.push(`${hours} ساعت`);
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes} دقیقه`);
-  return parts.join(" و ");
-});
+/** Chips, the live label, and the ceiling hint share one formatter, so they can never disagree. */
+function durationWords(minutes: number): string {
+  return formatDuration(minutes);
+}
 
 function isSelf(candidate: UserSearchResult): boolean {
   return candidate.id === auth.user?.id;
@@ -584,6 +582,35 @@ watch(
   flex-wrap: wrap;
   gap: 0.4rem;
   margin-top: 0.5rem;
+}
+
+.share-dialog__chip {
+  min-height: 2.1rem;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
+  border-radius: 999px;
+  background: rgba(var(--v-theme-on-surface), 0.03);
+  color: #23504f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
+}
+
+.share-dialog__chip:hover {
+  border-color: rgba(var(--v-theme-on-surface), 0.34);
+}
+
+.share-dialog__chip:focus-visible {
+  outline: 2px solid #173b3c;
+  outline-offset: 2px;
+}
+
+.share-dialog__chip--on {
+  background-color: #2f6b46;
+  border-color: #2f6b46;
+  color: #ffffff;
 }
 
 .share-dialog__actions {
