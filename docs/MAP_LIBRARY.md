@@ -253,7 +253,39 @@ deleting the old files and the normal library build proceeds.
 Do not edit catalog checksums to accept a mismatched download. Delete or
 replace the bad library file and download the official dated file again.
 
-## 7. Offline boundary
+## 7. Clear map-data caches
+
+`scripts/clear-map-cache.sh` previews a cleanup by default. It clears the
+standard library's source PBFs, city crops, active/generated dataset bundles,
+and known legacy project-local map artifacts. It preserves `.env`, unrelated
+files in the library, and Planetiler/Photon tool JARs. It stops only the map
+services before an applied cleanup when Docker is available. The Nominatim
+volume is excluded unless explicitly requested; if you preserve it, keep the
+same area selection for the next setup run. Before changing areas, include the
+old Nominatim import volume too so it cannot be reused for a different selection.
+
+```bash
+# Review exactly what would be removed (default behavior)
+./scripts/clear-map-cache.sh --dry-run
+
+# Apply after typing CLEAR
+./scripts/clear-map-cache.sh --apply
+
+# Also delete this Compose project's Nominatim import database volume
+# (it must be imported again); the app's Postgres volume is never targeted.
+./scripts/clear-map-cache.sh --include-nominatim-volume --apply
+```
+
+`--yes` applies without the confirmation prompt and should be used only after
+reviewing the dry-run. Clearing these caches removes the offline map content;
+setup must download/rebuild it before the map stack can serve that selection
+again. Docker images/build cache, the application database volume, OS packages,
+Java, Osmium, and tool JARs are deliberately **not** removed. If recovering
+from a Docker `no space left on device` error, first check whether the Docker
+and containerd storage filesystems are the same filesystem as the map library;
+this script does not prune Docker's image/build cache.
+
+## 8. Offline boundary
 
 The library saves all **map content** needed by the runtime dataset. It does
 not contain Docker images, Docker volumes, PostgreSQL application data, apt
