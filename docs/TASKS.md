@@ -77,7 +77,7 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 2.1 Live Sharing
 
-- [ ] **T2.1.1** Table `location_shares` (ownerId,targetUserId,mode,expiresAt,isRevoked,priorityDeviceId)
+- [x] **T2.1.1** Table `location_shares` with owner/target FKs, mode/expiry and no-self-share checks, revocation/device/note fields, and owner/target/expiry indexes — Drizzle migration `0006_quiet_old_lace.sql`; completed 2026-10-21
 - [ ] **T2.1.2** `POST /_user/location/share` {targetUserIds, mode, durationMinutes, note} → timed/permanent
 - [ ] **T2.1.3** `DELETE /_user/location/share/:shareId` — immediate revoke
 - [ ] **T2.1.4** `GET /_user/location/shares` (mine + shared-with-me)

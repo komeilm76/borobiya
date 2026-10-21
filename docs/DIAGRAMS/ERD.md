@@ -85,16 +85,24 @@ CREATE INDEX idx_sessions_user ON user_sessions (user_id);
 
 -- Location
 CREATE TABLE location_shares (
-  id UUID PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   target_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  mode VARCHAR(10) NOT NULL CHECK (mode IN ('timed','permanent')),
+  mode VARCHAR(10) NOT NULL,
   expires_at TIMESTAMPTZ,
   is_revoked BOOLEAN NOT NULL DEFAULT false,
   priority_device_id TEXT,
   note TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT location_shares_mode_check CHECK (mode IN ('timed', 'permanent')),
+  CONSTRAINT location_shares_owner_target_check CHECK (owner_id <> target_user_id),
+  CONSTRAINT location_shares_expiry_mode_check CHECK (
+    (mode = 'timed' AND expires_at IS NOT NULL) OR (mode = 'permanent' AND expires_at IS NULL)
+  )
 );
+CREATE INDEX location_shares_owner_created_at_idx ON location_shares (owner_id, created_at);
+CREATE INDEX location_shares_target_created_at_idx ON location_shares (target_user_id, created_at);
+CREATE INDEX location_shares_expires_at_idx ON location_shares (expires_at);
 
 CREATE TABLE location_history (
   id BIGSERIAL PRIMARY KEY,
@@ -230,7 +238,7 @@ CREATE TABLE admin_audit_log (
 
 ## Notes
 
-- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, and the `admin_audit_log`; domain tables and remaining user columns (including `suspended_until`, `suspension_reason`, and `is_on_mission`) remain future tasks.
+- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, and the live `location_shares` table (T2.1.1). Location history, history shares, category/incident, SOS, and mission tables plus remaining user columns (including `suspended_until`, `suspension_reason`, and `is_on_mission`) remain future tasks.
 - **Geospatial:** `last_location` and `sos_requests.location` use `GEOGRAPHY(Point,4326)` for meter-accurate `ST_Distance`.
 - **No delete:** No `deleted_at` — deactivated users stay with `is_active=false` for audit.
 - **Retention:** `location_history` pruned by cron; partitioning by month optional.

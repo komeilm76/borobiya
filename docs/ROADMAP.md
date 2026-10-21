@@ -78,11 +78,13 @@ gantt
 
 **Exit criteria:** All numbered T1.0–T1.5 implementation tasks are checked complete. The user reported the core Phase 1 human tests passing on Ubuntu 24.04 on 2026-10-21: setup, admin login, user registration/login, light/dark/system theme, admin user list/deactivation, map display/zoom/fullscreen, and denied login after deactivation (see [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance)). The release proceeds with the remaining P1-G1 external-Internet-offline library run, P1-A1 live outage test, P1-A2 extended database-flow evidence, and P1-M1 latency measurement documented as non-blocking follow-ups. Their untested behavior is not claimed as passed.
 
-**Phase gate:** Phase 2 is unblocked. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the v0.1.0 release or Phase 2; begin Phase 2 at T2.1.1. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope. PR #2 is to be retargeted to `main` and merged for the Phase 1 release.
+**Phase gate:** Phase 2 is active. PR #2 was merged to `main` as `95a88a3` and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Work started at T2.1.1; its `location_shares` table and migration are complete, while share APIs, realtime updates, expiry processing, history sharing, and multi-device UI remain future tasks. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the release or Phase 2. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope.
 
 ---
 
 ## Phase 2 — Location Sharing (Weeks 3-4)
+
+**Status:** Active since 2026-10-21. T2.1.1 (`location_shares` schema and migration) is complete; API behavior and live sharing are not yet implemented.
 
 **Goal:** Users share live & history locations, manage shares, multi-device aware.
 
