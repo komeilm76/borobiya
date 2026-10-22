@@ -150,10 +150,12 @@ CREATE TABLE categories (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-> Both catalog `created_at` columns are `NOT NULL DEFAULT now()`, which is one step past the first draft of
-> this diagram: the shared response schemas (`incidentTypeSchema`, `categorySchema`) require `createdAt`, so
-> a row without one has no legal response body. `drizzle/0011` tightened the columns after the store's own
-> record type came out as `Date | null`.
+> All three `created_at` columns in this block — both catalogs and `sos_requests` — are
+> `NOT NULL DEFAULT now()`, one step past the first draft of this diagram: the shared response schemas
+> (`incidentTypeSchema`, `categorySchema`, `sosRequestRecordSchema`) require `createdAt`, so a row without
+> one has no legal response body. `drizzle/0011` tightened the catalog pair after the store's own record type
+> came out as `Date | null`; `sos_requests` was declared NOT NULL from the start so the same gap is not
+> reopened by T3.2.2's store.
 
 CREATE TABLE category_incident_types (
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
@@ -182,7 +184,7 @@ CREATE TABLE sos_requests (
   cancellation_reason_id UUID REFERENCES cancellation_reasons(id),
   cancellation_custom_text TEXT,
   cancelled_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE mission_proposals (

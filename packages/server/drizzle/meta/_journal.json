@@ -85,6 +85,13 @@
       "when": 1792673026491,
       "tag": "0011_sturdy_ego",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792674722493,
+      "tag": "0012_modern_sentry",
+      "breakpoints": true
     }
   ]
 }

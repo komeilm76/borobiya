@@ -8,6 +8,7 @@ import {
   categoryUsers,
   incidentTypes,
   locationHistory,
+  sosRequests,
   locationHistoryShares,
   locationShares,
   passwordResetChallenges,
@@ -381,5 +382,76 @@ describe("categories and incident catalog (T3.1.1)", () => {
     expect(sql).not.toMatch(/INSERT INTO "category_(users|incident_types)"/);
     expect(sql.match(/DEFAULT gen_random_uuid\(\)/g) ?? []).toHaveLength(2);
     expect(sql.match(/DEFAULT now\(\)/g) ?? []).toHaveLength(2);
+  });
+});
+
+describe("sos request table (T3.2.1)", () => {
+  const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+    /^0012_.*\.sql$/.test(name)
+  );
+
+  it("declares the request with its three owners and no cascades", () => {
+    const config = getTableConfig(sosRequests);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("requester_id")?.notNull).toBe(true);
+    expect(columns.get("incident_type_id")?.notNull).toBe(true);
+    expect(columns.get("location")?.getSQLType()).toBe("geography(Point,4326)");
+    expect(columns.get("location")?.notNull).toBe(true);
+    // The device may not know how accurate it is, and a photo is optional until T3.2.3 exists.
+    expect(columns.get("accuracy")?.notNull).toBe(false);
+    expect(columns.get("photo_url")?.notNull).toBe(false);
+    for (const name of ["is_manual", "status", "created_at"]) {
+      expect(columns.get(name)?.notNull, name).toBe(true);
+      expect(columns.get(name)?.hasDefault, name).toBe(true);
+    }
+    expect(config.foreignKeys).toHaveLength(3);
+    // No cascade anywhere on this table: an account being deleted must not erase that somebody asked for
+    // help, and an incident type must not be deletable out from under a request naming it.
+    for (const fk of config.foreignKeys) {
+      expect(fk.onDelete).toBe("no action");
+    }
+    expect(config.indexes).toHaveLength(0);
+    expect(config.uniqueConstraints).toHaveLength(0);
+  });
+
+  it("restates the body's own bounds as database checks, so no row can exist that the API would refuse", () => {
+    const config = getTableConfig(sosRequests);
+    const names = config.checks.map(({ name }) => name);
+    expect(names).toEqual([
+      "sos_requests_severity_check",
+      "sos_requests_description_length_check",
+      "sos_requests_status_check"
+    ]);
+    // A cancellation cross-check belongs to T3.6, where §11.7C's rule is being implemented; guessing it
+    // here would make this table the authority on a decision that task has not made yet.
+    expect(names.filter((name) => name.includes("cancellation"))).toEqual([]);
+  });
+
+  it("generates the DDL the diagram describes", () => {
+    expect(migrationNames).toHaveLength(1);
+    const name = migrationNames[0];
+    if (!name) throw new Error("The sos_requests migration is missing.");
+    const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    expect(sql).toContain('CREATE TABLE "sos_requests"');
+    expect(sql).toContain('"location" "geography(Point,4326)" NOT NULL');
+    expect(sql).toContain("\"status\" text DEFAULT 'pending' NOT NULL");
+    expect(sql).toContain('"is_manual" boolean DEFAULT false NOT NULL');
+    expect(sql).toContain('"created_at" timestamp with time zone DEFAULT now() NOT NULL');
+    expect(sql).toContain('CONSTRAINT "sos_requests_description_length_check" CHECK (char_length("description") BETWEEN 10 AND 500)');
+    expect(sql).toContain(
+      `CONSTRAINT "sos_requests_status_check" CHECK ("status" IN ('pending', 'dispatched', 'accepted', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired', 'completed'))`
+    );
+    for (const fk of [
+      '"sos_requests_requester_id_users_id_fk" FOREIGN KEY ("requester_id") REFERENCES "public"."users"("id") ON DELETE no action',
+      '"sos_requests_incident_type_id_incident_types_id_fk" FOREIGN KEY ("incident_type_id") REFERENCES "public"."incident_types"("id") ON DELETE no action',
+      '"sos_requests_cancellation_reason_id_cancellation_reasons_id_fk" FOREIGN KEY ("cancellation_reason_id") REFERENCES "public"."cancellation_reasons"("id") ON DELETE no action'
+    ]) {
+      expect(sql, fk).toContain(fk);
+    }
+    // The nearest-responder index (T3.3.1) is a measured decision for that query, not a guess here.
+    expect(sql).not.toContain("CREATE INDEX");
+    expect(sql).not.toContain("GIST");
   });
 });

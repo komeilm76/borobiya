@@ -122,6 +122,7 @@ gantt
 - [ ] Frontend: Admin /incidents & /categories CRUD + assign users — the server surface is in place; the screens are T3.1.5
 
 ### M3.2 SOS Request
+- [x] `sos_requests` table — `drizzle/0012_modern_sentry.sql`, 2026-10-22 (T3.2.1)
 - [ ] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback, optional photo 5MB)
 - [ ] Photo upload endpoint + storage (local volume → S3 later)
 - [ ] Socket `sos:new-request` to `admin` room + pulsing marker + sound

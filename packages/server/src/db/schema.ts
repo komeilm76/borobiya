@@ -1,4 +1,4 @@
-import type { CancellationType, LocationShareMode, UserRole } from "@borobiya/shared";
+import type { CancellationType, LocationShareMode, Severity, SosRequestStatus, UserRole } from "@borobiya/shared";
 import { sql } from "drizzle-orm";
 import {
   bigserial,
@@ -350,6 +350,58 @@ export const categoryUsers = pgTable(
   (table) => [primaryKey({ columns: [table.categoryId, table.userId], name: "category_users_pkey" })]
 );
 
+/**
+ * An SOS as raised by a requester (T3.2.1) — the row every later Phase 3 piece hangs off: dispatch
+ * (T3.3) proposes against it, a mission (T3.5) becomes from it, cancellation (T3.6) writes back to it.
+ * Declared as `docs/DIAGRAMS/ERD.md` specifies, with two differences that are both recorded below.
+ *
+ * `requester_id` and `incident_type_id` are plain `REFERENCES` with no cascade, unlike the category pivots.
+ * That is the ERD's choice and it is the right one to keep: an account being deleted must not erase the
+ * record that somebody asked for help, and an incident type must not be deletable out from under a request
+ * that names it. Deactivating a user is what the admin surface does; deleting them is not.
+ */
+export const sosRequests = pgTable(
+  "sos_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requesterId: uuid("requester_id")
+      .notNull()
+      .references(() => users.id),
+    severity: text("severity").$type<Severity>().notNull(),
+    /**
+     * Length is bounded here as well as in `sosRequestSchema`: the request body's `min(10).max(500)` is
+     * the same rule, and a CHECK means a row cannot exist that the API would refuse to return.
+     */
+    description: text("description").notNull(),
+    incidentTypeId: uuid("incident_type_id")
+      .notNull()
+      .references(() => incidentTypes.id),
+    location: geographyPoint("location").notNull(),
+    accuracy: doublePrecision("accuracy"),
+    /** True when a human picked the point on the map because the device fix was unusable (T3.2.2). */
+    isManual: boolean("is_manual").notNull().default(false),
+    photoUrl: text("photo_url"),
+    status: text("status").$type<SosRequestStatus>().notNull().default("pending"),
+    cancellationReasonId: uuid("cancellation_reason_id").references(() => cancellationReasons.id),
+    cancellationCustomText: text("cancellation_custom_text"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    check("sos_requests_severity_check", sql`"severity" IN ('low', 'medium', 'high')`),
+    check("sos_requests_description_length_check", sql`char_length("description") BETWEEN 10 AND 500`),
+    check(
+      "sos_requests_status_check",
+      sql`"status" IN ('pending', 'dispatched', 'accepted', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired', 'completed')`
+    )
+    // No index here, including no GiST on `location`, matching the ERD: the shape that will actually pay is
+    // T3.3.1's nearest query over *open* requests, which wants a partial index on the live statuses and
+    // should be written when that predicate exists — the active-pinned share index above is that precedent.
+    // Nor a cancellation cross-check: which of reason/custom text are required is §11.7C's rule, and the
+    // cancellation task (T3.6) is where that becomes a constraint instead of a guess.
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
@@ -371,3 +423,5 @@ export type CategoryRow = typeof categories.$inferSelect;
 export type NewCategoryRow = typeof categories.$inferInsert;
 export type CategoryIncidentTypeRow = typeof categoryIncidentTypes.$inferSelect;
 export type CategoryUserRow = typeof categoryUsers.$inferSelect;
+export type SosRequestRow = typeof sosRequests.$inferSelect;
+export type NewSosRequestRow = typeof sosRequests.$inferInsert;
