@@ -7,6 +7,7 @@ import { locationHistory, locationHistoryShares, users } from "./schema";
 import {
   DrizzleLocationHistoryStore,
   historyWindowQuery,
+  ownedHistorySharesQuery,
   historyWindowResult,
   locationFixQueries,
   pruneLocationHistoryQuery,
@@ -79,6 +80,7 @@ class FakeQuery implements PromiseLike<unknown> {
   readonly limit = vi.fn(() => this);
   readonly orderBy = vi.fn(() => this);
   readonly innerJoin = vi.fn(() => this);
+  readonly leftJoin = vi.fn(() => this);
   readonly returning = vi.fn(() => this);
   readonly set = vi.fn((values: Record<string, unknown>) => {
     this.mutations.push({ type: "update", values });
@@ -230,6 +232,24 @@ describe("pruneLocationHistoryQuery", () => {
     expect(sql).toContain('"location_history"."id" IN ((');
     expect(sql).toContain('select "id" from "location_history" where "location_history"."created_at" < $2 order by "location_history"."id" asc limit $3');
     expect(built.params).toEqual(["2026-07-23T00:00:00.000Z", "2026-07-23T00:00:00.000Z", 5000]);
+  });
+});
+
+describe("ownedHistorySharesQuery", () => {
+  it("joins the target on its own alias, and tolerates not knowing the name", () => {
+    const built = ownedHistorySharesQuery(offlineDb, { userId: ownerId, limit: 50 }).toSQL();
+    const text = built.sql.replace(/\s+/g, " ");
+
+    // The alias is the point: the received half of the same read joins `users` for the owner, and two
+    // joins on one table without distinct names is how a label silently ends up describing the wrong side.
+    expect(text).toContain('left join "users" "history_share_target" on "history_share_target"."id" = "location_history_shares"."target_user_id"');
+    expect(text).toContain('"history_share_target"."username"');
+    // A left join and not an inner one: a grant whose target cannot be named is still a grant the owner
+    // can delete, and hiding the row would hide the only way to do that.
+    expect(text).not.toContain("inner join");
+    expect(text).toContain('"location_history_shares"."owner_id" = $1');
+    expect(text).toContain('order by "location_history_shares"."created_at" desc limit $2');
+    expect(built.params).toEqual([ownerId, 50]);
   });
 });
 

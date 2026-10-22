@@ -241,12 +241,12 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note?, priorityDeviceId?: string }
 → 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
 DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
-GET    /_user/location/shares            → { owned: LocationShare[], sharedWithMe: (LocationShare & { owner })[] }
+GET    /_user/location/shares            → { owned: (LocationShare & { targetUsername })[], sharedWithMe: (LocationShare & { owner })[] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
 → 201 { shares: LocationHistoryShare[], createdShareIds: string[], reusedShareIds: string[] }
 GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp,accuracy?}], totalPoints } // own history
-GET    /_user/location/history/shares    → { owned: LocationHistoryShare[], sharedWithMe: (LocationHistoryShare & { owner })[] }
+GET    /_user/location/history/shares    → { owned: (LocationHistoryShare & { targetUsername })[], sharedWithMe: (LocationHistoryShare & { owner })[] }
 GET    /_user/location/history/shared/:shareId → the granted window, same shape as above
 DELETE /_user/location/history/share/:shareId → 200 empty body (the grant row is deleted)
 
@@ -255,7 +255,7 @@ POST   /_user/location/update            deprecated REST fallback for Socket `lo
 
 **Client use (T2.1.7, live).** `packages/client/src/api/location.ts` is the only caller of these routes; `ShareDialog.vue` posts a share (with `priorityDeviceId` only while the `409` chooser is open) and `ShareLists.vue` reads both directions, so a browser never guesses at a shape the shared schemas already define.
 
-**`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Responses are `Cache-Control: no-store`.
+**`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Since P2-Q1, `owned` rows also carry `targetUsername: string | null` — the *other* party's name for the same reason `sharedWithMe` carries `owner.username`: a list of uuids does not answer "who can see me right now". It is nullable and read with a **left** join on purpose: a share whose target row cannot be read still has to appear, because that row is how the owner revokes it. `POST /_user/location/share` does not answer with the label (its schema is strict), so a client must not expect it there. Responses are `Cache-Control: no-store`.
 
 **`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
 
@@ -267,7 +267,7 @@ Two properties follow from the shape of a history grant and are worth stating pl
 
 - `GET /_user/location/history` reads the caller's own rows and requires explicit `from`/`to` (a 90-day retention default would silently hide how much was omitted). Sampling uses the configured default, because your own history has no grant to carry a target.
 - `GET /_user/location/history/shared/:shareId` reads one grant the caller *received*. Nothing about the window or the density is a query parameter: the grant fixes both, so a receiver cannot widen what they were given, and every receiver of one grant sees the same view. A grant id that does not exist and one belonging to a different receiver answer identically with `404 SHARE_NOT_FOUND`, since this is the only endpoint that can probe whether another account shares history with anybody.
-- `GET /_user/location/history/shares` lists both directions newest first, capped at `MAX_LOCATION_SHARE_LIST_ITEMS` per list, and is how a receiver learns an id in the first place. Nothing is filtered out: a grant has no expiry and no revoked state, so the list is whatever the account holds. `sharedWithMe` rows carry `owner: { id, username }` — deliberately not `lastLocation`, which a history grant never authorizes.
+- `GET /_user/location/history/shares` lists both directions newest first, capped at `MAX_LOCATION_SHARE_LIST_ITEMS` per list, and is how a receiver learns an id in the first place. Nothing is filtered out: a grant has no expiry and no revoked state, so the list is whatever the account holds. `sharedWithMe` rows carry `owner: { id, username }` — deliberately not `lastLocation`, which a history grant never authorizes. `owned` rows carry `targetUsername` under the same left-join rule as the live list.
 - `DELETE /_user/location/history/share/:shareId` is owner-only and immediate: the row goes away and the receiver's next read answers `404`. It does not recall points the receiver already loaded, and repeating the delete answers `404` (unlike the live revoke, which repeats `200`, there is no retained row to be idempotent about).
 
 **Expiry & retention (T2.1.6 + T2.2.5, live).** No HTTP surface: a maintenance timer inside the API process retires

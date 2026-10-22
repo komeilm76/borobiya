@@ -257,7 +257,7 @@ export async function registerLocationHistoryShareRoutes(
     });
 
     return reply.code(200).header("cache-control", "no-store").send({
-      owned: owned.map(historySharePayload),
+      owned: owned.map((share) => ({ ...historySharePayload(share), targetUsername: share.targetUsername })),
       sharedWithMe: sharedWithMe.map((share) => ({
         ...historySharePayload(share),
         owner: { id: share.owner.id, username: share.owner.username }

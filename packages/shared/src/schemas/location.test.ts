@@ -101,7 +101,8 @@ describe("location schemas", () => {
       note: null,
       createdAt: from
     };
-    expect(locationSharesResponseSchema.safeParse({ owned: [share], sharedWithMe: [] }).success).toBe(true);
+    const ownedRow = { ...share, targetUsername: "satellite" };
+    expect(locationSharesResponseSchema.safeParse({ owned: [ownedRow], sharedWithMe: [] }).success).toBe(true);
     expect(
       locationSharesResponseSchema.safeParse({
         owned: [],
@@ -110,7 +111,41 @@ describe("location schemas", () => {
     ).toBe(true);
     // Received rows must carry an owner; a bare share row is not enough to render a marker.
     expect(locationSharesResponseSchema.safeParse({ owned: [], sharedWithMe: [share] }).success).toBe(false);
-    expect(locationSharesResponseSchema.safeParse({ owned: [share], sharedWithMe: [], extra: 1 }).success).toBe(false);
+    expect(locationSharesResponseSchema.safeParse({ owned: [ownedRow], sharedWithMe: [], extra: 1 }).success).toBe(false);
+  });
+
+  it("names an owned row's target, and admits when the name could not be read", () => {
+    const base = {
+      id: targetId,
+      ownerId: otherTargetId,
+      targetUserId: targetId,
+      mode: "permanent" as const,
+      expiresAt: null,
+      isRevoked: false,
+      priorityDeviceId: null,
+      note: null,
+      createdAt: from
+    };
+    expect(locationSharesResponseSchema.safeParse({ owned: [{ ...base, targetUsername: null }], sharedWithMe: [] }).success).toBe(true);
+    // Missing is not the same as unknown: an owned row without the field is a server that stopped
+    // answering the question, and a strict parse says so here rather than a label silently going blank.
+    expect(locationSharesResponseSchema.safeParse({ owned: [base], sharedWithMe: [] }).success).toBe(false);
+    // The create response describes rows the caller just wrote: no label, and no room to smuggle one.
+    expect(locationShareCreatedSchema.safeParse({ shares: [{ ...base, targetUsername: "satellite" }] }).success).toBe(false);
+  });
+
+  it("names an owned history grant the same way", () => {
+    const grant = {
+      id: targetId,
+      ownerId: otherTargetId,
+      targetUserId: targetId,
+      from: "2026-04-01T00:00:00.000Z",
+      to: "2026-04-02T00:00:00.000Z",
+      maxPoints: null,
+      createdAt: from
+    };
+    expect(locationHistorySharesResponseSchema.safeParse({ owned: [grant], sharedWithMe: [] }).success).toBe(false);
+    expect(locationHistorySharesResponseSchema.safeParse({ owned: [{ ...grant, targetUsername: null }], sharedWithMe: [] }).success).toBe(true);
   });
 
   it("reads a history window with its sampled total", () => {
@@ -149,10 +184,12 @@ describe("location schemas", () => {
       createdAt: from
     };
     const received = { ...grant, id: otherTargetId, ownerId: targetId, targetUserId: otherTargetId };
+    // An owned grant carries the target's name (P2-Q1); a received one carries `owner` instead.
+    const ownedGrant = { ...grant, targetUsername: "satellite" };
 
     expect(
       locationHistorySharesResponseSchema.safeParse({
-        owned: [grant],
+        owned: [ownedGrant],
         sharedWithMe: [{ ...received, owner: { id: targetId, username: "dispatcher" } }]
       }).success
     ).toBe(true);
@@ -166,7 +203,7 @@ describe("location schemas", () => {
       }).success
     ).toBe(false);
 
-    const capped = Array.from({ length: MAX_LOCATION_SHARE_LIST_ITEMS }, () => grant);
+    const capped = Array.from({ length: MAX_LOCATION_SHARE_LIST_ITEMS }, () => ownedGrant);
     expect(locationHistorySharesResponseSchema.safeParse({ owned: capped, sharedWithMe: [] }).success).toBe(true);
     expect(locationHistorySharesResponseSchema.safeParse({ owned: [...capped, grant], sharedWithMe: [] }).success).toBe(false);
   });

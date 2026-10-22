@@ -41,6 +41,9 @@ function shareRow(id: string, priorityDeviceId: string | null) {
     isRevoked: false,
     priorityDeviceId,
     note: null,
+    // Required since P2-Q1: the owned list answers with the target's name, and the response schema is
+    // strict in both directions, so an incomplete fixture fails the read rather than rendering blanks.
+    targetUsername: "satellite",
     createdAt: new Date(NOW - 3_600_000).toISOString()
   };
 }

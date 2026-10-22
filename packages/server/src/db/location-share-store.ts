@@ -1,8 +1,21 @@
 import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
 import { locationShares, userSessions, users } from "./schema";
 import { ownerAdvisoryLockSql } from "./owner-lock";
+
+/**
+ * The `users` row of the *target*, on its own alias. Two joins on one table need distinct names — for
+ * the SQL and for anyone reading it — and the alias is what makes the left join below reviewable rather
+ * than "which users row is this?".
+ */
+export const shareTargetUsers = alias(users, "share_target");
+
+/** An owned row as the list reads it: the record plus the label the dashboard needs. */
+export interface OwnedLocationShareRecord extends LocationShareRecord {
+  targetUsername: string | null;
+}
 
 export interface LocationShareRecord {
   id: string;
@@ -103,7 +116,7 @@ export interface LocationShareStore {
   listActiveShares(input: {
     userId: string;
     limit: number;
-  }): Promise<{ owned: LocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }>;
+  }): Promise<{ owned: OwnedLocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }>;
 }
 
 /**
@@ -186,6 +199,32 @@ export function planShareReuse(
   }
 
   return patch;
+}
+
+/** The "not revoked and not past its window" predicate both halves of the list share. */
+function activeShareConditions() {
+  return [
+    eq(locationShares.isRevoked, false),
+    sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
+  ];
+}
+
+/**
+ * The owned half of the list, as an exported builder so the join is assertable as SQL text — the
+ * convention in `location-share-store.test.ts`, where a fake database can prove a mapping but not that a
+ * join exists.
+ *
+ * A left join, deliberately: the username is a label, and an inner join would drop a share whose target
+ * row is unreadable. A share that disappears from the list is a share that cannot be revoked from it.
+ */
+export function activeOwnedSharesQuery(db: Database, input: { userId: string; limit: number }) {
+  return db
+    .select({ ...locationShareSelection, targetUsername: shareTargetUsers.username })
+    .from(locationShares)
+    .leftJoin(shareTargetUsers, eq(shareTargetUsers.id, locationShares.targetUserId))
+    .where(and(eq(locationShares.ownerId, input.userId), ...activeShareConditions()))
+    .orderBy(desc(locationShares.createdAt))
+    .limit(input.limit);
 }
 
 const locationShareSelection = {
@@ -384,18 +423,10 @@ export class DrizzleLocationShareStore implements LocationShareStore {
   async listActiveShares(input: {
     userId: string;
     limit: number;
-  }): Promise<{ owned: LocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }> {
-    const activeConditions = [
-      eq(locationShares.isRevoked, false),
-      sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
-    ];
+  }): Promise<{ owned: OwnedLocationShareRecord[]; sharedWithMe: ReceivedLocationShareRecord[] }> {
+    const activeConditions = activeShareConditions();
 
-    const owned = await this.db
-      .select(locationShareSelection)
-      .from(locationShares)
-      .where(and(eq(locationShares.ownerId, input.userId), ...activeConditions))
-      .orderBy(desc(locationShares.createdAt))
-      .limit(input.limit);
+    const owned = await activeOwnedSharesQuery(this.db, input);
 
     const receivedRows = await this.db
       .select({

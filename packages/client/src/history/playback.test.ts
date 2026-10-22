@@ -259,16 +259,19 @@ describe("range presets and hand-typed windows", () => {
   });
 
   it("rejects the ranges that produce a confusing screen, and only those", () => {
-    expect(historyWindowIssue({ from: "yesterday", to: "today" })).toBe("unparsable");
-    expect(historyWindowIssue({ from: new Date(nowMs).toISOString(), to: new Date(nowMs).toISOString() })).toBe("order");
-    expect(historyWindowIssue({ from: new Date(nowMs + DAY).toISOString(), to: new Date(nowMs + 2 * DAY).toISOString() })).toBe(
+    expect(historyWindowIssue({ from: "yesterday", to: "today" }, nowMs)).toBe("unparsable");
+    expect(historyWindowIssue({ from: new Date(nowMs).toISOString(), to: new Date(nowMs).toISOString() }, nowMs)).toBe("order");
+    expect(historyWindowIssue({ from: new Date(nowMs + DAY).toISOString(), to: new Date(nowMs + 2 * DAY).toISOString() }, nowMs)).toBe(
       "in_future"
     );
+    // The clock is an argument, not a hidden `Date.now()`: a window a day ahead of `nowMs` is refused
+    // whatever day the suite runs on. It was read off the wall clock until 2026-10-22, when the fixture's
+    // date stopped being in the future and this assertion began failing by itself.
     // No span limit is imposed here on purpose: the server caps a *share* window at
     // `LOCATION_HISTORY_MAX_SHARE_DAYS` and does not cap reading one's own history, so a client bound
     // would refuse requests the API answers correctly.
     expect(
-      historyWindowIssue({ from: new Date(nowMs - 400 * DAY).toISOString(), to: new Date(nowMs).toISOString() })
+      historyWindowIssue({ from: new Date(nowMs - 400 * DAY).toISOString(), to: new Date(nowMs).toISOString() }, nowMs)
     ).toBeNull();
   });
 

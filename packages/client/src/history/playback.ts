@@ -356,12 +356,16 @@ export type HistoryLoadIssue = "grant_required" | "grant_gone" | "no_token" | "r
  * data" rather than "bad range"), or the start is in the future (always empty, and the user was aiming
  * at their browser's clock widget).
  */
-export function historyWindowIssue(window: HistoryWindow): HistoryWindowIssue | null {
+export function historyWindowIssue(window: HistoryWindow, nowMs: number = Date.now()): HistoryWindowIssue | null {
   const from = Date.parse(window.from);
   const to = Date.parse(window.to);
   if (!Number.isFinite(from) || !Number.isFinite(to)) return "unparsable";
   if (to <= from) return "order";
-  if (from > Date.now()) return "in_future";
+  // The clock is injected for the same reason `historyWindowFromPreset` takes one: with a hidden
+  // `Date.now()` the "start is in the future" rule cannot be tested at all (the answer changed depending
+  // on what day the suite ran — which is how this was found), and the panel's own preset math and its
+  // validation of a hand-typed window would be judged against two clocks.
+  if (from > nowMs) return "in_future";
   return null;
 }
 

@@ -144,6 +144,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type {
   LocationHistoryShare,
   LocationShare,
+  OwnedLocationShare,
+  OwnedLocationHistoryShare,
   ReceivedLocationHistoryShare,
   ReceivedLocationShare
 } from "@shared/index";
@@ -200,9 +202,9 @@ const auth = useAuthStore();
 const loading = ref(false);
 const loaded = ref(false);
 const loadError = ref<string | null>(null);
-const owned = ref<LocationShare[]>([]);
+const owned = ref<OwnedLocationShare[]>([]);
 const received = ref<ReceivedLocationShare[]>([]);
-const ownedHistory = ref<LocationHistoryShare[]>([]);
+const ownedHistory = ref<OwnedLocationHistoryShare[]>([]);
 const receivedHistory = ref<ReceivedLocationHistoryShare[]>([]);
 const pendingRow = ref<LiveRowView | HistoryRowView | null>(null);
 const confirmOpen = ref(false);
@@ -210,9 +212,9 @@ const revoking = ref(false);
 const pendingRevocation = ref<string | null>(null);
 
 /**
- * Names for owned rows. The live-share response only carries `targetUserId`, so a target's
- * username comes from what this session has already seen (a received row's owner, or the picker);
- * otherwise the row shows a short id rather than pretending to know a name.
+ * Names for owned rows whose `targetUsername` the server could not read (it left-joins the target for
+ * exactly that reason). The fallback is what this session has already seen — a received row's owner, or
+ * the picker — and failing that the row shows a short id rather than pretending to know a name.
  */
 const names = computed(() => {
   const entries: { id: string; username: string }[] = [];
@@ -248,7 +250,8 @@ const ownedRows = computed<LiveRowView[]>(() => {
     const described = describeLiveShareRow(share, now);
     return {
       ...described,
-      label: shareRowLabel(share.targetUserId, names.value),
+            // The server names the target; `names` is the fallback for the row its left join could not name.
+      label: shareRowLabel(share.targetUserId, names.value, share.targetUsername),
       history: false
     };
   });
@@ -275,7 +278,8 @@ const historyRows = computed<HistoryRowView[]>(() => {
     const described = describeHistoryShareRow(share, now);
     return {
       ...described,
-      label: shareRowLabel(share.targetUserId, names.value),
+            // The server names the target; `names` is the fallback for the row its left join could not name.
+      label: shareRowLabel(share.targetUserId, names.value, share.targetUsername),
       history: true
     };
   });

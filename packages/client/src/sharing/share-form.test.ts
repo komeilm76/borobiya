@@ -261,6 +261,26 @@ describe("share list rows", () => {
     expect(shareRowLabel(id, names)).toBe("rescue_dog");
     expect(shareRowLabel(id, buildShareNameMap([]))).toBe("dddddddd…");
   });
+
+  it("prefers the name the server read over what this session guessed", () => {
+    // The order is the whole rule of P2-Q1: the server joined the target and knows; a name picked up
+    // from the picker is a guess about the same person and must not win when both exist.
+    const id = "dddddddd-0000-4000-8000-000000000004";
+    const names = buildShareNameMap([{ id, username: "rescue_dog" }]);
+    expect(shareRowLabel(id, names, "satellite")).toBe("satellite");
+    expect(shareRowLabel(id, names, null)).toBe("rescue_dog");
+    expect(shareRowLabel(id, names, "   ")).toBe("rescue_dog");
+    expect(shareRowLabel(id, buildShareNameMap([]), "")).toBe("dddddddd…");
+  });
+
+  it("labels owned rows in both lists from the server's field", () => {
+    const source = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
+    // Two lists, one rule — a fixed live row and a still-guessed history row is the kind of half-fix
+    // that leaves the same id truncated a few pixels below the one that was repaired.
+    expect(source.match(/shareRowLabel\(share\.targetUserId, names\.value, share\.targetUsername\)/g)).toHaveLength(2);
+    expect(source).toContain("ref<OwnedLocationShare[]>");
+    expect(source).toContain("ref<OwnedLocationHistoryShare[]>");
+  });
 });
 
 describe("duration wording", () => {

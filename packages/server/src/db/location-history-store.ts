@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Database } from "./client";
 import { locationHistory, locationHistoryShares, users } from "./schema";
 import { ownerAdvisoryLockSql } from "./owner-lock";
@@ -14,6 +15,14 @@ export interface LocationFixInput {
 }
 
 /** One granted history window for one recipient, as the shared `LocationHistoryShare` contract reads it. */
+/** The target's `users` row, on its own alias — same reason as `shareTargetUsers` next door. */
+export const historyShareTargetUsers = alias(users, "history_share_target");
+
+/** An owned grant as the list reads it: the record plus the label the dashboard needs. */
+export interface OwnedLocationHistoryShareRecord extends LocationHistoryShareRecord {
+  targetUsername: string | null;
+}
+
 export interface LocationHistoryShareRecord {
   id: string;
   ownerId: string;
@@ -91,7 +100,7 @@ export interface LocationHistoryStore {
   listHistoryShares(input: {
     userId: string;
     limit: number;
-  }): Promise<{ owned: LocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }>;
+  }): Promise<{ owned: OwnedLocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }>;
   /**
    * Grants `fromTime..toTime` to each target, reusing the existing grant when one already covers the
    * identical owner/target/window pair (the unique index that enforces it is also the duplicate rule).
@@ -197,6 +206,21 @@ export function historyWindowResult(rows: readonly LocationHistoryWindowRow[]): 
     // Every row of the same window carries the same count, and an empty window has no rows to read it from.
     totalPoints: rows[0]?.totalPoints ?? 0
   };
+}
+
+/**
+ * The owned half of the history-grant list, as an exported builder so the left join is assertable as SQL
+ * text. A grant whose target cannot be named is still a grant the owner can delete, so the join must not
+ * be able to hide one.
+ */
+export function ownedHistorySharesQuery(db: Database, input: { userId: string; limit: number }) {
+  return db
+    .select({ ...historyShareSelection, targetUsername: historyShareTargetUsers.username })
+    .from(locationHistoryShares)
+    .leftJoin(historyShareTargetUsers, eq(historyShareTargetUsers.id, locationHistoryShares.targetUserId))
+    .where(eq(locationHistoryShares.ownerId, input.userId))
+    .orderBy(desc(locationHistoryShares.createdAt))
+    .limit(input.limit);
 }
 
 const historyShareSelection = {
@@ -305,13 +329,8 @@ export class DrizzleLocationHistoryStore implements LocationHistoryStore {
   async listHistoryShares(input: {
     userId: string;
     limit: number;
-  }): Promise<{ owned: LocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }> {
-    const owned = await this.db
-      .select(historyShareSelection)
-      .from(locationHistoryShares)
-      .where(eq(locationHistoryShares.ownerId, input.userId))
-      .orderBy(desc(locationHistoryShares.createdAt))
-      .limit(input.limit);
+  }): Promise<{ owned: OwnedLocationHistoryShareRecord[]; sharedWithMe: LocationHistoryShareWithOwner[] }> {
+    const owned = await ownedHistorySharesQuery(this.db, input);
 
     const receivedRows = await this.db
       .select({ ...historyShareSelection, ownerUsername: users.username })

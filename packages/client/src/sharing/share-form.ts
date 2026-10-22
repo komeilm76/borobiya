@@ -427,21 +427,24 @@ export function describeHistoryShareRow(
 }
 
 /**
- * Names for the ids the share lists carry.
+ * Names this session has seen, for the ids the share lists carry.
  *
- * `GET /_user/location/shares` returns the *other* party's username only on received rows
- * (`owner.username`); an owned row has a bare `targetUserId`. Rather than invent a server-side
- * join in a client commit, the dashboard labels those rows from the people it has already seen in
- * this session (the picker's selections) and falls back to a short id, so a row is never
- * anonymous-looking without a reason. Tracked in `docs/PROGRESS.md`.
+ * The server now labels an owned row itself (`targetUsername`, since P2-Q1), so this map is the
+ * *fallback* rather than the answer: it covers the case the server's left join tolerates — a share whose
+ * target row could not be read — with a name the user learned from the picker or from a received row.
+ * It is kept for that case instead of a bare short id, and the last resort is still the id prefix,
+ * because a row that pretends to know a name it does not is worse than a row that admits it.
  */
 export function buildShareNameMap(entries: readonly { id: string; username: string }[]): Map<string, string> {
   return new Map(entries.map((entry) => [entry.id, entry.username]));
 }
 
-export function shareRowLabel(id: string, names: ReadonlyMap<string, string>): string {
-  const known = names.get(id);
-  if (known) return known;
+/** The order is the rule: what the server read, then what this session saw, then the id. */
+export function shareRowLabel(id: string, names: ReadonlyMap<string, string>, knownName?: string | null): string {
+  const name = knownName?.trim();
+  if (name) return name;
+  const seen = names.get(id);
+  if (seen) return seen;
   return `${id.slice(0, 8)}…`;
 }
 

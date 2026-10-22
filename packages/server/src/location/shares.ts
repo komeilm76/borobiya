@@ -289,7 +289,9 @@ export async function registerLocationShareRoutes(
     });
 
     return reply.code(200).header("cache-control", "no-store").send({
-      owned: owned.map(sharePayload),
+      // `targetUsername` rides along so an outgoing row reads as a person; see `ownedLocationShareSchema`
+      // for why the read tolerates not knowing the name.
+      owned: owned.map((share) => ({ ...sharePayload(share), targetUsername: share.targetUsername })),
       sharedWithMe: sharedWithMe.map((share) => ({
         ...sharePayload(share),
         owner: {

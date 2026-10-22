@@ -6,6 +6,7 @@ import postgres from "postgres";
 import type { Database } from "./client";
 import { locationHistory, locationShares, userSessions, users } from "./schema";
 import {
+  activeOwnedSharesQuery,
   DrizzleLocationShareStore,
   expireOverdueSharesQuery,
   planShareReuse,
@@ -34,6 +35,7 @@ interface ExecutedStatement { sql: string; params: unknown[] }
 class FakeQuery implements PromiseLike<unknown> {
   readonly innerJoin = vi.fn(() => this);
   readonly limit = vi.fn(() => this);
+  readonly leftJoin = vi.fn(() => this);
   readonly from = vi.fn(() => this);
   readonly where = vi.fn(() => this);
   readonly orderBy = vi.fn(() => this);
@@ -423,9 +425,31 @@ describe("DrizzleLocationShareStore", () => {
   });
 });
 
+describe("activeOwnedSharesQuery", () => {
+  it("labels an owned row with a left join, so an unreadable target cannot hide the share", () => {
+    const built = activeOwnedSharesQuery(offlineDb, { userId: ownerId, limit: 100 }).toSQL();
+    const text = built.sql.replace(/\s+/g, " ");
+
+    // The alias is the point: the received half of the same read joins `users` for the owner, and two
+    // joins on one table without distinct names is how a label silently ends up describing the wrong side.
+    expect(text).toContain('left join "users" "share_target" on "share_target"."id" = "location_shares"."target_user_id"');
+    // Drizzle names the result key from the selection object, so there is no SQL alias to assert — the
+    // joined column itself is the thing that must be read.
+    expect(text).toContain('"share_target"."username"');
+    // A left join and not an inner one: dropping the row would drop the only way to revoke it.
+    expect(text).not.toContain('inner join "users" "share_target"');
+    // Active only, newest first, capped — the same predicates the received half applies.
+    expect(text).toContain('"location_shares"."owner_id" = $1');
+    expect(text).toContain('"location_shares"."is_revoked" = $2');
+    expect(text).toContain('("location_shares"."expires_at" IS NULL OR "location_shares"."expires_at" > now())');
+    expect(text).toContain('order by "location_shares"."created_at" desc limit $3');
+    expect(built.params).toEqual([ownerId, false, 100]);
+  });
+});
+
 describe("DrizzleLocationShareStore.listActiveShares", () => {
   it("reads owned shares first and maps the received owner position", async () => {
-    const ownedRow = shareRow();
+    const ownedRow = { ...shareRow(), targetUsername: "satellite" };
     const receivedRow = {
       ...shareRow({ mode: "permanent", expiresAt: null }),
       ownerUsername: "dispatch_lead",

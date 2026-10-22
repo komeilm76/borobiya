@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import type {
   LocationHistoryShareRecord,
   LocationHistoryStore,
+  OwnedLocationHistoryShareRecord,
   LocationHistoryWindowResult
 } from "../db/location-history-store";
 import type { LocationShareStore, ShareTargetAssessment } from "../db/location-share-store";
@@ -30,6 +31,11 @@ function grant(overrides: Partial<LocationHistoryShareRecord> = {}): LocationHis
     createdAt: new Date("2026-10-21T09:00:00.000Z"),
     ...overrides
   };
+}
+
+/** An owned grant as the list reads it: the same row plus the target label the list joins in. */
+function ownedGrant(overrides: Partial<OwnedLocationHistoryShareRecord> = {}): OwnedLocationHistoryShareRecord {
+  return { ...grant(overrides), targetUsername: "satellite", ...overrides };
 }
 
 const DEFAULT_READ_POINTS = 1_000;
@@ -87,7 +93,7 @@ async function makeApp(
     options.deleteHistoryShare ?? (async () => true)
   );
   const listHistoryShares = vi.fn<LocationHistoryStore["listHistoryShares"]>(
-    options.listHistoryShares ?? (async () => ({ owned: [grant()], sharedWithMe: [] }))
+    options.listHistoryShares ?? (async () => ({ owned: [ownedGrant()], sharedWithMe: [] }))
   );
 
   const app = Fastify({ logger: false });
@@ -378,7 +384,7 @@ describe("GET /_user/location/history/shares", () => {
   it("lists both directions with the owner named only on received grants", async () => {
     const { app, listHistoryShares } = await makeApp({
       listHistoryShares: async () => ({
-        owned: [grant()],
+        owned: [ownedGrant()],
         sharedWithMe: [
           {
             ...grant({ id: randomUUID(), ownerId: targetId, targetUserId: ownerId }),
@@ -395,7 +401,7 @@ describe("GET /_user/location/history/shares", () => {
     const body = response.json();
     expect(body.owned[0]).not.toHaveProperty("owner");
     expect(body.sharedWithMe[0].owner).toEqual({ id: targetId, username: "dispatcher" });
-    expect(body.owned[0]).toMatchObject({ from: FROM, to: TO, maxPoints: null });
+    expect(body.owned[0]).toMatchObject({ from: FROM, to: TO, maxPoints: null, targetUsername: "satellite" });
   });
 });
 

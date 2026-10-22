@@ -183,7 +183,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     let plan: { kind: "own"; window: HistoryWindow } | { kind: "grant"; shareId: string };
     if (sourceKind.value === "own") {
       const window = currentWindow();
-      const issue = window ? historyWindowIssue(window) : "unparsable";
+      const issue = window ? historyWindowIssue(window, now()) : "unparsable";
       if (!window || issue) {
         windowIssue.value = issue;
         failed.value = true;

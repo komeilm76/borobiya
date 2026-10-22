@@ -57,9 +57,24 @@ function shareRow(id: string, targetUserId: string, overrides: Record<string, un
     isRevoked: false,
     priorityDeviceId: PHONE,
     note: null,
+    // An owned row carries the target's name as of P2-Q1; the response schema is strict, so a fixture
+    // that omits it is refused at the boundary rather than rendering a blank label.
+    targetUsername: "satellite",
     createdAt: new Date(NOW - 3_600_000).toISOString(),
     ...overrides
   };
+}
+
+/**
+ * A `POST /_user/location/share` answer, without the list's label.
+ *
+ * `locationShareCreatedSchema` is strict and describes the rows the caller just wrote — the
+ * `targetUsername` belongs to the list read, so a fixture that reuses the list shape here would be
+ * refused by the client's own parse and every post would read as a server failure.
+ */
+function createdRow(id: string, targetUserId: string, overrides: Record<string, unknown> = {}) {
+  const { targetUsername: _label, ...row } = shareRow(id, targetUserId, overrides);
+  return row;
 }
 
 function defaultResponder(url: string, method: string) {
@@ -76,7 +91,7 @@ function defaultResponder(url: string, method: string) {
   return {
     status: 200,
     body: {
-      shares: [shareRow(SHARE_ONE, TARGET, { priorityDeviceId: LAPTOP })],
+      shares: [createdRow(SHARE_ONE, TARGET, { priorityDeviceId: LAPTOP })],
       createdShareIds: [],
       reusedShareIds: [SHARE_ONE]
     }

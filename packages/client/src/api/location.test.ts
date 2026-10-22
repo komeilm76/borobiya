@@ -171,7 +171,7 @@ describe("live share calls", () => {
   });
 
   it("lists both directions", async () => {
-    const payload = { owned: created.shares, sharedWithMe: [] };
+    const payload = { owned: created.shares.map((row) => ({ ...row, targetUsername: "satellite" })), sharedWithMe: [] };
     const fetchMock = stubFetch(() => jsonResponse(payload));
     await expect(listLocationShares(token)).resolves.toEqual(payload);
     expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("/api/_user/location/shares");
@@ -221,7 +221,7 @@ describe("history share and read calls", () => {
   });
 
   it("lists grants in both directions and revokes one", async () => {
-    const payload = { owned: historyCreated.shares, sharedWithMe: [] };
+    const payload = { owned: historyCreated.shares.map((row) => ({ ...row, targetUsername: "satellite" })), sharedWithMe: [] };
     const listMock = stubFetch(() => jsonResponse(payload));
     await expect(listLocationHistoryShares(token)).resolves.toEqual(payload);
     expect((listMock.mock.calls[0] as unknown as [string])[0]).toBe(

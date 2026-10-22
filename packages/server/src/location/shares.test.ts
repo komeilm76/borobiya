@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
 import { MAX_LOCATION_SHARE_MINUTES, MAX_LOCATION_SHARE_TARGETS } from "@borobiya/shared";
-import type { LocationShareRecord, LocationShareStore } from "../db/location-share-store";
+import type { LocationShareRecord, LocationShareStore, OwnedLocationShareRecord } from "../db/location-share-store";
 import type { UserDeviceRecord, UserDeviceStore } from "../db/device-store";
 import type { SecurityQuestionsUserRecord, UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "../auth/user-security-questions";
@@ -54,7 +54,7 @@ function userRow(overrides: Partial<SecurityQuestionsUserRecord> = {}): Security
   };
 }
 
-function shareRow(overrides: Partial<LocationShareRecord> = {}): LocationShareRecord {
+function shareRow(overrides: Partial<OwnedLocationShareRecord> = {}): OwnedLocationShareRecord {
   return {
     id: randomUUID(),
     ownerId,
@@ -64,9 +64,10 @@ function shareRow(overrides: Partial<LocationShareRecord> = {}): LocationShareRe
     isRevoked: false,
     priorityDeviceId: null,
     note: null,
+    targetUsername: "satellite",
     createdAt,
     ...overrides
-  } as LocationShareRecord;
+  } as OwnedLocationShareRecord;
 }
 
 function makeSecurityStore(user: SecurityQuestionsUserRecord) {
@@ -518,10 +519,19 @@ describe("GET /_user/location/shares", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(listActiveShares.mock.calls[0]![0]).toEqual({ userId: ownerId, limit: listLimit });
+    // An owned row keeps its label even when the target could not be named: the list is how a share is
+    // revoked, so an unreadable username costs a label and not the row.
+    const unnamed = await app.inject({
+      method: "GET",
+      url: "/_user/location/shares",
+      headers: await authorizedHeaders()
+    });
+    expect(unnamed.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
       owned: [expect.objectContaining({
         ownerId,
         targetUserId: targetId,
+        targetUsername: "satellite",
         mode: "timed",
         note: "night shift",
         expiresAt: "2026-10-21T10:00:00.000Z",

@@ -139,8 +139,14 @@ export type ReceivedLocationHistoryShare = z.infer<typeof receivedHistoryShareSc
  * (or retention prunes the points underneath it). Receivers need this list because the shared read
  * endpoint takes a grant id and there is no other way to learn one.
  */
+/** An owned history grant: same label rule as `ownedLocationShareSchema`. */
+export const ownedLocationHistoryShareSchema = locationHistoryShareSchema.extend({
+  targetUsername: z.string().nullable()
+});
+export type OwnedLocationHistoryShare = z.infer<typeof ownedLocationHistoryShareSchema>;
+
 export const locationHistorySharesResponseSchema = z.strictObject({
-  owned: z.array(locationHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  owned: z.array(ownedLocationHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
   sharedWithMe: z.array(receivedHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
 });
 export type LocationHistorySharesResponse = z.infer<typeof locationHistorySharesResponseSchema>;
@@ -153,6 +159,23 @@ export const locationShareOwnerSchema = z.strictObject({
 });
 export type LocationShareOwner = z.infer<typeof locationShareOwnerSchema>;
 
+/**
+ * An owned row of the live-share list, as the server answers it.
+ *
+ * The label exists because a list of bare uuids is not an answer to "who can see me right now": the
+ * receiver side already gets `owner.username`, and an outgoing row is the same question in the other
+ * direction. It is nullable and the read is a left join on purpose — a share whose target row cannot be
+ * read must still appear, because that row is the one the owner needs in order to revoke it. Dropping it
+ * to keep the shape tidy would hide an open share.
+ *
+ * Not on `locationShareSchema` itself: the create response describes rows the caller just wrote and has
+ * no use for a label, and an additive field there would make the two responses drift apart silently.
+ */
+export const ownedLocationShareSchema = locationShareSchema.extend({
+  targetUsername: z.string().nullable()
+});
+export type OwnedLocationShare = z.infer<typeof ownedLocationShareSchema>;
+
 export const receivedLocationShareSchema = locationShareSchema.extend({
   owner: locationShareOwnerSchema
 });
@@ -163,7 +186,7 @@ export type ReceivedLocationShare = z.infer<typeof receivedLocationShareSchema>;
  * lists. Each list is capped at `MAX_LOCATION_SHARE_LIST_ITEMS` newest rows.
  */
 export const locationSharesResponseSchema = z.strictObject({
-  owned: z.array(locationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  owned: z.array(ownedLocationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
   sharedWithMe: z.array(receivedLocationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
 });
 export type LocationSharesResponse = z.infer<typeof locationSharesResponseSchema>;
