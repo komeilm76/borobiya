@@ -123,7 +123,7 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, and the live-location surface are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, the live-location surface, and SOS creation are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
@@ -167,6 +167,9 @@ packages/server/
     ├── users/
     │   ├── search.ts         # GET /_user/users/search: term-bounded username search with the filters this build can honor, and a refusal for the ones it cannot
     │   └── search.test.ts    # required term, refused filters, cleared controls, filter mapping, coordinate pairing, and page/total mapping
+    ├── sos/
+    │   ├── requests.ts       # POST /_user/sos/requests: schema-bounded severity/description/coordinates, the catalog lookup that decides whether the incident type exists, and the refusal of a client-supplied photoUrl
+    │   └── requests.test.ts  # length bounds at both ends, coordinate and accuracy rules, trimming, strict keys, catalog refusal wording, and the /_user guard's coverage of this path
     ├── realtime/
     │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
     │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests
@@ -184,6 +187,8 @@ packages/server/
     │   ├── location-history-store.ts # grant creation with the duplicate window rule, grant lists and delete, windowed reads sampled inside the query, fix persistence, and the batched retention prune — one transaction per fix: PostGIS users.last_location upsert + location_history insert
     │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
+    │   ├── sos-request-store.ts # one transaction for the incident-type probe and the SOS insert: PostGIS point built from (lon, lat), status read back from the row, photo column left to the upload endpoint
+    │   ├── sos-request-store.test.ts # rendered SQL for the geography expression and defaults, plus the probe-empty/insert-never ordering and the typed refusal
     │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
     │   ├── user-search-store.ts # partial username match over reachable accounts with rating/online filters, session-derived liveness, and PostGIS distance in kilometres
     │   ├── user-search-store.test.ts # escaped patterns, parameter order, the position fallback, and page/count mapping
@@ -208,7 +213,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, and responder-category stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS, missions, and geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (SOS, missions, geocoding and the rest of search) are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, responder-category, and SOS-request stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS request creation is live (T3.2.2) — the photo upload, list/detail and cancellation halves of `/_user/sos` and every mission handler are not, and `/_admin/sos` dispatch arrives with T3.3.2; geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes and `POST /_user/sos/requests`, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share or file an SOS. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (the rest of SOS, missions, geocoding and the rest of search) are not.
 
 ---
 

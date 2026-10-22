@@ -24,6 +24,8 @@ import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
 import { registerAdminCategoryRoutes } from "./admin/categories";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
+import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
+import { registerSosRequestRoutes } from "./sos/requests";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
 import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
 import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
@@ -73,6 +75,8 @@ export interface FastifyAppDependencies {
   incidentTypeStore?: IncidentTypeStore;
   /** Override responder-category persistence in tests. */
   categoryStore?: CategoryStore;
+  /** Override SOS-request creation persistence in tests. */
+  sosRequestStore?: SosRequestStore;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
@@ -118,7 +122,8 @@ export async function createFastifyApp(
     dependencies.locationHistoryStore,
     dependencies.userSearchStore,
     dependencies.incidentTypeStore,
-    dependencies.categoryStore
+    dependencies.categoryStore,
+    dependencies.sosRequestStore
   ].some((store) => store === undefined);
   const database = needsDatabase ? createDatabase(config.databaseUrl) : undefined;
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
@@ -132,6 +137,7 @@ export async function createFastifyApp(
   const userSearchStore = dependencies.userSearchStore ?? new DrizzleUserSearchStore(database!.db);
   const incidentTypeStore = dependencies.incidentTypeStore ?? new DrizzleIncidentTypeStore(database!.db);
   const categoryStore = dependencies.categoryStore ?? new DrizzleCategoryStore(database!.db);
+  const sosRequestStore = dependencies.sosRequestStore ?? new DrizzleSosRequestStore(database!.db);
   const liveLocationService = createLiveLocationService({
     shareStore: locationShareStore,
     historyStore: locationHistoryStore
@@ -181,6 +187,9 @@ export async function createFastifyApp(
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks.
   await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
+  // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
+  // has finished onboarding, which is exactly the state dispatch is entitled to trust.
+  await registerSosRequestRoutes(app, { store: sosRequestStore });
   await registerLocationHistoryShareRoutes(app, {
     store: locationHistoryStore,
     shares: locationShareStore,

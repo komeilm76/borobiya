@@ -44,7 +44,8 @@ const implementedOperationIds = new Set([
   "locationRevokeHistoryShare",
   "locationRevokeShare",
   "locationListShares",
-  "locationUpdateRestFallback"
+  "locationUpdateRestFallback",
+  "sosCreateRequest"
 ]);
 
 interface JsonObjectSchema {

@@ -87,6 +87,53 @@ describe("Fastify server skeleton", () => {
     expect(paths["/_admin/incidents/{id}"]?.patch?.responses, "rename gained 409").toHaveProperty("409");
   });
 
+  it("registers the SOS creation route, so it answers 401 rather than the contract-only 404", async () => {
+    // T3.2.2 mounted a real handler at `POST /_user/sos/requests`. The store below refuses to run
+    // without a session, so reaching 401 instead of 404 is the proof the route exists and that the
+    // `/_user` hook — the only thing standing between an anonymous caller and the SOS table — is in
+    // front of it.
+    const app = await makeApp({}, {
+      sosRequestStore: {
+        async createRequest() {
+          throw new Error("the session guard must reject before anything is filed");
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests",
+      payload: {
+        severity: "high",
+        description: "Roof collapse, two people unaccounted for inside.",
+        incidentTypeId: "00000000-0000-4000-8000-000000000001",
+        location: { lat: 35.7, lon: 51.4, isManual: false }
+      }
+    });
+    expect(response.statusCode).toBe(401);
+
+    const document = await app.inject({ method: "GET", url: "/docs/json" });
+    const createRequest = (document.json().paths as Record<string, Record<string, Record<string, unknown>>>)[
+      "/_user/sos/requests"
+    ]?.post;
+    expect(createRequest?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(createRequest?.["x-borobiya-access"]).toBe("authenticated");
+    expect(createRequest?.["security"]).toEqual([{ bearerAuth: [] }]);
+    expect(createRequest?.["responses"]).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // The map pin is the field the generated client must be able to write, and its absence would
+    // mean the contract the SOS screen is built against still describes a lat/lon pair it cannot set.
+    expect(createRequest?.["requestBody"]).toHaveProperty(
+      "content.application/json.schema.properties.location.properties.isManual"
+    );
+    expect(createRequest?.["requestBody"]).toHaveProperty("content.application/json.schema.properties.incidentTypeId");
+  });
+
   it("serves the public health endpoint with security headers", async () => {
     const app = await makeApp();
     const response = await app.inject({ method: "GET", url: "/_public/health" });
