@@ -1052,6 +1052,7 @@ MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=2026-10-18
+MAP_PLANETILER_SOURCES_DIR=   # blank = <map-library>/planetiler-sources; Planetiler's reference layers are cached once per library
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14
 # (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)

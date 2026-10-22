@@ -889,6 +889,12 @@ if [[ -s "$MAP_DATASET_DIR/${DATASET}.pmtiles" ]] && \
    [[ "$(metadata_value "$MAP_DATASET_DIR/${DATASET}.metadata.json" sourcePbfSha256)" == "$pbf_sha" ]]; then
   note "existing ${DATASET}.pmtiles matches the dataset checksum — skipping tile build"
 else
+  # Planetiler wants three global reference layers (Natural Earth, lake centerlines, water polygons) on top of
+  # the dataset PBF. generate-tiles.sh fetches them into the shared library cache first and reuses them for
+  # every dataset, so say here that a first build may pull ~1.3 GB — a multi-GB surprise mid-pipeline is what
+  # people mistake for a hang, and an unreachable host is now reported by the fetch script with the paths it
+  # needs rather than as a Java stack trace from Planetiler.
+  note "tile build may fetch ~1.3 GB of Planetiler reference layers into ${MAP_PLANETILER_SOURCES_DIR:-${MAP_LIBRARY_DIR}/planetiler-sources} (reused by later builds; MAP_SOURCE_POLICY=offline requires them present)"
   ./map-server/scripts/generate-tiles.sh
 fi
 

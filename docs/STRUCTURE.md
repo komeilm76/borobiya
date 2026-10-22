@@ -34,7 +34,7 @@ borobiya/
 │
 ├── map-server/
 │   ├── README.md             # map-server setup and runtime-data status
-│   ├── scripts/              # region catalog, source/crop pipeline, library manager, verifiers
+│   ├── scripts/              # region catalog, source/crop pipeline, library manager, Planetiler reference-layer fetcher, verifiers
 │   ├── routing-gateway/      # route/geocoding adapter and map-config endpoint
 │   ├── styles/, sprites/, fonts/ # committed MapLibre assets
 │   └── photon/               # Photon Dockerfile; release JAR is ignored
@@ -345,7 +345,7 @@ map-server/
 ├── styles/                   # committed light/dark MapLibre styles
 ├── sprites/                  # committed SVG source artwork for Martin sprites
 ├── fonts/                    # licensed TTFs and provenance
-├── scripts/                  # region catalog, source/crop pipeline, library manager, verifiers
+├── scripts/                  # region catalog, source/crop pipeline, library manager, Planetiler reference-layer fetcher, verifiers
 ├── routing-gateway/          # route/geocoding adapter, public map config, and tests
 └── photon/                   # Photon Dockerfile; versioned JAR is ignored
 

@@ -9,6 +9,7 @@ This guide builds and verifies T1.4.2 (Martin vector tiles), T1.4.4 (OSRM routes
 - The default snapshot is the repository-pinned Geofabrik **2026-10-18 snapshot** in `map-server/regions.json` (dated `*-261018.osm.pbf` files; checksums are verified against committed MD5s where available and otherwise against Geofabrik's official `.md5` sidecars). For example, Iran is 229,852,435 bytes, MD5 `a23eb2f21e426677bd243b2712ec1bc8`, data timestamp `2026-10-18T20:25:06Z`. The added Afghanistan, Armenia, Azerbaijan, Iraq, Pakistan, Turkmenistan, Saudi Arabia, Oman, Bahrain, Kuwait, Qatar, and UAE sources resolve their official pinned-date sidecars on first online use; the verified MD5 and file metadata are cached in the external map library for offline reuse. Setup can instead deliberately resolve the newest common dated snapshot or a specific `YYYY-MM-DD`; those sources are also verified against Geofabrik sidecars. Never hand-substitute a moving `*-latest` URL. [Geofabrik Iran page](https://download.geofabrik.de/asia/iran.html) · [dated MD5 sidecar](https://download.geofabrik.de/asia/iran-261018.osm.pbf.md5) · [`MAP_LIBRARY.md`](./MAP_LIBRARY.md).
 - Ubuntu 24.04's standard `osmium-tool` package is **1.16.0**, and the project pins that exact version everywhere (`MAP_OSMIUM_VERSION=1.16.0` in `.env.example`, the `prepare-regions-pbf.sh` default, and this runbook), so no override is needed on this VM. Install the Ubuntu package and keep the pinned value; the preparation script requires an exact match with `osmium --version` and writes it into the crop manifest. Reload `.env` in every new terminal (`set -a; source .env; set +a`), or step 8 sees a stale/empty value. [Ubuntu Noble package](https://packages.ubuntu.com/noble/utils/osmium-tool).
 - If the VM has no direct internet, use the **Proxy** section below before Phase A.
+- Planetiler needs three global reference layers in addition to the dataset PBF (Natural Earth, OSM lake centerlines, OSM water polygons, ~1.3 GB together). `generate-tiles.sh` fetches them once into `MAP_PLANETILER_SOURCES_DIR` inside the map library and reuses them for every later build, so tile generation itself needs no internet. Their hosts are independent of Geofabrik and have their own outages — `osmdata.openstreetmap.de` was unreachable on 2026-10-22 and aborted builds with `Error getting size of …water-polygons-split-3857.zip`; see **If step 9 fails**.
 - `--max-table-size 100` is an OSRM `/table` query-size limit, **not** a general RAM limit. We keep the default cap and set OSRM runtime workers to one. [OSRM command-line options](https://project-osrm.org/docs/v26.4.0/tools).
 
 ---
@@ -74,8 +75,10 @@ printf '[Service]\nEnvironment="HTTP_PROXY=%s"\nEnvironment="HTTPS_PROXY=%s"\nEn
 sudo systemctl daemon-reload
 sudo systemctl restart docker
 
-# Java (only before Step 9, for Planetiler's download)
-export JAVA_TOOL_OPTIONS="-Dhttp.proxyHost=${PROXY_HOST} -Dhttp.proxyPort=${PROXY_PORT} -Dhttps.proxyHost=${PROXY_HOST} -Dhttps.proxyPort=${PROXY_PORT}"
+# No Java proxy setup is needed for Step 9 any more: the three reference layers Planetiler wants are
+# fetched by map-server/scripts/fetch-planetiler-sources.sh, which uses curl and so honors http_proxy/
+# https_proxy from this terminal. Planetiler 0.10.2's own downloader has no proxy option at all, which is
+# part of why the project fetches those files itself.
 ```
 
 Do not write proxy values into `.env`.
@@ -255,6 +258,10 @@ MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_OSMIUM_VERSION=1.16.0
+MAP_PLANETILER_SOURCES_DIR=
+MAP_NATURAL_EARTH_URL=
+MAP_LAKE_CENTERLINES_URL=
+MAP_WATER_POLYGONS_URL=
 PLANETILER_HEAP=3g
 OSRM_BUILD_THREADS=2
 OSRM_RUNTIME_THREADS=1
@@ -268,7 +275,7 @@ NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
 PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
 
-The `.env.example` already contains the resource-tuning values; edit the existing entries rather than appending duplicate keys.
+The `.env.example` already contains the resource-tuning values; edit the existing entries rather than appending duplicate keys. Leave the four `MAP_PLANETILER_*`/`MAP_*_URL` lines blank for normal use: the first means "cache under the map library" and the other three mean "use the public source"; they exist for mirrors and air-gapped networks.
 
 Then generate real secrets—the API refuses to start while `.env` contains the example placeholders (`Replace the example placeholder secret`). Run this **before** the first `docker compose up`, and do not change the database passwords afterwards: PostgreSQL and Nominatim keep the first password inside their data volumes.
 
@@ -393,6 +400,51 @@ PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh
 ```
 
 The script uses `-Xmx3g` by default, checks Java 21+, downloads/verifies Planetiler 0.10.2, and writes the PMTiles archive plus build metadata. If the Java process is killed for memory, stop and share the final log and `free -h`; do not immediately raise the heap on a 6 GiB VM.
+
+Before Planetiler starts, the script makes sure the three reference layers it wants are in the shared cache, and prints one line each:
+
+```bash
+PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh
+# Natural Earth: fetching https://naciscdn.org/naturalearth/packages/natural_earth_vector.sqlite.zip
+# Natural Earth: verified …/planetiler-sources/natural_earth_vector.sqlite.zip (SHA-256 …, 407349211 bytes)
+# OSM lake centerlines: cached …/planetiler-sources/lake_centerline.shp.zip (SHA-256 …)
+# OSM water polygons: cached …/planetiler-sources/water-polygons-split-3857.zip (SHA-256 …)
+# Generating /home/user/.local/share/borobiya/map-library/datasets/…/borobiya.pmtiles (…)
+```
+
+The first run on a VM downloads roughly 1.3 GB into `$MAP_PLANETILER_SOURCES_DIR` (default `<map-library>/planetiler-sources`); every later build — including a build after changing the area selection or snapshot — reuses those files and touches no network for them. That is deliberate: these layers are global, not per-dataset, and Planetiler only fetches a source whose file is missing, so a warm cache is what makes tiles buildable on a machine with no internet. A copy left behind by an older checkout inside the dataset directory is moved into the cache rather than re-downloaded. Run the fetch step alone if you want to stage them in advance or verify them separately:
+
+```bash
+./map-server/scripts/fetch-planetiler-sources.sh
+```
+
+#### If step 9 fails
+
+**`Exception in thread "main" java.lang.IllegalStateException: Error getting size of https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip` / `Caused by: java.util.concurrent.TimeoutException`** — this is not a bad PBF, a memory problem, or a bug in the dataset: one of the three reference-layer hosts did not answer in time. Before this pipeline step existed, that request was made inside Planetiler, which waits a hard-coded 10 seconds for a size probe with no retry, so a slow or down host killed the whole build before it started and `--http_timeout`/`--http_retries` did not apply to it. Now the fetch happens in `fetch-planetiler-sources.sh`, which resumes, retries, and fails with the file, the destination path, and three ways to fix it. Usual causes, in order:
+
+1. **The host is down or unreachable from this network** (osmdata was on 2026-10-22). Get the file any way you trust and put it at the printed path — another machine, a mirror, or a copy from a previous VM:
+   ```bash
+   curl -fL --retry 3 -C - -o "$MAP_PLANETILER_SOURCES_DIR/water-polygons-split-3857.zip" \
+     https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip
+   ```
+   To use a different source instead, set the override (it replaces the public URL completely, so no fallback to the dead host) and re-run:
+   ```bash
+   export MAP_WATER_POLYGONS_URL=https://<your-mirror>/water-polygons-split-3857.zip
+   ./map-server/scripts/fetch-planetiler-sources.sh
+   ```
+2. **You only need the build to get past this step** (development checks, not a deliverable dataset): Planetiler publishes small copies of these two archives as test resources, and its own README points `--water-polygons-url`/`--natural-earth-url` at them for exactly this purpose. They cover Monaco, so water outside that box is simply missing — fine for a smoke test of a Tehran build (the sea is not in the bbox), never for a whole-country dataset:
+   ```bash
+   export MAP_WATER_POLYGONS_URL=https://github.com/onthegomap/planetiler/raw/main/planetiler-core/src/test/resources/water-polygons-split-3857.zip
+   export MAP_NATURAL_EARTH_URL=https://github.com/onthegomap/planetiler/raw/main/planetiler-core/src/test/resources/natural_earth_vector.sqlite.zip
+   ./map-server/scripts/fetch-planetiler-sources.sh
+   ```
+   The script writes whatever URL you give it to the cache filename Planetiler expects, so a differently-named or pre-staged copy works too; say in the acceptance notes that these two layers are Planetiler's Monaco test fixtures, and rebuild the tiles when the real archive is available — the metadata records the dataset hash, not these layers, so the shortcut is invisible to `verify-tiles.sh`.
+
+3. **The proxy is set in the JVM but not in the shell.** `curl` and `wget` read `http_proxy`/`https_proxy`; re-export them as in the Proxy section, then re-run the fetch script.
+4. **The download was truncated** (an interrupted transfer or a saved error page). A file that is not a readable archive is never accepted: it is discarded, the next URL is tried, and a later run will re-fetch. If a cache entry is suspect, delete just that file and re-run.
+
+If the VM is meant to build offline, put the three archives in `$MAP_PLANETILER_SOURCES_DIR` first and set `MAP_SOURCE_POLICY=offline`: the fetch step then refuses instead of reaching out, and names the exact paths it wanted.
+
 
 ### 10. Build OSRM car, bicycle, and foot graphs sequentially
 

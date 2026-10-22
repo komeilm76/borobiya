@@ -342,6 +342,8 @@ MAP_DATA_VERSION=2026-10-18  # equals MAP_SNAPSHOT_DATE
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14              # Planetiler 0.10.2 supports up to 16
 MAP_OSMIUM_VERSION=1.16.0  # must match `osmium --version`; Ubuntu 24.04 apt version
+MAP_PLANETILER_SOURCES_DIR=      # blank = <map-library>/planetiler-sources (shared by all datasets)
+MAP_WATER_POLYGONS_URL=          # optional mirror; replaces the public URL for that source
 MAP_PBF=                   # setup-managed <dataset>/borobiya.osm.pbf
 PHOTON_DEFAULT_LANGUAGE=fa   # follows the first selected area's country
 PLANETILER_HEAP=3g
@@ -367,6 +369,8 @@ NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
 PHOTON_PORT=2322
 PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
+
+**Reference layers:** Planetiler's OpenMapTiles profile also reads three global archives — Natural Earth, OSM lake centerlines, and OSM water polygons — from their own hosts. `generate-tiles.sh` fetches anything missing into `$MAP_PLANETILER_SOURCES_DIR` (default `<map-library>/planetiler-sources`) via `fetch-planetiler-sources.sh` before starting the JVM, then passes that directory as `--download-dir`, so a warm cache means tile generation touches no network and `MAP_SOURCE_POLICY=offline` covers the tiles as well as the PBF. A source is re-fetched only when its file is absent, so `--refresh_sources` is deliberately never passed; `MAP_NATURAL_EARTH_URL`/`MAP_LAKE_CENTERLINES_URL`/`MAP_WATER_POLYGONS_URL` replace a public URL outright for a mirror, and an archive that is not a readable ZIP is discarded rather than cached.
 
 **Geographic coverage:** The default selection is Tehran (`ir-tehran`); any catalog areas can be combined (cities and/or whole countries, including adjacent countries whose rectangular bounds overlap). `prepare-regions-pbf.sh` builds the one shared merged dataset for the selection; Planetiler bounds, `/map-config` bounds, OSRM graphs, and the Nominatim→Photon import all derive from it, and generated tile/route metadata store its SHA-256 + area list while `MAP_DATA_VERSION` records the installed snapshot date. Switching areas or snapshot is a data operation, not a code change: resolve the standardized library dataset, rebuild tiles/graphs/geocoding from it, and activate it after acceptance — `scripts/setup-ubuntu-vm.sh` does exactly this, including the Nominatim/Photon reset and pruning replaced releases. Styles, Martin config, and Compose are selection-independent because the dataset slug (`borobiya`) never changes. Note that very distant multi-city selections enlarge the union bbox Planetiler processes (more download/compute for natural-earth/water data), and whole large countries are heavy builds on a 6 GiB VM.
 

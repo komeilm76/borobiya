@@ -55,6 +55,11 @@ if [[ -z "$MAP_SNAPSHOT_DATE" ]]; then
   MAP_SNAPSHOT_DATE="$(python3 "$SCRIPT_DIR/regions.py" pinned-snapshot)"
 fi
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-$MAP_SNAPSHOT_DATE}"
+# Planetiler's OpenMapTiles profile wants three global reference layers in addition to the dataset PBF.
+# They are not area- or snapshot-specific, so they are cached once per library (see the fetch script for why
+# this project fetches them itself instead of letting Planetiler do it) and pointed at with --download-dir.
+MAP_PLANETILER_SOURCES_DIR="${MAP_PLANETILER_SOURCES_DIR:-$MAP_LIBRARY_DIR/planetiler-sources}"
+[[ "$MAP_PLANETILER_SOURCES_DIR" == /* ]] || fail 'MAP_PLANETILER_SOURCES_DIR must be an absolute path'
 MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
 MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
 # The canonical merged dataset PBF is the default; explicit paths remain available for audited local setups.
@@ -163,6 +168,13 @@ temp_dir="$(mktemp -d "$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.XXXXXX")"
 temp_output="$temp_dir/$MAP_REGION.pmtiles"
 metadata_tmp="$temp_dir/$MAP_REGION.metadata.json"
 trap 'rm -rf -- "${temp_dir:-}"' EXIT
+# Overlap sources first, while a failure is still a sentence rather than a Java stack trace: Planetiler gives
+# each source 10 hard-coded seconds to answer a size probe, with no retry, and aborts the whole build when a
+# host is slow or down. By the time it runs, every one of these files exists on disk, so it issues no request.
+MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR" MAP_DATA_DIR="$MAP_DATA_DIR" \
+  MAP_PLANETILER_SOURCES_DIR="$MAP_PLANETILER_SOURCES_DIR" MAP_SOURCE_POLICY="${MAP_SOURCE_POLICY:-cache-first}" \
+  "$SCRIPT_DIR/fetch-planetiler-sources.sh"
+
 printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
   "$OUTPUT" "$MAP_DATA_VERSION" "$map_min_zoom" "$map_max_zoom" "$MAP_BBOX" "$MAP_PBF"
 (
@@ -173,7 +185,15 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
     --bounds="$MAP_BBOX" \
     --minzoom="$map_min_zoom" \
     --maxzoom="$map_max_zoom" \
+    --download-dir="$MAP_PLANETILER_SOURCES_DIR" \
+    --download-osm-tile-weights=false \
     --download --force
+  # `--download` stays so a source added to the profile in a future Planetiler bump still works, and it is
+  # harmless for the three we just cached: Planetiler only fetches a source whose file is absent.
+  # `--force` is only "overwrite the output file and ignore disk/RAM warnings" (Planetiler 0.10.2) - it does
+  # not re-download anything, and the output here is a fresh temp path, so it is kept for the overwrite half.
+  # `--refresh_sources` is deliberately NOT passed: it is the flag that makes Planetiler HEAD every source on
+  # every run, which is exactly the request whose 10-second timeout kills a build when a host is unreachable.
 )
 [[ -s "$temp_output" ]] || fail 'Planetiler did not produce a non-empty PMTiles archive'
 

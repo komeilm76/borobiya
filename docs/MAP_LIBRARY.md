@@ -61,6 +61,11 @@ just because it exists.
     <continent>/<country>/<city>/<YYYY-MM-DD>/
       <country>-<city>.osm.pbf
       <country>-<city>.source.json
+  planetiler-sources/
+    natural_earth_vector.sqlite.zip
+    natural_earth_vector.sqlite.zip.sha256
+    lake_centerline.shp.zip
+    water-polygons-split-3857.zip
   datasets/
     current -> <YYYY-MM-DD>/<fingerprint>
     <YYYY-MM-DD>/<fingerprint>/
@@ -292,6 +297,17 @@ not contain Docker images, Docker volumes, PostgreSQL application data, apt
 packages, Java, Osmium, Bun dependencies, Planetiler/Photon tool JARs, or the
 Nominatim database volume. Those remain separate installation/runtime
 concerns.
+
+The three global reference layers Planetiler's OpenMapTiles profile wants on
+top of the dataset PBF (Natural Earth, OSM lake centerlines, OSM water polygons)
+**are** map content, and they live in `planetiler-sources/` rather than inside a
+dataset bundle: they do not vary with the selected areas or snapshot, so caching
+them per dataset would re-download roughly 1.3 GB for every selection. Their
+third-party hosts fail independently of Geofabrik, which is why
+`map-server/scripts/fetch-planetiler-sources.sh` owns that fetch (resume, retry,
+archive validation, mirror overrides, SHA-256 stamps) and `generate-tiles.sh`
+points Planetiler's `--download-dir` at the same directory — with the files
+present, Planetiler issues no request for them and a build needs no internet.
 
 Once those prerequisites and service images are installed, a complete active
 dataset in the library can be launched and verified without downloading map
