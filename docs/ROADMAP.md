@@ -117,7 +117,7 @@ gantt
 **Goal:** Full SOS lifecycle — request → admin dispatch → rescuer accept → navigation → status timeline → cancellation/replacement.
 
 ### M3.1 Admin Domain Model
-- [ ] `incident_types` + `categories` + pivots `category_users` + `category_incident_types`
+- [x] `incident_types` + `categories` + pivots `category_users` + `category_incident_types` — DDL generated as `drizzle/0010_complete_namor.sql`, 2026-10-22
 - [ ] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users`
 - [ ] Frontend: Admin /incidents & /categories CRUD + assign users
 

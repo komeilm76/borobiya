@@ -229,7 +229,7 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 - `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and no index backs `ILIKE '%x%'` yet — trigram/prefix indexing and index-backed term-free browsing belong to T4.1.1.
 - The caller's own account is never a candidate, in the page or in its `total`: `POST /_user/location/share` refuses it (`self_target`), so a list that offered it could only produce an error the user cannot act on. The dialog still greys it out when it happens to see it (a cached list from before a profile load), but that is presentation, not the rule.
 - `minRating` and `online` are honored: unrated accounts count as 0 (a quality floor should not be satisfied by an absence of data), and liveness is the same rule the device list uses — a session still holding a refresh token.
-- `category` and `incidentType` answer `400 SEARCH_FILTER_UNSUPPORTED` listing the offending names, because category membership and incident specialty have no tables yet. An empty-string `category=` is treated as absent.
+- `category` and `incidentType` answer `400 SEARCH_FILTER_UNSUPPORTED` listing the offending names, because the search read does not join `categories`/`category_users`/`category_incident_types` yet — the tables arrived with T3.1.1, the projection is a later task, and refusing beats returning unfiltered rows under a filter the caller believes was applied. An empty-string `category=` is treated as absent.
 - `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix. `total` counts the filtered set in its own statement: page and total are not read in one transaction, so on a busy instance they can differ by whoever signed up in between.
 - `sort` accepts only `distance`, so it needs no refusal; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
 
@@ -460,7 +460,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
 | 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
-| 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter with no backing table yet (`category`, `incidentType`); `issues[0].filters` lists them |
+| 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter its read does not join yet (`category`, `incidentType`); `issues[0].filters` lists them |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |

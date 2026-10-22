@@ -86,16 +86,17 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | History share + retention | 100% (6/6 tasks) | T2.2.1 `location_history` and T2.2.2 `location_history_shares` exist in migration `0007_brief_hedge_knight.sql`, the writer runs inside `location:update` (T2.1.5), T2.2.5 wired `LOCATION_HISTORY_RETENTION_DAYS`/`LOCATION_HISTORY_MAX_SHARE_DAYS` plus the batched daily prune, and T2.2.3 creates grants — window bounded by the share-days ceiling, 1–50 recipients checked with the live-share rules, `max_points` stored on the row (`0009`) — and T2.2.4 reads them: both directions listed, a window sampled inside the query with its unsampled `totalPoints` reported, and a grant deleted outright; and T2.2.6 put the read on the map: presets (1/7/30 days, default 7) or a hand-typed local window, a sampled polyline with the played prefix and an interpolated head, scrub slider, step and 1×/4×/16×/60× transport, camera fit that refuses to zoom into a single fix, and a caption naming the sampling (67 new client cases). Every task in this milestone is now complete in code; what is left is the browser run and PostgreSQL verification |
 | Multi-device priority | 100% (6/6 tasks) | T2.3.4 server-side rejection of non-priority devices is live inside the realtime path; T2.3.1 confirms `user_sessions` carries every spec field (and now stores a human device label instead of a raw UA); T2.3.2 serves `GET /_user/devices` with `deviceId` exposed for the picker; T2.3.3 enforces the selection on the server — auto-pin for one live device, `409 PRIORITY_DEVICE_REQUIRED` with the device list for more, and a sweep that re-points a share whose device signed out. T2.3.5 (2026-10-22) is the settings side: `/_user/devices` shows the live sessions (label, status, age, IP, how many shares each one broadcasts) and re-points any share's pin — with the “only this device sends, the others stop” rule stated on the screen, and with the write built so it cannot extend a timed share, change a row that already expired, or create one that vanished; and T2.3.6 (2026-10-22) closes the milestone: a native build reports brand+model as its session label (never the user-assigned device name, which is personal data and generic on recent iOS) and `usePriorityDevice` answers “am I the device that broadcasts?” by deriving it from the same two lists rather than enforcing anything; the client half of T2.3.3 landed inside the share dialog (T2.1.7), where a `409` opens a radio list of the device ids the server itself reported |
 
-### Phase 3 — SOS Rescue — 0%
+### Phase 3 — SOS Rescue — 5% (2 of 39 tracked items, counted from `docs/TASKS.md` §3.1–3.7)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
-| Incidents/categories | 0% | — |
-| SOS request | 0% | — |
-| Dispatch + nearest | 0% | — |
-| Proposals | 0% | — |
-| Live mission + routing | 0% | — |
-| Cancellation + re-dispatch | 0% | — |
+| 3.1 Incidents/categories | 20% (1/5) | ✅ T3.1.1 shipped the four tables (`drizzle/0010_complete_namor.sql`: `incident_types` + `categories` + both composite-key pivots, cascade on every side, nothing seeded). ⬜ T3.1.2 incident CRUD, T3.1.3 category CRUD + assignment, T3.1.4 the multi-category/no-category behavior check, T3.1.5 the admin screens. Search still refuses `category=`/`incidentType=` because its read does not join these tables — the projection's job, not the DDL's |
+| 3.2 SOS request | 0% (0/5) | — |
+| 3.3 Dispatch + nearest | 0% (0/4) | — |
+| 3.4 Proposals | 0% (0/6) | — |
+| 3.5 Live mission + navigation | 0% (0/8) | — |
+| 3.6 Cancellation + re-dispatch | 14% (1/7) | ✅ T3.6.1 seeded `cancellation_reasons` back with T1.1.3 (2026-10-18) — the row read 0% until this pass, which is a board bug, not a reopened task: the item was checked in the tracker all along |
+| 3.7 History + rating | 0% (0/4) | ⬜ This milestone had no row on the board at all before this pass, so the phase percentage was not derivable from it; Phase 4's "Rating + history" row is the polish stage of the same domain |
 
 ### Phase 4 — Polish — 0%
 
@@ -126,6 +127,16 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-22 — T3.1.1: the category and incident catalog schema (3.1's first of five)
+
+- **Four tables, no invention:** `incident_types`, `categories`, `category_incident_types`, `category_users` are now declared in `packages/server/src/db/schema.ts` and generated into `drizzle/0010_complete_namor.sql`. The declarations mirror `docs/DIAGRAMS/ERD.md` column for column — unique `slug`, free-text `icon`/`color` with no CHECK, `created_at` nullable with a default, composite-key pivots, `ON DELETE CASCADE` on all four foreign keys. Where the ERD stops, this stops too: `icon` gets no format rule (that would be enforcing our own guess), and no reverse index is added to the pivots on the theory that some later read wants it.
+- **Nothing is seeded, deliberately.** `category_users` has no default and the migration inserts no rows, because T3.1.4 requires every account to start in no category — an assignment has to be a decision somebody made, and a schema that implied membership would make the admin screen's list a lie.
+- **Verified by executing the DDL, not only by reading it.** `src/db/schema.test.ts` pins the Drizzle table config *and* the migration text; then `0010` was applied against real PostgreSQL in PGlite (with a stand-in `users` table, since PGlite has no PostGIS): duplicate slug refused, duplicate membership refused, a phantom `user_id` refused, and deleting a user or an incident type removed exactly its pivot rows while the category survived. Re-running `bun run db:generate` writes no second migration, so schema and `drizzle/` are provably in sync. Server 333/333, shared 47/47, client 334/334, all three typechecks green.
+- **Counting the board against the tracker turned up two pre-existing errors,** both fixed here rather than quietly inherited: Phase 3's board had six rows for seven tracked sections (3.7 History & Rating was missing, so the phase percentage could not be derived), and 3.6 read 0% while T3.6.1 has been checked since 2026-10-18. The rows now carry their own `done/total` so the next reader can re-add them; Phase 3 is 2 of 39, i.e. 5%.
+- **Three bugs in my own new tests, caught by the tools rather than by luck:** I asserted `fk.foreignData.onDelete` (Drizzle's `PgForeignKey` exposes `onDelete` on the object itself), left a nonsense comparison in the pivot loop from a sloppy edit, and asserted `not.toContain('DEFAULT gen_random_uuid()')` on a migration whose two `id` columns use exactly that. The last is the instructive one: I had written an assertion for the rule I meant ("no membership is defaulted") instead of the rule the file states. It now pins `DEFAULT gen_random_uuid()` to exactly two occurrences — allowed for keys, forbidden for memberships.
+- **A doc line my own change made stale, corrected in the same commit:** `docs/API.md` and `docs/TASKS.md` justified the search refusal with "no tables yet". After this task the behavior is still right but the reason is false, so both now say what is actually missing — the read does not join them. A tracker that explains a limitation with a reason that no longer holds is worse than no reason, because the next reader stops trusting the rest of it.
+- **Next in 3.1:** T3.1.2 (`POST /_admin/incidents` + `GET /_admin/incidents` + update), then T3.1.3 (`POST /_admin/categories` with `incidentTypeIds`, and `POST /_admin/categories/:id/users`), then T3.1.4 as written — "all users start in NO category; admin assigns; user can be in multiple categories (verify)" — which this schema makes possible but does not by itself prove; the verification belongs to that task, against the API and the admin screen. T3.1.5 is the admin frontend.
 
 ### 2026-10-22 — P2-Q1: owned share rows name their target, and a rule that only held until Tuesday
 

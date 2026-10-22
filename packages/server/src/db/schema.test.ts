@@ -3,6 +3,10 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
   adminAuditLog,
+  categories,
+  categoryIncidentTypes,
+  categoryUsers,
+  incidentTypes,
   locationHistory,
   locationHistoryShares,
   locationShares,
@@ -278,5 +282,88 @@ describe("location history schema (T2.2.1/T2.2.2)", () => {
     // share row a receiver is still reading.
     expect(migrationSql.trim().split("\n")).toHaveLength(1);
     expect(migrationSql).not.toMatch(/DROP|DELETE|UPDATE|ALTER TABLE/i);
+  });
+});
+
+describe("categories and incident catalog (T3.1.1)", () => {
+  const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+    /^0010_.*\.sql$/.test(name)
+  );
+
+  it("declares the incident catalog with a unique slug and no invented format rules", () => {
+    const config = getTableConfig(incidentTypes);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("id")?.hasDefault).toBe(true);
+    expect(columns.get("name")?.notNull).toBe(true);
+    expect(columns.get("slug")?.notNull).toBe(true);
+    for (const optional of ["icon", "color", "description"]) {
+      expect(columns.get(optional)?.notNull, optional).toBe(false);
+    }
+    // The ERD gives `created_at` a default and no NOT NULL, and this migration matches it: a cosmetic
+    // tightening here would be a delta a later reader has to re-derive from the diagram.
+    expect(columns.get("created_at")?.hasDefault).toBe(true);
+    expect(columns.get("created_at")?.notNull).toBe(false);
+    expect(config.uniqueConstraints.map(({ name }) => name)).toEqual(["incident_types_slug_unique"]);
+    expect(config.checks).toHaveLength(0);
+    expect(config.foreignKeys).toHaveLength(0);
+  });
+
+  it("declares a category as a name plus membership, nothing else", () => {
+    const config = getTableConfig(categories);
+    expect(config.columns.map((column) => column.name)).toEqual(["id", "name", "description", "created_at"]);
+    expect(config.indexes).toHaveLength(0);
+    expect(config.foreignKeys).toHaveLength(0);
+  });
+
+  for (const [label, table, columns] of [
+    ["category_incident_types", categoryIncidentTypes, ["category_id", "incident_type_id"]],
+    ["category_users", categoryUsers, ["category_id", "user_id"]]
+  ] as const) {
+    it(`makes ${label} a composite-key pivot whose rows die with either side`, () => {
+      const config = getTableConfig(table);
+      expect(config.uniqueConstraints).toHaveLength(0);
+      expect(config.indexes).toHaveLength(0);
+      expect(config.primaryKeys.map((key) => key.name)).toEqual([`${label}_pkey`]);
+      // Both halves cascade: the row is a pairing, so it cannot outlive either side, and a stale pairing
+      // would keep a deleted incident type answering a live category (or a deleted user in a group).
+      expect(config.foreignKeys).toHaveLength(2);
+      for (const fk of config.foreignKeys) {
+        expect(fk.onDelete).toBe("cascade");
+        expect(fk.onUpdate).toBe("no action");
+      }
+      // Exactly two NOT NULL columns and no defaults: a membership row is always written on purpose,
+      // never implied by an insert (T3.1.4 starts every account in no category).
+      expect(config.columns.map((column) => column.name)).toEqual([...columns]);
+      expect(config.columns.filter((column) => column.notNull).map((column) => column.name)).toEqual([...columns]);
+      expect(config.columns.some((column) => column.hasDefault)).toBe(false);
+    });
+  }
+
+  it("ships the four tables as one generated migration, with the pivots' keys and cascades", () => {
+    expect(migrationNames).toHaveLength(1);
+    const name = migrationNames[0];
+    if (!name) throw new Error("The categories/incident-types migration is missing.");
+    const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    for (const table of ["incident_types", "categories", "category_incident_types", "category_users"]) {
+      expect(sql, table).toContain(`CREATE TABLE "${table}"`);
+    }
+    expect(sql).toContain('CONSTRAINT "incident_types_slug_unique" UNIQUE("slug")');
+    expect(sql).toContain('CONSTRAINT "category_users_pkey" PRIMARY KEY("category_id","user_id")');
+    expect(sql).toContain('CONSTRAINT "category_incident_types_pkey" PRIMARY KEY("category_id","incident_type_id")');
+    for (const fk of [
+      '"category_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade',
+      '"category_users_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade',
+      '"category_incident_types_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade',
+      '"category_incident_types_incident_type_id_incident_types_id_fk" FOREIGN KEY ("incident_type_id") REFERENCES "public"."incident_types"("id") ON DELETE cascade'
+    ]) {
+      expect(sql, fk).toContain(fk);
+    }
+    // No membership is seeded by the DDL itself — T3.1.4 starts every account unassigned, so the only
+    // defaults in this migration are the two `gen_random_uuid()` primary keys and `created_at`.
+    expect(sql).not.toMatch(/INSERT INTO "category_(users|incident_types)"/);
+    expect(sql.match(/DEFAULT gen_random_uuid\(\)/g) ?? []).toHaveLength(2);
+    expect(sql.match(/DEFAULT now\(\)/g) ?? []).toHaveLength(2);
   });
 });

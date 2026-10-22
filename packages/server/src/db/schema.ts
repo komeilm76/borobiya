@@ -11,6 +11,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -267,6 +268,83 @@ export const cancellationReasons = pgTable(
   ]
 );
 
+/**
+ * Incident catalog and responder categories (T3.1.1) — the four tables `docs/DIAGRAMS/ERD.md` groups as
+ * "Categories & Incidents", declared in the shape that document specifies, with nothing invented on top.
+ *
+ * `incident_types` is a table rather than an enum because admins extend it at runtime (T3.1.2), and its
+ * `slug` is the stable handle a seed can be idempotent against — hence unique. `icon` and `color` are
+ * deliberately free text with no CHECK: they are display hints the admin UI owns, and a format rule the
+ * spec does not state would only ever be enforced against the app's own guess.
+ *
+ * `created_at` is nullable with a default, exactly as the ERD writes it. Making it `NOT NULL` would be a
+ * tidy deviation from documented DDL that no query needs yet, and a schema whose deltas are cosmetic is
+ * a schema a later reader cannot trust to match its diagram.
+ */
+export const incidentTypes = pgTable(
+  "incident_types",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    icon: text("icon"),
+    color: text("color"),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
+  },
+  (table) => [unique("incident_types_slug_unique").on(table.slug)]
+);
+
+/** A responder group. It has no rules of its own beyond a name: membership lives in the pivots below. */
+export const categories = pgTable("categories", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
+});
+
+/**
+ * Which incident types a category answers — the set the nearest-responder query (T3.3.1) intersects an
+ * incoming SOS against. Cascade on both sides: the pivot describes a pairing, so it cannot outlive either
+ * half of it, and a deleted incident type must not leave a category claiming to answer it.
+ */
+export const categoryIncidentTypes = pgTable(
+  "category_incident_types",
+  {
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    incidentTypeId: uuid("incident_type_id")
+      .notNull()
+      .references(() => incidentTypes.id, { onDelete: "cascade" })
+  },
+  (table) => [primaryKey({ columns: [table.categoryId, table.incidentTypeId], name: "category_incident_types_pkey" })]
+);
+
+/**
+ * Who belongs to which category. An account with no rows here is in no category — that is the starting
+ * state T3.1.4 requires, which is why there is no default membership, no trigger, and nothing in the seed
+ * that assigns anybody.
+ *
+ * The primary key leads on `category_id`, matching the ERD, so "who is in this category" (the admin
+ * assignment screen) is the indexed direction and "which categories is this user in" (the search
+ * projection, and T3.3.1's filter) is a scan of a table whose rows are one per membership. A reverse
+ * index is a measured decision for whichever of those reads first needs one at real volume, not a
+ * speculative addition here.
+ */
+export const categoryUsers = pgTable(
+  "category_users",
+  {
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+  },
+  (table) => [primaryKey({ columns: [table.categoryId, table.userId], name: "category_users_pkey" })]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
@@ -282,3 +360,9 @@ export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
 export type PasswordResetChallengeRow = typeof passwordResetChallenges.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type CancellationReasonRow = typeof cancellationReasons.$inferSelect;
+export type IncidentTypeRow = typeof incidentTypes.$inferSelect;
+export type NewIncidentTypeRow = typeof incidentTypes.$inferInsert;
+export type CategoryRow = typeof categories.$inferSelect;
+export type NewCategoryRow = typeof categories.$inferInsert;
+export type CategoryIncidentTypeRow = typeof categoryIncidentTypes.$inferSelect;
+export type CategoryUserRow = typeof categoryUsers.$inferSelect;

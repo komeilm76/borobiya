@@ -38,7 +38,7 @@ Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 ### 1.3 Admin User Management (No Delete!)
 
 - [x] **T1.3.1** `PATCH /_admin/users/:id/status` {isActive} + transactional audit log `admin_audit_log`, refresh-session revocation on deactivation, and status/no-op handling — completed 2026-10-18
-- [x] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions) — completed 2026-10-18; category assignments and mission records remain empty until T3.1.1/T3.5.1 add those tables
+- [x] **T1.3.2** `GET /_admin/users` (q,isActive,hasCategory,pagination) + `GET /_admin/users/:id` detail (devices, missions) — completed 2026-10-18; category assignments and mission records remain empty until the admin reads join those tables (the category/incident DDL arrived with T3.1.1; T3.5.1 still owes the mission tables)
 - [x] **T1.3.3** Ensure NO `DELETE /_admin/users/:id` exists; runtime regression test asserts `404` and OpenAPI omits the operation — completed 2026-10-19
 - [x] **T1.3.4** Frontend `/_admin/users` searchable, paginated account table with status filtering and activate/deactivate confirmation — completed 2026-10-19
 
@@ -138,7 +138,12 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 3.1 Admin Domain: Incidents & Categories
 
-- [ ] **T3.1.1** Tables: `incident_types` (name, slug, icon, color), `categories`, `category_incident_types`, `category_users`
+- [x] **T3.1.1** Tables: `incident_types` (name, slug, icon, color), `categories`, `category_incident_types`, `category_users` — completed 2026-10-22
+  - **Notes:** declared in `packages/server/src/db/schema.ts` exactly as `docs/DIAGRAMS/ERD.md` specifies and generated into `drizzle/0010_complete_namor.sql` by `bun run db:generate`, so the snapshot/journal stay consistent with the schema; re-running `db:generate` afterwards creates no second migration, which is the proof the two agree. `incident_types.slug` is unique (the stable handle a seed can be idempotent against); `icon`/`color`/`description` stay free text with no CHECK, because a format rule the spec does not state would only ever be enforced against our own guess. Both pivots are composite-keyed and cascade on every side, so a pairing can never outlive either half.
+  - **Verified against real PostgreSQL:** the generated migration was executed in PGlite (with a stand-in `users` table, since PGlite has no PostGIS) — duplicate `slug` refused, duplicate membership refused, a phantom `user_id` refused, deleting a user or an incident type removed exactly its membership/pairing rows while the category survived, and `created_at` defaults filled. `src/db/schema.test.ts` pins the same facts twice over: the Drizzle table config and the migration text. Server suite 333/333, all three typechecks green.
+  - **No seeding, by design:** `category_users` has no default and the migration inserts nothing, because T3.1.4 requires every account to start in no category.
+  - **Deviation:** no index on `category_users(user_id)` or `category_incident_types(incident_type_id)`, matching the ERD. The composite keys lead on `category_id`, so "who is in this category" is the indexed direction and the reverse is a scan of a table with one row per membership; whichever read first needs it at volume (T3.3.1's nearest query, or the search projection) should add it with a measured reason rather than this migration guessing. `created_at` is nullable-with-default as documented — tightening it here would be a cosmetic delta from the diagram.
+  - **Scope:** DDL only. `GET /_user/users/search` still answers `SEARCH_FILTER_UNSUPPORTED` for `category=`/`incidentType=`: tables existing is not the same as the search read joining them, and that join belongs to the search projection, not to this task.
 - [ ] **T3.1.2** `POST /_admin/incidents` + `GET /_admin/incidents` + update
 - [ ] **T3.1.3** `POST /_admin/categories` {name, description, incidentTypeIds} + `POST /_admin/categories/:id/users`
 - [ ] **T3.1.4** All users start in NO category; admin assigns; user can be in multiple categories (verify)
