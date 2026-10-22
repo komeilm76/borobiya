@@ -432,6 +432,12 @@ The first run on a VM downloads roughly 1.3 GB into `$MAP_PLANETILER_SOURCES_DIR
    export MAP_WATER_POLYGONS_URL=https://<your-mirror>/water-polygons-split-3857.zip
    ./map-server/scripts/fetch-planetiler-sources.sh
    ```
+   One copy that was reachable while osmdata was down is a GitHub release asset — `https://github.com/Commander-Cody/frasch-koord/releases/download/tile-sources-2026-09-30/water-polygons-split-3857.zip`, 929,162,760 bytes, stated by its release notes to be the osmdata archive generated 2026-09-14 (ODbL, © OpenStreetMap contributors). It is **not** the source of record: it is somebody's snapshot, it is five-plus weeks older than a fresh download, and nothing in this project maintains it. Two things make it safe enough to use deliberately — the fetch script refuses anything that is not a readable ZIP, and the size is checkable before the 900 MB finishes:
+   ```bash
+   curl -fL --retry 3 -C - -o "$HOME/.local/share/borobiya/map-library/planetiler-sources/water-polygons-split-3857.zip"      https://github.com/Commander-Cody/frasch-koord/releases/download/tile-sources-2026-09-30/water-polygons-split-3857.zip
+   wc -c "$HOME/.local/share/borobiya/map-library/planetiler-sources/water-polygons-split-3857.zip"   # 929162760
+   ```
+   Placing the file at that path needs no override at all, because a readable file already in the cache means no request to any host. When osmdata answers again, `MAP_SOURCE_POLICY=refresh ./map-server/scripts/fetch-planetiler-sources.sh` replaces the copy with the current one — the archive is unversioned upstream, so "is my copy stale?" cannot be detected from the cache and is answered by that run's printed SHA-256 instead; record both digests in the build notes if the difference matters to the acceptance.
 2. **You only need the build to get past this step** (development checks, not a deliverable dataset): Planetiler publishes small copies of these two archives as test resources, and its own README points `--water-polygons-url`/`--natural-earth-url` at them for exactly this purpose. They cover Monaco, so water outside that box is simply missing — fine for a smoke test of a Tehran build (the sea is not in the bbox), never for a whole-country dataset:
    ```bash
    export MAP_WATER_POLYGONS_URL=https://github.com/onthegomap/planetiler/raw/main/planetiler-core/src/test/resources/water-polygons-split-3857.zip
