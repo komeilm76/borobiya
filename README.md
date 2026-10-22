@@ -1054,8 +1054,7 @@ MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=2026-10-18
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14
-MAP_STYLE_LIGHT=http://localhost:8000/style/light
-MAP_STYLE_DARK=http://localhost:8000/style/dark
+# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_GEOCODE_URL=http://localhost:8001/geocode
 MAP_REVERSE_URL=http://localhost:8001/reverse

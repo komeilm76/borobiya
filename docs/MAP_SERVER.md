@@ -348,8 +348,7 @@ PLANETILER_HEAP=3g
 OSRM_BUILD_THREADS=2
 OSRM_RUNTIME_THREADS=1
 MAP_SERVER_URL=http://localhost:8000
-MAP_STYLE_LIGHT=http://localhost:8000/style/light
-MAP_STYLE_DARK=http://localhost:8000/style/dark
+# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_ROUTING_PORT=8001
 MAP_OSRM_DATA_DIR=         # setup-managed <dataset>/routing

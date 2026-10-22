@@ -362,7 +362,7 @@ Backend mirrors these with Fastify hooks `authenticate` + `authorize`.
 
 ### 9.3 Map Integration
 
-- `MapLibre GL JS` initialized with `style: MAP_STYLE_LIGHT or DARK`.
+- `MapLibre GL JS` initialized with the theme's same-origin style URL: `/map/style/light` or `/map/style/dark` (the client's `DEFAULT_MAP_STYLE` pair, proxied by Nginx to Martin — there is no `MAP_STYLE_*` environment override, and the app does not read one).
 - Theme toggle → `map.setStyle(newStyle)` preserving `center, zoom, pitch, bearing, markers`.
 - Markers: custom SVG (not raster), clustered via `supercluster` if >100.
 - Navigation mode: `map.easeTo({ pitch, bearing, zoom })` throttled 1s on location.
