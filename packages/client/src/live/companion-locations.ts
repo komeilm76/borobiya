@@ -65,7 +65,12 @@ export interface CompanionFix {
 export interface CompanionPeer {
   readonly userId: string;
   readonly name: string;
-  readonly fix: CompanionFix;
+  /**
+   * `null` for a peer with an open share and no position yet. Membership is what authorises their fixes;
+   * an empty position must not remove them from the allow-list, or the first fix they ever send — which is
+   * exactly the "share created a moment ago" case — would be dropped as unlisted, forever.
+   */
+  readonly fix: CompanionFix | null;
 }
 
 /** Keyed by owner id, so one peer is one dot however many shares or devices feed it. */
@@ -120,7 +125,7 @@ export function applyPeerUpdate(
 
   const observedAtMs = parseTime(update.timestamp);
   if (observedAtMs === null) return { registry, changed: false, reason: "invalid" };
-  const previous = known.fix.observedAtMs;
+  const previous = known.fix?.observedAtMs ?? null;
   // A seeded fix (no time) is always replaced; a live one only by something newer. Same-instant
   // duplicates from the double fan-out are dropped so the dot does not re-render on every echo.
   if (previous !== null && observedAtMs <= previous) return { registry, changed: false, reason: "stale-replay" };
@@ -154,12 +159,12 @@ export function applyShareList(
       continue;
     }
     const seeded = seedFix(owner.lastLocation);
-    if (!seeded) continue;
     // `observedAtMs: null` rather than the read time: claiming "now" for a position the server never
     // timestamped would be an invention, and an age we made up would later win the "never move
     // backwards" comparison against a real fix. A seed is therefore stale from the first render, and
     // `pruneRegistry` keeps it (there is no age to judge) until the share goes or a live fix arrives.
-    next[userId] = { userId, name, fix: { ...seeded, observedAtMs: null } };
+    // A peer with no `lastLocation` at all is registered with `fix: null` rather than skipped.
+    next[userId] = { userId, name, fix: seeded ? { ...seeded, observedAtMs: null } : null };
   }
   return next;
 }
@@ -181,6 +186,7 @@ export function pruneRegistry(registry: CompanionRegistry, nowMs: number, discar
 
 export function peersOf(registry: CompanionRegistry, nowMs: number): CompanionView[] {
   return Object.values(registry)
+    .filter((peer): peer is CompanionPeer & { fix: CompanionFix } => peer.fix !== null)
     .map((peer) => ({
       userId: peer.userId,
       name: peer.name,
@@ -194,14 +200,24 @@ export function peersOf(registry: CompanionRegistry, nowMs: number): CompanionVi
     .sort((left, right) => (left.ageMs ?? -1) - (right.ageMs ?? -1));
 }
 
-function ageOf(fix: CompanionFix, nowMs: number): number | null {
-  return fix.observedAtMs === null ? null : Math.max(0, nowMs - fix.observedAtMs);
+function ageOf(fix: CompanionFix | null, nowMs: number): number | null {
+  if (!fix || fix.observedAtMs === null) return null;
+  return Math.max(0, nowMs - fix.observedAtMs);
 }
 
-function isStale(fix: CompanionFix, nowMs: number, staleAfterMs = STALE_AFTER_MS): boolean {
+/**
+ * Staleness is only ever *noticed* on a tick, so callers should read this as "stale within one tick of the
+ * threshold" rather than at the exact millisecond; nothing about a dot changes between ticks anyway.
+ */
+function isStale(fix: CompanionFix | null, nowMs: number, staleAfterMs = STALE_AFTER_MS): boolean {
   // A seeded position is stale by definition: we cannot claim it is current when the API never said when it was taken.
-  if (fix.observedAtMs === null) return true;
+  if (!fix || fix.observedAtMs === null) return true;
   return nowMs - fix.observedAtMs > staleAfterMs;
+}
+
+/** How many peers hold a share but have sent nothing we can draw yet. */
+export function countAwaiting(registry: CompanionRegistry): number {
+  return Object.values(registry).filter((peer) => peer.fix === null).length;
 }
 
 /** One `FeatureCollection` of every peer, `stale` as 0/1 so a single layer can paint both states. */
@@ -214,10 +230,23 @@ export function peersOverlay(registry: CompanionRegistry, nowMs: number): Overla
   );
 }
 
+/**
+ * The two marker colors, exposed because the status panel's legend dot has to be the *same* teal the map
+ * paints. A component that hardcoded it would drift the first time the map palette moved, and nothing
+ * here renders a map to catch that.
+ */
+export function liveMarkerColors(dark: boolean): { live: string; stale: string } {
+  return dark ? { live: "#6ee7d7", stale: "rgba(226, 240, 238, 0.55)" } : { live: "#0e6666", stale: "rgba(23, 59, 60, 0.45)" };
+}
+
 /** The sources and layers the live overlay owns, as data — same reason as the playback descriptor. */
 export function liveCompanionsStyle(dark: boolean): OverlayStyle {
-  const liveColor = dark ? "#6ee7d7" : "#0e6666";
-  const staleColor = dark ? "rgba(226, 240, 238, 0.55)" : "rgba(23, 59, 60, 0.45)";
+  const { live: liveColor, stale: staleColor } = liveMarkerColors(dark);
+  // No text layer with the peer's name, even though both local styles declare `glyphs`: whether the
+  // `/font/{fontstack}/{range}` endpoint actually carries a Persian-capable face is unverified here, and
+  // a missing glyph range is a broken map rather than a missing label. Names belong to the status panel,
+  // which is also where they stay readable at every zoom.
+  //
   // A `["case", ["==", ["get","stale"], 1], …]` expression instead of two layers: one source, one
   // setData per update, and the property lives on the feature that carries it.
   const color = ["case", ["==", ["get", "stale"], 1], staleColor, liveColor];
@@ -255,25 +284,46 @@ export function liveCompanionsStyle(dark: boolean): OverlayStyle {
  * The status line above the map. Every state says who is missing and why — the rule this phase holds
  * itself to for refusals too.
  */
-export function liveStatus(registry: CompanionRegistry, options: { connected: boolean; nowMs: number; shareCount: number }): { line: string; peerCount: number; staleCount: number } {
+export function liveStatus(
+  registry: CompanionRegistry,
+  options: { connected: boolean; nowMs: number; shareCount: number; readFailed?: boolean }
+): { line: string; peerCount: number; staleCount: number; awaitingCount: number } {
   const peers = peersOf(registry, options.nowMs);
   const staleCount = peers.filter((peer) => peer.stale).length;
+  const awaiting = countAwaiting(registry);
+  if (options.readFailed) {
+    // A failed read is our fault, not a companion's: "nobody has shared with you" would be a confident
+    // invention, so the copy says the list did not load and keeps whatever is already on the map.
+    const shown = peers.length > 0 ? `${peers.length} آخرین موقعیت شناخته‌شده نمایش داده می‌شود` : "موقعیتی نمایش داده نمی‌شود";
+    return { line: `فهرست اشتراک‌ها خوانده نشد؛ ${shown}. با دکمهٔ تازه‌سازی دوباره تلاش کنید.`, peerCount: peers.length, staleCount, awaitingCount: awaiting };
+  }
   if (peers.length === 0) {
     if (options.shareCount === 0) {
-      return { line: "هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.", peerCount: 0, staleCount: 0 };
+      return { line: "هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.", peerCount: 0, staleCount: 0, awaitingCount: 0 };
     }
     return {
       line: options.connected
         ? `${options.shareCount} اشتراک زنده باز است و منتظر اولین به‌روزرسانی هستیم.`
         : `${options.shareCount} اشتراک زنده باز است، اما اتصال زنده برقرار نیست.`,
       peerCount: 0,
-      staleCount: 0
+      staleCount: 0,
+      awaitingCount: awaiting
     };
   }
   const parts = [`${peers.length} همراه روی نقشه`];
   if (staleCount > 0) parts.push(`${staleCount} نفر آخرین موقعیت شناخته‌شده`);
+  if (awaiting > 0) parts.push(`${awaiting} نفر هنوز موقعیتی نفرستاده`);
   parts.push(options.connected ? "اتصال زنده" : "بدون اتصال زنده");
-  return { line: parts.join(" · "), peerCount: peers.length, staleCount };
+  return { line: parts.join(" · "), peerCount: peers.length, staleCount, awaitingCount: awaiting };
+}
+
+/**
+ * What the signal icon says. It lives here for the same reason the status line does: a component allowed
+ * to phrase the connection state would phrase it differently from the sentence next to it, and the two
+ * would contradict each other in exactly the case a user is trying to understand.
+ */
+export function connectionTitle(connected: boolean): string {
+  return connected ? "اتصال زنده برقرار است" : "اتصال زنده برقرار نیست";
 }
 
 /** The age of one peer, in the words the interface uses everywhere. */

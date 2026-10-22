@@ -7,6 +7,7 @@ import {
   pointOverlay,
   pointsOverlay,
   type OverlayMapState,
+  type OverlayOp,
   type OverlayStyle
 } from "./overlay-sync";
 
@@ -32,6 +33,11 @@ function map(options: { sources?: string[]; layers?: string[]; loaded?: boolean;
 }
 
 const ALL = { sources: ["s-a", "s-b"], layers: ["l-a1", "l-a2", "l-b1"] };
+
+/** An `addLayer` op names its layer inside `layer`; every other op carries the id directly. */
+function idOf(op: OverlayOp): string {
+  return op.op === "addLayer" ? op.layer.id : op.id;
+}
 
 describe("planOverlaySync", () => {
   it("returns nothing while the style is loading, because maplibre would throw", () => {
@@ -87,7 +93,7 @@ describe("planOverlayRemoval", () => {
   it("drops every layer before any source, in reverse order", () => {
     const ops = planOverlayRemoval(map(ALL), STYLE);
     expect(ops.map((op) => op.op)).toEqual(["removeLayer", "removeLayer", "removeLayer", "removeSource", "removeSource"]);
-    expect(ops.map((op) => op.id)).toEqual(["l-b1", "l-a2", "l-a1", "s-b", "s-a"]);
+    expect(ops.map(idOf)).toEqual(["l-b1", "l-a2", "l-a1", "s-b", "s-a"]);
   });
 
   it("skips what was never added, so tearing down an unpainted overlay is not an error", () => {
@@ -96,8 +102,8 @@ describe("planOverlayRemoval", () => {
   });
 
   it("leaves the map exactly where it started, which is what makes the pair reviewable", () => {
-    const added = planOverlaySync(map(), STYLE, () => emptyOverlay()).map((op) => (op.op === "addLayer" ? op.layer.id : op.id));
-    const removed = planOverlayRemoval(map(ALL), STYLE).map((op) => op.id);
+    const added = planOverlaySync(map(), STYLE, () => emptyOverlay()).map(idOf);
+    const removed = planOverlayRemoval(map(ALL), STYLE).map(idOf);
     expect([...removed].sort()).toEqual([...added].sort());
   });
 });

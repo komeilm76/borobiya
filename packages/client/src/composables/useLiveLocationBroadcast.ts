@@ -17,7 +17,7 @@ export type BroadcastStatus = "idle" | "connecting" | "broadcasting" | "stopped"
  * Socket.IO connection, a throttled `location:update` every 3-5s, and the server's rejection
  * codes surfaced so a UI can explain why a broadcast stopped.
  *
- * The peer/recipient side (markers, playback) belongs to the share views (T2.1.7, T2.2.4).
+ * The peer/recipient side (live markers T2.1.8, history playback T2.2.6) belongs to `/_user/map`.
  */
 export function useLiveLocationBroadcast() {
   const auth = useAuthStore();

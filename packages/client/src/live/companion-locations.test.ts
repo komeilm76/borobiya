@@ -9,8 +9,11 @@ import {
   ageWords,
   applyPeerUpdate,
   applyShareList,
+  countAwaiting,
   emptyRegistry,
   liveCompanionsStyle,
+  liveMarkerColors,
+  connectionTitle,
   liveStatus,
   peersOf,
   peersOverlay,
@@ -55,7 +58,7 @@ describe("applyPeerUpdate", () => {
     const registry = { ...emptyRegistry, ...registryWith({ userId: ME }) };
     const result = applyPeerUpdate(registry, { userId: ME, lat: 35.9, lon: 51.9, timestamp: NOW + 10_000 }, ME);
     expect(result).toMatchObject({ changed: false, reason: "self" });
-    expect(result.registry[ME]?.fix.lat).toBe(35.7);
+    expect(result.registry[ME]?.fix?.lat).toBe(35.7);
   });
 
   it("drops a fix for a peer the share list never named, and asks for a re-read", () => {
@@ -79,12 +82,12 @@ describe("applyPeerUpdate", () => {
     const registry = registryWith({ userId: ALICE, observedAtMs: null });
     const result = applyPeerUpdate(registry, { userId: ALICE, lat: 36.2, lon: 50.9, timestamp: NOW - 3_600_000 }, ME);
     expect(result.changed).toBe(true);
-    expect(result.registry[ALICE]?.fix.observedAtMs).toBe(NOW - 3_600_000);
+    expect(result.registry[ALICE]?.fix?.observedAtMs).toBe(NOW - 3_600_000);
   });
 
   it("reads a numeric timestamp as well as an ISO one, and accepts either", () => {
     const result = applyPeerUpdate(registryWith({ userId: ALICE }), { userId: ALICE, lat: 35.7, lon: 51.4, timestamp: NOW + 1 }, ME);
-    expect(result.registry[ALICE]?.fix.observedAtMs).toBe(NOW + 1);
+    expect(result.registry[ALICE]?.fix?.observedAtMs).toBe(NOW + 1);
   });
 
   for (const [label, payload] of [
@@ -104,7 +107,7 @@ describe("applyPeerUpdate", () => {
 
   it("keeps accuracy null when the fix carries none, so no dot claims a radius", () => {
     const result = applyPeerUpdate(registryWith({ userId: ALICE }), { userId: ALICE, lat: 35.7, lon: 51.4, timestamp: NOW + 1 }, ME);
-    expect(result.registry[ALICE]?.fix.accuracy).toBeNull();
+    expect(result.registry[ALICE]?.fix?.accuracy).toBeNull();
   });
 });
 
@@ -116,9 +119,32 @@ describe("applyShareList", () => {
     ]);
   });
 
-  it("skips an owner who has never sent a fix, rather than drawing them at [0, 0]", () => {
-    expect(applyShareList(emptyRegistry, [{ id: ALICE, username: "مریم", lastLocation: null }])).toEqual({});
-    expect(applyShareList(emptyRegistry, [{ id: BOB, username: "علی", lastLocation: { lat: 400, lon: 0 } }])).toEqual({});
+  it("registers an owner who has never sent a fix, without drawing anything for them", () => {
+    const registry = applyShareList(emptyRegistry, [
+      { id: ALICE, username: "مریم", lastLocation: null },
+      { id: BOB, username: "علی", lastLocation: { lat: 400, lon: 0 } }
+    ]);
+    expect(peersOf(registry, NOW)).toEqual([]);
+    expect(countAwaiting(registry)).toBe(2);
+  });
+
+  it("lets the first fix from a peer we know nothing about paint, because the share is what authorises them", () => {
+    // The regression this pins: seeding from a share with no `lastLocation` used to skip the row, so
+    // `applyPeerUpdate` read their very first update as unauthorised and dropped it on the floor.
+    const registry = applyShareList(emptyRegistry, [{ id: ALICE, username: "مریم", lastLocation: null }]);
+    const result = applyPeerUpdate(registry, { userId: ALICE, lat: 35.7, lon: 51.4, timestamp: NOW }, ME);
+    expect(result.changed).toBe(true);
+    expect(peersOf(result.registry, NOW)[0]).toMatchObject({ name: "مریم", stale: false });
+  });
+
+  it("says a peer has sent nothing yet instead of pretending the map is empty for no reason", () => {
+    const registry = applyShareList(emptyRegistry, [
+      { id: ALICE, username: "مریم", lastLocation: null },
+      { id: BOB, username: "علی", lastLocation: { lat: 35.7, lon: 51.4 } }
+    ]);
+    const status = liveStatus(registry, { connected: true, nowMs: NOW, shareCount: 2 });
+    expect(status).toMatchObject({ peerCount: 1, awaitingCount: 1 });
+    expect(status.line).toContain("1 نفر هنوز موقعیتی نفرستاده");
   });
 
   it("keeps a live fix when a list read carries an older one", () => {
@@ -222,6 +248,14 @@ describe("liveCompanionsStyle", () => {
     }
   });
 
+  it("hands the panel the same colors the map paints, so a legend cannot drift", () => {
+    for (const dark of [true, false]) {
+      const colors = liveMarkerColors(dark);
+      const expression = liveCompanionsStyle(dark).layers[0]?.paint["circle-color"] as unknown[];
+      expect(new Set(expression.slice(2))).toEqual(new Set([colors.stale, colors.live]));
+    }
+  });
+
   it("carries no text layer, because the map labels belong to the base style", () => {
     for (const layer of liveCompanionsStyle(true).layers) expect(layer.type).not.toBe("symbol");
   });
@@ -253,6 +287,14 @@ describe("status copy", () => {
     expect(status.line).toContain("1 نفر آخرین موقعیت شناخته‌شده");
   });
 
+  it("blames the failed read and not the companion when the share list did not load", () => {
+    const status = liveStatus(registryWith({ userId: ALICE }), { connected: true, nowMs: NOW, shareCount: 3, readFailed: true });
+    expect(status.line).toContain("فهرست اشتراک‌ها خوانده نشد");
+    expect(status.line).not.toContain("هنوز کسی");
+    expect(status.peerCount).toBe(1);
+    expect(liveStatus(emptyRegistry, { connected: true, nowMs: NOW, shareCount: 0, readFailed: true }).line).toContain("موقعیتی نمایش داده نمی‌شود");
+  });
+
   it("says nothing about silence when every peer is moving", () => {
     const status = liveStatus(registryWith({ userId: ALICE }), { connected: true, nowMs: NOW, shareCount: 1 });
     expect(status.line).not.toContain("شناخته‌شده");
@@ -262,6 +304,16 @@ describe("status copy", () => {
   it("drops the live claim when the socket is down but dots remain", () => {
     const status = liveStatus(registryWith({ userId: ALICE }), { connected: false, nowMs: NOW, shareCount: 1 });
     expect(status.line).toContain("بدون اتصال زنده");
+  });
+});
+
+describe("connection title", () => {
+  it("agrees with the status line, so the icon and the sentence cannot contradict each other", () => {
+    expect(connectionTitle(true)).toBe("اتصال زنده برقرار است");
+    expect(connectionTitle(false)).toBe("اتصال زنده برقرار نیست");
+    const down = liveStatus(registryWith({ userId: ALICE }), { connected: false, nowMs: NOW, shareCount: 1 });
+    expect(down.line).toContain("بدون اتصال زنده");
+    for (const line of [connectionTitle(true), connectionTitle(false), down.line]) expect(line).toContain("اتصال زنده");
   });
 });
 

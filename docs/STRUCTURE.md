@@ -236,6 +236,7 @@ packages/client/
     │   ├── map/
     │   │   ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
     │   │   ├── HistoryPlaybackPanel.vue # range presets, hand-typed window, transport, scrub slider
+    │   │   ├── LiveCompanionPanel.vue # who is on the map, how old each position is, and why it might be empty
     │   │   └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
     │   ├── settings/
     │   │   └── DevicePriorityPanel.vue # live-session table + per-share priority chooser
@@ -252,6 +253,7 @@ packages/client/
     │   ├── map-cache-worker.test.ts
     │   ├── socket-options.ts # same-origin Socket.IO path and handshake auth options
     │   ├── socket-options.test.ts
+    │   ├── socket-events.ts  # the realtime event names, in a module that imports nothing
     │   └── socket.ts         # lazily connected realtime client with token rotation and close()
     ├── stores/
     │   ├── index.ts          # Pinia instance
@@ -266,6 +268,8 @@ packages/client/
     ├── composables/
     │   ├── use-history-playback.ts # window, cursor, transport loop, and the two history reads
     │   ├── use-history-playback.test.ts
+    │   ├── use-live-companions.ts # share bootstrap, peer subscription, connect/disconnect, ageing clock (opens socket.io lazily)
+    │   ├── use-live-companions.test.ts
     │   ├── use-device-settings.ts # the two lists, per-minute clock, and the re-pin posts
     │   ├── use-device-settings.test.ts
     │   ├── use-priority-device.ts # "am I the broadcasting device?", derived, never enforced
@@ -280,11 +284,17 @@ packages/client/
     ├── history/
     │   ├── playback.ts       # frames, interpolation, sampled window rules, GeoJSON + style descriptors
     │   ├── playback.test.ts
-    │   ├── playback-map-sync.ts # what maplibre must be told, as a plan rather than as calls
+    │   ├── playback-map-sync.ts # the lookup that names playback's three collections for the shared planner
     │   └── playback-map-sync.test.ts
+    ├── live/                 # live companion markers (T2.1.8)
+    │   ├── companion-locations.ts # peer registry as the allow-list, forward-only fixes, staleness, GeoJSON + style descriptor + copy
+    │   └── companion-locations.test.ts
     ├── settings/
     │   ├── priority-device.ts # repin bodies that cannot extend an expiry, device rows, refusal copy
     │   └── priority-device.test.ts
+    ├── map/                  # the rules every client-drawn map overlay shares
+    │   ├── overlay-sync.ts   # structural GeoJSON, the source/layer descriptors, the sync/removal plans (maplibre is never imported here)
+    │   └── overlay-sync.test.ts
     ├── sharing/
     │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, refusal + duration words
     │   └── share-form.test.ts
@@ -312,7 +322,7 @@ packages/client/
         └── _admin/PlaceholderView.vue
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Device detection lives in `src/device/`: `capacitor.ts` probes the native shell lazily (the only place `@capacitor/core` / `@capacitor/device` are imported, and the plugin itself is loaded only when the shell exists) and `native-label.ts` maps the plugin's facts into the bounded `login.deviceName` the Active Devices table shows, while `composables/use-priority-device.ts` answers the same question for any screen that needs it. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. Routing, live companion markers on the map, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Device detection lives in `src/device/`: `capacitor.ts` probes the native shell lazily (the only place `@capacitor/core` / `@capacitor/device` are imported, and the plugin itself is loaded only when the shell exists) and `native-label.ts` maps the plugin's facts into the bounded `login.deviceName` the Active Devices table shows, while `composables/use-priority-device.ts` answers the same question for any screen that needs it. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. Routing and Android packaging remain future work. Live companion markers arrived with T2.1.8: `live/companion-locations.ts` decides who may appear (the share list is the allow-list), when a dot is stale, and that a position never moves backwards; `composables/use-live-companions.ts` owns the socket and the ageing clock; and `UserMapView.vue` paints both overlays through `map/overlay-sync.ts`, where the maplibre ordering rules now live once. The client opens `socket.io-client` lazily so the map route does not carry 42 kB of transport, and the panel rather than the map carries the words: ages, accuracy, and the reason an empty map is empty.
 
 ---
 

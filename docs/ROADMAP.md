@@ -93,7 +93,7 @@ gantt
 - [x] Socket `location:update` (3-5s throttled) → broadcast to targets — T2.1.5 with T2.3.4, client pacing at 4s
 - [x] Cron: expire timed shares every minute — T2.1.6 (readers also filter `expiresAt`, so a deadline holds between sweeps)
 - [x] Frontend: share dialog (user search, timed/permanent, duration slider), “My Shares” + “Shared With Me” lists — T2.1.7 (2026-10-22); the priority-device chooser rides along with the `409`
-- [ ] Live companion markers on the map (peer positions from the socket)
+- [x] Live companion markers on the map (peer positions from the socket) — T2.1.8 (2026-10-22): `live/companion-locations.ts` decides who may appear and when a dot is stale, `composables/use-live-companions.ts` owns the socket, and both map overlays (markers, playback) are painted through one `map/overlay-sync.ts` planner; positions are never invented (a fix with no timestamp renders stale rather than "now", and a dot never jumps backwards)
 
 ### M2.2 History Sharing
 - [x] `location_history` table + insert on each update — T2.2.1 with the writer inside `location:update`; deliberately one insert per accepted fix, since a 4s floor gives batching nothing to save

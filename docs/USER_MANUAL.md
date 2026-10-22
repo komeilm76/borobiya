@@ -133,7 +133,12 @@ Open **Map** (`/_user/map`) for the full-height MapLibre view, or use the map pr
 - If map settings are unavailable, the view uses safe default bounds and zoom. Map resource errors show a retry toast; previously cached resources may still be displayed.
 - The first map visit needs the local Map Server. The browser cache stores map resources after a successful load on secure origins (HTTPS or localhost); already-loaded tiles also remain in MapLibre's in-memory cache for the current page session.
 
-**Current scope:** this version displays the base map only. GPS location, live companion markers, search, reverse geocoding, and routing are not enabled yet.
+**On this screen** (both are overlays on the same map, and neither moves the camera except once per loaded track):
+
+- **تاریخچهٔ مسیر / پخش حرکت** — the playback panel: pick your own track or a companion's grant, choose 1/7/30 days or type a window, then scrub or play at 1×/4×/16×/60×. The grey dashed line is the whole recorded path, the solid one is what has been played, and the caption says when the server sampled the window (`maxPoints`) rather than showing every point.
+- **موقعیت زنده / همراهان** — the live panel: one dot per companion who has an open live share with you, and a line saying what is on the map. A dot is drawn from the last position the server knows even before it moves; a companion who has gone quiet turns grey and keeps their age («۱۲ دقیقه پیش»), and only after 30 minutes of silence does the dot leave the map. If the map is empty the line names the reason — nobody has shared with you, the share list could not be read (with a retry button), or the live connection is down. Accuracy is shown as `±N متر` next to a name, never as a circle on the map.
+
+**Current scope:** live markers and history playback are on the map; broadcast from the browser (geolocation → the socket) is available on the dashboard, and the app never claims a position it does not have. Search-based place picking, reverse geocoding, and routing on this map are not enabled yet. *(This paragraph previously said the screen "displays the base map only" — stale since playback shipped, corrected with T2.1.8.)*
 
 [Screenshot: Dashboard map widget and full-height map view]
 

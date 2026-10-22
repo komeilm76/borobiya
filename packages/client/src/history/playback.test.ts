@@ -360,7 +360,9 @@ describe("the panel and the view", () => {
     // The style swap `MapCanvas` performs on a theme change drops layers it does not declare, so the
     // overlay has to be re-ensured on `ready`, on every frame, and on a theme change.
     expect(view).toContain("watch(() => playback.frame.value, paintPlayback)");
-    expect(view).toContain("watch(() => playbackStyle.value, paintPlayback)");
+    // A theme change now repaints both overlays, live first because playback asks to sit under it.
+    expect(view).toContain("watch(() => playbackStyle.value, () => {");
+    expect(view).toContain("paintLive();\n  paintPlayback();");
     expect(view).toContain("paintPlayback();\n  frameCamera();");
   });
 
