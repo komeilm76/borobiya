@@ -300,10 +300,10 @@ describe("categories and incident catalog (T3.1.1)", () => {
     for (const optional of ["icon", "color", "description"]) {
       expect(columns.get(optional)?.notNull, optional).toBe(false);
     }
-    // The ERD gives `created_at` a default and no NOT NULL, and this migration matches it: a cosmetic
-    // tightening here would be a delta a later reader has to re-derive from the diagram.
+    // `created_at` is NOT NULL with a default (tightened by 0011) because the shared response schemas
+    // require `createdAt`; a nullable column there leaks a `Date | null` no route can answer with.
     expect(columns.get("created_at")?.hasDefault).toBe(true);
-    expect(columns.get("created_at")?.notNull).toBe(false);
+    expect(columns.get("created_at")?.notNull).toBe(true);
     expect(config.uniqueConstraints.map(({ name }) => name)).toEqual(["incident_types_slug_unique"]);
     expect(config.checks).toHaveLength(0);
     expect(config.foreignKeys).toHaveLength(0);
@@ -312,6 +312,7 @@ describe("categories and incident catalog (T3.1.1)", () => {
   it("declares a category as a name plus membership, nothing else", () => {
     const config = getTableConfig(categories);
     expect(config.columns.map((column) => column.name)).toEqual(["id", "name", "description", "created_at"]);
+    expect(config.columns.find((column) => column.name === "created_at")?.notNull).toBe(true);
     expect(config.indexes).toHaveLength(0);
     expect(config.foreignKeys).toHaveLength(0);
   });
@@ -339,6 +340,21 @@ describe("categories and incident catalog (T3.1.1)", () => {
       expect(config.columns.some((column) => column.hasDefault)).toBe(false);
     });
   }
+
+  it("tightens the catalog timestamps to NOT NULL, backfilling before the constraint", () => {
+    const names = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((n) => /^0011_.*\.sql$/.test(n));
+    expect(names).toHaveLength(1);
+    const name = names[0];
+    if (!name) throw new Error("The catalog timestamp migration is missing.");
+    const sqlText = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    for (const table of ["categories", "incident_types"]) {
+      // Without the backfill, `SET NOT NULL` fails outright on a database that already has rows.
+      expect(sqlText, table).toContain(`UPDATE "${table}" SET "created_at" = now() WHERE "created_at" IS NULL`);
+      expect(sqlText, table).toContain(`ALTER TABLE "${table}" ALTER COLUMN "created_at" SET NOT NULL`);
+      expect(sqlText.indexOf(`UPDATE "${table}"`), table).toBeLessThan(sqlText.indexOf(`ALTER TABLE "${table}"`));
+    }
+  });
 
   it("ships the four tables as one generated migration, with the pivots' keys and cascades", () => {
     expect(migrationNames).toHaveLength(1);

@@ -140,15 +140,20 @@ CREATE TABLE incident_types (
   icon TEXT,
   color TEXT,
   description TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE categories (
   id UUID PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+> Both catalog `created_at` columns are `NOT NULL DEFAULT now()`, which is one step past the first draft of
+> this diagram: the shared response schemas (`incidentTypeSchema`, `categorySchema`) require `createdAt`, so
+> a row without one has no legal response body. `drizzle/0011` tightened the columns after the store's own
+> record type came out as `Date | null`.
 
 CREATE TABLE category_incident_types (
   category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,

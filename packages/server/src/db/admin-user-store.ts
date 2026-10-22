@@ -102,7 +102,9 @@ export class DrizzleAdminUserStore implements AdminUserStore {
   }
 
   async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
-    // Category membership is introduced in T3.1.1; until then every persisted account is unassigned.
+    // This read does not consult `categories`/`category_users` yet — the tables arrived with T3.1.1, and
+    // joining them belongs to the assignment task (T3.1.3). The short-circuit below is therefore still the
+    // truthful answer, but it is a placeholder with an owner, not the shape of the final predicate.
     if (query.hasCategory === true) {
       return { items: [], total: 0, page: query.page, limit: query.limit, totalPages: 0 };
     }

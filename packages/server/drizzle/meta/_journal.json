@@ -78,6 +78,13 @@
       "when": 1792672353991,
       "tag": "0010_complete_namor",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792673026491,
+      "tag": "0011_sturdy_ego",
+      "breakpoints": true
     }
   ]
 }

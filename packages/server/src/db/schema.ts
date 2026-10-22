@@ -204,7 +204,10 @@ export const adminAuditLog = pgTable(
     action: text("action").notNull(),
     targetType: text("target_type"),
     targetId: uuid("target_id"),
-    meta: jsonb("meta").$type<{ previousIsActive: boolean; isActive: boolean } | null>(),
+    // Per-action by nature: `user_deactivated` records prior/new state, `incident_type_created` records a
+    // slug. Typing this to one action's payload made every new audited action a schema edit, so it is an
+    // open object and each writer owns its own shape.
+    meta: jsonb("meta").$type<Record<string, unknown> | null>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
@@ -277,9 +280,11 @@ export const cancellationReasons = pgTable(
  * deliberately free text with no CHECK: they are display hints the admin UI owns, and a format rule the
  * spec does not state would only ever be enforced against the app's own guess.
  *
- * `created_at` is nullable with a default, exactly as the ERD writes it. Making it `NOT NULL` would be a
- * tidy deviation from documented DDL that no query needs yet, and a schema whose deltas are cosmetic is
- * a schema a later reader cannot trust to match its diagram.
+ * `created_at` is `NOT NULL DEFAULT now()`, one step past the ERD's `DEFAULT now()`, and the reason is not
+ * tidiness: `incidentTypeSchema.createdAt`/`categorySchema.createdAt` in `@borobiya/shared` are required
+ * strings, so a row with no creation time has no legal response body — the nullable column leaked straight
+ * into the store's record type as `Date | null` and left the route with nothing honest to answer. The
+ * diagram was corrected in the same commit rather than left to drift from the schema.
  */
 export const incidentTypes = pgTable(
   "incident_types",
@@ -290,7 +295,7 @@ export const incidentTypes = pgTable(
     icon: text("icon"),
     color: text("color"),
     description: text("description"),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [unique("incident_types_slug_unique").on(table.slug)]
 );
@@ -300,7 +305,7 @@ export const categories = pgTable("categories", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow()
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 /**

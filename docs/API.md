@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, the admin incident-type catalog (`GET`/`POST /_admin/incidents`, `PATCH /_admin/incidents/:id`), and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -348,15 +348,21 @@ The list and detail routes use the same signed-admin-token, current-account, and
 ### 6.2 Incidents & Categories
 
 ```
-POST  /_admin/incidents           { name, icon?, color?, description? }
+POST  /_admin/incidents           { name, slug?, icon?, color?, description? }
 GET   /_admin/incidents
-PATCH /_admin/incidents/:id
+PATCH /_admin/incidents/:id       { name?, slug?, icon?, color?, description? } (null clears icon/color/description)
 POST  /_admin/categories          { name, description?, incidentTypeIds: string[] }
 GET   /_admin/categories
 PATCH /_admin/categories/:id     { name?, description?, incidentTypeIds? }
 POST  /_admin/categories/:id/users   { userIds: string[] }
 DELETE /_admin/categories/:id/users/:userId
 ```
+
+`POST /_admin/incidents`, `GET /_admin/incidents`, and `PATCH /_admin/incidents/:id` are implemented (T3.1.2) and use the same signed-admin-token, current-account, and unrevoked-session checks as the admin user routes; the other five routes in this section remain contract-only and return 404 until T3.1.3.
+
+The caller sends a `name`, not an identifier: the server derives the URL-safe `slug` from it (lowercased, accents folded, non-alphanumerics collapsed to `-`), and an explicit `slug` in the body overrides the derivation — the only way to add a type whose name has no ASCII letters or digits, which the server refuses with `400 VALIDATION_ERROR` and an `invalid_incident_slug` issue on `slug` rather than inventing one. A blank `description` is stored as `NULL`, so "no description" has exactly one representation; `icon` and `color` have no blank form (the schema requires a non-empty string), so clearing them means sending `null` on a PATCH — an empty string there is a validation error.
+
+`GET /_admin/incidents` returns the whole catalog as a bare array ordered by `name`, because that is what an admin scans to find one entry, and `Cache-Control: no-store`. `PATCH` sends only the fields it names; unknown ids answer `404 INCIDENT_TYPE_NOT_FOUND`, and a body with no fields is a `400`, never a no-op write. Renaming onto another type's slug answers `409 INCIDENT_TYPE_SLUG_TAKEN`, and both the create path (through the unique index) and the rename path refuse a duplicate rather than silently suffixing it — the message names the type that already holds the slug, falling back to a nameless refusal only if that row is deleted in the same instant. Every accepted create and every change that actually altered a value appends an `admin_audit_log` row (`incident_type_created` / `incident_type_updated`, with the changed fields and their before/after values) in the same transaction as the write; a PATCH that changed nothing writes no audit row.
 
 ### 6.3 SOS Dispatch
 
@@ -413,7 +419,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding/devices, partial-username user search, admin user list/detail/create/status, and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and the remaining search operations (place search, reverse geocode) remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding/devices, partial-username user search, admin user list/detail/create/status, the admin incident-type catalog (list/create/update), and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and the remaining search operations (place search, reverse geocode) remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -475,8 +481,10 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
+| 404 | `INCIDENT_TYPE_NOT_FOUND` | Admin incident-type update names an id that does not exist |
 | 404 | `SHARE_NOT_FOUND` | A live or history share id is unknown, belongs to another account, or (for a received history read) was never granted to the caller |
 | 409 | `USERNAME_TAKEN` | Duplicate |
+| 409 | `INCIDENT_TYPE_SLUG_TAKEN` | An admin create or rename lands on a slug another incident type already owns; `issues[0].slug` carries the slug that collided |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
 | 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection; `issues[0].deviceIds` carries the live devices for the chooser |
