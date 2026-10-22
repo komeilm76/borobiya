@@ -45,8 +45,24 @@ function slugConflictResponse(conflict: IncidentTypeSlugConflict | null) {
   ]);
 }
 
-const UNDERIVABLE_SLUG_MESSAGE =
-  "This name has no letters or digits to build a slug from, so provide a `slug` of your own.";
+/**
+ * `resolveIncidentSlug` answers `null` for more than one input, and the sentence this replaced described only
+ * one of them: "This name has no letters or digits to build a slug from" is true of `عسل`, and untrue in a way
+ * the admin can see with their own eyes for a pasted paragraph — a name whose slug would run past 64 characters
+ * is refused because of its *length*, not because it has no letters. A refusal that contradicts what is on screen teaches people not to believe the API, so the message
+ * names the value being refused and states the rule that failed.
+ *
+ * The quote is capped because the slug rule is the only thing bounding `incident_types.name` (the column is
+ * plain TEXT in the ERD and the DDL, on purpose: a long name with an explicit `slug` is a legitimate row).
+ * Without the cap, an oversized paste would come back at full length in the response body and in any log line.
+ */
+function slugRuleFailure(name: string) {
+  const quoted = name.length > 60 ? `${name.slice(0, 60)}…` : name;
+  return (
+    `The name "${quoted}" does not reduce to a usable slug: a slug is lowercase letters, digits, and single ` +
+    "hyphens, at most 64 characters. Shorten the name or send a `slug` of your own."
+  );
+}
 
 export async function registerAdminIncidentRoutes(
   app: FastifyInstance,
@@ -83,7 +99,7 @@ export async function registerAdminIncidentRoutes(
     });
     if (slug === null) {
       return reply.code(400).send(errorResponse("VALIDATION_ERROR", "Request body validation failed.", [
-        { code: "invalid_incident_slug", message: UNDERIVABLE_SLUG_MESSAGE, path: ["slug"] }
+        { code: "invalid_incident_slug", message: slugRuleFailure(parsed.data.name), path: ["slug"] }
       ]));
     }
 
@@ -126,7 +142,9 @@ export async function registerAdminIncidentRoutes(
       const resolved = resolveIncidentSlug({ name: body.name ?? "", ...(body.slug === undefined ? {} : { slug: body.slug }) });
       if (resolved === null) {
         return reply.code(400).send(errorResponse("VALIDATION_ERROR", "Request validation failed.", [
-          { code: "invalid_incident_slug", message: UNDERIVABLE_SLUG_MESSAGE, path: ["slug"] }
+          // `body.name` is always present when this branch can be reached: an explicit `slug` is checked
+          // against the same shape by the body schema, so `null` here means derivation from the name failed.
+          { code: "invalid_incident_slug", message: slugRuleFailure(body.name ?? ""), path: ["slug"] }
         ]));
       }
       slug = resolved;

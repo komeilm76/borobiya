@@ -42,6 +42,11 @@ Prefix `feat/fix/docs/chore/refactor/test`. Keep scope narrow.
 
 Use **Lefthook** (single binary, fast) or **Husky** — pick one, document in `lefthook.yml` or `.husky/`.
 
+Neither is installed yet, and the root `package.json` currently defines only `dev` — there is no root `lint`,
+`typecheck`, `test`, or `build` script for a hook to call. The commands below are the wiring to add, not the
+current state. What runs today, per package: `bunx vitest run`, `bunx tsc --noEmit -p tsconfig.json`
+(shared/server) or `bunx vue-tsc --noEmit -p tsconfig.json` (client), and `bun run build` in `packages/client`.
+
 ### Lefthook (`lefthook.yml`)
 
 ```yaml
@@ -313,13 +318,20 @@ Permissions in `AndroidManifest.xml`: `ACCESS_FINE_LOCATION`, `CAMERA`, `INTERNE
 ## 7. Release Process
 
 ```bash
-# Ensure main green
+# Ensure main green. Root has no lint/typecheck/test/build scripts, so run the real gates per package:
 git checkout main && git pull
-bun run lint && bun run typecheck && bun test && bun run build
+bun install
+for p in shared server client; do (cd packages/$p && bunx vitest run) || exit 1; done
+(cd packages/shared && bunx tsc --noEmit -p tsconfig.json) || exit 1
+(cd packages/server && bunx tsc --noEmit -p tsconfig.json) || exit 1
+(cd packages/client && bunx vue-tsc --noEmit -p tsconfig.json) || exit 1
+(cd packages/client && bun run build) || exit 1
+# (a `bun test` / `bun run lint` line here would fail: tests run under Vitest and no linter is configured)
 # Bump version in package.json + docs/PROGRESS.md
 git add . && git commit -m "chore: v1.0.0 prep"
 git tag v1.0.0 && git push origin main --tags
-# → triggers deploy.yml (to VPS) + android.yml (APK)
+# → would trigger deploy.yml (to VPS) + android.yml (APK): neither workflow file exists in
+#   .github/workflows yet, so tagging publishes nothing on its own (see README §19)
 # Create GitHub Release with notes from PROGRESS.md changelog
 gh release create v1.0.0 --notes-file docs/PROGRESS.md
 ```

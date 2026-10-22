@@ -123,12 +123,18 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, onboarding, user search, and the live-location surface are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, and the live-location surface are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
     │   ├── users.ts          # current-admin auth, user list/detail/create/status handlers
-    │   └── users.test.ts     # admin auth, list/detail, creation, status, state, and conflict tests
+    │   ├── users.test.ts     # admin auth, list/detail, creation, status, state, and conflict tests
+    │   ├── authorize.ts      # the admin identity check the other admin route files share (token → live session → role/state)
+    │   ├── incidents.ts      # incident-type catalog: ordered list, create with a derived-or-explicit slug, rename/clear; 409 names the type holding the slug
+    │   ├── incidents.test.ts # auth, ordering/no-store, slug-rule refusals and conflicts, blank-description folding, audit-on-change-only tests
+    │   ├── categories.ts     # responder categories: list, create/update with the incident-type set, assign and remove members
+    │   ├── categories.test.ts# set-replacement semantics, unknown-id issues, 404-vs-400 split, and no-audit-on-no-op tests
+    │   └── normalize.ts      # the blank-to-NULL and zod-issue rules both catalog route files share, kept in one place
     ├── config/
     │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
     │   └── env.test.ts
@@ -168,6 +174,10 @@ packages/server/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
+    │   ├── incident-type-store.ts # catalog list/create/update in one transaction, unique-slug conflict reads, and audit rows
+    │   ├── category-store.ts # category CRUD, the incident-type link set, and member assignment/removal on the pivots
+    │   ├── incident-type-store.test.ts # rendered SQL for the conflict lookup and set replacement, plus PGlite-backed behavior cases
+    │   ├── category-store.test.ts  # links/membership queries, no-op detection, and the two-category-per-account case
     │   ├── device-store.ts   # live-session reads for the Active Devices table (never selects the token hash)
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
@@ -180,8 +190,8 @@ packages/server/
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
-    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit, and location share/history tables
-    │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
+    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit, location share/history, incident-type catalog, responder-category, and `sos_requests` tables
+    │   ├── schema.test.ts    # Drizzle user-column, PostGIS, catalog-constraint, and migration-text assertions (0010–0012 included)
     │   ├── seed.ts           # transactional, idempotent reference/admin seeder
     │   ├── seed-config.ts    # production-safe bootstrap password policy
     │   ├── seed-data.ts      # Persian questions and localized cancellation reasons
@@ -198,7 +208,7 @@ packages/server/
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, and location share/history stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (SOS, missions, geocoding and the rest of search) are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, and responder-category stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS, missions, and geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (SOS, missions, geocoding and the rest of search) are not.
 
 ---
 

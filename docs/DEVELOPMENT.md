@@ -286,11 +286,16 @@ bun --filter @borobiya/client build
 ## 10. First Contribution Walkthrough
 
 1. Read `docs/ARCHITECTURE.md` + `docs/API.md` + `docs/SECURITY.md`.
-2. Pick a task in `docs/TASKS.md` (e.g., `T1.2.1` register endpoint).
-3. Create branch `feat/register-endpoint` from `main` (or work on assigned `arena/...`).
-4. Add Zod schema in `packages/shared/src/schemas/auth.ts`.
-5. Implement route in `packages/server/src/modules/auth/auth.routes.ts`.
-6. Test via `curl` + Vitest.
-7. Update `docs/PROGRESS.md` % for that milestone.
-8. Push, open PR targeting `main`, ensure `lefthook` passes.
+2. Pick the highest open task in `docs/TASKS.md` — the numbered list is the queue, and any task marked done in a
+   doc but unticked there (or the reverse) is a bug to fix before starting new work.
+3. Create a branch from `main` (or work on the branch assigned to you, e.g. `arena/...`).
+4. Add the Zod schema in `packages/shared/src/schemas/`, and the route contract in `packages/shared/src/api/` —
+   every endpoint is declared there first, marked `contract-only` until a handler registers it.
+5. Implement the handler in the domain folder that already owns that surface: `packages/server/src/auth/`,
+   `src/admin/`, `src/location/`, `src/users/`. There is no `src/modules/` tree — adding one starts a second
+   layout that half the docs then fail to describe. Persistence goes in `src/db/<name>-store.ts`.
+6. Test via Vitest (`bunx vitest run` inside the package) plus a `curl` against the running server.
+7. Update `docs/PROGRESS.md` (board + changelog) and `docs/TASKS.md` in the same commit as the code.
+8. Push and open a PR targeting `main`. The gates today are the three `typecheck` scripts, the three Vitest
+   suites, and `bun --filter @borobiya/client build`; no hook manager is wired yet, so nothing runs them for you.
 

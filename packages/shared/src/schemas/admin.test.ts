@@ -41,6 +41,20 @@ describe("incident slug derivation", () => {
     expect(resolveIncidentSlug({ name: "", slug: "" })).toBeNull();
   });
 
+  it("bounds an explicit slug the same way the derivation is bounded", () => {
+    // The asymmetry this closes: a 70-character name was refused because its derived slug would not fit, while
+    // the identical string sent as `slug` went straight into the table. One schema, both directions — the
+    // response payload uses the same schema, so a stored value can never outgrow what a read will serialize.
+    expect(incidentSlugValueSchema.safeParse("f".repeat(64)).success).toBe(true);
+    expect(incidentSlugValueSchema.safeParse("f".repeat(65)).success).toBe(false);
+    expect(incidentTypeCreateSchema.safeParse({ name: "Flood", slug: "f".repeat(65) }).success).toBe(false);
+    expect(incidentTypeUpdateSchema.safeParse({ slug: "f".repeat(65) }).success).toBe(false);
+    expect(deriveIncidentSlug("f".repeat(70))).toBeNull();
+    // One character is legal, in both directions: the floor is the pattern's, not an invented minimum.
+    expect(incidentSlugValueSchema.safeParse("0").success).toBe(true);
+    expect(deriveIncidentSlug("0")).toBe("0");
+  });
+
   it("keeps the slug pattern the table's unique index and any URL share", () => {
     for (const valid of ["fire", "flood-response", "cbrn-decon", "a1", "0"]) {
       expect(incidentSlugValueSchema.safeParse(valid).success, valid).toBe(true);

@@ -360,7 +360,7 @@ DELETE /_admin/categories/:id/users/:userId
 
 `POST /_admin/incidents`, `GET /_admin/incidents`, and `PATCH /_admin/incidents/:id`, together with `GET`/`POST /_admin/categories`, `PATCH /_admin/categories/:id`, `POST /_admin/categories/:id/users` and `DELETE /_admin/categories/:id/users/:userId` (T3.1.2, T3.1.3), all using the same signed-admin-token, current-account, and unrevoked-session checks as the admin user routes.
 
-The caller sends a `name`, not an identifier: the server derives the URL-safe `slug` from it (lowercased, accents folded, non-alphanumerics collapsed to `-`), and an explicit `slug` in the body overrides the derivation — the only way to add a type whose name has no ASCII letters or digits, which the server refuses with `400 VALIDATION_ERROR` and an `invalid_incident_slug` issue on `slug` rather than inventing one. A blank `description` is stored as `NULL`, so "no description" has exactly one representation; `icon` and `color` have no blank form (the schema requires a non-empty string), so clearing them means sending `null` on a PATCH — an empty string there is a validation error.
+The caller sends a `name`, not an identifier: the server derives the URL-safe `slug` from it (lowercased, accents folded, non-alphanumerics collapsed to `-`), and an explicit `slug` in the body overrides the derivation — the only way to add a type whose name has no ASCII letters or digits. Both directions obey one rule (`^[a-z0-9]+(?:-[a-z0-9]+)*$`, at most 64 characters): the body schema, the derivation, and the response payload all use the same schema, so a slug can never be legal in the field you typed it into and illegal in the read that returns it, which the server refuses with `400 VALIDATION_ERROR` and an `invalid_incident_slug` issue on `slug` rather than inventing one. A blank `description` is stored as `NULL`, so "no description" has exactly one representation; `icon` and `color` have no blank form (the schema requires a non-empty string), so clearing them means sending `null` on a PATCH — an empty string there is a validation error.
 
 `GET /_admin/incidents` returns the whole catalog as a bare array ordered by `name`, because that is what an admin scans to find one entry, and `Cache-Control: no-store`. `PATCH` sends only the fields it names; unknown ids answer `404 INCIDENT_TYPE_NOT_FOUND`, and a body with no fields is a `400`, never a no-op write. Renaming onto another type's slug answers `409 INCIDENT_TYPE_SLUG_TAKEN`, and both the create path (through the unique index) and the rename path refuse a duplicate rather than silently suffixing it — the message names the type that already holds the slug, falling back to a nameless refusal only if that row is deleted in the same instant. Every accepted create and every change that actually altered a value appends an `admin_audit_log` row (`incident_type_created` / `incident_type_updated`, with the changed fields and their before/after values) in the same transaction as the write; a PATCH that changed nothing writes no audit row.
 
@@ -469,6 +469,10 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 ---
 
 ## 9. Error Codes
+
+Rows whose HTTP column is `—` belong to phases that have not shipped a handler yet (missions, cancellation rate
+limits): the code is reserved so the client can handle it before the server ever sends it, and nothing returns it
+today. Every row naming a real status is produced by a registered handler.
 
 | HTTP | Code | When |
 |------|------|------|

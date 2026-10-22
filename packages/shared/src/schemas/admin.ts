@@ -34,7 +34,15 @@ export const adminUserListQuerySchema = z.strictObject({
 export type AdminUserListQuery = z.output<typeof adminUserListQuerySchema>;
 
 /** The slug shape the `incident_types` unique index and any URL that embeds it both rely on. */
-export const incidentSlugValueSchema = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+/**
+ * One rule, used by every direction this value moves in: an explicit `slug` on create or rename, the shape the
+ * derivation is checked against, and the response payload `incidentTypeSchema` below. That last use is why the
+ * bound lives here rather than only in the derivation — before it, a 5,000-character `slug` was storable while
+ * the *same* string derived from a name was refused, and a rule that depends on which field you typed the value
+ * into is not a rule anyone can predict. The floor stays at one character, because nothing in the ERD or the
+ * unique index asks for more, and `"0"` is a legitimate identifier for a type someone named `0`.
+ */
+export const incidentSlugValueSchema = z.string().min(1).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
 /**
  * The identifier an admin actually types is the name; the slug is what a client hardcodes and what a
