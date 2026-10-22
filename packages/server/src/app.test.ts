@@ -100,6 +100,32 @@ describe("Fastify server skeleton", () => {
       }
     });
 
+    const anonymousUpload = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests/00000000-0000-4000-8000-000000000001/photo",
+      headers: { "content-type": "multipart/form-data; boundary=borobiya-app-test" },
+      payload: Buffer.from("--borobiya-app-test--\r\n", "utf8")
+    });
+    // Mounted behind the same guard, and a multipart body is not *read* before that guard answers: the
+    // plugin's content-type parser only claims the stream, so an unauthenticated caller cannot make the
+    // server buffer 5 MB of anything.
+    expect(anonymousUpload.statusCode).toBe(401);
+
+    // The same, with a body far past the 5 MB the parser would refuse: still 401, not 413. That is the
+    // ordering stated as a test — an unauthenticated caller cannot make this server collect a photo,
+    // only to be told at the end that it had no business uploading one.
+    const oversizedAnonymousUpload = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests/00000000-0000-4000-8000-000000000001/photo",
+      headers: { "content-type": "multipart/form-data; boundary=borobiya-app-test" },
+      payload: Buffer.concat([
+        Buffer.from("--borobiya-app-test\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"a\"\r\n\r\n", "utf8"),
+        Buffer.alloc(6 * 1024 * 1024, 0x20),
+        Buffer.from("\r\n--borobiya-app-test--\r\n", "utf8")
+      ])
+    });
+    expect(oversizedAnonymousUpload.statusCode).toBe(401);
+
     const response = await app.inject({
       method: "POST",
       url: "/_user/sos/requests",
@@ -132,6 +158,24 @@ describe("Fastify server skeleton", () => {
       "content.application/json.schema.properties.location.properties.isManual"
     );
     expect(createRequest?.["requestBody"]).toHaveProperty("content.application/json.schema.properties.incidentTypeId");
+
+    const uploadPhoto = (document.json().paths as Record<string, Record<string, Record<string, unknown>>>)[
+      "/_user/sos/requests/{id}/photo"
+    ]?.post;
+    expect(uploadPhoto?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(uploadPhoto?.["x-borobiya-access"]).toBe("authenticated");
+    // 413 is the size refusal `docs/SECURITY.md` §9 implies and the route answers; a generated client
+    // needs it in the document to type the "compress it first" branch.
+    expect(uploadPhoto?.["responses"]).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      413: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // The read half is still a promise: no `GET /uploads/{id}` operation exists in the document.
+    expect(document.json().paths).not.toHaveProperty("/uploads/{id}");
   });
 
   it("serves the public health endpoint with security headers", async () => {

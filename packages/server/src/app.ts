@@ -26,6 +26,10 @@ import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-s
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
 import { registerSosRequestRoutes } from "./sos/requests";
+import { registerMultipartParser } from "./plugins/multipart";
+import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
+import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
+import { registerSosPhotoRoutes } from "./sos/photos";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
 import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
 import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
@@ -77,6 +81,10 @@ export interface FastifyAppDependencies {
   categoryStore?: CategoryStore;
   /** Override SOS-request creation persistence in tests. */
   sosRequestStore?: SosRequestStore;
+  /** Override the photo attach write in tests. */
+  photoStore?: SosPhotoStore;
+  /** Override where uploaded photos are written in tests. */
+  photoStorage?: PhotoStorage;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
@@ -123,7 +131,8 @@ export async function createFastifyApp(
     dependencies.userSearchStore,
     dependencies.incidentTypeStore,
     dependencies.categoryStore,
-    dependencies.sosRequestStore
+    dependencies.sosRequestStore,
+    dependencies.photoStore
   ].some((store) => store === undefined);
   const database = needsDatabase ? createDatabase(config.databaseUrl) : undefined;
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
@@ -138,6 +147,8 @@ export async function createFastifyApp(
   const incidentTypeStore = dependencies.incidentTypeStore ?? new DrizzleIncidentTypeStore(database!.db);
   const categoryStore = dependencies.categoryStore ?? new DrizzleCategoryStore(database!.db);
   const sosRequestStore = dependencies.sosRequestStore ?? new DrizzleSosRequestStore(database!.db);
+  const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
+  const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
   const liveLocationService = createLiveLocationService({
     shareStore: locationShareStore,
     historyStore: locationHistoryStore
@@ -187,9 +198,20 @@ export async function createFastifyApp(
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks.
   await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
+  // multipart is only needed by the photo upload, but it must be on the app before that route is
+  // created. The limits are the contract's, not a guess: `docs/SECURITY.md` §9 caps a photo at 5 MB,
+  // and an SOS carries one — so the parser refuses anything bigger before a byte is buffered, and
+  // `throwFileSizeLimit` makes that an error rather than a silently truncated buffer (the route checks
+  // `truncated` as well, so turning the flag off cannot start storing half an image).
+  await registerMultipartParser(app, { maxBytes: config.sosPhotoMaxBytes });
   // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
   // has finished onboarding, which is exactly the state dispatch is entitled to trust.
   await registerSosRequestRoutes(app, { store: sosRequestStore });
+  await registerSosPhotoRoutes(app, {
+    store: photoStore,
+    storage: photoStorage,
+    maxBytes: config.sosPhotoMaxBytes
+  });
   await registerLocationHistoryShareRoutes(app, {
     store: locationHistoryStore,
     shares: locationShareStore,

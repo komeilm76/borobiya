@@ -123,7 +123,7 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, the live-location surface, and SOS creation are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, the live-location surface, and SOS creation with its photo attachment are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
@@ -136,7 +136,7 @@ packages/server/
     │   ├── categories.test.ts# set-replacement semantics, unknown-id issues, 404-vs-400 split, and no-audit-on-no-op tests
     │   └── normalize.ts      # the blank-to-NULL and zod-issue rules both catalog route files share, kept in one place
     ├── config/
-    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
+    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits, location retention, the uploads directory and the photo ceiling
     │   └── env.test.ts
     ├── auth/
     │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
@@ -169,7 +169,11 @@ packages/server/
     │   └── search.test.ts    # required term, refused filters, cleared controls, filter mapping, coordinate pairing, and page/total mapping
     ├── sos/
     │   ├── requests.ts       # POST /_user/sos/requests: schema-bounded severity/description/coordinates, the catalog lookup that decides whether the incident type exists, and the refusal of a client-supplied photoUrl
-    │   └── requests.test.ts  # length bounds at both ends, coordinate and accuracy rules, trimming, strict keys, catalog refusal wording, and the /_user guard's coverage of this path
+    │   ├── requests.test.ts  # length bounds at both ends, coordinate and accuracy rules, trimming, strict keys, catalog refusal wording, and the /_user guard's coverage of this path
+    │   ├── photos.ts         # POST /_user/sos/requests/:id/photo: the multipart rules the container enforces (one `photo` part, nothing else), the byte sniff, the owner-only attach folded into the update, replace-not-append, and no state rule of its own
+    │   ├── photos.test.ts    # 401 before the parser claims the stream, part-naming refusals that name the field, 413 quoting the configured ceiling, GIF-as-PNG, truncated bodies, empty files, unknown and other-owned requests, the stored bytes and name, and the absence of any read route
+    │   ├── photo-storage.ts  # the volume: server-chosen names, a private mode, `.part` then rename, `discard()` for bytes the database refused, and a `publicPath` the future read route resolves
+    │   └── photo-storage.test.ts # traversal-proof naming, nothing left behind on a refused attach, the exact 0600 mode, and that a replacement never rewrites the previous file in place
     ├── realtime/
     │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
     │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests
@@ -189,6 +193,8 @@ packages/server/
     │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
     │   ├── sos-request-store.ts # one transaction for the incident-type probe and the SOS insert: PostGIS point built from (lon, lat), status read back from the row, photo column left to the upload endpoint
     │   ├── sos-request-store.test.ts # rendered SQL for the geography expression and defaults, plus the probe-empty/insert-never ordering and the typed refusal
+    │   ├── sos-photo-store.ts # the attach as one statement: `WHERE id = request AND requester_id = caller`, so a missing row and someone else's row are the same answer, and `photo_url` is the only column it may touch
+    │   ├── sos-photo-store.test.ts # the owner predicate and the `set` clause in the rendered SQL, and both refusals collapsing into `not_found`
     │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
     │   ├── user-search-store.ts # partial username match over reachable accounts with rating/online filters, session-derived liveness, and PostGIS distance in kilometres
     │   ├── user-search-store.test.ts # escaped patterns, parameter order, the position fallback, and page/count mapping
@@ -205,15 +211,19 @@ packages/server/
     │   ├── password.ts      # Argon2id hash/verify helpers
     │   ├── password.test.ts
     │   ├── tokens.ts        # HS256 access/refresh JWT signing and verification
-    │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
+    │   ├── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
+    │   ├── image-payload.ts # the photo validator: three formats by magic bytes *and* closing structure, the size ceiling, and a refusal that names what actually arrived
+    │   └── image-payload.test.ts # accepted fixtures, truncated and renamed files, unknown and announced kinds, and that nothing in a name is ever consulted
     └── plugins/
         ├── security.ts       # Helmet, CORS allowlist, global rate limit, no-store default
+        ├── multipart.ts      # `@fastify/multipart` with the photo contract's shape: one file, the configured byte ceiling, and bounds that keep a refused body cheap
+        ├── multipart.test.ts # the ceiling comes from configuration, and the shape limits stay small
         ├── error-envelope.ts # one sanitized envelope for failures no handler answered
         ├── error-envelope.test.ts
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, responder-category, and SOS-request stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS request creation is live (T3.2.2) — the photo upload, list/detail and cancellation halves of `/_user/sos` and every mission handler are not, and `/_admin/sos` dispatch arrives with T3.3.2; geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes and `POST /_user/sos/requests`, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share or file an SOS. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (the rest of SOS, missions, geocoding and the rest of search) are not.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, responder-category, and SOS-request stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS request creation is live (T3.2.2) and so is attaching its photo (T3.2.3: bytes validated by signature, written to `UPLOAD_DIR` under a server-chosen name, and re-pointed by an owner-checked update) — what is not live is reading those bytes back (`GET /uploads/:id` is T3.2.6, and no static mount exists on purpose), the list/detail and cancellation halves of `/_user/sos`, and every mission handler, and `/_admin/sos` dispatch arrives with T3.3.2; geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes and `POST /_user/sos/requests`, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share or file an SOS. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (the rest of SOS, missions, geocoding and the rest of search) are not.
 
 ---
 

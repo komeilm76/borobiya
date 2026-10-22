@@ -48,10 +48,21 @@ services:
       LOCATION_HISTORY_RETENTION_DAYS: ${LOCATION_HISTORY_RETENTION_DAYS:-90}
       LOCATION_HISTORY_MAX_SHARE_DAYS: ${LOCATION_HISTORY_MAX_SHARE_DAYS:-30}
       LOCATION_HISTORY_READ_POINTS: ${LOCATION_HISTORY_READ_POINTS:-1000}
+      # Largest SOS photo the API accepts, and where the photos live. The absolute path is the one the
+      # image creates and hands to the runtime user, mounted from a named volume below: without that
+      # mount, recreating the container would answer every photo the requester already paid 5 MB to
+      # upload with nothing — a rescue record is the wrong thing to lose to a container lifecycle.
+      SOS_PHOTO_MAX_SIZE_MB: ${SOS_PHOTO_MAX_SIZE_MB:-5}
+      UPLOAD_DIR: ${UPLOAD_DIR:-/app/data/uploads}
       OPENAPI_SERVER_PATH: ${OPENAPI_SERVER_PATH:-/api}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:3000,http://localhost:8080}
     ports:
       - "127.0.0.1:${API_PORT:-3000}:3000"
+    volumes:
+      # SOS photo evidence (SECURITY §9). Named rather than bind-mounted, and deliberately not exposed
+      # through nginx: the only thing that reads these files is the API, which is where the
+      # participants-and-admin rule lives.
+      - borobiya-uploads:/app/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,6 +235,8 @@ services:
 volumes:
   postgres-data: {}
   nominatim-data: {}
+  # Uploaded SOS photos, owned by the API user via the image directory it is mounted over.
+  borobiya-uploads: {}
 
 # Pinned so the API's TRUSTED_PROXY_IPS default (172.30.0.0/24) always matches
 # the network nginx proxies from, instead of Docker's ephemeral 172.x pool.

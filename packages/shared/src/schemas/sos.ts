@@ -13,6 +13,19 @@ import {
   sosRequestStatusSchema
 } from "../types/enums";
 
+/**
+ * The photo rules spec §11.2 states for an SOS, kept here so the client can pre-check what the server
+ * will refuse anyway. The size is the **default**: `SOS_PHOTO_MAX_SIZE_MB` overrides it per deployment
+ * (README §14 lists the knob), so a client that wants certainty must read the 413 rather than trust this
+ * number. The formats are not configurable: `POST /_user/sos/requests/:id/photo` accepts one of these
+ * three, judged by the file's bytes, whatever its name or declared content type says.
+ */
+export const MAX_SOS_PHOTO_BYTES = 5 * 1024 * 1024;
+/** The one form field the upload endpoint reads, named so a client cannot guess at it. */
+export const SOS_PHOTO_FIELD_NAME = "photo";
+export const ALLOWED_SOS_PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+export type SosPhotoMimeType = (typeof ALLOWED_SOS_PHOTO_MIME_TYPES)[number];
+
 export const sosLocationSchema = coordinatesSchema.extend({
   accuracy: z.number().finite().nonnegative().optional(),
   isManual: z.boolean()
