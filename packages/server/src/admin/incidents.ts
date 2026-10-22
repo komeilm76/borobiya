@@ -9,6 +9,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { IncidentTypeRecord, IncidentTypeSlugConflict, IncidentTypeStore } from "../db/incident-type-store";
 import { authorizeAdmin, errorResponse, type AdminAuthorizerDependencies } from "./authorize";
+import { blankToNull, validationIssues } from "./normalize";
 
 /**
  * The incident-type catalog (`/_admin/incidents`) — T3.1.2's three routes. Categories and membership
@@ -33,19 +34,6 @@ function incidentTypePayload(record: IncidentTypeRecord): IncidentType {
   };
 }
 
-/**
- * Only `description` can arrive blank. `icon`/`color` are `min(1)` in the schema, so clearing those means
- * sending `null` and an empty string is a validation error rather than a silent one; `description` accepts
- * `""`, and without this the column would hold "unset" in two representations forever. Collapsing it at the
- * boundary keeps one empty state, lets the store's no-op check see the same value back, and stops a
- * re-sent clear from adding an audit row.
- */
-function blankToNull(value: string | null | undefined): string | null | undefined {
-  if (value === undefined || value === null) return value;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? null : trimmed;
-}
-
 function slugConflictResponse(conflict: IncidentTypeSlugConflict | null) {
   const taken = conflict?.name
     ? `"${conflict.name}" already uses the slug "${conflict.slug}". Choose a different name or slug.`
@@ -59,15 +47,6 @@ function slugConflictResponse(conflict: IncidentTypeSlugConflict | null) {
 
 const UNDERIVABLE_SLUG_MESSAGE =
   "This name has no letters or digits to build a slug from, so provide a `slug` of your own.";
-
-/**
- * Zod's issue objects are a union of variants whose `path` is a readonly `PropertyKey[]`, so the parameter
- * is deliberately wide: the route only re-emits `code`/`message`/`path` verbatim, exactly as `./users` does
- * inline. Narrowing it here would tie this file to one Zod release's issue shape for no gain.
- */
-function validationIssues(error: { issues: readonly { code: string; message: string; path: readonly unknown[] }[] }) {
-  return error.issues.map(({ code, message, path }) => ({ code, message, path }));
-}
 
 export async function registerAdminIncidentRoutes(
   app: FastifyInstance,

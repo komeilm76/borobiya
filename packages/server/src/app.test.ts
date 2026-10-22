@@ -45,6 +45,48 @@ function makeRecoveryStore(questions: SecurityQuestion[]): UserRecoveryStore {
 }
 
 describe("Fastify server skeleton", () => {
+  it("registers the admin catalog routes, so they answer 401 rather than the contract-only 404", async () => {
+    // The whole point of T3.1.2/T3.1.3 landing: these URLs used to fall through to the 404 that unregistered
+    // descriptors return. A 401 here is proof the handler is mounted and its authorization runs.
+    const app = await makeApp();
+
+    const cases = [
+      { method: "GET" as const, url: "/_admin/incidents" },
+      { method: "POST" as const, url: "/_admin/incidents", payload: { name: "Fire" } },
+      { method: "PATCH" as const, url: "/_admin/incidents/00000000-0000-4000-8000-000000000001", payload: { color: null } },
+      { method: "GET" as const, url: "/_admin/categories" },
+      { method: "POST" as const, url: "/_admin/categories", payload: { name: "Mountain", incidentTypeIds: [] } },
+      { method: "PATCH" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001", payload: { name: "Alpine" } },
+      { method: "POST" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001/users", payload: { userIds: ["00000000-0000-4000-8000-000000000002"] } },
+      { method: "DELETE" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001/users/00000000-0000-4000-8000-000000000002" }
+    ];
+
+    for (const route of cases) {
+      const response = await app.inject(route as never);
+      expect(response.statusCode, `${route.method} ${route.url}`).toBe(401);
+    }
+
+    const document = await app.inject({ method: "GET", url: "/docs/json" });
+    const paths = document.json().paths as Record<string, Record<string, Record<string, unknown>>>;
+    const implemented = [
+      ["/_admin/incidents", "get"],
+      ["/_admin/incidents", "post"],
+      ["/_admin/incidents/{id}", "patch"],
+      ["/_admin/categories", "get"],
+      ["/_admin/categories", "post"],
+      ["/_admin/categories/{id}", "patch"],
+      ["/_admin/categories/{id}/users", "post"],
+      ["/_admin/categories/{id}/users/{userId}", "delete"]
+    ] as const;
+    for (const [path, method] of implemented) {
+      expect(paths[path]?.[method]?.["x-borobiya-runtime-status"], `${method} ${path}`).toBe("implemented");
+    }
+    // The slug collision the unique index makes reachable has to be in the document, or a client cannot
+    // be written against it.
+    expect(paths["/_admin/incidents"]?.post?.responses, "create gained 409").toHaveProperty("409");
+    expect(paths["/_admin/incidents/{id}"]?.patch?.responses, "rename gained 409").toHaveProperty("409");
+  });
+
   it("serves the public health endpoint with security headers", async () => {
     const app = await makeApp();
     const response = await app.inject({ method: "GET", url: "/_public/health" });

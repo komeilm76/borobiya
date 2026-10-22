@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, the admin incident-type catalog (`GET`/`POST /_admin/incidents`, `PATCH /_admin/incidents/:id`), and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, the admin incident-type and responder-category catalogs including member assignment (`/_admin/incidents`, `/_admin/categories`), and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -358,11 +358,19 @@ POST  /_admin/categories/:id/users   { userIds: string[] }
 DELETE /_admin/categories/:id/users/:userId
 ```
 
-`POST /_admin/incidents`, `GET /_admin/incidents`, and `PATCH /_admin/incidents/:id` are implemented (T3.1.2) and use the same signed-admin-token, current-account, and unrevoked-session checks as the admin user routes; the other five routes in this section remain contract-only and return 404 until T3.1.3.
+`POST /_admin/incidents`, `GET /_admin/incidents`, and `PATCH /_admin/incidents/:id`, together with `GET`/`POST /_admin/categories`, `PATCH /_admin/categories/:id`, `POST /_admin/categories/:id/users` and `DELETE /_admin/categories/:id/users/:userId` (T3.1.2, T3.1.3), all using the same signed-admin-token, current-account, and unrevoked-session checks as the admin user routes.
 
 The caller sends a `name`, not an identifier: the server derives the URL-safe `slug` from it (lowercased, accents folded, non-alphanumerics collapsed to `-`), and an explicit `slug` in the body overrides the derivation — the only way to add a type whose name has no ASCII letters or digits, which the server refuses with `400 VALIDATION_ERROR` and an `invalid_incident_slug` issue on `slug` rather than inventing one. A blank `description` is stored as `NULL`, so "no description" has exactly one representation; `icon` and `color` have no blank form (the schema requires a non-empty string), so clearing them means sending `null` on a PATCH — an empty string there is a validation error.
 
 `GET /_admin/incidents` returns the whole catalog as a bare array ordered by `name`, because that is what an admin scans to find one entry, and `Cache-Control: no-store`. `PATCH` sends only the fields it names; unknown ids answer `404 INCIDENT_TYPE_NOT_FOUND`, and a body with no fields is a `400`, never a no-op write. Renaming onto another type's slug answers `409 INCIDENT_TYPE_SLUG_TAKEN`, and both the create path (through the unique index) and the rename path refuse a duplicate rather than silently suffixing it — the message names the type that already holds the slug, falling back to a nameless refusal only if that row is deleted in the same instant. Every accepted create and every change that actually altered a value appends an `admin_audit_log` row (`incident_type_created` / `incident_type_updated`, with the changed fields and their before/after values) in the same transaction as the write; a PATCH that changed nothing writes no audit row.
+
+`POST /_admin/categories` takes `{ name, description?, incidentTypeIds }`; the id list is required (an empty array is a legal category that answers nothing) and every id must exist, otherwise the whole request is refused with `400 VALIDATION_ERROR` and one `unknown_incident_type` issue per bad id, each carrying its index in the caller's array — the same shape the share routes use for `unknown_target`, so a form can mark the entry instead of asking the admin to retype the list. Validation runs before the insert, inside the same transaction, so a refused request cannot leave a half-built category behind.
+
+`PATCH /_admin/categories/:id` treats `incidentTypeIds` as the whole new set (delete then re-insert), because the contract has no way to say "add one" and diffing a field the caller named would let a stale admin list silently delete assignments it never displayed. The set is rewritten only when it actually differs, and an update that changed neither the name, the description, nor the set writes nothing at all — including no audit row. `GET /_admin/categories` returns the list ordered by category name with each `incidentTypeIds` ordered by incident-type name, so the same data renders identically twice; `Cache-Control: no-store`.
+
+Assignment is idempotent: `POST /_admin/categories/:id/users` inserts through `on conflict ("category_id","user_id") do nothing`, so re-assigning an existing member is a `200` with an empty body rather than a failure, and an empty set of newly-added members produces no audit entry. Unknown accounts are refused the same way unknown incident types are (`unknown_user` per index); a missing category is `404 CATEGORY_NOT_FOUND`. `DELETE /_admin/categories/:id/users/:userId` answers `200` when the pair was deleted *and* when the user simply was not a member — the admin asked for a state, and it holds — while an unknown category is `404 CATEGORY_NOT_FOUND`. This differs from share revocation on purpose: there, "you were never granted this" is information the caller needs.
+
+Nothing assigns membership by default: no trigger, no seed row, and no column default on `category_users`, which is the schema half of T3.1.4. Its other half — an admin-visible projection that says which categories an account is in — is not in this task: `GET /_admin/users` still short-circuits `hasCategory=true` and the user-search read still refuses `category=`, both because neither joins these tables yet.
 
 ### 6.3 SOS Dispatch
 
@@ -464,7 +472,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
+| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), an admin category naming an incident type that does not exist (`unknown_incident_type`, one issue per index) or assigning an account that does not exist (`unknown_user`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
 | 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
 | 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter its read does not join yet (`category`, `incidentType`); `issues[0].filters` lists them |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
@@ -482,6 +490,7 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
 | 404 | `INCIDENT_TYPE_NOT_FOUND` | Admin incident-type update names an id that does not exist |
+| 404 | `CATEGORY_NOT_FOUND` | Admin category update, member assignment, or member removal names a category that does not exist |
 | 404 | `SHARE_NOT_FOUND` | A live or history share id is unknown, belongs to another account, or (for a received history read) was never granted to the caller |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `INCIDENT_TYPE_SLUG_TAKEN` | An admin create or rename lands on a slug another incident type already owns; `issues[0].slug` carries the slug that collided |

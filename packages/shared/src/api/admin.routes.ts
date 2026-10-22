@@ -28,6 +28,7 @@ import {
 import { sosRequestStatusSchema } from "../types/enums";
 import {
   apiErrorResponses,
+  categoryUserParamsSchema,
   noContentResponseSchema,
   uuidPathParamsSchema
 } from "./common";
@@ -223,7 +224,7 @@ export const adminRoutes = {
     method: "DELETE",
     url: "/_admin/categories/:id/users/:userId",
     schema: {
-      params: z.strictObject({ id: z.string().uuid(), userId: z.string().uuid() }),
+      params: categoryUserParamsSchema,
       responses: { 200: noContentResponseSchema, ...apiErrorResponses }
     },
     meta: {

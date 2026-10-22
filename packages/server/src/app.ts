@@ -20,6 +20,8 @@ import { registerUserDevicesRoute } from "./auth/devices";
 import { registerAdminUserRoutes } from "./admin/users";
 import { DrizzleIncidentTypeStore, type IncidentTypeStore } from "./db/incident-type-store";
 import { registerAdminIncidentRoutes } from "./admin/incidents";
+import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
+import { registerAdminCategoryRoutes } from "./admin/categories";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
@@ -69,6 +71,8 @@ export interface FastifyAppDependencies {
   userSearchStore?: UserSearchStore;
   /** Override the incident-type catalog persistence in tests. */
   incidentTypeStore?: IncidentTypeStore;
+  /** Override responder-category persistence in tests. */
+  categoryStore?: CategoryStore;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
@@ -113,7 +117,8 @@ export async function createFastifyApp(
     dependencies.locationShareStore,
     dependencies.locationHistoryStore,
     dependencies.userSearchStore,
-    dependencies.incidentTypeStore
+    dependencies.incidentTypeStore,
+    dependencies.categoryStore
   ].some((store) => store === undefined);
   const database = needsDatabase ? createDatabase(config.databaseUrl) : undefined;
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
@@ -126,6 +131,7 @@ export async function createFastifyApp(
   const locationHistoryStore = dependencies.locationHistoryStore ?? new DrizzleLocationHistoryStore(database!.db);
   const userSearchStore = dependencies.userSearchStore ?? new DrizzleUserSearchStore(database!.db);
   const incidentTypeStore = dependencies.incidentTypeStore ?? new DrizzleIncidentTypeStore(database!.db);
+  const categoryStore = dependencies.categoryStore ?? new DrizzleCategoryStore(database!.db);
   const liveLocationService = createLiveLocationService({
     shareStore: locationShareStore,
     historyStore: locationHistoryStore
@@ -164,6 +170,11 @@ export async function createFastifyApp(
   });
   await registerAdminIncidentRoutes(app, {
     store: incidentTypeStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
+  });
+  await registerAdminCategoryRoutes(app, {
+    store: categoryStore,
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret
   });

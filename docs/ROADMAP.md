@@ -118,8 +118,8 @@ gantt
 
 ### M3.1 Admin Domain Model
 - [x] `incident_types` + `categories` + pivots `category_users` + `category_incident_types` — DDL generated as `drizzle/0010_complete_namor.sql`, 2026-10-22
-- [ ] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users` — the incident routes are live (T3.1.2, 2026-10-22); both category routes are still contract-only (T3.1.3)
-- [ ] Frontend: Admin /incidents & /categories CRUD + assign users
+- [x] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users` — live as of T3.1.2/T3.1.3 (2026-10-22), with list/update reads and member removal too
+- [ ] Frontend: Admin /incidents & /categories CRUD + assign users — the server surface is in place; the screens are T3.1.5
 
 ### M3.2 SOS Request
 - [ ] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback, optional photo 5MB)

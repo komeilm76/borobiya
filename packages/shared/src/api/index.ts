@@ -1,6 +1,13 @@
 export { defineRoute } from "./define-route";
 export type { ApiRoute, ApiRouteAccess, ApiRouteDefinition, ApiRouteMeta, ApiRouteSchema } from "./define-route";
-export { apiErrorResponses, locationHistoryQuerySchema, noContentResponseSchema, sharePathParamsSchema, uuidPathParamsSchema } from "./common";
+export {
+  apiErrorResponses,
+  categoryUserParamsSchema,
+  locationHistoryQuerySchema,
+  noContentResponseSchema,
+  sharePathParamsSchema,
+  uuidPathParamsSchema
+} from "./common";
 export { authRoutes } from "./auth.routes";
 export { publicRoutes } from "./public.routes";
 export { userRoutes } from "./user.routes";
