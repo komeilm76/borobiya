@@ -20,34 +20,30 @@ export interface PlaybackFrame {
   lon: number;
 }
 
+import {
+  emptyOverlay,
+  lineOverlay,
+  pointOverlay,
+  type MapPosition,
+  type OverlayCollection,
+  type OverlayFeature,
+  type OverlayLineGeometry,
+  type OverlayLayerSpec,
+  type OverlayPointGeometry,
+  type OverlaySourceSpec,
+  type OverlayStyle
+} from "@/map/overlay-sync";
+
 /**
- * MapLibre's coordinate order is `[longitude, latitude]` — the reverse of the API's named fields.
- * Every conversion in this module happens here, in one place, because a polyline built from
- * `[lat, lon]` pairs draws a plausible-looking path across the wrong continent and no test of the
- * component would ever notice.
+ * Playback's GeoJSON shapes are the generic overlay shapes (see `@/map/overlay-sync`); the aliases stay
+ * because this module is where a reader looks for the playback data model, and the map rules the
+ * companion markers share belong to the map module.
  */
-export type MapPosition = [number, number];
-
-export interface PlaybackPointGeometry {
-  type: "Point";
-  coordinates: MapPosition;
-}
-
-export interface PlaybackLineGeometry {
-  type: "LineString";
-  coordinates: MapPosition[];
-}
-
-export interface PlaybackFeature {
-  type: "Feature";
-  geometry: PlaybackPointGeometry | PlaybackLineGeometry;
-  properties: Record<string, never>;
-}
-
-export interface PlaybackCollection {
-  type: "FeatureCollection";
-  features: PlaybackFeature[];
-}
+export type PlaybackCollection = OverlayCollection;
+export type PlaybackFeature = OverlayFeature;
+export type PlaybackLineGeometry = OverlayLineGeometry;
+export type PlaybackPointGeometry = OverlayPointGeometry;
+export type { MapPosition };
 
 /** The window a range picker answers with, in the ISO instants the API's query schema expects. */
 export interface HistoryWindow {
@@ -229,35 +225,17 @@ export interface PlaybackFrameData {
  */
 export function playbackGeoJson(frames: readonly PlaybackFrame[], cursorMs: number): PlaybackFrameData {
   return {
-    trace: lineCollection(frames.map((frame) => [frame.lon, frame.lat] as MapPosition)),
-    played: lineCollection(playedCoordinates(frames, cursorMs)),
-    head: headCollection(positionAt(frames, cursorMs))
-  };
-}
-
-function lineCollection(coordinates: MapPosition[]): PlaybackCollection {
-  if (coordinates.length < 2) {
-    // A `LineString` with one vertex is invalid GeoJSON; maplibre tolerates it, and a strict validator
-    // downstream would not. An empty collection draws nothing, which is the correct rendering anyway.
-    return { type: "FeatureCollection", features: [] };
-  }
-  return {
-    type: "FeatureCollection",
-    features: [{ type: "Feature", geometry: { type: "LineString", coordinates }, properties: {} }]
-  };
-}
-
-function headCollection(position: MapPosition | null): PlaybackCollection {
-  if (!position) return { type: "FeatureCollection", features: [] };
-  return {
-    type: "FeatureCollection",
-    features: [{ type: "Feature", geometry: { type: "Point", coordinates: position }, properties: {} }]
+    // `[lon, lat]` and not `[lat, lon]`, in the one place that order is chosen for playback: a swap
+    // here draws a plausible track across the wrong continent.
+    trace: lineOverlay(frames.map((frame) => [frame.lon, frame.lat] as MapPosition)),
+    played: lineOverlay(playedCoordinates(frames, cursorMs)),
+    head: pointOverlay(positionAt(frames, cursorMs))
   };
 }
 
 /** An empty collection is a valid `setData` argument and clears a layer without removing it. */
-export function emptyCollection(): PlaybackCollection {
-  return { type: "FeatureCollection", features: [] };
+export function emptyCollection(): OverlayCollection {
+  return emptyOverlay();
 }
 
 /**
@@ -283,10 +261,7 @@ export function trackBounds(frames: readonly PlaybackFrame[]): [MapPosition, Map
 }
 
 /** The whole overlay a playback view installs on the map, as data. */
-export interface PlaybackStyleDescriptor {
-  readonly sources: PlaybackSourceSpec[];
-  readonly layers: PlaybackLayerSpec[];
-}
+export type PlaybackStyleDescriptor = OverlayStyle;
 
 /** Source ids, exported so the panel and the map agree on them without a string agreed on twice. */
 export const PLAYBACK_SOURCE_IDS = {
@@ -295,20 +270,8 @@ export const PLAYBACK_SOURCE_IDS = {
   head: "borobiya-history-head"
 } as const;
 
-export interface PlaybackSourceSpec {
-  type: "geojson";
-  id: string;
-  data: PlaybackCollection;
-}
-
-export interface PlaybackLayerSpec {
-  id: string;
-  type: "line" | "circle";
-  source: string;
-  paint: Record<string, unknown>;
-  /** Only on the unplayed remainder: a dashed grey reads as "the rest of the track" at a glance. */
-  layout?: Record<string, unknown>;
-}
+export type PlaybackSourceSpec = OverlaySourceSpec;
+export type PlaybackLayerSpec = OverlayLayerSpec;
 
 /**
  * The sources and layers a playback view needs, as data.

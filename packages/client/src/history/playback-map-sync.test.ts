@@ -13,7 +13,7 @@ interface LiveMap {
   readonly sources?: string[];
   readonly layers?: string[];
   readonly styleLoaded?: boolean;
-  readonly firstLiveLayerId?: string;
+  readonly beforeLayerId?: string;
 }
 
 function withMap(loaded: LiveMap = {}): PlaybackMapState {
@@ -21,7 +21,7 @@ function withMap(loaded: LiveMap = {}): PlaybackMapState {
     styleLoaded: loaded.styleLoaded ?? true,
     hasSource: (id) => (loaded.sources ?? []).includes(id),
     hasLayer: (id) => (loaded.layers ?? []).includes(id),
-    ...(loaded.firstLiveLayerId ? { firstLiveLayerId: loaded.firstLiveLayerId } : {})
+    ...(loaded.beforeLayerId ? { beforeLayerId: loaded.beforeLayerId } : {})
   };
 }
 
@@ -90,13 +90,13 @@ describe("planPlaybackSync", () => {
   });
 
   it("inserts below the live overlay so companion markers stay on top", () => {
-    const ops = planPlaybackSync(withMap({ firstLiveLayerId: "borobiya-live" }), historyPlaybackStyle(false), frame);
+    const ops = planPlaybackSync(withMap({ beforeLayerId: "borobiya-live" }), historyPlaybackStyle(false), frame);
     const added = ops.filter((entry) => entry.op === "addLayer");
     expect(added).toHaveLength(3);
     for (const entry of added) expect(entry).toMatchObject({ beforeId: "borobiya-live" });
   });
 
-  it("omits beforeId when the map has no live layer, because maplibre rejects an unknown one", () => {
+  it("omits beforeId when nobody names a layer to sit under", () => {
     const ops = planPlaybackSync(withMap(), historyPlaybackStyle(false), frame);
     for (const entry of ops.filter((candidate) => candidate.op === "addLayer")) expect(entry).not.toHaveProperty("beforeId");
   });
