@@ -359,11 +359,12 @@ Each update appears as **timeline** to requester + admin.
 
 ## 21. Admin — Categories & Incidents
 
-*`/_admin/categories`, `/_admin/incidents`*
+*`/_admin/categories`, `/_admin/incidents`* — live since T3.1.5
 
-- **Incident Types:** Create `name, icon, color, description` (e.g., Fire 🔥 red) → used in SOS dropdown.
-- **Categories:** Create `name, description` + select **multiple incident types** it contains + **assign users** to category.
-- All users start **in no category**; admin assigns; user can be in **multiple categories**.
+- **Incident Types:** Create `name, icon, color, description` (e.g., Fire 🔥 red) → used in SOS dropdown. The slug is derived from the name when the field is left empty; a name with nothing slug-shaped in it (a Persian-only label is normal here) has to be given one by hand, and the form says so before the server has to. Renaming is allowed, and a taken slug is refused with a `409` naming the type that holds it.
+- **Categories:** Create `name, description` + select **multiple incident types** it contains + **assign users** to category. The picker is the username search rather than a list of ids; the chosen set replaces the stored one, so unticking is how a type is removed.
+- **What this screen cannot do yet:** show who is already in a category, and therefore remove one. No read returns a category's members (T3.1.4); the dialog says so instead of offering a uuid to type, and adding somebody already a member is a no-op success rather than an error.
+- All users start **in no category**; admin assigns; user can be in **multiple categories**. An empty catalog is the shipped state: nothing is seeded, so the SOS form has no options until an admin adds them.
 
 [Screenshot: Category form with incident Type multi-select + user assignment]
 

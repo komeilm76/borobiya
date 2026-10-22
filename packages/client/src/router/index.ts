@@ -113,22 +113,14 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_admin/categories",
     name: "admin-categories",
-    component: () => import("@client/views/_admin/PlaceholderView.vue"),
-    props: {
-      title: "دسته‌بندی‌ها",
-      description: "دسته‌بندی رخدادها و تنظیمات مرتبط با آن‌ها در این بخش مدیریت می‌شوند.",
-      icon: "mdi-shape-outline"
-    }
+    component: () => import("@client/views/_admin/AdminCategoriesView.vue")
   },
   {
     path: "/_admin/incidents",
     name: "admin-incidents",
-    component: () => import("@client/views/_admin/PlaceholderView.vue"),
-    props: {
-      title: "گزارش‌های امدادی",
-      description: "گزارش‌های فعال و گذشته برای بررسی و پیگیری در دسترس مدیران خواهند بود.",
-      icon: "mdi-alert-circle-outline"
-    }
+    // T3.1.5 replaced this placeholder; the copy here used to call the incident-type catalog
+    // "گزارش‌های امدادی" (rescue reports), which is a different thing and was wrong on the screen.
+    component: () => import("@client/views/_admin/AdminIncidentsView.vue")
   },
   {
     path: "/_admin/dispatch",

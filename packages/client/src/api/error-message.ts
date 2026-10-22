@@ -4,6 +4,10 @@ const localizedApiErrors: Record<string, string> = {
   ACCOUNT_INACTIVE: "این حساب غیرفعال است. برای راهنمایی با پشتیبانی تماس بگیرید.",
   ACCOUNT_SUSPENDED: "این حساب موقتاً محدود شده است. برای راهنمایی با پشتیبانی تماس بگیرید.",
   ALREADY_AUTHENTICATED: "ابتدا از حساب فعلی خارج شوید.",
+  // Both mean "the row you were editing is gone" — usually a second browser tab. Naming the entity the
+  // request was about is the whole point of the message, so the two codes are not folded into one line.
+  CATEGORY_NOT_FOUND: "این گروه امدادگر دیگر وجود ندارد؛ فهرست را تازه کنید.",
+  INCIDENT_TYPE_NOT_FOUND: "این نوع رویداد دیگر وجود ندارد؛ فهرست را تازه کنید.",
   INVALID_CREDENTIALS: "نام کاربری یا گذرواژه درست نیست.",
   INVALID_REFRESH: "نشست شما پایان یافته است؛ دوباره وارد شوید.",
   INVALID_RESET_TOKEN: "پیوند بازیابی معتبر نیست یا زمان آن به پایان رسیده است.",
