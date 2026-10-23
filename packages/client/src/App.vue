@@ -39,6 +39,29 @@
             />
           </v-list>
         </v-menu>
+        <v-menu v-if="auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions" location="bottom end">
+          <template #activator="{ props: inboxProps }">
+            <v-btn v-bind="inboxProps" icon variant="text" aria-label="پیشنهادهای مأموریت" @click="proposalInbox.refresh()">
+              <v-badge :content="proposalInbox.total" :model-value="proposalInbox.total > 0" color="error">
+                <v-icon icon="mdi-bell-outline" />
+              </v-badge>
+            </v-btn>
+          </template>
+          <v-list density="compact" min-width="260" aria-label="پیشنهادهای امدادگری در انتظار پاسخ">
+            <v-list-subheader>پیشنهادهای مأموریت ({{ proposalInbox.total }})</v-list-subheader>
+            <v-list-item v-if="proposalInbox.loading" title="در حال دریافت…" />
+            <v-list-item v-else-if="proposalInbox.failed" title="دریافت پیشنهادها ناموفق بود؛ دوباره تلاش کنید." @click="proposalInbox.refresh()" />
+            <v-list-item v-else-if="proposalInbox.total === 0" title="پیشنهاد جدیدی ندارید." />
+            <v-list-item
+              v-for="proposal in proposalInbox.proposals"
+              :key="proposal.id"
+              :title="`درخواست امداد ${proposal.sosRequestId.slice(0, 8)}`"
+              :subtitle="new Date(proposal.createdAt).toLocaleString('fa-IR')"
+              prepend-icon="mdi-lifebuoy"
+            />
+            <v-list-item v-if="proposalInbox.total > proposalInbox.proposals.length" title="۲۰ مورد نخست نمایش داده می‌شود؛ فهرست کامل در مرحلهٔ بعد اضافه می‌شود." />
+          </v-list>
+        </v-menu>
         <v-btn class="nav-button d-none d-sm-flex" to="/_public/landing" variant="text" rounded="lg">
           خانه
         </v-btn>
@@ -138,6 +161,7 @@ import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
+import { useProposalInboxStore } from "./stores/proposal-inbox";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
@@ -145,6 +169,7 @@ import type { ThemePreference } from "./theme/theme-preference";
 
 const auth = useAuthStore(pinia);
 const adminSos = useAdminSosStore(pinia);
+const proposalInbox = useProposalInboxStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 const appTheme = useThemeStore(pinia);
 const showSosButton = computed(

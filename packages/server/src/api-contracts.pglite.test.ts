@@ -768,6 +768,12 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(nearest.responders[0]?.userId).toBe(createdResponder.id);
     expect(nearest.responders[0]?.avgRating).toBe(4.9);
 
+    const emptyInbox = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
+      url: apiRoutes.sos.listProposals.url,
+      headers: responderHeaders
+    });
+    expect(emptyInbox.total).toBe(0);
+
     const dispatched = await callContract<{ proposals: Array<{ rescuerId: string; status: string }> }>(
       apiRoutes.admin.dispatchSosRequest,
       201,
@@ -780,6 +786,22 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(dispatched.proposals).toHaveLength(1);
     expect(dispatched.proposals[0]?.rescuerId).toBe(createdResponder.id);
 
+    const inbox = await callContract<{ items: Array<{ rescuerId: string; status: string }>; total: number; totalPages: number }>(
+      apiRoutes.sos.listProposals, 200, { url: apiRoutes.sos.listProposals.url, headers: responderHeaders }
+    );
+    expect(inbox.total).toBe(1);
+    expect(inbox.totalPages).toBe(1);
+    expect(inbox.items).toMatchObject([{ rescuerId: createdResponder.id, status: "pending" }]);
+    const requesterInbox = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
+      url: apiRoutes.sos.listProposals.url, headers: requesterHeaders
+    });
+    expect(requesterInbox.total).toBe(0);
+    const outOfRangeInbox = await callContract<{ items: unknown[]; total: number }>(apiRoutes.sos.listProposals, 200, {
+      url: `${apiRoutes.sos.listProposals.url}?page=3&limit=1`, headers: responderHeaders
+    });
+    expect(outOfRangeInbox).toMatchObject({ items: [], total: 1 });
+    expect((await app.inject({ method: "GET", url: `${apiRoutes.sos.listProposals.url}?limit=9999`, headers: responderHeaders })).statusCode).toBe(400);
+
     const rescuerPhotoAccess = await callContract<{ url: string }>(apiRoutes.sos.getPhotoAccess, 200, {
       url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
       headers: responderHeaders
@@ -791,6 +813,10 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       method: "GET", url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
       headers: responderHeaders
     })).statusCode).toBe(404);
+    const afterDeclineInbox = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
+      url: apiRoutes.sos.listProposals.url, headers: responderHeaders
+    });
+    expect(afterDeclineInbox.total).toBe(0);
 
     // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
     await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);

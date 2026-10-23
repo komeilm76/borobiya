@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import type { MissionProposalStatus, NearestResponder, SosRequestStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import {
@@ -77,6 +77,7 @@ export interface SosDispatchStore {
   findNearestResponders(sosRequestId: string, limit?: number): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
+  listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: MissionProposalRecord[]; total: number }>;
 }
 
 function toValidDate(value: Date | string): Date {
@@ -87,7 +88,8 @@ export function createPlaceholderSosDispatchStore(): SosDispatchStore {
   return {
     findNearestResponders: async () => ({ status: "not_found" }),
     dispatchResponders: async () => ({ status: "not_found" }),
-    listProposalsByRequest: async () => []
+    listProposalsByRequest: async () => [],
+    listPendingProposals: async () => ({ items: [], total: 0 })
   };
 }
 
@@ -369,6 +371,23 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         sosRequest
       };
     });
+  }
+
+  public async listPendingProposals(rescuerId: string, page: number, limit: number): Promise<{ items: MissionProposalRecord[]; total: number }> {
+    const where = and(eq(missionProposals.rescuerId, rescuerId), eq(missionProposals.status, "pending"));
+    const [items, totals] = await Promise.all([
+      this.db.select({
+        id: missionProposals.id,
+        sosRequestId: missionProposals.sosRequestId,
+        rescuerId: missionProposals.rescuerId,
+        status: missionProposals.status,
+        createdAt: missionProposals.createdAt
+      }).from(missionProposals).where(where)
+        .orderBy(desc(missionProposals.createdAt), asc(missionProposals.id))
+        .limit(limit).offset((page - 1) * limit),
+      this.db.select({ total: count() }).from(missionProposals).where(where)
+    ]);
+    return { items, total: totals[0]?.total ?? 0 };
   }
 
   public async listProposalsByRequest(sosRequestId: string): Promise<MissionProposalRecord[]> {

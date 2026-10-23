@@ -32,6 +32,7 @@ import {
   type SosDispatchStore
 } from "./db/sos-dispatch-store";
 import { registerSosRequestRoutes } from "./sos/requests";
+import { registerSosProposalRoutes } from "./sos/proposals";
 import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
 import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
@@ -242,6 +243,7 @@ export async function createFastifyApp(
   // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
   // has finished onboarding, which is exactly the state dispatch is entitled to trust.
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
+  await registerSosProposalRoutes(app, sosDispatchStore);
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,

@@ -219,7 +219,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 - [x] **T3.4.1** Table `mission_proposals` (sosRequestId, rescuerId, status: pending|accepted|declined|expired) ✅ 2026-10-23
   - **Delivered:** Declared `missionProposals` in `packages/server/src/db/schema.ts` and generated `drizzle/0013_stiff_rhodey.sql` with `ON DELETE CASCADE` on `sos_request_id`, `NO ACTION` on `rescuer_id`, `UNIQUE ("sos_request_id", "rescuer_id")`, `CHECK ("status" IN ('pending', 'accepted', 'declined', 'expired'))`, and `INDEX "mission_proposals_rescuer_status_idx" ("rescuer_id", "status")`.
-- [ ] **T3.4.2** `GET /_user/sos/proposals` inbox (poll + socket) — bell count
+- [x] **T3.4.2** `GET /_user/sos/proposals` inbox (poll + socket) — bell count ✅ 2026-10-24
+  - **Delivered:** A live-session-guarded paginated read of the caller’s pending proposals (count includes all pages), ordered newest first; no other rescuer’s proposals or completed decisions leak into the inbox. The app-level Pinia inbox hydrates on sign-in, refreshes every 30 seconds and on `sos:proposal-received`, shows a bell/count and first-page preview, and resets/tears down its socket and timer on logout/account switch. The full proposal details/actions screen is T3.4.6. PGlite end-to-end tests pin dispatch→inbox→decline visibility and strict response schemas.
 - [ ] **T3.4.3** `POST /_user/sos/proposals/:id/accept` — guard `isOnMission=false`, set proposal accepted, create `missions`, `rescuer.isOnMission=true`, auto-decline own other pendings
 - [ ] **T3.4.4** `POST /_user/sos/proposals/:id/decline` {reason?}
 - [ ] **T3.4.5** Guard: if `isOnMission=true`, dispatch query skips them + runtime 400 on accept
