@@ -407,5 +407,34 @@ describe("T3.1.4 category membership lifecycle against real PostgreSQL (PGlite)"
       headers: { authorization: `Bearer ${rescuerToken}` }
     });
     expect(afterRemovalMe.json().categories).toEqual([{ id: roadCatId, name: "Road Rescue" }]);
+
+    // 6. Updating a category with multi-type ids in non-alphabetical order preserves canonical
+    // name order and treats re-submitting the identical set in reverse order as a true no-op.
+    const setBothRes = await app.inject({
+      method: "PATCH",
+      url: `/_admin/categories/${mountainCatId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { incidentTypeIds: [roadTypeId, alpineTypeId] }
+    });
+    expect(setBothRes.statusCode).toBe(200);
+    expect(setBothRes.json().incidentTypeIds).toEqual([alpineTypeId, roadTypeId]);
+
+    const auditCountBefore = (
+      await pg.query<{ c: number }>(`SELECT count(*)::int AS c FROM admin_audit_log`)
+    ).rows[0]!.c;
+
+    const reverseNoOpRes = await app.inject({
+      method: "PATCH",
+      url: `/_admin/categories/${mountainCatId}`,
+      headers: { authorization: `Bearer ${adminToken}` },
+      payload: { incidentTypeIds: [roadTypeId, alpineTypeId] }
+    });
+    expect(reverseNoOpRes.statusCode).toBe(200);
+    expect(reverseNoOpRes.json().incidentTypeIds).toEqual([alpineTypeId, roadTypeId]);
+
+    const auditCountAfter = (
+      await pg.query<{ c: number }>(`SELECT count(*)::int AS c FROM admin_audit_log`)
+    ).rows[0]!.c;
+    expect(auditCountAfter).toBe(auditCountBefore);
   });
 });

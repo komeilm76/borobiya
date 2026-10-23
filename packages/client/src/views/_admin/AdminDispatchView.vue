@@ -249,6 +249,7 @@ const incidentNameById = computed(
 
 let mapInstance: MapLibreMap | null = null;
 let pulseAnimationFrame: number | null = null;
+let lastPulseUpdateAt = 0;
 let detachMapEvents: (() => void) | null = null;
 
 function severityMeta(severity: Severity) {
@@ -319,10 +320,21 @@ function syncMapData(): void {
 }
 
 function startPulseLoop(): void {
-  if (pulseAnimationFrame !== null || typeof requestAnimationFrame !== "function") return;
+  if (
+    pulseAnimationFrame !== null ||
+    typeof requestAnimationFrame !== "function" ||
+    adminSos.visibleRequests.length === 0
+  ) {
+    return;
+  }
   const step = (timestamp: number) => {
+    pulseAnimationFrame = null;
+    if (adminSos.visibleRequests.length === 0) return;
+
     const map = mapInstance;
-    if (map && map.isStyleLoaded() && map.getLayer(SOS_PULSE_LAYER_ID)) {
+    const isHidden = typeof document !== "undefined" && document.hidden;
+    if (!isHidden && timestamp - lastPulseUpdateAt >= 50 && map && map.isStyleLoaded() && map.getLayer(SOS_PULSE_LAYER_ID)) {
+      lastPulseUpdateAt = timestamp;
       const phase = (timestamp % 1600) / 1600;
       const radius = 11 + phase * 18;
       const opacity = Math.max(0.06, (1 - phase) * 0.45);
@@ -388,8 +400,13 @@ function onMapReady(map: MapLibreMap): void {
 
 watch(
   () => [adminSos.visibleRequests, adminSos.selectedId] as const,
-  () => {
+  ([nextVisible]) => {
     syncMapData();
+    if (nextVisible.length > 0 && mapInstance) {
+      startPulseLoop();
+    } else if (nextVisible.length === 0) {
+      stopPulseLoop();
+    }
   }
 );
 

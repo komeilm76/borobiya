@@ -173,4 +173,35 @@ describe("useSosRequest composable", () => {
     expect(sos.lonInput.value).toBe("51.3890");
     expect(sos.canSubmit.value).toBe(true);
   });
+
+  it("ignores slow late GPS callbacks after the survivor explicitly picks a manual location on the map", async () => {
+    let resolveSlowGps:
+      | ((pos: { coords: { latitude: number; longitude: number; accuracy: number } }) => void)
+      | undefined;
+
+    const sos = useSosRequest({
+      accessToken: ref("token-ok"),
+      ensureSession: async () => true,
+      geolocation: () => ({
+        getCurrentPosition: (ok) => {
+          resolveSlowGps = ok;
+        }
+      })
+    });
+
+    sos.prepareForOpen();
+    expect(sos.locating.value).toBe(true);
+
+    // User manually selects exact incident point on MapCanvas while GPS is still resolving.
+    sos.setManualLocation(35.744, 51.375);
+    expect(sos.locating.value).toBe(false);
+
+    // Slow cell-tower GPS arrives 5 seconds later — must NOT clobber the user's manual pin!
+    resolveSlowGps?.({ coords: { latitude: 35.6, longitude: 51.2, accuracy: 950 } });
+    expect(sos.location.value).toEqual({
+      lat: 35.744,
+      lon: 51.375,
+      isManual: true
+    });
+  });
 });

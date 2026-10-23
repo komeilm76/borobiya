@@ -181,4 +181,48 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.requests).toEqual([row]);
     expect(store.errorMessage).toBeNull();
   });
+
+  it("refreshes session and reconnects socket when handshake fails with data.code INVALID_ACCESS_TOKEN", async () => {
+    const updateToken = vi.fn();
+    configureAdminSosRuntimeForTests({
+      openSocket: async () => ({
+        socket: socketEmitter as never,
+        updateToken,
+        connect: () => {
+          socketEmitter.connected = true;
+        },
+        close: () => {
+          socketEmitter.removeAllListeners();
+          socketEmitter.connected = false;
+        }
+      }),
+      listRequests: async () => ({ items: [], total: 0 })
+    });
+
+    const auth = useAuthStore();
+    auth.accessToken = "stale-ws-token";
+    auth.user = {
+      id: "admin-1",
+      username: "admin",
+      role: "admin",
+      mustCompleteSecurityQuestions: false
+    };
+    const refreshSpy = vi.spyOn(auth, "refreshSession").mockImplementation(async () => {
+      auth.accessToken = "rotated-ws-token";
+      return true;
+    });
+
+    useAdminSosStore();
+    await vi.waitFor(() => expect(socketEmitter.listenerCount("connect_error")).toBe(1));
+
+    socketEmitter.emit(
+      "connect_error",
+      Object.assign(new Error("Handshake rejected"), { data: { code: "INVALID_ACCESS_TOKEN" } })
+    );
+
+    await vi.waitFor(() => {
+      expect(refreshSpy).toHaveBeenCalledOnce();
+      expect(updateToken).toHaveBeenCalledWith("rotated-ws-token");
+    });
+  });
 });

@@ -107,13 +107,13 @@ export function categoryListQueries(db: Database) {
   };
 }
 
-/** Which of the requested ids the catalog does not have — reported in the order the caller sent them. */
+/** Which of the requested ids the catalog does not have — ordered by name so callers get canonical ordering. */
 export function foundIncidentTypeIdsQuery(db: Database, ids: string[]) {
   return db
     .select({ id: incidentTypes.id })
     .from(incidentTypes)
     .where(inArray(incidentTypes.id, ids))
-    .orderBy(asc(incidentTypes.id));
+    .orderBy(asc(incidentTypes.name), asc(incidentTypes.id));
 }
 
 /** The same question for accounts: assigning a user who does not exist is a refusal, not a typo. */
@@ -233,10 +233,12 @@ export class DrizzleCategoryStore implements CategoryStore {
   }): Promise<CategoryCreateResult> {
     return this.db.transaction(async (transaction) => {
       const db = transaction as unknown as Database;
+      let orderedIncidentTypeIds: string[] = [];
       if (input.incidentTypeIds.length > 0) {
         const found = await foundIncidentTypeIdsQuery(db, input.incidentTypeIds);
         const unknown = missingFrom(input.incidentTypeIds, found);
         if (unknown.length > 0) return { status: "unknown_incident_types" as const, ids: unknown };
+        orderedIncidentTypeIds = found.map((item) => item.id);
       }
 
       const inserted = await db
@@ -259,7 +261,7 @@ export class DrizzleCategoryStore implements CategoryStore {
 
       return {
         status: "created" as const,
-        record: { ...row, incidentTypeIds: input.incidentTypeIds, members: [] }
+        record: { ...row, incidentTypeIds: orderedIncidentTypeIds, members: [] }
       };
     });
   }
@@ -277,10 +279,12 @@ export class DrizzleCategoryStore implements CategoryStore {
       if (!existing) return { status: "not_found" as const };
 
       const requestedIds = input.patch.incidentTypeIds;
+      let orderedRequestedIds: string[] | undefined = requestedIds ? [] : undefined;
       if (requestedIds && requestedIds.length > 0) {
         const found = await foundIncidentTypeIdsQuery(db, requestedIds);
         const unknown = missingFrom(requestedIds, found);
         if (unknown.length > 0) return { status: "unknown_incident_types" as const, ids: unknown };
+        orderedRequestedIds = found.map((item) => item.id);
       }
 
       const set: Record<string, string | null> = {};
@@ -289,7 +293,8 @@ export class DrizzleCategoryStore implements CategoryStore {
         set.description = input.patch.description;
       }
       const currentIds = await readIncidentTypeIds(db, input.id);
-      const idsDiffer = requestedIds !== undefined && requestedIds.join(",") !== currentIds.join(",");
+      const idsDiffer =
+        orderedRequestedIds !== undefined && orderedRequestedIds.join(",") !== currentIds.join(",");
       // Sorted as one list, so the audit entry does not depend on which keys the caller happened to send.
       const writtenFields = [...Object.keys(set), ...(idsDiffer ? ["incidentTypeIds"] : [])].sort();
 
@@ -318,9 +323,9 @@ export class DrizzleCategoryStore implements CategoryStore {
 
       if (idsDiffer) {
         await deleteCategoryIncidentTypesQuery(db, input.id);
-        await insertIncidentTypeLinks(db, input.id, requestedIds ?? []);
+        await insertIncidentTypeLinks(db, input.id, orderedRequestedIds ?? []);
       }
-      const incidentTypeIds = idsDiffer ? requestedIds ?? [] : currentIds;
+      const incidentTypeIds = idsDiffer ? orderedRequestedIds ?? [] : currentIds;
 
       await db.insert(adminAuditLog).values({
         adminId: input.adminId,

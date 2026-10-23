@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SOS_PHOTO_FIELD_NAME } from "@shared/index";
-import { ApiError } from "./http";
+import { ApiError, registerAccessTokenRefresher } from "./http";
 import { createSosRequest, listSosIncidentTypes, uploadSosRequestPhoto } from "./sos";
 
 const INCIDENT_TYPE_ID = "11111111-1111-4111-8111-111111111111";
@@ -105,5 +105,35 @@ describe("SOS client API", () => {
       status: 413,
       code: "PHOTO_TOO_LARGE"
     } satisfies Partial<ApiError>);
+  });
+
+  it("retries multipart photo upload once when access token rotates after HTTP 401", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }), {
+          status: 401,
+          headers: { "content-type": "application/json" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ photoUrl: `/uploads/sos/${REQUEST_ID}.png` }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        })
+      );
+    registerAccessTokenRefresher(async () => "fresh-multipart-tok");
+
+    try {
+      const blob = new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" });
+      const res = await uploadSosRequestPhoto(REQUEST_ID, blob, "stale-multipart-tok");
+      expect(res).toEqual({ photoUrl: `/uploads/sos/${REQUEST_ID}.png` });
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect((fetchSpy.mock.calls[1]?.[1]?.headers as Headers).get("authorization")).toBe(
+        "Bearer fresh-multipart-tok"
+      );
+    } finally {
+      registerAccessTokenRefresher(null);
+    }
   });
 });

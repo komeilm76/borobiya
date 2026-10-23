@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, requestJson } from "./http";
+import { ApiError, registerAccessTokenRefresher, requestJson } from "./http";
 
 afterEach(() => {
+  registerAccessTokenRefresher(null);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -49,5 +50,37 @@ describe("same-origin API client", () => {
         message: "Incorrect answers"
       });
     expect(new ApiError(400, "BAD_REQUEST", "Rejected")).toBeInstanceOf(Error);
+  });
+
+  it("refreshes once and retries authenticated requests when an expired/clock-skewed token returns 401", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }), {
+          status: 401,
+          headers: { "content-type": "application/json" }
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: ["ok"] }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const refresher = vi.fn(async () => "rotated-access-token");
+    registerAccessTokenRefresher(refresher);
+
+    const result = await requestJson<{ items: string[] }>("/_admin/categories", {
+      accessToken: "stale-access-token"
+    });
+
+    expect(result).toEqual({ items: ["ok"] });
+    expect(refresher).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetchMock.mock.calls[1]?.[1]?.headers).get("authorization")).toBe(
+      "Bearer rotated-access-token"
+    );
   });
 });

@@ -53,8 +53,8 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     await live.start();
   }
 
-  watch(accessToken, (token) => {
-    if (token) void priority.refresh();
+  watch(accessToken, () => {
+    void priority.refresh();
   });
 
   return {

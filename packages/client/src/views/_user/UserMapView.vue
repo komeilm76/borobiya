@@ -83,7 +83,7 @@ const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
  */
 const live = useLiveCompanions({
   accessToken: computed(() => auth.accessToken),
-  ensureSession: () => auth.ensureSession(),
+  ensureSession: () => auth.refreshSession(),
   // The server echoes an accepted fix into the sender's own room, so without our own id a user who is
   // both broadcasting and receiving would draw themselves as one of their own companions.
   ownUserId: computed(() => auth.user?.id ?? null)

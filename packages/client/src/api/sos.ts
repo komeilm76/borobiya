@@ -10,7 +10,12 @@ import {
   type SosRequestCreated
 } from "@shared/index";
 import { apiRoutes } from "@shared/api";
-import { apiBasePath, ApiError, requestJson } from "./http";
+import {
+  apiBasePath,
+  ApiError,
+  refreshAccessTokenAfterUnauthorized,
+  requestJson
+} from "./http";
 
 const incidentTypeListSchema = z.array(incidentTypeSchema);
 const photoUploadResponseSchema = z.strictObject({
@@ -67,18 +72,25 @@ export async function uploadSosRequestPhoto(
   formData.append(SOS_PHOTO_FIELD_NAME, file);
 
   const path = apiRoutes.sos.uploadRequestPhoto.url.replace(":id", encodeURIComponent(params.id));
-  const headers = new Headers({
-    accept: "application/json",
-    authorization: `Bearer ${accessToken}`
-  });
+  const sendUpload = (token: string) =>
+    fetch(`${apiBasePath()}${path}`, {
+      method: "POST",
+      headers: new Headers({
+        accept: "application/json",
+        authorization: `Bearer ${token}`
+      }),
+      body: formData,
+      credentials: "same-origin",
+      signal
+    });
 
-  const response = await fetch(`${apiBasePath()}${path}`, {
-    method: "POST",
-    headers,
-    body: formData,
-    credentials: "same-origin",
-    signal
-  });
+  let response = await sendUpload(accessToken);
+  if (response.status === 401 && accessToken) {
+    const refreshedToken = await refreshAccessTokenAfterUnauthorized(accessToken);
+    if (refreshedToken) {
+      response = await sendUpload(refreshedToken);
+    }
+  }
 
   let payload: unknown;
   try {

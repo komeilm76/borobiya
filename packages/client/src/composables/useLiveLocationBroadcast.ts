@@ -47,7 +47,7 @@ function geolocationErrorCode(error: { readonly code?: number } | null | undefin
 export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOptions = {}) {
   const auth = options.accessToken ? null : useAuthStore();
   const accessToken = options.accessToken ?? computed(() => auth!.accessToken);
-  const ensureSession = options.ensureSession ?? (auth ? () => auth.ensureSession() : undefined);
+  const ensureSession = options.ensureSession ?? (auth ? () => auth.refreshSession() : undefined);
   const clock = options.now ?? (() => Date.now());
   const intervalMs = options.intervalMs ?? LOCATION_UPDATE_INTERVAL_MS;
   const openSocket =

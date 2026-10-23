@@ -13,6 +13,28 @@ interface ErrorPayload {
   issues?: unknown;
 }
 
+export type AccessTokenRefresher = () => Promise<string | null>;
+
+let registeredRefresher: AccessTokenRefresher | null = null;
+
+/**
+ * Registers the active session's token refresher so any authenticated REST or multipart request
+ * that hits an expired/clock-skewed `401` rotates once through `POST /_auth/refresh` and retries.
+ */
+export function registerAccessTokenRefresher(refresher: AccessTokenRefresher | null): void {
+  registeredRefresher = refresher;
+}
+
+export async function refreshAccessTokenAfterUnauthorized(failedToken: string): Promise<string | null> {
+  if (!registeredRefresher) return null;
+  try {
+    const refreshed = await registeredRefresher();
+    return refreshed && refreshed !== failedToken ? refreshed : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Same-origin prefix the browser uses for API traffic. A relative `VITE_API_URL` becomes the
  * proxy prefix (nginx and Vite both strip it before the API sees the request); an absolute URL
@@ -37,21 +59,34 @@ export class ApiError extends Error {
   }
 }
 
-export async function requestJson<T>(
-  path: string,
-  options: JsonRequestOptions = {}
-): Promise<T> {
+function buildJsonInit(options: JsonRequestOptions, token: string | null): RequestInit {
   const headers = new Headers({ accept: "application/json" });
   if (options.body !== undefined) headers.set("content-type", "application/json");
-  if (options.accessToken) headers.set("authorization", `Bearer ${options.accessToken}`);
+  if (token) headers.set("authorization", `Bearer ${token}`);
 
-  const response = await fetch(`${apiBasePath()}${path}`, {
+  return {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     credentials: "same-origin",
     signal: options.signal
-  });
+  };
+}
+
+export async function requestJson<T>(
+  path: string,
+  options: JsonRequestOptions = {}
+): Promise<T> {
+  const url = `${apiBasePath()}${path}`;
+  const initialToken = options.accessToken ?? null;
+  let response = await fetch(url, buildJsonInit(options, initialToken));
+
+  if (response.status === 401 && initialToken && registeredRefresher) {
+    const refreshedToken = await refreshAccessTokenAfterUnauthorized(initialToken);
+    if (refreshedToken) {
+      response = await fetch(url, buildJsonInit(options, refreshedToken));
+    }
+  }
 
   let payload: unknown;
   try {

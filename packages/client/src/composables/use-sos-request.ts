@@ -66,6 +66,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const createdRequestId = ref<string | null>(null);
   const photoUploadedUrl = ref<string | null>(null);
   const awaitingPhotoRetry = ref(false);
+  let gpsRequestId = 0;
 
   const draft = computed<SosFormDraft>(() => ({
     severity: severity.value,
@@ -105,6 +106,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function requestGpsLocation(): void {
+    const currentGpsRequest = ++gpsRequestId;
     const provider = (options.geolocation ?? defaultGeolocation)();
     if (!provider) {
       locating.value = false;
@@ -117,6 +119,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
     locationHint.value = null;
     provider.getCurrentPosition(
       (position) => {
+        if (currentGpsRequest !== gpsRequestId) return;
         locating.value = false;
         const resolved = gpsLocationDraft(position.coords);
         if (!resolved) {
@@ -128,6 +131,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
         lonInput.value = String(resolved.lon);
       },
       () => {
+        if (currentGpsRequest !== gpsRequestId) return;
         locating.value = false;
         locationHint.value =
           "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
@@ -142,6 +146,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
       submitError.value = sosIssueMessage("location_invalid");
       return false;
     }
+    gpsRequestId++;
+    locating.value = false;
     location.value = next;
     latInput.value = String(next.lat);
     lonInput.value = String(next.lon);
@@ -151,6 +157,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function setCoordinateInputs(nextLatInput: string, nextLonInput: string): boolean {
+    gpsRequestId++;
+    locating.value = false;
     latInput.value = nextLatInput;
     lonInput.value = nextLonInput;
     const next = parseCoordinatePair(nextLatInput, nextLonInput);
@@ -283,6 +291,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function reset(): void {
+    gpsRequestId++;
+    locating.value = false;
     severity.value = "high";
     description.value = "";
     location.value = null;

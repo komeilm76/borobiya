@@ -60,7 +60,10 @@
             <div v-if="sos.submitError.value" class="mt-1 text-sm">{{ sos.submitError.value }}</div>
           </v-alert>
           <div class="flex flex-wrap justify-end gap-2">
-            <v-btn variant="text" rounded="lg" :disabled="sos.submitting.value" @click="sos.clearPhoto()">
+            <v-btn variant="text" rounded="lg" :disabled="sos.submitting.value" @click="startFresh">
+              ثبت درخواست جدید
+            </v-btn>
+            <v-btn variant="tonal" rounded="lg" :disabled="sos.submitting.value" @click="sos.clearPhoto()">
               ادامه بدون تصویر
             </v-btn>
             <v-btn
@@ -570,10 +573,15 @@ onBeforeUnmount(() => {
 }
 
 .sos-sheet__map-wrap {
-  height: 14.5rem;
+  height: 15.5rem;
   border-radius: 0.9rem;
   overflow: hidden;
   border: 1px solid rgba(120, 140, 140, 0.25);
+}
+
+.sos-sheet__map-wrap :deep(.map-canvas) {
+  min-height: 0;
+  height: 100%;
 }
 
 .sos-sheet__actions {

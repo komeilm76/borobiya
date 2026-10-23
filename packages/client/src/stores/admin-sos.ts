@@ -51,6 +51,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   let detachSocketListeners: (() => void) | null = null;
   let socketGeneration = 0;
   let refreshGeneration = 0;
+  let refreshingSocketAuth = false;
 
   const isAdminSession = computed(
     () => auth.isAuthenticated && auth.user?.role === "admin"
@@ -168,15 +169,26 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const onDisconnect = () => {
       connected.value = false;
     };
-    const onConnectError = (err: Error) => {
+    const onConnectError = (err: Error & { data?: { code?: unknown } }) => {
       connected.value = false;
-      if (/unauthorized|token|jwt|session|expired/i.test(err.message)) {
-        void auth.refreshSession().then((ok) => {
-          if (ok && attachedClient && auth.accessToken) {
-            attachedClient.updateToken(auth.accessToken);
-            attachedClient.connect();
-          }
-        });
+      const errorCode = typeof err.data?.code === "string" ? err.data.code : "";
+      const isAuthFailure =
+        errorCode === "UNAUTHORIZED" ||
+        errorCode === "INVALID_ACCESS_TOKEN" ||
+        /unauthorized|token|jwt|session|expired/i.test(err.message);
+      if (isAuthFailure && !refreshingSocketAuth) {
+        refreshingSocketAuth = true;
+        void auth
+          .refreshSession()
+          .then((ok) => {
+            if (ok && attachedClient && auth.accessToken) {
+              attachedClient.updateToken(auth.accessToken);
+              attachedClient.connect();
+            }
+          })
+          .finally(() => {
+            refreshingSocketAuth = false;
+          });
       }
     };
     const onNewRequest = (payload: unknown) => {

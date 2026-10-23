@@ -15,7 +15,13 @@ import {
   type UserCategorySummary,
   type UserProfile
 } from "@shared/index";
-import { ApiError, authApiRoutes, requestJson, userApiRoutes } from "../api/http";
+import {
+  ApiError,
+  authApiRoutes,
+  registerAccessTokenRefresher,
+  requestJson,
+  userApiRoutes
+} from "../api/http";
 
 const USER_STORAGE_KEY = "borobiya.auth-user";
 const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60_000;
@@ -197,6 +203,11 @@ export const useAuthStore = defineStore("auth", () => {
       return false;
     }
   }
+
+  registerAccessTokenRefresher(async () => {
+    const refreshed = await refreshSession();
+    return refreshed ? accessToken.value : null;
+  });
 
   function acceptLogin(response: unknown): void {
     const parsed = loginResponseSchema.parse(response);
