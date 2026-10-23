@@ -70,6 +70,7 @@ FUNCTIONS = (
     "compose_volume_exists",
     "alter_sql_for",
     "psql_in_postgres",
+    "apply_alter_sql",
     "set_database_passwords",
     "check_database_credentials",
 )
@@ -120,6 +121,16 @@ class Fixture(unittest.TestCase):
 
     def postgres_running(self, value: str = "cid123") -> None:
         (self.state / "postgres.running").write_text(value, encoding="utf-8")
+
+    def api_running(self, database_url: str | None = None) -> None:
+        """The API container exists; with a URL, it is the DATABASE_URL Compose interpolated for it."""
+        (self.state / "api.running").write_text("cidapi", encoding="utf-8")
+        if database_url is not None:
+            (self.state / "api_database_url").write_text(database_url, encoding="utf-8")
+
+    def superuser(self, name: str) -> None:
+        """Which role the container's local socket will let in as superuser."""
+        (self.state / "superuser").write_text(name, encoding="utf-8")
 
     def volume(self, name: str = "postgres_data.volume") -> None:
         (self.state / name).write_text("", encoding="utf-8")
@@ -486,7 +497,7 @@ class CredentialProbeTests(Fixture):
         self.container_password(secret)
         result = self.invoke("check_database_credentials")
         self.assert_ok(result)
-        self.assertEqual(self.probe_url(), f"postgresql://borobiya:{secret}@127.0.0.1:5432/borobiya")
+        self.assertEqual(self.probe_url(), f"postgresql://borobiya:{secret}@postgres:5432/borobiya")
         for call in self.calls():
             self.assertNotIn(secret, " ".join(call), call)
 
@@ -536,6 +547,77 @@ class CredentialProbeTests(Fixture):
         self.assert_ok(result)
         self.assertEqual(self.calls(), [])
 
+    def test_a_loopback_answer_is_not_accepted_as_verification(self) -> None:
+        # The image trusts 127.0.0.1, so a probe that goes there says `1` whatever the password is. This is
+        # the regression that made the first version of this check useless on a real VM: it printed
+        # "verified" three lines before the migration failed.
+        self.env(self.BASE_ENV + "POSTGRES_PASSWORD=Wrong-But-Trusted_1\n")
+        self.postgres_running()
+        self.role_password("Something-Else-Entirely")
+        self.container_password("Wrong-But-Trusted_1")
+        self.volume()
+        result = self.invoke("check_database_credentials")
+        self.assertEqual(result.returncode, 1, "a refusal is right here, and it must not be called verified")
+        self.assertIn("The database rejects the password in .env", result.stdout)
+        self.assertNotIn("verified", result.stdout)
+        self.assertIn("postgres:5432", self.probe_url())
+        for host in ("127.0.0.1", "localhost", "::1"):
+            self.assertNotIn(host, self.probe_url(), host)
+        # The fake answers `1` to any loopback connection, exactly as the image does. So this file existing
+        # would mean the script asked a question that could not be answered honestly, even if the answer
+        # had been the one it wanted.
+        self.assertFalse((self.state / "trust_probe_seen").exists(), "the script probed loopback")
+
+    def test_the_api_container_is_asked_first_and_answers_for_the_app(self) -> None:
+        secret = "As-The-App-Sees-It_1"
+        self.env(self.BASE_ENV + f"POSTGRES_PASSWORD={secret}\n")
+        self.postgres_running()
+        self.role_password("Old-On-Disk_123456")          # the volume disagrees with .env ...
+        self.container_password(secret)
+        # ... but the API container's own URL is fine, so the app-side probe is the one that must decide.
+        self.api_running("postgresql://borobiya:Old-On-Disk_123456@postgres:5432/borobiya")
+        result = self.invoke("check_database_credentials")
+        self.assert_ok(result)
+        self.assertIn("the DATABASE_URL the API container holds authenticates", result.stdout)
+        self.assertEqual([c for c in self.calls() if c[3:4] == ["postgres"] and "sh -c" in " ".join(c)], [])
+
+    def test_an_api_container_that_cannot_answer_is_not_an_answer(self) -> None:
+        # A container that is still starting makes `exec` fail with something that says nothing about the
+        # credential; falling back to the database is the only honest move.
+        secret = "Api-Still-Starting_1"
+        self.env(self.BASE_ENV + f"POSTGRES_PASSWORD={secret}\n")
+        self.postgres_running()
+        self.role_password(secret)
+        self.container_password(secret)
+        self.api_running(None)                             # exists, but bun never answered
+        result = self.invoke("check_database_credentials")
+        self.assert_ok(result)
+        self.assertIn("could not answer the probe", result.stdout)
+        self.assertIn("authenticates over the network the apps use", result.stdout)
+
+    def test_the_alter_runs_as_the_role_the_image_created(self) -> None:
+        secret = "Alter-As-Borobiya_1"
+        self.env(self.BASE_ENV + f"POSTGRES_PASSWORD={secret}\n")
+        self.postgres_running()
+        self.role_password("Old-On-Disk_123")
+        self.container_password(secret)
+        self.superuser("borobiya")                         # POSTGRES_USER is the superuser; postgres is not
+        result = self.invoke("check_database_credentials", stdin="y\n", interactive=True)
+        self.assert_ok(result)
+        self.assertEqual(read_state(self.state, "alter_role"), "borobiya")
+        self.assertIn("verified: .env's password now authenticates", result.stdout)
+
+    def test_the_alter_falls_back_when_only_the_default_superuser_exists(self) -> None:
+        secret = "Alter-As-Postgres_123"
+        self.env(self.BASE_ENV + f"POSTGRES_PASSWORD={secret}\n")
+        self.postgres_running()
+        self.role_password("Old-On-Disk_123")
+        self.container_password(secret)
+        self.superuser("postgres")                         # an image configured the other way round
+        result = self.invoke("check_database_credentials", stdin="y\n", interactive=True)
+        self.assert_ok(result)
+        self.assertEqual(read_state(self.state, "alter_role"), "postgres")
+
     def test_a_restarted_api_is_suggested_only_when_one_is_running(self) -> None:
         secret = "Rotate-With-Pool_1"
         self.env(self.BASE_ENV + f"POSTGRES_PASSWORD={secret}\n")
@@ -556,6 +638,11 @@ class CredentialProbeTests(Fixture):
         return path.read_text(encoding="utf-8").strip() if path.exists() else ""
 
 
+def read_state(directory: Path, name: str) -> str:
+    path = directory / name
+    return path.read_text(encoding="utf-8").strip() if path.exists() else ""
+
+
 class ShippedInterfaceTests(unittest.TestCase):
     """Claims about the file as a user meets it, not just about its functions."""
 
@@ -569,6 +656,26 @@ class ShippedInterfaceTests(unittest.TestCase):
     def test_the_admin_password_prompt_and_the_database_prompts_share_one_shape(self) -> None:
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertEqual(text.count("[Enter = generate a strong one]"), 2, "admin + ask_db_secret")
+
+    def test_nothing_in_the_script_probes_postgres_over_loopback(self) -> None:
+        # The comments are allowed to name 127.0.0.1 (that is what the trap is); the code is not.
+        text = SCRIPT.read_text(encoding="utf-8")
+        cases = (
+            ("check_database_credentials", "@postgres:${port}"),
+            ("check_nominatim_database_auth", "-h nominatim"),
+        )
+        for name, needle in cases:
+            start = text.index(name + "() {")
+            body = text[start : text.index("\n}\n", start)]
+            code = "\n".join(line for line in body.splitlines() if not line.lstrip().startswith("#"))
+            self.assertNotIn("127.0.0.1", code, f"{name} probes loopback, which the image trusts")
+            self.assertIn(needle, code, f"{name} does not name the address the apps use")
+
+    def test_the_healthcheck_does_not_claim_to_authenticate_over_loopback(self) -> None:
+        compose = Path(__file__).resolve().parents[1].joinpath("docker-compose.yml").read_text(encoding="utf-8")
+        block = compose[compose.index("  postgres:") : compose.index("  api:")]
+        assert "-h postgres" in block, "the healthcheck must leave the container to require a password"
+        assert "127.0.0.1" not in block.split("healthcheck:")[1].split("interval:")[0], block
 
     def test_no_password_is_ever_printed_by_the_helpers(self) -> None:
         text = SCRIPT.read_text(encoding="utf-8")

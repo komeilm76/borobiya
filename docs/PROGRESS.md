@@ -128,6 +128,61 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — the credential probe lied: `127.0.0.1` is `trust`, and so was my new check
+
+- **What the VM said back.** After the previous commit, the manual triage printed `1` for the `.env`
+  password while the API kept failing with 28P01, and `psql -U postgres` was not even asked for a
+  password — it answered `FATAL: role "postgres" does not exist`. Both are properties of the image, not
+  of the machine: the default `pg_hba.conf` trusts the local socket and loopback TCP and requires a
+  password only from other addresses, and with `POSTGRES_USER=borobiya` initdb names the superuser that,
+  leaving no `postgres` role. So a `psql` probe from inside the container says `1` to any password, and
+  the API — connecting from another container — is the only one of the two that is really checked.
+- **Three things were living on that lie, and all three changed.** The `postgres` healthcheck used
+  `-h 127.0.0.1` while its comment claimed it authenticated so a rotated password would report unhealthy;
+  it now connects to the service's own Compose alias (`-h postgres`), leaves the container, hits the scram
+  line, and does what the comment said — for containers created after this change, which § 9.3 now states
+  instead of implying. `check_database_credentials`'s psql probe does the same, and additionally prefers a
+  better question when an API container exists: run `bun -e` with the `postgres` driver *inside that
+  container*, against the `DATABASE_URL` Compose interpolated into it. That one probe covers the password,
+  the URL as parsed, and the pg_hba line that will be matched — and if the container cannot answer (still
+  starting, exec refused), the script refuses to conclude and falls back to the database instead of
+  reading a non-answer as a pass. `check_nominatim_database_auth` had the identical flaw (`-h 127.0.0.1`
+  inside the nominatim container), which is why a wrong `NOMINATIM_PASSWORD` was caught only when Photon
+  connected from outside; it now probes `-h nominatim`.
+- **The reconcile runs as the role that exists**: `apply_alter_sql` connects as `POSTGRES_USER` first and
+  only then as `postgres`, because the order matters on this image and a script that says "run `ALTER USER`
+  as the postgres superuser" fails with a message about a nonexistent role on the one machine that needs it.
+- **The fake `docker` now models the trust rule**, which is what makes this a verified fix rather than an
+  argued one: `127.0.0.1`/`localhost`/`::1` answer `1` to anything, `postgres`/`nominatim` compare the
+  password to the role, and any other host is refused outright. A test asserts the loopback case explicitly
+  (`test_a_loopback_answer_is_not_accepted_as_verification`) — a wrong password must reach the refusal, never
+  a "verified" line — and another asserts that the state file recording a trusted answer was never written,
+  i.e. the script never asked a question that could not be answered honestly. Two source-level guards keep
+  the config and the script from sliding back: no `127.0.0.1` in the code of either probe function, and no
+  loopback address in the healthcheck. 48 tests in this file, all run twice.
+- **Two of my own tools made the noise, and both are worth remembering.** The § 9.3 commands I had printed
+  in chat (`docker compose inspect`, `-U postgres`) were wrong in ways no checker could see — the subcommand
+  does not exist, and the role does not either — because I wrote them as the plausible shape rather than a
+  measured one; the runbook now carries the forms that ran. And patching that block by exact 40-line
+  text-splice, with backslashes written through python strings, turned `| ` at a line end into `|| ` — and
+  a repr that doubles backslashes then made a second, nonexistent defect look real until `od -c` showed one
+  backslash where the repr had shown two. `bash -n` accepted the mangled fence, because a `|| ` at a line end
+  is valid bash that simply does not do what it looks like. Splicing by unambiguous line range, and reading
+  bytes instead of reprs, found it in one pass; a repo-wide grep for a line ending in two backslashes
+  (0 hits, now the standing audit for that class) confirmed the file itself was never the problem.
+- **Docs.** § 9.3's `28P01` bullet was rewritten around the trust rule: the four commands to compare (file,
+  container, the URL digest the app will get, and the off-loopback probe), the deliberately-wrong-password
+  line that lets anyone *see* the trap before being told about it, and each branch's fix — recreate the
+  service when only the container is stale, `ALTER USER` when the role is the odd one, and a hex password
+  when the URL is what cannot carry it. The older § 9.3 bullet about `postgres: unhealthy` now says which
+  containers have a real healthcheck, and the 2026 changelog line that claimed the healthcheck
+  "authenticates" carries its correction in place rather than being quietly rewritten.
+- **Not measured here**: a real `ALTER USER` over a real container socket, and the new healthcheck against
+  a genuinely wrong password — this workspace has no Docker daemon. The fake models both, which is why the
+  trust rule is encoded in it rather than asserted in prose. Anyone running the manual form on a machine
+  where the image was configured with `POSTGRES_HOST_AUTH_METHOD=trust` will get further than the script
+  does; the script's fallback is to say so and hand over the statement.
+
 ### 2026-10-23 — setup now asks for the database passwords, and proves them before the long stages
 
 - **What changed.** `scripts/setup-ubuntu-vm.sh` asks for `NOMINATIM_PASSWORD` and `POSTGRES_PASSWORD`
@@ -862,7 +917,7 @@ Two browsers signed in as the share target and owner on the target VM should sho
 ### 2026-10-20 — Second config/script audit: decoupled Martin from Postgres, real healthchecks, in-image migrations
 
 - **Martin no longer connects to PostgreSQL.** `martin.yaml` published zero database sources, yet the connection made Martin exit on credential drift (seen live at step 12) and carried auto-publish privacy risk; the `postgres` block, the Compose `DATABASE_URL`, and the `depends_on: postgres` are removed. Martin now serves PMTiles/styles/sprites/fonts from files only, independent of the application database.
-- **Health checks now mean something.** Postgres healthcheck authenticates (`psql SELECT 1`) instead of `pg_isready`, so a password/volume mismatch reports `unhealthy` at the source. Photon (HTTP 200 on `/status` via bash `/dev/tcp`) and all three OSRM services (TCP connect after graph load) gained healthchecks; Nominatim's grace was widened to ~70 min so a slow first import is not mislabelled `unhealthy`.
+- **Health checks now mean something.** Postgres healthcheck authenticates (`psql SELECT 1`) instead of `pg_isready`, so a password/volume mismatch reports `unhealthy` at the source. Photon (HTTP 200 on `/status` via bash `/dev/tcp`) and all three OSRM services (TCP connect after graph load) gained healthchecks; Nominatim's grace was widened to ~70 min so a slow first import is not mislabelled `unhealthy`. (corrected later: that check connected to 127.0.0.1, which the image trusts, so it did not authenticate for real - see the 2026-10-23 entry at the top of this changelog)
 - **API/Compose hygiene.** Removed seven variables Compose passed to the API but `env.ts` never validated or used (`ADMIN_SEED_PASSWORD`, `MAP_*`); the service now receives exactly the 11 validated keys. Pinned the Compose subnet to `172.30.0.0/24` and defaulted `TRUSTED_PROXY_IPS` to it, so per-client rate limiting works behind Nginx. Pinned `nginx:1.30.6-alpine`.
 - **Nginx re-resolves upstreams.** `nginx.conf` uses Docker's embedded DNS (`resolver 127.0.0.11 valid=10s`) with variable `proxy_pass` and hoisted proxy headers, so recreating an upstream container no longer leaves Nginx proxying to a stale IP until restart.
 - **Migrations can run inside the API image.** New `src/db/migrate.ts` (drizzle-orm runtime migrator over the shipped `drizzle/` folder) plus `db:migrate:runtime`; the production image excludes drizzle-kit, so `docker compose run --rm api bun src/db/migrate.ts` is now the in-stack path. `seed.ts`/`drizzle.config.ts` dotenv banners silenced.

@@ -10,11 +10,15 @@ services:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    # Authenticate for real (pg_isready does not log in): if POSTGRES_PASSWORD
-    # was changed after the volume was initialized, this reports unhealthy and
-    # blocks dependents instead of letting them fail with auth errors.
+    # Authenticate for real, from the address the apps use. The image's default pg_hba trusts
+    # the local socket and loopback TCP and asks for a password only on other addresses, so a
+    # `-h 127.0.0.1` healthcheck answers healthy for ANY password at all — which is how a
+    # machine ends up printing `postgres: healthy` three lines above `28P01: password
+    # authentication failed`. Reaching the service's own Compose alias leaves the container,
+    # hits the scram line, and reports unhealthy and blocks dependents when POSTGRES_PASSWORD
+    # was changed after the volume was initialized.
     healthcheck:
-      test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tAc 'SELECT 1' >/dev/null"]
+      test: ["CMD-SHELL", "PGPASSWORD=\"$${POSTGRES_PASSWORD}\" psql -h postgres -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\" -tAc 'SELECT 1' >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 10

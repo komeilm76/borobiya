@@ -1812,45 +1812,69 @@ Symptom first, always — grep this section for the error text.
 - **`postgres` `unhealthy`, dependents report `dependency failed to start`** (on older checkouts:
   `map-server` restart-looping with `password authentication failed`) — the current
   `POSTGRES_PASSWORD` doesn't match the one `postgres-data` was initialized with, and
-  `pg_isready`-style checks cannot see that. Either put the original password back in `.env`, or —
+  `pg_isready`-style checks cannot see that, and neither can a container created before § 9.3's healthcheck fix: its check still goes over loopback, which the image trusts, until the service is recreated. Either put the original password back in `.env`, or —
   while the app database is still empty — reset **only** that volume:
   `docker compose down && docker volume rm <project>_postgres-data`, reload `.env`, re-run step 12.
   Tiles, graphs, index and the Nominatim volume live elsewhere and are untouched.
 - **Migration `28P01: password authentication failed for user "borobiya"` while Postgres is
-  `healthy`** — three values are in play, and a healthy server proves only the middle one: the password
-  in `.env`, the one the **container** was created with (what its healthcheck authenticates), and the one
-  the **role inside `postgres-data`** has kept since its first init. `setup-ubuntu-vm.sh` compares them
-  before it starts anything long and offers to settle the disagreement; by hand, in that order:
+  `healthy`** — this is the confusing one, and the reason it is confusing is that `healthy` is not
+  evidence about any password. The Postgres image's default `pg_hba.conf` trusts the local socket and
+  loopback TCP and asks for a password only from other addresses, so anything that checks the server
+  from inside it (the healthcheck did, until this section's fix; so does a `psql -h 127.0.0.1` you run
+  by hand) succeeds with any password, right or wrong. The API connects from another container, where a
+  password really is required. Three values are in play: the one in `.env`, the one the **container** was
+  created with, and the one the **role inside `postgres-data`** has kept since its first init — the image
+  applies `POSTGRES_PASSWORD` once, at initdb, and never again. `setup-ubuntu-vm.sh` compares them before
+  it starts anything long and offers to settle the disagreement. By hand, in this order:
 
   ```bash
-  set -a; source .env; set +a                                   # 1. what the file says
-  docker compose inspect postgres | grep -m1 POSTGRES_PASSWORD   # 2. what the container was given
-  printf '%s\n' "postgresql://borobiya:$POSTGRES_PASSWORD@127.0.0.1:5432/borobiya" | \
+  set -a; source .env; set +a                                    # 1. what the file says
+  docker inspect "$(docker compose ps -q postgres)" | grep -m1 POSTGRES_PASSWORD   # 2. what the container holds
+  printf '%s' "postgresql://borobiya:$POSTGRES_PASSWORD@postgres:5432/borobiya" | sha256sum | cut -c1-12
+  docker compose run --rm --no-deps api sh -c 'printf %s "$DATABASE_URL" | sha256sum | cut -c1-12'
+  ```
+
+  Lines 3 and 4 are the same number when Compose will hand the migrator what you expect; different means
+  it is being interpolated from something else, usually an export in your shell (§ 2.1's loader block
+  exports these names, and an export beats `.env` for Compose). Then the probe that means something — off
+  loopback, and with the connection string on stdin rather than in argv, which every process on the
+  machine can read while the command runs:
+
+  ```bash
+  printf '%s\n' "postgresql://borobiya:$POSTGRES_PASSWORD@postgres:5432/borobiya" | \
+    docker compose exec -T postgres sh -c 'IFS= read -r u; exec psql "$u" -tAc "SELECT 1"'
+  # and to see the trust rule with your own eyes, the same command with a password you know is wrong:
+  printf '%s\n' "postgresql://borobiya:definitely-not-it@postgres:5432/borobiya" | \
     docker compose exec -T postgres sh -c 'IFS= read -r u; exec psql "$u" -tAc "SELECT 1"'
   ```
 
-  The third line is what the migrator will do, and the URL arrives on stdin because a password in argv is
-  readable by every other process on the machine while the command runs.
+  The second prints `1` if you change `postgres` to `127.0.0.1` — that is the trap. Only the first form
+  can answer a question about the credential.
 
   - **1 and 2 differ** — the volume is fine and only the container is stale:
-    `docker compose up -d --force-recreate postgres`. Data lives in the volume, not the container, so
-    this costs nothing. Re-running § 7.2's migrate command after this is what the "clear stale exports"
-    advice above was for: an export in your shell beats `.env` for Compose.
-  - **1 and 2 agree and the probe fails** — the role's own password is something else, usually because
-    `.env` was regenerated after the first `up`. Put the old value back, or make the role match the file,
-    which changes one credential and no data (the local socket inside the container authenticates as the
-    superuser without a password):
+    `docker compose up -d --force-recreate postgres`. Data lives in the volume, not the container, so it
+    costs nothing. A container created before this section was fixed keeps its old loopback healthcheck
+    until it is recreated, so `healthy` goes on meaning nothing there; for newly created ones, a wrong
+    password now reports `unhealthy` and blocks dependents instead of letting them fail at first use.
+  - **1, 2 and the URL agree and the probe still fails** — the role's own password is something else,
+    usually because `.env` was regenerated, or the volume was restored, after the first `up`. Put the old
+    value back, or make the role match the file, which changes one credential and no data. The role to
+    connect as is **`POSTGRES_USER`, not `postgres`**: with `POSTGRES_USER=borobiya`, initdb named the
+    superuser that, and `psql -U postgres` answers `FATAL: role "postgres" does not exist` — over the
+    local socket, without ever asking for a password, because the socket is trusted:
 
     ```bash
     printf "ALTER USER \"borobiya\" WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | \
-      docker compose exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f -
+      docker compose exec -T postgres psql -U borobiya -d postgres -v ON_ERROR_STOP=1 -f -
     docker compose restart api      # it holds a pool of connections made with the old password
     ```
 
-  - **the probe fails while the container's own healthcheck passes, and `psql -U borobiya` with the same
-    password works** — the password contains a character the URL cannot carry, so `DATABASE_URL` says
-    something shorter than `.env` does. Nothing is wrong with the account. Set a hex password in both
-    spellings (A6), then reconcile the role with the `ALTER USER` above.
+    Re-run the probe above afterwards; `1` is the only acceptable answer, and § 7.2's migrate command is
+    the next thing to run.
+  - **the off-loopback probe works and the API still fails** — the password contains a character the URL
+    cannot carry (`#`, `/`, `%`, `[`, a space), so `DATABASE_URL` says something shorter than `.env` does,
+    while `PGPASSWORD`-style clients say the truth. Nothing is wrong with the account. Set a hex password
+    in both spellings (A6), then reconcile the role with the `ALTER USER` above.
 
   Never resolve this by deleting `postgres-data` unless the database really is disposable: tiles, OSRM
   graphs, the Photon index and the Nominatim volume are elsewhere (§ 8.5), but every row an operator has

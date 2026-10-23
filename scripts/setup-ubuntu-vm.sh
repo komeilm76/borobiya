@@ -415,13 +415,30 @@ PYEOF
 }
 
 psql_in_postgres() {
-  # $1 = connection string, rest = psql arguments, run against the postgres service's container. The
-  # connection string travels over stdin and not as an argument: the argv of a docker command is
-  # readable by every other process on the host for as long as it runs, and this string carries the
-  # database password.
+  # $1 = connection string, rest = psql arguments, run inside the postgres container. Two details are
+  # load-bearing. The string arrives over stdin rather than as an argument, because the argv of a
+  # docker command is readable by every other process on the host while it runs and this carries the
+  # database password. And the host must not be 127.0.0.1: the image trusts the local socket and
+  # loopback TCP, requiring a password only on other addresses, so a loopback probe answers 1 to a
+  # wrong password and reports a healthy database on a machine where nothing can log in. Use the
+  # service's own Compose alias, which is the line the apps will match.
   local conninfo="$1"; shift
   printf '%s\n' "$conninfo" | \
     docker compose exec -T postgres sh -c 'IFS= read -r url; exec psql "$url" "$@"' sh "$@" 2>&1
+}
+
+apply_alter_sql() {
+  # Change a role's password from inside the container, where the local socket needs no password.
+  # The role to connect as is POSTGRES_USER, not `postgres`: with POSTGRES_USER set, initdb names the
+  # superuser that and there is no `postgres` role at all — which is why the manual form of this
+  # command dies with `role "postgres" does not exist` on a machine like this one. Both names are
+  # tried, so a server configured the other way is not left without a path.
+  local sql
+  sql="$(cat)"
+  if printf '%s\n' "$sql" | docker compose exec -T postgres psql -U "$1" -d postgres -q -v ON_ERROR_STOP=1 -f - >/dev/null 2>&1; then
+    return 0
+  fi
+  printf '%s\n' "$sql" | docker compose exec -T postgres psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -f -
 }
 
 set_database_passwords() {
@@ -479,11 +496,13 @@ set_database_passwords() {
 }
 
 check_database_credentials() {
-  # Prove the credential before the hours of map work, and name which side is wrong. A healthy postgres
-  # next to a failed login is a real combination: the healthcheck authenticates with the password the
-  # *container* was created with, while the migrator authenticates with a URL Compose builds from
-  # today's .env. Three values can therefore differ — .env, the container's environment, and the role
-  # stored in the volume — and only two of them can be settled by editing a file.
+  # Prove the credential before the hours of map work, and name which side is wrong. Three values can
+  # differ — the password in .env, the one the container was created with, and the one the role in
+  # postgres-data has kept since its first init — and only two of them can be settled by editing a
+  # file. A `postgres: healthy` line is evidence about none of them unless whatever produced it
+  # connected from off loopback, because the image trusts local addresses: the healthcheck and this
+  # script's first version both said 127.0.0.1, and a real VM then answered healthy and 28P01 in the
+  # same log with the password genuinely wrong.
   (( DRY_RUN )) && return 0
   local user db port postgres problem cid answer out container_password
   user="$(env_value POSTGRES_USER)"; [[ -n "$user" ]] || user="borobiya"
@@ -511,10 +530,37 @@ check_database_credentials() {
     done
   fi
 
-  out="$(psql_in_postgres "postgresql://${user}:${postgres}@127.0.0.1:${port}/${db}" -tAc 'SELECT 1' || true)"
-  if [[ "${out//[[:space:]]/}" == "1" ]]; then
-    note "verified: the password in .env authenticates against this database"
-    return 0
+  # Best case, ask the driver the application uses, inside the application's container, with the
+  # application's own DATABASE_URL: that one question covers the password, the URL Compose interpolated
+  # into it, and the pg_hba line that will really be matched. It needs a container to exec into, so a
+  # first run falls through to the psql form below.
+  local api_cid out
+  api_cid="$(docker compose ps -q api 2>/dev/null || true)"
+  if [[ -n "$api_cid" ]]; then
+    out="$(docker compose exec -T api bun -e '
+      import postgres from "postgres";
+      const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+      const rows = await sql.query("select 1 as ok");
+      console.log(rows[0].ok);
+      await sql.end();
+    ' 2>&1 || true)"
+    if [[ "${out//[[:space:]]/}" == "1" ]]; then
+      note "verified: the DATABASE_URL the API container holds authenticates"
+      return 0
+    fi
+    if ! grep -qiE 'password authentication failed|28P01|no password' <<< "$out"; then
+      # Exec into a container that is still starting answers with something else entirely, and that is
+      # not an answer about the credential. Refusing to conclude from it is the point.
+      note "the API container could not answer the probe (${out:0:120}); asking the database directly instead"
+      api_cid=""
+    fi
+  fi
+  if [[ -z "$api_cid" ]]; then
+    out="$(psql_in_postgres "postgresql://${user}:${postgres}@postgres:${port}/${db}" -tAc 'SELECT 1' || true)"
+    if [[ "${out//[[:space:]]/}" == "1" ]]; then
+      note "verified: the password in .env authenticates over the network the apps use"
+      return 0
+    fi
   fi
 
   container_password="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid" 2>/dev/null | \
@@ -539,13 +585,12 @@ check_database_credentials() {
     [yY] | [yY][eE][sS]) ;;
     *) fail "nothing changed. Restore the previous POSTGRES_PASSWORD in .env, or re-run and accept, before the migration step can pass." ;;
   esac
-  # Superuser over the container's local socket, which the image authenticates without a password; the
-  # statement arrives on stdin, so the new password never appears in any argv.
-  if ! alter_sql_for "$user" "$postgres" | \
-      docker compose exec -T postgres psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -f -; then
-    fail "could not run ALTER USER as the postgres superuser. Do it from a shell in the container instead: docker compose exec -ti postgres psql -U postgres (runbook § 9.3)."
+  # The statement is generated and piped, never passed as an argument, so the new password is not
+  # sitting in ps output for the length of the command.
+  if ! alter_sql_for "$user" "$postgres" | apply_alter_sql "$user"; then
+    fail "could not run ALTER USER as a superuser over the container local socket. Do it from a shell inside the container instead (runbook § 9.3 has the statement)."
   fi
-  out="$(psql_in_postgres "postgresql://${user}:${postgres}@127.0.0.1:${port}/${db}" -tAc 'SELECT 1' || true)"
+  out="$(psql_in_postgres "postgresql://${user}:${postgres}@postgres:${port}/${db}" -tAc 'SELECT 1' || true)"
   if [[ "${out//[[:space:]]/}" == "1" ]]; then
     note "verified: .env's password now authenticates"
   else
@@ -1281,10 +1326,13 @@ reset_nominatim_volume() {
 }
 
 check_nominatim_database_auth() {
+  # -h nominatim and not -h 127.0.0.1: the same image trusts loopback TCP, so a loopback probe passes on
+  # a wrong password and the Photon import — which reaches this server from outside the container, where
+  # a password really is required — would fail an hour later, after the long one.
   local result=""
   if result="$(docker compose --profile geocoding-import exec -T \
       -e "PGPASSWORD=${NOMINATIM_PASSWORD}" nominatim \
-      psql -h 127.0.0.1 -U nominatim -d nominatim -tAc 'SELECT 1' 2>&1)"; then
+      psql -h nominatim -U nominatim -d nominatim -tAc 'SELECT 1' 2>&1)"; then
     [[ "${result//[[:space:]]/}" == "1" ]] || \
       fail "Nominatim database auth probe returned an unexpected result: ${result:-<empty>}"
     note "Nominatim database authentication verified for the Photon import"
