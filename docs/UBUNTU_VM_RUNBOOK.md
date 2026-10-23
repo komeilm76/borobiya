@@ -751,11 +751,13 @@ Two scripts do that, and they are the recommended path:
 
 Neither one contains an address or a port, and this file does not either: a bridged VM needs the host's
 LAN address while a NAT VM needs the gateway, so any value either of them shipped would be wrong for
-one of the two. Both open by printing what each of the four places holds right now — including the
-Docker daemon's own environment, where a VM with no proxy answers "no proxy in the unit environment",
-which is information and not a failure. Both accept `--status` (that report alone) and `--dry-run`
-(the whole run, with nothing written) without a network or root rights. The sections below stay the reference: they say what each of the four
-settings is for, they are what to fall back on when a script's assumption does not fit the machine, and
+one of the two. Both open by printing what each of the four places holds right now: a count
+(`how much is set : 2 of 4 places`), the Docker daemon's own environment — where a machine with no proxy
+answers "no proxy in the unit environment", which is information and not a failure — and every file in
+the two root-owned directories that sets a proxy but was not written here. Both accept `--status` (that
+report alone) and `--dry-run` (the whole run, with nothing written) without a network or root rights. The
+sections below stay the reference: they say what each of the four settings is for, they are what to fall
+back on when a script's assumption does not fit the machine, and
 § 5.1a is the host-side half that no script in this repository can do for you.
 
 Whether the gateway is the right address depends on VMware's network mode, and the wrong answer
@@ -873,11 +875,13 @@ already-running `setup-ubuntu-vm.sh` will not pick them up.
 env | grep -iE '^(http|https|no|all)_proxy=' || echo "no proxy in this shell"
 # 2. Direct egress: does the VM reach the internet without the proxy? (000/timeout = needs it)
 curl --noproxy '*' -sS --max-time 10 -o /dev/null -w 'direct: %{http_code}\n' https://github.com/ || echo "direct: failed"
-# 3. Through the proxy: the proxy must answer, and curl must name the proxy it used (curl >= 8.3)
-curl -sS --max-time 15 -o /dev/null -w 'proxied: %{http_code} via %{proxy_addrs}\n' https://github.com/
-# 4. The real targets, in order: apt, GitHub releases, Geofabrik
+# 3. Through the proxy: did curl pick the exported value up at all? (works on every curl version)
+curl -sS --max-time 15 -o /dev/null -w 'proxied: %{http_code}\n' https://github.com/
+curl -v -o /dev/null --max-time 15 https://github.com/ 2>&1 | grep -E -m2 'Uses proxy env variable|Connected to'
+# 4. The real targets, in order: apt, GitHub (page then a slice of the asset), Geofabrik
 curl -sS --max-time 15 -o /dev/null -w 'docker apt repo: %{http_code}\n' https://download.docker.com/linux/ubuntu/dists/noble/Release
-curl -sS --max-time 15 -o /dev/null -w 'planetiler jar: %{http_code}\n' -L https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar
+curl -sS --max-time 15 -o /dev/null -w 'release page: %{http_code}\n' https://github.com/onthegomap/planetiler/releases/tag/v0.10.2
+curl -sS --max-time 20 -o /dev/null -r 0-1023 -w 'jar, first 1 KiB: %{http_code} %{size_download} bytes\n' -L https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar
 curl -sS --max-time 15 -o /dev/null -w 'geofabrik: %{http_code}\n' -I https://download.geofabrik.de/
 # 5. Do apt and Docker agree with the shell? (these are three separate proxy settings)
 sudo apt-get -o Debug::Acquire::http=true download ca-certificates 2>&1 | grep -i proxy | head -3
@@ -897,17 +901,47 @@ session; re-source `~/.bashrc` (`set -a; source .env; set +a` does **not** resto
 Item 6 is the one that surprises people: `docker pull` failing while `curl` is fine means the
 **daemon** has no proxy (§ 5.3).
 
+Four readings that are easy to misjudge, each one from a real run:
+
+- **Item 2 answering `direct: 200` means you do not need this section.** Free egress plus a proxy file
+  in `/etc` is the worst combination: every later failure is blamed on the proxy, which is not being
+  used, while the file stays behind. Skip to § 5.4 and remove what is there.
+- **There is no `--write-out` variable for the proxy in use until curl 8.7.0**, where `%{proxy_used}`
+  appeared (it answers 1 or 0, not an address). Ubuntu 24.04 ships 8.5.0, so the version-proof form is
+  item 3's second line: curl says `Uses proxy env variable http_proxy == '…'` before it connects, and
+  the `Connected to` line names the **proxy's** host and port, not github.com's. That line also prints
+  the whole value of the variable, so with credentials in the URL do not paste it into a log or a
+  screenshot — `grep -m1 -oE 'Uses proxy env variable [a-z_]+'` keeps the proof and drops the password.
+- **A `(28)` on the jar line is a bandwidth reading, not a failure**, and the range request exists to
+  keep it that way: 1 KiB instead of 93 MB. `206` means the asset host honoured the range, `200` means
+  it served the file anyway — both are proof the proxy carries GitHub's asset host, which is
+  `release-assets.githubusercontent.com`, a *different* host from `github.com` and one a filtering
+  proxy sometimes allows less generously. The full download is what `fetch-planetiler-sources.sh` does,
+  with `--retry` and resume, on a timeout budget meant for it.
+- **`apt-config dump` and `docker info` disagreeing with `env` is normal**, and is why item 5 exists:
+  the shell block, apt's `apt.conf.d`, the systemd drop-in and `~/.docker/config.json` are four
+  separate settings. `enable-proxy.sh --status` prints all four plus any file in those directories that
+  it did not write itself — which is how a leftover from an older revision of this very section shows up.
+
 ### 5.3 apt and the Docker daemon (only if § 5.2's items 5 and 6 failed)
 
 `./scripts/enable-proxy.sh` writes both files below, refuses to overwrite either one if it exists
-without its marker line, and asks before restarting Docker. Manual equivalent:
+without its marker line, and asks before restarting Docker. It also stops when a *different* file in
+either directory already sets a proxy — which is what a machine that followed an earlier revision of
+this section has, because those names were `/etc/apt/apt.conf.d/95proxy` and
+`docker.service.d/proxy.conf`. The duplication is not cosmetic: apt reads `apt.conf.d` in sorted
+filename order and the last value it sees wins, while systemd concatenates `Environment=` across
+drop-ins, so two files coexist instead of one overriding the other. § 5.4 has the two commands that find
+such a file, and the script prints the path and its own proxy lines rather than guessing at them.
+
+Manual equivalent:
 
 ```bash
 # apt (system-wide; a per-command -o Acquire::http::Proxy="…" also works):
 printf 'Acquire::http::Proxy "http://%s:%s";\nAcquire::https::Proxy "http://%s:%s";\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/apt/apt.conf.d/95borobiya-proxy
 # Docker daemon — systemd does not read your shell environment, so it needs a drop-in:
 sudo mkdir -p /etc/systemd/system/docker.service.d
-printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:%s"\nEnvironment="HTTPS_PROXY=http://%s:%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/systemd/system/docker.service.d/borobiya-proxy.conf
+printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:%s"\nEnvironment="HTTPS_PROXY=http://%s:%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/systemd/system/docker.service.d/borobiya-proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
 ```
 
@@ -939,7 +973,7 @@ config = json.loads(path.read_text()) if path.is_file() else {}
 config["proxies"] = {"default": {
     "httpProxy": f"http://{host}:{port}",
     "httpsProxy": f"http://{host}:{port}",
-    "noProxy": "localhost,127.0.0.1,172.30.0.0/24",
+    "noProxy": "localhost,127.0.0.1,::1,172.30.0.0/24",
 }}
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(config, indent=2) + "\n")
@@ -971,6 +1005,18 @@ downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.`
 It asks for confirmation only when there is something of ours to remove; on a machine that was never
 enabled it says so and stops, because a proxy file you wrote by hand is listed as left alone rather
 than silently kept. Either way the host-side rule from § 5.1a is still yours to delete.
+
+First, find every proxy file that exists, whatever wrote it. This section used `/etc/apt/apt.conf.d/
+95proxy` and `/etc/systemd/system/docker.service.d/proxy.conf` before the scripts existed, and those
+names are still what a machine from that revision holds. apt reads `apt.conf.d` in sorted filename
+order and the last value it sees wins, so two files there is a setting that depends on which one sorts
+later — and the older one may hold something else besides, so read it before deleting it:
+
+```bash
+grep -ilE '::[a-z]*proxy' /etc/apt/apt.conf.d/* 2>/dev/null || echo "apt: no proxy file"
+grep -lE 'PROXY=' /etc/systemd/system/docker.service.d/*.conf 2>/dev/null || echo "dockerd: no drop-in"
+cat /etc/apt/apt.conf.d/95proxy /etc/systemd/system/docker.service.d/proxy.conf 2>/dev/null  # read first
+```
 
 Then the manual equivalent, if you configured any of it by hand (the order is the same as § 5.1–§ 5.3,
 and every line is safe to run when the thing it removes was never there):

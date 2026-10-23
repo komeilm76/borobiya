@@ -465,6 +465,100 @@ PY
 # Order matters here. A check that can fail has to run before the writes, not after: an enable that
 # configured ~/.bashrc and then discovered an administrator's apt file would leave a half-configured
 # proxy behind, which is the exact state this whole section exists to avoid.
+proxy_foreign_proxy_files() { # $1 = apt | dockerd | (empty for both) → "kind<TAB>path" per hit
+  # Every file in a root-owned proxy directory that is not ours, which is the only way to find a
+  # configuration written under a name this repository used before the scripts existed. A second file in
+  # either place is not harmless: apt reads apt.conf.d in sorted filename order and the last value it
+  # sees wins, while systemd concatenates Environment= across drop-ins, so two files can both be in
+  # force at once.
+  #
+  # Kinds: "proxy" means the file sets one; "unreadable" means it exists and we could not tell, which
+  # belongs in the report but must never cause a refusal — refusing over an unknown is worse than
+  # printing it. Callers filter on the kind.
+  local which="${1:-all}" dir f skip found=0
+  local -a files
+  for dir in apt dockerd; do
+    [[ "$which" == "all" || "$which" == "$dir" ]] || continue
+    case "$dir" in
+      apt) [[ -d "${PROXY_ETC}/apt/apt.conf.d" ]] || continue
+           files=( "${PROXY_ETC}"/apt/apt.conf.d/* )
+           skip="$PROXY_APT_FILE" ;;
+      *)   [[ -d "${PROXY_ETC}/systemd/system/docker.service.d" ]] || continue
+           files=( "${PROXY_ETC}"/systemd/system/docker.service.d/*.conf )
+           skip="$PROXY_DOCKERD_DROPIN" ;;
+    esac
+    # An array, not "$1": `set -- dir/* file` puts the first match in $1 and shifts the rest out of
+    # sight, so only one file in the directory was ever examined — which is precisely the file that
+    # is not the interesting one, because apt.conf.d is alphabetical and the leftovers sort late.
+    for f in "${files[@]}"; do
+      [[ -f "$f" && "$f" != "$skip" ]] || continue
+      if [[ ! -r "$f" ]]; then
+        printf 'unreadable %s\n' "$f"
+        found=1
+      elif grep -qiE '::[a-z]*proxy|proxy=' "$f"; then
+        printf 'proxy %s\n' "$f"
+        found=1
+      fi
+    done
+  done
+  return $(( 1 - found ))
+}
+
+
+
+
+# `sed -n '/^proxy /p'` and not `grep -q`: grep -q stops reading at its first match, the writer then
+# dies of SIGPIPE, and under `set -o pipefail` the pipeline's status is 141 — so "it matched" arrives at
+# the `if` as a failure, whenever the producer is fast enough to still be writing. Which is a race, and
+# this whole file exists to avoid half-configured state. sed reads to the end and cannot lose that race.
+proxy_foreign_conflicts() { # $1 = apt | dockerd | (omitted) → only the provable hits
+  # ${1:-} and not "$1": `set -u` makes an omitted argument a fatal error, and because this runs inside
+  # a command substitution in a condition, that error is swallowed and the check silently reports "no
+  # conflict" — the refusal stops working, which is the one thing this function exists to do.
+  proxy_foreign_proxy_files "${1:-}" | sed -n '/^proxy /p'
+}
+
+
+proxy_apt_sets_proxy() {
+  # "sets a proxy" means provably: an unreadable neighbour is shown by --status and does not count here,
+  # because 0-of-4 versus 1-of-4 is a claim about the machine, not about what we could read.
+  [[ -e "$PROXY_APT_FILE" ]] && return 0
+  [[ -n "$(proxy_foreign_conflicts apt)" ]]
+}
+
+
+proxy_dockerd_sets_proxy() {
+  [[ -e "$PROXY_DOCKERD_DROPIN" ]] && return 0
+  [[ -n "$(proxy_foreign_conflicts dockerd)" ]]
+}
+
+
+proxy_foreign_note() { # the advice that belongs wherever the list is printed
+  local kind f line hits
+  hits="$(proxy_foreign_proxy_files || true)"
+  [[ -n "$hits" ]] || return 0   # no advice when there is nothing to advise about
+  while read -r kind f; do
+    [[ -n "$f" ]] || continue
+    if [[ "$kind" == "unreadable" ]]; then
+      # Named without its contents: the reader has to know the file is there, and "we could not read
+      # it" is the honest form of that.
+      printf '    also here, and not readable without sudo, so it may set a proxy: %s\n' "$f"
+      continue
+    fi
+    printf '    also sets a proxy, and was not written here: %s\n' "$f"
+    # Its own proxy lines, quoted back, because "there is another file" is not actionable and
+    # "there is another file pointing at a different address" is.
+    line="$(grep -h -iE '::[a-z]*proxy|proxy=' "$f" | head -2 | tr '\n' ' ')"
+    [[ -n "$line" ]] && printf '      %s\n' "$line"
+  done <<<"$hits"
+  proxy_note "apt merges apt.conf.d in filename order (the last value read wins) and systemd appends"
+  proxy_note "Environment= across drop-ins, so this file and ours will disagree in ways that are hard"
+  proxy_note "to read back. Read it, then remove it: sudo rm -f <path> — this script will not delete a"
+  proxy_note "file it did not write, because you may have put a second proxy in it on purpose."
+  return 0
+}
+
+
 proxy_system_preflight() {
   local f foreign=0
   for f in "$PROXY_APT_FILE" "$PROXY_DOCKERD_DROPIN"; do
@@ -473,6 +567,13 @@ proxy_system_preflight() {
       foreign=1
     fi
   done
+  # Only a provable conflict stops the run: a file we could not read is reported by --status, but
+  # refusing because something in /etc might disagree would hold up a working machine.
+  if [[ -n "$(proxy_foreign_conflicts)" ]]; then
+    proxy_log "Another proxy file is already in the way"
+    proxy_foreign_note
+    foreign=1
+  fi
   if (( foreign )); then
     proxy_fail "a proxy file already exists that this script did not write; read it, then remove it or point this script elsewhere"
   fi
@@ -655,6 +756,22 @@ proxy_status() {
   # `grep -i proxy` finds nothing and exits 1 — which, inside an assignment under `set -e`, ended the
   # whole script mid-report. That is the bug a reader on a real VM hits first and cannot name: the
   # output simply stops. Hence `|| true`, the guard, and the `return 0`.
+  # The report is also the only place a reader learns that the machine is *half* proxied: apt can be
+  # pointed at a proxy the shell has never heard of, which is what a hand-written file from an earlier
+  # revision of the runbook leaves behind. Both facts come from the same scan.
+  # Counted per *place*, whoever configured it: on a machine where apt was set up by hand from an older
+  # revision of this file, "0 of 4" would be a false reassurance and "2 of 4" is the actual diagnosis.
+  local set=0
+  if [[ -f "$PROXY_BASHRC" ]] && grep -qF -- "$PROXY_BLOCK_BEGIN" "$PROXY_BASHRC"; then set=$(( set + 1 )); fi
+  if proxy_apt_sets_proxy; then set=$(( set + 1 )); fi
+  if proxy_dockerd_sets_proxy; then set=$(( set + 1 )); fi
+  if [[ -f "$PROXY_DOCKER_CONFIG" ]] && grep -q '"proxies"' "$PROXY_DOCKER_CONFIG" 2>/dev/null; then
+    set=$(( set + 1 ))
+  fi
+  printf '  how much is set : %s of 4 places%s\n' "$set" \
+    "$(if (( set > 0 && set < 4 )); then printf ' — the four are independent settings, so a partial one is the usual cause of "apt works but curl does not"'; fi)"
+  proxy_foreign_note
+
   if [[ "${BOROBIYA_PROXY_NO_SYSTEMD:-0}" != "1" ]] && proxy_have docker \
     && proxy_have systemctl && docker info >/dev/null 2>&1; then
     local daemon_env=""

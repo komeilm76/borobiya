@@ -20,7 +20,7 @@ source "$SCRIPT_DIR/proxy-common.sh"
 
 usage() {
   cat <<'EOF'
-Usage: scripts/enable-proxy.sh [host[:port]] [options]
+Usage: scripts/enable-proxy.sh [host[:port] [port]] [options]
 
 Asks for whatever it is not given, checks the port, then configures the proxy for the shell, apt,
 the Docker daemon and Docker builds.
@@ -81,10 +81,18 @@ while (( $# > 0 )); do
     -h | --help) usage; exit 0 ;;
     -*) proxy_fail "unknown option: $1 (see --help)" ;;
     *)
-      [[ -z "$ARG_TARGET" ]] || proxy_fail "unexpected extra argument: $1"
-      ARG_TARGET="$1"
-      shift
-      ;;
+      # Order matters here: a digits-only argument is a port once a host is known from anywhere, and a
+      # host otherwise. "enable-proxy.sh 192.168.100.225 2080" and "enable-proxy.sh --host 1.2.3.4 2080"
+      # are both how the answer arrives when nobody opens --help, and treating the second as a hostname
+      # would send the run looking for a machine called "2080".
+      if [[ "$1" =~ ^[0-9]+$ && -z "$ARG_PORT" && ( -n "$ARG_HOST" || -n "$ARG_TARGET" ) ]]; then
+        ARG_PORT="$1"
+      elif [[ -z "$ARG_TARGET" ]]; then
+        ARG_TARGET="$1"
+      else
+        proxy_fail "unexpected extra argument: $1 (see --help)"
+      fi
+      shift ;;
   esac
 done
 
@@ -100,15 +108,19 @@ if [[ -n "$ARG_TARGET" ]]; then
 else
   proxy_split_target "${PROXY_HOST:-}"
 fi
+TARGET_PORT="$PROXY_PORT"
 if [[ -n "$ARG_HOST" ]]; then
   # --host accepts "10.0.0.5", "10.0.0.5:3128" or "[fd00::1]:3128": one flag should not be a trap for
   # the value a proxy client shows on screen, and a colon that survives into the host field becomes
   # "http://10.0.0.5:3128:2080" — a URL that fails as a timeout, not as a parse error.
   proxy_split_target "$ARG_HOST"
-  if [[ -n "$ARG_PORT" && -n "$PROXY_PORT" && "$ARG_PORT" != "$PROXY_PORT" ]]; then
-    proxy_fail "--port $ARG_PORT contradicts the port inside --host '$ARG_HOST'; give it once"
-  fi
-  [[ -n "$ARG_PORT" ]] || ARG_PORT="$PROXY_PORT"
+  [[ -n "$PROXY_PORT" ]] || PROXY_PORT="$TARGET_PORT"
+fi
+# A port can arrive three ways — inside the positional target, as --port / PROXY_PORT, or as a bare
+# second positional. Whoever typed it, two different values is a typo and not a precedence rule: a
+# silently chosen winner shows up later as a proxy that "does not work".
+if [[ -n "$ARG_PORT" && -n "$PROXY_PORT" && "$ARG_PORT" != "$PROXY_PORT" ]]; then
+  proxy_fail "the port $ARG_PORT contradicts the port $PROXY_PORT already given; give it once"
 fi
 [[ -n "$ARG_PORT" ]] && PROXY_PORT="$ARG_PORT"
 
@@ -304,10 +316,12 @@ if (( DO_SYSTEM )) && (( PROXY_DOCKER_RESTART_SKIPPED )); then
   proxy_note "the daemon drop-in is on disk but dockerd has not reloaded it yet"
 fi
 proxy_note "prove it on the four things that use it, in a terminal that has sourced ~/.bashrc:"
-proxy_note "  curl -sS -o /dev/null -w 'proxied: %{http_code} via %{proxy_addrs}\\n' https://download.docker.com/linux/ubuntu/dists/noble/Release"
+proxy_note "  curl -sS -o /dev/null --max-time 15 -w 'proxied: %{http_code}\\n' https://download.docker.com/linux/ubuntu/dists/noble/Release"
+proxy_note "  curl -v -o /dev/null --max-time 15 https://github.com/ 2>&1 | grep -E -m2 'Uses proxy|Connected to'"
 proxy_note "  sudo apt-get update        # then: docker info | grep -i proxy"
-proxy_note "the curl above carries no -x on purpose: it proves the exported value, which is what every"
-proxy_note "later script in this repository uses, and it works for a bracketed IPv6 or an authenticated"
-proxy_note "proxy without repeating a password on screen"
+proxy_note "the -v line is what proves the *exported* value is live, on any curl: curl has no write-out"
+proxy_note "variable for the proxy it used until 8.7.0 (%{proxy_used}), and Ubuntu 24.04 ships 8.5.0. It"
+proxy_note "prints http_proxy's full value, so trim it with this instead of pasting it into a log:"
+proxy_note "  ... 2>&1 | grep -m1 -oE 'Uses proxy env variable [a-z_]+'"
 proxy_note "and run the six checks in docs/UBUNTU_VM_RUNBOOK.md § 5.2 before the big downloads."
 proxy_note "undo everything with: scripts/disable-proxy.sh"

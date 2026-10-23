@@ -138,4 +138,8 @@ fi
 if [[ -f "$PROXY_DOCKER_BACKUP" ]]; then
   proxy_note "a config.json backup is still at $PROXY_DOCKER_BACKUP (it was kept because a proxies key predated enable-proxy.sh)"
 fi
+if [[ -n "$(proxy_foreign_proxy_files || true)" ]]; then
+  proxy_log "Left in place on purpose"
+  proxy_foreign_note
+fi
 proxy_note "runbook § 5.1a lists the host-side commands (firewall rule, netsh portproxy) this script cannot reach."

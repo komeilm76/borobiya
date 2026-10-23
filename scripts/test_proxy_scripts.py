@@ -420,6 +420,114 @@ class TestOtherPeoplesConfigSurvives(ScriptCase):
         self.assertNotIn(BLOCK_BEGIN, self.bashrc.read_text())  # pre-flight, not half a config
 
 
+class TestForeignProxyFiles(ScriptCase):
+    """A machine that already had a proxy file, written before these scripts existed.
+
+    The runbook used /etc/apt/apt.conf.d/95proxy and docker.service.d/proxy.conf, so following that
+    revision leaves a second file in each directory that enable-proxy.sh never wrote and disable-proxy.sh
+    must not delete — and those files are not inert: apt merges apt.conf.d in filename order, and
+    systemd concatenates Environment= across drop-ins, so two of them can be in force at once.
+    """
+
+    def legacy(self) -> tuple[Path, Path]:
+        apt = self.etc / "apt" / "apt.conf.d" / "95proxy"
+        apt.write_text('Acquire::http::Proxy "http://192.168.100.225:2080";\n')
+        # A neighbour that sets no proxy at all, to prove the scan reads the directory rather than
+        # guessing from the file name.
+        (self.etc / "apt" / "apt.conf.d" / "01autoremove").write_text(
+            'APT::Never-MarkAuto-Sections "true";\n'
+        )
+        dockerd = self.etc / "systemd" / "system" / "docker.service.d" / "proxy.conf"
+        dockerd.parent.mkdir(parents=True, exist_ok=True)
+        dockerd.write_text('[Service]\nEnvironment="HTTP_PROXY=http://192.168.100.225:2080"\n')
+        (dockerd.parent / "deprecation.conf").write_text("[Service]\nExecStart=\n")
+        return apt, dockerd
+
+    def test_the_report_counts_the_place_not_our_own_file(self) -> None:
+        apt, dockerd = self.legacy()
+        result = self.enable("--status")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("2 of 4 places", result.stdout)
+        self.assertIn(str(apt), result.stdout)
+        self.assertIn(str(dockerd), result.stdout)
+        self.assertIn('Acquire::http::Proxy "http://192.168.100.225:2080"', result.stdout)
+        self.assertNotIn("01autoremove", result.stdout)
+        self.assertNotIn("deprecation.conf", result.stdout)
+
+    def test_enable_refuses_before_writing_anything(self) -> None:
+        """Writing ours on top of theirs is how you get a proxy that changes when you rename a file."""
+        apt, dockerd = self.legacy()
+        before = apt.read_text()
+        result = self.enable("192.168.100.225", "2080", "--yes", "--skip-checks")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("Another proxy file is already in the way", result.stdout)
+        self.assertIn(str(apt), result.stdout)
+        self.assertIn(str(dockerd), result.stdout)
+        self.assertIn("sudo rm -f", result.stdout)  # the way out, in the message that blocks the way in
+        self.assertFalse(self.apt_file.exists())
+        self.assertFalse(self.dropin.exists())
+        self.assertNotIn(BLOCK_BEGIN, self.bashrc.read_text())
+        self.assertFalse(self.state_file.exists())
+        self.assertEqual(apt.read_text(), before)
+        self.assertTrue(dockerd.exists())
+
+    def test_no_system_still_sets_up_the_shell(self) -> None:
+        """The escape hatch: theirs stays theirs, ours goes where no root file is needed."""
+        apt, _ = self.legacy()
+        result = self.enable("10.0.2.5:3128", "--yes", "--skip-checks", "--no-system", "--no-docker-config")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("http://10.0.2.5:3128", self.bashrc.read_text())
+        self.assertFalse(self.apt_file.exists())
+        self.assertIn("Acquire::http::Proxy", apt.read_text())  # untouched
+
+    def test_disable_says_what_it_left_in_place(self) -> None:
+        self.enable("10.0.2.5:3128", "--skip-checks")
+        apt, _ = self.legacy()
+        result = self.disable()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Left in place on purpose", result.stdout)
+        self.assertIn(str(apt), result.stdout)
+        self.assertTrue(apt.exists())
+        self.assertFalse(self.apt_file.exists(), "ours was still ours to remove")
+
+    def test_an_unreadable_file_is_reported_but_never_refuses(self) -> None:
+        """Refusing over a file we could not read would hold up a working machine for a guess."""
+        if hasattr(os, "geteuid") and os.geteuid() == 0:
+            self.skipTest("running as root, so no file is unreadable here")
+        stranger = self.etc / "apt" / "apt.conf.d" / "70-local"
+        stranger.write_text('Acquire::http::Proxy "http://internal:3128";\n')
+        stranger.chmod(0o000)
+        self.addCleanup(stranger.chmod, 0o644)
+        status = self.enable("--status")
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("not readable without sudo", status.stdout)
+        enabled = self.enable("10.0.2.5:3128", "--yes", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+
+
+class TestWhereAPortComesFrom(ScriptCase):
+    """Three ways to give the port (target, flag, bare second argument) and no silent winner.
+
+    The pair form is how the answer arrives when nobody opens --help; a second value that disagrees is
+    a typo, and whichever one quietly won would show up later as "the proxy does not work".
+    """
+
+    def test_a_bare_second_positional_is_the_port(self) -> None:
+        result = self.enable("1.2.3.4", "2080", "--skip-checks", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("http://1.2.3.4:2080", result.stdout)
+
+    def test_a_port_in_the_target_and_a_second_positional_must_agree(self) -> None:
+        result = self.enable("1.2.3.4:80", "8080", "--skip-checks", "--dry-run")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("contradicts", result.stdout + result.stderr)
+
+    def test_a_bare_port_completes_a_target_that_has_none(self) -> None:
+        result = self.enable("--host", "1.2.3.4", "2080", "--skip-checks", "--dry-run")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("http://1.2.3.4:2080", result.stdout)
+
+
 class TestStatusReports(ScriptCase):
     def stub(self, names: dict[str, str]) -> str:
         """A PATH holding fake docker/systemctl, so a test can describe a machine this sandbox is not.

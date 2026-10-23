@@ -128,6 +128,64 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — a reader ran § 5.2 on the VM and pasted the output; three claims in it were wrong
+
+- **`%{proxy_addrs}` does not exist.** Not in the reader's curl, not in this workspace's: I had written
+  it into § 5.2's proof line and into `enable-proxy.sh`'s closing note as the credential-free way to show
+  which proxy curl used. The variable that answers that question is `%{proxy_used}`, added in curl
+  8.7.0, and it returns 1 or 0 rather than an address — Ubuntu 24.04 ships 8.5.0, so no version of curl
+  this project targets has it. What works everywhere, measured here against a canary listener:
+  `curl -v` prints `Uses proxy env variable http_proxy == '…'` before it connects, and its
+  `Connected to` line names the **proxy's** host and port. Both are in the doc and in the script now,
+  with the caveat that the first line carries the whole URL — so for an authenticated proxy, trim it
+  with `grep -m1 -oE 'Uses proxy env variable [a-z_]+'` instead of pasting the line anywhere.
+- **§ 5.2 asked for a 93 MB release asset under `--max-time 15`**, so the reader got `curl: (28) …
+  62978027 out of 93278824 bytes` *and* `planetiler jar: 200` on the same line: a passing check that
+  looks like a failure. Item 4 now asks the release page and then 1 KiB of the asset (`-r 0-1023`),
+  and says what each answer means — including that the asset lives on
+  `release-assets.githubusercontent.com`, a different host from `github.com`, which is the one a
+  filtering proxy is likely to allow less generously. The full download stays where it belongs, in
+  `fetch-planetiler-sources.sh`, with its `--retry` and its resume.
+- **The reader's machine had a second proxy in both root-owned directories**, under the names this
+  section used before the scripts existed (`/etc/apt/apt.conf.d/95proxy`,
+  `docker.service.d/proxy.conf`), with `direct: 200` in the shell and no `proxies` key in
+  `~/.docker/config.json`. Three separate things follow, and all three are now implemented: the report
+  prints `how much is set : n of 4 places` counting *the machine* rather than our own files; it lists
+  any neighbouring file that sets a proxy, quoting its own lines back, and names one it cannot read
+  without pretending to know; and `enable-proxy.sh` refuses before writing anything, because apt reads
+  `apt.conf.d` in sorted filename order (so `95proxy` wins over `95borobiya-proxy`) and systemd
+  concatenates `Environment=` across drop-ins — two files coexist, they do not override.
+  `disable-proxy.sh` still removes only what it wrote, and now says so under a heading. § 5.4 begins
+  with the two greps that find such a file whatever it is called, and § 5.3 states the refusal.
+- **Two bugs in the fix, both found by running it, both worth writing down.** The scan first emitted
+  `kind<TAB>path`, and the patcher's python string produced a literal backslash-and-`t`: the separator
+  was two characters, so `grep -q $'^proxy\t'` matched nothing and the refusal silently never fired —
+  the same `	` trap this file has recorded before. Then a helper took an optional `$1` and read it as
+  `"$1"` under `set -u`: inside `[[ -n "$(…)" ]]` the unbound-variable error is swallowed by the command
+  substitution, and the check quietly reported "no conflict". Both are now `${1:-}`, a space separator,
+  and a comment on each. `grep -q` was also dropped from those pipelines: `-q` stops reading at its
+  first match, the producer dies of SIGPIPE, and `pipefail` hands the `if` a 141 — which matched on my
+  fixture and not in the test suite, the signature of a race rather than a bug. `sed -n '/^proxy /p'`
+  cannot lose that race because it reads to the end.
+- **Aligned while measuring**: the manual drop-in and the `config.json` `noProxy` in § 5.3 carried
+  `localhost,127.0.0.1,172.30.0.0/24` while § 5.1's exports and the script's default carried `::1` too.
+  The doc's manual paths now match the scripted one; a daemon that resolves `localhost` to `::1` was
+  being sent through the proxy on the manual path only, which is the kind of difference that survives
+  because nobody runs both paths.
+- **Also accepted now**: `enable-proxy.sh 192.168.100.225 2080` (a bare second positional is the port
+  once a host is known from anywhere), `--status` ending with `Nothing to remove` instead of asking
+  `disable-proxy.sh` with no flags answering `Nothing to remove` instead of asking "remove the
+  configuration listed above?" about an empty list, and one header before the questions so a prompt does
+  not sit flush against a report.
+- **Verification**: 42 tests in `scripts/test_proxy_scripts.py` (a new `TestForeignProxyFiles` with a
+  legacy pair plus two decoy files that must *not* be reported, and a `TestWhereAPortComesFrom`), run
+  three times in a row to be sure the refusal is not timing-dependent; 124 python tests under pytest;
+  the 11-scenario drive exits 0; shellcheck clean at `-S warning`; every markdown file passes the
+  structural checker except the pre-existing dangling reference in `docs/USER_MANUAL.md`. Skipped on
+  purpose: one status test asserts only where `systemctl` is genuinely absent. What remains unmeasured
+  is stated in § 5.2 — the 1 KiB asset request was never fetched from this workspace, because its host
+  is outside the allowed network, and both `206` and `200` are treated as a pass for that reason.
+
 ### 2026-10-23 — the proxy scripts met a real VM, and it was the *report* that broke them
 
 - **What the reader got**: `./scripts/enable-proxy.sh` printed six lines of state and stopped — no
