@@ -133,7 +133,12 @@ Open **Map** (`/_user/map`) for the full-height MapLibre view, or use the map pr
 - If map settings are unavailable, the view uses safe default bounds and zoom. Map resource errors show a retry toast; previously cached resources may still be displayed.
 - The first map visit needs the local Map Server. The browser cache stores map resources after a successful load on secure origins (HTTPS or localhost); already-loaded tiles also remain in MapLibre's in-memory cache for the current page session.
 
-**Current scope:** this version displays the base map only. GPS location, live companion markers, search, reverse geocoding, and routing are not enabled yet.
+**On this screen** (both are overlays on the same map, and neither moves the camera except once per loaded track):
+
+- **تاریخچهٔ مسیر / پخش حرکت** — the playback panel: pick your own track or a companion's grant, choose 1/7/30 days or type a window, then scrub or play at 1×/4×/16×/60×. The grey dashed line is the whole recorded path, the solid one is what has been played, and the caption says when the server sampled the window (`maxPoints`) rather than showing every point.
+- **موقعیت زنده / همراهان** — the live panel: one dot per companion who has an open live share with you, and a line saying what is on the map. A dot is drawn from the last position the server knows even before it moves; a companion who has gone quiet turns grey and keeps their age («۱۲ دقیقه پیش»), and only after 30 minutes of silence does the dot leave the map. If the map is empty the line names the reason — nobody has shared with you, the share list could not be read (with a retry button), or the live connection is down. Accuracy is shown as `±N متر` next to a name, never as a circle on the map.
+
+**Current scope:** live markers and history playback are on the map; broadcast from the browser (geolocation → the socket) is available on the dashboard, and the app never claims a position it does not have. Search-based place picking, reverse geocoding, and routing on this map are not enabled yet. *(This paragraph previously said the screen "displays the base map only" — stale since playback shipped, corrected with T2.1.8.)*
 
 [Screenshot: Dashboard map widget and full-height map view]
 
@@ -196,9 +201,16 @@ If you are logged in on **two devices** (e.g., phone + laptop):
 2. Choose a device (e.g., “Samsung S23”) → **Confirm**.
 3. Only that device’s GPS is used; the other is ignored.
 
-Manage at **Settings → Active Devices** — table with `deviceName, lastActiveAt, IP` + change priority anytime.
+Manage at **`/_user/devices`** (linked from the dashboard card «دستگاه پخش‌کننده»): a table of the account's **live sessions** — device label, online/offline, minutes since last activity, IP, and how many of your shares each one is currently broadcasting — plus a chooser per share and an “apply to all” action.
 
 [Screenshot: Priority device modal + Devices table]
+
+Two things this screen will not do, both of them deliberate:
+
+- **It does not extend a share.** Changing the device of a timed share keeps the expiry exactly where it is; if it were to run out in under a minute, the change is refused and you are told to open a fresh share instead.
+- **It lists live sessions only.** A device you have logged out of is absent rather than shown as “offline”, and a share still pinned to a device that just left keeps showing that id as “no longer in the list” until the server re-points it (or you choose a new one).
+
+In a native (Android) build the device column is filled from the platform: brand and model, e.g. `Samsung Galaxy S23`. The name **you** gave your phone in its own settings is never sent — it is personal data, and on recent iOS it is a generic string anyway. If the platform cannot be read at all, nothing is sent and the label is derived from the browser instead, so a login is never refused because a device name could not be read.
 
 ---
 
@@ -347,11 +359,12 @@ Each update appears as **timeline** to requester + admin.
 
 ## 21. Admin — Categories & Incidents
 
-*`/_admin/categories`, `/_admin/incidents`*
+*`/_admin/categories`, `/_admin/incidents`* — live since T3.1.5
 
-- **Incident Types:** Create `name, icon, color, description` (e.g., Fire 🔥 red) → used in SOS dropdown.
-- **Categories:** Create `name, description` + select **multiple incident types** it contains + **assign users** to category.
-- All users start **in no category**; admin assigns; user can be in **multiple categories**.
+- **Incident Types:** Create `name, icon, color, description` (e.g., Fire 🔥 red) → used in SOS dropdown. The slug is derived from the name when the field is left empty; a name with nothing slug-shaped in it (a Persian-only label is normal here) has to be given one by hand, and the form says so before the server has to. Renaming is allowed, and a taken slug is refused with a `409` naming the type that holds it.
+- **Categories:** Create `name, description` + select **multiple incident types** it contains + **assign users** to category. The picker is the username search rather than a list of ids; the chosen set replaces the stored one, so unticking is how a type is removed.
+- **What this screen cannot do yet:** show who is already in a category, and therefore remove one. No read returns a category's members (T3.1.4); the dialog says so instead of offering a uuid to type, and adding somebody already a member is a no-op success rather than an error.
+- All users start **in no category**; admin assigns; user can be in **multiple categories**. An empty catalog is the shipped state: nothing is seeded, so the SOS form has no options until an admin adds them.
 
 [Screenshot: Category form with incident Type multi-select + user assignment]
 

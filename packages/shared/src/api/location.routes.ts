@@ -6,6 +6,7 @@ import {
   locationShareCreatedSchema,
   locationSharesResponseSchema,
   locationHistoryShareCreatedSchema,
+  locationHistorySharesResponseSchema,
   locationUpdateSchema
 } from "../schemas/location";
 import {
@@ -22,11 +23,13 @@ export const locationRoutes = {
     url: "/_user/location/share",
     schema: {
       body: createLocationShareSchema,
-      responses: { 201: locationShareCreatedSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 201: locationShareCreatedSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "locationCreateShare",
       summary: "Share live location with one or more users",
+      description:
+        "Recipients are validated as a batch, so one unusable target rejects the whole request with 400 VALIDATION_ERROR and per-target issue codes. When the account has more than one live device and no priorityDeviceId is supplied, the request is refused with 409 PRIORITY_DEVICE_REQUIRED and issues[0].deviceIds lists the candidates to choose between; an account with a single live device is pinned by the server. The pin decides which device may feed these shares via Socket `location:update`.",
       tags: ["location"],
       access: "authenticated"
     }
@@ -40,7 +43,9 @@ export const locationRoutes = {
     },
     meta: {
       operationId: "locationRevokeShare",
-      summary: "Revoke a live location share",
+      summary: "Revoke a live location share immediately",
+      description:
+        "Only the share owner may revoke. Revoking an unknown id or one owned by another account returns 404 SHARE_NOT_FOUND; an already-revoked id returns 200 so retries stay idempotent.",
       tags: ["location"],
       access: "authenticated"
     }
@@ -68,6 +73,8 @@ export const locationRoutes = {
     meta: {
       operationId: "locationCreateHistoryShare",
       summary: "Share a bounded range of location history",
+      description:
+        "Grants one fixed window (1-50 recipients per call) from the caller's stored location history. The window must not span more than LOCATION_HISTORY_MAX_SHARE_DAYS, otherwise 400 SHARE_RANGE_TOO_LARGE; recipients are validated as a batch with the same issue codes as live-share creation. A repeated request for the identical owner, target, and window reuses the existing grant and only rewrites maxPoints, so createdShareIds and reusedShareIds explain what changed. No priority device is involved: a history grant replays rows the server already stored, and it lasts until retention prunes them.",
       tags: ["location"],
       access: "authenticated"
     }
@@ -82,6 +89,8 @@ export const locationRoutes = {
     meta: {
       operationId: "locationGetHistory",
       summary: "Get the authenticated user's location history",
+      description:
+        "Returns the caller's own stored points inside a required from/to window, oldest first. A read of your own history has no grant to take a sampling target from, so it samples to LOCATION_HISTORY_READ_POINTS; totalPoints reports how many rows the window actually holds. Only the caller's own rows are ever considered.",
       tags: ["location"],
       access: "authenticated"
     }
@@ -91,11 +100,50 @@ export const locationRoutes = {
     url: "/_user/location/history/shared/:shareId",
     schema: {
       params: sharePathParamsSchema,
-      responses: { 200: locationHistoryResponseSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: {
+        200: locationHistoryResponseSchema,
+        400: errorSchema,
+        401: errorSchema,
+        403: errorSchema,
+        404: errorSchema
+      }
     },
     meta: {
       operationId: "locationGetSharedHistory",
       summary: "Get history shared with the authenticated user",
+      description:
+        "Reads the fixed window one history grant covers, addressed by its grant id (from GET /_user/location/history/shares). The window and the sampling target come from the grant itself - maxPoints, or LOCATION_HISTORY_READ_POINTS when it stores none - so every receiver of one grant sees the same view and nobody can widen a window they were given. Points the owner's devices sent after the grant was created still appear, since they fall inside the window. An unknown id and a grant somebody else received answer identically with 404 SHARE_NOT_FOUND.",
+      tags: ["location"],
+      access: "authenticated"
+    }
+  }),
+  listHistoryShares: defineRoute({
+    method: "GET",
+    url: "/_user/location/history/shares",
+    schema: {
+      responses: { 200: locationHistorySharesResponseSchema, 401: errorSchema, 403: errorSchema }
+    },
+    meta: {
+      operationId: "locationListHistoryShares",
+      summary: "List history grants owned by or shared with the current user",
+      description:
+        "Both directions of the caller's history grants, newest first, capped at 100 rows per list. A grant has no expiry and no revoked state, so this is every row the account holds; sharedWithMe rows name the owner so a receiver can label the polyline. Responses are Cache-Control: no-store.",
+      tags: ["location"],
+      access: "authenticated"
+    }
+  }),
+  revokeHistoryShare: defineRoute({
+    method: "DELETE",
+    url: "/_user/location/history/share/:shareId",
+    schema: {
+      params: sharePathParamsSchema,
+      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "locationRevokeHistoryShare",
+      summary: "Delete a history grant",
+      description:
+        "Owner-only and immediate. Unlike a live share there is no revoked flag to set, so the grant row is deleted and the receiver's next read answers 404 SHARE_NOT_FOUND; points already delivered to the receiver's device are not recalled. Repeating the delete for the same id answers 200 again, which keeps a retried request idempotent.",
       tags: ["location"],
       access: "authenticated"
     }

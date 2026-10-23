@@ -1332,23 +1332,31 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
         )
         crop_candidate = Path(os.path.abspath(crop_path))
         if crop_candidate != expected_crop:
-            raise SystemExit(1)
+            fail(
+                f"crop {crop_candidate} is not the library path for {area['id']} "
+                f"({expected_crop}); refusing a crop that resolves outside the standardized layout"
+            )
         expected_meta = expected_crop.with_name(f"{area['id']}.source.json")
         meta_candidate = Path(os.path.abspath(meta_path))
         if meta_candidate != expected_meta:
-            raise SystemExit(1)
+            fail(
+                f"crop metadata {meta_candidate} is not the sidecar next to the crop "
+                f"({expected_meta})"
+            )
         crop_path = expected_crop
         meta_path = library_path(
             library_root, expected_meta.relative_to(library_root)
         )
     try:
         meta = json.loads(meta_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        raise SystemExit(1)
+    except OSError:
+        fail(f"crop metadata is missing or unreadable: {meta_path}")
+    except json.JSONDecodeError as error:
+        fail(f"crop metadata is not valid JSON ({error.msg} at line {error.lineno}): {meta_path}")
     if not isinstance(meta, dict):
-        raise SystemExit(1)
+        fail(f"crop metadata is not a JSON object: {meta_path}")
     if not crop_path.is_file() or crop_path.stat().st_size == 0:
-        raise SystemExit(1)
+        fail(f"crop file is missing or empty: {crop_path}")
     if snapshot_arg:
         expected_snapshot = parse_snapshot_date(snapshot_arg, "--snapshot-date").isoformat()
         meta_snapshot = meta.get("snapshotDate")
@@ -1357,24 +1365,40 @@ def command_verify_crop(catalog: dict, args: argparse.Namespace) -> None:
             and expected_snapshot == catalog_snapshot_date(catalog).isoformat()
         )
         if meta_snapshot != expected_snapshot and not legacy_pinned_meta:
-            raise SystemExit(1)
+            fail(
+                f"crop was built for snapshot {meta_snapshot!r}, this run is on "
+                f"{expected_snapshot}"
+            )
     metadata_bbox = meta.get("bbox")
-    if bbox_problem(metadata_bbox):
-        raise SystemExit(1)
+    bbox_issue = bbox_problem(metadata_bbox)
+    if bbox_issue:
+        fail(f"crop metadata bbox is unusable: {bbox_issue} (got {metadata_bbox!r})")
     metadata_osmium = meta.get("osmiumToolVersion")
     expected_osmium = getattr(args, "osmium_version", None)
-    if (
-        meta.get("area") != area["id"]
-        or meta.get("source") != area["source"]
-        or meta.get("sourceSha256") != args.source_sha256
-        or meta.get("strategy") != "smart"
-        or [float(value) for value in metadata_bbox] != area["bbox"]
-        or not isinstance(metadata_osmium, str)
-        or not metadata_osmium
-        or (expected_osmium is not None and metadata_osmium != expected_osmium)
-        or meta.get("sha256") != sha256_file(crop_path)
-    ):
-        raise SystemExit(1)
+    mismatches: list[str] = []
+    if meta.get("area") != area["id"]:
+        mismatches.append(f"metadata area {meta.get('area')!r} is not {area['id']!r}")
+    if meta.get("source") != area["source"]:
+        mismatches.append(
+            f"metadata source {meta.get('source')!r} is not the area's source {area['source']!r}"
+        )
+    if meta.get("sourceSha256") != args.source_sha256:
+        mismatches.append("the source PBF changed since the crop was made")
+    if meta.get("strategy") != "smart":
+        mismatches.append(f"crop strategy is {meta.get('strategy')!r}, not 'smart'")
+    if [float(value) for value in metadata_bbox] != area["bbox"]:
+        mismatches.append("the crop bbox differs from the catalog bbox for the area")
+    if not isinstance(metadata_osmium, str) or not metadata_osmium:
+        mismatches.append("the metadata does not record an osmium version")
+    elif expected_osmium is not None and metadata_osmium != expected_osmium:
+        mismatches.append(
+            f"the crop was made by osmium {metadata_osmium}, this machine has {expected_osmium}"
+        )
+    # The checksum is the expensive check, so it only runs when nothing else has already failed.
+    if not mismatches and meta.get("sha256") != sha256_file(crop_path):
+        mismatches.append("the crop bytes no longer match the checksum its metadata recorded")
+    if mismatches:
+        fail(f"crop for {area['id']} is not reusable: {'; '.join(mismatches)}")
     print(f"OK: reusing verified crop for {area['id']}")
 
 

@@ -21,7 +21,10 @@ export const publicRoutes = {
       operationId: "publicHealth",
       summary: "Check API health",
       tags: ["public"],
-      access: "public"
+      access: "public",
+      // See `ApiRouteMeta.rateLimitExempt`: a probe that can be throttled is a probe that reports a
+      // busy-but-healthy instance as down.
+      rateLimitExempt: true
     }
   }),
   securityQuestions: defineRoute({

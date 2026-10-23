@@ -1,0 +1,1 @@
+CREATE INDEX "location_shares_active_pinned_idx" ON "location_shares" USING btree ("owner_id","priority_device_id") WHERE "is_revoked" = false and "priority_device_id" is not null;

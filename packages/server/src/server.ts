@@ -3,7 +3,7 @@ import { parseServerEnv } from "./config/env";
 
 export async function startServer() {
   const config = parseServerEnv();
-  const app = await createFastifyApp(config);
+  const app = await createFastifyApp(config, { startMaintenanceJobs: true });
 
   // Docker and other process supervisors stop containers with SIGTERM. Close
   // Fastify explicitly so its onClose hooks can end the Postgres pool.

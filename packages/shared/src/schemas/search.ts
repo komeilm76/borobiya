@@ -32,10 +32,14 @@ const optionalRatingQuerySchema = z.preprocess(
   z.coerce.number().pipe(z.number().finite().min(1).max(5)).optional()
 );
 
+const optionalIdQuerySchema = z.preprocess(emptyQueryValueToUndefined, idSchema.optional());
+
 export const userSearchSchema = z.strictObject({
   q: z.string().trim().max(30).optional(),
-  category: idSchema.optional(),
-  incidentType: idSchema.optional(),
+  // A cleared picker control arrives as an empty string, which means "no filter" rather than "invalid
+  // id" — the same treatment lat/lon/rating already get below.
+  category: optionalIdQuerySchema,
+  incidentType: optionalIdQuerySchema,
   minRating: optionalRatingQuerySchema,
   online: optionalBooleanQuerySchema,
   sort: z.enum(["distance"]).default("distance"),

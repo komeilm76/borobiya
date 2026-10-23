@@ -34,7 +34,7 @@ borobiya/
 │
 ├── map-server/
 │   ├── README.md             # map-server setup and runtime-data status
-│   ├── scripts/              # region catalog, source/crop pipeline, library manager, verifiers
+│   ├── scripts/              # region catalog, source/crop pipeline, library manager, Planetiler reference-layer fetcher, verifiers
 │   ├── routing-gateway/      # route/geocoding adapter and map-config endpoint
 │   ├── styles/, sprites/, fonts/ # committed MapLibre assets
 │   └── photon/               # Photon Dockerfile; release JAR is ignored
@@ -123,18 +123,28 @@ packages/server/
 ├── package.json              # Fastify, Drizzle, Postgres.js, Argon2, jose JWTs, security plugins, and Swagger
 ├── tsconfig.json
 └── src/
-    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, profile, and onboarding handlers are live
+    ├── app.ts                # creates Fastify app; health/catalog, auth/session/recovery, admin list/detail/create/status, the incident-type catalog and responder categories, profile, onboarding, user search, the live-location surface, and SOS creation with its photo attachment are live
     ├── app.test.ts           # Fastify inject/security/CORS/rate-limit/OpenAPI tests
     ├── server.ts             # validates environment and listens
     ├── admin/
     │   ├── users.ts          # current-admin auth, user list/detail/create/status handlers
-    │   └── users.test.ts     # admin auth, list/detail, creation, status, state, and conflict tests
+    │   ├── users.test.ts     # admin auth, list/detail, creation, status, state, and conflict tests
+    │   ├── authorize.ts      # the admin identity check the other admin route files share (token → live session → role/state)
+    │   ├── incidents.ts      # incident-type catalog: ordered list, create with a derived-or-explicit slug, rename/clear; 409 names the type holding the slug
+    │   ├── incidents.test.ts # auth, ordering/no-store, slug-rule refusals and conflicts, blank-description folding, audit-on-change-only tests
+    │   ├── categories.ts     # responder categories: list, create/update with the incident-type set, assign and remove members
+    │   ├── categories.test.ts# set-replacement semantics, unknown-id issues, 404-vs-400 split, and no-audit-on-no-op tests
+    │   └── normalize.ts      # the blank-to-NULL and zod-issue rules both catalog route files share, kept in one place
     ├── config/
-    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits
+    │   ├── env.ts            # host, port, DB URL syntax, JWT secrets, CORS, rate limits, location retention, the uploads directory and the photo ceiling
     │   └── env.test.ts
     ├── auth/
     │   ├── login.ts          # login route, JWTs, refresh cookie, and IP+username limit
     │   ├── login.test.ts     # token/session/account-status regression tests
+    │   ├── devices.ts        # GET /_user/devices: live-session device list for the Active Devices table
+    │   ├── devices.test.ts   # payload mapping, fail-closed guard, empty list, and cap tests
+    │   ├── device-label.ts   # human device labels: client-supplied name, User-Agent summary, bounds
+    │   ├── device-label.test.ts # browser/platform recognition and truncation cases
     │   ├── register.ts       # registration route, Argon2id hashing, and IP+username limit
     │   ├── register.test.ts  # registration behavior/rate-limit regression tests
     │   ├── rate-limit.ts     # bounded per-IP+username limiter key generation
@@ -145,17 +155,54 @@ packages/server/
     │   ├── forgot-password.ts # server-selected recovery challenges and reset flow
     │   ├── recovery-decoys.ts # keyed stable decoy pool for non-enumerable recovery requests
     │   └── recovery-decoys.test.ts
+    ├── location/
+    │   ├── shares.ts         # live-share create, revoke, and active list handlers for /_user/location, plus priority-device resolution and the shared recipient-issue mapping
+    │   ├── history.ts        # the whole `/_user/location/history` surface: grant creation with its ENV range bound and batched recipient rules, the windowed owner and receiver reads, the grant lists, and the delete
+    │   ├── history.test.ts   # auth guard, range limit, recipient batch rules, contract bounds, window resolution, no-leak 404s, and store call shapes
+    │   ├── shares.test.ts    # creation, validation, idempotence, revoke, list, and guard tests
+    │   ├── live.ts           # shared broadcast service: throttle-independent validation, priority-device rule, fix persistence, peer selection + REST fallback route
+    │   ├── live.test.ts      # service rules and REST fallback status/ack tests
+    │   ├── jobs.ts           # in-process maintenance timers: expire overdue shares and repair stale priority pins (1m) and prune history past retention (daily, batched)
+    │   └── jobs.test.ts      # batching, cadence, failure isolation, and no-overlap tests
+    ├── users/
+    │   ├── search.ts         # GET /_user/users/search: term-bounded username search with the filters this build can honor, and a refusal for the ones it cannot
+    │   └── search.test.ts    # required term, refused filters, cleared controls, filter mapping, coordinate pairing, and page/total mapping
+    ├── sos/
+    │   ├── requests.ts       # POST /_user/sos/requests: schema-bounded severity/description/coordinates, the catalog lookup that decides whether the incident type exists, and the refusal of a client-supplied photoUrl
+    │   ├── requests.test.ts  # length bounds at both ends, coordinate and accuracy rules, trimming, strict keys, catalog refusal wording, and the /_user guard's coverage of this path
+    │   ├── photos.ts         # POST /_user/sos/requests/:id/photo: the multipart rules the container enforces (one `photo` part, nothing else), the byte sniff, the owner-only attach folded into the update, replace-not-append, and no state rule of its own
+    │   ├── photos.test.ts    # 401 before the parser claims the stream, part-naming refusals that name the field, 413 quoting the configured ceiling, GIF-as-PNG, truncated bodies, empty files, unknown and other-owned requests, the stored bytes and name, and the absence of any read route
+    │   ├── photo-storage.ts  # the volume: server-chosen names, a private mode, `.part` then rename, `discard()` for bytes the database refused, and a `publicPath` the future read route resolves
+    │   └── photo-storage.test.ts # traversal-proof naming, nothing left behind on a refused attach, the exact 0600 mode, and that a replacement never rewrites the previous file in place
+    ├── realtime/
+    │   ├── socket.ts         # Socket.IO server: handshake auth, rooms, location:update handling, per-connection throttle
+    │   └── socket.test.ts    # handshake rejection codes, room fan-out, priority-device, and throttle tests
     ├── db/
     │   ├── client.ts         # Drizzle/Postgres.js factory used by runtime handlers
     │   ├── admin-user-store.ts # current-admin checks, user list/detail, status transactions, session revocation, audit writes
     │   ├── admin-user-store.test.ts # list/detail, persistence/default/conflict, and status/audit assertions
+    │   ├── incident-type-store.ts # catalog list/create/update in one transaction, unique-slug conflict reads, and audit rows
+    │   ├── category-store.ts # category CRUD, the incident-type link set, and member assignment/removal on the pivots
+    │   ├── incident-type-store.test.ts # rendered SQL for the conflict lookup and set replacement, plus PGlite-backed behavior cases
+    │   ├── category-store.test.ts  # links/membership queries, no-op detection, and the two-category-per-account case
+    │   ├── device-store.ts   # live-session reads for the Active Devices table (never selects the token hash)
     │   ├── login-store.ts    # credential lookup and persisted refresh sessions
     │   ├── recovery-store.ts # persisted recovery challenges, reset tokens, and atomic reset
+    │   ├── location-history-store.ts # grant creation with the duplicate window rule, grant lists and delete, windowed reads sampled inside the query, fix persistence, and the batched retention prune — one transaction per fix: PostGIS users.last_location upsert + location_history insert
+    │   ├── location-share-store.ts # share-target classification, atomic creation/reuse with the pinned device, owner-only revocation, active share lists, and stale-pin repair
+    │   ├── location-share-store.test.ts # classification, insert, reuse, revoke, timed-extension, and list-mapping assertions
+    │   ├── sos-request-store.ts # one transaction for the incident-type probe and the SOS insert: PostGIS point built from (lon, lat), status read back from the row, photo column left to the upload endpoint
+    │   ├── sos-request-store.test.ts # rendered SQL for the geography expression and defaults, plus the probe-empty/insert-never ordering and the typed refusal
+    │   ├── sos-photo-store.ts # the attach as one statement: `WHERE id = request AND requester_id = caller`, so a missing row and someone else's row are the same answer, and `photo_url` is the only column it may touch
+    │   ├── sos-photo-store.test.ts # the owner predicate and the `set` clause in the rendered SQL, and both refusals collapsing into `not_found`
+    │   ├── owner-lock.ts     # the per-owner transaction-scoped advisory lock used by both share stores, so concurrent requests never race a unique index
+    │   ├── user-search-store.ts # partial username match over reachable accounts with rating/online filters, session-derived liveness, and PostGIS distance in kilometres
+    │   ├── user-search-store.test.ts # escaped patterns, parameter order, the position fallback, and page/count mapping
     │   ├── security-questions-store.ts # user profile/state, question catalog, and atomic onboarding persistence
     │   ├── security-questions-store.test.ts # onboarding persistence contract assertions
     │   ├── registration-store.ts # username/question queries and atomic user/answer write
-    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit tables
-    │   ├── schema.test.ts    # Drizzle user-column and PostGIS migration assertions
+    │   ├── schema.ts         # auth, user-state, PostGIS location, session, cancellation-reason, audit, location share/history, incident-type catalog, responder-category, and `sos_requests` tables
+    │   ├── schema.test.ts    # Drizzle user-column, PostGIS, catalog-constraint, and migration-text assertions (0010–0012 included)
     │   ├── seed.ts           # transactional, idempotent reference/admin seeder
     │   ├── seed-config.ts    # production-safe bootstrap password policy
     │   ├── seed-data.ts      # Persian questions and localized cancellation reasons
@@ -164,13 +211,19 @@ packages/server/
     │   ├── password.ts      # Argon2id hash/verify helpers
     │   ├── password.test.ts
     │   ├── tokens.ts        # HS256 access/refresh JWT signing and verification
-    │   └── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
+    │   ├── tokens.test.ts   # token use, expiry, claim, and legacy-claim checks
+    │   ├── image-payload.ts # the photo validator: three formats by magic bytes *and* closing structure, the size ceiling, and a refusal that names what actually arrived
+    │   └── image-payload.test.ts # accepted fixtures, truncated and renamed files, unknown and announced kinds, and that nothing in a name is ever consulted
     └── plugins/
-        ├── security.ts       # Helmet, CORS allowlist, global rate limit
+        ├── security.ts       # Helmet, CORS allowlist, global rate limit, no-store default
+        ├── multipart.ts      # `@fastify/multipart` with the photo contract's shape: one file, the configured byte ceiling, and bounds that keep a refused body cheap
+        ├── multipart.test.ts # the ceiling comes from configuration, and the shape limits stay small
+        ├── error-envelope.ts # one sanitized envelope for failures no handler answered
+        ├── error-envelope.test.ts
         └── swagger.ts        # OpenAPI contract catalog and Swagger UI/runtime status
 ```
 
-Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, and onboarding stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables; category membership and missions remain empty until their later domain migrations. The onboarding auth hook is ready for future `/_user` handlers; remaining user/admin/domain handlers, realtime, and background jobs are not present yet.
+Fastify creates a PostgreSQL client for the registration, login/session, recovery, admin, onboarding, device, user-search, location share/history, incident-catalog, responder-category, and SOS-request stores; queries run on demand. Migrations and the idempotent seed command remain explicit developer operations and are not run at startup. Public health/security-question catalog, T1.2.1–T1.2.7 auth/session/recovery/admin-create/profile/onboarding handlers, and T1.3.1–T1.3.2 admin status/list/detail handlers are live with their relevant contracts. Status changes, refresh-session revocation on deactivation, and the audit insert are transactional. Admin list filters and device detail use current tables. The incident-type catalog and responder categories are live end to end (T3.1.2–T3.1.3) and the admin screens for both are in the client (T3.1.5) — `AdminIncidentsView` creates and renames types using the shared slug derivation, `AdminCategoriesView` edits the incident-type set and adds members through the user search — and nothing is seeded for them: an installation starts with an empty catalog by design, because default categories would assign responder groups nobody chose. User search still cannot report `hasCategory=true` and `GET /_user/map` search still refuses `category=`, because no read projects category membership into a profile yet — that projection is the other half of T3.1.4. SOS request creation is live (T3.2.2) and so is attaching its photo (T3.2.3: bytes validated by signature, written to `UPLOAD_DIR` under a server-chosen name, and re-pointed by an owner-checked update) — what is not live is reading those bytes back (`GET /uploads/:id` is T3.2.6, and no static mount exists on purpose), the list/detail and cancellation halves of `/_user/sos`, every mission handler, and `/_admin/sos` dispatch (T3.3.2); geocoding handlers remain unwired. The app-scoped `/_user` hook also guards the Phase 2 share routes and `POST /_user/sos/requests`, so an inactive, suspended, revoked-session, or unfinished-onboarding account cannot create a share or file an SOS. Realtime (`location:update` with its REST fallback), the history grant and read surface, username user search, and the maintenance timers (share expiry, stale-pin repair, history retention prune) are present; the remaining admin/domain handlers (the rest of SOS, missions, geocoding and the rest of search) are not.
 
 ---
 
@@ -198,11 +251,25 @@ packages/client/
     │   ├── http.test.ts
     │   ├── error-message.ts  # localized auth/API errors
     │   ├── security-questions.ts # cached public question catalog
-    │   └── map-config.ts     # same-origin validated map settings
+    │   ├── map-config.ts     # same-origin validated map settings
+    │   ├── admin-users.ts    # typed admin user list and status calls
+    │   ├── admin-catalog.ts  # the incident-type and category calls, each body and response run through the shared schema
+    │   ├── admin-catalog.test.ts # methods and paths, an empty patch refused locally, a non-uuid never sent, a schema-breaking response caught here
+    │   ├── location.ts       # share create/revoke/list, history grants, both history reads, picker search
+    │   ├── location.test.ts
+    │   ├── devices.ts        # GET /_user/devices, the only ids the priority rule accepts
+    │   └── devices.test.ts
     ├── components/
-    │   └── map/
-    │       ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
-    │       └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    │   ├── map/
+    │   │   ├── MapCanvas.vue # MapLibre canvas, outage toast/retry, and cache-aware lifecycle
+    │   │   ├── HistoryPlaybackPanel.vue # range presets, hand-typed window, transport, scrub slider
+    │   │   ├── LiveCompanionPanel.vue # who is on the map, how old each position is, and why it might be empty
+    │   │   └── map-canvas-options.ts # map defaults, runtime bounds/zoom, and theme/style helpers
+    │   ├── settings/
+    │   │   └── DevicePriorityPanel.vue # live-session table + per-share priority chooser
+    │   └── sharing/
+    │       ├── ShareDialog.vue # recipient picker, timed/permanent modes, device chooser
+    │       └── ShareLists.vue  # My Shares / Shared With Me / history grants, confirm-to-revoke
     ├── router/
     │   ├── index.ts          # namespaced routes and auth-guard wiring
     │   ├── guards.ts         # guest-only, authenticated, admin, and onboarding redirects
@@ -210,14 +277,58 @@ packages/client/
     │   └── index.test.ts
     ├── services/
     │   ├── map-cache.ts      # Service Worker registration/activation for map requests
-    │   └── map-cache-worker.test.ts
+    │   ├── map-cache-worker.test.ts
+    │   ├── socket-options.ts # same-origin Socket.IO path and handshake auth options
+    │   ├── socket-options.test.ts
+    │   ├── socket-events.ts  # the realtime event names, in a module that imports nothing
+    │   └── socket.ts         # lazily connected realtime client with token rotation and close()
     ├── stores/
     │   ├── index.ts          # Pinia instance
     │   ├── auth.ts           # in-memory access token, refresh-cookie restoration, user state
     │   ├── auth.test.ts
     │   └── theme.ts          # persisted theme preference and system-change synchronization
+    ├── device/
+    │   ├── capacitor.ts      # the only Capacitor import in the client, behind a lazy platform probe
+    │   ├── capacitor.test.ts
+    │   ├── native-label.ts   # plugin facts → bounded `login.deviceName`, user-assigned name ignored
+    │   └── native-label.test.ts
     ├── composables/
-    │   └── useSystemTheme.ts # reactive prefers-color-scheme signal
+    │   ├── use-history-playback.ts # window, cursor, transport loop, and the two history reads
+    │   ├── use-history-playback.test.ts
+    │   ├── use-live-companions.ts # share bootstrap, peer subscription, connect/disconnect, ageing clock (opens socket.io lazily)
+    │   ├── use-live-companions.test.ts
+    │   ├── use-device-settings.ts # the two lists, per-minute clock, and the re-pin posts
+    │   ├── use-device-settings.test.ts
+    │   ├── use-priority-device.ts # "am I the broadcasting device?", derived, never enforced
+    │   ├── use-priority-device.test.ts
+    │   ├── useSystemTheme.ts # reactive prefers-color-scheme signal
+    │   ├── location-broadcast.ts # pure geolocation→payload mapping, 3-5s pacing, and ack parsing
+    │   ├── location-broadcast.test.ts
+    │   ├── device-identity.ts # this session's deviceId read from its own access token
+    │   ├── useLiveLocationBroadcast.ts # geolocation watch + throttled location:update over Socket.IO
+    │   ├── use-target-search.ts # 300ms picker debounce, aborts, and stale-response guard
+    │   └── use-target-search.test.ts
+    ├── history/
+    │   ├── playback.ts       # frames, interpolation, sampled window rules, GeoJSON + style descriptors
+    │   ├── playback.test.ts
+    │   ├── playback-map-sync.ts # the lookup that names playback's three collections for the shared planner
+    │   └── playback-map-sync.test.ts
+    ├── live/                 # live companion markers (T2.1.8)
+    │   ├── companion-locations.ts # peer registry as the allow-list, forward-only fixes, staleness, GeoJSON + style descriptor + copy
+    │   └── companion-locations.test.ts
+    ├── settings/
+    │   ├── priority-device.ts # repin bodies that cannot extend an expiry, device rows, refusal copy
+    │   └── priority-device.test.ts
+    ├── admin/                # the two catalog screens' decisions, kept out of the components
+    │   ├── catalog-form.ts   # drafts → request bodies (what blank, null and "" each mean), the shared slug preview, taken-slug and refused-id wording
+    │   ├── catalog-form.test.ts
+    │   └── catalog-views.test.ts # the rules that exist only in the `.vue` markup, pinned by reading those sources
+    ├── map/                  # the rules every client-drawn map overlay shares
+    │   ├── overlay-sync.ts   # structural GeoJSON, the source/layer descriptors, the sync/removal plans (maplibre is never imported here)
+    │   └── overlay-sync.test.ts
+    ├── sharing/
+    │   ├── share-form.ts     # share draft rules: validation, payloads, 409 devices, refusal + duration words
+    │   └── share-form.test.ts
     ├── theme/
     │   ├── theme-preference.ts # theme persistence and system/light/dark resolution
     │   ├── theme-preference.test.ts
@@ -236,12 +347,16 @@ packages/client/
         ├── _public/PlaceholderView.vue
         ├── _user/CompleteSecurityQuestionsView.vue
         ├── _user/UserDashboardView.vue # responsive dashboard with map widget
-        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view
+        ├── _user/UserDevicesView.vue   # Active Devices and the priority-device chooser (spec §7.3)
+        ├── _user/UserMapView.vue       # full-height theme-aware MapLibre view + playback wiring
         ├── _user/PlaceholderView.vue
-        └── _admin/PlaceholderView.vue
+        ├── _admin/PlaceholderView.vue
+        ├── _admin/AdminUsersView.vue # user table, filters, confirm-to-deactivate (spec §7.1)
+        ├── _admin/AdminIncidentsView.vue # incident-type table with the create/rename dialog (T3.1.5)
+        └── _admin/AdminCategoriesView.vue # category table, the incident-type picker, and the add-members dialog
 ```
 
-Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. Search, routing, live locations, and Android packaging remain future work.
+Login, registration, recovery, onboarding, and the corresponding route guards are live in the client. The reusable MapLibre canvas loads same-origin local styles, applies validated runtime bounds/zoom settings, supports reactive diff-based light/dark changes, and reports server failures with cached-resource fallback/retry. The app-wide theme menu synchronizes Vuetify, Tailwind's manual `dark:` variant, persisted system/light/dark preference, and the operating-system preference; a synchronous head script applies the initial theme before the app bundle. The protected user map and dashboard now compose the canvas, follow the resolved app theme, and provide routes between the full-height map and dashboard widget. The dashboard also owns the sharing surface: `ShareLists` reads both directions of `GET /_user/location/shares` (plus history grants) and `ShareDialog` writes `POST /_user/location/share` through the picker, with the priority-device chooser standing behind the server's `409`. Following the repository's client convention, the decisions live in pure modules (`sharing/share-form.ts`, `composables/use-target-search.ts`, `api/location.ts`) that are unit-tested, while the `.vue` files only render and dispatch. Device detection lives in `src/device/`: `capacitor.ts` probes the native shell lazily (the only place `@capacitor/core` / `@capacitor/device` are imported, and the plugin itself is loaded only when the shell exists) and `native-label.ts` maps the plugin's facts into the bounded `login.deviceName` the Active Devices table shows, while `composables/use-priority-device.ts` answers the same question for any screen that needs it. History playback is live on the map (`components/map/HistoryPlaybackPanel.vue` renders `composables/use-history-playback.ts`, and the view paints through `history/playback-map-sync.ts`). `/_user/devices` is the Active Devices screen: `settings/priority-device.ts` builds the one write that re-points a share without touching its expiry, and `components/settings/DevicePriorityPanel.vue` renders it. The admin catalogs gained their screens in T3.1.5 (`views/_admin/AdminIncidentsView.vue`, `views/_admin/AdminCategoriesView.vue`), with every rule that decides a request body in `admin/catalog-form.ts`; adding members goes through the same username search the share dialog uses, and the dialog states plainly that this build cannot list a category's current members — which is also why it offers no remove button (T3.1.4). Routing and Android packaging remain future work. Live companion markers arrived with T2.1.8: `live/companion-locations.ts` decides who may appear (the share list is the allow-list), when a dot is stale, and that a position never moves backwards; `composables/use-live-companions.ts` owns the socket and the ageing clock; and `UserMapView.vue` paints both overlays through `map/overlay-sync.ts`, where the maplibre ordering rules now live once. The client opens `socket.io-client` lazily so the map route does not carry 42 kB of transport, and the panel rather than the map carries the words: ages, accuracy, and the reason an empty map is empty.
 
 ---
 
@@ -254,7 +369,7 @@ map-server/
 ├── styles/                   # committed light/dark MapLibre styles
 ├── sprites/                  # committed SVG source artwork for Martin sprites
 ├── fonts/                    # licensed TTFs and provenance
-├── scripts/                  # region catalog, source/crop pipeline, library manager, verifiers
+├── scripts/                  # region catalog, source/crop pipeline, library manager, Planetiler reference-layer fetcher, verifiers
 ├── routing-gateway/          # route/geocoding adapter, public map config, and tests
 └── photon/                   # Photon Dockerfile; versioned JAR is ignored
 
@@ -287,7 +402,7 @@ Use the root [`.env.example`](../.env.example) as the source of truth for the co
 ## 8. Database Migrations
 
 - ORM selected for this project: Drizzle ORM with the Postgres.js driver; decision rationale is in [`ARCHITECTURE.md` ADR-011](./ARCHITECTURE.md#adr-011--drizzle-orm--postgresjs).
-- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index under `packages/server/drizzle/`.
+- Drizzle migrations cover `users`, `security_questions`, `user_security_answers`, `user_sessions`, and (in T1.1.3) `cancellation_reasons`; T1.1.4 enables PostGIS and adds user-state/rating/location fields plus a GiST index. Phase 2 adds `location_shares`, then `location_history` and `location_history_shares` (`0007`), the partial index the maintenance sweep seeks over active pinned shares (`0008`), and the point cap stored on a history grant (`0009`), all under `packages/server/drizzle/`.
 - `bun --filter @borobiya/server db:generate` generates later schema changes; `bun --filter @borobiya/server db:migrate` explicitly applies pending migrations; `bun --filter @borobiya/server db:seed` inserts reference/bootstrap data. None run by Fastify startup. Database-backed routes include registration/login, refresh/logout, recovery, onboarding, and user/admin account management; SOS, live-location, and mission persistence remain future work.
 
 ---

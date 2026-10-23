@@ -16,7 +16,9 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    expect(allApiRoutes).toHaveLength(59);
+    // 61 = the 59 documented before Phase 2's history read path plus GET /_user/location/history/shares
+    // and DELETE /_user/location/history/share/:shareId (T2.2.4), which the receiver flow needs.
+    expect(allApiRoutes).toHaveLength(61);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 
@@ -49,6 +51,9 @@ describe("shared km-api route descriptors", () => {
     expect(Object.keys(route.schema.params?.shape ?? {})).toEqual(["shareId"]);
     expect(route.makeFullPath({ shareId: "00000000-0000-4000-8000-000000000001" }))
       .toBe("/_user/location/share/00000000-0000-4000-8000-000000000001");
+    // T2.1.3 revocation returns an empty body and must document the ownership-safe 404.
+    expect(Object.keys(route.schema.responses)).toEqual(["200", "400", "401", "403", "404", "409", "429"]);
+    expect(route.meta.description).toContain("SHARE_NOT_FOUND");
   });
 
   it("converts OpenAPI placeholders for Fastify routes with static suffixes", () => {

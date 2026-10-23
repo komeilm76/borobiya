@@ -129,7 +129,7 @@ export MAP_DATA_VERSION="$SNAPSHOT_DATE"
 # The same merged PBF is mounted as Nominatim's local PBF_PATH for the Photon import; see §7.
 ```
 
-Prerequisites for preparation are `curl`, Osmium Tool, Python 3, and SHA-256/MD5 utilities. The manifest records the exact installed Osmium version. Install with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script and `.env.example` both pin `MAP_OSMIUM_VERSION=1.16.0`, the Ubuntu 24.04 archive version on the target VM. If `osmium --version` reports a different release, set `MAP_OSMIUM_VERSION` to that reviewed installed version in `.env` and reload it (`set -a; source .env; set +a`) before running the script; the exact checked version is recorded in provenance. If downloads need a host proxy, see the Proxy section in [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md). Planetiler uses a conservative 3 GiB Java heap by default (`PLANETILER_HEAP=3g`) for 6 GiB machines; it additionally needs Java 21+. The routing build needs Docker and defaults to two OSRM build threads. Re-running preparation with the same selection is a verified no-op; changing `MAP_REGION_IDS`/`MAP_BBOX` re-merges from cached downloads/crops (`MAP_CROP_OVERWRITE=1` is only for replacing a manifest-less leftover dataset file). `verify-map-pbf.sh` checks the merged hash, selected areas, union bbox, per-source pins, and ODbL record before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
+Prerequisites for preparation are `curl`, Osmium Tool, Python 3, and SHA-256/MD5 utilities. The manifest records the exact installed Osmium version. Install with `sudo apt-get install osmium-tool` on Debian/Ubuntu or `brew install osmium-tool` on macOS. The script and `.env.example` both pin `MAP_OSMIUM_VERSION=1.16.0`, the Ubuntu 24.04 archive version on the target VM. If `osmium --version` reports a different release, set `MAP_OSMIUM_VERSION` to that reviewed installed version in `.env` and reload it (`set -a; source .env; set +a`) before running the script; the exact checked version is recorded in provenance. If downloads need a host proxy, run `./scripts/enable-proxy.sh` — it asks for the proxy address and port, proves the port answers, and writes all four settings; `./scripts/disable-proxy.sh` removes exactly what it wrote. [`UBUNTU_VM_RUNBOOK.md`](./UBUNTU_VM_RUNBOOK.md) § 5 explains why a proxy has to be configured in four places and carries the manual commands for each. Planetiler uses a conservative 3 GiB Java heap by default (`PLANETILER_HEAP=3g`) for 6 GiB machines; it additionally needs Java 21+. The routing build needs Docker and defaults to two OSRM build threads. Re-running preparation with the same selection is a verified no-op; changing `MAP_REGION_IDS`/`MAP_BBOX` re-merges from cached downloads/crops (`MAP_CROP_OVERWRITE=1` is only for replacing a manifest-less leftover dataset file). `verify-map-pbf.sh` checks the merged hash, selected areas, union bbox, per-source pins, and ODbL record before tile/routing generation. The PMTiles archive, source PBFs, manifests, Photon index, Nominatim database, and OSRM graphs remain ignored local data.
 
 `map-server/scripts/generate-tiles.sh` verifies Planetiler 0.10.2 by SHA-256 and writes `borobiya.pmtiles` plus metadata containing the dataset-PBF hash and area list. `build-routing.sh` uses that same verified dataset for each profile and records the input/manifest hashes beside each graph. `verify-tiles.sh`, `verify-routing.sh`, and `verify-geocoding.sh` are live per-area smoke tests driven by the catalog's test points. Live acceptance passed on the target Ubuntu VM on 2026-10-20 (real MVT tile, car/bicycle/foot routes, and forward/reverse geocoding for the Tehran dataset); see `docs/PROGRESS.md`.
 
@@ -252,6 +252,16 @@ The project contract remains a simple `POST /route`; its body is translated to O
 
 `profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, and OSRM `legs`, plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
 
+A failure that reaches the client says what the upstream said. `map-server/routing-gateway/upstream.mjs`
+reads the profile's body once as text and parses it, so every 502 carries `upstream` (the container and path
+that answered), `upstream_status`, `upstream_code` when OSRM sent one, and `message` — OSRM's own text when
+it has one, otherwise a sentence that says so; a body that is not JSON adds a bounded `upstream_body`
+excerpt, and a body that could not be read at all reports `upstream_body: null`. `no_route` (422) and
+`routing_unavailable` / `geocoding_unavailable` (503) keep their fixed two-key shape, because a client can do
+nothing with more detail there; the reason for a refused or timed-out connection is written to the container
+log instead, along with the same upstream summary. Photon query text is deliberately never copied into a
+response or a log line — only the upstream host and path, never the query string.
+
 `GET /map-config` is the public, same-origin configuration endpoint (gateway path `/config`). It returns only `{ region, bbox, dataVersion, minZoom, maxZoom }`; invalid region, bounds, version, or zoom environment values prevent the gateway from starting. Both Nginx and Vite proxy this endpoint to the same routing gateway, and the client validates the response before using it.
 
 Run the deterministic, network-free gateway tests with Node.js; they exercise all three OSRM profile mappings and Photon geocode/reverse forwarding against local fixtures:
@@ -342,14 +352,15 @@ MAP_DATA_VERSION=2026-10-18  # equals MAP_SNAPSHOT_DATE
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14              # Planetiler 0.10.2 supports up to 16
 MAP_OSMIUM_VERSION=1.16.0  # must match `osmium --version`; Ubuntu 24.04 apt version
+MAP_PLANETILER_SOURCES_DIR=      # blank = <map-library>/planetiler-sources (shared by all datasets)
+MAP_WATER_POLYGONS_URL=          # optional mirror; replaces the public URL for that source
 MAP_PBF=                   # setup-managed <dataset>/borobiya.osm.pbf
 PHOTON_DEFAULT_LANGUAGE=fa   # follows the first selected area's country
 PLANETILER_HEAP=3g
 OSRM_BUILD_THREADS=2
 OSRM_RUNTIME_THREADS=1
 MAP_SERVER_URL=http://localhost:8000
-MAP_STYLE_LIGHT=http://localhost:8000/style/light
-MAP_STYLE_DARK=http://localhost:8000/style/dark
+# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_ROUTING_PORT=8001
 MAP_OSRM_DATA_DIR=         # setup-managed <dataset>/routing
@@ -368,6 +379,8 @@ NOMINATIM_POSTGRES_EFFECTIVE_CACHE_SIZE=3GB
 PHOTON_PORT=2322
 PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"
 ```
+
+**Reference layers:** Planetiler's OpenMapTiles profile also reads three global archives — Natural Earth, OSM lake centerlines, and OSM water polygons — from their own hosts. `generate-tiles.sh` fetches anything missing into `$MAP_PLANETILER_SOURCES_DIR` (default `<map-library>/planetiler-sources`) via `fetch-planetiler-sources.sh` before starting the JVM, then passes that directory as `--download-dir`, so a warm cache means tile generation touches no network and `MAP_SOURCE_POLICY=offline` covers the tiles as well as the PBF. A source is re-fetched only when its file is absent, so `--refresh_sources` is deliberately never passed; `MAP_NATURAL_EARTH_URL`/`MAP_LAKE_CENTERLINES_URL`/`MAP_WATER_POLYGONS_URL` replace a public URL outright for a mirror, and an archive that is not a readable ZIP is discarded rather than cached.
 
 **Geographic coverage:** The default selection is Tehran (`ir-tehran`); any catalog areas can be combined (cities and/or whole countries, including adjacent countries whose rectangular bounds overlap). `prepare-regions-pbf.sh` builds the one shared merged dataset for the selection; Planetiler bounds, `/map-config` bounds, OSRM graphs, and the Nominatim→Photon import all derive from it, and generated tile/route metadata store its SHA-256 + area list while `MAP_DATA_VERSION` records the installed snapshot date. Switching areas or snapshot is a data operation, not a code change: resolve the standardized library dataset, rebuild tiles/graphs/geocoding from it, and activate it after acceptance — `scripts/setup-ubuntu-vm.sh` does exactly this, including the Nominatim/Photon reset and pruning replaced releases. Styles, Martin config, and Compose are selection-independent because the dataset slug (`borobiya`) never changes. Note that very distant multi-city selections enlarge the union bbox Planetiler processes (more download/compute for natural-earth/water data), and whole large countries are heavy builds on a 6 GiB VM.
 

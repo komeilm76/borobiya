@@ -5,6 +5,8 @@ export const noContentResponseSchema = z.void();
 
 export const uuidPathParamsSchema = z.strictObject({ id: idSchema });
 export const sharePathParamsSchema = z.strictObject({ shareId: idSchema });
+/** `DELETE /_admin/categories/:id/users/:userId` — a pair of ids in the path, validated as one object. */
+export const categoryUserParamsSchema = z.strictObject({ id: idSchema, userId: idSchema });
 
 export const locationHistoryQuerySchema = z.strictObject({
   from: timestampSchema,

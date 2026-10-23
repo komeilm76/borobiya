@@ -100,7 +100,10 @@ describe("POST /_auth/login", () => {
     const response = await app.inject({
       method: "POST",
       url: "/_auth/login",
-      headers: { origin: "http://localhost:5173", "user-agent": "Borobiya Web Test" },
+      headers: {
+        origin: "http://localhost:5173",
+        "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36"
+      },
       payload: loginPayload
     });
 
@@ -140,7 +143,8 @@ describe("POST /_auth/login", () => {
     expect(calls.sessions).toHaveLength(1);
     expect(calls.sessions[0]).toMatchObject({
       userId: baseUser.id,
-      deviceName: "Borobiya Web Test",
+      // The stored label is a summary of the User-Agent, never the raw string (T2.3.1).
+      deviceName: "Chrome on Windows",
       ip: expect.any(String),
       isOnline: true
     });
@@ -148,6 +152,47 @@ describe("POST /_auth/login", () => {
     expect(refresh.payload.sessionId).toBe(calls.sessions[0]?.id);
     expect(refresh.payload.jti).not.toBe(calls.sessions[0]?.id);
     expect(refresh.payload.deviceId).toBe(calls.sessions[0]?.deviceId);
+  });
+
+  it("prefers a client-reported device name and stores null when the User-Agent is unrecognizable", async () => {
+    const okPassword: PasswordVerifier = async (hash, password) =>
+      hash === "stored-argon2-hash" && password === loginPayload.password;
+    const supplied = makeLoginStore();
+    const suppliedApp = await makeApp(supplied.store, okPassword);
+    const named = await suppliedApp.inject({
+      method: "POST",
+      url: "/_auth/login",
+      headers: { origin: "http://localhost:5173", "user-agent": "Chrome/129.0.0.0" },
+      payload: { ...loginPayload, deviceName: "  Samsung S23  " }
+    });
+    expect(named.statusCode).toBe(200);
+    expect(supplied.calls.sessions[0]?.deviceName).toBe("Samsung S23");
+
+    const anonymous = makeLoginStore();
+    const anonymousApp = await makeApp(anonymous.store, okPassword);
+    const unnamed = await anonymousApp.inject({
+      method: "POST",
+      url: "/_auth/login",
+      headers: { origin: "http://localhost:5173", "user-agent": "SomeClient/9 unknown" },
+      payload: loginPayload
+    });
+    expect(unnamed.statusCode).toBe(200);
+    expect(anonymous.calls.sessions[0]?.deviceName).toBeNull();
+  });
+
+  it("rejects an oversized device name before any credential work", async () => {
+    const { store, calls } = makeLoginStore();
+    const app = await makeApp(store);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_auth/login",
+      payload: { ...loginPayload, deviceName: "d".repeat(101) }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json().code).toBe("VALIDATION_ERROR");
+    expect(calls.sessions).toHaveLength(0);
   });
 
   it("verifies stored Argon2id password hashes using the production verifier", async () => {

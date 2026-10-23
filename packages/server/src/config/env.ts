@@ -1,10 +1,12 @@
 import { config as loadDotEnv } from "dotenv";
 import { z } from "zod";
 import { isIP } from "node:net";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repositoryEnvPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../.env");
+/** The checkout root, which is also where a relative `UPLOAD_DIR` is anchored (see below). */
+const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const repositoryEnvPath = resolve(repositoryRoot, ".env");
 // Quiet: in Docker there is no repository .env file (Compose supplies the
 // environment), and dotenv's "injected env" banner is only log noise there.
 loadDotEnv({ path: repositoryEnvPath, quiet: true });
@@ -63,7 +65,23 @@ const rawServerEnvSchema = z.object({
   CORS_ORIGINS: z.string().trim().min(1),
   TRUSTED_PROXY_IPS: z.string().default(""),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().min(1).max(2_147_483_647).default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000_000).default(100)
+  RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(1_000_000).default(100),
+  // Retention window for `location_history`; the daily prune job deletes rows older than this.
+  LOCATION_HISTORY_RETENTION_DAYS: z.coerce.number().int().min(1).max(3_650).default(90),
+  // Largest history window one account may hand to another in a single share.
+  LOCATION_HISTORY_MAX_SHARE_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  // Points a history read returns when the grant itself stores no maxPoints (and for the owner's own
+  // read, which has no grant at all). The ceiling is the contract's sampling bound, so a read can never
+  // answer with more rows than an owner was allowed to ask for on the grant.
+  LOCATION_HISTORY_READ_POINTS: z.coerce.number().int().min(1).max(10_000).default(1_000),
+  // The photo ceiling `docs/SECURITY.md` §9 and README §14 state as 5 MB, kept configurable because the
+  // spec lists it as a knob. The ceiling on this entry is a typo guard, not policy: an operator who sets
+  // 100 MB has overridden the contract deliberately, and every refusal will quote their number.
+  SOS_PHOTO_MAX_SIZE_MB: z.coerce.number().int().min(1).max(100).default(5),
+  // Where uploaded SOS photos are written (`docs/SECURITY.md` §9's volume). A relative value resolves
+  // against the repository root — the same anchor `.env` is read from — so the development default is
+  // the gitignored `data/uploads/` the docs name, and a container points this at its mounted volume.
+  UPLOAD_DIR: z.string().trim().min(1).default("data/uploads")
 }).superRefine((env, context) => {
   if (env.JWT_SECRET === env.JWT_REFRESH_SECRET) {
     context.addIssue({
@@ -110,6 +128,15 @@ const rawServerEnvSchema = z.object({
     }
   });
 
+  if (env.LOCATION_HISTORY_MAX_SHARE_DAYS > env.LOCATION_HISTORY_RETENTION_DAYS) {
+    // A share wider than the retention window would silently promise points that no longer exist.
+    context.addIssue({
+      code: "custom",
+      path: ["LOCATION_HISTORY_MAX_SHARE_DAYS"],
+      message: `Must not exceed LOCATION_HISTORY_RETENTION_DAYS (${env.LOCATION_HISTORY_RETENTION_DAYS}).`
+    });
+  }
+
   const trustedProxyIps = splitTrustedProxyIps(env.TRUSTED_PROXY_IPS);
   trustedProxyIps.forEach((ip, index) => {
     if (!isValidTrustedProxyIp(ip)) {
@@ -133,7 +160,12 @@ export const serverEnvSchema = rawServerEnvSchema.transform((env) => ({
   corsOrigins: splitCorsOrigins(env.CORS_ORIGINS),
   trustedProxyIps: splitTrustedProxyIps(env.TRUSTED_PROXY_IPS),
   rateLimitWindowMs: env.RATE_LIMIT_WINDOW_MS,
-  rateLimitMax: env.RATE_LIMIT_MAX
+  rateLimitMax: env.RATE_LIMIT_MAX,
+  locationHistoryRetentionDays: env.LOCATION_HISTORY_RETENTION_DAYS,
+  locationHistoryMaxShareDays: env.LOCATION_HISTORY_MAX_SHARE_DAYS,
+  locationHistoryReadPoints: env.LOCATION_HISTORY_READ_POINTS,
+  sosPhotoMaxBytes: env.SOS_PHOTO_MAX_SIZE_MB * 1024 * 1024,
+  uploadDir: isAbsolute(env.UPLOAD_DIR) ? env.UPLOAD_DIR : resolve(repositoryRoot, env.UPLOAD_DIR)
 }));
 
 export type ServerConfig = z.output<typeof serverEnvSchema>;

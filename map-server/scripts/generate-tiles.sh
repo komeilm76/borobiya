@@ -12,7 +12,11 @@ fail() {
 # MAP_REGION_IDS carries the selected areas from regions.json.
 MAP_REGION="${MAP_REGION:-borobiya}"
 MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
-MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
+# The bounds must describe THIS selection. The historical Tehran default is kept only for the
+# default selection: as an unconditional fallback it made every other area look invalid to
+# verify-map-pbf.sh, which then blamed the dataset for a value this script had invented.
+MAP_BBOX="${MAP_BBOX:-}"
+MAP_BBOX_WAS_SET="${MAP_BBOX:-}"
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-}"
 MAP_SNAPSHOT_DATE="${MAP_SNAPSHOT_DATE:-$MAP_DATA_VERSION}"
 if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
@@ -49,12 +53,28 @@ if [[ -z "$MAP_DATA_DIR" ]]; then
   fi
   eval "$library_paths"
   MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE"
+  # The resolver already computed the selection's real union bounds; use them instead of a default.
+  [[ -n "$MAP_BBOX_WAS_SET" ]] || MAP_BBOX="${UNION_BBOX:-}"
+fi
+if [[ -z "$MAP_BBOX" && "$MAP_REGION_IDS" == "ir-tehran" ]]; then
+  MAP_BBOX="51.0,35.5,51.7,35.9"
+fi
+if [[ -z "$MAP_BBOX" ]]; then
+  fail 'MAP_BBOX is not set and the selection was not resolved (MAP_DATA_DIR was given explicitly). ' \
+       'Run the loader block from docs/UBUNTU_VM_RUNBOOK.md § 2.1, which exports MAP_BBOX from the ' \
+       'resolver, or pass MAP_BBOX=west,south,east,north for this selection. ' \
+       'A non-default selection must never fall back to another area'"'"'s bounds.'
 fi
 if [[ -z "$MAP_SNAPSHOT_DATE" ]]; then
   command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to resolve the pinned snapshot'
   MAP_SNAPSHOT_DATE="$(python3 "$SCRIPT_DIR/regions.py" pinned-snapshot)"
 fi
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-$MAP_SNAPSHOT_DATE}"
+# Planetiler's OpenMapTiles profile wants three global reference layers in addition to the dataset PBF.
+# They are not area- or snapshot-specific, so they are cached once per library (see the fetch script for why
+# this project fetches them itself instead of letting Planetiler do it) and pointed at with --download-dir.
+MAP_PLANETILER_SOURCES_DIR="${MAP_PLANETILER_SOURCES_DIR:-$MAP_LIBRARY_DIR/planetiler-sources}"
+[[ "$MAP_PLANETILER_SOURCES_DIR" == /* ]] || fail 'MAP_PLANETILER_SOURCES_DIR must be an absolute path'
 MAP_MIN_ZOOM="${MAP_MIN_ZOOM:-0}"
 MAP_MAX_ZOOM="${MAP_MAX_ZOOM:-14}"
 # The canonical merged dataset PBF is the default; explicit paths remain available for audited local setups.
@@ -163,6 +183,13 @@ temp_dir="$(mktemp -d "$(dirname -- "$MAP_DATA_DIR")/.$MAP_REGION.XXXXXX")"
 temp_output="$temp_dir/$MAP_REGION.pmtiles"
 metadata_tmp="$temp_dir/$MAP_REGION.metadata.json"
 trap 'rm -rf -- "${temp_dir:-}"' EXIT
+# Overlap sources first, while a failure is still a sentence rather than a Java stack trace: Planetiler gives
+# each source 10 hard-coded seconds to answer a size probe, with no retry, and aborts the whole build when a
+# host is slow or down. By the time it runs, every one of these files exists on disk, so it issues no request.
+MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR" MAP_DATA_DIR="$MAP_DATA_DIR" \
+  MAP_PLANETILER_SOURCES_DIR="$MAP_PLANETILER_SOURCES_DIR" MAP_SOURCE_POLICY="${MAP_SOURCE_POLICY:-cache-first}" \
+  "$SCRIPT_DIR/fetch-planetiler-sources.sh"
+
 printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
   "$OUTPUT" "$MAP_DATA_VERSION" "$map_min_zoom" "$map_max_zoom" "$MAP_BBOX" "$MAP_PBF"
 (
@@ -173,7 +200,15 @@ printf 'Generating %s (version %s, zoom %s-%s, bbox %s) from %s...\n' \
     --bounds="$MAP_BBOX" \
     --minzoom="$map_min_zoom" \
     --maxzoom="$map_max_zoom" \
+    --download-dir="$MAP_PLANETILER_SOURCES_DIR" \
+    --download-osm-tile-weights=false \
     --download --force
+  # `--download` stays so a source added to the profile in a future Planetiler bump still works, and it is
+  # harmless for the three we just cached: Planetiler only fetches a source whose file is absent.
+  # `--force` is only "overwrite the output file and ignore disk/RAM warnings" (Planetiler 0.10.2) - it does
+  # not re-download anything, and the output here is a fresh temp path, so it is kept for the overwrite half.
+  # `--refresh_sources` is deliberately NOT passed: it is the flag that makes Planetiler HEAD every source on
+  # every run, which is exactly the request whose 10-second timeout kills a build when a host is unreachable.
 )
 [[ -s "$temp_output" ]] || fail 'Planetiler did not produce a non-empty PMTiles archive'
 

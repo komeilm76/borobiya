@@ -14,6 +14,11 @@ RUN bun install --frozen-lockfile --production
 COPY packages/server ./packages/server
 COPY packages/shared ./packages/shared
 
+# The uploads directory must exist and belong to the runtime user before the volume is mounted on it:
+# a named volume inherits ownership from the image's directory, so without this the API would run as
+# `bun` against a root-owned /app/data and every photo upload would fail with EACCES.
+RUN mkdir -p /app/data/uploads && chown -R bun:bun /app/data
+
 WORKDIR /app/packages/server
 USER bun
 EXPOSE 3000

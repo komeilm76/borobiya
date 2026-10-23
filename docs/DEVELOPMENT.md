@@ -61,6 +61,15 @@ Nginx proxies `/api/` to Fastify, `/map/` and Martin's root-relative assets to M
 
 Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; registration and login use the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. If that password is lost, reset it (this also revokes admin sessions) with `bun --filter @borobiya/server db:reset-admin-password '<new-password>'`, or the same script inside the API image. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
+Two Compose values have to agree in a way nothing checks for you. Compose builds the API's
+`DATABASE_URL` by interpolating `POSTGRES_PASSWORD` into it, so a password carrying `#`, `/`, `%`, `[` or
+a space reaches Postgres shortened and authenticates as a wrong password — keep to `A-Z a-z 0-9 . _ ~ -`,
+which is what `scripts/setup-ubuntu-vm.sh` asks for and refuses anything else (it asks for
+`NOMINATIM_PASSWORD` too, and Enter generates both). `POSTGRES_PASSWORD` also only takes effect at the
+volume's first init: afterwards the role inside `postgres-data` is the truth, the container's own
+environment is the second opinion, and `docker compose inspect postgres` versus `.env` is how you tell
+which of the three you are looking at (`docs/UBUNTU_VM_RUNBOOK.md` § 9.3).
+
 ### 2.4 Client and development loop
 
 For a local API + client with hot reload, stop the Compose stack first (the API uses host port `3000`) and run from the repository root:
@@ -155,7 +164,10 @@ RATE_LIMIT_WINDOW_MS=60000
 RATE_LIMIT_MAX=100
 LOCATION_HISTORY_RETENTION_DAYS=90
 LOCATION_HISTORY_MAX_SHARE_DAYS=30
+LOCATION_HISTORY_READ_POINTS=1000
 SOS_PHOTO_MAX_SIZE_MB=5
+# Where SOS photos are stored (the volume `docker-compose.yml` mounts for the API service).
+UPLOAD_DIR=data/uploads
 SOS_REQUEST_AUTO_EXPIRE_HOURS=24
 MISSION_STATUS_TIMEOUT_HOURS=6
 
@@ -172,8 +184,7 @@ MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=2026-10-18
 MAP_MAX_ZOOM=14
 MAP_MIN_ZOOM=0
-MAP_STYLE_LIGHT=http://localhost:8000/style/light
-MAP_STYLE_DARK=http://localhost:8000/style/dark
+# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_ROUTING_PORT=8001
 MAP_OSRM_DATA_DIR=
@@ -219,7 +230,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 
 ### OpenAPI client generation
 
-Start the API first, then run `bun --filter @borobiya/client generate:api`. By default the script fetches `http://localhost:3000/docs/json`; set `API_OPENAPI_URL` to use another server or `ZOPIA_OUTPUT_DIR` to change the output directory. Generated code under `packages/client/src/generated/` is intentionally ignored by Git.
+Start the API first, then run `bun --filter @borobiya/client generate:api`. By default the script fetches `http://localhost:3000/docs/json`; set `API_OPENAPI_URL` to use another server or `ZOPIA_OUTPUT_DIR` to change the output directory. Generated code under `packages/client/src/generated/` is intentionally ignored by Git — run the generator inside the Linux VM, because the pinned `@openapi-zod-client` toolchain needs glibc (`ld-linux-x86-64.so.2`) and cannot start from a Windows/WSL-mounted toolchain; regenerate and delete rather than committing the output.
 
 ---
 
@@ -285,11 +296,16 @@ bun --filter @borobiya/client build
 ## 10. First Contribution Walkthrough
 
 1. Read `docs/ARCHITECTURE.md` + `docs/API.md` + `docs/SECURITY.md`.
-2. Pick a task in `docs/TASKS.md` (e.g., `T1.2.1` register endpoint).
-3. Create branch `feat/register-endpoint` from `main` (or work on assigned `arena/...`).
-4. Add Zod schema in `packages/shared/src/schemas/auth.ts`.
-5. Implement route in `packages/server/src/modules/auth/auth.routes.ts`.
-6. Test via `curl` + Vitest.
-7. Update `docs/PROGRESS.md` % for that milestone.
-8. Push, open PR targeting `main`, ensure `lefthook` passes.
+2. Pick the highest open task in `docs/TASKS.md` — the numbered list is the queue, and any task marked done in a
+   doc but unticked there (or the reverse) is a bug to fix before starting new work.
+3. Create a branch from `main` (or work on the branch assigned to you, e.g. `arena/...`).
+4. Add the Zod schema in `packages/shared/src/schemas/`, and the route contract in `packages/shared/src/api/` —
+   every endpoint is declared there first, marked `contract-only` until a handler registers it.
+5. Implement the handler in the domain folder that already owns that surface: `packages/server/src/auth/`,
+   `src/admin/`, `src/location/`, `src/users/`. There is no `src/modules/` tree — adding one starts a second
+   layout that half the docs then fail to describe. Persistence goes in `src/db/<name>-store.ts`.
+6. Test via Vitest (`bunx vitest run` inside the package) plus a `curl` against the running server.
+7. Update `docs/PROGRESS.md` (board + changelog) and `docs/TASKS.md` in the same commit as the code.
+8. Push and open a PR targeting `main`. The gates today are the three `typecheck` scripts, the three Vitest
+   suites, and `bun --filter @borobiya/client build`; no hook manager is wired yet, so nothing runs them for you.
 

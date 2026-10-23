@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseServerEnv } from "./env";
 
 const validEnv = {
@@ -22,8 +24,50 @@ describe("server environment validation", () => {
       corsOrigins: ["http://localhost:5173", "http://localhost:3000"],
       trustedProxyIps: [],
       rateLimitWindowMs: 60_000,
-      rateLimitMax: 100
+      rateLimitMax: 100,
+      locationHistoryRetentionDays: 90,
+      locationHistoryMaxShareDays: 30,
+      locationHistoryReadPoints: 1_000,
+      sosPhotoMaxBytes: 5 * 1024 * 1024,
+      // Pinned by its own test below: the default is a resolved path, not the literal.
+      uploadDir: expect.any(String)
     });
+  });
+
+  it("keeps the history-share window inside the retention window", () => {
+    expect(() => parseServerEnv({
+      ...validEnv,
+      LOCATION_HISTORY_RETENTION_DAYS: "7",
+      LOCATION_HISTORY_MAX_SHARE_DAYS: "30"
+    })).toThrow(/LOCATION_HISTORY_MAX_SHARE_DAYS: Must not exceed LOCATION_HISTORY_RETENTION_DAYS \(7\)/);
+
+    expect(parseServerEnv({
+      ...validEnv,
+      LOCATION_HISTORY_RETENTION_DAYS: "30",
+      LOCATION_HISTORY_MAX_SHARE_DAYS: "30"
+    })).toMatchObject({ locationHistoryRetentionDays: 30, locationHistoryMaxShareDays: 30 });
+
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_RETENTION_DAYS: "0" })).toThrow(
+      /LOCATION_HISTORY_RETENTION_DAYS/
+    );
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_RETENTION_DAYS: "1.5" })).toThrow(
+      /LOCATION_HISTORY_RETENTION_DAYS/
+    );
+  });
+
+  it("samples a history read at the configured target when a grant stores none", () => {
+    expect(parseServerEnv(validEnv)).toMatchObject({ locationHistoryReadPoints: 1_000 });
+    expect(parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "25" })).toMatchObject({
+      locationHistoryReadPoints: 25
+    });
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "0" })).toThrow(
+      /LOCATION_HISTORY_READ_POINTS/
+    );
+    // The ceiling is the same bound a grant may name in the contract, so a default could never ask a
+    // read for more rows than an owner was allowed to ask for.
+    expect(() => parseServerEnv({ ...validEnv, LOCATION_HISTORY_READ_POINTS: "10001" })).toThrow(
+      /LOCATION_HISTORY_READ_POINTS/
+    );
   });
 
   it("rejects weak or reused JWT secrets without echoing their values", () => {
@@ -71,6 +115,25 @@ describe("server environment validation", () => {
     expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "proxy.internal" })).toThrow(/TRUSTED_PROXY_IPS/);
     expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "0.0.0.0/0" })).toThrow(/TRUSTED_PROXY_IPS/);
     expect(() => parseServerEnv({ ...validEnv, TRUSTED_PROXY_IPS: "192.168.0.1/33" })).toThrow(/TRUSTED_PROXY_IPS/);
+  });
+
+  it("anchors a relative UPLOAD_DIR at the repository root, beside the .env it reads", () => {
+    // The same anchor `env.ts` uses, computed from this file's own location: what the test is really
+    // asserting is that the upload directory does *not* follow the process's working directory, so a
+    // `bun run` from `packages/server` and one from the root both land in the gitignored `data/uploads`.
+    const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+    expect(parseServerEnv(validEnv).uploadDir).toBe(join(repositoryRoot, "data/uploads"));
+    expect(isAbsolute(parseServerEnv(validEnv).uploadDir)).toBe(true);
+
+    // An absolute value is a deployment's own path and is never rewritten.
+    expect(parseServerEnv({ ...validEnv, UPLOAD_DIR: "/srv/borobiya/uploads" }).uploadDir).toBe("/srv/borobiya/uploads");
+    expect(() => parseServerEnv({ ...validEnv, UPLOAD_DIR: "   " })).toThrow(/UPLOAD_DIR/);
+  });
+
+  it("turns the photo size knob into bytes and refuses nonsense", () => {
+    expect(parseServerEnv({ ...validEnv, SOS_PHOTO_MAX_SIZE_MB: "2" }).sosPhotoMaxBytes).toBe(2 * 1024 * 1024);
+    expect(() => parseServerEnv({ ...validEnv, SOS_PHOTO_MAX_SIZE_MB: "0" })).toThrow(/SOS_PHOTO_MAX_SIZE_MB/);
+    expect(() => parseServerEnv({ ...validEnv, SOS_PHOTO_MAX_SIZE_MB: "101" })).toThrow(/SOS_PHOTO_MAX_SIZE_MB/);
   });
 
   it("rejects invalid ports and non-Postgres database URLs", () => {

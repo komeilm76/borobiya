@@ -28,6 +28,7 @@ import {
 import { sosRequestStatusSchema } from "../types/enums";
 import {
   apiErrorResponses,
+  categoryUserParamsSchema,
   noContentResponseSchema,
   uuidPathParamsSchema
 } from "./common";
@@ -128,11 +129,11 @@ export const adminRoutes = {
     url: "/_admin/incidents",
     schema: {
       body: incidentTypeCreateSchema,
-      responses: { 201: incidentTypeSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 201: incidentTypeSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "adminCreateIncidentType",
-      summary: "Create an incident type",
+      summary: "Create an incident type (slug derived from the name unless one is given)",
       tags: ["admin", "incidents"],
       access: "admin"
     }
@@ -154,7 +155,8 @@ export const adminRoutes = {
     schema: {
       params: uuidPathParamsSchema,
       body: incidentTypeUpdateSchema,
-      responses: { 200: incidentTypeSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      // 409 because a rename can collide with another type's slug, and the unique index is the rule.
+      responses: { 200: incidentTypeSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "adminUpdateIncidentType",
@@ -222,7 +224,7 @@ export const adminRoutes = {
     method: "DELETE",
     url: "/_admin/categories/:id/users/:userId",
     schema: {
-      params: z.strictObject({ id: z.string().uuid(), userId: z.string().uuid() }),
+      params: categoryUserParamsSchema,
       responses: { 200: noContentResponseSchema, ...apiErrorResponses }
     },
     meta: {

@@ -4,6 +4,7 @@
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
       aria-label="نقشهٔ تعاملی"
+      @ready="onMapReady"
     />
 
     <header class="user-map-view__toolbar">
@@ -29,21 +30,192 @@
       </v-card>
     </header>
 
-    <v-card class="user-map-view__notice" elevation="2" rounded="lg" role="status">
-      <v-icon icon="mdi-information-outline" size="19" />
-      <span>در این نسخه نقشهٔ پایه در دسترس است؛ موقعیت‌های همراهان هنوز نمایش داده نمی‌شوند.</span>
-    </v-card>
+    <aside class="user-map-view__playback">
+      <HistoryPlaybackPanel :api="playback" />
+    </aside>
+
+    <aside class="user-map-view__live">
+      <LiveCompanionPanel :api="live" />
+    </aside>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
+import type { Map as MapLibreMap } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
+import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
+import { useHistoryPlayback } from "@/composables/use-history-playback";
+import { historyPlaybackStyle } from "@/history/playback";
+import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
+import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
+import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overlay-sync";
+import { useLiveCompanions } from "@/composables/use-live-companions";
+import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
 const theme = useThemeStore();
+const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
+
+/**
+ * History playback, wired to the map.
+ *
+ * The view owns the composable rather than the panel because the *map* has to follow the cursor, not a
+ * control: the panel is a renderer and this file is where a `MapLibreMap` exists.
+ */
+const playback = useHistoryPlayback({ accessToken: computed(() => auth.accessToken) });
+const map = shallowRef<MapLibreMap | null>(null);
+let fittedFor: string | null = null;
+
+const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
+
+/**
+ * Live companion markers (T2.1.8): the peer positions the socket hands us, painted from the same planner
+ * playback uses so the two overlays agree on ordering and on teardown.
+ */
+const live = useLiveCompanions({
+  accessToken: computed(() => auth.accessToken),
+  // The server echoes an accepted fix into the sender's own room, so without our own id a user who is
+  // both broadcasting and receiving would draw themselves as one of their own companions.
+  ownUserId: computed(() => auth.user?.id ?? null)
+});
+const liveStyle = computed(() => liveCompanionsStyle(theme.isDark));
+
+/**
+ * The maplibre calls the plan asked for, and nothing else. `data` and the layer spec cross a boundary
+ * whose types come from a package (`@types/geojson`) this workspace does not resolve, so the values are
+ * cast here once; the shapes themselves are pinned in `history/playback.test.ts` and
+ * `live/companion-locations.test.ts`.
+ */
+type GeoJsonTarget = { setData(data: unknown): unknown };
+
+function applyOp(instance: MapLibreMap, op: OverlayOp): void {
+  switch (op.op) {
+    case "addSource":
+      instance.addSource(op.id, { type: "geojson", data: op.data } as Parameters<MapLibreMap["addSource"]>[1]);
+      break;
+    case "setData":
+      (instance.getSource(op.id) as GeoJsonTarget | undefined)?.setData(op.data);
+      break;
+    case "addLayer":
+      instance.addLayer(op.layer as Parameters<MapLibreMap["addLayer"]>[0], op.beforeId);
+      break;
+    case "setPaintProperty":
+      // maplibre narrows the property name to its own union of known paint keys; the descriptor's keys
+      // are literals pinned in `history/playback.test.ts`, so the call site widens the name, not the value.
+      const setPaint = instance.setPaintProperty.bind(instance) as (layerId: string, key: string, value: unknown) => void;
+      for (const [key, value] of Object.entries(op.paint)) setPaint(op.id, key, value);
+      break;
+    case "removeLayer":
+      instance.removeLayer(op.id);
+      break;
+    case "removeSource":
+      instance.removeSource(op.id);
+      break;
+  }
+}
+
+function mapState(instance: MapLibreMap) {
+  return {
+    styleLoaded: Boolean(instance.isStyleLoaded()),
+    hasSource: (id: string) => Boolean(instance.getSource(id)),
+    hasLayer: (id: string) => Boolean(instance.getLayer(id))
+  };
+}
+
+function paintLive(): void {
+  const instance = map.value;
+  if (!instance) return;
+  // The live overlay owns the top of the stack, so it names no `beforeLayerId`: appending is the only
+  // order that does not depend on a layer the base style might not declare.
+  for (const op of planOverlaySync(mapState(instance), liveStyle.value, () => live.overlay.value)) applyOp(instance, op);
+}
+
+function playbackMapState(instance: MapLibreMap) {
+  const state = mapState(instance);
+  // Only name a layer maplibre can actually find: an unknown `beforeId` throws, and during the first
+  // paint after a theme switch the markers may not be re-added yet. Painted without it, playback sits on
+  // top for one frame instead of the map refusing to paint at all.
+  return instance.getLayer(LIVE_BOTTOM_LAYER_ID) ? { ...state, beforeLayerId: LIVE_BOTTOM_LAYER_ID } : state;
+}
+
+function paintPlayback(): void {
+  const instance = map.value;
+  if (!instance) return;
+  for (const op of planPlaybackSync(playbackMapState(instance), playbackStyle.value, playback.frame.value)) applyOp(instance, op);
+}
+
+function frameCamera(): void {
+  const instance = map.value;
+  const track = playback.frames.value;
+  if (!instance || track.length === 0) return;
+  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}`;
+  if (fittedFor === key) return;
+  fittedFor = key;
+  const bounds = playback.boundsForMap.value;
+  if (bounds) {
+    // Padding leaves the toolbar and the panel off the track itself, which matters more on a phone
+    // where the panel covers half the viewport.
+    instance.fitBounds(bounds, { padding: { top: 96, bottom: 168, left: 72, right: 72 }, maxZoom: 15, duration: 700 });
+    return;
+  }
+  const only = track[0]!;
+  instance.easeTo({ center: [only.lon, only.lat], duration: 500 });
+}
+
+function onMapReady(instance: MapLibreMap): void {
+  map.value = instance;
+  // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
+  // `ready` (and every paint) re-ensures the overlay instead of assuming it is still there. Live markers
+  // go first because playback asks to be inserted beneath them.
+  paintLive();
+  paintPlayback();
+  frameCamera();
+}
+
+watch(() => playback.frame.value, paintPlayback);
+watch(() => playbackStyle.value, () => {
+  paintLive();
+  paintPlayback();
+});
+watch(() => live.overlay.value, paintLive);
+// A peer arriving or ageing must never move the camera: the user chose where to look, and a dot that
+// yanks the viewport every few seconds makes the map unusable. Playback frames the camera once per track.
+watch(() => live.peers.value.length, paintLive);
+watch(
+  () => playback.frames.value,
+  () => {
+    paintPlayback();
+    frameCamera();
+  }
+);
+watch(
+  () => auth.accessToken,
+  (token) => {
+    // Signing out must not leave somebody else's track on the screen; signing in offers the last 7 days
+    // without the user having to press anything, which is the shortcut this panel exists for.
+    fittedFor = null;
+    if (!token) playback.points.value = [];
+    else void playback.selectPreset(playback.presetDays.value || 7);
+  }
+);
+
+onBeforeUnmount(() => {
+  // `map.value` is cleared first: Vue runs a parent's `beforeUnmount` before the child's, so the map is
+  // still alive here and nothing else can paint after this point.
+  const instance = map.value;
+  map.value = null;
+  if (instance) {
+    for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
+    for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
+  }
+});
+
+// The first paint for a signed-in visitor: without this the map is empty until they touch a chip.
+if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
 </script>
 
 <style scoped>
@@ -114,45 +286,39 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
   flex: 0 0 auto;
 }
 
-.user-map-view__notice {
+.user-map-view__playback {
+  position: absolute;
+  z-index: 2;
+  inset-block-start: 1rem;
+  inset-inline-start: 1rem;
+  width: min(24rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  pointer-events: none;
+}
+
+/*
+ * The live panel replaces the placeholder notice that used to sit here. It is interactive (a retry
+ * button) so unlike the playback column it does not set `pointer-events: none` — a card that swallows
+ * drags is the price of a button that works, and the panel is small enough to live at the edge.
+ */
+.user-map-view__live {
   position: absolute;
   z-index: 2;
   inset-block-end: 1rem;
   inset-inline-start: 1rem;
-  display: flex;
-  max-width: min(30rem, calc(100% - 2rem));
-  align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.75rem 0.9rem;
-  color: #536d6c;
-  background: rgba(var(--v-theme-surface), 0.94);
-  font-size: 0.76rem;
-  line-height: 1.65;
-  backdrop-filter: blur(10px);
+  width: min(21rem, calc(100% - 2rem));
 }
 
-.user-map-view__notice :deep(.v-icon) {
-  flex: 0 0 auto;
-  margin-top: 0.08rem;
-  color: #0e6666;
-}
-
-:global(:root.dark) .user-map-view__toolbar-card,
-:global(:root.dark) .user-map-view__notice {
+:global(:root.dark) .user-map-view__toolbar-card {
   background: rgba(27, 41, 42, 0.94);
 }
 
-:global(:root.dark) .user-map-view__title-block p,
-:global(:root.dark) .user-map-view__notice {
+:global(:root.dark) .user-map-view__title-block p {
   color: #a0b6b2;
 }
 
 :global(:root.dark) .user-map-view__title-block h1 {
   color: #edf5f2;
-}
-
-:global(:root.dark) .user-map-view__notice :deep(.v-icon) {
-  color: #71c7be;
 }
 
 @media (max-width: 600px) {
@@ -167,6 +333,13 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
     width: min(24rem, calc(100% - 1.3rem));
   }
 
+  .user-map-view__playback {
+    inset-block-start: 5.9rem;
+    inset-inline-start: 0.65rem;
+    width: min(20rem, calc(100% - 1.3rem));
+    max-height: calc(100% - 7rem);
+  }
+
   .user-map-view__toolbar-card {
     gap: 0.5rem;
     padding: 0.55rem 0.65rem;
@@ -176,10 +349,10 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
     font-size: 0.92rem;
   }
 
-  .user-map-view__notice {
+  .user-map-view__live {
     inset-block-end: 0.65rem;
     inset-inline-start: 0.65rem;
-    max-width: calc(100% - 1.3rem);
+    width: calc(100% - 1.3rem);
   }
 }
 </style>

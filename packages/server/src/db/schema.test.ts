@@ -3,6 +3,13 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import {
   adminAuditLog,
+  categories,
+  categoryIncidentTypes,
+  categoryUsers,
+  incidentTypes,
+  locationHistory,
+  sosRequests,
+  locationHistoryShares,
   locationShares,
   passwordResetChallenges,
   passwordResetTokens,
@@ -112,8 +119,15 @@ describe("users database schema", () => {
     expect(indexNames).toEqual([
       "location_shares_owner_created_at_idx",
       "location_shares_target_created_at_idx",
-      "location_shares_expires_at_idx"
+      "location_shares_expires_at_idx",
+      "location_shares_active_pinned_idx"
     ]);
+    // Partial index for the maintenance sweeps: retired rows stay for audit, so an unpredicated
+    // scan of this table grows forever.
+    const pinnedIndex = config.indexes.find(
+      ({ config: indexConfig }) => indexConfig.name === "location_shares_active_pinned_idx"
+    );
+    expect(pinnedIndex?.config.where).toBeTruthy();
 
     const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
       /^0006_.*\.sql$/.test(name)
@@ -167,5 +181,282 @@ describe("users database schema", () => {
     expect(extensionPosition).toBeGreaterThanOrEqual(0);
     expect(geographyPosition).toBeGreaterThan(extensionPosition);
     expect(migrationSql).not.toContain('"geography(Point,4326)"');
+  });
+});
+
+describe("location history schema (T2.2.1/T2.2.2)", () => {
+  it("stores bounded fixes with a user/time index and cascade deletes", () => {
+    const config = getTableConfig(locationHistory);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("id")?.getSQLType()).toBe("bigserial");
+    expect(columns.get("user_id")?.notNull).toBe(true);
+    expect(columns.get("lat")?.getSQLType()).toBe("double precision");
+    expect(columns.get("lon")?.getSQLType()).toBe("double precision");
+    expect(columns.get("accuracy")?.notNull).toBe(false);
+    expect(columns.get("timestamp")?.notNull).toBe(true);
+    expect(config.foreignKeys).toHaveLength(1);
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "location_history_lat_check",
+      "location_history_lon_check",
+      "location_history_accuracy_check"
+    ]);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name)).toEqual([
+      "idx_location_history_user_time"
+    ]);
+  });
+
+  it("grants one bounded, non-self window per owner/target pair", () => {
+    const config = getTableConfig(locationHistoryShares);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("from_time")?.notNull).toBe(true);
+    expect(columns.get("to_time")?.notNull).toBe(true);
+    // The requested sampling resolution rides on the grant, nullable because "no preference" is legal.
+    expect(columns.get("max_points")?.notNull).toBe(false);
+    expect(config.foreignKeys).toHaveLength(2);
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "location_history_shares_owner_target_check",
+      "location_history_shares_window_check",
+      "location_history_shares_max_points_check"
+    ]);
+    expect(
+      config.uniqueConstraints.some(({ name }) => name === "location_history_shares_owner_target_window_unique")
+    ).toBe(true);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name)).toEqual([
+      "location_history_shares_owner_idx",
+      "location_history_shares_target_idx"
+    ]);
+  });
+
+  it("creates both tables, indexes, and constraints in the T2.2 migration", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0007_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationName = migrationNames[0];
+    if (!migrationName) throw new Error("The location-history migration is missing.");
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationName}`, import.meta.url), "utf8");
+
+    expect(migrationSql).toContain('CREATE TABLE "location_history" (\n\t"id" bigserial PRIMARY KEY NOT NULL');
+    expect(migrationSql).toContain('CREATE TABLE "location_history_shares"');
+    expect(migrationSql).toContain('"lat" double precision NOT NULL');
+    expect(migrationSql).toContain('"accuracy" double precision');
+    expect(migrationSql).toContain('CONSTRAINT "location_history_lat_check" CHECK ("lat" BETWEEN -90 AND 90)');
+    expect(migrationSql).toContain('CONSTRAINT "location_history_shares_window_check" CHECK ("to_time" > "from_time")');
+    expect(migrationSql).toContain(
+      'CONSTRAINT "location_history_shares_owner_target_window_unique" UNIQUE("owner_id","target_user_id","from_time","to_time")'
+    );
+    expect(migrationSql).toContain('CREATE INDEX "idx_location_history_user_time" ON "location_history" USING btree ("user_id","timestamp")');
+    // History rows follow the account away; share grants must survive until their own retention pass.
+    expect((migrationSql.match(/ON DELETE cascade/g) ?? [])).toHaveLength(1);
+    expect(migrationSql).not.toContain("DROP TABLE");
+    expect(migrationSql).not.toContain("ALTER TABLE \"users\"");
+  });
+
+  it("adds max_points to history grants without disturbing existing windows", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0009_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationNames[0]}`, import.meta.url), "utf8");
+
+    expect(migrationSql).toContain('ALTER TABLE "location_history_shares" ADD COLUMN "max_points" integer;');
+    expect(migrationSql).toContain(
+      'ADD CONSTRAINT "location_history_shares_max_points_check" CHECK ("max_points" IS NULL OR "max_points" > 0)'
+    );
+    // A nullable column with a value-free check: no backfill, no rewrite of grants already handed out.
+    expect(migrationSql).not.toMatch(/DROP|DELETE|UPDATE|SET NOT NULL/i);
+  });
+
+  it("adds the sweep's partial index as an index-only migration", () => {
+    const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+      /^0008_.*\.sql$/.test(name)
+    );
+    expect(migrationNames).toHaveLength(1);
+    const migrationSql = readFileSync(new URL(`../../drizzle/${migrationNames[0]}`, import.meta.url), "utf8");
+
+    expect(migrationSql.trim()).toBe(
+      'CREATE INDEX "location_shares_active_pinned_idx" ON "location_shares" USING btree ("owner_id","priority_device_id") WHERE "is_revoked" = false and "priority_device_id" is not null;'
+    );
+    // Nothing but an index: no table rewrite, no data statement, and no drop that could lose a
+    // share row a receiver is still reading.
+    expect(migrationSql.trim().split("\n")).toHaveLength(1);
+    expect(migrationSql).not.toMatch(/DROP|DELETE|UPDATE|ALTER TABLE/i);
+  });
+});
+
+describe("categories and incident catalog (T3.1.1)", () => {
+  const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+    /^0010_.*\.sql$/.test(name)
+  );
+
+  it("declares the incident catalog with a unique slug and no invented format rules", () => {
+    const config = getTableConfig(incidentTypes);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("id")?.hasDefault).toBe(true);
+    expect(columns.get("name")?.notNull).toBe(true);
+    expect(columns.get("slug")?.notNull).toBe(true);
+    for (const optional of ["icon", "color", "description"]) {
+      expect(columns.get(optional)?.notNull, optional).toBe(false);
+    }
+    // `created_at` is NOT NULL with a default (tightened by 0011) because the shared response schemas
+    // require `createdAt`; a nullable column there leaks a `Date | null` no route can answer with.
+    expect(columns.get("created_at")?.hasDefault).toBe(true);
+    expect(columns.get("created_at")?.notNull).toBe(true);
+    expect(config.uniqueConstraints.map(({ name }) => name)).toEqual(["incident_types_slug_unique"]);
+    expect(config.checks).toHaveLength(0);
+    expect(config.foreignKeys).toHaveLength(0);
+  });
+
+  it("declares a category as a name plus membership, nothing else", () => {
+    const config = getTableConfig(categories);
+    expect(config.columns.map((column) => column.name)).toEqual(["id", "name", "description", "created_at"]);
+    expect(config.columns.find((column) => column.name === "created_at")?.notNull).toBe(true);
+    expect(config.indexes).toHaveLength(0);
+    expect(config.foreignKeys).toHaveLength(0);
+  });
+
+  for (const [label, table, columns] of [
+    ["category_incident_types", categoryIncidentTypes, ["category_id", "incident_type_id"]],
+    ["category_users", categoryUsers, ["category_id", "user_id"]]
+  ] as const) {
+    it(`makes ${label} a composite-key pivot whose rows die with either side`, () => {
+      const config = getTableConfig(table);
+      expect(config.uniqueConstraints).toHaveLength(0);
+      expect(config.indexes).toHaveLength(0);
+      expect(config.primaryKeys.map((key) => key.name)).toEqual([`${label}_pkey`]);
+      // Both halves cascade: the row is a pairing, so it cannot outlive either side, and a stale pairing
+      // would keep a deleted incident type answering a live category (or a deleted user in a group).
+      expect(config.foreignKeys).toHaveLength(2);
+      for (const fk of config.foreignKeys) {
+        expect(fk.onDelete).toBe("cascade");
+        expect(fk.onUpdate).toBe("no action");
+      }
+      // Exactly two NOT NULL columns and no defaults: a membership row is always written on purpose,
+      // never implied by an insert (T3.1.4 starts every account in no category).
+      expect(config.columns.map((column) => column.name)).toEqual([...columns]);
+      expect(config.columns.filter((column) => column.notNull).map((column) => column.name)).toEqual([...columns]);
+      expect(config.columns.some((column) => column.hasDefault)).toBe(false);
+    });
+  }
+
+  it("tightens the catalog timestamps to NOT NULL, backfilling before the constraint", () => {
+    const names = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((n) => /^0011_.*\.sql$/.test(n));
+    expect(names).toHaveLength(1);
+    const name = names[0];
+    if (!name) throw new Error("The catalog timestamp migration is missing.");
+    const sqlText = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    for (const table of ["categories", "incident_types"]) {
+      // Without the backfill, `SET NOT NULL` fails outright on a database that already has rows.
+      expect(sqlText, table).toContain(`UPDATE "${table}" SET "created_at" = now() WHERE "created_at" IS NULL`);
+      expect(sqlText, table).toContain(`ALTER TABLE "${table}" ALTER COLUMN "created_at" SET NOT NULL`);
+      expect(sqlText.indexOf(`UPDATE "${table}"`), table).toBeLessThan(sqlText.indexOf(`ALTER TABLE "${table}"`));
+    }
+  });
+
+  it("ships the four tables as one generated migration, with the pivots' keys and cascades", () => {
+    expect(migrationNames).toHaveLength(1);
+    const name = migrationNames[0];
+    if (!name) throw new Error("The categories/incident-types migration is missing.");
+    const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    for (const table of ["incident_types", "categories", "category_incident_types", "category_users"]) {
+      expect(sql, table).toContain(`CREATE TABLE "${table}"`);
+    }
+    expect(sql).toContain('CONSTRAINT "incident_types_slug_unique" UNIQUE("slug")');
+    expect(sql).toContain('CONSTRAINT "category_users_pkey" PRIMARY KEY("category_id","user_id")');
+    expect(sql).toContain('CONSTRAINT "category_incident_types_pkey" PRIMARY KEY("category_id","incident_type_id")');
+    for (const fk of [
+      '"category_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade',
+      '"category_users_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade',
+      '"category_incident_types_category_id_categories_id_fk" FOREIGN KEY ("category_id") REFERENCES "public"."categories"("id") ON DELETE cascade',
+      '"category_incident_types_incident_type_id_incident_types_id_fk" FOREIGN KEY ("incident_type_id") REFERENCES "public"."incident_types"("id") ON DELETE cascade'
+    ]) {
+      expect(sql, fk).toContain(fk);
+    }
+    // No membership is seeded by the DDL itself — T3.1.4 starts every account unassigned, so the only
+    // defaults in this migration are the two `gen_random_uuid()` primary keys and `created_at`.
+    expect(sql).not.toMatch(/INSERT INTO "category_(users|incident_types)"/);
+    expect(sql.match(/DEFAULT gen_random_uuid\(\)/g) ?? []).toHaveLength(2);
+    expect(sql.match(/DEFAULT now\(\)/g) ?? []).toHaveLength(2);
+  });
+});
+
+describe("sos request table (T3.2.1)", () => {
+  const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+    /^0012_.*\.sql$/.test(name)
+  );
+
+  it("declares the request with its three owners and no cascades", () => {
+    const config = getTableConfig(sosRequests);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("requester_id")?.notNull).toBe(true);
+    expect(columns.get("incident_type_id")?.notNull).toBe(true);
+    expect(columns.get("location")?.getSQLType()).toBe("geography(Point,4326)");
+    expect(columns.get("location")?.notNull).toBe(true);
+    // The device may not know how accurate it is, and a photo is optional until T3.2.3 exists.
+    expect(columns.get("accuracy")?.notNull).toBe(false);
+    expect(columns.get("photo_url")?.notNull).toBe(false);
+    for (const name of ["is_manual", "status", "created_at"]) {
+      expect(columns.get(name)?.notNull, name).toBe(true);
+      expect(columns.get(name)?.hasDefault, name).toBe(true);
+    }
+    expect(config.foreignKeys).toHaveLength(3);
+    // No cascade anywhere on this table: an account being deleted must not erase that somebody asked for
+    // help, and an incident type must not be deletable out from under a request naming it.
+    for (const fk of config.foreignKeys) {
+      expect(fk.onDelete).toBe("no action");
+    }
+    expect(config.indexes).toHaveLength(0);
+    expect(config.uniqueConstraints).toHaveLength(0);
+  });
+
+  it("restates the body's own bounds as database checks, so no row can exist that the API would refuse", () => {
+    const config = getTableConfig(sosRequests);
+    const names = config.checks.map(({ name }) => name);
+    expect(names).toEqual([
+      "sos_requests_severity_check",
+      "sos_requests_description_length_check",
+      "sos_requests_status_check"
+    ]);
+    // A cancellation cross-check belongs to T3.6, where §11.7C's rule is being implemented; guessing it
+    // here would make this table the authority on a decision that task has not made yet.
+    expect(names.filter((name) => name.includes("cancellation"))).toEqual([]);
+  });
+
+  it("generates the DDL the diagram describes", () => {
+    expect(migrationNames).toHaveLength(1);
+    const name = migrationNames[0];
+    if (!name) throw new Error("The sos_requests migration is missing.");
+    const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    expect(sql).toContain('CREATE TABLE "sos_requests"');
+    // Bare, not quoted: `"geography(Point,4326)"` is one identifier to Postgres, and a fresh database
+    // answered it with `42704: type "geography(Point,4326)" does not exist` on 2026-10-23. The assertion
+    // used to pin that broken spelling, which is how it survived review — a test that restates a reviewed
+    // line protects the line, not the intent. scripts/test_migration_sql.py now rejects the quoted form
+    // across the whole folder and ties this column to the string schema.ts's geographyPoint returns.
+    expect(sql).toContain('"location" geography(Point,4326) NOT NULL');
+    expect(sql).toContain("\"status\" text DEFAULT 'pending' NOT NULL");
+    expect(sql).toContain('"is_manual" boolean DEFAULT false NOT NULL');
+    expect(sql).toContain('"created_at" timestamp with time zone DEFAULT now() NOT NULL');
+    expect(sql).toContain('CONSTRAINT "sos_requests_description_length_check" CHECK (char_length("description") BETWEEN 10 AND 500)');
+    expect(sql).toContain(
+      `CONSTRAINT "sos_requests_status_check" CHECK ("status" IN ('pending', 'dispatched', 'accepted', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired', 'completed'))`
+    );
+    for (const fk of [
+      '"sos_requests_requester_id_users_id_fk" FOREIGN KEY ("requester_id") REFERENCES "public"."users"("id") ON DELETE no action',
+      '"sos_requests_incident_type_id_incident_types_id_fk" FOREIGN KEY ("incident_type_id") REFERENCES "public"."incident_types"("id") ON DELETE no action',
+      '"sos_requests_cancellation_reason_id_cancellation_reasons_id_fk" FOREIGN KEY ("cancellation_reason_id") REFERENCES "public"."cancellation_reasons"("id") ON DELETE no action'
+    ]) {
+      expect(sql, fk).toContain(fk);
+    }
+    // The nearest-responder index (T3.3.1) is a measured decision for that query, not a guess here.
+    expect(sql).not.toContain("CREATE INDEX");
+    expect(sql).not.toContain("GIST");
   });
 });

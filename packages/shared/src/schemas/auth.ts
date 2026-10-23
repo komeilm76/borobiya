@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { idSchema, usernameSchema } from "./common";
-import { authUserSchema, registeredUserSchema } from "./user";
+import { MAX_USER_DEVICE_NAME_LENGTH, authUserSchema, registeredUserSchema } from "./user";
 
 export const passwordSchema = z
   .string()
@@ -50,7 +50,13 @@ export type SecurityQuestionsResponse = z.infer<typeof securityQuestionsResponse
 export const loginSchema = z.strictObject({
   username: usernameSchema,
   // Login checks the stored credential; bound it to the largest password accepted at creation/reset.
-  password: z.string().min(1).max(1024)
+  password: z.string().min(1).max(1024),
+  /**
+   * Optional platform-reported label for the Active Devices table (spec §7.3), e.g. "Samsung S23"
+   * from a Capacitor build. Web clients omit it and the server derives a short label from the
+   * `User-Agent` instead, so the column never holds a raw UA string.
+   */
+  deviceName: z.string().trim().min(1).max(MAX_USER_DEVICE_NAME_LENGTH).optional()
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 

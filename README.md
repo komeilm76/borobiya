@@ -264,6 +264,7 @@ Map Server is a **completely separate service** responsible for:
   ```env
   LOCATION_HISTORY_RETENTION_DAYS=90   # after 90 days, data is pruned
   LOCATION_HISTORY_MAX_SHARE_DAYS=30   # user cannot share >30 days at once
+  LOCATION_HISTORY_READ_POINTS=1000    # points a history read returns when the grant sets no maxPoints
   ```
   - Background job daily prunes `location_history` where `createdAt < now - RETENTION`.
 
@@ -813,7 +814,7 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   bun --filter @borobiya/client generate:api
   ```
 - The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/`. Set `API_OPENAPI_URL` or `ZOPIA_OUTPUT_DIR` to override those defaults.
-- All shared API contracts appear in OpenAPI. Runtime handlers include `GET /_public/health`, `GET /_public/security-questions`, the registration/login/refresh/logout/forgot-password routes, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` plus `POST /_user/complete-security-questions`. The client includes login, registration, recovery, onboarding, and route guards; remaining operations are marked `contract-only` and return 404 until implemented.
+- All shared API contracts appear in OpenAPI. Runtime handlers include `GET /_public/health`, `GET /_public/security-questions`, the registration/login/refresh/logout/forgot-password routes, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, `GET /_user/users/search` (term-bounded username search), the admin incident-type catalog (`GET`/`POST /_admin/incidents`, `PATCH /_admin/incidents/:id`) with responder categories and membership (`GET`/`POST /_admin/categories`, `PATCH /_admin/categories/:id`, `POST`/`DELETE /_admin/categories/:id/users`), and the whole `/_user/location` surface — live share create/revoke/list, `location:update` over Socket.IO with its deprecated REST fallback, and history grant create/list/read/delete with windowed reads. On the SOS side, `POST /_user/sos/requests` is live (severity, 10–500 character description, an incident type from the admin catalog, and a GPS fix or a manually placed pin, throttled to 3 per minute per account), and so is `POST /_user/sos/requests/:id/photo` — one `photo` part, `SOS_PHOTO_MAX_SIZE_MB` (5 MB by default) judged from the bytes rather than the name, stored on the `UPLOAD_DIR` volume under a server-chosen name, and re-pointed by a statement that only the requester's own request satisfies. The photo cannot be read back yet (`GET /uploads/:id` is T3.2.6: a browser sends no bearer token with an `<img>`, and the spec does not say what should authorize one instead); the list, detail and cancel routes are not implemented. The client includes login, registration, recovery, onboarding, the admin catalog screens for incident types and responder categories (T3.1.5, including the add-members dialog), and the route guards; remaining operations are marked `contract-only` and return 404 until implemented.
 - Benefits:
   - No manual duplication of types between server/client
   - Instant break detection if backend changes contract
@@ -871,7 +872,9 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
 ```env
 LOCATION_HISTORY_RETENTION_DAYS=90
 LOCATION_HISTORY_MAX_SHARE_DAYS=30
+LOCATION_HISTORY_READ_POINTS=1000
 SOS_PHOTO_MAX_SIZE_MB=5
+UPLOAD_DIR=data/uploads           # SOS photo volume (SECURITY §9); containers use an absolute path
 SOS_REQUEST_AUTO_EXPIRE_HOURS=24  # if no rescuer accepted, auto-expire
 MISSION_STATUS_TIMEOUT_HOURS=6     # if rescuer stuck in on_the_way too long, alert admin
 ```
@@ -1050,10 +1053,10 @@ MAP_REGION_IDS=ir-tehran
 MAP_REGION=borobiya
 MAP_BBOX=51.0,35.5,51.7,35.9
 MAP_DATA_VERSION=2026-10-18
+MAP_PLANETILER_SOURCES_DIR=   # blank = <map-library>/planetiler-sources; Planetiler's reference layers are cached once per library
 MAP_MIN_ZOOM=0
 MAP_MAX_ZOOM=14
-MAP_STYLE_LIGHT=http://localhost:8000/style/light
-MAP_STYLE_DARK=http://localhost:8000/style/dark
+# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
 MAP_ROUTING_URL=http://localhost:8001/route
 MAP_GEOCODE_URL=http://localhost:8001/geocode
 MAP_REVERSE_URL=http://localhost:8001/reverse
@@ -1101,4 +1104,4 @@ stateDiagram-v2
 ---
 
 **This document is the single source of truth for initial documentation and development of Borobiya. Use it as the prompt for AI Assistant to generate docs, structure, and tasks.**
-```
+````

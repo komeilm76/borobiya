@@ -116,6 +116,95 @@ test("reports local OSRM unavailability as 503", async () => {
   assert.deepEqual(await response.json(), { error: "routing_unavailable", profile: "car" });
 });
 
+test("names the upstream status and code when OSRM answers an error without a message", async () => {
+  const lines = [];
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => new Response('{"code":"InvalidValue"}', { status: 400 }),
+    log: (line) => lines.push(line)
+  });
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.error, "routing_failed");
+  assert.equal(body.profile, "car");
+  assert.equal(body.upstream, "osrm-car:5000/route/v1/car");
+  assert.equal(body.upstream_status, 400);
+  assert.equal(body.upstream_code, "InvalidValue");
+  assert.match(body.message, /error and no message/);
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /car routing: upstream osrm-car:5000\/route\/v1\/car answered HTTP 400 code=InvalidValue/);
+});
+
+test("forwards OSRM's own message instead of the canned one", async () => {
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => new Response(
+      '{"code":"InvalidValue","message":"Failed to find near matching edges for start point"}',
+      { status: 400, headers: { "content-type": "application/json" } }
+    ),
+    log: () => {}
+  });
+  const body = await response.json();
+  assert.equal(body.error, "routing_failed");
+  assert.equal(body.message, "Failed to find near matching edges for start point");
+  assert.equal(body.upstream_code, "InvalidValue");
+});
+
+test("shows an excerpt when the upstream answers with something that is not JSON", async () => {
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => new Response("<html><body>Bad Gateway</body></html>", { status: 502 }),
+    log: () => {}
+  });
+  const body = await response.json();
+  assert.equal(body.error, "invalid_upstream_response");
+  assert.equal(body.upstream_status, 502);
+  assert.equal(body.upstream_body, "<html><body>Bad Gateway</body></html>");
+});
+
+test("treats a JSON scalar or array as an invalid upstream answer, not a crash", async () => {
+  for (const payload of ["null", "[]", '"busy"', "42"]) {
+    const response = await handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => new Response(payload, { status: 200, headers: { "content-type": "application/json" } }),
+      log: () => {}
+    });
+    assert.equal(response.status, 502, payload);
+    const body = await response.json();
+    assert.equal(body.error, "invalid_upstream_response", payload);
+    assert.equal(body.upstream_status, 200, payload);
+  }
+});
+
+test("flags an Ok reply that carries no routes array", async () => {
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => Response.json({ code: "Ok" }),
+    log: () => {}
+  });
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.error, "invalid_upstream_response");
+  assert.match(body.message, /without a routes array/);
+  assert.equal(body.upstream_status, 200);
+});
+
+test("truncates a huge non-JSON upstream body before echoing it", async () => {
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => new Response("x".repeat(5000), { status: 500 }),
+    log: () => {}
+  });
+  const body = await response.json();
+  assert.equal(body.upstream_body.length, 401); // 400 characters plus the ellipsis
+});
+
+test("logs the failure but keeps the 503 body fixed when the profile container is unreachable", async () => {
+  const lines = [];
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => { throw Object.assign(new Error("connect ECONNREFUSED 172.30.0.9:5000"), { name: "TypeError" }); },
+    log: (line) => lines.push(line)
+  });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "routing_unavailable", profile: "car" });
+  assert.match(lines[0], /no HTTP answer from http:\/\/osrm-car:5000\/route\/v1\/car/);
+  assert.match(lines[0], /TypeError: connect ECONNREFUSED/);
+});
+
 test("serves public map settings on GET /config", async () => {
   const mapConfig = {
     region: "tehran",

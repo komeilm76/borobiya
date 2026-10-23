@@ -52,11 +52,13 @@
 
         <div class="user-dashboard__map-caption" role="status">
           <v-icon icon="mdi-information-outline" size="19" />
-          <span>در این نسخه نقشهٔ پایه نمایش داده می‌شود؛ اشتراک موقعیت و نشانگرهای همراهان در گام‌های بعدی اضافه می‌شوند.</span>
+          <span>در این نسخه نقشهٔ پایه نمایش داده می‌شود؛ نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند.</span>
         </div>
       </v-card>
 
       <aside class="user-dashboard__side" aria-label="وضعیت امکانات بوروبیا">
+        <ShareLists ref="shareLists" @create="shareOpen = true" />
+
         <v-card class="user-dashboard__feature-card" elevation="0" rounded="xl">
           <v-chip class="user-dashboard__coming-soon" color="secondary" variant="tonal" size="small">
             در حال آماده‌سازی
@@ -66,14 +68,9 @@
           </div>
           <h2>همراهی، وقتی مهم است</h2>
           <p>
-            ابزارهای اشتراک امن موقعیت و هماهنگی امدادی به‌تدریج به این پیشخوان اضافه می‌شوند.
+            اشتراک موقعیت از همین‌جا باز می‌شود؛ درخواست و پیگیری امداد در گام بعدی اضافه می‌شود.
           </p>
           <div class="user-dashboard__feature-list">
-            <div>
-              <v-icon icon="mdi-crosshairs-gps" size="19" />
-              <span>اشتراک‌گذاری موقعیت</span>
-              <span class="user-dashboard__feature-state">به‌زودی</span>
-            </div>
             <div>
               <v-icon icon="mdi-ambulance" size="19" />
               <span>درخواست و پیگیری امداد</span>
@@ -82,21 +79,36 @@
           </div>
         </v-card>
 
-        <v-card class="user-dashboard__privacy-card" elevation="0" rounded="xl">
+        <v-card class="user-dashboard__note-card user-dashboard__devices-card" elevation="0" rounded="xl">
+          <v-icon icon="mdi-devices" size="23" />
+          <div>
+            <h2>دستگاه پخش‌کننده</h2>
+            <p>اگر با دو دستگاه وارد شده‌اید، مشخص کنید کدام موقعیت بفرستد — و هر وقت خواستید عوضش کنید.</p>
+          </div>
+          <v-btn class="user-dashboard__devices-link" size="small" variant="tonal" color="primary" to="/_user/devices">
+            دستگاه‌ها
+          </v-btn>
+        </v-card>
+
+        <v-card class="user-dashboard__note-card" elevation="0" rounded="xl">
           <v-icon icon="mdi-shield-check-outline" size="23" />
           <div>
             <h2>حریم خصوصی در اولویت است</h2>
-            <p>تا زمان فعال‌شدن اشتراک‌ها، هیچ موقعیت زنده‌ای در این نقشه نمایش داده نمی‌شود.</p>
+            <p>تا وقتی خودتان اشتراکی باز نکنید، هیچ موقعیت زنده‌ای دیده نمی‌شود. فهرست بالا همیشه از همین سرور خوانده می‌شود، نه از حافظهٔ مرورگر.</p>
           </div>
         </v-card>
       </aside>
     </div>
+
+    <ShareDialog v-model="shareOpen" @shared="onShared" />
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import ShareDialog from "@/components/sharing/ShareDialog.vue";
+import ShareLists from "@/components/sharing/ShareLists.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -105,6 +117,13 @@ const auth = useAuthStore();
 const theme = useThemeStore();
 const username = computed(() => auth.user?.username ?? "همراه");
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
+const shareOpen = ref(false);
+const shareLists = ref<InstanceType<typeof ShareLists> | null>(null);
+
+/** The dialog reports success after a 201; the lists re-read rather than patch local state. */
+function onShared(): void {
+  void shareLists.value?.refresh();
+}
 </script>
 
 <style scoped>
@@ -167,7 +186,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 
 .user-dashboard__map-card,
 .user-dashboard__feature-card,
-.user-dashboard__privacy-card {
+.user-dashboard__note-card {
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
   box-shadow: 0 12px 34px rgba(25, 53, 54, 0.055);
@@ -189,7 +208,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 
 .user-dashboard__card-header h2,
 .user-dashboard__feature-card h2,
-.user-dashboard__privacy-card h2 {
+.user-dashboard__note-card h2 {
   margin: 0;
   color: #193536;
   font-size: 1.08rem;
@@ -300,7 +319,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
   white-space: nowrap;
 }
 
-.user-dashboard__privacy-card {
+.user-dashboard__note-card {
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
@@ -309,16 +328,21 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
   background: rgba(52, 124, 97, 0.07);
 }
 
-.user-dashboard__privacy-card > .v-icon {
+.user-dashboard__devices-link {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.user-dashboard__note-card > .v-icon {
   flex: 0 0 auto;
   margin-top: 0.1rem;
 }
 
-.user-dashboard__privacy-card h2 {
+.user-dashboard__note-card h2 {
   font-size: 0.87rem;
 }
 
-.user-dashboard__privacy-card p {
+.user-dashboard__note-card p {
   margin: 0.25rem 0 0;
   color: #627a7a;
   font-size: 0.76rem;
@@ -333,7 +357,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 :global(:root.dark) .user-dashboard h1,
 :global(:root.dark) .user-dashboard__card-header h2,
 :global(:root.dark) .user-dashboard__feature-card h2,
-:global(:root.dark) .user-dashboard__privacy-card h2 {
+:global(:root.dark) .user-dashboard__note-card h2 {
   color: #edf5f2;
 }
 
@@ -341,7 +365,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 :global(:root.dark) .user-dashboard__card-header p,
 :global(:root.dark) .user-dashboard__feature-card > p,
 :global(:root.dark) .user-dashboard__map-caption,
-:global(:root.dark) .user-dashboard__privacy-card p {
+:global(:root.dark) .user-dashboard__note-card p {
   color: #a0b6b2;
 }
 
@@ -368,12 +392,12 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
   color: #c1d2cd;
 }
 
-:global(:root.dark) .user-dashboard__privacy-card {
+:global(:root.dark) .user-dashboard__note-card {
   color: #6bbe93;
   background: rgba(107, 190, 147, 0.1);
 }
 
-:global(:root.dark) .user-dashboard__privacy-card p {
+:global(:root.dark) .user-dashboard__note-card p {
   color: #a0b6b2;
 }
 

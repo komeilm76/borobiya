@@ -1,6 +1,6 @@
 # Borobiya — API Specification
 
-> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, and authenticated `GET /_user/me` + `POST /_user/complete-security-questions`; other documented operations remain contract-only and return 404 until implemented.
+> TL;DR: REST + Socket.IO. Routes use `_auth`, `_public`, `_user`, and `_admin` prefixes with access metadata. Shared Zod descriptors feed Swagger at `/docs` + `/docs/json`. Runtime handlers include public health/security-question catalog, `POST /_auth/{register,login,refresh,logout,forgot-password/*}`, admin-only `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status`, authenticated `GET /_user/me` + `POST /_user/complete-security-questions` + `GET /_user/devices`, the admin incident-type and responder-category catalogs including member assignment (`/_admin/incidents`, `/_admin/categories`), and the whole `/_user/location` surface (live share create/revoke/list, history grant create/list/read/delete, the windowed own-history read, and the deprecated REST fallback); other documented operations remain contract-only and return 404 until implemented.
 
 ---
 
@@ -13,7 +13,7 @@ Route: http://localhost:8001/route      (OSRM adapter; graphs are built locally 
 Map config: GET /map-config              (region, bounds, version, and zoom range)
 Swagger UI:   GET /docs
 OpenAPI JSON: GET /docs/json
-Health:       GET /_public/health      → { status: "ok", uptime, version }
+Health:       GET /_public/health      → { status: "ok", uptime, version }   (the one route the global throttle skips)
 ```
 
 The OpenAPI document uses `/` for a directly exposed API and `/api` first when served by Compose through Nginx (with `/` retained as the direct-port alternative). Configure `OPENAPI_SERVER_PATH` when a gateway uses a different prefix.
@@ -24,6 +24,22 @@ Authorization: Bearer <accessToken>   // for _user & _admin
 Content-Type: application/json
 X-Map-Data-Version: development       // reserved optional version pin; not currently enforced
 ```
+
+Caching and throttling are defaults rather than per-route habits:
+
+- Every response carries `cache-control: no-store`, applied by an `onSend` hook in `plugins/security.ts` so
+  it also covers replies no handler produced — a throttled `429`, Fastify's `404` for an unknown path, and the
+  `401` the `/_user` hook returns before routing. A handler that sets its own `cache-control` still wins, which
+  makes `GET /_public/security-questions` (`public, max-age=3600`) the only deliberately cacheable response in
+  the API. The per-route `no-store` calls elsewhere are kept as documentation of intent, not as the mechanism.
+- The global request throttle (`RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS`, per client IP once `TRUSTED_PROXY_IPS`
+  is configured) covers every route **except** `GET /_public/health`: an orchestrator must never be able to
+  mistake a busy-but-healthy instance for a dead one, which is what happens when the probe that decides whether
+  to restart a container starts answering `429` during a load spike. The exemption is one descriptor field,
+  `ApiRouteMeta.rateLimitExempt`, read both by `app.ts` (which sets the route's `rateLimit: false`) and by the
+  OpenAPI generator (which then does not attach its implicit `429` to that operation) — so the contract cannot
+  advertise an error the runtime is unable to produce. `/docs` and `/docs/json` remain throttled: they are
+  developer surfaces, not liveness probes.
 
 Error shape (uniform):
 
@@ -81,7 +97,7 @@ The handler verifies the five question IDs against the seeded catalog, hashes th
 ### 3.2 POST `/_auth/login`
 
 ```text
-Request: { username, password }
+Request: { username, password, deviceName? }
 Browser (Origin header) 200: { accessToken, user } + Set-Cookie refreshToken
 Native (no Origin header) 200: { accessToken, refreshToken, user } (store refreshToken in secure storage)
 400: { code: "VALIDATION_ERROR" }
@@ -90,7 +106,8 @@ Native (no Origin header) 200: { accessToken, refreshToken, user } (store refres
 429: { code: "RATE_LIMITED" }
 ```
 
-The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login accepts existing credentials without reapplying the new-password letter/digit rule, but caps the submitted password at 1024 characters. It returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
+The refresh cookie is `HttpOnly; Secure; SameSite=Lax` and expires after 7 days; its default browser path follows the login URL, so it works both at the direct API path and behind the `/api` gateway prefix. Browser requests are distinguished by their `Origin` header; native clients omit it and receive the refresh token only in the response body. Login accepts existing credentials without reapplying the new-password letter/digit rule, but caps the submitted password at 1024 characters.
+`deviceName` (1–100 characters, trimmed) is an optional platform label for the Active Devices table — a Capacitor build can send `"Samsung S23"`. Web clients omit it and the server summarizes the `User-Agent` instead (`"Chrome on Windows"`, `"Safari on iPhone"`, `"Microsoft Edge on Windows"`); a UA that matches no known browser or platform stores `null`, because the column is user-visible text, not an archive of client detail. It returns `user.mustCompleteSecurityQuestions` with tokens so an admin-created account can authenticate to the required onboarding route; T1.2.6 will gate other `/_user` operations until completion. A suspended account currently returns a generic `ACCOUNT_SUSPENDED` error because suspension expiry/reason columns are future schema work.
 
 Rate: 5/15m per `ip+username`.
 
@@ -191,11 +208,13 @@ No auth required; may include `X-User-Id` personalization if token present (opti
 ```
 GET    /_user/me                         → { id, username, role, isActive, avgRating, mustComplete..., createdAt }
 PATCH  /_user/me                         Body { username? } // limited fields
-GET    /_user/devices                    → [{ id, deviceName, ip, isCurrentDevice, lastActiveAt, isOnline }]
+GET    /_user/devices                    → [{ id, deviceId, deviceName, ip, isCurrentDevice, lastActiveAt, isOnline }]
 POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ```
 
 `POST /_user/complete-security-questions` requires an access JWT backed by a matching unrevoked session, five unique question IDs from the seeded catalog, and non-empty answers. The server stores `trim().toLowerCase()` Argon2id answer hashes and atomically clears `mustCompleteSecurityQuestions`; it returns `409 SECURITY_QUESTIONS_ALREADY_COMPLETED` rather than replacing answers if onboarding is already complete. While the flag is true, the user authorization hook returns `403 SECURITY_QUESTIONS_REQUIRED` for every other registered `/_user` route. The same hook returns `401 INVALID_ACCESS_TOKEN` when logout, password reset, or admin action revoked the persisted session, immediately invalidating any access JWT from it. `GET /_user/me` returns the current profile with `Cache-Control: no-store` after onboarding; incomplete accounts receive the security-question gate response. Other `_user` operations shown here remain contract-only.
+
+**`GET /_user/devices` (T2.3.2, live).** Returns the caller's **live sessions** — rows of `user_sessions` that still hold a refresh token — newest `lastActiveAt` first, capped at `MAX_USER_DEVICE_LIST_ITEMS` (50), with `Cache-Control: no-store`. `id` is the session row and `deviceId` is the value `location_shares.priorityDeviceId` pins (T2.3.3), so the picker offers exactly the ids the server accepts; exactly one row has `isCurrentDevice: true` because the `/_user` hook already rejects a revoked or missing session. `deviceName` is the label described in §3.2 and `ip` is the address seen at the last credential exchange (login or refresh rotation). Logged-out and admin-revoked sessions are excluded rather than listed as offline history, since sessions have no retention job of their own; `isOnline` still mirrors session liveness and will only differentiate once socket presence (T2.1.5) drives it.
 
 ### 5.2 User Search
 
@@ -206,23 +225,70 @@ GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=dista
 
 `online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting may use the authenticated user's last known location.
 
+**Live for the share picker (T2.1.7's prerequisite; T4.1.1's first slice).** This build answers a term-bounded search and refuses the rest rather than quietly ignoring filters:
+- `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and no index backs `ILIKE '%x%'` yet — trigram/prefix indexing and index-backed term-free browsing belong to T4.1.1.
+- The caller's own account is never a candidate, in the page or in its `total`: `POST /_user/location/share` refuses it (`self_target`), so a list that offered it could only produce an error the user cannot act on. The dialog still greys it out when it happens to see it (a cached list from before a profile load), but that is presentation, not the rule.
+- `minRating` and `online` are honored: unrated accounts count as 0 (a quality floor should not be satisfied by an absence of data), and liveness is the same rule the device list uses — a session still holding a refresh token.
+- `category` and `incidentType` answer `400 SEARCH_FILTER_UNSUPPORTED` listing the offending names, because the search read does not join `categories`/`category_users`/`category_incident_types` yet — the tables arrived with T3.1.1, the projection is a later task, and refusing beats returning unfiltered rows under a filter the caller believes was applied. An empty-string `category=` is treated as absent.
+- `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix. `total` counts the filtered set in its own statement: page and total are not read in one transaction, so on a busy instance they can differ by whoever signed up in between.
+- `sort` accepts only `distance`, so it needs no refusal; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
+
+`Cache-Control: no-store`, because the answer depends on who is asking and where they last were.
+
 ### 5.3 Location Sharing
 
 ```
-POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note? }
-→ 201 { shareId, expiresAt? }
-DELETE /_user/location/share/:shareId    → 200 (immediate revoke)
-GET    /_user/location/shares            → { owned: [], sharedWithMe: [] }
+POST   /_user/location/share             { targetUserIds: string[], mode:"timed"|"permanent", durationMinutes?: number, note?, priorityDeviceId?: string }
+→ 201 { shares: LocationShare[], createdShareIds: string[], reusedShareIds: string[] }
+DELETE /_user/location/share/:shareId    → 200 empty body (immediate revoke)
+GET    /_user/location/shares            → { owned: (LocationShare & { targetUsername })[], sharedWithMe: (LocationShare & { owner })[] }
 
 POST   /_user/location/history/share     { targetUserIds, from: ISO, to: ISO, maxPoints? }
-→ 201 { shareId }
-GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp}] } // own history
-GET    /_user/location/history/shared/:shareId → polyline for receiver
+→ 201 { shares: LocationHistoryShare[], createdShareIds: string[], reusedShareIds: string[] }
+GET    /_user/location/history?from=&to= → { points: [{lat,lon,timestamp,accuracy?}], totalPoints } // own history
+GET    /_user/location/history/shares    → { owned: (LocationHistoryShare & { targetUsername })[], sharedWithMe: (LocationHistoryShare & { owner })[] }
+GET    /_user/location/history/shared/:shareId → the granted window, same shape as above
+DELETE /_user/location/history/share/:shareId → 200 empty body (the grant row is deleted)
 
-POST   /_user/location/update            deprecated in favor of Socket location:update; REST fallback
+POST   /_user/location/update            deprecated REST fallback for Socket `location:update` (live)
 ```
 
-Retain ENV limits: `from-to <= MAX_SHARE_DAYS`, else `400 SHARE_RANGE_TOO_LARGE`.
+**Client use (T2.1.7, live).** `packages/client/src/api/location.ts` is the only caller of these routes; `ShareDialog.vue` posts a share (with `priorityDeviceId` only while the `409` chooser is open) and `ShareLists.vue` reads both directions, so a browser never guesses at a shape the shared schemas already define.
+
+**`GET /_user/location/shares` (T2.1.4, live).** Both lists contain only **active** shares — `isRevoked = false` and either permanent or still inside `expiresAt` — newest first, capped at the 100 most recent rows per list (`MAX_LOCATION_SHARE_LIST_ITEMS`). `owned` rows are the caller's outgoing shares; `sharedWithMe` rows are incoming shares and each one carries `owner: { id, username, lastLocation }`, where `lastLocation` is the owner's last server-known WGS84 position (`{ lat, lon }`, `null` before the first update) so a receiver can render a marker without a second request. Since P2-Q1, `owned` rows also carry `targetUsername: string | null` — the *other* party's name for the same reason `sharedWithMe` carries `owner.username`: a list of uuids does not answer "who can see me right now". It is nullable and read with a **left** join on purpose: a share whose target row cannot be read still has to appear, because that row is how the owner revokes it. `POST /_user/location/share` does not answer with the label (its schema is strict), so a client must not expect it there. Responses are `Cache-Control: no-store`.
+
+**`DELETE /_user/location/share/:shareId` (T2.1.3, live).** Owner-only and immediate: the row keeps existing for audit but `isRevoked=true` makes it invisible to every reader, including the receiver's live update path. A non-UUID id is `400 VALIDATION_ERROR`; an unknown id or a share owned by another account is `404 SHARE_NOT_FOUND` with the same message, so the endpoint never confirms that somebody else owns it. Revoking an already-revoked id repeats `200` with an empty body, which keeps client retries idempotent. Responses are `Cache-Control: no-store`.
+
+**`POST /_user/location/history/share` (T2.2.3, live).** Grants one fixed window of the caller's stored history to 1–50 unique recipients. Limits: the window may span at most `LOCATION_HISTORY_MAX_SHARE_DAYS` — checked here rather than in the schema because it is configuration, and over that bound the answer is `400 SHARE_RANGE_TOO_LARGE` with `issues: [{ code: "range_too_large", maxShareDays, requestedDays, path: ["to"] }]` and nothing written — and `maxPoints` is an integer from 1 to `MAX_LOCATION_HISTORY_SHARE_POINTS` (10000), stored on the grant so every receiver of that window reads it at the same density — the receiver's read takes no sampling parameter, and the owner changes the density by re-posting the same window with a new value, which the reuse path applies. Recipients are validated as a batch with the identical live-share rule, issue codes (`self_target`, `unknown_target`, `unavailable_target`) and `["targetUserIds", index]` paths; one unusable recipient rejects the whole request. A repeat of the same owner/target/`from`/`to` reuses the existing grant — the unique index over exactly those columns *is* the duplicate rule — and rewrites only `maxPoints`, including back to `null` when the repeat states no preference.
+
+Two properties follow from the shape of a history grant and are worth stating plainly: it needs **no priority device** (it replays rows the server already stored, so there is nothing to broadcast, and `priorityDeviceId` is not part of this payload), and it **does not expire** — it lasts until the retention prune removes the points underneath it, which is also why a window that no longer contains any point is created normally instead of being refused, and reads back as no points. `DELETE /_user/location/history/share/:shareId` (T2.2.4, live) is that real `DELETE`: unlike `location_shares`, this table keeps no `is_revoked` flag. Responses are `Cache-Control: no-store`.
+
+**History reads (T2.2.4, live).** A window read is `[from, to)` on the observation `timestamp` — the same half-open convention the shared range check uses — and returns at most the grant's `maxPoints` points, oldest first, or `LOCATION_HISTORY_READ_POINTS` when the grant stores none. The ceiling and the total are decided in one statement: `row_number()` and `count(*) OVER ()` are computed over the rows the `(user_id, timestamp)` index already yields, so a 30-day window never travels to Node just to be thrown away; the response's `totalPoints` says how many rows the window holds, which is how a player tells a sampled view from the complete record.
+
+- `GET /_user/location/history` reads the caller's own rows and requires explicit `from`/`to` (a 90-day retention default would silently hide how much was omitted). Sampling uses the configured default, because your own history has no grant to carry a target.
+- `GET /_user/location/history/shared/:shareId` reads one grant the caller *received*. Nothing about the window or the density is a query parameter: the grant fixes both, so a receiver cannot widen what they were given, and every receiver of one grant sees the same view. A grant id that does not exist and one belonging to a different receiver answer identically with `404 SHARE_NOT_FOUND`, since this is the only endpoint that can probe whether another account shares history with anybody.
+- `GET /_user/location/history/shares` lists both directions newest first, capped at `MAX_LOCATION_SHARE_LIST_ITEMS` per list, and is how a receiver learns an id in the first place. Nothing is filtered out: a grant has no expiry and no revoked state, so the list is whatever the account holds. `sharedWithMe` rows carry `owner: { id, username }` — deliberately not `lastLocation`, which a history grant never authorizes. `owned` rows carry `targetUsername` under the same left-join rule as the live list.
+- `DELETE /_user/location/history/share/:shareId` is owner-only and immediate: the row goes away and the receiver's next read answers `404`. It does not recall points the receiver already loaded, and repeating the delete answers `404` (unlike the live revoke, which repeats `200`, there is no retained row to be idempotent about).
+
+**Expiry & retention (T2.1.6 + T2.2.5, live).** No HTTP surface: a maintenance timer inside the API process retires
+`location_shares` rows with `expiresAt <= now` by setting `isRevoked = true` (checked every 15s, at least once a minute,
+plus one catch-up pass on startup). Clients see no new status or error code — a share stops being readable the moment its
+`expiresAt` passes, because every reader filters on `expiresAt > now`, and the sweep only makes that state permanent and
+visible in the table. Practical consequences for clients:
+
+- `GET /_user/location/shares` stops listing the row at the deadline itself, not at the sweep — the list has always filtered on `expiresAt > now`.
+- `DELETE /_user/location/share/:shareId` on an expired id still answers `200` (the row exists and stays owner-addressable, only already inactive).
+- Re-sharing with the same target after expiry creates a **new** row (`createdShareIds`) instead of reusing the retired one, because reuse only considers active shares.
+
+History retention is enforced by the same scheduler once a day: `location_history` rows with
+`created_at < now - LOCATION_HISTORY_RETENTION_DAYS` are deleted in batches of 5,000 (max 40 batches per pass), so a window
+requested near the retention edge can legitimately return fewer points than expected. `LOCATION_HISTORY_MAX_SHARE_DAYS` is
+validated at startup to be ≤ `LOCATION_HISTORY_RETENTION_DAYS`; the per-request `400 SHARE_RANGE_TOO_LARGE` check above is
+part of T2.2.3.
+
+**`POST /_user/location/share` (T2.1.2, live).** Requires the same verified `/_user` access token, active account, and completed-onboarding state as every other user route. Limits: 1-50 unique recipients, `durationMinutes` an integer from 1 to 43200 (30 days, required only for `timed`), and `note` up to 500 characters. Recipients are validated as a batch: the owner's own account, unknown ids, and inactive or suspended accounts are rejected with `400 VALIDATION_ERROR` and `issues[].code` of `self_target`, `unknown_target`, or `unavailable_target`, each with `issues[].path` set to the body path of the offending element (`["targetUserIds", index]`, the shape every other issue in the response uses) so a client can name the person it refused instead of reporting a form-wide error; nothing is written when any recipient is rejected. On success all rows are written in one transaction and each response `shares[]` item follows `LocationShare` (`id`, `ownerId`, `targetUserId`, `mode`, `expiresAt`, `isRevoked`, `priorityDeviceId`, `note`, `createdAt`). A recipient has **one** active arrangement, whatever its mode: a repeated request for the same owner/target reuses that row (`reusedShareIds`) — a `timed` row is extended only forward (a shorter window is a revoke, not a side effect), a switch to `permanent` clears its `expiresAt`, and a switch to `timed` writes the new one — while `createdShareIds` is answered only when the pair has no active row at all. Any other active row for the same pair, left behind when reuse was keyed on mode, is revoked in that same transaction. Concurrent retries serialize on a transaction-scoped advisory lock per owner, so a double-tapped share button cannot create two active rows for one recipient. Responses are `Cache-Control: no-store`.
+
+**Priority device (T2.3.3, live).** `priorityDeviceId` names the device that will broadcast the position for these shares. When the account has exactly one device with a live session the server pins it itself, so a single-device account never has to choose and an omitted field is never a rejection. When it has more than one, the field is required: a share request without it is `409 PRIORITY_DEVICE_REQUIRED` with `issues: [{ code: "multiple_active_devices", deviceIds, path: ["priorityDeviceId"] }]` and nothing is written, so the client can open the chooser from that list and retry. That status is declared on the operation in the OpenAPI document, so a generated client types it as its own outcome rather than an opaque error. An id that is not one of the caller's live devices is `400 VALIDATION_ERROR` with the issue code `unknown_priority_device`; a malformed id is rejected by `shareSchema` before any device lookup. The pin is stored per share row, and a repeated request for an existing share re-points it whenever the requested device differs — including on a permanent share, which otherwise never changes; `note` is still only rewritten together with an extension. Only devices with a live session can be pinned: signing out of the last one stops broadcasts by design, and because the expiry sweep re-points a share whose pinned device no longer has a session, a share is never stranded on a signed-out device while the account has exactly one live device left. The pin governs live broadcasting only: `location:update` (section 8) accepts a fix for the shares that pin the sender's device, while history shares need no selection because they replay rows the server already stored.
 
 ### 5.4 SOS — Requester Side
 
@@ -234,6 +300,23 @@ GET   /_user/sos/requests/:id
 POST  /_user/sos/requests/:id/cancel     { cancellationReasonId, customReason? }
 POST  /_user/sos/requests/:id/photo      multipart max 5MB → { photoUrl }
 ```
+
+**`POST /_user/sos/requests/:id/photo` (T3.2.3, live).** `multipart/form-data` with exactly one file part named `photo` and nothing else; `@fastify/multipart` runs with `files: 1`, `fields: 5`, `fileSize` = `SOS_PHOTO_MAX_SIZE_MB` × 1 MiB (README §14's knob, defaulting to spec §11.2's 5 MB — the shared `MAX_SOS_PHOTO_BYTES` is that default, not a second limit), and `throwFileSizeLimit` on so an oversized body never reaches the handler at all. The rules, in the order a request meets them:
+
+- `401` unless the caller passes the `/_user` guard (live session, active and unsuspended account, completed onboarding) — and `401` rather than `413` even for a 6 MB body, because the parser only claims the stream and the guard runs before the route would look at it. Past the guard, the route shares filing an SOS's budget (3 per minute per account, `SECURITY.md` §3) on its own counter, so a fourth photo in a minute is a `429` while an SOS can still be created.
+- `400 VALIDATION_ERROR` if the path segment is not a UUID, if the content type is not multipart (`expected_multipart`), if the body has no file (`no_file`), or if any part is named something other than `photo` (`unexpected_field`, `TOO_MANY_PARTS`). A wrongly named field is refused with both names in the message rather than chosen for the caller, and a stray `caption` is refused rather than dropped: losing a note about an emergency in silence is worse than a 400 that says where to put it.
+- `413 PHOTO_TOO_LARGE` above the configured ceiling. The message states that limit in MB — the *configured* one, so a deployment that set 2 MB reads 2 MB back — and does not ask the sender to compress a file the server has already measured.
+- `400 VALIDATION_ERROR` with `issues[].code` of `empty`, `too_large`, `unsupported_format`, or `truncated` and `path: ["photo"]` when the bytes themselves are wrong. `docs/SECURITY.md` §9 asks for magic-byte validation; `src/security/image-payload.ts` does it and is stricter than a header sniff — it requires the format's closing structure too, so a 40-byte file that starts with a PNG signature is `truncated` rather than stored. The declared `Content-Type` and the file name are never consulted, and the refusal names what arrived when it recognizes it (a GIF, a PDF, a ZIP, a `data:` URL, markup), because "unsupported format" is advice nobody can act on.
+- `404 SOS_REQUEST_NOT_FOUND` with one message for a request that does not exist and one owned by somebody else — the ownership test is folded into the `WHERE` of the update, so this route cannot walk the SOS table by probing ids. Only the requester may attach a photo to a request; a `200` for an admin's upload would put words in a survivor's mouth.
+- No rule about *when* a photo may arrive. The endpoint deliberately imposes none — not on `status`, not on `cancelled_at`, not one per request — for the same reason `POST /_user/sos/requests` invents no duplicate-suppression rule: nothing in spec §11.2, §11.7, or `SECURITY.md` §9 states one, and a policy invented here would be a promise the docs do not keep. A re-post therefore replaces which file the request points at (`photo_url` is one column), and the superseded bytes stay on the volume until a retention rule for orphans is written with the read route.
+
+On success the bytes are written into `UPLOAD_DIR` under a name the server chose — `<random uuid>.<png|jpg|webp>`, mode `0600`, staged as `<name>.<uuid>.part` and renamed, so a crash leaves a stray `.part` rather than a truncated photo that reads as a complete one, and a caller-supplied file name never reaches the filesystem at all. `sos_requests.photo_url` is set to `/uploads/<that name>`, the app-relative shape `SECURITY.md` §9 reserves for the read route, and the extension comes from the sniffed format rather than from anything the client sent. The response is `200 { photoUrl }` with `Cache-Control: no-store`, echoing the path the row holds rather than recomputing it. Two deliberate absences: **the photo is not readable over HTTP yet** (§9 explains why that is a security decision and not a leftover), and **`GET /uploads/:id` is not declared in the contract either** — §2's prefix law and `DEVELOPMENT.md`'s "declare it first, as contract-only" rule both want a descriptor, and this is the one endpoint where following that rule now would advertise an operation that cannot state its own authorization, so it stays out of the document until §9's decision is made; a test in `src/sos/photos.test.ts` pins that `GET /uploads/<file>` answers `404`, so mounting a static handler on the directory by accident cannot silently make every SOS photo public. A re-post replaces the URL the request points at and leaves the previous file on the volume; destroying a picture someone already submitted as evidence is not a decision this endpoint gets to make, and no orphan-retention rule exists yet.
+
+**`POST /_user/sos/requests` (T3.2.2, live).** Requires the same verified `/_user` access token, active and unsuspended account, and completed-onboarding state as every other user route, because dispatch is entitled to trust that the account behind a request exists and is in good standing — those checks run before the body is read. Everything the SOS form promises is enforced here as well, through `createSosRequestSchema`: `severity` is one of `low | medium | high`; `description` is trimmed and bounded at 10–500 characters, the same rule the table's own `CHECK` carries so no row can exist that the API would refuse to return; `incidentTypeId` is a UUID; and `location` is `{ lat ∈ [-90, 90], lon ∈ [-180, 180], accuracy? ≥ 0, isManual }`, where `isManual: true` is what a pin the human moved on the map looks like and an omitted `accuracy` is stored as NULL rather than 0 — "the device reported no radius" and "the device reported a perfect fix" are opposite facts. An invented extra field is refused rather than half-stored, so a client that guesses at the shape learns immediately.
+
+An incident type the catalog does not contain is `400 VALIDATION_ERROR` with `issues: [{ code: "unknown_incident_type", message: "The incident type <id> does not exist. Pick one of the types an admin has created.", path: ["incidentTypeId"] }]` and nothing is filed. The catalog is data, and nothing is seeded: on a fresh install that refusal is the *expected* first answer until an admin creates at least one type (§6.2), which is why the SOS screen fills its dropdown from the catalog the server offers instead of a hardcoded list. `incident_types` has no enabled/disabled column, so availability here is existence — and the probe and the insert run in one transaction, which is why an admin deleting a type concurrently cannot leave a request that names nothing.
+
+`photoUrl` is refused with `400 PHOTO_URL_NOT_ACCEPTED`, even though §11.2 lists it among the fields of an SOS and the schema therefore accepts its shape: the only writer of that column is `POST /_user/sos/requests/:id/photo` (T3.2.3), because a URL the requester supplies is an address the dispatcher's browser would have to load in order to read the evidence (§9). Refusing it beats accepting and ignoring it, which would leave a client wondering where its photo went. Success answers `201 { requestId, status }`, with the status read back from the row rather than assumed (`pending` today), and `Cache-Control: no-store`. The route carries §3's per-user throttle — 3 requests per minute keyed by the verified `userId`, enforced after the session guard so an unauthenticated flood spends none of it — and the fourth attempt in a minute is the shared `429 RATE_LIMITED` envelope with `retry-after`, whether or not the earlier bodies were valid. Listing, detail, cancellation and the upload endpoint remain contract-only.
 
 ### 5.5 SOS — Proposals & Missions (Rescuer)
 
@@ -277,20 +360,34 @@ PATCH /_admin/users/:id/unsuspend
 
 `PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin and unrevoked-session authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` (including a revoked session), `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; both `/_user` and `/_admin` authorization checks require a matching session with a non-null refresh-token hash, so outstanding access JWTs are invalidated immediately. Reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
 
-The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. Category assignment tables are not part of the current database schema yet, so current users are all unassigned: `hasCategory=true` returns an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records; `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
+The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. Category assignment tables are not part of the current database schema yet, so current users are all unassigned: `hasCategory=true` returns an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
 
 ### 6.2 Incidents & Categories
 
 ```
-POST  /_admin/incidents           { name, icon?, color?, description? }
+POST  /_admin/incidents           { name, slug?, icon?, color?, description? }
 GET   /_admin/incidents
-PATCH /_admin/incidents/:id
+PATCH /_admin/incidents/:id       { name?, slug?, icon?, color?, description? } (null clears icon/color/description)
 POST  /_admin/categories          { name, description?, incidentTypeIds: string[] }
 GET   /_admin/categories
 PATCH /_admin/categories/:id     { name?, description?, incidentTypeIds? }
 POST  /_admin/categories/:id/users   { userIds: string[] }
 DELETE /_admin/categories/:id/users/:userId
 ```
+
+`POST /_admin/incidents`, `GET /_admin/incidents`, and `PATCH /_admin/incidents/:id`, together with `GET`/`POST /_admin/categories`, `PATCH /_admin/categories/:id`, `POST /_admin/categories/:id/users` and `DELETE /_admin/categories/:id/users/:userId` (T3.1.2, T3.1.3), all using the same signed-admin-token, current-account, and unrevoked-session checks as the admin user routes.
+
+The caller sends a `name`, not an identifier: the server derives the URL-safe `slug` from it (lowercased, accents folded, non-alphanumerics collapsed to `-`), and an explicit `slug` in the body overrides the derivation — the only way to add a type whose name has no ASCII letters or digits. Both directions obey one rule (`^[a-z0-9]+(?:-[a-z0-9]+)*$`, at most 64 characters): the body schema, the derivation, and the response payload all use the same schema, so a slug can never be legal in the field you typed it into and illegal in the read that returns it, which the server refuses with `400 VALIDATION_ERROR` and an `invalid_incident_slug` issue on `slug` rather than inventing one. A blank `description` is stored as `NULL`, so "no description" has exactly one representation; `icon` and `color` have no blank form (the schema requires a non-empty string), so clearing them means sending `null` on a PATCH — an empty string there is a validation error.
+
+`GET /_admin/incidents` returns the whole catalog as a bare array ordered by `name`, because that is what an admin scans to find one entry, and `Cache-Control: no-store`. `PATCH` sends only the fields it names; unknown ids answer `404 INCIDENT_TYPE_NOT_FOUND`, and a body with no fields is a `400`, never a no-op write. Renaming onto another type's slug answers `409 INCIDENT_TYPE_SLUG_TAKEN`, and both the create path (through the unique index) and the rename path refuse a duplicate rather than silently suffixing it — the message names the type that already holds the slug, falling back to a nameless refusal only if that row is deleted in the same instant. Every accepted create and every change that actually altered a value appends an `admin_audit_log` row (`incident_type_created` / `incident_type_updated`, with the changed fields and their before/after values) in the same transaction as the write; a PATCH that changed nothing writes no audit row.
+
+`POST /_admin/categories` takes `{ name, description?, incidentTypeIds }`; the id list is required (an empty array is a legal category that answers nothing) and every id must exist, otherwise the whole request is refused with `400 VALIDATION_ERROR` and one `unknown_incident_type` issue per bad id, each carrying its index in the caller's array — the same shape the share routes use for `unknown_target`, so a form can mark the entry instead of asking the admin to retype the list. Validation runs before the insert, inside the same transaction, so a refused request cannot leave a half-built category behind.
+
+`PATCH /_admin/categories/:id` treats `incidentTypeIds` as the whole new set (delete then re-insert), because the contract has no way to say "add one" and diffing a field the caller named would let a stale admin list silently delete assignments it never displayed. The set is rewritten only when it actually differs, and an update that changed neither the name, the description, nor the set writes nothing at all — including no audit row. `GET /_admin/categories` returns the list ordered by category name with each `incidentTypeIds` ordered by incident-type name, so the same data renders identically twice; `Cache-Control: no-store`.
+
+Assignment is idempotent: `POST /_admin/categories/:id/users` inserts through `on conflict ("category_id","user_id") do nothing`, so re-assigning an existing member is a `200` with an empty body rather than a failure, and an empty set of newly-added members produces no audit entry. Unknown accounts are refused the same way unknown incident types are (`unknown_user` per index); a missing category is `404 CATEGORY_NOT_FOUND`. `DELETE /_admin/categories/:id/users/:userId` answers `200` when the pair was deleted *and* when the user simply was not a member — the admin asked for a state, and it holds — while an unknown category is `404 CATEGORY_NOT_FOUND`. This differs from share revocation on purpose: there, "you were never granted this" is information the caller needs.
+
+Nothing assigns membership by default: no trigger, no seed row, and no column default on `category_users`, which is the schema half of T3.1.4. Its other half — an admin-visible projection that says which categories an account is in — is not in this task: `GET /_admin/users` still short-circuits `hasCategory=true` and the user-search read still refuses `category=`, both because neither joins these tables yet.
 
 ### 6.3 SOS Dispatch
 
@@ -347,7 +444,7 @@ flowchart LR
 
    `access` is `public`, `guest`, `authenticated`, or `admin`. The descriptor preserves `method`, `url`, `schema`, and `meta` while adapting the request/response schemas and metadata to `km-api`'s `makeApiConfig` format.
 3. Register a real Fastify handler in the server module using the descriptor's method and `makeExpressPathShape()`; keep application logic outside `packages/shared`. Until registered, the endpoint is contract-only and returns 404.
-4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding, and admin user list/detail/create/status; SOS, live-location, mission, and most search operations remain contract-only.
+4. The Swagger plugin builds `/docs/json` from every shared descriptor without registering placeholder handlers. Contract-only operations carry `x-borobiya-runtime-status: contract-only`. Implemented handlers include public health/security-question catalog, auth register/login/refresh/logout/forgot-password flows, user profile/onboarding/devices, partial-username user search, admin user list/detail/create/status, the admin incident-type catalog (list/create/update), and the whole `/_user/location` surface — live share create/revoke/list, realtime `location:update` with its deprecated REST fallback, and history grant create/list/read/delete with the windowed own-history read; SOS, mission, and the remaining search operations (place search, reverse geocode) remain contract-only.
 5. Start the API, then run `bun --filter @borobiya/client generate:api`. The script fetches `http://localhost:3000/docs/json` by default and writes Zopia output to `packages/client/src/generated/api/` (ignored by Git). Override the source with `API_OPENAPI_URL` or the output directory with `ZOPIA_OUTPUT_DIR`.
 6. Use generated modules in client API integration and form validation.
 
@@ -356,6 +453,12 @@ flowchart LR
 ## 8. Realtime (Socket.IO)
 
 **Auth:** `io(auth:{token: accessToken})` → server verifies JWT in `handshake`.
+
+Mounted at `/socket.io` on the API port (behind nginx/Vite as `/api/socket.io`, which proxies the WebSocket upgrade and falls back to long polling). The handshake middleware applies the same rules as the `/_user` REST hook — verified access JWT, existing account whose role still matches, active, unsuspended, onboarding-complete, and backed by a persisted session — and closes the connection with `UNAUTHORIZED`, `INVALID_ACCESS_TOKEN`, `ACCOUNT_INACTIVE`, `ACCOUNT_SUSPENDED`, `SECURITY_QUESTIONS_REQUIRED`, or `SERVICE_UNAVAILABLE` (a database that cannot answer during the handshake; retry the connection). Each socket joins `user:{userId}` and admins additionally join `admin`. Neither path may reject instead: Socket.IO middleware and event listeners are callback-based, so a rejected promise there is never observed, and Node ends the process on an unhandled rejection.
+
+**`location:update` (T2.1.5, live)** — payload `locationUpdateSchema` (`lat`, `lon`, optional `accuracy`, `timestamp`, `priorityDeviceId`). Server order: per-connection throttle (60/min) → payload validation → the reported `priorityDeviceId` must equal the session device of the connection (T2.3.4) → every active outgoing share whose pinned priority device (if any) matches that connection is accepted → the fix is written once in a transaction that updates `users.last_location` (`ST_SetSRID(ST_MakePoint(lon, lat), 4326)::geography`) and inserts `location_history` → `location:peer-update { userId, lat, lon, accuracy, timestamp }` is emitted to each accepting target's room and echoed to the sender's own room so other tabs on the account stay in sync. The ack is `{ ok, status, peers? }` or `{ ok: false, code, message, retryAfterMs? }` with codes `VALIDATION_ERROR`, `INVALID_TIMESTAMP` (a device clock more than 5 minutes ahead, or an observation older than 24 hours), `WRONG_DEVICE`, `RATE_LIMITED`, `SERVICE_UNAVAILABLE` (a storage failure under the update, reported instead of ending the process), and `UNAUTHORIZED`. A fix is stored even when no share is active, because SOS dispatch (T3.3.1) reads `users.last_location` as the last known position — which is also why the observation-age bound exists: a client that flushes a day of buffered fixes after reconnecting would otherwise drag that marker back to where the device stood yesterday and every receiver would follow it there.
+
+The deprecated `POST /_user/location/update` fallback runs the identical service path and, when a realtime server is attached, fans the accepted fix out to peers too, so a polled fix is never silently local-only.
 
 **Rooms:** `user:{userId}`, `admin`, `mission:{missionId}`.
 
@@ -384,9 +487,15 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 
 ## 9. Error Codes
 
+Rows whose HTTP column is `—` belong to phases that have not shipped a handler yet (missions, cancellation rate
+limits): the code is reserved so the client can handle it before the server ever sends it, and nothing returns it
+today. Every row naming a real status is produced by a registered handler.
+
 | HTTP | Code | When |
 |------|------|------|
-| 400 | `VALIDATION_ERROR` | Invalid input or selected security-question ID is not in the catalog |
+| 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), an admin category naming an incident type that does not exist (`unknown_incident_type`, one issue per index) or assigning an account that does not exist (`unknown_user`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
+| 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
+| 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter its read does not join yet (`category`, `incidentType`); `issues[0].filters` lists them |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |
@@ -401,16 +510,22 @@ Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
+| 404 | `INCIDENT_TYPE_NOT_FOUND` | Admin incident-type update names an id that does not exist |
+| 404 | `CATEGORY_NOT_FOUND` | Admin category update, member assignment, or member removal names a category that does not exist |
+| 404 | `SHARE_NOT_FOUND` | A live or history share id is unknown, belongs to another account, or (for a received history read) was never granted to the caller |
 | 409 | `USERNAME_TAKEN` | Duplicate |
+| 409 | `INCIDENT_TYPE_SLUG_TAKEN` | An admin create or rename lands on a slug another incident type already owns; `issues[0].slug` carries the slug that collided |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
-| 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection |
+| 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection; `issues[0].deviceIds` carries the live devices for the chooser |
 | 429 | `RATE_LIMITED` | Too many req |
 | 503 | `RECOVERY_UNAVAILABLE` | Security-question catalog or recovery challenge storage is unavailable |
+| — | `SERVICE_UNAVAILABLE` | A storage or account lookup failed under a realtime handshake or `location:update` ack; retry, because nothing was written |
 | 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |
 | — | `CANCEL_RATE_LIMITED` | 3 cancels/hour |
+| 500 | `INTERNAL_ERROR` | A failure no handler answered (a store or serializer error). The detail is logged, never sent; safe to retry |
 
-Use `code` for client i18n and retry logic (never English message).
+Use `code` for client i18n and retry logic (never English message). Framework-level 4xx (an unparseable body, an unsupported content type, a payload over the limit) arrive through one error handler that maps them onto these codes by status, so `FST_ERR_*` names are never part of the contract; a thrown 503 keeps its status and becomes `SERVICE_UNAVAILABLE`.
 
 ---
 
@@ -466,8 +581,9 @@ curl -X PATCH http://localhost:3000/_user/missions/MISSION_ID/status -H "Authori
 | `/_auth/login` | `POST /_auth/login` |
 | `/_auth/register` | `GET /_public/security-questions` + `POST /_auth/register` |
 | `/_auth/forgot-password` | 3-step forgot |
-| `/_user/dashboard` | `GET /_user/me`, `GET /_user/location/shares`, live socket |
-| `/_user/map` | Map Server tiles/styles + `GET /_user/users/search` |
+| `/_user/dashboard` | `GET /_user/me`, `GET /_user/location/shares`, `GET /_user/location/history/shares`, `DELETE /_user/location/share/:shareId`, plus the share dialog's `GET /_user/users/search` and `POST /_user/location/share`; live socket |
+| `/_user/devices` | `GET /_user/devices`, `GET /_user/location/shares`; changing a priority device re-posts `POST /_user/location/share` for that one recipient (reuse re-points the row; the expiry cannot move) |
+| `/_user/map` | Map Server tiles/styles via `/map-config`; history playback reads `GET /_user/location/history?from&to` for one's own track and `GET /_user/location/history/shared/:shareId` (no query — the grant fixes range and density) for a companion's, with the grant list from `GET /_user/location/history/shares`; live companion markers bootstrap from `GET /_user/location/shares` (`sharedWithMe[].owner.lastLocation`, which carries **no** timestamp — hence a stale-by-construction dot) and then follow the `location:peer-update` socket event, ignoring the echo of one's own fix |
 | `/_user/sos/history` | `GET /_user/sos/requests` + `missions` |
 | `/_admin/users` | `GET /_admin/users`, `PATCH .../status` |
 | `/_admin/dispatch` | `GET /_admin/sos/requests/:id/nearest`, `POST .../dispatch` |

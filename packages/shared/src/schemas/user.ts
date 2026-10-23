@@ -29,8 +29,20 @@ export const updateUserProfileSchema = z.strictObject({
 }).refine((input) => Object.keys(input).length > 0, "At least one profile field must be provided.");
 export type UpdateUserProfileInput = z.infer<typeof updateUserProfileSchema>;
 
+/** Caps `GET /_user/devices` so one account can never force an unbounded list (spec §7.3). */
+export const MAX_USER_DEVICE_LIST_ITEMS = 50;
+/** A device label is user-visible text; bound it so no client can push large payloads into `user_sessions`. */
+export const MAX_USER_DEVICE_NAME_LENGTH = 100;
+
 export const deviceSchema = z.strictObject({
+  /** `user_sessions.id` — the session row this device entry describes. */
   id: idSchema,
+  /**
+   * `user_sessions.device_id`, i.e. the value the priority-device rule stores in
+   * `location_shares.priorityDeviceId` (spec §7.3). It is a UUID because the server mints it at
+   * login and every access token carries the same claim.
+   */
+  deviceId: idSchema,
   deviceName: z.string().nullable(),
   ip: z.string().nullable(),
   isCurrentDevice: z.boolean(),

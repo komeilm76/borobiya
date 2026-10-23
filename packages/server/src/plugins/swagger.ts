@@ -25,7 +25,28 @@ const implementedOperationIds = new Set([
   "adminGetUser",
   "adminCreateUser",
   "adminUpdateUserStatus",
-  "userCompleteSecurityQuestions"
+  "adminCreateIncidentType",
+  "adminListIncidentTypes",
+  "adminUpdateIncidentType",
+  "adminCreateCategory",
+  "adminListCategories",
+  "adminUpdateCategory",
+  "adminAssignCategoryUsers",
+  "adminRemoveCategoryUser",
+  "userCompleteSecurityQuestions",
+  "userListDevices",
+  "userSearch",
+  "locationCreateShare",
+  "locationCreateHistoryShare",
+  "locationGetHistory",
+  "locationGetSharedHistory",
+  "locationListHistoryShares",
+  "locationRevokeHistoryShare",
+  "locationRevokeShare",
+  "locationListShares",
+  "locationUpdateRestFallback",
+  "sosCreateRequest",
+  "sosUploadRequestPhoto"
 ]);
 
 interface JsonObjectSchema {
@@ -147,14 +168,17 @@ function buildResponses(route: ApiRouteDefinition): Record<string, OpenApiRespon
     };
   }
 
-  // The server applies a global throttle even when a descriptor does not declare
-  // a route-specific 429 response.
-  responses["429"] ??= {
-    description: responseDescription(429, false),
-    content: {
-      "application/json": { schema: toJsonSchema(apiErrorResponses[429], "output") }
-    }
-  };
+  // The server applies a global throttle even when a descriptor does not declare a route-specific 429
+  // response — except where the descriptor says the route is exempt, because advertising an error the
+  // runtime cannot answer is exactly the drift `rateLimitExempt` exists to prevent.
+  if (route.meta.rateLimitExempt !== true) {
+    responses["429"] ??= {
+      description: responseDescription(429, false),
+      content: {
+        "application/json": { schema: toJsonSchema(apiErrorResponses[429], "output") }
+      }
+    };
+  }
 
   return responses;
 }
@@ -228,9 +252,9 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
     openapi: {
       info: {
         title: "Borobiya API",
-        version: process.env.npm_package_version ?? "0.1.0",
+        version: process.env.npm_package_version ?? "0.2.0",
         description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, and authenticated profile/onboarding routes are implemented at runtime; remaining operations are contract-only and currently return 404."
+          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, the admin incident-type catalog (list/create/update), the responder-category catalog with member assignment and removal, authenticated profile/onboarding/devices, partial-username user search, live-location share creation, revocation, listing, history-share creation with its windowed reads, grant lists, and delete, and the deprecated REST location-update fallback are implemented at runtime (live `location:update` arrives over Socket.IO); SOS and mission operations are contract-only and currently return 404."
       },
       servers: [
         { url: openApiServerPath },

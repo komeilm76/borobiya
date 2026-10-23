@@ -55,7 +55,9 @@ export type {
   LocationShare,
   LocationShareCreated,
   LocationShareInput,
+  LocationShareOwner,
   LocationSharesResponse,
+  ReceivedLocationShare,
   LocationUpdate,
   OptionalCoordinates
 } from "../schemas/location";

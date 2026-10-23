@@ -4,6 +4,7 @@ import { loginSchema } from "@borobiya/shared";
 import type { FastifyInstance } from "fastify";
 import { hashRefreshToken, signAccessToken, signRefreshToken } from "../security/tokens";
 import { usernameRateLimitKey } from "./rate-limit";
+import { resolveLoginDeviceName } from "./device-label";
 import { refreshCookieOptionsForRequest, refreshTokenCookie } from "./cookies";
 import { DUMMY_ARGON2ID_HASH, verifyPassword as argon2VerifyPassword } from "../security/password";
 import type { UserLoginStore } from "../db/login-store";
@@ -84,6 +85,12 @@ export async function registerLoginRoute(
     // The user flag is returned to the client; T1.2.6 will allow only question completion until it is cleared.
     const sessionId = randomUUID();
     const deviceId = randomUUID();
+    // A native client may name itself; otherwise the label is summarized from the User-Agent so the
+    // Active Devices table never has to show a raw UA string (spec §7.3).
+    const deviceName = resolveLoginDeviceName({
+      deviceName: parsed.data.deviceName,
+      userAgent: request.headers["user-agent"] ?? null
+    });
     const identity = { userId: user.id, role: user.role, deviceId, sessionId };
     const accessToken = await signAccessToken(identity, dependencies.jwtSecret);
     const refreshToken = await signRefreshToken(identity, dependencies.jwtRefreshSecret);
@@ -92,7 +99,7 @@ export async function registerLoginRoute(
       id: sessionId,
       userId: user.id,
       deviceId,
-      deviceName: request.headers["user-agent"]?.slice(0, 255) ?? null,
+      deviceName,
       refreshTokenHash: hashRefreshToken(refreshToken),
       ip: request.ip,
       lastActiveAt: new Date(),

@@ -78,7 +78,7 @@ gantt
 
 **Exit criteria:** All numbered T1.0–T1.5 implementation tasks are checked complete. The user reported the core Phase 1 human tests passing on Ubuntu 24.04 on 2026-10-21: setup, admin login, user registration/login, light/dark/system theme, admin user list/deactivation, map display/zoom/fullscreen, and denied login after deactivation (see [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance)). The release proceeds with the remaining P1-G1 external-Internet-offline library run, P1-A1 live outage test, P1-A2 extended database-flow evidence, and P1-M1 latency measurement documented as non-blocking follow-ups. Their untested behavior is not claimed as passed.
 
-**Phase gate:** Phase 2 is active. PR #2 was merged to `main` as `95a88a3` and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Work started at T2.1.1; its `location_shares` table and migration are complete, while share APIs, realtime updates, expiry processing, history sharing, and multi-device UI remain future tasks. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the release or Phase 2. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope.
+**Phase gate:** Phase 2 is complete in code and Phase 3 is underway. PR #2 was merged to `main` as `95a88a3` and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21; `v0.2.0` was cut on 2026-10-23 from the merge of the branch carrying Phase 2, Phase 3's M3.1/M3.2 work, and the map-pipeline and Ubuntu VM setup fixes (see `docs/PROGRESS.md`). Work started at T2.1.1; its `location_shares` table and migration are complete, while share APIs, realtime updates, expiry processing, history sharing, and multi-device UI remain future tasks. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the release or Phase 2. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope.
 
 ---
 
@@ -89,25 +89,26 @@ gantt
 **Goal:** Users share live & history locations, manage shares, multi-device aware.
 
 ### M2.1 Live Sharing
-- [ ] `POST /_user/location/share` (timed/permanent) + `DELETE /.../:shareId`
-- [ ] Socket `location:update` (3-5s throttled) → broadcast to targets
-- [ ] Cron: expire timed shares every minute
-- [ ] Frontend: share dialog (pick users, timed slider), “My Shares” list, live markers on map
+- [x] `POST /_user/location/share` (timed/permanent) + `DELETE /.../:shareId` — T2.1.2/T2.1.3
+- [x] Socket `location:update` (3-5s throttled) → broadcast to targets — T2.1.5 with T2.3.4, client pacing at 4s
+- [x] Cron: expire timed shares every minute — T2.1.6 (readers also filter `expiresAt`, so a deadline holds between sweeps)
+- [x] Frontend: share dialog (user search, timed/permanent, duration slider), “My Shares” + “Shared With Me” lists — T2.1.7 (2026-10-22); the priority-device chooser rides along with the `409`
+- [x] Live companion markers on the map (peer positions from the socket) — T2.1.8 (2026-10-22): `live/companion-locations.ts` decides who may appear and when a dot is stale, `composables/use-live-companions.ts` owns the socket, and both map overlays (markers, playback) are painted through one `map/overlay-sync.ts` planner; positions are never invented (a fix with no timestamp renders stale rather than "now", and a dot never jumps backwards)
 
 ### M2.2 History Sharing
-- [ ] `location_history` table + insert on each update (batched)
-- [ ] `POST /_user/location/history/share` (from/to, maxPoints downsample)
-- [ ] Receiver: polyline + time slider on map
-- [ ] ENV retention 90d + maxShare 30d, daily prune cron
-- [ ] Frontend: date range picker + polyline playback
+- [x] `location_history` table + insert on each update — T2.2.1 with the writer inside `location:update`; deliberately one insert per accepted fix, since a 4s floor gives batching nothing to save
+- [x] `POST /_user/location/history/share` (from/to, maxPoints stored on the grant) — done 2026-10-22; the read-side downsample lands with the receiver polyline task below
+- [x] Receiver: polyline + time slider on map — T2.2.4 (server read) with T2.2.6 (client: sampled polyline, scrub slider, transport)
+- [x] ENV retention 90d + maxShare 30d, daily prune cron — T2.2.5 (validated at startup, batched delete, catch-up pass on boot)
+- [x] Frontend: date range picker + polyline playback — T2.2.6 (2026-10-22): 1/7/30-day presets with last-7-days as the default, hand-typed local window, playback at 1×/4×/16×/60× on the map
 
 ### M2.3 Multi-Device Priority
-- [ ] `user_sessions` table + `GET /_user/devices` + deviceName detection
-- [ ] Warning modal if `activeDevices>1` on share start: “Select broadcasting device”
-- [ ] Server only accepts GPS from `priorityDeviceId`
-- [ ] Settings page: Active Devices Table
+- [x] `user_sessions` table + `GET /_user/devices` + deviceName detection — T2.3.1/T2.3.2 (the label is a bounded human summary of the UA, not the raw header)
+- [x] Warning modal if `activeDevices>1` on share start: “Select broadcasting device” — the `409 PRIORITY_DEVICE_REQUIRED` list opens the chooser inside the share dialog (T2.3.3's client half, landed with T2.1.7)
+- [x] Server only accepts GPS from `priorityDeviceId` — T2.3.4, with T2.3.3 choosing the pin on share creation
+- [x] Settings page: Active Devices Table + change-the-priority-anytime — T2.3.5 (2026-10-22) at `/_user/devices`, reached from the dashboard; the write reuses `POST /_user/location/share` with a body that cannot move the expiry
 
-**Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline.
+**Exit Criteria:** Two browsers as same user, pick priority device, see live dot moving; share last-7-days history as polyline. — the second half has its implementation (T2.2.6: grant → sampled polyline on the receiver's map, opened on the last 7 days) and is now measured by the browser run, not by code: P2-A1 covers both halves of the first clause and the playback panel's live behavior (fit-to-track, theme swap, scrub), so neither can be claimed from unit tests.
 
 ---
 
@@ -116,11 +117,12 @@ gantt
 **Goal:** Full SOS lifecycle — request → admin dispatch → rescuer accept → navigation → status timeline → cancellation/replacement.
 
 ### M3.1 Admin Domain Model
-- [ ] `incident_types` + `categories` + pivots `category_users` + `category_incident_types`
-- [ ] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users`
-- [ ] Frontend: Admin /incidents & /categories CRUD + assign users
+- [x] `incident_types` + `categories` + pivots `category_users` + `category_incident_types` — DDL generated as `drizzle/0010_complete_namor.sql`, 2026-10-22
+- [x] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users` — live as of T3.1.2/T3.1.3 (2026-10-22), with list/update reads and member removal too
+- [ ] Frontend: Admin /incidents & /categories CRUD + assign users — the server surface is in place; the screens are T3.1.5
 
 ### M3.2 SOS Request
+- [x] `sos_requests` table — `drizzle/0012_modern_sentry.sql`, 2026-10-22 (T3.2.1)
 - [ ] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback, optional photo 5MB)
 - [ ] Photo upload endpoint + storage (local volume → S3 later)
 - [ ] Socket `sos:new-request` to `admin` room + pulsing marker + sound

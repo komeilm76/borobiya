@@ -15,9 +15,31 @@ import {
   type UserSecurityQuestionsStore
 } from "./db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "./auth/user-security-questions";
+import { DrizzleUserDeviceStore, type UserDeviceStore } from "./db/device-store";
+import { registerUserDevicesRoute } from "./auth/devices";
 import { registerAdminUserRoutes } from "./admin/users";
+import { DrizzleIncidentTypeStore, type IncidentTypeStore } from "./db/incident-type-store";
+import { registerAdminIncidentRoutes } from "./admin/incidents";
+import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
+import { registerAdminCategoryRoutes } from "./admin/categories";
+import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
+import { registerUserSearchRoute } from "./users/search";
+import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
+import { registerSosRequestRoutes } from "./sos/requests";
+import { registerMultipartParser } from "./plugins/multipart";
+import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
+import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
+import { registerSosPhotoRoutes } from "./sos/photos";
+import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
+import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
+import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
+import { startLocationJobs } from "./location/jobs";
+import { attachRealtime, PEER_UPDATE_EVENT, userRoom } from "./realtime/socket";
+import { registerLocationHistoryShareRoutes } from "./location/history";
+import { registerLocationShareRoutes } from "./location/shares";
 import { registerAuthRoutes, type PasswordHasher } from "./auth/register";
 import { registerHttpSecurityPlugins } from "./plugins/security";
+import { registerErrorEnvelope } from "./plugins/error-envelope";
 import { registerSwagger } from "./plugins/swagger";
 
 const sensitiveLogPaths = [
@@ -45,12 +67,35 @@ export interface FastifyAppDependencies {
   adminUserStore?: AdminUserStore;
   /** Override user authorization/onboarding persistence in tests. */
   securityQuestionsStore?: UserSecurityQuestionsStore;
+  /** Override the Active Devices read path in tests. */
+  userDeviceStore?: UserDeviceStore;
+  /** Override live-location share persistence in tests. */
+  locationShareStore?: LocationShareStore;
+  /** Override live-location fix persistence in tests. */
+  locationHistoryStore?: LocationHistoryStore;
+  /** Override the user-search read path in tests. */
+  userSearchStore?: UserSearchStore;
+  /** Override the incident-type catalog persistence in tests. */
+  incidentTypeStore?: IncidentTypeStore;
+  /** Override responder-category persistence in tests. */
+  categoryStore?: CategoryStore;
+  /** Override SOS-request creation persistence in tests. */
+  sosRequestStore?: SosRequestStore;
+  /** Override the photo attach write in tests. */
+  photoStore?: SosPhotoStore;
+  /** Override where uploaded photos are written in tests. */
+  photoStorage?: PhotoStorage;
   /** Override registration hashing in tests; production defaults to the Argon2id helper. */
   hashPassword?: PasswordHasher;
   /** Override login password verification in tests; production uses Argon2id. */
   verifyPassword?: PasswordVerifier;
   /** Override recovery-answer verification in tests; production uses Argon2id. */
   verifySecurityAnswer?: SecurityAnswerVerifier;
+  /**
+   * Start the in-process maintenance timers (share expiry, history retention prune). Only the API
+   * entrypoint sets this: `app.inject()` tests build apps that must not own intervals.
+   */
+  startMaintenanceJobs?: boolean;
 }
 
 export async function createFastifyApp(
@@ -67,25 +112,56 @@ export async function createFastifyApp(
 
   await app.register(cookie);
   await registerHttpSecurityPlugins(app, config);
+  // Registered before the routes so a store failure anywhere lands as the documented envelope
+  // instead of Fastify's default body, which carried the driver's message to the browser.
+  registerErrorEnvelope(app);
   await registerSwagger(app, config.openApiServerPath);
 
-  const hasInjectedStores =
-    dependencies.registrationStore !== undefined &&
-    dependencies.loginStore !== undefined &&
-    dependencies.recoveryStore !== undefined &&
-    dependencies.adminUserStore !== undefined &&
-    dependencies.securityQuestionsStore !== undefined;
-  const database = hasInjectedStores ? undefined : createDatabase(config.databaseUrl);
+  // A pool is only opened when at least one store still needs the real database; queries
+  // run lazily, so inject-test apps never connect.
+  const needsDatabase = [
+    dependencies.registrationStore,
+    dependencies.loginStore,
+    dependencies.recoveryStore,
+    dependencies.adminUserStore,
+    dependencies.securityQuestionsStore,
+    dependencies.userDeviceStore,
+    dependencies.locationShareStore,
+    dependencies.locationHistoryStore,
+    dependencies.userSearchStore,
+    dependencies.incidentTypeStore,
+    dependencies.categoryStore,
+    dependencies.sosRequestStore,
+    dependencies.photoStore
+  ].some((store) => store === undefined);
+  const database = needsDatabase ? createDatabase(config.databaseUrl) : undefined;
   const registrationStore = dependencies.registrationStore ?? new DrizzleUserRegistrationStore(database!.db);
   const loginStore = dependencies.loginStore ?? new DrizzleUserLoginStore(database!.db);
   const recoveryStore = dependencies.recoveryStore ?? new DrizzleUserRecoveryStore(database!.db);
   const adminUserStore = dependencies.adminUserStore ?? new DrizzleAdminUserStore(database!.db);
   const securityQuestionsStore = dependencies.securityQuestionsStore ?? new DrizzleUserSecurityQuestionsStore(database!.db);
+  const userDeviceStore = dependencies.userDeviceStore ?? new DrizzleUserDeviceStore(database!.db);
+  const locationShareStore = dependencies.locationShareStore ?? new DrizzleLocationShareStore(database!.db);
+  const locationHistoryStore = dependencies.locationHistoryStore ?? new DrizzleLocationHistoryStore(database!.db);
+  const userSearchStore = dependencies.userSearchStore ?? new DrizzleUserSearchStore(database!.db);
+  const incidentTypeStore = dependencies.incidentTypeStore ?? new DrizzleIncidentTypeStore(database!.db);
+  const categoryStore = dependencies.categoryStore ?? new DrizzleCategoryStore(database!.db);
+  const sosRequestStore = dependencies.sosRequestStore ?? new DrizzleSosRequestStore(database!.db);
+  const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
+  const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
+  const liveLocationService = createLiveLocationService({
+    shareStore: locationShareStore,
+    historyStore: locationHistoryStore
+  });
   await registerUserSecurityQuestionsRoute(app, {
     store: securityQuestionsStore,
     jwtSecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword
   });
+  // Registered after the `/_user` authorization hook so the device list inherits the access-token,
+  // account-state, onboarding, and live-session checks and can trust `request.authenticatedUser`.
+  await registerUserDevicesRoute(app, { store: userDeviceStore });
+  await registerUserSearchRoute(app, { store: userSearchStore });
   await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
   await registerLoginRoute(app, {
     store: loginStore,
@@ -109,6 +185,76 @@ export async function createFastifyApp(
     jwtSecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword
   });
+  await registerAdminIncidentRoutes(app, {
+    store: incidentTypeStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
+  });
+  await registerAdminCategoryRoutes(app, {
+    store: categoryStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
+  });
+  // Registered after the `/_user` authorization hook so share routes inherit the
+  // access-token, account-state, and onboarding checks.
+  await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
+  // multipart is only needed by the photo upload, but it must be on the app before that route is
+  // created. The limits are the contract's, not a guess: `docs/SECURITY.md` §9 caps a photo at 5 MB,
+  // and an SOS carries one — so the parser refuses anything bigger before a byte is buffered, and
+  // `throwFileSizeLimit` makes that an error rather than a silently truncated buffer (the route checks
+  // `truncated` as well, so turning the flag off cannot start storing half an image).
+  await registerMultipartParser(app, { maxBytes: config.sosPhotoMaxBytes });
+  // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
+  // has finished onboarding, which is exactly the state dispatch is entitled to trust.
+  await registerSosRequestRoutes(app, { store: sosRequestStore });
+  await registerSosPhotoRoutes(app, {
+    store: photoStore,
+    storage: photoStorage,
+    maxBytes: config.sosPhotoMaxBytes
+  });
+  await registerLocationHistoryShareRoutes(app, {
+    store: locationHistoryStore,
+    shares: locationShareStore,
+    maxShareDays: config.locationHistoryMaxShareDays,
+    defaultReadPoints: config.locationHistoryReadPoints
+  });
+
+  const realtime = attachRealtime(app.server, {
+    jwtSecret: config.jwtSecret,
+    users: securityQuestionsStore,
+    live: liveLocationService,
+    corsOrigins: config.corsOrigins,
+    logger: app.log
+  });
+  await registerLocationUpdateRoute(app, {
+    service: liveLocationService,
+    broadcast: (peerIds, update) => {
+      for (const peerId of peerIds) {
+        realtime.io.to(userRoom(peerId)).emit(PEER_UPDATE_EVENT, update);
+      }
+    }
+  });
+
+  app.addHook("onClose", async () => {
+    await realtime.close();
+  });
+
+  if (dependencies.startMaintenanceJobs) {
+    const jobs = startLocationJobs({
+      shareStore: locationShareStore,
+      historyStore: locationHistoryStore,
+      retentionDays: config.locationHistoryRetentionDays,
+      logger: app.log
+    });
+    // One catch-up pass per listener turn: shares whose window closed while the API was down are
+    // expired before the first request is served, and nothing is awaited on the hot startup path.
+    app.addHook("onReady", async () => {
+      void jobs.tick({ runAll: true });
+    });
+    app.addHook("onClose", async () => {
+      jobs.stop();
+    });
+  }
 
   if (database) {
     app.addHook("onClose", async () => {
@@ -116,11 +262,21 @@ export async function createFastifyApp(
     });
   }
 
-  app.get(apiRoutes.public.health.url, async () => ({
-    status: "ok" as const,
-    uptime: process.uptime(),
-    version: process.env.npm_package_version ?? "0.1.0"
-  }));
+  // The liveness probe sits deliberately outside the global throttle (see `ApiRouteMeta.rateLimitExempt`).
+  // The limiter protects handlers, and a health check is not a handler worth protecting: under
+  // `RATE_LIMIT_MAX` pressure an orchestrator would restart a healthy-but-busy API precisely during the
+  // load spike that made it look unreachable. The exemption is read from the descriptor rather than
+  // written here, so the contract and the runtime cannot disagree about which routes are limited.
+  const healthRoute = apiRoutes.public.health;
+  app.get(
+    healthRoute.url,
+    healthRoute.meta.rateLimitExempt === true ? { config: { rateLimit: false } } : {},
+    async () => ({
+      status: "ok" as const,
+      uptime: process.uptime(),
+      version: process.env.npm_package_version ?? "0.2.0"
+    })
+  );
   app.get(apiRoutes.public.securityQuestions.url, async (_request, reply) => {
     const questions = await recoveryStore.listSecurityQuestions();
     return reply

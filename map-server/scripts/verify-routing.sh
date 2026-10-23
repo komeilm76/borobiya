@@ -39,7 +39,14 @@ for profile in car bicycle foot; do
     -d "$request_body" \
     -o "$response_file" -w '%{http_code}' "$ROUTING_URL")" || \
     fail "${profile} route request failed: $ROUTING_URL"
-  [[ "$status" == '200' ]] || fail "${profile} route returned HTTP $status: $(cat "$response_file")"
+  if [[ "$status" != '200' ]]; then
+    # The gateway's 502 body now carries the upstream status, code and message it saw; printing the request
+    # body next to it means the same call can be replayed against the profile container without guessing.
+    printf 'verify-routing: request body: %s\n' "$request_body" >&2
+    printf 'verify-routing: profile container log: docker compose logs --tail 40 osrm-%s routing-gateway\n' "$profile" >&2
+    printf 'verify-routing: which selection the mounted graph covers: docker compose exec -T osrm-%s cat "/data/${MAP_REGION:-borobiya}.metadata.json"\n' "$profile" >&2
+    fail "${profile} route returned HTTP $status: $(cat "$response_file")"
+  fi
 
   python3 - "$response_file" "$profile" <<'PY' || fail "${profile} response is not a valid route"
 import json, sys

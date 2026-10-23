@@ -1,3 +1,5 @@
+import { describeUpstream, formatUpstreamLog, readUpstreamBody } from "./upstream.mjs";
+
 const DEFAULT_PHOTON_UPSTREAMS = Object.freeze({
   geocode: "http://photon:2322/api",
   reverse: "http://photon:2322/reverse"
@@ -41,7 +43,7 @@ function photonUrl(endpoint, params) {
   return target;
 }
 
-async function proxyPhotonRequest(target, fetchImpl, timeoutMs) {
+async function proxyPhotonRequest(target, { fetchImpl, timeoutMs, log = console.error }) {
   let response;
   try {
     response = await fetchImpl(target, {
@@ -49,19 +51,27 @@ async function proxyPhotonRequest(target, fetchImpl, timeoutMs) {
       headers: { accept: "application/geo+json, application/json" },
       signal: AbortSignal.timeout(timeoutMs)
     });
-  } catch {
+  } catch (error) {
+    const reason = `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
+    log(`geocoding: no HTTP answer from ${target} (${reason})`);
     return json({ error: "geocoding_unavailable" }, 503);
   }
 
-  let body;
-  try {
-    body = await response.json();
-  } catch {
-    return json({ error: "invalid_geocoder_response" }, 502);
+  const { text, parsed: body, readFailed } = await readUpstreamBody(response);
+  const upstream = describeUpstream({ endpoint: target, status: response.status, text, parsed: body, readFailed });
+  const report = (error, fallback) => {
+    log(formatUpstreamLog("geocoding", { status: response.status, endpoint: target, ...upstream }));
+    return json({ error, message: upstream.message ?? fallback, ...upstream.fields }, 502);
+  };
+
+  if (readFailed || body === null || typeof body !== "object" || Array.isArray(body)) {
+    return report("invalid_geocoder_response", readFailed
+      ? "The Photon response body could not be read."
+      : "Photon answered with something that is not a JSON object.");
   }
-  if (!response.ok) return json({ error: "geocoding_failed" }, 502);
-  if (body?.type !== "FeatureCollection" || !Array.isArray(body.features)) {
-    return json({ error: "invalid_geocoder_response" }, 502);
+  if (!response.ok) return report("geocoding_failed", "Photon answered with an error and no message.");
+  if (body.type !== "FeatureCollection" || !Array.isArray(body.features)) {
+    return report("invalid_geocoder_response", "Photon did not answer with a GeoJSON FeatureCollection.");
   }
   return json(body);
 }
@@ -69,7 +79,8 @@ async function proxyPhotonRequest(target, fetchImpl, timeoutMs) {
 export async function handleGeocodeRequest(request, {
   upstreams = DEFAULT_PHOTON_UPSTREAMS,
   fetchImpl = globalThis.fetch,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
+  log = console.error
 } = {}) {
   const url = new URL(request.url);
   const isReverse = url.pathname === "/reverse";
@@ -89,7 +100,7 @@ export async function handleGeocodeRequest(request, {
     } catch {
       return json({ error: "geocoding_unavailable" }, 503);
     }
-    return proxyPhotonRequest(target, fetchImpl, timeoutMs);
+    return proxyPhotonRequest(target, { fetchImpl, timeoutMs, log });
   }
 
   const params = readParams(url.searchParams, new Set(["q", "limit", "bbox"]));
@@ -110,7 +121,7 @@ export async function handleGeocodeRequest(request, {
   } catch {
     return json({ error: "geocoding_unavailable" }, 503);
   }
-  return proxyPhotonRequest(target, fetchImpl, timeoutMs);
+  return proxyPhotonRequest(target, { fetchImpl, timeoutMs, log });
 }
 
 export { DEFAULT_PHOTON_UPSTREAMS };

@@ -8,25 +8,50 @@ import {
 } from "./common";
 import { locationShareModeSchema } from "../types/enums";
 
-const uniqueUserIdsSchema = z.array(idSchema).min(1).superRefine((ids, context) => {
-  const seen = new Set<string>();
-  ids.forEach((id, index) => {
-    if (seen.has(id)) {
-      context.addIssue({
-        code: "custom",
-        path: [index],
-        message: "Target user IDs must be unique."
-      });
-    }
-    seen.add(id);
+/** Upper bounds that keep one share request inside a sane, reviewable payload. */
+export const MAX_LOCATION_SHARE_TARGETS = 50;
+/** Timed shares must end within 30 days; longer-lived visibility uses `permanent` mode. */
+export const MAX_LOCATION_SHARE_MINUTES = 30 * 24 * 60;
+export const MAX_LOCATION_SHARE_NOTE_LENGTH = 500;
+/** Caps one user's share list so `GET /_user/location/shares` stays a small payload. */
+export const MAX_LOCATION_SHARE_LIST_ITEMS = 100;
+
+const uniqueUserIdsSchema = z
+  .array(idSchema)
+  .min(1)
+  .max(MAX_LOCATION_SHARE_TARGETS)
+  .superRefine((ids, context) => {
+    const seen = new Set<string>();
+    ids.forEach((id, index) => {
+      if (seen.has(id)) {
+        context.addIssue({
+          code: "custom",
+          path: [index],
+          message: "Target user IDs must be unique."
+        });
+      }
+      seen.add(id);
+    });
   });
-});
 
 export const shareSchema = z.strictObject({
   targetUserIds: uniqueUserIdsSchema,
   mode: locationShareModeSchema,
-  durationMinutes: z.number().int().positive().nullable().optional(),
-  note: z.string().trim().optional()
+  durationMinutes: z
+    .number()
+    .int()
+    .min(1, "A timed share must last at least one minute.")
+    .max(MAX_LOCATION_SHARE_MINUTES, `Timed location sharing must not exceed ${MAX_LOCATION_SHARE_MINUTES} minutes. Use permanent mode for longer visibility.`)
+    .nullable()
+    .optional(),
+  note: z.string().trim().max(MAX_LOCATION_SHARE_NOTE_LENGTH).optional(),
+  /**
+   * Which of the owner's live sessions should broadcast to these recipients (spec §7.3), i.e. the
+   * value stored in `location_shares.priority_device_id`. Omitted when the account has exactly one
+   * live device, because then there is nothing to choose; with several, the server answers
+   * `409 PRIORITY_DEVICE_REQUIRED` until one is named.
+   */
+  priorityDeviceId: idSchema.optional()
 }).superRefine((share, context) => {
   if (share.mode === "timed" && (share.durationMinutes === undefined || share.durationMinutes === null)) {
     context.addIssue({
@@ -61,28 +86,137 @@ export const locationShareSchema = z.strictObject({
 });
 export type LocationShare = z.infer<typeof locationShareSchema>;
 
+/**
+ * One `POST /_user/location/share` call can target several users, so the created
+ * shares are returned in full (each row carries its own `expiresAt`). A repeated
+ * request reuses the caller's existing active share for a target and only extends a
+ * timed expiry, so `createdShareIds` and `reusedShareIds` explain what changed.
+ */
 export const locationShareCreatedSchema = z.strictObject({
-  shareId: idSchema,
-  expiresAt: timestampSchema.nullable().optional()
+  shares: z.array(locationShareSchema).min(1).max(MAX_LOCATION_SHARE_TARGETS),
+  createdShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([]),
+  reusedShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([])
 });
 export type LocationShareCreated = z.infer<typeof locationShareCreatedSchema>;
 
+/** One granted history window for one recipient (`location_history_shares`). */
+export const locationHistoryShareSchema = z.strictObject({
+  id: idSchema,
+  ownerId: idSchema,
+  targetUserId: idSchema,
+  from: timestampSchema,
+  to: timestampSchema,
+  maxPoints: z.number().int().nullable(),
+  createdAt: timestampSchema
+});
+export type LocationHistoryShare = z.infer<typeof locationHistoryShareSchema>;
+
+/**
+ * Like live-share creation, one call can grant the same window to several users and a repeated
+ * request for the identical owner/target/window reuses the existing grant instead of duplicating it,
+ * so the response lists the rows and says which ones were created.
+ */
 export const locationHistoryShareCreatedSchema = z.strictObject({
-  shareId: idSchema
+  shares: z.array(locationHistoryShareSchema).min(1).max(MAX_LOCATION_SHARE_TARGETS),
+  createdShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([]),
+  reusedShareIds: z.array(idSchema).max(MAX_LOCATION_SHARE_TARGETS).default([])
 });
 export type LocationHistoryShareCreated = z.infer<typeof locationHistoryShareCreatedSchema>;
 
+/**
+ * A grant seen from the receiving side. Unlike a live share, no current position is attached: a
+ * history grant is a read of rows the owner's devices already sent, so the owner's live marker is
+ * irrelevant to it (and would leak a position the owner never shared).
+ */
+export const receivedHistoryShareSchema = locationHistoryShareSchema.extend({
+  owner: z.strictObject({ id: idSchema, username: z.string().min(1) })
+});
+export type ReceivedLocationHistoryShare = z.infer<typeof receivedHistoryShareSchema>;
+
+/**
+ * Both directions of the caller's history grants, newest first. There is nothing to filter here:
+ * a history grant has no expiry and no revocation flag, so it is in force until its owner deletes it
+ * (or retention prunes the points underneath it). Receivers need this list because the shared read
+ * endpoint takes a grant id and there is no other way to learn one.
+ */
+/** An owned history grant: same label rule as `ownedLocationShareSchema`. */
+export const ownedLocationHistoryShareSchema = locationHistoryShareSchema.extend({
+  targetUsername: z.string().nullable()
+});
+export type OwnedLocationHistoryShare = z.infer<typeof ownedLocationHistoryShareSchema>;
+
+export const locationHistorySharesResponseSchema = z.strictObject({
+  owned: z.array(ownedLocationHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  sharedWithMe: z.array(receivedHistoryShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
+});
+export type LocationHistorySharesResponse = z.infer<typeof locationHistorySharesResponseSchema>;
+
+/** The share owner's identity and last server-side known position, shown to receivers. */
+export const locationShareOwnerSchema = z.strictObject({
+  id: idSchema,
+  username: z.string().min(1),
+  lastLocation: coordinatesSchema.nullable()
+});
+export type LocationShareOwner = z.infer<typeof locationShareOwnerSchema>;
+
+/**
+ * An owned row of the live-share list, as the server answers it.
+ *
+ * The label exists because a list of bare uuids is not an answer to "who can see me right now": the
+ * receiver side already gets `owner.username`, and an outgoing row is the same question in the other
+ * direction. It is nullable and the read is a left join on purpose — a share whose target row cannot be
+ * read must still appear, because that row is the one the owner needs in order to revoke it. Dropping it
+ * to keep the shape tidy would hide an open share.
+ *
+ * Not on `locationShareSchema` itself: the create response describes rows the caller just wrote and has
+ * no use for a label, and an additive field there would make the two responses drift apart silently.
+ */
+export const ownedLocationShareSchema = locationShareSchema.extend({
+  targetUsername: z.string().nullable()
+});
+export type OwnedLocationShare = z.infer<typeof ownedLocationShareSchema>;
+
+export const receivedLocationShareSchema = locationShareSchema.extend({
+  owner: locationShareOwnerSchema
+});
+export type ReceivedLocationShare = z.infer<typeof receivedLocationShareSchema>;
+
+/**
+ * Active shares only: revoked rows and timed rows past `expiresAt` are excluded from both
+ * lists. Each list is capped at `MAX_LOCATION_SHARE_LIST_ITEMS` newest rows.
+ */
 export const locationSharesResponseSchema = z.strictObject({
-  owned: z.array(locationShareSchema),
-  sharedWithMe: z.array(locationShareSchema)
+  owned: z.array(ownedLocationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS),
+  sharedWithMe: z.array(receivedLocationShareSchema).max(MAX_LOCATION_SHARE_LIST_ITEMS)
 });
 export type LocationSharesResponse = z.infer<typeof locationSharesResponseSchema>;
+
+/**
+ * Upper bound on `maxPoints`, the resolution a history share is meant to be viewed at. It bounds the
+ * payload of every later read of the grant (T2.2.4), which is why the ceiling belongs to the contract
+ * rather than to the read handler.
+ */
+export const MAX_LOCATION_HISTORY_SHARE_POINTS = 10_000;
 
 export const historyShareSchema = z.strictObject({
   targetUserIds: uniqueUserIdsSchema,
   from: timestampSchema,
   to: timestampSchema,
-  maxPoints: z.number().int().positive().optional()
+  /**
+   * Downsample target, stored on the grant so every receiver of this window reads it at the same
+   * density. Bounded here because it is a fixed response-size ceiling; the *window* bound next to it
+   * is not, because `LOCATION_HISTORY_MAX_SHARE_DAYS` is server configuration (spec §7.2), so the API
+   * layer owns that check and answers `400 SHARE_RANGE_TOO_LARGE`.
+   */
+  maxPoints: z
+    .number()
+    .int()
+    .min(1)
+    .max(
+      MAX_LOCATION_HISTORY_SHARE_POINTS,
+      `A shared history window can be sampled to at most ${MAX_LOCATION_HISTORY_SHARE_POINTS} points.`
+    )
+    .optional()
 }).superRefine((share, context) => {
   if (Date.parse(share.to) <= Date.parse(share.from)) {
     context.addIssue({
@@ -102,8 +236,15 @@ export const locationHistoryPointSchema = coordinatesSchema.extend({
 });
 export type LocationHistoryPoint = z.infer<typeof locationHistoryPointSchema>;
 
+/**
+ * A window of stored history, oldest point first. `points` is the sampled view the client should draw
+ * and never exceeds the sampling target of the read; `totalPoints` is how many rows the window actually
+ * holds, so a player can tell a sampled view from the complete record and label the difference. The two
+ * numbers satisfy `points.length <= totalPoints`, which the sampled query guarantees by construction.
+ */
 export const locationHistoryResponseSchema = z.strictObject({
-  points: z.array(locationHistoryPointSchema)
+  points: z.array(locationHistoryPointSchema).max(MAX_LOCATION_HISTORY_SHARE_POINTS),
+  totalPoints: z.number().int().nonnegative()
 });
 export type LocationHistoryResponse = z.infer<typeof locationHistoryResponseSchema>;
 

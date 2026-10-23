@@ -13,7 +13,12 @@ interface ErrorPayload {
   issues?: unknown;
 }
 
-function apiPrefix(): string {
+/**
+ * Same-origin prefix the browser uses for API traffic. A relative `VITE_API_URL` becomes the
+ * proxy prefix (nginx and Vite both strip it before the API sees the request); an absolute URL
+ * means the client talks to the API directly and no prefix is prepended.
+ */
+export function apiBasePath(): string {
   const configured = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
   return configured?.startsWith("/") && configured !== "/" ? configured : "/api";
 }
@@ -40,7 +45,7 @@ export async function requestJson<T>(
   if (options.body !== undefined) headers.set("content-type", "application/json");
   if (options.accessToken) headers.set("authorization", `Bearer ${options.accessToken}`);
 
-  const response = await fetch(`${apiPrefix()}${path}`, {
+  const response = await fetch(`${apiBasePath()}${path}`, {
     method: options.method ?? "GET",
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),

@@ -158,6 +158,22 @@ sequenceDiagram
 
 Multi-device conflict resolution is **mandatory**: only `priorityDeviceId`'s GPS accepted.
 
+Share expiry and retention are **in-process timers** (`packages/server/src/location/jobs.ts`), not a
+system crontab, so one container is all a deployment needs:
+
+- `runLocationJobs` runs the two statements in order — `expireOverdueShares({ now })` retires every
+  timed share whose window closed, `pruneOlderThan({ olderThan, limit })` deletes history older than
+  `LOCATION_HISTORY_RETENTION_DAYS` in bounded batches. Each is isolated: a failing job is logged and
+  retried on the next tick, and never blocks the other one.
+- `startLocationJobs` checks the schedule every 15s, keeps the 60s expiry cadence and the daily prune
+  cadence, and skips a pass while the previous one is still in flight. Both statements are idempotent,
+  so running them from several API replicas costs wasted work rather than correctness; a dedicated
+  worker or an advisory lock only becomes necessary if that waste matters.
+- The timers are started by `server.ts` through `createFastifyApp(config, { startMaintenanceJobs: true })`
+  and stopped in an `onClose` hook, after one `tick({ runAll: true })` catch-up pass in `onReady`. Route
+  tests therefore never create intervals, and a restarted API does not keep serving a share whose window
+  closed while it was down.
+
 ---
 
 ## 5. Data Flow — SOS Rescue
@@ -247,7 +263,7 @@ Events (full list in API.md § Realtime):
 ```
 
 **Disconnection:**
-- Heartbeat `ping` 25s → server `pong` timeout 10s → mark `user_sessions.isOnline=false`.
+- Heartbeat `ping` 25s → server `pong` timeout 10s → mark `user_sessions.isOnline=false`. Runtime status: the heartbeat pair is live since T2.1.5/T2.3.4 (the server drops a silent connection), but the drop is **not** yet written to `user_sessions`; until it is, `GET /_user/devices` reports `isOnline` from refresh-token liveness (login/refresh set it, logout/revocation clear it).
 - Grace period 5 min before auto-cancel consideration (no auto-cancel in v1, just badge).
 - Reconnect: refresh JWT if needed, rejoin rooms, `GET /_user/sync?since=lastDisconnectAt` for missed events.
 
@@ -294,8 +310,27 @@ Requires GiST index on `last_location`. For large scale, add `ST_DWithin` radius
 
 ### 8.3 Retention & Pruning
 
-- `location_history` partitioned by month (optional for scale).
-- Daily cron: `DELETE FROM location_history WHERE created_at < NOW() - INTERVAL 'RETENTION_DAYS days'`
+- `location_history` exists since T2.2.1 as plain `lat`/`lon` rows indexed by `(user_id, timestamp)`; partitioning by month stays optional for scale and is not used yet.
+- Daily prune (T2.2.5, implemented in `src/location/jobs.ts`) — the batched shape Drizzle emits
+  (`pruneLocationHistoryQuery`), so a first run after a long outage never holds one long lock:
+
+```sql
+DELETE FROM location_history
+WHERE created_at < $retention_cutoff
+  AND id IN (
+    SELECT id FROM location_history
+    WHERE created_at < $retention_cutoff
+    ORDER BY id ASC
+    LIMIT 5000          -- repeated at most 40 times per pass
+  );
+```
+
+- Share expiry runs every minute in the same scheduler:
+  `UPDATE location_shares SET is_revoked = true WHERE is_revoked = false AND expires_at IS NOT NULL AND expires_at <= now`.
+  Marking rather than deleting keeps revocation history auditable, and readers already filter on
+  `expires_at > now`, so an expired row is never active even in the seconds before the sweep sees it.
+- `LOCATION_HISTORY_MAX_SHARE_DAYS` (same commit) is validated at startup to stay inside retention and
+  is applied to the requested window by `POST /_user/location/history/share` (T2.2.3).
 
 ---
 
@@ -327,7 +362,7 @@ Backend mirrors these with Fastify hooks `authenticate` + `authorize`.
 
 ### 9.3 Map Integration
 
-- `MapLibre GL JS` initialized with `style: MAP_STYLE_LIGHT or DARK`.
+- `MapLibre GL JS` initialized with the theme's same-origin style URL: `/map/style/light` or `/map/style/dark` (the client's `DEFAULT_MAP_STYLE` pair, proxied by Nginx to Martin — there is no `MAP_STYLE_*` environment override, and the app does not read one).
 - Theme toggle → `map.setStyle(newStyle)` preserving `center, zoom, pitch, bearing, markers`.
 - Markers: custom SVG (not raster), clustered via `supercluster` if >100.
 - Navigation mode: `map.easeTo({ pitch, bearing, zoom })` throttled 1s on location.
@@ -450,7 +485,7 @@ Performance targets: map load <2s LAN, location update <500ms socket, route <1s.
 
 **Rationale:** Drizzle keeps table definitions close to PostgreSQL/SQL, supports TypeScript without a separate generated query-engine client, and leaves PostGIS-specific DDL/queries explicit through custom types and SQL expressions. Prisma was considered but rejected for this scaffold because its abstraction around unsupported native geography types would require raw SQL for central spatial features and introduces an additional generated-client workflow. Drizzle is less opinionated about higher-level relation access and requires migrations to be reviewed; generated SQL will therefore be checked in and hand-edited where necessary.
 
-**Consequences:** The checked-in migrations cover the auth, user-state, security-question, session, cancellation-reason, audit, and PostGIS location schema, plus the initial `location_shares` table added in T2.1.1. Migrations and seed data are applied explicitly (including through the runtime migrator in the API image), not automatically at startup. Fastify creates PostgreSQL clients for the implemented registration/login/session, recovery, onboarding, and user/admin account-management stores; the location-share table has no handler yet, and share APIs/realtime updates, location history, SOS, and mission persistence remain later work.
+**Consequences:** The checked-in migrations cover the auth, user-state, security-question, session, cancellation-reason, audit, and PostGIS location schema, plus the initial `location_shares` table added in T2.1.1. Migrations and seed data are applied explicitly (including through the runtime migrator in the API image), not automatically at startup. Fastify creates PostgreSQL clients for the implemented registration/login/session, recovery, onboarding, user/admin account-management, and location share/history stores. `POST /_user/location/share` writes `location_shares` transactionally with batched recipient checks, `DELETE /_user/location/share/:shareId` revokes, `GET /_user/location/shares` lists active grants, `POST /_user/location/history/share` writes bounded `location_history_shares` grants under the same recipient rules and per-owner lock, `GET /_user/location/history{,/shares,/shared/:shareId}` reads a window (sampled in SQL) or the grant lists, and `DELETE /_user/location/history/share/:shareId` removes a grant outright, and the Socket.IO `location:update` handler (plus its deprecated REST fallback) upserts `users.last_location` and appends `location_history`. Share expiry, stale-priority-pin repair, and history retention pruning run on in-process timers; the share and history UI screens, the device-selection dialog in the client, SOS, and mission persistence remain later work.
 
 > Add new ADRs after this entry as `| 012 | YYYY-MM-DD | ...` — do not remove history.
 

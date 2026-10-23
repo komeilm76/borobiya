@@ -1,9 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FastifyInstance } from "fastify";
 import { allApiRoutes, apiRoutes } from "@borobiya/shared/api";
 import type { SecurityQuestion } from "@borobiya/shared";
 import type { UserRecoveryStore } from "./db/recovery-store";
 import { createFastifyApp, type FastifyAppDependencies } from "./app";
+import { JOB_TICK_INTERVAL_MS } from "./location/jobs";
+import type { LocationHistoryStore } from "./db/location-history-store";
+import type { LocationShareStore } from "./db/location-share-store";
 import { parseServerEnv } from "./config/env";
 
 const serverConfig = parseServerEnv({
@@ -42,6 +45,139 @@ function makeRecoveryStore(questions: SecurityQuestion[]): UserRecoveryStore {
 }
 
 describe("Fastify server skeleton", () => {
+  it("registers the admin catalog routes, so they answer 401 rather than the contract-only 404", async () => {
+    // The whole point of T3.1.2/T3.1.3 landing: these URLs used to fall through to the 404 that unregistered
+    // descriptors return. A 401 here is proof the handler is mounted and its authorization runs.
+    const app = await makeApp();
+
+    const cases = [
+      { method: "GET" as const, url: "/_admin/incidents" },
+      { method: "POST" as const, url: "/_admin/incidents", payload: { name: "Fire" } },
+      { method: "PATCH" as const, url: "/_admin/incidents/00000000-0000-4000-8000-000000000001", payload: { color: null } },
+      { method: "GET" as const, url: "/_admin/categories" },
+      { method: "POST" as const, url: "/_admin/categories", payload: { name: "Mountain", incidentTypeIds: [] } },
+      { method: "PATCH" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001", payload: { name: "Alpine" } },
+      { method: "POST" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001/users", payload: { userIds: ["00000000-0000-4000-8000-000000000002"] } },
+      { method: "DELETE" as const, url: "/_admin/categories/00000000-0000-4000-8000-000000000001/users/00000000-0000-4000-8000-000000000002" }
+    ];
+
+    for (const route of cases) {
+      const response = await app.inject(route as never);
+      expect(response.statusCode, `${route.method} ${route.url}`).toBe(401);
+    }
+
+    const document = await app.inject({ method: "GET", url: "/docs/json" });
+    const paths = document.json().paths as Record<string, Record<string, Record<string, unknown>>>;
+    const implemented = [
+      ["/_admin/incidents", "get"],
+      ["/_admin/incidents", "post"],
+      ["/_admin/incidents/{id}", "patch"],
+      ["/_admin/categories", "get"],
+      ["/_admin/categories", "post"],
+      ["/_admin/categories/{id}", "patch"],
+      ["/_admin/categories/{id}/users", "post"],
+      ["/_admin/categories/{id}/users/{userId}", "delete"]
+    ] as const;
+    for (const [path, method] of implemented) {
+      expect(paths[path]?.[method]?.["x-borobiya-runtime-status"], `${method} ${path}`).toBe("implemented");
+    }
+    // The slug collision the unique index makes reachable has to be in the document, or a client cannot
+    // be written against it.
+    expect(paths["/_admin/incidents"]?.post?.responses, "create gained 409").toHaveProperty("409");
+    expect(paths["/_admin/incidents/{id}"]?.patch?.responses, "rename gained 409").toHaveProperty("409");
+  });
+
+  it("registers the SOS creation route, so it answers 401 rather than the contract-only 404", async () => {
+    // T3.2.2 mounted a real handler at `POST /_user/sos/requests`. The store below refuses to run
+    // without a session, so reaching 401 instead of 404 is the proof the route exists and that the
+    // `/_user` hook — the only thing standing between an anonymous caller and the SOS table — is in
+    // front of it.
+    const app = await makeApp({}, {
+      sosRequestStore: {
+        async createRequest() {
+          throw new Error("the session guard must reject before anything is filed");
+        }
+      }
+    });
+
+    const anonymousUpload = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests/00000000-0000-4000-8000-000000000001/photo",
+      headers: { "content-type": "multipart/form-data; boundary=borobiya-app-test" },
+      payload: Buffer.from("--borobiya-app-test--\r\n", "utf8")
+    });
+    // Mounted behind the same guard, and a multipart body is not *read* before that guard answers: the
+    // plugin's content-type parser only claims the stream, so an unauthenticated caller cannot make the
+    // server buffer 5 MB of anything.
+    expect(anonymousUpload.statusCode).toBe(401);
+
+    // The same, with a body far past the 5 MB the parser would refuse: still 401, not 413. That is the
+    // ordering stated as a test — an unauthenticated caller cannot make this server collect a photo,
+    // only to be told at the end that it had no business uploading one.
+    const oversizedAnonymousUpload = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests/00000000-0000-4000-8000-000000000001/photo",
+      headers: { "content-type": "multipart/form-data; boundary=borobiya-app-test" },
+      payload: Buffer.concat([
+        Buffer.from("--borobiya-app-test\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"a\"\r\n\r\n", "utf8"),
+        Buffer.alloc(6 * 1024 * 1024, 0x20),
+        Buffer.from("\r\n--borobiya-app-test--\r\n", "utf8")
+      ])
+    });
+    expect(oversizedAnonymousUpload.statusCode).toBe(401);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/_user/sos/requests",
+      payload: {
+        severity: "high",
+        description: "Roof collapse, two people unaccounted for inside.",
+        incidentTypeId: "00000000-0000-4000-8000-000000000001",
+        location: { lat: 35.7, lon: 51.4, isManual: false }
+      }
+    });
+    expect(response.statusCode).toBe(401);
+
+    const document = await app.inject({ method: "GET", url: "/docs/json" });
+    const createRequest = (document.json().paths as Record<string, Record<string, Record<string, unknown>>>)[
+      "/_user/sos/requests"
+    ]?.post;
+    expect(createRequest?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(createRequest?.["x-borobiya-access"]).toBe("authenticated");
+    expect(createRequest?.["security"]).toEqual([{ bearerAuth: [] }]);
+    expect(createRequest?.["responses"]).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // The map pin is the field the generated client must be able to write, and its absence would
+    // mean the contract the SOS screen is built against still describes a lat/lon pair it cannot set.
+    expect(createRequest?.["requestBody"]).toHaveProperty(
+      "content.application/json.schema.properties.location.properties.isManual"
+    );
+    expect(createRequest?.["requestBody"]).toHaveProperty("content.application/json.schema.properties.incidentTypeId");
+
+    const uploadPhoto = (document.json().paths as Record<string, Record<string, Record<string, unknown>>>)[
+      "/_user/sos/requests/{id}/photo"
+    ]?.post;
+    expect(uploadPhoto?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(uploadPhoto?.["x-borobiya-access"]).toBe("authenticated");
+    // 413 is the size refusal `docs/SECURITY.md` §9 implies and the route answers; a generated client
+    // needs it in the document to type the "compress it first" branch.
+    expect(uploadPhoto?.["responses"]).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      413: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // The read half is still a promise: no `GET /uploads/{id}` operation exists in the document.
+    expect(document.json().paths).not.toHaveProperty("/uploads/{id}");
+  });
+
   it("serves the public health endpoint with security headers", async () => {
     const app = await makeApp();
     const response = await app.inject({ method: "GET", url: "/_public/health" });
@@ -51,6 +187,39 @@ describe("Fastify server skeleton", () => {
     expect(response.json().uptime).toEqual(expect.any(Number));
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
+  });
+
+  it("catches up on expired shares once the API owns the maintenance timers", async () => {
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 3);
+    const pruneOlderThan = vi.fn(async () => 0);
+    const app = await makeApp({}, {
+      locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
+      locationHistoryStore: { pruneOlderThan } as unknown as LocationHistoryStore,
+      startMaintenanceJobs: true
+    });
+
+    // `inject` implies `ready`, which is what triggers the startup pass.
+    expect((await app.inject({ method: "GET", url: "/_public/health" })).statusCode).toBe(200);
+    await vi.waitFor(() => expect(expireOverdueShares).toHaveBeenCalledTimes(1));
+    expect(pruneOlderThan).toHaveBeenCalledTimes(1);
+    expect(expireOverdueShares.mock.calls[0]?.[0]).toEqual({ now: expect.any(Date) });
+  });
+
+  it("starts no maintenance interval for apps that do not own the timers", async () => {
+    const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 0);
+
+    const app = await makeApp({}, {
+      locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
+      locationHistoryStore: { pruneOlderThan: async () => 0 } as unknown as LocationHistoryStore
+    });
+    await app.inject({ method: "GET", url: "/_public/health" });
+    await app.close();
+
+    expect(expireOverdueShares).not.toHaveBeenCalled();
+    const scheduledDelays = setIntervalSpy.mock.calls.map((call) => (call as unknown as unknown[])[1]);
+    expect(scheduledDelays).not.toContain(JOB_TICK_INTERVAL_MS);
+    setIntervalSpy.mockRestore();
   });
 
   it("serves the public security-question catalog for registration and onboarding", async () => {
@@ -64,6 +233,47 @@ describe("Fastify server skeleton", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual(questions);
     expect(response.headers["cache-control"]).toBe("public, max-age=3600");
+  });
+
+  // The API's caching default is a hook rather than 39 handler lines, so these pin the responses no
+  // handler produced or deliberately annotated — including the one cache that must survive.
+  it("sends no-store on a rate-limited rejection that no handler produced", async () => {
+    const app = await makeApp({ rateLimitMax: 1 }, { recoveryStore: makeRecoveryStore([]) });
+
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(200);
+    const limited = await app.inject({ method: "GET", url: "/_public/security-questions" });
+    expect(limited.statusCode).toBe(429);
+    expect(limited.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("sends no-store on the responses no handler answered", async () => {
+    const app = await makeApp();
+
+    // An unknown path at all: Fastify's own 404, which never enters a route file that could set a header.
+    const missing = await app.inject({ method: "GET", url: "/not-a-route" });
+    expect(missing.statusCode).toBe(404);
+    expect(missing.headers["cache-control"]).toBe("no-store");
+
+    // An unknown path under `/_user`, rejected by the group's auth hook before routing: a response a
+    // proxy must not hold on to, since it says nothing about whether the caller may reach that path later.
+    const rejected = await app.inject({ method: "GET", url: "/_user/not-a-route" });
+    expect(rejected.statusCode).toBe(401);
+    expect(rejected.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("keeps the health probe reachable past the global request limit", async () => {
+    // The point of the exemption: an instance under load must still answer its own liveness check, and
+    // the limiter must still be live for the routes it does protect — otherwise this test would pass on
+    // a plugin that never registered at all.
+    const app = await makeApp({ rateLimitMax: 1 }, { recoveryStore: makeRecoveryStore([]) });
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await app.inject({ method: "GET", url: "/_public/health" })).statusCode).toBe(200);
+    }
+    // And the throttle is live for the routes it does protect, so this is an exemption rather than a
+    // limiter that never registered.
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: "/_public/security-questions" })).statusCode).toBe(429);
   });
 
   it("serves Swagger UI and documents shared contracts without fake runtime routes", async () => {
@@ -97,6 +307,17 @@ describe("Fastify server skeleton", () => {
     const refreshParameters = refresh?.parameters as Array<Record<string, unknown>>;
     const userProfile = paths["/_user/me"]?.get;
     const revokeShare = paths["/_user/location/share/{shareId}"]?.delete;
+    const createShare = paths["/_user/location/share"]?.post;
+    const sharePath = paths["/_user/location/share/{shareId}"]?.delete;
+    const listShares = paths["/_user/location/shares"]?.get;
+    const createHistoryShare = paths["/_user/location/history/share"]?.post;
+    const ownHistory = paths["/_user/location/history"]?.get;
+    const sharedHistory = paths["/_user/location/history/shared/{shareId}"]?.get;
+    const historyShareList = paths["/_user/location/history/shares"]?.get;
+    const revokeHistoryShare = paths["/_user/location/history/share/{shareId}"]?.delete;
+    const listDevices = paths["/_user/devices"]?.get;
+    const userSearch = paths["/_user/users/search"]?.get;
+    const restLocationUpdate = paths["/_user/location/update"]?.post;
     const mapStyle = paths["/_public/map/styles/{theme}.json"]?.get;
     const mapStyleParameters = mapStyle?.parameters as Array<Record<string, unknown>>;
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
@@ -106,7 +327,11 @@ describe("Fastify server skeleton", () => {
     expect(operationCount).toBe(allApiRoutes.length);
     expect(document.info.description).toContain("contract-only");
     expect(paths["/_public/health"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
-    expect(paths["/_public/health"]?.get?.responses).toHaveProperty("429");
+    // Health is the one route the global throttle deliberately skips, so the generator must not
+    // advertise an error the runtime cannot answer there — while every other operation keeps the
+    // implicit 429 the throttle really does produce.
+    expect(Object.keys(paths["/_public/health"]?.get?.responses ?? {})).toEqual(["200"]);
+    expect(paths["/_public/security-questions"]?.get?.responses).toHaveProperty("429");
     expect(registration?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(registration?.responses).toMatchObject({
       201: expect.any(Object),
@@ -249,6 +474,80 @@ describe("Fastify server skeleton", () => {
     });
     expect(publicSecurityQuestions?.["x-borobiya-runtime-status"]).toBe("implemented");
     expect(publicSecurityQuestions?.responses).toHaveProperty("200");
+    expect(createShare?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(sharePath?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(restLocationUpdate?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(restLocationUpdate?.deprecated).toBe(true);
+    expect(listShares?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(listDevices?.["x-borobiya-runtime-status"]).toBe("implemented");
+    // The share picker reads accounts, so search is live too — with the filters it refuses declared.
+    expect(userSearch?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(userSearch?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object)
+    });
+    expect(userSearch?.description ?? "").not.toBe("");
+    expect(listDevices?.["x-borobiya-access"]).toBe("authenticated");
+    expect(listDevices?.security).toEqual([{ bearerAuth: [] }]);
+    expect(listDevices?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
+    // The Active Devices row carries the device identity the priority-device rule pins (T2.3.3).
+    expect(listDevices?.responses).toHaveProperty("200.content.application/json.schema.items.properties.deviceId");
+    expect(listShares?.responses).toMatchObject({ 200: expect.any(Object), 401: expect.any(Object), 403: expect.any(Object) });
+    expect(sharePath?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      404: expect.any(Object)
+    });
+    expect(createShare?.["x-borobiya-access"]).toBe("authenticated");
+    expect(createShare?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      409: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // The 409 is the multi-device prompt (T2.3.3): declared in the contract, or a generated client
+    // cannot type the response the share dialog has to branch on.
+    expect(createShare?.responses).toHaveProperty("409");
+    expect(createHistoryShare?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(createHistoryShare?.responses).toMatchObject({
+      201: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      429: expect.any(Object)
+    });
+    // T2.2.4 is what makes a grant usable, so every half of the history path declares its runtime status:
+    // a "contract-only" here would mean the player had nothing to read.
+    for (const [name, operation] of [
+      ["locationGetHistory", ownHistory],
+      ["locationGetSharedHistory", sharedHistory],
+      ["locationListHistoryShares", historyShareList],
+      ["locationRevokeHistoryShare", revokeHistoryShare]
+    ] as const) {
+      expect(operation?.["x-borobiya-runtime-status"], name).toBe("implemented");
+    }
+    expect(sharedHistory?.responses).toMatchObject({
+      200: expect.any(Object),
+      400: expect.any(Object),
+      401: expect.any(Object),
+      403: expect.any(Object),
+      404: expect.any(Object)
+    });
+    // A sampled view must not look like the whole record: both reads report how many rows the window holds.
+    expect(ownHistory?.responses).toHaveProperty("200.content.application/json.schema.properties.totalPoints");
+    expect(sharedHistory?.responses).toHaveProperty("200.content.application/json.schema.properties.totalPoints");
+    // The receiver's list is the only way to learn a grant id, and it names the owner without a position.
+    expect(historyShareList?.responses).toHaveProperty(
+      "200.content.application/json.schema.properties.sharedWithMe.items.properties.owner"
+    );
+    expect(revokeHistoryShare?.responses).toHaveProperty("200", {
+      description: "Successful response with no response body."
+    });
     expect(refreshParameters).toContainEqual({
       name: "refreshToken",
       in: "cookie",
@@ -304,6 +603,53 @@ describe("Fastify server skeleton", () => {
     const missingUserProfileToken = await app.inject({ method: "GET", url: "/_user/me" });
     expect(missingUserProfileToken.statusCode).toBe(401);
     expect(missingUserProfileToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingDevicesToken = await app.inject({ method: "GET", url: "/_user/devices" });
+    expect(missingDevicesToken.statusCode).toBe(401);
+    expect(missingDevicesToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    // Every history route is `/_user`-scoped, including the reads: a windowed read of another account's
+    // stored positions is the most sensitive path in this feature, so it fails closed on the same hook.
+    for (const probe of [
+      { method: "GET" as const, url: `/_user/location/history?from=2026-10-14T00:00:00.000Z&to=2026-10-21T00:00:00.000Z` },
+      { method: "GET" as const, url: "/_user/users/search?q=field_responder" },
+      { method: "GET" as const, url: "/_user/location/history/shares" },
+      { method: "GET" as const, url: "/_user/location/history/shared/00000000-0000-4000-8000-000000000001" },
+      { method: "DELETE" as const, url: "/_user/location/history/share/00000000-0000-4000-8000-000000000001" }
+    ]) {
+      const unauthenticated = await app.inject(probe);
+      expect(unauthenticated.statusCode, probe.url).toBe(401);
+      expect(unauthenticated.json()).toMatchObject({ code: "UNAUTHORIZED" });
+    }
+
+    // The `/_user` authorization hook is app-scoped, so newly added Phase 2 user routes
+    // must fail closed on the same token/session checks.
+    const missingShareToken = await app.inject({
+      method: "POST",
+      url: "/_user/location/share",
+      payload: { targetUserIds: ["00000000-0000-4000-8000-000000000001"], mode: "permanent" }
+    });
+    expect(missingShareToken.statusCode).toBe(401);
+    expect(missingShareToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingRevokeToken = await app.inject({
+      method: "DELETE",
+      url: "/_user/location/share/00000000-0000-4000-8000-000000000001"
+    });
+    expect(missingRevokeToken.statusCode).toBe(401);
+    expect(missingRevokeToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
+
+    const missingHistoryShareToken = await app.inject({
+      method: "POST",
+      url: "/_user/location/history/share",
+      payload: {
+        targetUserIds: ["00000000-0000-4000-8000-000000000001"],
+        from: "2026-10-14T00:00:00.000Z",
+        to: "2026-10-21T00:00:00.000Z"
+      }
+    });
+    expect(missingHistoryShareToken.statusCode).toBe(401);
+    expect(missingHistoryShareToken.json()).toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("does not expose DELETE /_admin/users/:id", async () => {
@@ -366,16 +712,19 @@ describe("Fastify server skeleton", () => {
     expect(preflight.headers["access-control-allow-headers"]).toContain("authorization");
   });
 
+  // Probed through `/docs/json` rather than the health check: `/_public/health` is exempt from the
+  // throttle (see `ApiRouteMeta.rateLimitExempt`), so a limiter test that used it would stop testing the
+  // limiter the moment the exemption landed and still pass on status codes alone.
   it("ignores spoofed forwarded IP headers unless the proxy is trusted", async () => {
     const app = await makeApp({ rateLimitMax: 1 });
     const first = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
     const second = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.2" }
     });
 
@@ -388,17 +737,17 @@ describe("Fastify server skeleton", () => {
     const app = await makeApp({ rateLimitMax: 1, trustedProxyIps: ["127.0.0.1"] });
     const firstClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
     const secondClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.2" }
     });
     const repeatedClient = await app.inject({
       method: "GET",
-      url: "/_public/health",
+      url: "/docs/json",
       headers: { "x-forwarded-for": "203.0.113.1" }
     });
 

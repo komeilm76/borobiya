@@ -10,6 +10,12 @@ describe("search and common query schemas", () => {
   it("coerces pagination values and enforces the published maximum", () => {
     expect(userSearchSchema.parse({ page: "2", limit: "50" })).toMatchObject({ page: 2, limit: 50 });
     expect(userSearchSchema.parse({})).toMatchObject({ page: 1, limit: 20, sort: "distance" });
+    // A cleared picker control arrives as an empty string: that means "no filter", not "invalid id".
+    expect(userSearchSchema.parse({ category: "", incidentType: "" })).toMatchObject({
+      category: undefined,
+      incidentType: undefined
+    });
+    expect(userSearchSchema.safeParse({ category: "not-a-uuid" }).success).toBe(false);
     expect(userSearchSchema.safeParse({ limit: "101" }).success).toBe(false);
   });
 

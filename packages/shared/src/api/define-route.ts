@@ -23,6 +23,16 @@ export interface ApiRouteMeta {
   requestContentType?: IRequestContentType;
   responseContentType?: IResponseContentType;
   deprecated?: boolean;
+  /**
+   * `true` when the server deliberately does not apply its global request throttle to this route.
+   *
+   * The OpenAPI generator adds a `429` response to every operation because the throttle is global, so a
+   * route that opts out must opt out of that claim too — otherwise the contract advertises an error the
+   * runtime can never produce. One field on the descriptor feeds both sides (see `app.ts` and
+   * `plugins/swagger.ts`), because "documented as limited" and "actually limited" drifting apart is the
+   * failure this exists to prevent.
+   */
+  rateLimitExempt?: boolean;
 }
 
 export interface ApiRouteDefinition {

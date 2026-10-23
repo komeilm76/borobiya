@@ -101,6 +101,14 @@ export default defineConfig(({ mode }) => {
           target: routingTarget,
           changeOrigin: true
         },
+        // Socket.IO must be listed before the generic API prefix: Vite matches proxy contexts in
+        // insertion order, and the WebSocket upgrade for /socket.io needs ws: true.
+        [`${apiPrefix}/socket.io`]: {
+          target: env.API_PROXY_TARGET || "http://127.0.0.1:3000",
+          changeOrigin: true,
+          ws: true,
+          rewrite: stripPrefix(apiPrefix)
+        },
         [apiPrefix]: {
           target: env.API_PROXY_TARGET || "http://127.0.0.1:3000",
           changeOrigin: true,
