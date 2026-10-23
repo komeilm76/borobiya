@@ -920,12 +920,12 @@ describe("Fastify server skeleton", () => {
     const tldrLine = apiMarkdown.split("\n").find((line) => line.startsWith("> TL;DR:")) ?? "";
     const stepFourLine = apiMarkdown.split("\n").find((line) => line.startsWith("4. The Swagger plugin")) ?? "";
     for (const summaryLine of [tldrLine, stepFourLine]) {
-      expect(summaryLine).toContain("POST /_user/sos/requests");
-      expect(summaryLine).toContain("POST /_user/sos/requests/:id/photo");
-      expect(summaryLine).toContain("GET /_admin/sos/requests");
-      expect(summaryLine).toContain("GET /_admin/sos/requests/:id");
-      expect(summaryLine).toContain("GET /_admin/sos/requests/:id/nearest");
-      expect(summaryLine).toContain("POST /_admin/sos/requests/:id/dispatch");
+      expect(summaryLine).toContain(`POST ${apiRoutes.sos.createRequest.url}`);
+      expect(summaryLine).toContain(`POST ${apiRoutes.sos.uploadRequestPhoto.url}`);
+      expect(summaryLine).toContain(`GET ${apiRoutes.admin.listSosRequests.url}`);
+      expect(summaryLine).toContain(`GET ${apiRoutes.admin.getSosRequest.url}`);
+      expect(summaryLine).toContain(`GET ${apiRoutes.admin.getNearestResponders.url}`);
+      expect(summaryLine).toContain(`POST ${apiRoutes.admin.dispatchSosRequest.url}`);
     }
     expect(apiMarkdown).not.toContain("SOS, mission, and the remaining search operations");
     expect(apiMarkdown).not.toContain("and the upload endpoint remain contract-only");

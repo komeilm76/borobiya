@@ -112,7 +112,7 @@ export async function registerUserSecurityQuestionsRoute(
       createdAt: user.createdAt
     };
 
-    if (user.mustCompleteSecurityQuestions && (request.method !== route.method || path !== route.url)) {
+    if (user.role !== "admin" && user.mustCompleteSecurityQuestions && (request.method !== route.method || path !== route.url)) {
       return sendError(
         reply,
         403,
@@ -134,7 +134,7 @@ export async function registerUserSecurityQuestionsRoute(
       role: user.role,
       mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
       isActive: user.isActive,
-      avgRating: user.avgRating,
+      avgRating: user.avgRating === null ? null : Number(user.avgRating),
       categories,
       createdAt: user.createdAt.toISOString()
     });

@@ -553,7 +553,7 @@ onUnmounted(() => {
 
 .admin-users-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(220px, 0.6fr);
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(190px, 0.65fr));
   align-items: start;
   gap: 0.85rem;
   padding: 1.3rem 1.45rem 0.25rem;

@@ -10,7 +10,7 @@ const jsonSchemaOptions = {
   reused: "inline"
 } as const;
 
-const implementedOperationIds = new Set([
+export const implementedOperationIds: ReadonlySet<string> = new Set([
   "publicHealth",
   "authRegister",
   "authLogin",
@@ -277,7 +277,7 @@ export function describeOpenApiRuntimeStatus(paths: OpenApiPaths = buildOpenApiP
   const totalCount = implementedCount + contractOnlyCount;
   const sosImplemented = implementedByTag.get("sos") ?? [];
   const sosClause = sosImplemented.length > 0
-    ? `SOS creation and evidence upload (${sosImplemented.join(", ")}) are live, while the remaining SOS, dispatch, proposal, mission, and place-search operations carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`
+    ? `SOS creation, evidence upload, admin queue/detail reads, nearest-responder ranking, and multi-responder dispatch (${sosImplemented.join(", ")}) are live, while the remaining SOS history/cancellation, rescuer proposal, mission, and place-search operations carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`
     : "SOS and mission operations carry `x-borobiya-runtime-status: contract-only` and currently return 404.";
 
   return (

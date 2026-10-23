@@ -35,7 +35,7 @@ export function userSearchPayload(row: UserSearchRow) {
     id: row.id,
     username: row.username,
     category: row.category ?? null,
-    avgRating: row.avgRating,
+    avgRating: row.avgRating === null ? null : Number(row.avgRating),
     isOnline: row.isOnline,
     distance: row.distanceKm
   };

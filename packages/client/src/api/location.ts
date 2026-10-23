@@ -28,35 +28,45 @@ import { requestJson } from "./http";
  */
 
 /**
- * Options for the picker's username search.
+ * Options for the picker's username search (`GET /_user/users/search`).
  *
- * `category` and `incidentType` are deliberately absent. The server answers those with
- * `400 SEARCH_FILTER_UNSUPPORTED` because the responder tables do not exist yet, so a control
- * for them would either do nothing or fail — and a filtered-looking list that is not filtered is
- * the worst option of the three. When T4.1.1 lands the categories, this type gains the fields and
- * `ShareDialog` gains the selects.
+ * Supports partial username matching alongside responder `category`, `incidentType` specialty,
+ * `minRating`, `online` liveness, explicit `lat`/`lon` distance reference, and pagination.
  */
 export interface UserSearchOptions {
   q?: string;
+  category?: string;
+  incidentType?: string;
   minRating?: number;
   online?: boolean;
+  lat?: number;
+  lon?: number;
   page?: number;
   limit?: number;
+  sort?: "distance";
+  /** Alias accepted for backwards compatibility; serialized on the wire as `sort`. */
   sortBy?: "distance";
 }
 
-/** Builds the query string, omitting anything the user left untouched. */
+/** Builds the query string matching `userSearchSchema` (`sort`, `category`, `incidentType`, `lat`, `lon`, etc.). */
 export function userSearchQuery(options: UserSearchOptions): string {
   const search = new URLSearchParams();
   const term = options.q?.trim();
   if (term) search.set("q", term);
+  const category = options.category?.trim();
+  if (category) search.set("category", category);
+  const incidentType = options.incidentType?.trim();
+  if (incidentType) search.set("incidentType", incidentType);
   if (options.minRating !== undefined) search.set("minRating", String(options.minRating));
   // An untouched `online` control is not sent at all: `online=false` is a real filter ("show the
   // people who are currently *not* connected") and must never be the default of a clearable switch.
   if (options.online !== undefined) search.set("online", String(options.online));
+  if (options.lat !== undefined) search.set("lat", String(options.lat));
+  if (options.lon !== undefined) search.set("lon", String(options.lon));
   if (options.page !== undefined) search.set("page", String(options.page));
   if (options.limit !== undefined) search.set("limit", String(options.limit));
-  if (options.sortBy) search.set("sortBy", options.sortBy);
+  const sort = options.sort ?? options.sortBy;
+  if (sort) search.set("sort", sort);
   return search.toString();
 }
 

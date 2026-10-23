@@ -220,18 +220,18 @@ POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 
 ```
 GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=distance&lat=&lon=&page=&limit=
-→ { items: [{ id, username, category, avgRating, isOnline, distance }], total, page, limit }
+→ { items: [{ id, username, category, avgRating, isOnline, distance }], total, page, limit, totalPages }
 ```
 
-`online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting may use the authenticated user's last known location.
+`online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting uses the authenticated user's last known location when available.
 
-**Live for the share picker (T2.1.7's prerequisite; T4.1.1's first slice).** This build answers a term-bounded search and refuses the rest rather than quietly ignoring filters:
-- `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and no index backs `ILIKE '%x%'` yet — trigram/prefix indexing and index-backed term-free browsing belong to T4.1.1.
-- The caller's own account is never a candidate, in the page or in its `total`: `POST /_user/location/share` refuses it (`self_target`), so a list that offered it could only produce an error the user cannot act on. The dialog still greys it out when it happens to see it (a cached list from before a profile load), but that is presentation, not the rule.
-- `minRating` and `online` are honored: unrated accounts count as 0 (a quality floor should not be satisfied by an absence of data), and liveness is the same rule the device list uses — a session still holding a refresh token.
-- `category` and `incidentType` answer `400 SEARCH_FILTER_UNSUPPORTED` listing the offending names, because the search read does not join `categories`/`category_users`/`category_incident_types` yet — the tables arrived with T3.1.1, the projection is a later task, and refusing beats returning unfiltered rows under a filter the caller believes was applied. An empty-string `category=` is treated as absent.
-- `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix. `total` counts the filtered set in its own statement: page and total are not read in one transaction, so on a busy instance they can differ by whoever signed up in between.
-- `sort` accepts only `distance`, so it needs no refusal; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
+**Live for the share picker and responder filtering (T2.1.7 + T3.1.4).** This build answers a term-bounded search across all filters:
+- `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and trigram/prefix indexing belongs to T4.1.1.
+- The caller's own account is never a candidate, in the page or in its `total`: `POST /_user/location/share` refuses it (`self_target`), so a list that offered it could only produce an error the user cannot act on.
+- `category` and `incidentType` are honored against `categories`, `category_users`, and `category_incident_types`, projecting the matching responder category name (or primary alphabetical category when unfiltered).
+- `minRating` and `online` are honored: unrated accounts count as 0, and `online` checks active unrevoked socket-connected sessions (`user_sessions.is_online = true` with non-null `refresh_token_hash`).
+- `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix.
+- `sort` accepts `distance`; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
 
 `Cache-Control: no-store`, because the answer depends on who is asking and where they last were.
 
@@ -360,7 +360,7 @@ PATCH /_admin/users/:id/unsuspend
 
 `PATCH /_admin/users/:id/status` accepts only the strict body `{ isActive: boolean }` and applies the same current-admin and unrevoked-session authorization checks. It returns the updated user profile with `200`, `400 VALIDATION_ERROR` for an invalid UUID/body, `401 UNAUTHORIZED`/`INVALID_ACCESS_TOKEN` (including a revoked session), `403 ADMIN_REQUIRED`/`ACCOUNT_INACTIVE`/`ACCOUNT_SUSPENDED`, or `404 USER_NOT_FOUND`. The status change, audit entry, and (on deactivation) refresh-session revocation run in one database transaction. The audit entry records `user_activated` or `user_deactivated`, target type/id, and prior/new active state; repeated requests for the existing state are idempotent and do not create duplicate events. Deactivation clears every stored refresh-token hash and marks sessions offline; both `/_user` and `/_admin` authorization checks require a matching session with a non-null refresh-token hash, so outstanding access JWTs are invalidated immediately. Reactivation does not restore those sessions, so the user must sign in again. The route returns `Cache-Control: no-store`.
 
-The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles only, never password hashes. `GET /_admin/users` does not join `category_users` yet (tracked under T3.1.4), so `hasCategory=true` currently short-circuits to an empty page and `false` includes otherwise-matching users. `GET /_admin/users/:id` returns the profile and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty because the mission tables are introduced by T3.5.1. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
+The list and detail routes use the same signed-admin-token, current-account, and unrevoked-session checks. `GET /_admin/users` supports case-insensitive username substring search (`q`), `isActive`, `hasCategory`, and `page`/`limit` (defaults 1/20, max 100); it returns profiles with assigned `categories[]`, never password hashes. `GET /_admin/users/:id` returns the profile, `categories[]`, and device-session records — the same `deviceSchema` rows as `GET /_user/devices`, `deviceId` included, so a pinned priority device is identifiable from either view — where `isCurrentDevice` compares the returned session ID with the requesting admin's session. Its missions array is currently empty until mission read endpoints land in T3.5. Both read routes return `Cache-Control: no-store`; an invalid UUID/query returns `400 VALIDATION_ERROR`, and an unknown user returns `404 USER_NOT_FOUND`.
 
 ### 6.2 Incidents & Categories
 
@@ -392,14 +392,14 @@ Nothing assigns membership by default: no trigger, no seed row, and no column de
 ### 6.3 SOS Dispatch
 
 ```
-GET   /_admin/sos/requests                    → all SOS, filter status
-GET   /_admin/sos/requests/:id
-GET   /_admin/sos/requests/:id/nearest       → { responders: [{userId, distance, avgRating, categoryName, lastActiveAt}] }
-POST  /_admin/sos/requests/:id/dispatch      { rescuerIds: string[] } → creates proposals + emits
-GET   /_admin/stats                           → { counts: sosByStatus, activeMissions, onlineUsers }
+GET   /_admin/sos/requests                    → paginated SOS queue, optional status filter
+GET   /_admin/sos/requests/:id                → single SOS request detail
+GET   /_admin/sos/requests/:id/nearest        → { responders: [{ userId, username, distance, avgRating, categoryName, lastActiveAt }] }
+POST  /_admin/sos/requests/:id/dispatch       { rescuerIds: string[] } → 201 { proposals } + emits sos:proposal-received
+GET   /_admin/stats                           → { counts: sosByStatus, activeMissions, onlineUsers } (contract-only)
 ```
 
-`GET /_admin/sos/requests` (`page`, `limit`, optional `status`) and `GET /_admin/sos/requests/:id` are live behind the standard admin guard with `Cache-Control: no-store`; unknown request ids answer `404 SOS_REQUEST_NOT_FOUND`. Whenever a survivor files an SOS (`POST /_user/sos/requests`) or attaches/replaces its photo (`POST /_user/sos/requests/:id/photo`), the server broadcasts `sos:new-request` (`{ sosRequest }`) exclusively to the Socket.IO `admin` room (T3.2.5). `GET /_admin/sos/requests/:id/nearest`, `POST /_admin/sos/requests/:id/dispatch`, and `GET /_admin/stats` remain contract-only until T3.3/T3.4 land.
+`GET /_admin/sos/requests` (`page`, `limit`, optional `status`), `GET /_admin/sos/requests/:id`, `GET /_admin/sos/requests/:id/nearest` (T3.3.2), and `POST /_admin/sos/requests/:id/dispatch` (T3.3.3 + T3.4.5) are live behind the standard admin guard with `Cache-Control: no-store`; unknown request ids answer `404 SOS_REQUEST_NOT_FOUND`. Nearest responders match active, unsuspended, non-busy responders (`is_on_mission = false` and no active mission row) whose category maps to the SOS `incident_type_id` and who have a stored `last_location`, ordered by PostGIS spherical `ST_Distance` (up to 10 results). `POST /_admin/sos/requests/:id/dispatch` locks the SOS row and ordered responder rows in one transaction, rejects non-dispatchable SOS statuses with `409 INVALID_SOS_STATUS`, rejects busy responders with `409 RESCUER_BUSY`, creates/refreshes `mission_proposals`, transitions `pending` / `cancelled_by_rescuer` SOS rows to `dispatched`, appends an `sos_dispatched` audit entry, and emits `sos:proposal-received` to each `user:{rescuerId}` room plus `sos:new-request` to `admin`. `GET /_admin/stats` remains contract-only.
 
 ### 6.4 Cancellation Reasons (admin config)
 
@@ -499,8 +499,8 @@ today. Every row naming a real status is produced by a registered handler.
 | HTTP | Code | When |
 |------|------|------|
 | 400 | `VALIDATION_ERROR` | Invalid input, selected security-question ID not in the catalog, an unusable location-share recipient (issue codes `self_target`, `unknown_target`, `unavailable_target`), an admin category naming an incident type that does not exist (`unknown_incident_type`, one issue per index) or assigning an account that does not exist (`unknown_user`), or a share request naming a priority device that has no live session (`unknown_priority_device`) |
+| 400 | `PHOTO_URL_NOT_ACCEPTED` | `POST /_user/sos/requests` received `photoUrl` instead of uploading via `POST /_user/sos/requests/:id/photo` |
 | 400 | `SHARE_RANGE_TOO_LARGE` | A history share spans more than `LOCATION_HISTORY_MAX_SHARE_DAYS`; `issues[0]` carries `maxShareDays` and `requestedDays` |
-| 400 | `SEARCH_FILTER_UNSUPPORTED` | User search names a filter its read does not join yet (`category`, `incidentType`); `issues[0].filters` lists them |
 | 400 | `WRONG_ANSWERS` | Security answers do not match the active recovery challenge |
 | 400 | `INVALID_RESET_TOKEN` | Reset token is invalid, expired, or already used |
 | 401 | `UNAUTHORIZED` | Missing credentials |
@@ -510,24 +510,26 @@ today. Every row naming a real status is produced by a registered handler.
 | 403 | `ALREADY_AUTHENTICATED` | A request with an `Authorization` header hits a guest-only `/_auth/*` endpoint |
 | 403 | `ACCOUNT_INACTIVE` | Login/refresh or authenticated operation for a deactivated account |
 | 403 | `ACCOUNT_SUSPENDED` | Login/refresh or authenticated operation for a suspended account |
-| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks non-onboarding `_user` routes |
+| 403 | `SECURITY_QUESTIONS_REQUIRED` | `mustCompleteSecurityQuestions` blocks non-onboarding `_user` routes for non-admin accounts |
 | 403 | `ON_MISSION` | Try accept second proposal while busy |
 | 409 | `SECURITY_QUESTIONS_ALREADY_COMPLETED` | Onboarding endpoint cannot replace an account's completed security answers |
 | 404 | `NOT_FOUND` | Unknown id for a generic operation |
 | 404 | `USER_NOT_FOUND` | Admin status update targets a missing user |
 | 404 | `INCIDENT_TYPE_NOT_FOUND` | Admin incident-type update names an id that does not exist |
 | 404 | `CATEGORY_NOT_FOUND` | Admin category update, member assignment, or member removal names a category that does not exist |
-| 404 | `SOS_REQUEST_NOT_FOUND` | Admin SOS detail read (`GET /_admin/sos/requests/:id`) names an id that does not exist |
+| 404 | `SOS_REQUEST_NOT_FOUND` | Admin SOS read/dispatch or requester photo upload names an SOS request id that does not exist |
 | 404 | `SHARE_NOT_FOUND` | A live or history share id is unknown, belongs to another account, or (for a received history read) was never granted to the caller |
 | 409 | `USERNAME_TAKEN` | Duplicate |
 | 409 | `INCIDENT_TYPE_SLUG_TAKEN` | An admin create or rename lands on a slug another incident type already owns; `issues[0].slug` carries the slug that collided |
+| 409 | `INVALID_SOS_STATUS` | `POST /_admin/sos/requests/:id/dispatch` targets an SOS request whose status is neither `pending` nor `cancelled_by_rescuer` |
+| 409 | `RESCUER_BUSY` | `POST /_admin/sos/requests/:id/dispatch` selects a responder who is already assigned to an active mission |
 | 409 | `WRONG_DEVICE` | GPS from non-priority device |
 | 409 | `INVALID_STATUS_TRANSITION` | Bad mission order |
 | 409 | `PRIORITY_DEVICE_REQUIRED` | Multi-device without selection; `issues[0].deviceIds` carries the live devices for the chooser |
 | 429 | `RATE_LIMITED` | Too many req |
 | 503 | `RECOVERY_UNAVAILABLE` | Security-question catalog or recovery challenge storage is unavailable |
 | — | `SERVICE_UNAVAILABLE` | A storage or account lookup failed under a realtime handshake or `location:update` ack; retry, because nothing was written |
-| 413 | `PAYLOAD_TOO_LARGE` | Photo >5MB |
+| 413 | `PHOTO_TOO_LARGE` / `PAYLOAD_TOO_LARGE` | Uploaded SOS evidence photo exceeds `SOS_PHOTO_MAX_SIZE_MB` (default 5 MB) |
 | — | `CANCEL_RATE_LIMITED` | 3 cancels/hour |
 | 500 | `INTERNAL_ERROR` | A failure no handler answered (a store or serializer error). The detail is logged, never sent; safe to retry |
 

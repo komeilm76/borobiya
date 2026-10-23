@@ -12,6 +12,7 @@ import {
   listAdminSosRequests,
   type ListAdminSosRequestsParams
 } from "@/api/admin-sos";
+import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
 import {
   isDispatchableSosStatus,
@@ -174,8 +175,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       }
     } catch (err) {
       if (gen !== refreshGeneration) return;
-      errorMessage.value =
-        err instanceof Error ? err.message : "دریافت فهرست درخواست‌های اضطراری انجام نشد.";
+      errorMessage.value = friendlyErrorMessage(
+        err,
+        "دریافت فهرست درخواست‌های اضطراری انجام نشد."
+      );
     } finally {
       if (gen === refreshGeneration) {
         loading.value = false;
@@ -206,8 +209,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     } catch (err) {
       if (gen !== nearestGeneration) return;
       nearestResponders.value = [];
-      nearestError.value =
-        err instanceof Error ? err.message : "دریافت فهرست نزدیک‌ترین امدادگران انجام نشد.";
+      nearestError.value = friendlyErrorMessage(
+        err,
+        "دریافت فهرست نزدیک‌ترین امدادگران انجام نشد."
+      );
     } finally {
       if (gen === nearestGeneration) {
         nearestLoading.value = false;
@@ -268,7 +273,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     } catch (err) {
       dispatchFeedback.value = {
         type: "error",
-        message: err instanceof Error ? err.message : "ارسال پیشنهاد مأموریت انجام نشد."
+        message: friendlyErrorMessage(err, "ارسال پیشنهاد مأموریت انجام نشد.")
       };
       return false;
     } finally {

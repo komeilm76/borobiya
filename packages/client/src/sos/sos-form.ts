@@ -8,6 +8,7 @@ import {
   type SosLocation
 } from "@shared/index";
 import { ApiError } from "../api/http";
+import { friendlyErrorMessage } from "../api/error-message";
 
 export const SOS_DESCRIPTION_MIN_LENGTH = 10;
 export const SOS_DESCRIPTION_MAX_LENGTH = 500;
@@ -236,6 +237,9 @@ export function sosApiErrorMessage(
     if (issueCodes.includes("unsupported_format") || issueCodes.includes("truncated")) {
       return "فایل تصویر معتبر نیست؛ یک تصویر کامل با فرمت JPEG، PNG یا WebP انتخاب کنید.";
     }
+    if (issueCodes.includes("empty") || issueCodes.includes("no_file")) {
+      return "فایل تصویر انتخاب‌شده خالی است.";
+    }
   }
-  return fallback;
+  return friendlyErrorMessage(error, fallback);
 }

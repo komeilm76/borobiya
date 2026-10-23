@@ -33,7 +33,7 @@ function profilePayload(user: AdminUserRecord) {
     role: user.role,
     mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
     isActive: user.isActive,
-    avgRating: user.avgRating,
+    avgRating: user.avgRating === null ? null : Number(user.avgRating),
     categories: user.categories ?? [],
     createdAt: user.createdAt.toISOString()
   };

@@ -76,9 +76,10 @@ export const useAuthStore = defineStore("auth", () => {
   const onboardingRequired = ref(false);
   const initialized = ref(false);
   const isAuthenticated = computed(() => accessToken.value !== null);
-  const mustCompleteSecurityQuestions = computed(
-    () => onboardingRequired.value || user.value?.mustCompleteSecurityQuestions === true
-  );
+  const mustCompleteSecurityQuestions = computed(() => {
+    if (user.value?.role === "admin") return false;
+    return onboardingRequired.value || user.value?.mustCompleteSecurityQuestions === true;
+  });
   const userRole = computed(() => user.value?.role ?? null);
   let initializationPromise: Promise<void> | null = null;
   let refreshPromise: Promise<void> | null = null;

@@ -407,4 +407,119 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     expect(store.selectedId).toBe("66666666-6666-4666-8666-666666666662");
     store.resetState();
   });
+
+  it("serializes category, incidentType, lat, and lon in userSearchQuery, exempts admins from client onboarding lock, and localizes Phase 3 API errors", async () => {
+    const { userSearchQuery } = await import("../api/location");
+    const { friendlyErrorMessage } = await import("../api/error-message");
+    const { sosApiErrorMessage } = await import("../sos/sos-form");
+
+    const { userSearchSchema } = await import("@shared/index");
+    const query = userSearchQuery({
+      q: "  rescuer  ",
+      category: "40000000-0000-4000-8000-000000000001",
+      incidentType: "30000000-0000-4000-8000-000000000001",
+      minRating: 4.5,
+      online: true,
+      lat: 35.8012,
+      lon: 51.4285,
+      sortBy: "distance",
+      limit: 20
+    });
+    const parsedQuery = new URLSearchParams(query);
+    expect(parsedQuery.get("q")).toBe("rescuer");
+    expect(parsedQuery.get("category")).toBe("40000000-0000-4000-8000-000000000001");
+    expect(parsedQuery.get("incidentType")).toBe("30000000-0000-4000-8000-000000000001");
+    expect(parsedQuery.get("minRating")).toBe("4.5");
+    expect(parsedQuery.get("online")).toBe("true");
+    expect(parsedQuery.get("lat")).toBe("35.8012");
+    expect(parsedQuery.get("lon")).toBe("51.4285");
+    expect(parsedQuery.get("sort")).toBe("distance");
+    expect(parsedQuery.has("sortBy")).toBe(false);
+    // Validate the exact serialized query against the server's strict userSearchSchema!
+    expect(() => userSearchSchema.parse(Object.fromEntries(parsedQuery.entries()))).not.toThrow();
+
+    // Admin accounts with mustCompleteSecurityQuestions = true are NOT locked out of admin views:
+    setActivePinia(createPinia());
+    const auth = useAuthStore();
+    auth.accessToken = makeJwt("admin-dev-onboarding-exempt");
+    auth.user = {
+      id: "99999999-9999-4999-8999-999999999999",
+      username: "admin_with_flag",
+      role: "admin",
+      mustCompleteSecurityQuestions: true
+    };
+    expect(auth.mustCompleteSecurityQuestions).toBe(false);
+
+    // Phase 3 error codes resolve to localized Persian messages in both general & SOS/Admin surfaces:
+    for (const code of [
+      "INCIDENT_TYPE_SLUG_TAKEN",
+      "SOS_REQUEST_NOT_FOUND",
+      "INVALID_SOS_STATUS",
+      "RESCUER_BUSY",
+      "PHOTO_TOO_LARGE",
+      "PHOTO_URL_NOT_ACCEPTED",
+      "TOO_MANY_PARTS"
+    ]) {
+      const apiErr = new ApiError(409, code, "Raw English Server Message");
+      const msg = friendlyErrorMessage(apiErr, "FALLBACK_SENTINEL");
+      expect(msg, code).not.toBe("FALLBACK_SENTINEL");
+      expect(msg, code).not.toBe("Raw English Server Message");
+      expect(sosApiErrorMessage(apiErr, "FALLBACK_SENTINEL"), code).not.toBe("FALLBACK_SENTINEL");
+    }
+
+    // useAdminSosStore translates server ApiError codes into Persian instead of leaking English text:
+    const sock = makeFakeSocket();
+    configureAdminSosRuntimeForTests({
+      openSocket: async () => ({
+        socket: sock as unknown as RealtimeClient["socket"],
+        connect: vi.fn(),
+        updateToken: vi.fn(),
+        close: vi.fn()
+      }),
+      listRequests: async () => ({
+        total: 1,
+        items: [
+          {
+            id: "88888888-8888-4888-8888-888888888888",
+            requesterId: "11111111-1111-4111-8111-111111111111",
+            severity: "high" as const,
+            description: "آزمون خطای فارسی در پنل اعزام امدادگر",
+            incidentTypeId: "77777777-7777-4777-8777-777777777777",
+            location: { lat: 35.7, lon: 51.4, accuracy: 5, isManual: false },
+            photoUrl: null,
+            status: "pending" as const,
+            cancellationReasonId: null,
+            cancellationCustomText: null,
+            cancelledAt: null,
+            createdAt: "2026-10-23T14:00:00.000Z"
+          }
+        ]
+      }),
+      getNearestResponders: async () => ({
+        responders: [
+          {
+            userId: "77777777-7777-4777-8777-777777777771",
+            username: "rescuer_busy_1",
+            distance: 220,
+            avgRating: 4.8,
+            categoryName: "امداد شهری",
+            lastActiveAt: "2026-10-23T14:00:00.000Z"
+          }
+        ]
+      }),
+      dispatchResponders: async () => {
+        throw new ApiError(409, "RESCUER_BUSY", "Selected responders are already assigned to an active mission.");
+      }
+    });
+
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.nearestResponders).toHaveLength(1));
+    store.toggleResponderSelection("77777777-7777-4777-8777-777777777771");
+    const dispatched = await store.dispatchSelectedResponders();
+    expect(dispatched).toBe(false);
+    expect(store.dispatchFeedback?.type).toBe("error");
+    expect(store.dispatchFeedback?.message).not.toContain("Selected responders are already assigned");
+    expect(store.dispatchFeedback?.message).toContain("مأموریت فعال");
+    store.resetState();
+  });
 });

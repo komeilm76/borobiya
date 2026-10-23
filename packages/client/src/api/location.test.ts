@@ -62,9 +62,9 @@ describe("user search query", () => {
     expect(userSearchQuery({ q: "ham" })).toBe("q=ham");
   });
 
-  it("passes the paging and rating controls through", () => {
+  it("passes the paging, filter, and sort controls through using the wire query schema keys", () => {
     expect(userSearchQuery({ q: "ha", minRating: 4, page: 2, limit: 25, sortBy: "distance" })).toBe(
-      "q=ha&minRating=4&page=2&limit=25&sortBy=distance"
+      "q=ha&minRating=4&page=2&limit=25&sort=distance"
     );
   });
 });
