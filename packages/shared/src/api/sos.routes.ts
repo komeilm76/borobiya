@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   errorSchema,
-  idSchema,
   paginationQuerySchema,
   paginatedResponseSchema,
   timestampSchema
@@ -14,6 +13,8 @@ import {
   missionRatingSchema,
   missionSchema,
   missionStatusUpdateSchema,
+  nearestResponderSchema,
+  nearestRespondersResponseSchema,
   proposalAcceptResponseSchema,
   proposalDeclineSchema,
   sosRequestCreatedSchema,
@@ -24,17 +25,7 @@ import {
 import { noContentResponseSchema } from "./common";
 import { defineRoute } from "./define-route";
 
-export const nearestResponderSchema = z.strictObject({
-  userId: idSchema,
-  distance: z.number().finite().nonnegative(),
-  avgRating: z.number().finite().min(0).max(5).nullable(),
-  categoryName: z.string().nullable(),
-  lastActiveAt: timestampSchema
-});
-
-export const nearestRespondersResponseSchema = z.strictObject({
-  responders: z.array(nearestResponderSchema)
-});
+export { nearestResponderSchema, nearestRespondersResponseSchema };
 
 const sosRequestListQuerySchema = z.strictObject({
   role: z.enum(["requester", "rescuer"]).optional(),

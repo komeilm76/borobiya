@@ -36,6 +36,7 @@ const implementedOperationIds = new Set([
   "adminRemoveCategoryUser",
   "adminListSosRequests",
   "adminGetSosRequest",
+  "adminGetNearestResponders",
   "userCompleteSecurityQuestions",
   "userListDevices",
   "userSearch",

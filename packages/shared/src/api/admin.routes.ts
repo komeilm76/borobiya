@@ -20,8 +20,8 @@ import {
 } from "../schemas/common";
 import { devicesSchema, userProfileSchema } from "../schemas/user";
 import {
+  dispatchResponseSchema,
   dispatchSosRequestSchema,
-  missionProposalSchema,
   missionSchema,
   sosRequestRecordSchema
 } from "../schemas/sos";
@@ -46,7 +46,6 @@ export const adminSosListQuerySchema = z.strictObject({
 });
 export type AdminSosListQuery = z.output<typeof adminSosListQuerySchema>;
 
-const dispatchResponseSchema = z.strictObject({ proposals: z.array(missionProposalSchema) });
 const adminStatsResponseSchema = z.strictObject({
   counts: z.record(z.string(), z.number().int().nonnegative()),
   activeMissions: z.number().int().nonnegative(),

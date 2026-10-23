@@ -192,8 +192,10 @@ CREATE TABLE mission_proposals (
   sos_request_id UUID NOT NULL REFERENCES sos_requests(id) ON DELETE CASCADE,
   rescuer_id UUID NOT NULL REFERENCES users(id),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired')),
-  created_at TIMESTAMPTZ DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (sos_request_id, rescuer_id)
 );
+CREATE INDEX mission_proposals_rescuer_status_idx ON mission_proposals (rescuer_id, status);
 
 CREATE TABLE missions (
   id UUID PRIMARY KEY,

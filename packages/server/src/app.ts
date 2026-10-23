@@ -26,6 +26,11 @@ import { registerAdminSosRoutes } from "./admin/sos";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
+import {
+  createPlaceholderSosDispatchStore,
+  DrizzleSosDispatchStore,
+  type SosDispatchStore
+} from "./db/sos-dispatch-store";
 import { registerSosRequestRoutes } from "./sos/requests";
 import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
@@ -82,6 +87,8 @@ export interface FastifyAppDependencies {
   categoryStore?: CategoryStore;
   /** Override SOS-request creation persistence in tests. */
   sosRequestStore?: SosRequestStore;
+  /** Override SOS nearest-responder & dispatch persistence in tests. */
+  sosDispatchStore?: SosDispatchStore;
   /** Override the photo attach write in tests. */
   photoStore?: SosPhotoStore;
   /** Override where uploaded photos are written in tests. */
@@ -148,6 +155,9 @@ export async function createFastifyApp(
   const incidentTypeStore = dependencies.incidentTypeStore ?? new DrizzleIncidentTypeStore(database!.db);
   const categoryStore = dependencies.categoryStore ?? new DrizzleCategoryStore(database!.db);
   const sosRequestStore = dependencies.sosRequestStore ?? new DrizzleSosRequestStore(database!.db);
+  const sosDispatchStore =
+    dependencies.sosDispatchStore ??
+    (database ? new DrizzleSosDispatchStore(database.db) : createPlaceholderSosDispatchStore());
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
   const liveLocationService = createLiveLocationService({
@@ -208,6 +218,7 @@ export async function createFastifyApp(
   });
   await registerAdminSosRoutes(app, {
     store: sosRequestStore,
+    dispatchStore: sosDispatchStore,
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret
   });

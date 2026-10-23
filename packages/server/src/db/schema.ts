@@ -1,4 +1,11 @@
-import type { CancellationType, LocationShareMode, Severity, SosRequestStatus, UserRole } from "@borobiya/shared";
+import type {
+  CancellationType,
+  LocationShareMode,
+  MissionProposalStatus,
+  Severity,
+  SosRequestStatus,
+  UserRole
+} from "@borobiya/shared";
 import { sql } from "drizzle-orm";
 import {
   bigserial,
@@ -42,6 +49,7 @@ export const users = pgTable(
     role: varchar("role", { length: 10 }).$type<UserRole>().notNull().default("user"),
     isActive: boolean("is_active").notNull().default(true),
     isSuspended: boolean("is_suspended").notNull().default(false),
+    isOnMission: boolean("is_on_mission").notNull().default(false),
     mustCompleteSecurityQuestions: boolean("must_complete_security_questions").notNull().default(false),
     avgRating: numeric("avg_rating", { precision: 2, scale: 1, mode: "number" }),
     lastLocation: geographyPoint("last_location"),
@@ -409,6 +417,26 @@ export const sosRequests = pgTable(
   ]
 );
 
+export const missionProposals = pgTable(
+  "mission_proposals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sosRequestId: uuid("sos_request_id")
+      .notNull()
+      .references(() => sosRequests.id, { onDelete: "cascade" }),
+    rescuerId: uuid("rescuer_id")
+      .notNull()
+      .references(() => users.id),
+    status: text("status").$type<MissionProposalStatus>().notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("mission_proposals_request_rescuer_unique").on(table.sosRequestId, table.rescuerId),
+    check("mission_proposals_status_check", sql`"status" IN ('pending', 'accepted', 'declined', 'expired')`),
+    index("mission_proposals_rescuer_status_idx").on(table.rescuerId, table.status)
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
@@ -432,3 +460,5 @@ export type CategoryIncidentTypeRow = typeof categoryIncidentTypes.$inferSelect;
 export type CategoryUserRow = typeof categoryUsers.$inferSelect;
 export type SosRequestRow = typeof sosRequests.$inferSelect;
 export type NewSosRequestRow = typeof sosRequests.$inferInsert;
+export type MissionProposalRow = typeof missionProposals.$inferSelect;
+export type NewMissionProposalRow = typeof missionProposals.$inferInsert;

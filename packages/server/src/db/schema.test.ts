@@ -11,6 +11,7 @@ import {
   sosRequests,
   locationHistoryShares,
   locationShares,
+  missionProposals,
   passwordResetChallenges,
   passwordResetTokens,
   userSecurityAnswers,
@@ -35,6 +36,7 @@ describe("users database schema", () => {
     for (const [name, defaultValue] of [
       ["is_active", true],
       ["is_suspended", false],
+      ["is_on_mission", false],
       ["must_complete_security_questions", false]
     ] as const) {
       const column = columns.get(name);
@@ -458,5 +460,51 @@ describe("sos request table (T3.2.1)", () => {
     // The nearest-responder index (T3.3.1) is a measured decision for that query, not a guess here.
     expect(sql).not.toContain("CREATE INDEX");
     expect(sql).not.toContain("GIST");
+  });
+});
+
+describe("mission_proposals table and users.is_on_mission flag (T3.3.1 / T3.4.1)", () => {
+  const migrationNames = readdirSync(new URL("../../drizzle/", import.meta.url)).filter((name) =>
+    /^0013_.*\.sql$/.test(name)
+  );
+
+  it("declares mission_proposals with cascade-from-request, preserved-rescuer FK, status check, and rescuer+status index", () => {
+    const config = getTableConfig(missionProposals);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+
+    expect(columns.get("id")?.hasDefault).toBe(true);
+    expect(columns.get("sos_request_id")?.notNull).toBe(true);
+    expect(columns.get("rescuer_id")?.notNull).toBe(true);
+    expect(columns.get("status")?.notNull).toBe(true);
+    expect(columns.get("status")?.hasDefault).toBe(true);
+    expect(columns.get("status")?.default).toBe("pending");
+    expect(columns.get("created_at")?.notNull).toBe(true);
+    expect(columns.get("created_at")?.hasDefault).toBe(true);
+
+    expect(config.uniqueConstraints.map(({ name }) => name)).toEqual(["mission_proposals_request_rescuer_unique"]);
+    expect(config.checks.map(({ name }) => name)).toEqual(["mission_proposals_status_check"]);
+    expect(config.indexes.map(({ config: idx }) => idx.name)).toEqual(["mission_proposals_rescuer_status_idx"]);
+
+    const requestFk = config.foreignKeys.find((fk) => fk.getName().includes("sos_request_id"));
+    const rescuerFk = config.foreignKeys.find((fk) => fk.getName().includes("rescuer_id"));
+    expect(requestFk?.onDelete).toBe("cascade");
+    expect(rescuerFk?.onDelete).toBe("no action");
+  });
+
+  it("generates migration 0013 cleanly with mission_proposals DDL and users.is_on_mission", () => {
+    expect(migrationNames).toHaveLength(1);
+    const name = migrationNames[0];
+    if (!name) throw new Error("The mission_proposals migration is missing.");
+    const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
+
+    expect(sql).toContain('CREATE TABLE "mission_proposals"');
+    expect(sql).toContain('ALTER TABLE "users" ADD COLUMN "is_on_mission" boolean DEFAULT false NOT NULL;');
+    expect(sql).toContain('CONSTRAINT "mission_proposals_request_rescuer_unique" UNIQUE("sos_request_id","rescuer_id")');
+    expect(sql).toContain(
+      `CONSTRAINT "mission_proposals_status_check" CHECK ("status" IN ('pending', 'accepted', 'declined', 'expired'))`
+    );
+    expect(sql).toContain(
+      'CREATE INDEX "mission_proposals_rescuer_status_idx" ON "mission_proposals" USING btree ("rescuer_id","status")'
+    );
   });
 });

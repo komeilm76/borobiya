@@ -3,7 +3,8 @@ import {
   coordinatesSchema,
   idParamsSchema,
   idSchema,
-  timestampSchema
+  timestampSchema,
+  usernameSchema
 } from "./common";
 import {
   missionProgressStatusSchema,
@@ -144,7 +145,33 @@ export const sosRequestRecordSchema = z.strictObject({
 export type SosRequest = z.infer<typeof sosRequestRecordSchema>;
 export type SosRequestRecord = SosRequest;
 
+export const nearestResponderSchema = z.strictObject({
+  userId: idSchema,
+  username: usernameSchema,
+  distance: z.number().finite().nonnegative(),
+  avgRating: z.number().finite().min(0).max(5).nullable(),
+  categoryName: z.string().nullable(),
+  lastActiveAt: timestampSchema
+});
+export type NearestResponder = z.infer<typeof nearestResponderSchema>;
+
+export const nearestRespondersResponseSchema = z.strictObject({
+  responders: z.array(nearestResponderSchema)
+});
+export type NearestRespondersResponse = z.infer<typeof nearestRespondersResponseSchema>;
+
+export const dispatchResponseSchema = z.strictObject({
+  proposals: z.array(missionProposalSchema)
+});
+export type DispatchResponse = z.infer<typeof dispatchResponseSchema>;
+
 export const sosNewRequestEventSchema = z.strictObject({
   sosRequest: sosRequestRecordSchema
 });
 export type SosNewRequestEvent = z.infer<typeof sosNewRequestEventSchema>;
+
+export const sosProposalReceivedEventSchema = z.strictObject({
+  proposal: missionProposalSchema,
+  sosRequest: sosRequestRecordSchema
+});
+export type SosProposalReceivedEvent = z.infer<typeof sosProposalReceivedEventSchema>;
