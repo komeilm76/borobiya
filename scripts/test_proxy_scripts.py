@@ -61,6 +61,9 @@ class ScriptCase(unittest.TestCase):
         self.dropin = self.etc / "systemd" / "system" / "docker.service.d" / "borobiya-proxy.conf"
 
     def base_env(self, **extra: str) -> dict[str, str]:
+        # PATH_EXTRA puts a stub docker/systemctl ahead of the real PATH, for the tests that have to
+        # describe a machine this sandbox is not. It is consumed here, never passed to the child.
+        prepend = extra.pop("PATH_EXTRA", None)
         env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "HOME": str(self.home),
@@ -72,6 +75,8 @@ class ScriptCase(unittest.TestCase):
             "BOROBIYA_PROXY_CHECK_URL": "http://check.invalid/",
         }
         env.update(extra)
+        if prepend:
+            env["PATH"] = prepend + os.pathsep + env["PATH"]
         return env
 
     def enable(self, *args: str, stdin: str = "", **env_extra: str) -> subprocess.CompletedProcess[str]:
@@ -416,6 +421,82 @@ class TestOtherPeoplesConfigSurvives(ScriptCase):
 
 
 class TestStatusReports(ScriptCase):
+    def stub(self, names: dict[str, str]) -> str:
+        """A PATH holding fake docker/systemctl, so a test can describe a machine this sandbox is not.
+
+        The report bug that reached a real VM was invisible here for one reason: no docker binary, so
+        the whole branch never ran. A stub makes that state reachable on purpose.
+        """
+        bin_dir = self.home / "stub-bin"
+        bin_dir.mkdir(parents=True, exist_ok=True)
+        for name, body in names.items():
+            script = bin_dir / name
+            script.write_text("#!/bin/sh\n" + body + "\n")
+            script.chmod(0o755)
+        return str(bin_dir)
+
+    def test_a_running_daemon_with_no_proxy_still_asks_for_the_address(self) -> None:
+        """The machine from the bug report: docker answers, and its unit environment has no proxy.
+
+        Before the fix, `grep -i proxy` inside the report exited 1, `set -e` read that assignment as
+        fatal, and enable-proxy.sh printed five lines and died — no prompt, no error, nothing a
+        reader could act on. Only reproducible with a docker binary, so this stubs one.
+        """
+        path = self.stub({
+            "docker": 'if [ "$1" = info ]; then exit 0; fi\nexit 0',
+            "systemctl": 'printf "Environment=\n"\nexit 0',
+        })
+        # NO_SYSTEMD off, so the report asks the daemon; --no-system on, so the run does not write to
+        # it. Reporting and writing are separate decisions and this test is about the first one.
+        result = self.enable(
+            "--dry-run", "--skip-checks", "--no-system", "--no-docker-config",
+            PATH_EXTRA=path, BOROBIYA_PROXY_NO_SYSTEMD="0", PROXY_FORCE_FORM="1",
+            stdin="10.0.2.5:3128\n",
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Proxy address", result.stdout)
+        self.assertIn("no proxy in the unit environment", result.stdout)
+    def test_status_survives_a_daemon_that_reports_a_proxy(self) -> None:
+        """The other half: when there *is* a proxy in the unit environment, say so, and say it cleanly."""
+        path = self.stub({
+            "docker": 'if [ "$1" = info ]; then exit 0; fi\nexit 0',
+            "systemctl": 'printf "Environment=http_proxy=http://10.0.2.5:3128 https_proxy=http://10.0.2.5:3128\n"\nexit 0',
+        })
+        result = self.enable("--status", PATH_EXTRA=path, BOROBIYA_PROXY_NO_SYSTEMD="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("daemon env", result.stdout)
+        self.assertIn("http://10.0.2.5:3128", result.stdout)
+        self.assertNotIn("Environment=", result.stdout)  # systemctl's field name is not part of the value
+    def test_status_survives_a_daemon_that_does_not_answer(self) -> None:
+        """A docker CLI with no daemon behind it (the usual state before step 12) skips the line."""
+        path = self.stub({"docker": "exit 1", "systemctl": "exit 1"})
+        result = self.enable("--status", PATH_EXTRA=path, BOROBIYA_PROXY_NO_SYSTEMD="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("daemon env", result.stdout)
+    def test_status_survives_a_host_without_systemd(self) -> None:
+        """docker answers and systemctl does not exist (a container host, WSL without systemd)."""
+        if shutil.which("systemctl") is not None:
+            self.skipTest("this host has a real systemctl, so the no-systemd shape cannot be faked")
+        path = self.stub({"docker": 'if [ "$1" = info ]; then exit 0; fi\nexit 0'})
+        result = self.enable("--status", PATH_EXTRA=path, BOROBIYA_PROXY_NO_SYSTEMD="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("daemon env", result.stdout)
+    def test_disabling_a_never_enabled_machine_asks_nothing(self) -> None:
+        """disable-proxy.sh with no flags on a clean VM: exit 0, an explanation, no [y/N].
+
+        Every earlier test called disable through a helper that passes --yes, so the confirmation
+        path — the thing a reader actually walks into after runbook § 5.4 — had never run against a
+        machine with nothing to remove.
+        """
+        result = subprocess.run(
+            [str(DISABLE)], input="", capture_output=True, text=True, check=False,
+            env=self.base_env(), cwd=REPO_ROOT, timeout=90,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Nothing to remove", result.stdout)
+        self.assertIn("nothing to remove", result.stdout)
+        self.assertNotIn("[y/N]", result.stdout)
+        self.assertIn("5.1a", result.stdout)  # the host-side half it cannot reach, named at the moment
     def test_status_on_a_clean_machine(self) -> None:
         result = self.enable("--status")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

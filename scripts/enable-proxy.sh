@@ -113,6 +113,7 @@ fi
 [[ -n "$ARG_PORT" ]] && PROXY_PORT="$ARG_PORT"
 
 if [[ -z "$PROXY_HOST" ]]; then
+  proxy_log "Where to proxy to"
   # One answer may carry both halves ("10.0.2.5:3128"), because that is the shape a proxy client shows
   # on screen; splitting it here is what stops ":3128" from becoming part of a hostname.
   proxy_ask "Proxy address, optionally host:port (host LAN IP when the VM is bridged; the default gateway only in NAT mode)" ""

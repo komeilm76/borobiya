@@ -60,6 +60,23 @@ proxy_setup_io
 proxy_status
 if (( STATUS_ONLY )); then exit 0; fi
 
+if ! proxy_is_configured; then
+  # A machine that was never enabled needs no permission to change nothing — and the reader who just
+  # typed this because runbook § 5.4 said to remove the proxy deserves to be told it is not there,
+  # rather than being asked "remove the configuration listed above?" about an empty list.
+  proxy_log "Nothing to remove"
+  proxy_note "no block in $PROXY_BASHRC, no $PROXY_APT_FILE, no drop-in, no proxies key, no state file"
+  proxy_note "nothing to remove: this machine holds no configuration written by enable-proxy.sh"
+  if [[ -n "${http_proxy:-${HTTP_PROXY:-}}" ]]; then
+    proxy_note "this terminal still exports $(printf '%s' "${http_proxy:-${HTTP_PROXY}}" | proxy_mask);"
+    proxy_note "  that is the shell's own environment, not a file — open a new terminal, or:"
+    proxy_note "  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY all_proxy ALL_PROXY"
+  fi
+  proxy_note "the host-side changes runbook § 5.1a describes (a firewall rule, a netsh portproxy) live"
+  proxy_note "outside this VM, so nothing here can undo them; the section lists the commands that do."
+  exit 0
+fi
+
 proxy_log "Confirm"
 if [[ -n "${http_proxy:-${HTTP_PROXY:-}}" ]]; then
   proxy_note "this terminal still exports $(printf '%s' "${http_proxy:-${HTTP_PROXY}}" | proxy_mask);"

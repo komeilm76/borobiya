@@ -522,17 +522,21 @@ proxy_system_apply() { # $1 = url with credentials for apt/daemon, $2 = no_proxy
     proxy_note "would write $PROXY_APT_FILE and $PROXY_DOCKERD_DROPIN"
     return 0
   fi
-  proxy_sudo mkdir -p "${PROXY_APT_FILE%/*}"
+  proxy_sudo mkdir -p "${PROXY_APT_FILE%/*}" ||
+    proxy_fail "could not create ${PROXY_APT_FILE%/*} — re-run with a working sudo, or use runbook § 5.3"
   printf '%s\n' "$apt_body" | proxy_sudo tee "$PROXY_APT_FILE" >/dev/null ||
     proxy_fail "could not write $PROXY_APT_FILE"
   proxy_note "wrote $PROXY_APT_FILE"
-  proxy_sudo mkdir -p "${PROXY_DOCKERD_DROPIN%/*}"
+  proxy_sudo mkdir -p "${PROXY_DOCKERD_DROPIN%/*}" ||
+    proxy_fail "could not create ${PROXY_DOCKERD_DROPIN%/*} — the apt file is written, the drop-in is not"
   printf '%s\n' "$daemon_body" | proxy_sudo tee "$PROXY_DOCKERD_DROPIN" >/dev/null ||
     proxy_fail "could not write $PROXY_DOCKERD_DROPIN"
   proxy_note "wrote $PROXY_DOCKERD_DROPIN"
   if [[ -n "${PROXY_USERPASS:-}" ]]; then
     # Both files now contain a password. apt and systemd read them as root, so 0600 costs nothing.
-    proxy_sudo chmod 600 "$PROXY_APT_FILE" "$PROXY_DOCKERD_DROPIN"
+    proxy_sudo chmod 600 "$PROXY_APT_FILE" "$PROXY_DOCKERD_DROPIN" ||
+      proxy_fail "both files were written but are not 0600, so a password is readable: run" \
+        "'sudo chmod 600 $PROXY_APT_FILE $PROXY_DOCKERD_DROPIN' before anything else"
   fi
 }
 
@@ -550,8 +554,13 @@ proxy_system_remove() {
     if (( DRY_RUN )); then
       proxy_note "would remove $f"
     else
-      proxy_sudo rm -f "$f"
-      proxy_note "removed $f"
+      if proxy_sudo rm -f "$f"; then
+        proxy_note "removed $f"
+      else
+        # Not fatal: a file that outlives the run because sudo was unavailable is a leak to report,
+        # and saying so beats the script exiting between two notes.
+        proxy_note "could not remove $f — it is still there, and needs: sudo rm -f $f"
+      fi
     fi
   done
 }
@@ -574,8 +583,15 @@ proxy_reload_docker() {
     proxy_note "skipped: apply it later with 'sudo systemctl daemon-reload && sudo systemctl restart docker'"
     return 0
   fi
-  proxy_sudo systemctl daemon-reload
-  proxy_sudo systemctl restart docker
+  # Both are said rather than trusted: under `set -e` a bare failing command here would stop the
+  # script after the files were written, which is the worst place to go silent — the reader would be
+  # left with a configured apt and a daemon that never re-read it.
+  proxy_sudo systemctl daemon-reload ||
+    proxy_note "daemon-reload failed; the drop-in is still on disk and applies at the next restart"
+  proxy_sudo systemctl restart docker ||
+    proxy_fail "docker did not restart, so it is still running without the proxy: run" \
+      "'sudo systemctl restart docker' by hand, then re-check with 'docker info | grep -i proxy'"
+  proxy_note "docker restarted; the daemon now reads $PROXY_DOCKERD_DROPIN"
 }
 
 # ---------- reporting ----------
@@ -588,6 +604,23 @@ proxy_file_state() { # $1 = path
     printf '  %s: exists, not ours\n' "$1"
   fi
 }
+
+proxy_is_configured() {
+  # True when there is anything at all in the places this project uses — ours or somebody else's.
+  # The question exists so disable-proxy.sh can decline to ask "remove the configuration listed
+  # above?" about an empty list, and a foreign apt file is emphatically not an empty list: disable has
+  # to run, report it as left alone, and let the reader see that decision being made. Ours-ness is
+  # each writer's business (they refuse on it); presence is this function's.
+  if [[ -f "$PROXY_STATE_FILE" ]]; then return 0; fi
+  if [[ -f "$PROXY_BASHRC" ]] && grep -qF -- "$PROXY_BLOCK_BEGIN" "$PROXY_BASHRC"; then return 0; fi
+  if [[ -e "$PROXY_APT_FILE" ]]; then return 0; fi
+  if [[ -e "$PROXY_DOCKERD_DROPIN" ]]; then return 0; fi
+  if [[ -f "$PROXY_DOCKER_CONFIG" ]] && grep -q '"proxies"' "$PROXY_DOCKER_CONFIG" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
 
 proxy_status() {
   proxy_log "Proxy state, as far as this machine shows it"
@@ -616,11 +649,23 @@ proxy_status() {
   else
     printf '  state file    : none (nothing was enabled by enable-proxy.sh, or it has been removed)\n'
   fi
-  if proxy_have docker && docker info >/dev/null 2>&1; then
-    local daemon_env
-    daemon_env="$(systemctl show docker --property=Environment 2>/dev/null | tr ' ' '\n' | grep -i proxy | paste -sd' ' -)"
-    printf '  daemon env    : %s\n' "${daemon_env:-none reported}"
+  # The daemon's own view, when there is a daemon to ask. Every part of that sentence is a way for
+  # this report to fail, and a report is not allowed to fail: `systemctl` is absent on a non-systemd
+  # host, `docker info` needs the socket, and on a correctly configured machine with no proxy the
+  # `grep -i proxy` finds nothing and exits 1 — which, inside an assignment under `set -e`, ended the
+  # whole script mid-report. That is the bug a reader on a real VM hits first and cannot name: the
+  # output simply stops. Hence `|| true`, the guard, and the `return 0`.
+  if [[ "${BOROBIYA_PROXY_NO_SYSTEMD:-0}" != "1" ]] && proxy_have docker \
+    && proxy_have systemctl && docker info >/dev/null 2>&1; then
+    local daemon_env=""
+    # `sed` first because systemctl answers with the field name attached ("Environment=http_proxy=…"),
+    # and `|| true` because a machine with no proxy in its unit environment makes `grep` exit 1 — which
+    # inside an assignment is exactly the fatal status that ended this report under `set -e`.
+    daemon_env="$(systemctl show docker --property=Environment 2>/dev/null \
+      | sed -e 's/^Environment=//' | tr ' ' '\n' | grep -i proxy | paste -sd' ' - || true)"
+    printf '  daemon env    : %s\n' "${daemon_env:-no proxy in the unit environment}"
   fi
+  return 0
 }
 
 # ---------- the host side, which this repository cannot touch ----------

@@ -751,8 +751,10 @@ Two scripts do that, and they are the recommended path:
 
 Neither one contains an address or a port, and this file does not either: a bridged VM needs the host's
 LAN address while a NAT VM needs the gateway, so any value either of them shipped would be wrong for
-one of the two. Both accept `--status` (what is configured now) and `--dry-run` (what would change)
-without a network or root rights. The sections below stay the reference: they say what each of the four
+one of the two. Both open by printing what each of the four places holds right now — including the
+Docker daemon's own environment, where a VM with no proxy answers "no proxy in the unit environment",
+which is information and not a failure. Both accept `--status` (that report alone) and `--dry-run`
+(the whole run, with nothing written) without a network or root rights. The sections below stay the reference: they say what each of the four
 settings is for, they are what to fall back on when a script's assumption does not fit the machine, and
 § 5.1a is the host-side half that no script in this repository can do for you.
 
@@ -965,6 +967,10 @@ downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.`
 ```bash
 ./scripts/disable-proxy.sh        # --status to look first, --dry-run to see the plan
 ```
+
+It asks for confirmation only when there is something of ours to remove; on a machine that was never
+enabled it says so and stops, because a proxy file you wrote by hand is listed as left alone rather
+than silently kept. Either way the host-side rule from § 5.1a is still yours to delete.
 
 Then the manual equivalent, if you configured any of it by hand (the order is the same as § 5.1–§ 5.3,
 and every line is safe to run when the thing it removes was never there):

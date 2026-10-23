@@ -128,6 +128,40 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — the proxy scripts met a real VM, and it was the *report* that broke them
+
+- **What the reader got**: `./scripts/enable-proxy.sh` printed six lines of state and stopped — no
+  prompt, no error, exit 1 — and `./scripts/disable-proxy.sh` did the same thing. Both were green here.
+- **The cause was a line this sandbox cannot produce.** `proxy_status` ends by asking the Docker daemon
+  what it holds: `systemctl show docker --property=Environment | tr … | grep -i proxy | paste`. On a
+  correctly configured machine with no proxy, `grep` matches nothing and exits 1; inside
+  `var="$(…)"`, under `set -e`, that is fatal, so the report killed the script mid-sentence. Every test
+  took the other branch because `docker info` fails where there is no daemon — and an `if` whose
+  condition is false returns 0, so nothing propagated. A function that reports must not decide: the
+  probe is now guarded (docker present, systemctl present, daemon answering), the substitution ends in
+  `|| true`, the function ends in `return 0`, and the line reads `no proxy in the unit environment`
+  instead of carrying systemctl's field name along with it.
+- **The same class, five more times.** A `mkdir -p`, a `chmod 600`, an `rm -f` and the two `systemctl`
+  calls in the apt/dockerd stages were bare commands whose failure would also have meant silence after
+  a partial write. Each now says what failed and what to type. The `chmod` one fails hard on purpose:
+  a file holding a password that did not get tightened is a leak, not a cosmetic problem.
+- **A second finding in the same transcript**: `disable-proxy.sh` with no flags, on a machine that was
+  never enabled, asked "remove the configuration listed above?" about an empty list. It now answers
+  (`Nothing to remove`, plus the host-side reminder nothing here can act on) and exits 0. The test is
+  *presence*, not ownership — a proxy file somebody else wrote still gets the full run and its
+  "left alone" report. The suite missed the question because its helper always passed `--yes`, the flag
+  that skips exactly the path a reader walks into first.
+- **Tests for the states the sandbox does not have**: four drive a stub `docker`/`systemctl` through
+  `PATH_EXTRA` in `base_env` (daemon answering with no proxy, with a proxy, not answering, and no
+  `systemctl` at all — that last one skips itself when the host has a real one rather than pretending),
+  and one runs disable with no flags. The stub-path plumbing was itself a bug in the test helper: the
+  first version of `base_env` ignored `PATH_EXTRA`, and the two "fixed" tests failed for that reason
+  alone, which is the same lesson as the scripts — a green test that never reached the branch is not a
+  test. 34 tests, 1 skip; the 11-scenario end-to-end drive still exits 0, and `shellcheck`/`bash -n`
+  cover every script in `scripts/`.
+- **Recorded where it would be needed**: runbook § 5 now says both scripts open with that report and
+  what the daemon line means, and § 5.4 says removal does not ask permission to remove nothing.
+
 ### 2026-10-23 — the runbook's proxy section became two scripts, because its numbers were not portable
 
 - **Why scripts rather than prose.** § 5 had become a section holding one machine's address and port — a
