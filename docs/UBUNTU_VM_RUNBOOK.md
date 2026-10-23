@@ -7,9 +7,14 @@ Step-by-step build of the Borobiya map stack (tiles, routing, geocoding) on the 
 > **Resource warning.** 6 GiB is tight for five live map services. The defaults below reduce the
 > Java heaps, the database memory and the thread counts, but they cannot guarantee the complete
 > stack fits on every dataset and runtime. Keep at least **15–20 GiB free** on the filesystem that
-> holds the map library before starting any import (the pinned Iran extract plus its crops, tiles,
-> three road graphs, the Photon index and the Nominatim database together run to well over 10 GB),
-> and check `free -h` / `df -h` again before step 11. If services are killed by the OOM killer, run
+> holds the map library before starting any import: it has to absorb the pinned Iran extract, its
+> crops, the tiles, three road graphs, the Photon index and the Nominatim database. **No total for
+> that is measured anywhere in this repo** — the figure is this runbook's guidance, so grow it with
+> `du -sh "$MAP_LIBRARY_DIR"` after each step instead of trusting a number here. `setup-ubuntu-vm.sh`
+> agrees it is advisory on that filesystem: below 15 GiB it prints
+> `WARNING: only N GiB free on the repository filesystem; imports may fail (runbook wants 15-20 GiB
+> free)` and carries on. (§ A4 has the one capacity number it really refuses.) Check `free -h` /
+> `df -h` again before step 11. If services are killed by the OOM killer, run
 > the live routing profiles one at a time or move the VM to 8 GiB (§ 9.4).
 
 This document is written to be read **once, top to bottom**, and then followed. Every command
@@ -62,9 +67,9 @@ snapshot). The `Check` column is how you prove to yourself that the step worked 
 | — | *(optional)* proxy for downloads, and proof that it works | § 5 | § 5.2's six checks pass | seconds |
 | 7 | *(optional)* pre-download the big files: Geofabrik extracts + Planetiler's reference layers (≈230 MB + 1.3 GB) | `./map-server/scripts/fetch-planetiler-sources.sh` (steps 8 and 9 otherwise fetch what they need themselves) | Each line ends `cached` or `verified` | it skips already-verified files |
 | 8 | Download + verify + crop + merge the OSM extracts | `./map-server/scripts/prepare-regions-pbf.sh` | `PBF OK` from `verify-map-pbf.sh` | downloads skip, crop+merge re-run |
-| 9 | Build the vector tiles (PMTiles) | `PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh` | `Wrote build metadata …` and both tile files exist; the HTTP proof is step 13 | 30–50 min (no re-download of reference layers) |
-| 10 | Build the OSRM road graphs | `OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh` | `car/`, `bicycle/` and `foot/` each full of `*.osrm*` files in `$MAP_OSRM_DATA_DIR` | 25–45 min |
-| 11 | Geocoding: Photon JAR+index, Nominatim import, Nominatim→Photon | `./map-server/scripts/download-photon.sh` + the § 6.5 commands | Photon index dir + its dataset stamp exist; `verify-geocoding.sh` in step 13 passes | hours; volumes are reused unless you clear them |
+| 9 | Build the vector tiles (PMTiles) | `PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh` | `Wrote build metadata …` and both tile files exist; the HTTP proof is step 13 | the longest CPU step; no re-download of reference layers |
+| 10 | Build the OSRM road graphs | `OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh` | `car/`, `bicycle/` and `foot/` each full of `*.osrm*` files in `$MAP_OSRM_DATA_DIR` | three profiles, one after another, never in parallel |
+| 11 | Geocoding: Photon JAR+index, Nominatim import, Nominatim→Photon | `./map-server/scripts/download-photon.sh` + the § 6.5 commands | Photon index dir + its dataset stamp exist; `verify-geocoding.sh` in step 13 passes | up to 60–90 min is the budget the repo itself sets (§ 6.5 step 11b); volumes are reused unless you clear them |
 | 12 | Start the serving stack | `docker compose --profile routing --profile geocoding up -d …` | § 7.1's table shows six `Up`; the five with healthchecks `healthy` (Martin has none) | seconds |
 | 13 | Acceptance checks + sign-off | three `verify-*.sh` scripts + the § 6.7 curls | All exit 0; notes written down | seconds |
 
@@ -94,13 +99,23 @@ cd ~/borobiya
 | `--source-policy cache-first\|refresh\|offline` | Use what is on disk, re-download anyway, or never touch the network |
 | `--refresh-sources` | Shortcut for `--source-policy refresh` |
 | `--offline` | Require every artifact to already exist; never touch the network |
-| `--update-map` | Rebuild the map data for a `.env` that already exists |
+| `--update-map` | Resolve and download the **latest common snapshot** online, instead of the pinned/saved one |
 | `--map-library PATH` | Move the map library (downloads, crops, tiles, indexes) outside the repo |
 | `--yes` | Non-interactive: run the whole plan without confirming |
-| `--dry-run` | Print the steps, change nothing |
+| `--dry-run` | Resolve the configuration and print the stage plan only; writes nothing and downloads no map data |
+| `-h`, `--help` | The option list above, from the script itself |
+
+That is the whole interface (eleven options plus help) — there is no `--no-start`, `--skip-docker` or
+`--dev` flag to reach for, and a runbook that invented one would be obeyed before it was tested. The same inputs exist as environment variables, which is what to use from CI or a
+provisioner: `SETUP_REGIONS`, `SETUP_SNAPSHOT`, `SETUP_SOURCE_POLICY`, `SETUP_MAP_LIBRARY`,
+`SETUP_FORCE_FORM=1` (answer the prompts even without a TTY), and `SETUP_NOMINATIM_TIMEOUT_MIN`
+(minutes, 1–720, default **90** — the ceiling on how long step 11's import may run before the automated
+path gives up on it).
 
 The script needs Phase A (A1–A4) already done — it checks for the tools and stops with that
-advice rather than installing system packages itself.
+advice rather than installing system packages itself. Its prerequisite list is exactly
+`docker git curl wget python3 openssl java osmium`; **Bun is not in it**, so a missing Bun is not a
+setup-script failure (A5b installs it).
 
 **b. Manual.** Do A0–A6, then steps 7 → 13 in order. Nothing here is backgrounded on purpose: an
 SSH session that drops should take its build down with it, so that a resumed step starts from a
@@ -507,10 +522,25 @@ out of the clone's own `package.json`.
 Do not trust this document's version numbers: read them out of the checkout and compare them with
 what is installed. Paste the whole block. The lines above `# What is actually installed` are what the
 repository demands, the lines after it are what the machine has, and the last group is capacity. Read
-them as pairs: a pin and a value that do not match is the thing to fix *now*, not in step 9. The floors
-this runbook works to are **≥ 15 GiB free and ≥ 50 000 free inodes** on both the library filesystem and
-Docker's storage root (the two the setup script enforces), Java **≥ 21**, and `osmium` **equal to the
-pin**.
+them as pairs: a pin and a value that do not match is the thing to fix *now*, not in step 9.
+
+The lines mix two kinds of requirement, and mixing them up wastes debugging time:
+
+- **Hard requirements, refused by the scripts:** Java **≥ 21** (step 9), and `osmium` **equal to
+  `MAP_OSMIUM_VERSION`** (step 8).
+- **One enforced capacity gate, on Docker's storage only:** `setup-ubuntu-vm.sh` refuses below
+  **15 GiB free or 50 000 free inodes**, and its message names the phase it was checking:
+  `Docker storage at <path> has only X GiB free before starting the map setup` then
+  "at least 15 GiB is required" and, usefully, *"do not prune Docker volumes blindly"* — all on one
+  line, so it survives being pasted into a bug report. Its roots are `docker info`'s `DockerRootDir` *plus* `/var/lib/containerd` when that
+  directory exists, because the image store can sit on its own filesystem where extraction fails even
+  though the data-root looks fine; the check deduplicates by device, so one filesystem shared by both is
+  measured once. Two further gates ask **5 GiB** each, later in the run — before
+  `building the Photon runtime image` and before `building/recreating the full Compose stack after the
+  Nominatim import` — which is why a build can pass the preflight and still stop at step 11.
+- **Advisory on the repo/library filesystem:** below 15 GiB the script only warns (the resource
+  warning at the top of this file has that message), so the 15–20 GiB figure there is guidance, not a
+  gate — `docker system df` and `du -sh "$MAP_LIBRARY_DIR"` are the numbers to act on.
 
 ```bash
 cd ~/borobiya
@@ -528,13 +558,14 @@ git --version; curl --version | head -1; wget --version | head -1 | cut -d' ' -f
 python3 --version; openssl version; unzip -v | head -1 | awk '{print $2}'
 docker --version; docker compose version
 systemctl is-active ssh                 # active
-# Capacity floors for this VM (15 GiB free / 50k inodes on the library filesystem, 6 GiB RAM):
-df -h --output=source,size,used,avail,pcent,target "${HOME}"          # Avail must be >= 15G
-df -i "${HOME}" | tail -1                                              # IUsed% near 100 (or < 50k free) aborts imports
+# Capacity: the gate that refuses (Docker's roots, 15 GiB + 50k inodes) and the one that warns (~, 6 GiB RAM):
+df -h --output=source,size,used,avail,pcent,target "${HOME}"          # >= 15 GiB here is this runbook's advice, not a gate
+df -i "${HOME}" | tail -1                                              # near 100% IUsed% makes step 8's hardlink/copy work crawl
 free -g | awk '/Mem:/ {print "total GiB: "$2"  available GiB: "$7}'
 DOCKER_ROOT="$(docker system info --format '{{.DockerRootDir}}' 2>/dev/null)"   # empty = daemon unreachable (A2's docker-group note)
 printf 'Docker data-root: %s  storage: %s\n' "${DOCKER_ROOT:-unknown}" "$(docker system info --format '{{.Driver}}' 2>/dev/null)"
-df -h "${DOCKER_ROOT:-/var/lib/docker}" | tail -1                       # images and build cache live here
+df -h "${DOCKER_ROOT:-/var/lib/docker}" /var/lib/containerd 2>/dev/null | tail -n +2   # both roots; the second may not exist, and the setup script checks it when it does
+df -i "${DOCKER_ROOT:-/var/lib/docker}" | tail -1                       # the 50 000-inode floor is measured on THIS filesystem
 docker system df                                                        # reusable cache vs volumes, in real numbers
 df -h "$(pwd)" | tail -1                                                # the repo itself is small; downloads land in the library, not here
 ```
@@ -545,8 +576,10 @@ What each answer means:
   (A6 does this for you only if you ran the setup script). Step 8 refuses to run on a mismatch,
   and `verify-map-pbf.sh` then reports the not-yet-created crop as "missing" — the error chain is
   confusing, the fix is one line in `.env`.
-- **Docker's data-root is on a different filesystem than `~`** → the "15 GiB free" number must be
-  met on **both**. Images and build layers live under the data-root, datasets under `~`.
+- **Docker's data-root is on a different filesystem than `~`** → the enforced "15 GiB + 50k inodes"
+  floor applies to the *Docker* side, while `~` only gets the warning. Images and build layers live
+  under the data-root, datasets under `~`: they can run out independently, and only one of them stops
+  the run with an error.
 - **`docker system df -v` shows hundreds of MB of old build cache** and space is tight →
   `docker builder prune -f` is safe (build layers only, never volumes; a rebuild just re-downloads
   image layers). `docker system prune -a` is **not** safe here: it deletes the pulled images and
@@ -932,7 +965,15 @@ cache and the Docker daemon.
 **Expected output.** `Generating <…>/borobiya.pmtiles (version <snapshot date>, zoom 0-14, bbox
 <union bbox>) from <…>/borobiya.osm.pbf`, then Planetiler's per-stage progress, then
 `Created <…>/borobiya.pmtiles (<n> bytes)` and `Wrote build metadata <…>/borobiya.metadata.json`.
-30–50 minutes for the default Tehran selection (longer for a whole country).
+
+No duration for this step is recorded in the repo, so don't plan against a number — and don't read
+silence as a stall: the archive is written into a sibling temp directory
+(`.$MAP_REGION.XXXXXX` next to `$MAP_DATA_DIR`) and moved into place only at the end, with an
+`EXIT` trap cleaning the temp directory up. So `ls "$MAP_DATA_DIR"` showing no
+`borobiya.pmtiles` while Java is still running is the *expected* state; the file appears in one step,
+not gradually. The progress you can watch is Planetiler's own log lines, plus the size of that temp
+directory, which `generate-tiles.sh:167` puts **beside** the data dir rather than inside it:
+`du -sh "$(dirname "$MAP_DATA_DIR")/.$MAP_REGION."*/ 2>/dev/null`.
 
 **Check.**
 
@@ -979,8 +1020,11 @@ OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh
 **Expected output.** one header line per profile — `Extracting car graph for borobiya from the
 approved PBF (2 threads)...`, then bicycle, then foot (partition and customize run between those
 lines without their own banner) — and at the end
-`Created car, bicycle, and foot graphs for borobiya under <…>/routing`. 25–45 minutes total for the
-default selection.
+`Created car, bicycle, and foot graphs for borobiya under <…>/routing`. There is no measured duration
+for this step in the repo, and none is claimed here; what the code does pin down is the shape of the
+run — three profiles in sequence, each inside its own `docker run`, and
+`OSRM_BUILD_THREADS` is validated rather than guessed: anything outside **1 to 4** fails immediately
+with `OSRM_BUILD_THREADS must be an integer from 1 to 4`.
 
 Two things the script does that you would otherwise debug: every graph is built in a temporary
 **staging** directory and moved into `$MAP_OSRM_DATA_DIR/<profile>` only at the end (so an interrupted
@@ -995,8 +1039,9 @@ ls -lh "$MAP_OSRM_DATA_DIR"/{car,bicycle,foot}/*.osrm*      # four+ files each p
 ```
 
 **Redo just this step.** `rm -rf -- "$MAP_OSRM_DATA_DIR"/{car,bicycle,foot}` then re-run the
-command (each profile is ~30–60% of the dataset size — that is the disk to reclaim if you only
-need `car`). If you changed the area selection since a previous build, the script **refuses** to
+command. To reclaim disk without rebuilding everything, measure first and delete the profiles you
+are not serving (`du -sh "$MAP_OSRM_DATA_DIR"/*`) — a profile's `*.osrm*` set is self-contained, so
+dropping `bicycle/` and `foot/` is legitimate as long as § 7's routing checks are the `car` ones. If you changed the area selection since a previous build, the script **refuses** to
 reuse non-empty profile directories: move `$MAP_OSRM_DATA_DIR/{car,bicycle,foot}` aside first (the
 setup script does this for you, and prunes them after acceptance).
 
@@ -1031,7 +1076,15 @@ Wait for `healthy`. The first start imports the shared dataset PBF into the `nom
 and the service's healthcheck (`curl …/status?format=json`, `start_period: 60m`, 40 retries) gives it an
 hour before it starts complaining — expect a long `health: starting` phase, and treat that as progress,
 not as a hang. What actually decides "done" is Nominatim's own `import finished` marker in the volume;
-the healthcheck only reflects it. **Do not restart it** while it is importing, and do not read a
+the healthcheck only reflects it. If the import outlives the hour, `ps` flips to `unhealthy` and
+**nothing stops** — the Compose file says so about that field itself ("the label never stops the
+import, it only informs `ps`/dependents"), and the automated path waits deliberately longer:
+`SETUP_NOMINATIM_TIMEOUT_MIN` minutes, default **90** (its own comment budgets "a slow first import
+(~70 min)", which is why the two figures differ). So `unhealthy` with a log that is still advancing
+means keep waiting; `unhealthy` with a frozen log, or `Restarting`, means § 9.2. If the 90 minutes
+expire, re-running the script does **not** restart the import — it waits on the same container — while
+a container that was killed mid-import will re-import from scratch, because the marker is what tells
+the entrypoint where it is. **Do not restart it** while it is importing, and do not read a
 `Restarting` state as "still working": that is a crash loop, and § 9.2 covers the one known cause in old
 checkouts (`chown: Read-only file system`).
 
@@ -1040,8 +1093,10 @@ shell**: the dataset directory is mounted read-only at `/osm` from `${MAP_DATASE
 `PBF_PATH=/osm/${MAP_REGION}.osm.pbf` (so a blank `MAP_DATASET_DIR` in `.env` falls back to the
 `.compose-unconfigured/dataset` placeholder and the import finds no file), and
 `NOMINATIM_PASSWORD` is what the database is created with (§ A6's write-back). The tunables are
-`NOMINATIM_THREADS=2`, `NOMINATIM_SHM_SIZE=1g` and the four `NOMINATIM_POSTGRES_*` memory values, all
-of which are in `.env.example`; `NOMINATIM_IMPORT_STYLE` (default `full`) and `IMPORT_WIKIPEDIA`
+`NOMINATIM_THREADS=2`, `NOMINATIM_SHM_SIZE=1g` and the five `NOMINATIM_POSTGRES_*` memory values
+(`SHARED_BUFFERS`, `MAINTENANCE_WORK_MEM`, `AUTOVACUUM_WORK_MEM`, `WORK_MEM`, `EFFECTIVE_CACHE_SIZE`), all
+of which are in `.env.example` — Compose falls back to the same five values if you leave them out, so
+they are tuning you can ignore rather than wiring you must do; `NOMINATIM_IMPORT_STYLE` (default `full`) and `IMPORT_WIKIPEDIA`
 (`false`) exist **only** as Compose defaults, so changing them means adding them to `.env`. These exist
 because this import is the single heaviest thing in the runbook on a 6 GiB VM.
 
@@ -1156,6 +1211,9 @@ Each script checks one area — the first of `MAP_REGION_IDS` unless you pass an
 (`localhost:8000`) and the local gateway (`localhost:8001`), and validating non-empty
 MVT/GeoJSON/route geometry. For a multi-area selection, run the trio once per area.
 
+The exact prefixes below come from the scripts; the sizes, distances and counts in them are from a
+Tehran run and **will differ on yours** — match the prefix and the field order, not the digits.
+
 | Script | Prints on success | What it actually checks |
 | --- | --- | --- |
 | `verify-tiles.sh` | `OK: http://localhost:8000/borobiya/12/… (Tehran) returned HTTP 200, application/vnd.mapbox-vector-tile, 4321 bytes` | HTTP 200, a **non-empty** body, and an MVT content type — a 200 with an empty tile is a failure, which is the difference between "Martin answered" and "the archive has this tile" |
@@ -1208,6 +1266,32 @@ docker compose down            # api/nginx;  NEVER add -v here — see § 8.4
 ---
 
 ## 7. Checking what is running
+
+### 7.0 Every port this stack publishes, and what answers on it
+
+Eight ports, all bound to `127.0.0.1` in `docker-compose.yml` — nothing here is reachable from the LAN
+without you editing a mapping, which is the security property the runbook relies on. Each one is
+`${VAR:-default}`, so a change belongs in `.env`, not in the Compose file. The container-side port (after
+the last `:`) is what the service listens for **inside** the network and is not yours to move.
+
+| Host port | Service | Set by | What answers there |
+| --- | --- | --- | --- |
+| `5432` | `postgres` | `POSTGRES_PORT` | the application database (`borobiya`); migrations and seed run *inside* the api container, so you rarely need this |
+| `3000` | `api` | `API_PORT` | `GET /_public/health` on the API directly — behind Nginx it is `/api/_public/health`, because `nginx.conf` rewrites `/api/…` → `/…` |
+| `8000` | `map-server` (Martin) | `MAP_SERVER_PORT` | `GET /borobiya/12/2632/1612` (tiles, `/$MAP_REGION/{z}/{x}/{y}`) and `/health`; container-side this service is on `3000` |
+| `8081` | `nominatim` HTTP | `NOMINATIM_HTTP_PORT` | Nominatim's own search API, only while the `geocoding-import` service is up |
+| `5433` | `nominatim` database | `NOMINATIM_DB_PORT` | what step 11c's Photon import connects to (`-host 127.0.0.1 -port 5433`, user `nominatim`) |
+| `2322` | `photon` | `PHOTON_PORT` | `GET /status`; Photon is the geocoder behind the gateway, and Compose probes exactly this path |
+| `8001` | `map-routing-gateway` | `MAP_ROUTING_PORT` | `/health` → `{"status":"ok"}`, plus `/route`, `/geocode`, `/reverse` — the surface the three verify scripts use |
+| `8080` | `nginx` | `NGINX_PORT` | the public entry point: `/health` → `ok`, `/api/*` → api |
+
+Two confusions this table exists to end: **`verify-tiles.sh` hits 8000, not 8080** (it asks Martin
+directly, so a Nginx fault cannot look like a tile fault), and **5433 is not a second copy of the app
+database** — it is Nominatim's private Postgres inside the same container, which is why
+a `psql` probe as `nominatim` answers on `5433` and not on `5432`. A3 installs no Postgres client on
+the host, so the probe is the throwaway-container one in § 6.5 step 11b — `psql -host 127.0.0.1 -port
+5433` from inside a `postgres:16-3.4` container, which is also the only way to test it while the
+container's own auth is in play.
 
 ### 7.1 Compose status (the five commands worth knowing)
 
@@ -1530,9 +1614,12 @@ Symptom first, always — grep this section for the error text.
 - The water-polygons mirror in § 3.4 is a third-party copy for a known upstream outage and is
   intentionally not a fallback URL in the scripts. If osmdata returns, `MAP_SOURCE_POLICY=refresh`
   moves you back; nobody has to edit this file.
-- Time estimates (30–50 min, 25–45 min, "hours" for the geocoding imports) are from the reference VM
-  at 4 vCPU / 6 GiB with the default pinned Tehran selection. A whole country with
-  `MAP_SNAPSHOT=latest` is slower on every line.
+- **This runbook quotes no build durations, on purpose.** Nothing in the repo records a measured one,
+  and a number invented here would be the first thing a reader blames when the run is slower. The only
+  time budgets that *are* encoded in code are Nominatim's: the Compose healthcheck gives it
+  `start_period: 60m` before failures count, and the setup script waits
+  `SETUP_NOMINATIM_TIMEOUT_MIN` minutes (default 90, accepted 1–720). Everything else is bounded by
+  your dataset, not by this file.
 - This runbook covers the reference Ubuntu VM. It is not the containerized `bun run dev` loop in
   `docs/DEVELOPMENT.md`, and it does not open the app in a browser: a green step 13 means the map
   services answer, not that the UI was exercised.
