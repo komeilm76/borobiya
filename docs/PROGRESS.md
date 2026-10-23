@@ -130,6 +130,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ### 2026-10-23 — v0.2.0 released
 
+- **Cut where v0.1.0 was cut.** PR #4 merged into `main` as `a7fa830`; the annotated tag `v0.2.0` points at
+  that merge commit and the GitHub release was published from it on 2026-10-23
+  (`komeilm76/borobiya/releases/tag/v0.2.0`). The release notes are curated from this changelog rather than
+  pasted from it — `docs/WORKFLOWS.md` § 7 passes `docs/PROGRESS.md` itself to `--notes-file`, and at 1,400
+  lines that is not a document anyone reads at a release page.
 - **What went out.** Everything between `v0.1.0` (`95a88a3`, 2026-10-21) and this branch: 55 commits, 208
   files, +42,269/−826, and **seven migrations (`0006`–`0012`)**. Feature content: Phase 2 end to end —
   live-share create/revoke/list, realtime `location:update` over Socket.IO with the priority-device rule, the
