@@ -188,8 +188,19 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function refreshSession(): Promise<boolean> {
+    try {
+      await refreshFromCookie();
+      return true;
+    } catch {
+      clearSession();
+      return false;
+    }
+  }
+
   function acceptLogin(response: unknown): void {
     const parsed = loginResponseSchema.parse(response);
+    userCategories.value = [];
     setAccessToken(parsed.accessToken);
     setUser(parsed.user);
     initialized.value = true;
@@ -202,6 +213,9 @@ export const useAuthStore = defineStore("auth", () => {
       body: parsedInput
     });
     acceptLogin(response);
+    if (accessToken.value && !mustCompleteSecurityQuestions.value) {
+      await loadCurrentUser(accessToken.value);
+    }
   }
 
   async function completeSecurityQuestions(input: CompleteSecurityQuestionsInput): Promise<void> {
@@ -247,6 +261,7 @@ export const useAuthStore = defineStore("auth", () => {
     mustCompleteSecurityQuestions,
     userRole,
     ensureSession,
+    refreshSession,
     refreshProfile,
     login,
     completeSecurityQuestions,

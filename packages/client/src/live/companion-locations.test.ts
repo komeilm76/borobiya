@@ -402,4 +402,15 @@ describe("ages in words", () => {
     const peer = peersOf(registryWith({ userId: ALICE, name: "مریم", observedAtMs: NOW - 120_000 }), NOW)[0]!;
     expect(peerLabel(peer, NOW)).toBe("مریم · 2 دقیقه پیش");
   });
+
+  it("ignores stale location:share-ended events when openShareIds proves another share is active", () => {
+    const seeded = applyShareList(emptyRegistry, [{ id: ALICE, username: "alice", lastLocation: { lat: 35.7, lon: 51.4 } }]);
+    const ignored = applyShareEnded(
+      seeded,
+      { shareId: "old-retired-share", userId: ALICE, reason: "expired" },
+      new Set(["active-share-now"])
+    );
+    expect(ignored).toMatchObject({ changed: false, shareEnded: false, reason: "stale-share" });
+    expect(ignored.registry[ALICE]).toBeDefined();
+  });
 });

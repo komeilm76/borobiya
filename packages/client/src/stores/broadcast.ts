@@ -18,9 +18,12 @@ export const useBroadcastStore = defineStore("broadcast", () => {
 
   const live = useLiveLocationBroadcast({
     accessToken,
-    ensureSession: () => auth.ensureSession()
+    ensureSession: () => auth.refreshSession()
   });
-  const priority = usePriorityDevice({ accessToken });
+  const priority = usePriorityDevice({
+    accessToken,
+    ensureSession: () => auth.refreshSession()
+  });
 
   const view = computed(() =>
     describeBroadcastState({

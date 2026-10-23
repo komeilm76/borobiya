@@ -383,6 +383,40 @@ describe("useLiveCompanions", () => {
     harness.scope.stop();
   });
 
+  it("refreshes the session and retries automatically when share reading returns 401 after JWT expiry", async () => {
+    const token = ref<string | null>("expired-map-token");
+    const ensureSession = vi.fn(async () => {
+      token.value = "fresh-map-token";
+    });
+    const readShares = vi.fn(async (supplied: string) => {
+      if (supplied === "expired-map-token") {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      return { sharedWithMe: [] };
+    });
+    const scope = effectScope();
+    const api = scope.run(() =>
+      useLiveCompanions({
+        accessToken: token,
+        ensureSession,
+        readShares,
+        openSocket: () => ({
+          socket: fakeSocket() as unknown as RealtimeClient["socket"],
+          close: vi.fn(),
+          connect: vi.fn(),
+          updateToken: vi.fn()
+        })
+      })
+    )!;
+    await settle();
+    await settle();
+
+    expect(ensureSession).toHaveBeenCalledTimes(1);
+    expect(readShares).toHaveBeenCalledWith("fresh-map-token");
+    expect(api.status.value.line).not.toContain("خوانده نشد");
+    scope.stop();
+  });
+
   it("takes a peer off the map immediately on location:share-ended without polling, identically for revoke and expiry", async () => {
     for (const reason of ["revoked", "expired"] as const) {
       const harness = mount();

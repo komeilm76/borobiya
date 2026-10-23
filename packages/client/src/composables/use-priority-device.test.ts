@@ -202,4 +202,27 @@ describe("deriving from the two lists", () => {
     expect(api.failed.value).toBe(false);
     expect(api.loadedAtMs.value).toBe(NOW);
   });
+
+  it("recovers from a 401 response via ensureSession and retries with the refreshed token", async () => {
+    const accessToken = ref<string | null>("expired-token");
+    const ensureSession = vi.fn(async () => {
+      accessToken.value = token(PHONE);
+    });
+    let firstWave = true;
+    responder = (url) => {
+      if (firstWave) {
+        firstWave = false;
+        return { status: 401, body: { code: "UNAUTHORIZED", message: "Expired", issues: [] } };
+      }
+      return okResponder(url);
+    };
+    const scope = effectScope();
+    const api = scope.run(() => usePriorityDevice({ accessToken, ensureSession }))!;
+    await api.refresh();
+    await settle();
+    expect(ensureSession).toHaveBeenCalledTimes(1);
+    expect(api.failed.value).toBe(false);
+    expect(api.devices.value).toHaveLength(2);
+    scope.stop();
+  });
 });

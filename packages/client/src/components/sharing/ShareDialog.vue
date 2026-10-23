@@ -393,6 +393,7 @@ const {
   cancelPending
 } = useTargetSearch({
   accessToken,
+  ensureSession: () => auth.refreshSession(),
   incidentType: computed(() => incidentTypeChoice.value ?? undefined),
   minRating: computed(() => minRatingChoice.value ?? undefined),
   online: computed(() => (onlineFilter.value === "online" ? true : undefined))

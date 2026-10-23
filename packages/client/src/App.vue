@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRouter } from "vue-router";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
@@ -131,6 +131,10 @@ const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
   () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
 );
+
+watch(showSosButton, (visible) => {
+  if (!visible) sosSheet.closeSheet();
+});
 const themeMenuLabel = computed(() => `انتخاب پوسته؛ پوستهٔ فعلی: ${appTheme.isDark ? "تیره" : "روشن"}`);
 const themeOptions: { value: ThemePreference; title: string; icon: string }[] = [
   { value: "system", title: "پیروی از دستگاه", icon: "mdi-theme-light-dark" },

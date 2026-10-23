@@ -64,6 +64,10 @@ describe("client auth store", () => {
     const refreshedAccessToken = "refreshed-access-token";
     const fetchMock = fakeFetch(
       jsonResponse({ accessToken: expiredAccessToken, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse({
+        ...profile,
+        categories: [{ id: "20000000-0000-4000-8000-000000000001", name: "امداد کوهستان" }]
+      }),
       jsonResponse({ accessToken: refreshedAccessToken }),
       jsonResponse(profile)
     );
@@ -71,11 +75,15 @@ describe("client auth store", () => {
     const auth = useAuthStore();
 
     await auth.login({ username: "rescue_user1", password: "safePass123" });
+    expect(auth.userCategories).toEqual([
+      { id: "20000000-0000-4000-8000-000000000001", name: "امداد کوهستان" }
+    ]);
     await auth.ensureSession();
 
     expect(auth.accessToken).toBe(refreshedAccessToken);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       `/api${apiRoutes.auth.login.url}`,
+      `/api${apiRoutes.user.me.url}`,
       `/api${apiRoutes.auth.refresh.url}`,
       `/api${apiRoutes.user.me.url}`
     ]);
@@ -170,6 +178,7 @@ describe("client auth store", () => {
 
       const fetchMock = fakeFetch(
         jsonResponse({ accessToken: initialToken, user: { ...user, mustCompleteSecurityQuestions: false } }),
+        jsonResponse(profile),
         jsonResponse({ accessToken: rotatedToken }),
         jsonResponse(profile)
       );
@@ -178,13 +187,14 @@ describe("client auth store", () => {
 
       await auth.login({ username: "rescue_user1", password: "safePass123" });
       expect(auth.accessToken).toBe(initialToken);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
 
       await vi.advanceTimersByTimeAsync(839_000);
-      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
 
       await vi.advanceTimersByTimeAsync(2_000);
       expect(auth.accessToken).toBe(rotatedToken);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
     }

@@ -39,7 +39,7 @@ export interface UseLiveCompanionsOptions {
    */
   openSocket?: (token: string) => RealtimeClient | Promise<RealtimeClient>;
   /** Refreshes the access token via the HttpOnly refresh cookie if a reconnect hits an expired JWT. */
-  ensureSession?: () => Promise<void>;
+  ensureSession?: () => Promise<unknown>;
   readShares?: (token: string) => Promise<Pick<LocationSharesResponse, "sharedWithMe">>;
   now?: () => number;
   tickMs?: number;
@@ -102,7 +102,15 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   );
 
   async function refresh(): Promise<void> {
-    const token = options.accessToken.value;
+    let token = options.accessToken.value;
+    if (!token && options.ensureSession) {
+      try {
+        await options.ensureSession();
+      } catch {
+        // Handled by empty-token branch below.
+      }
+      token = options.accessToken.value;
+    }
     if (!token) {
       registry.value = emptyRegistry;
       openShareIds = new Set();
@@ -125,7 +133,21 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       shareCount.value = shares.sharedWithMe.length;
       registry.value = applyShareList(registry.value, shares.sharedWithMe);
       readFailed.value = false;
-    } catch {
+    } catch (error) {
+      const statusCode = (error as { status?: unknown } | null)?.status;
+      if (statusCode === 401 && options.ensureSession && !refreshingAuth) {
+        refreshingAuth = true;
+        try {
+          await options.ensureSession();
+          if (options.accessToken.value && options.accessToken.value !== token) {
+            return;
+          }
+        } catch {
+          // Fall through to mark readFailed cleanly.
+        } finally {
+          refreshingAuth = false;
+        }
+      }
       if (request !== requestId) return;
       readFailed.value = true;
     } finally {

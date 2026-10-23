@@ -225,7 +225,7 @@
 
             <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <v-text-field
-                v-model="manualLatInput"
+                :model-value="sos.latInput.value"
                 label="عرض جغرافیایی (lat)"
                 dir="ltr"
                 density="compact"
@@ -233,10 +233,10 @@
                 rounded="lg"
                 hide-details
                 :disabled="sos.submitting.value"
-                @change="applyTypedCoordinates"
+                @update:model-value="onLatTyped"
               />
               <v-text-field
-                v-model="manualLonInput"
+                :model-value="sos.lonInput.value"
                 label="طول جغرافیایی (lon)"
                 dir="ltr"
                 density="compact"
@@ -244,7 +244,7 @@
                 rounded="lg"
                 hide-details
                 :disabled="sos.submitting.value"
-                @change="applyTypedCoordinates"
+                @update:model-value="onLonTyped"
               />
             </div>
           </div>
@@ -360,8 +360,6 @@ const severityOptions = SOS_SEVERITY_OPTIONS;
 const maxDescriptionLength = SOS_DESCRIPTION_MAX_LENGTH;
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 
-const manualLatInput = ref("");
-const manualLonInput = ref("");
 const cameraInput = ref<HTMLInputElement | null>(null);
 const galleryInput = ref<HTMLInputElement | null>(null);
 
@@ -379,17 +377,35 @@ async function syncPinMarker(): Promise<void> {
 
   if (!pinMarker.value) {
     const { Marker: MapLibreMarker } = await import("maplibre-gl");
-    const marker = new MapLibreMarker({ color: "#dc2626", draggable: true })
-      .setLngLat([current.lon, current.lat])
-      .addTo(map);
-    marker.on("dragend", () => {
-      const point = marker.getLngLat();
-      sos.setManualLocation(point.lat, point.lng);
+    const latest = sos.location.value;
+    if (mapInstance.value !== map || !latest) return;
+    const existing = pinMarker.value as Marker | null;
+    if (!existing) {
+      const marker = new MapLibreMarker({ color: "#dc2626", draggable: true })
+        .setLngLat([latest.lon, latest.lat])
+        .addTo(map);
+      marker.on("dragend", () => {
+        const point = marker.getLngLat();
+        sos.setManualLocation(point.lat, point.lng);
+      });
+      pinMarker.value = marker;
+    } else {
+      existing.setLngLat([latest.lon, latest.lat]);
+    }
+    map.easeTo({
+      center: [latest.lon, latest.lat],
+      zoom: Math.max(map.getZoom(), 14),
+      duration: 250
     });
-    pinMarker.value = marker;
-  } else {
-    pinMarker.value.setLngLat([current.lon, current.lat]);
+    return;
   }
+
+  pinMarker.value.setLngLat([current.lon, current.lat]);
+  map.easeTo({
+    center: [current.lon, current.lat],
+    zoom: Math.max(map.getZoom(), 14),
+    duration: 250
+  });
 }
 
 function onPickerMapReady(map: MapLibreMap): void {
@@ -400,9 +416,12 @@ function onPickerMapReady(map: MapLibreMap): void {
   void syncPinMarker();
 }
 
-function applyTypedCoordinates(): void {
-  if (!manualLatInput.value.trim() || !manualLonInput.value.trim()) return;
-  sos.setCoordinateInputs(manualLatInput.value, manualLonInput.value);
+function onLatTyped(value: unknown): void {
+  sos.setCoordinateInputs(typeof value === "string" ? value : "", sos.lonInput.value);
+}
+
+function onLonTyped(value: unknown): void {
+  sos.setCoordinateInputs(sos.latInput.value, typeof value === "string" ? value : "");
 }
 
 function onFilePicked(event: Event): void {
@@ -427,9 +446,7 @@ function close(): void {
 
 watch(
   () => sos.location.value,
-  (loc) => {
-    manualLatInput.value = loc ? String(loc.lat) : "";
-    manualLonInput.value = loc ? String(loc.lon) : "";
+  () => {
     void syncPinMarker();
   }
 );
@@ -444,6 +461,9 @@ watch(
     pinMarker.value?.remove();
     pinMarker.value = null;
     mapInstance.value = null;
+    if (sos.isCompleted.value) {
+      sos.reset();
+    }
   },
   { immediate: true }
 );

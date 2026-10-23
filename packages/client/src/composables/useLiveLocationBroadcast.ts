@@ -27,7 +27,7 @@ export interface BroadcastGeolocationSource {
 export interface UseLiveLocationBroadcastOptions {
   accessToken?: Ref<string | null> | ComputedRef<string | null>;
   /** Refreshes an expired access token via the HttpOnly refresh cookie when a socket auth check fails. */
-  ensureSession?: () => Promise<void>;
+  ensureSession?: () => Promise<unknown>;
   geolocation?: BroadcastGeolocationSource;
   openSocket?: (token: string) => RealtimeClient | Promise<RealtimeClient>;
   now?: () => number;
@@ -212,7 +212,15 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       lastErrorCode.value = "GEOLOCATION_UNAVAILABLE";
       return;
     }
-    const token = requireToken();
+    let token = requireToken();
+    if (!token && ensureSession) {
+      try {
+        await ensureSession();
+      } catch {
+        // Token state below determines whether starting is permitted.
+      }
+      token = requireToken();
+    }
     if (!token) {
       status.value = "rejected";
       lastErrorCode.value = "UNAUTHORIZED";

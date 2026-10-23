@@ -129,4 +129,48 @@ describe("useSosRequest composable", () => {
     expect(sos.isCompleted.value).toBe(true);
     expect(sos.photoUploadedUrl.value).toBe(`/uploads/sos/${REQUEST_ID}.png`);
   });
+
+  it("preserves trailing zeros while typing coordinates and clears stale GPS coordinates when invalidated", async () => {
+    vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([
+      {
+        id: INCIDENT_A,
+        name: "امداد شهری",
+        slug: "urban-rescue",
+        icon: null,
+        color: "#0284c7",
+        description: null,
+        createdAt: "2026-10-23T00:00:00Z"
+      }
+    ]);
+
+    const sos = useSosRequest({
+      accessToken: ref("token-ok"),
+      ensureSession: async () => true,
+      geolocation: () => ({
+        getCurrentPosition: (ok) =>
+          ok({ coords: { latitude: 35.6892, longitude: 51.389, accuracy: 8 } })
+      })
+    });
+
+    sos.prepareForOpen();
+    await vi.waitFor(() => expect(sos.location.value).not.toBeNull());
+    sos.description.value = "نیاز فوری به کمک پزشکی در ساختمان مسکونی";
+    expect(sos.canSubmit.value).toBe(true);
+
+    // Clearing or entering out-of-range coordinate must NEVER leave stale GPS coordinates submittable
+    sos.setCoordinateInputs("", "51.389");
+    expect(sos.location.value).toBeNull();
+    expect(sos.canSubmit.value).toBe(false);
+
+    sos.setCoordinateInputs("999", "51.389");
+    expect(sos.location.value).toBeNull();
+    expect(sos.canSubmit.value).toBe(false);
+    expect(sos.submitError.value).toContain("مختصات");
+
+    // Typing valid coordinates keeps trailing decimals/zeros intact AND immediately enables canSubmit without blur
+    sos.setCoordinateInputs("35.6890", "51.3890");
+    expect(sos.latInput.value).toBe("35.6890");
+    expect(sos.lonInput.value).toBe("51.3890");
+    expect(sos.canSubmit.value).toBe(true);
+  });
 });

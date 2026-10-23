@@ -20,6 +20,7 @@ import { ownDeviceId } from "@/composables/device-identity";
  */
 export interface UsePriorityDeviceOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  ensureSession?: () => Promise<unknown>;
   /**
    * Overrides the id read from the access token. The native shell is the reason this exists: a build that
    * keeps its own stable install id can report it here instead of trusting the token claim, and nothing
@@ -59,7 +60,15 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
   const hasData = computed(() => loadedAtMs.value !== null);
 
   async function refresh(): Promise<void> {
-    const accessToken = options.accessToken.value;
+    let accessToken = options.accessToken.value;
+    if (!accessToken && options.ensureSession) {
+      try {
+        await options.ensureSession();
+      } catch {
+        // Handled by null-token check below.
+      }
+      accessToken = options.accessToken.value;
+    }
     if (!accessToken) {
       devices.value = [];
       liveShares.value = [];
@@ -69,7 +78,19 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
     }
     loading.value = true;
     try {
-      const [deviceList, shares] = await Promise.all([fetchUserDevices(accessToken), listLocationShares(accessToken)]);
+      let [deviceList, shares] = await Promise.all([
+        fetchUserDevices(accessToken),
+        listLocationShares(accessToken)
+      ]).catch(async (error: unknown) => {
+        if ((error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
+          await options.ensureSession();
+          const refreshed = options.accessToken.value;
+          if (refreshed && refreshed !== accessToken) {
+            return Promise.all([fetchUserDevices(refreshed), listLocationShares(refreshed)]);
+          }
+        }
+        throw error;
+      });
       devices.value = deviceList;
       liveShares.value = shares.owned;
       loadedAtMs.value = Date.now();

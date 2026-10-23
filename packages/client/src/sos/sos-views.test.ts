@@ -41,8 +41,12 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(sheetSource).toContain("<v-bottom-sheet");
     expect(sheetSource).toContain("<MapCanvas");
     expect(sheetSource).toContain('capture="environment"');
-    expect(sheetSource).toContain("accept=\"image/jpeg,image/png,image/webp\"");
+    expect(sheetSource).toContain('accept="image/jpeg,image/png,image/webp"');
     expect(sheetSource).toContain("sos.retryPhotoUpload()");
+    expect(sheetSource).toContain("@update:model-value=\"onLatTyped\"");
+    expect(sheetSource).toContain("@update:model-value=\"onLonTyped\"");
+    expect(sheetSource).toContain("map.easeTo(");
+    expect(appSource).toContain("if (!visible) sosSheet.closeSheet()");
   });
 
   it("replaces the dashboard 'coming soon' rescue card with an active SOS trigger", () => {

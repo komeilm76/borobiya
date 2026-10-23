@@ -279,6 +279,8 @@ export function applyShareEnded(
         reason: "retained"
       };
     }
+  } else if (openShareIds && !openShareIds.has(shareId)) {
+    return { registry, changed: false, shareEnded: false, reason: "stale-share" };
   }
 
   const dropped = dropPeers(registry, (candidate) => candidate.userId === userId);

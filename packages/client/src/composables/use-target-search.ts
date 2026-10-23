@@ -16,6 +16,7 @@ import { isAbortError, isLatestSearch, SEARCH_DEBOUNCE_MS, shouldSearch } from "
  */
 export interface UseTargetSearchOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  ensureSession?: () => Promise<unknown>;
   /** Optional narrowing controls from the dialog. Undefined means "not filtered". */
   category?: Ref<string | undefined>;
   incidentType?: Ref<string | undefined>;
@@ -67,7 +68,16 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     // button for a request that has not been made yet.
     failed.value = false;
 
-    const accessToken = options.accessToken.value;
+    let accessToken = options.accessToken.value;
+    if (!accessToken && options.ensureSession) {
+      try {
+        await options.ensureSession();
+      } catch {
+        // Handled by empty-token branch below.
+      }
+      if (!isLatestSearch(requestIdForThisRun, requestId)) return;
+      accessToken = options.accessToken.value;
+    }
     if (!accessToken) {
       results.value = [];
       loading.value = false;
@@ -75,19 +85,26 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
       return;
     }
 
+    const searchParams = {
+      q: query,
+      limit: options.limit ?? 20,
+      ...(options.category?.value ? { category: options.category.value } : {}),
+      ...(options.incidentType?.value ? { incidentType: options.incidentType.value } : {}),
+      ...(options.minRating?.value === undefined ? {} : { minRating: options.minRating.value }),
+      ...(options.online?.value === undefined ? {} : { online: options.online.value })
+    };
+
     try {
-      const page = await searchUsers(
-        {
-          q: query,
-          limit: options.limit ?? 20,
-          ...(options.category?.value ? { category: options.category.value } : {}),
-          ...(options.incidentType?.value ? { incidentType: options.incidentType.value } : {}),
-          ...(options.minRating?.value === undefined ? {} : { minRating: options.minRating.value }),
-          ...(options.online?.value === undefined ? {} : { online: options.online.value })
-        },
-        accessToken,
-        signal
-      );
+      const page = await searchUsers(searchParams, accessToken, signal).catch(async (error: unknown) => {
+        if ((error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
+          await options.ensureSession();
+          const refreshed = options.accessToken.value;
+          if (refreshed && refreshed !== accessToken) {
+            return searchUsers(searchParams, refreshed, signal);
+          }
+        }
+        throw error;
+      });
       if (!isLatestSearch(requestIdForThisRun, requestId)) return;
       results.value = page.items;
       total.value = page.total;

@@ -53,6 +53,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const incidentTypeId = ref("");
   const description = ref("");
   const location = ref<SosLocation | null>(null);
+  const latInput = ref("");
+  const lonInput = ref("");
   const locating = ref(false);
   const locationHint = ref<string | null>(null);
 
@@ -122,6 +124,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
           return;
         }
         location.value = resolved;
+        latInput.value = String(resolved.lat);
+        lonInput.value = String(resolved.lon);
       },
       () => {
         locating.value = false;
@@ -139,15 +143,23 @@ export function useSosRequest(options: UseSosRequestOptions) {
       return false;
     }
     location.value = next;
+    latInput.value = String(next.lat);
+    lonInput.value = String(next.lon);
     locationHint.value = null;
     submitError.value = null;
     return true;
   }
 
-  function setCoordinateInputs(latInput: string, lonInput: string): boolean {
-    const next = parseCoordinatePair(latInput, lonInput);
+  function setCoordinateInputs(nextLatInput: string, nextLonInput: string): boolean {
+    latInput.value = nextLatInput;
+    lonInput.value = nextLonInput;
+    const next = parseCoordinatePair(nextLatInput, nextLonInput);
     if (!next) {
-      submitError.value = sosIssueMessage("location_invalid");
+      location.value = null;
+      submitError.value =
+        nextLatInput.trim().length > 0 && nextLonInput.trim().length > 0
+          ? sosIssueMessage("location_invalid")
+          : null;
       return false;
     }
     location.value = next;
@@ -273,6 +285,10 @@ export function useSosRequest(options: UseSosRequestOptions) {
   function reset(): void {
     severity.value = "high";
     description.value = "";
+    location.value = null;
+    latInput.value = "";
+    lonInput.value = "";
+    locationHint.value = null;
     photoFile.value = null;
     photoError.value = null;
     submitError.value = null;
@@ -298,6 +314,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
     incidentTypeId,
     description,
     location,
+    latInput,
+    lonInput,
     locating,
     locationHint,
     photoFile,
