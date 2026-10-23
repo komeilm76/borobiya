@@ -252,7 +252,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
     openapi: {
       info: {
         title: "Borobiya API",
-        version: process.env.npm_package_version ?? "0.1.0",
+        version: process.env.npm_package_version ?? "0.2.0",
         description:
           "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, the admin incident-type catalog (list/create/update), the responder-category catalog with member assignment and removal, authenticated profile/onboarding/devices, partial-username user search, live-location share creation, revocation, listing, history-share creation with its windowed reads, grant lists, and delete, and the deprecated REST location-update fallback are implemented at runtime (live `location:update` arrives over Socket.IO); SOS and mission operations are contract-only and currently return 404."
       },

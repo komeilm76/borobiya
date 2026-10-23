@@ -435,7 +435,12 @@ describe("sos request table (T3.2.1)", () => {
     const sql = readFileSync(new URL(`../../drizzle/${name}`, import.meta.url), "utf8");
 
     expect(sql).toContain('CREATE TABLE "sos_requests"');
-    expect(sql).toContain('"location" "geography(Point,4326)" NOT NULL');
+    // Bare, not quoted: `"geography(Point,4326)"` is one identifier to Postgres, and a fresh database
+    // answered it with `42704: type "geography(Point,4326)" does not exist` on 2026-10-23. The assertion
+    // used to pin that broken spelling, which is how it survived review — a test that restates a reviewed
+    // line protects the line, not the intent. scripts/test_migration_sql.py now rejects the quoted form
+    // across the whole folder and ties this column to the string schema.ts's geographyPoint returns.
+    expect(sql).toContain('"location" geography(Point,4326) NOT NULL');
     expect(sql).toContain("\"status\" text DEFAULT 'pending' NOT NULL");
     expect(sql).toContain('"is_manual" boolean DEFAULT false NOT NULL');
     expect(sql).toContain('"created_at" timestamp with time zone DEFAULT now() NOT NULL');

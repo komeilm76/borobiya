@@ -4,7 +4,7 @@
 
 ---
 
-## Overall project estimate: 24% (unchanged planning figure) — Phase 1 v0.1.0 released; Phase 2 history share/read path (T2.2.3–T2.2.6), the priority-device rule and its settings screen (T2.3.1–T2.3.5), and the share client (T2.1.7) complete (2026-10-22); Phase 3 is underway — the admin catalogs (T3.1.2–T3.1.3) with their screens (T3.1.5), `sos_requests` (T3.2.1), SOS creation (T3.2.2) and its photo upload and storage (T3.2.3) are live
+## Overall project estimate: 24% (unchanged planning figure; this release re-ships work, it does not re-estimate it) — Phase 1 v0.1.0 released; **v0.2.0 released 2026-10-23 (Phase 2, Phase 3 M3.1 + M3.2, the map pipeline and the Ubuntu VM setup fixes)**; Phase 2 history share/read path (T2.2.3–T2.2.6), the priority-device rule and its settings screen (T2.3.1–T2.3.5), and the share client (T2.1.7) complete (2026-10-22); Phase 3 is underway — the admin catalogs (T3.1.2–T3.1.3) with their screens (T3.1.5), `sos_requests` (T3.2.1), SOS creation (T3.2.2) and its photo upload and storage (T3.2.3) are live
 
 All numbered Phase 1 implementation tasks, T1.0–T1.5, are checked complete. On 2026-10-21, the user reported a successful Ubuntu 24.04 setup and passed interactive checks for admin/user login, registration, themes, admin user listing/deactivation, and the map view; the exact scope is listed in [Phase 1 human acceptance](#phase-1-human-acceptance). T1.4.7 remains complete and limited to map-data cache/reuse, safe cache removal, and whole-country/city-crop selection. PR #2 was merged to `main` as `95a88a3`, and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21. Phase 2 is underway: live-share storage and API (T2.1.1–T2.1.4), history storage tables (T2.2.1–T2.2.2), realtime `location:update` with the priority-device rule (T2.1.5/T2.3.4), and the share-expiry + history-retention maintenance jobs with their ENV wiring (T2.1.6/T2.2.5) are complete. The Active Devices foundation is next: `user_sessions` already carried every spec §7.3 field, T2.3.1 closed the label semantics, T2.3.2 exposed `GET /_user/devices`, and T2.3.3 made the server the authority on which device may broadcast a share. History sharing is now complete on the server (T2.2.3 creates a grant, T2.2.4 reads, lists, and deletes one), and T2.1.7 put the first `/_user/location` calls in the browser: the share dialog with a debounced username picker, the duration slider, both share lists with confirm-to-revoke, and the priority-device chooser that answers the server's `409`. T2.2.6 then put history playback on the map: `history/playback.ts` decides the frames, interpolation and GeoJSON, `history/playback-map-sync.ts` decides what maplibre is told, and `composables/use-history-playback.ts` owns the window, the cursor and the transport loop — with the range picker opening on the last 7 days, as the milestone's exit criterion asks. History sharing is therefore complete end to end in code. T2.3.5 then gave the priority device its screen (`/_user/devices`): the account's live sessions joined to the shares that pin them, a per-share chooser, and a bulk apply — all writing through the sharing endpoint with a body that cannot move an expiry, so the only Phase 2 implementation task left is the Capacitor identity work (T2.3.6), plus live companion markers on the map (a roadmap line, not a numbered task); no location data path has run against a real PostgreSQL instance yet, and the new client screens — the share dialog and now the playback panel — have not been opened in a browser either. The 24% whole-project estimate is unchanged; it is a planning figure rather than a per-task measurement.
 
@@ -128,6 +128,48 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — v0.2.0 released
+
+- **What went out.** Everything between `v0.1.0` (`95a88a3`, 2026-10-21) and this branch: 55 commits, 208
+  files, +42,269/−826, and **seven migrations (`0006`–`0012`)**. Feature content: Phase 2 end to end —
+  live-share create/revoke/list, realtime `location:update` over Socket.IO with the priority-device rule, the
+  share-expiry and history-retention jobs, history-share grants with windowed reads, playback on the map, the
+  share dialog and target picker, the Active Devices screen, native device identity, and live companion
+  markers — plus Phase 3's first two milestones: the category and incident-type catalogs with their admin
+  screens, and `sos_requests` with SOS creation and photo upload. Operational content: the Ubuntu VM
+  runbook rewritten and audited three times against the scripts, `enable-proxy.sh`/`disable-proxy.sh`
+  replacing the runbook's hand-written proxy steps, setup asking for and *proving* both database passwords
+  the way the application authenticates, the `0012` PostGIS quoting fix, the routing gateway's upstream
+  diagnostics, and the `noProxy` fix for the proxy leak that made a healthy stack unable to route.
+- **The gates ran, and one of them caught a real problem** — see the entry below this one:
+  `packages/server/src/db/schema.test.ts` was *asserting the broken quoted DDL*, so the migration fix and the
+  test could not both be right. The test now asserts the corrected spelling and says why, and it no longer
+  restates a reviewed line as its own authority.
+- **Version surface.** `0.1.0` → `0.2.0` in `@borobiya/shared`, `@borobiya/server`, `@borobiya/client`, and in
+  the two `process.env.npm_package_version ?? "0.1.0"` fallbacks (`packages/server/src/app.ts`, so `GET
+  /health` reports the release, and `src/plugins/swagger.ts`, so the OpenAPI `info.version` does). The root
+  `package.json` stays versionless and `private`, as it was for v0.1.0.
+- **How it was gated here, and the limit of that claim**: `docs/WORKFLOWS.md` § 7 lists the gates as
+  `bun install` + vitest per package + `tsc`/`vue-tsc` + `vite build`. This sandbox has no bun and no
+  `node_modules`, so they were run in a scratch copy of the tree with `npm install` (npm 12, Node 22, the
+  three `workspace:*` specifiers rewritten to `*`, dependencies resolved fresh rather than from
+  `bun.lock`): **shared 55 passed, server 472 passed, client 370 passed, tsc clean for shared and server,
+  vue-tsc clean, `vite build` succeeded** (its only warning is the pre-existing maplibre chunk size).
+  That is indicative, not identical: a `bun install` on the release machine is still the authoritative run,
+  and no CI exists — `.github/workflows` is empty, so tagging publishes nothing by itself.
+- **Offline suites, which run unmodified here**: `pytest -q scripts/ map-server/scripts/` → 185 passed,
+  1 skipped, 12 subtests (the shell-pipeline tests, the migration-folder guard, the credential tests);
+  `node --test map-server/routing-gateway/*.test.mjs` → 36 passed; `bash -n` on every tracked `.sh`;
+  shellcheck clean on `scripts/*.sh`; `scripts/check_runbook_markdown.py` clean on every doc except the one
+  finding this repository accepts and tracks in USER_MANUAL.md itself: a cross-reference to section 10.5 of
+  that manual that no heading in it provides (writing the section sign here would make *this* changelog the
+  broken reference, which is the checker working as intended, not a rule to route around).
+- **Known, and stated in the release notes rather than hidden**: the browser screens in this release
+  (share dialog, playback panel, device settings, admin catalogs) have not been exercised end to end in a
+  browser by anyone; the VM applied all migrations and seeded successfully on 2026-10-23 but
+  `verify-routing.sh`/`verify-geocoding.sh` are waiting on the `noProxy` fix being recreated into the
+  running containers; and `docs/MAP_SERVER.md`'s one line that SOS is "contract-only" predates T3.2.2–T3.2.3
+  and is left for the next docs pass rather than edited blind.
 ### 2026-10-23 — the routing 502 was our own proxy leak, and a `noProxy` of loopback plus a CIDR exempts nothing
 
 - **The measurement killed the leading hypothesis.** The VM ran the two commands from the previous entry.

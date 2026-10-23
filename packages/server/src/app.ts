@@ -274,7 +274,7 @@ export async function createFastifyApp(
     async () => ({
       status: "ok" as const,
       uptime: process.uptime(),
-      version: process.env.npm_package_version ?? "0.1.0"
+      version: process.env.npm_package_version ?? "0.2.0"
     })
   );
   app.get(apiRoutes.public.securityQuestions.url, async (_request, reply) => {
