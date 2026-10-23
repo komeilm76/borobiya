@@ -128,6 +128,69 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — setup now asks for the database passwords, and proves them before the long stages
+
+- **What changed.** `scripts/setup-ubuntu-vm.sh` asks for `NOMINATIM_PASSWORD` and `POSTGRES_PASSWORD`
+  the way it asks for the admin password: Enter generates 48 hex characters, a typed value is stored
+  verbatim, an unusable one is refused and re-asked, and `--yes` skips the questions instead of asking a
+  non-interactive run to answer. Nothing is printed — the answers go only into `.env`, mode 600. Both
+  spellings are written from one variable (`POSTGRES_PASSWORD` *and* the password inside `DATABASE_URL`),
+  through the same atomic `set_env` rewrite that protects paths containing `&` and `|`, so the file can no
+  longer hold a URL that disagrees with the key it was built from. An existing `.env` is still never
+  rotated, but it is now *read*: a placeholder or a URL-hostile value in it is named, and only replaced
+  when no database exists to disagree with it.
+- **Why the alphabet rule.** Compose interpolates `POSTGRES_PASSWORD` straight into the API's
+  `DATABASE_URL`, and the Nominatim image builds its own connection string the same way. A `#` starts a
+  fragment, `/` and `?` end the authority, `%` promises an escape, brackets stop the parser — measured
+  with `urlsplit` here: `pa#ss`, `pa/ss`, `pa%41ss` and `pa[ss]` all come back as something other than
+  what was written, while `pa@ss` and `pa:ss` survive. So a password can be correct and still fail, which
+  is the shape of the bug this closes: `28P01: password authentication failed for user "borobiya"` with
+  `postgres: healthy` in the same log. The accepted set is `A-Z a-z 0-9 . _ ~ -`, 12-128 characters.
+- **The three-way check.** `check_database_credentials` runs at the end of stage 1, before any download:
+  it reads the password from `.env` rather than from the shell (the runbook's loader block exports the
+  same names, and an export beating the file is half of this failure), builds the URL the same way the
+  container will, and asks the running server through it. A healthy postgres and a refused login are a
+  real combination because three values exist — `.env`, the container's create-time environment, and the
+  role in `postgres-data`, which the image only ever sets at first init. `.env` vs the container decides
+  whether `--force-recreate postgres` is the fix; if they agree and the role refuses, the script offers
+  `ALTER USER` (one credential changes, no data does), verifies the login again afterwards, and reminds
+  you that the API holds a pool of old connections. It refuses to change a password it was not asked to
+  change, and it only ever looks for `postgres-data` under this project's Compose labels — a global
+  `docker volume ls | grep` could otherwise talk this run into re-passwording another checkout's database.
+- **A new test file, and a fake `docker` that keeps the claims honest.** `scripts/test_setup_db_passwords.py`
+  (41 tests) lifts the shipped functions out of the script by name, as `test_env_writer.py` does, and runs
+  them against `scripts/fake_docker_for_tests.py`, which behaves like the postgis container: it authenticates
+  a probe URL against the role password in a state file, applies an `ALTER USER` it reads from stdin, records
+  every argv it was called with, and refuses a host other than its own loopback. So the reconcile path is
+  exercised end to end — refused before consent, applied after it, re-probed afterwards — and
+  "the password never travels as an argument" is an assertion over the recorded argv rather than a comment
+  in a review. Also covered: both prompts answered independently, an invalid answer re-asked without being
+  written, the placeholder-with-an-existing-volume refusal (the case where rotating is exactly wrong), a
+  stale container environment reported instead of reconciled, `db_password_problem`'s four reasons, `ALTER
+  USER`'s quoting of a password or a role name containing a quote, and `--dry-run` writing nothing.
+- **Two things the harness got wrong before the script did.** The fake `docker` started life as a python
+  string inside the test file, which added a round of escaping the test could not see — its `calls` log
+  ended up holding a literal backslash-`n`, and that sent me hunting through its regexes when the two real
+  faults were an absent exec bit on the stub and a `compose ps -q <service>` argument read from the wrong
+  index. The stub is its own file now, backslash-free by construction (`chr(34)`, `chr(39)`, string
+  partitions instead of patterns), which is the same lesson this file records about `\t` in a generated
+  bash string. The second: the test's own helper was named `run()`, which silently shadowed
+  `TestCase.run`, so unittest called *my* helper as the framework method and every test failed with
+  `AttributeError: no attribute 'root'` — a fixture that looks broken when the name is.
+- **Docs.** A6 says the script asks, states the alphabet and the reason; § 9.3's single-line
+  "unset exports and retry" bullet became the three-way triage with the commands for each branch,
+  including the `ALTER USER` form that pipes the statement over stdin; § 7.2 points at it for a retry
+  that fails twice; DEVELOPMENT.md § 2.3 carries the same invariant for a developer who never reads the
+  runbook; `.env.example`'s URL-safe comment now says who enforces it. `--yes` in § 1.2's table says what
+  it does to the prompts.
+- **Verified by running**: 41 + 42 proxy + env-writer tests OK; `pytest -q scripts/ map-server/scripts/`
+  → 165 passed, 1 skipped, 12 subtests; `shellcheck -S warning` clean across `scripts/`; `bash -n` on every
+  tracked `.sh`; the runbook and every other markdown file pass the structural checker (67 fences, 62
+  shell), except the known dangling reference in `docs/USER_MANUAL.md`. A `--dry-run` against a `.env` of
+  placeholders names both unusable passwords, says it would ask, and still prints the plan. Not measured
+  here: a real `ALTER USER` against a real volume — this workspace has no Docker daemon, so the fake
+  answers for it, which is why the stub parses the SQL rather than trusting the shape of the command.
+
 ### 2026-10-23 — a reader ran § 5.2 on the VM and pasted the output; three claims in it were wrong
 
 - **`%{proxy_addrs}` does not exist.** Not in the reader's curl, not in this workspace's: I had written
@@ -160,7 +223,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 - **Two bugs in the fix, both found by running it, both worth writing down.** The scan first emitted
   `kind<TAB>path`, and the patcher's python string produced a literal backslash-and-`t`: the separator
   was two characters, so `grep -q $'^proxy\t'` matched nothing and the refusal silently never fired —
-  the same `	` trap this file has recorded before. Then a helper took an optional `$1` and read it as
+  the same `\t` trap this file has recorded before. Then a helper took an optional `$1` and read it as
   `"$1"` under `set -u`: inside `[[ -n "$(…)" ]]` the unbound-variable error is swallowed by the command
   substitution, and the check quietly reported "no conflict". Both are now `${1:-}`, a space separator,
   and a comment on each. `grep -q` was also dropped from those pipelines: `-q` stops reading at its

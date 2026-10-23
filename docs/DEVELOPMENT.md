@@ -61,6 +61,15 @@ Nginx proxies `/api/` to Fastify, `/map/` and Martin's root-relative assets to M
 
 Compose runs PostgreSQL from the `postgis/postgis:16-3.4` image and health-checks the database service. Drizzle migrations under `packages/server/drizzle/` create the auth/reference tables; T1.1.4's migration enables the PostGIS extension and adds account-state and `GEOGRAPHY(Point,4326)` fields plus a GiST index. Run `bun --filter @borobiya/server db:generate` to generate reviewed schema changes, then `bun --filter @borobiya/server db:migrate` to apply pending migrations to the configured `DATABASE_URL`. Neither runs at API startup; registration and login use the database client on demand after schema setup. After migration, `bun --filter @borobiya/server db:seed` inserts 15 Persian security questions, 11 cancellation reasons, and a hashed bootstrap admin; the seed is idempotent and does not overwrite an existing admin password. If that password is lost, reset it (this also revokes admin sessions) with `bun --filter @borobiya/server db:reset-admin-password '<new-password>'`, or the same script inside the API image. Local development defaults to `admin` / `admin123`, which must be changed before exposing the service. Seeding rejects that fallback unless `NODE_ENV` is `development` or `test`; set a unique `ADMIN_SEED_PASSWORD` in every other environment. `db:setup` remains unwired.
 
+Two Compose values have to agree in a way nothing checks for you. Compose builds the API's
+`DATABASE_URL` by interpolating `POSTGRES_PASSWORD` into it, so a password carrying `#`, `/`, `%`, `[` or
+a space reaches Postgres shortened and authenticates as a wrong password — keep to `A-Z a-z 0-9 . _ ~ -`,
+which is what `scripts/setup-ubuntu-vm.sh` asks for and refuses anything else (it asks for
+`NOMINATIM_PASSWORD` too, and Enter generates both). `POSTGRES_PASSWORD` also only takes effect at the
+volume's first init: afterwards the role inside `postgres-data` is the truth, the container's own
+environment is the second opinion, and `docker compose inspect postgres` versus `.env` is how you tell
+which of the three you are looking at (`docs/UBUNTU_VM_RUNBOOK.md` § 9.3).
+
 ### 2.4 Client and development loop
 
 For a local API + client with hot reload, stop the Compose stack first (the API uses host port `3000`) and run from the repository root:

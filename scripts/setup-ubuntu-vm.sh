@@ -67,7 +67,9 @@ Options:
   --reselect        Ask for areas/snapshot/policy again even if saved
   --list-regions    Print the area catalog and exit
   --yes             Non-interactive: no prompts (uses CLI/env inputs,
-                    the saved configuration, or safe defaults)
+                    the saved configuration, or safe defaults). On a first run the
+                    two database passwords are generated into .env instead of
+                    asked for; an existing .env is never rotated.
   --dry-run         Resolve the configuration and print the stage plan only;
                     writes nothing and downloads no map data
   -h, --help        This help
@@ -289,6 +291,271 @@ set_env() {
   fi
 }
 
+env_value() {
+  # $1 = key; prints what .env assigns to it, or nothing. Deliberately not `source`: the file is data,
+  # sourcing executes it, and an older value exported earlier in this shell (the runbook's loader block
+  # exports POSTGRES_PASSWORD and DATABASE_URL) would then win over the file being checked.
+  local key="$1"
+  BOROBIYA_ENV_KEY="$key" awk '
+     BEGIN { key = ENVIRON["BOROBIYA_ENV_KEY"]; prefix = key "=" }
+     substr($0, 1, length(prefix)) == prefix { print substr($0, length(prefix) + 1); exit }
+   ' .env 2>/dev/null || true
+}
+
+db_password_problem() {
+  # $1 = value. Prints '' when the value can be used, otherwise the reason, phrased to follow a key
+  # name in a message. The character rule is not taste: Compose interpolates POSTGRES_PASSWORD straight
+  # into the API's DATABASE_URL and the Nominatim image does the same for its own connection string, so
+  # '#' starts a fragment, '/' and '?' end the authority, '%' promises an escape, and brackets stop the
+  # parser outright. Postgres then rejects a password that .env plainly contains, which is a far more
+  # confusing failure than refusing to accept it here.
+  python3 - "$1" <<'PYEOF'
+import re
+import sys
+
+value = sys.argv[1]
+if not value:
+    print("is empty")
+elif value == "change-me" or value.startswith("replace-"):
+    print("is still the placeholder from .env.example")
+elif not re.fullmatch(r"[A-Za-z0-9._~-]+", value):
+    print("contains characters a connection URL cannot carry (only A-Z a-z 0-9 . _ ~ - are)")
+else:
+    print("")
+PYEOF
+}
+
+valid_db_password() {
+  # A password this script is asked to accept: the URL-safe set, and long enough to be worth having.
+  # db_password_problem is the weaker rule it also satisfies — that one is used on values already in
+  # .env, where a short password that works is nobody's emergency.
+  python3 - "$1" <<'PYEOF'
+import re
+import sys
+
+sys.exit(0 if re.fullmatch(r"[A-Za-z0-9._~-]{12,128}", sys.argv[1]) else 1)
+PYEOF
+}
+
+new_db_password() {
+  # 48 hex characters: an alphabet no URL parser can misread, which is why generating is always correct
+  # and typing is only sometimes.
+  openssl rand -hex 24
+}
+
+ask_db_secret() {
+  # $1 = prompt label; the accepted value lands in DB_SECRET_ANSWER, left empty on --dry-run. A global
+  # rather than command substitution, because the notes this function prints would be captured into the
+  # secret.
+  DB_SECRET_ANSWER=""
+  if (( DRY_RUN )); then
+    note "would ask for $1 (Enter generates a strong one)"
+    return 0
+  fi
+  local typed=""
+  if (( INTERACTIVE )); then
+    while :; do
+      # -s: a database password that reaches the terminal echo also reaches scrollback and any
+      # screenshot of the run, and unlike the admin password this one never has to be typed again by
+      # hand, because it is written into .env.
+      printf '    %s [Enter = generate a strong one]: ' "$1"
+      IFS= read -r -s -u "$INPUT_FD" typed || typed=""
+      printf '\n'
+      if [[ -z "$typed" ]]; then
+        break
+      fi
+      if valid_db_password "$typed"; then
+        break
+      fi
+      printf '    Use 12-128 characters of A-Z a-z 0-9 . _ ~ - ; the value goes into a connection URL.\n' >&2
+      printf '    Try again, or press Enter to generate one.\n' >&2
+    done
+  fi
+  if [[ -n "$typed" ]]; then
+    DB_SECRET_ANSWER="$typed"
+  else
+    DB_SECRET_ANSWER="$(new_db_password)" || \
+      fail "could not run 'openssl rand -hex' to generate a database password"
+  fi
+}
+
+compose_volume_exists() {
+  # exit 0 when this Compose project has a named volume whose key is $1 (e.g. postgres-data). The label
+  # filters, rather than a global `docker volume ls` plus a grep, keep this about *this* checkout:
+  # another project's volume must not be able to talk this run out of setting a password it is safe to
+  # set here.
+  local project="" out=""
+  if ! project="$(docker compose config --format json 2>/dev/null | \
+      python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"; then
+    fail "could not read the Compose project name ('docker compose config' says why); refusing to decide about the database password from a global volume search."
+  fi
+  [[ -n "$project" ]] || \
+    fail "Compose reported no project name; refusing to decide about the database password from a global volume search."
+  if ! out="$(docker volume ls -q \
+      --filter "label=com.docker.compose.project=$project" \
+      --filter "label=com.docker.compose.volume=$1" 2>/dev/null)"; then
+    fail "could not list this project's volumes ('docker volume ls' says why); refusing to rotate POSTGRES_PASSWORD without knowing whether the database already exists."
+  fi
+  [[ -n "$out" ]]
+}
+
+alter_sql_for() {
+  # $1 = role, $2 = password -> one ALTER statement on stdout. Quoting happens here, by doubling the
+  # only characters that need it, so a password containing a quote cannot close the literal early and
+  # turn the rest of itself into SQL.
+  python3 - "$1" "$2" <<'PYEOF'
+import sys
+
+role, password = sys.argv[1], sys.argv[2]
+quote = chr(34)
+ident = quote + role.replace(quote, quote + quote) + quote
+literal = chr(39) + password.replace(chr(39), chr(39) + chr(39)) + chr(39)
+print("ALTER USER " + ident + " WITH PASSWORD " + literal + ";")
+PYEOF
+}
+
+psql_in_postgres() {
+  # $1 = connection string, rest = psql arguments, run against the postgres service's container. The
+  # connection string travels over stdin and not as an argument: the argv of a docker command is
+  # readable by every other process on the host for as long as it runs, and this string carries the
+  # database password.
+  local conninfo="$1"; shift
+  printf '%s\n' "$conninfo" | \
+    docker compose exec -T postgres sh -c 'IFS= read -r url; exec psql "$url" "$@"' sh "$@" 2>&1
+}
+
+set_database_passwords() {
+  # $1 = "ask" on a .env this run just created, "keep" on one that already existed.
+  local mode="$1" user db port postgres nominatim problem nproblem
+  user="$(env_value POSTGRES_USER)"; [[ -n "$user" ]] || user="borobiya"
+  db="$(env_value POSTGRES_DB)"; [[ -n "$db" ]] || db="borobiya"
+  port="$(env_value POSTGRES_PORT)"; [[ -n "$port" ]] || port="5432"
+
+  if [[ "$mode" == "keep" ]]; then
+    # An existing .env is only rewritten when what it holds cannot work at all. Otherwise the volumes
+    # were initialized with these values, and rotating one here is the single change that turns a
+    # working machine into "password authentication failed" with a .env that still looks reasonable.
+    postgres="$(env_value POSTGRES_PASSWORD)"; problem="$(db_password_problem "$postgres")"
+    nominatim="$(env_value NOMINATIM_PASSWORD)"; nproblem="$(db_password_problem "$nominatim")"
+    if [[ -z "$problem" && -z "$nproblem" ]]; then
+      note "reusing the database passwords in .env (the volumes hold these; they are never rotated)"
+      return 0
+    fi
+    if [[ -n "$problem" ]]; then
+      note "POSTGRES_PASSWORD ${problem}"
+    fi
+    if [[ -n "$nproblem" ]]; then
+      note "NOMINATIM_PASSWORD ${nproblem}"
+    fi
+    if (( DRY_RUN )) || ! command -v docker >/dev/null 2>&1; then
+      note "would ask for the unusable value(s) above; deciding that needs a Docker daemon, because a volume that already holds a database must not be re-passworded by surprise"
+      return 0
+    fi
+    if compose_volume_exists postgres-data; then
+      fail "POSTGRES_PASSWORD cannot be used, and postgres-data already holds this project's database, so this script will not write a new password over it. Put the volume's own password back in .env, or change the role instead of the file (runbook § 9.3 has both)."
+    fi
+    if [[ -n "$nproblem" ]] && compose_volume_exists nominatim-data; then
+      fail "NOMINATIM_PASSWORD cannot be used, and the nominatim volume is already initialized; runbook § 9.2 has the Nominatim password and volume recovery. Neither rebuilds map tiles."
+    fi
+    note "no database volume is initialized yet, so this is the moment to choose the passwords"
+  fi
+
+  ask_db_secret "Nominatim database password (NOMINATIM_PASSWORD)"
+  nominatim="$DB_SECRET_ANSWER"
+  ask_db_secret "Postgres app password (POSTGRES_PASSWORD, and the app URL below)"
+  postgres="$DB_SECRET_ANSWER"
+  unset DB_SECRET_ANSWER
+  if [[ -z "$postgres" ]]; then
+    note "would set NOMINATIM_PASSWORD, POSTGRES_PASSWORD and a matching DATABASE_URL in .env"
+    return 0
+  fi
+  set_env NOMINATIM_PASSWORD "$nominatim"
+  set_env POSTGRES_PASSWORD "$postgres"
+  # Both spellings of the one credential, from one variable: host-side tools read DATABASE_URL, the
+  # containers get a URL built from POSTGRES_PASSWORD by Compose, and the two disagreeing is the failure
+  # this block exists to prevent. No encoding is applied because the alphabet needs none.
+  set_env DATABASE_URL "postgresql://${user}:${postgres}@localhost:${port}/${db}"
+  note "database passwords are in .env (mode 600) and were never printed; DATABASE_URL carries the same one"
+}
+
+check_database_credentials() {
+  # Prove the credential before the hours of map work, and name which side is wrong. A healthy postgres
+  # next to a failed login is a real combination: the healthcheck authenticates with the password the
+  # *container* was created with, while the migrator authenticates with a URL Compose builds from
+  # today's .env. Three values can therefore differ — .env, the container's environment, and the role
+  # stored in the volume — and only two of them can be settled by editing a file.
+  (( DRY_RUN )) && return 0
+  local user db port postgres problem cid answer out container_password
+  user="$(env_value POSTGRES_USER)"; [[ -n "$user" ]] || user="borobiya"
+  db="$(env_value POSTGRES_DB)"; [[ -n "$db" ]] || db="borobiya"
+  port="$(env_value POSTGRES_PORT)"; [[ -n "$port" ]] || port="5432"
+  postgres="$(env_value POSTGRES_PASSWORD)"
+  problem="$(db_password_problem "$postgres")"
+  if [[ -n "$problem" ]]; then
+    fail "POSTGRES_PASSWORD ${problem}; runbook § 9.3 explains why the URL forms make that fatal."
+  fi
+
+  cid="$(docker compose ps -q postgres 2>/dev/null || true)"
+  if [[ -z "$cid" ]]; then
+    if ! compose_volume_exists postgres-data; then
+      note "no postgres-data volume yet: the database will be created with the password now in .env"
+      return 0
+    fi
+    note "starting postgres so the credentials can be checked before anything long begins"
+    docker compose up -d postgres >/dev/null 2>&1 || \
+      fail "could not start postgres for the credential check; fix that first (runbook § 7.1), then re-run this script."
+    local tries=0
+    until cid="$(docker compose ps -q postgres 2>/dev/null || true)"; [[ -n "$cid" ]]; do
+      (( ++tries > 30 )) && fail "postgres did not report a container within 30s of starting; runbook § 7.1 has the log commands."
+      sleep 1
+    done
+  fi
+
+  out="$(psql_in_postgres "postgresql://${user}:${postgres}@127.0.0.1:${port}/${db}" -tAc 'SELECT 1' || true)"
+  if [[ "${out//[[:space:]]/}" == "1" ]]; then
+    note "verified: the password in .env authenticates against this database"
+    return 0
+  fi
+
+  container_password="$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$cid" 2>/dev/null | \
+    sed -n 's/^POSTGRES_PASSWORD=//p' | head -1)"
+  if [[ -n "$container_password" && "$container_password" != "$postgres" ]]; then
+    fail "the running postgres container was created with a different POSTGRES_PASSWORD than .env holds now, and that is the password the volume was initialized with. Reload .env and recreate that one service — the data stays: docker compose up -d --force-recreate postgres (runbook § 9.3)."
+  fi
+
+  # .env and the container agree, and the role rejects both: the volume outlived the password it was
+  # created with. Only one of the two can be made the other, so offer the direction that loses nothing:
+  # .env stays as it is and the role is told what .env says.
+  log "The database rejects the password in .env"
+  note "postgres-data was initialized with a different password. Either put that password back in .env,"
+  note "or set the role's password to what .env says now — one credential changes, no data does — and"
+  note "this script can do the second for you."
+  if ! (( INTERACTIVE )); then
+    fail "refusing to change a database password without asking. Restore the previous POSTGRES_PASSWORD in .env, or run this script interactively and accept the offer. The manual form is at the end of runbook § 9.3."
+  fi
+  printf '    Set the role password for "%s" to the one in .env now? [y/N]: ' "$user"
+  IFS= read -r -u "$INPUT_FD" answer || answer=""
+  case "$answer" in
+    [yY] | [yY][eE][sS]) ;;
+    *) fail "nothing changed. Restore the previous POSTGRES_PASSWORD in .env, or re-run and accept, before the migration step can pass." ;;
+  esac
+  # Superuser over the container's local socket, which the image authenticates without a password; the
+  # statement arrives on stdin, so the new password never appears in any argv.
+  if ! alter_sql_for "$user" "$postgres" | \
+      docker compose exec -T postgres psql -U postgres -d postgres -q -v ON_ERROR_STOP=1 -f -; then
+    fail "could not run ALTER USER as the postgres superuser. Do it from a shell in the container instead: docker compose exec -ti postgres psql -U postgres (runbook § 9.3)."
+  fi
+  out="$(psql_in_postgres "postgresql://${user}:${postgres}@127.0.0.1:${port}/${db}" -tAc 'SELECT 1' || true)"
+  if [[ "${out//[[:space:]]/}" == "1" ]]; then
+    note "verified: .env's password now authenticates"
+  else
+    fail "ALTER USER ran but the login still fails, so something else is choosing the credential; runbook § 9.3 lists the three places it can come from."
+  fi
+  if [[ -n "$(docker compose ps -q api 2>/dev/null || true)" ]]; then
+    note "the API holds a pool of connections made with the old password: docker compose restart api"
+  fi
+}
+
 if [[ ! -f .env ]]; then
   FRESH_ENV_FROM_EXAMPLE=1
   if (( DRY_RUN )); then
@@ -300,35 +567,46 @@ if [[ ! -f .env ]]; then
     # Nominatim passwords, and `cp` would otherwise hand them the process umask (0644 by default).
     install -m 600 .env.example .env
     note "created .env from .env.example (mode 600)"
-    db_pass="$(openssl rand -hex 24)"
     sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
     sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
-    sed -i "s|^NOMINATIM_PASSWORD=.*|NOMINATIM_PASSWORD=$(openssl rand -hex 24)|" .env
-    sed -i "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${db_pass}|" .env
-    sed -i "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://borobiya:${db_pass}@localhost:5432/borobiya|" .env
-    unset db_pass
-    note "generated JWT + database secrets (never change the database passwords after first start)"
+    # The two database passwords used to be generated here in silence, which left anyone who wanted
+    # their own to edit .env by hand afterwards — and a hand-edited value carrying a '#' or an '@' comes
+    # back later, far away, as an authentication error. They are asked for now, the way the admin
+    # password is, with the same Enter-to-generate.
+    set_database_passwords ask
+    note "JWT secrets generated (never change the database passwords after first start)"
     set -a; # shellcheck disable=SC1091
     source .env; set +a
   fi
 else
   note "reusing existing .env (values are never rotated by this script)"
+  # Outside the DRY_RUN guard on purpose: this is the one place that can tell the user their .env holds
+  # a password that cannot work, and a preview that stays silent about it is a preview of a run that
+  # stops at the first question. The function itself writes nothing when --dry-run is set.
+  set_database_passwords keep
   if (( ! DRY_RUN )); then
     if grep -q '^JWT_SECRET=.*replace-this' .env || grep -q '^JWT_REFRESH_SECRET=.*replace-this' .env; then
       sed -i "s|^JWT_SECRET=.*replace-this.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
       sed -i "s|^JWT_REFRESH_SECRET=.*replace-this.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
       note "replaced placeholder JWT secrets with generated ones"
     fi
-    if grep -qE '^POSTGRES_PASSWORD=(change-me|replace-)' .env; then
-      fail "POSTGRES_PASSWORD is still a placeholder. If the postgres-data volume was never started, set a real password plus the matching DATABASE_URL in .env (runbook A6); if it was started, restore the original password instead."
-    fi
   fi
   set -a; # shellcheck disable=SC1091
   source .env; set +a
 fi
 
-[[ -n "${NOMINATIM_PASSWORD:-}" ]] || \
-  fail "NOMINATIM_PASSWORD is empty in .env; set a non-empty value before starting the Nominatim import."
+# Read from the file and not from the shell variables sourced above: the loader block in the runbook
+# exports the same names, and a stale export would let this check pass on a machine the containers
+# cannot log into.
+nominatim_problem="$(db_password_problem "$(env_value NOMINATIM_PASSWORD)")"
+if [[ -n "$nominatim_problem" ]]; then
+  if (( DRY_RUN )); then
+    note "WARNING: NOMINATIM_PASSWORD ${nominatim_problem} (a real run stops before the plan)"
+  else
+    fail "NOMINATIM_PASSWORD ${nominatim_problem} — that image builds its own connection string from it, so set a usable value before the import (runbook A6)."
+  fi
+fi
+check_database_credentials
 
 if [[ -f .env ]] && grep -q '^ADMIN_SEED_PASSWORD=' .env && [[ -n "${ADMIN_SEED_PASSWORD:-}" ]]; then
   ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
@@ -1069,6 +1347,8 @@ docker compose --profile routing --profile geocoding up -d --build --force-recre
   map-server routing-gateway osrm-car osrm-bicycle osrm-foot photon
 docker compose --profile routing --profile geocoding up -d --build
 wait_healthy postgres 180
+# Stage 1 already proved this password against the running server; that proof is why there is no
+# authentication handling here — by now the migrations are the only thing left to get wrong.
 log "Applying database migrations and seed (runtime migrator inside the API image)"
 docker compose run --rm api bun src/db/migrate.ts
 docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/seed.ts

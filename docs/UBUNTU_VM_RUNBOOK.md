@@ -87,7 +87,7 @@ selection, downloads, tiles, routing, geocoding, containers, migrations, seed, v
 
 ```bash
 cd ~/borobiya
-./scripts/setup-ubuntu-vm.sh --reselect          # interactive: pick areas, confirm plan
+./scripts/setup-ubuntu-vm.sh --reselect          # interactive: pick areas, set the passwords, confirm
 ```
 
 | Flag | What it changes |
@@ -101,7 +101,7 @@ cd ~/borobiya
 | `--offline` | Require every artifact to already exist; never touch the network |
 | `--update-map` | Resolve and download the **latest common snapshot** online, instead of the pinned/saved one |
 | `--map-library PATH` | Move the map library (downloads, crops, tiles, indexes) outside the repo |
-| `--yes` | Non-interactive: run the whole plan without confirming |
+| `--yes` | Non-interactive: run the whole plan without confirming; the two database passwords are generated into `.env` instead of asked for |
 | `--dry-run` | Resolve the configuration and print the stage plan only; writes nothing and downloads no map data |
 | `-h`, `--help` | The option list above, from the script itself |
 
@@ -670,9 +670,23 @@ script uses.
 
 `POSTGRES_PASSWORD` and `NOMINATIM_PASSWORD` are written **once**: the volumes keep whatever they
 were initialized with, so changing them later makes the containers fail authentication while
-`.env` still looks correct (see § 9). The same block is what `setup-ubuntu-vm.sh` does
+`.env` still looks correct (see § 9.3). The same block is what `setup-ubuntu-vm.sh` does
 automatically; the `-n` on `cp` and the `grep -q` guards mean running it again never overwrites a
 secret you already generated.
+
+`setup-ubuntu-vm.sh` also **asks** for those two, the way it asks for the admin password: press Enter and
+it generates 48 hex characters, type a value and it is stored verbatim in both spellings — the key and
+the password inside `DATABASE_URL`, which is the pair that must never disagree. Nothing is printed: the
+answers live only in `.env`, mode 600, and `--yes` skips the questions entirely rather than asking a
+non-interactive run to answer.
+
+Why an alphabet rule instead of accepting anything: Compose interpolates `POSTGRES_PASSWORD` straight
+into the API's `DATABASE_URL`, and the Nominatim image does the same for its own connection string, so a
+`#` starts a fragment, a `/` or `?` ends the authority, a `%` promises an escape, and brackets stop the
+parser outright. Postgres then rejects a password that `.env` plainly contains, which looks like a wrong
+password and is not one (§ 9.3). The script therefore accepts `A-Z a-z 0-9 . _ ~ -`, 12 to 128 of them,
+and refuses the rest where it can still say so cheaply — before the map import rather than after it.
+Editing `.env` by hand buys nothing here: the same characters would be in the same URL.
 
 Then run the loader block from § 2.1 — it is also the cheapest proof that the file parses and that
 the selection you wrote is the selection the pipeline will use.
@@ -1576,7 +1590,9 @@ migrations that match *this* code are the ones applied. Migrations and seed are 
 startup, so a VM that has been sitting for a month needs those two lines before accounts, SOS rows
 or the catalog behave. If the migrator stops with a database error, keep its sanitized
 cause/SQLSTATE line, then clear stale exports and retry — do **not** delete a Postgres volume to
-make an error disappear:
+make an error disappear. A retry that fails twice means the role and the file disagree, which is the
+three-way check at the end of § 9.3; `setup-ubuntu-vm.sh` runs the same comparison before stage 1's
+downloads, so a re-run tells you now instead of after the import:
 
 ```bash
 unset POSTGRES_USER POSTGRES_PASSWORD POSTGRES_DB DATABASE_URL
@@ -1801,9 +1817,44 @@ Symptom first, always — grep this section for the error text.
   `docker compose down && docker volume rm <project>_postgres-data`, reload `.env`, re-run step 12.
   Tiles, graphs, index and the Nominatim volume live elsewhere and are untouched.
 - **Migration `28P01: password authentication failed for user "borobiya"` while Postgres is
-  `healthy`** — the one-off container got a different password than the volume holds. Unset stale
-  exports, reload `.env`, re-run § 7.2's migrate command. If it still fails, restore the original
-  `POSTGRES_PASSWORD`; do not rotate it unless you have confirmed the database is new and empty.
+  `healthy`** — three values are in play, and a healthy server proves only the middle one: the password
+  in `.env`, the one the **container** was created with (what its healthcheck authenticates), and the one
+  the **role inside `postgres-data`** has kept since its first init. `setup-ubuntu-vm.sh` compares them
+  before it starts anything long and offers to settle the disagreement; by hand, in that order:
+
+  ```bash
+  set -a; source .env; set +a                                   # 1. what the file says
+  docker compose inspect postgres | grep -m1 POSTGRES_PASSWORD   # 2. what the container was given
+  printf '%s\n' "postgresql://borobiya:$POSTGRES_PASSWORD@127.0.0.1:5432/borobiya" | \
+    docker compose exec -T postgres sh -c 'IFS= read -r u; exec psql "$u" -tAc "SELECT 1"'
+  ```
+
+  The third line is what the migrator will do, and the URL arrives on stdin because a password in argv is
+  readable by every other process on the machine while the command runs.
+
+  - **1 and 2 differ** — the volume is fine and only the container is stale:
+    `docker compose up -d --force-recreate postgres`. Data lives in the volume, not the container, so
+    this costs nothing. Re-running § 7.2's migrate command after this is what the "clear stale exports"
+    advice above was for: an export in your shell beats `.env` for Compose.
+  - **1 and 2 agree and the probe fails** — the role's own password is something else, usually because
+    `.env` was regenerated after the first `up`. Put the old value back, or make the role match the file,
+    which changes one credential and no data (the local socket inside the container authenticates as the
+    superuser without a password):
+
+    ```bash
+    printf "ALTER USER \"borobiya\" WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | \
+      docker compose exec -T postgres psql -U postgres -d postgres -v ON_ERROR_STOP=1 -f -
+    docker compose restart api      # it holds a pool of connections made with the old password
+    ```
+
+  - **the probe fails while the container's own healthcheck passes, and `psql -U borobiya` with the same
+    password works** — the password contains a character the URL cannot carry, so `DATABASE_URL` says
+    something shorter than `.env` does. Nothing is wrong with the account. Set a hex password in both
+    spellings (A6), then reconcile the role with the `ALTER USER` above.
+
+  Never resolve this by deleting `postgres-data` unless the database really is disposable: tiles, OSRM
+  graphs, the Photon index and the Nominatim volume are elsewhere (§ 8.5), but every row an operator has
+  entered since the install is not.
 - **Compose says the network must be recreated after a `git pull`** (the project subnet is pinned to
   `172.30.0.0/24`) — `docker compose down` once, **without** `-v`, then `up -d` again. Containers
   are recreated; volumes and built data stay.
