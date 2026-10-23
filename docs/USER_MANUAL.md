@@ -19,7 +19,7 @@
 11. [Live Location Sharing](#11-live-location-sharing)
 12. [History Sharing](#12-history-sharing)
 13. [Active Devices & Priority Device](#13-active-devices--priority-device)
-14. [SOS — Requesting Help — Planned](#14-sos--requesting-help--planned)
+14. [SOS — Requesting Help](#14-sos--requesting-help)
 15. [SOS — Admin Dispatch — Planned](#15-sos--admin-dispatch--planned)
 16. [SOS — Responding as Rescuer — Planned](#16-sos--responding-as-rescuer--planned)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
@@ -215,24 +215,24 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ---
 
-## 14. SOS — Requesting Help — Planned
+## 14. SOS — Requesting Help
 
-> **Current status:** `POST /_user/sos/requests` (T3.2.2) and `POST /_user/sos/requests/:id/photo` (T3.2.3) are implemented on the API, while the client SOS button, bottom sheet, and manual map-pin picker are not yet shipped (tracked under T3.2.4; admin broadcast is T3.2.5 and photo read-back is T3.2.6). The steps below describe the planned end-user flow.
+> **Current status:** End-to-end requester SOS filing is live across API and client (`POST /_user/sos/requests` T3.2.2, `POST /_user/sos/requests/:id/photo` T3.2.3, and the global floating red SOS button + bottom-sheet form T3.2.4). Live `sos:new-request` admin broadcast (T3.2.5), authenticated photo read-back (T3.2.6), and request history pages (T3.7) remain queued.
 
 ### Big red SOS button
 
-- Always visible: floating **red button** on User Web + Android.
+- Always visible across all authenticated screens after security-question onboarding: floating **SOS امداد** red button in the corner (plus the **درخواست امداد فوری (SOS)** card on `/_user/dashboard`).
 
 ### Steps
 
-1. Tap **SOS**.
+1. Tap **SOS امداد** from any screen (or **ارسال درخواست امداد (SOS)** on Dashboard) to open the bottom sheet.
 2. Fill:
-   - **Severity:** Low / Medium / High.
-   - **Description:** 10–500 chars what happened.
-   - **Incident Type:** dropdown (Fire, Flood, Medical, etc. — created by admin).
-   - **Location:** auto GPS (blue dot) or **Pick on Map** (tap to set marker) if GPS fails.
-   - **Photo (optional):** **Camera** or **Gallery** → max 5MB jpg/png/webp.
-3. **Send SOS** → status `pending`; admin notified instantly (pulsing marker on their map + sound).
+   - **Severity (`شدت حادثه`):** `کم‌خطر` (Low) / `متوسط` (Medium) / `بحرانی / فوری` (High).
+   - **Incident Type (`نوع حادثه`):** loaded live from `/_public/incident-types` (configured by an administrator).
+   - **Description (`شرح وضعیت و نیاز امدادی`):** 10–500 characters describing the emergency.
+   - **Location (`موقعیت حادثه`):** automatically probes device GPS (`isManual: false`), or tap anywhere on the embedded map / drag the red pin / enter `lat` & `lon` coordinates (Persian or Latin digits) if GPS is unavailable (`isManual: true`).
+   - **Photo (`تصویر صحنهٔ حادثه`, optional):** **ثبت با دوربین** (rear camera hint) or **انتخاب از گالری** — JPEG, PNG, or WebP up to 5 MB.
+3. Tap **ارسال درخواست امداد فوری** → files the SOS (`status = pending`) and returns your tracking ID; if a network error interrupts optional photo upload after the SOS row is created, **تلاش دوباره برای ارسال تصویر** retries only the photo upload without creating a duplicate emergency request.
 
 [Screenshot: SOS form with severity + map picker + photo]
 

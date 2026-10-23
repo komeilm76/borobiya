@@ -94,6 +94,9 @@
       </RouterView>
     </v-main>
 
+    <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
+    <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
+
     <footer class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
       <a
@@ -114,13 +117,20 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { RouterLink, RouterView, useRouter } from "vue-router";
+import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
+import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { pinia } from "./stores";
 import { useAuthStore } from "./stores/auth";
+import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
 import type { ThemePreference } from "./theme/theme-preference";
 
 const auth = useAuthStore(pinia);
+const sosSheet = useSosSheetStore(pinia);
 const appTheme = useThemeStore(pinia);
+const showSosButton = computed(
+  () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
+);
 const themeMenuLabel = computed(() => `انتخاب پوسته؛ پوستهٔ فعلی: ${appTheme.isDark ? "تیره" : "روشن"}`);
 const themeOptions: { value: ThemePreference; title: string; icon: string }[] = [
   { value: "system", title: "پیروی از دستگاه", icon: "mdi-theme-light-dark" },

@@ -71,23 +71,27 @@
         <ShareLists ref="shareLists" @create="shareOpen = true" @changed="onSharesChanged" />
 
         <v-card class="user-dashboard__feature-card" elevation="0" rounded="xl">
-          <v-chip class="user-dashboard__coming-soon" color="secondary" variant="tonal" size="small">
-            در حال آماده‌سازی
+          <v-chip class="user-dashboard__coming-soon" color="error" variant="tonal" size="small">
+            فعال — اضطراری
           </v-chip>
           <div class="user-dashboard__feature-icon" aria-hidden="true">
-            <v-icon icon="mdi-account-group-outline" size="28" />
+            <v-icon icon="mdi-alarm-light" size="28" />
           </div>
-          <h2>همراهی، وقتی مهم است</h2>
+          <h2>درخواست امداد فوری (SOS)</h2>
           <p>
-            اشتراک موقعیت از همین‌جا باز می‌شود؛ درخواست و پیگیری امداد در گام بعدی اضافه می‌شود.
+            در شرایط اضطراری، دکمهٔ قرمز SOS همیشه در پایین صفحه در دسترس است یا از همین‌جا فرم امداد و انتخاب محل روی نقشه را باز کنید.
           </p>
-          <div class="user-dashboard__feature-list">
-            <div>
-              <v-icon icon="mdi-ambulance" size="19" />
-              <span>درخواست و پیگیری امداد</span>
-              <span class="user-dashboard__feature-state">به‌زودی</span>
-            </div>
-          </div>
+          <v-btn
+            class="mt-3"
+            color="error"
+            variant="flat"
+            rounded="lg"
+            block
+            prepend-icon="mdi-alarm-light"
+            @click="sosSheet.openSheet()"
+          >
+            ارسال درخواست امداد (SOS)
+          </v-btn>
         </v-card>
 
         <v-card class="user-dashboard__note-card user-dashboard__devices-card" elevation="0" rounded="xl">
@@ -124,10 +128,12 @@ import ShareLists from "@/components/sharing/ShareLists.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useAuthStore } from "@/stores/auth";
 import { useBroadcastStore } from "@/stores/broadcast";
+import { useSosSheetStore } from "@/stores/sos-sheet";
 import { useThemeStore } from "@/stores/theme";
 
 const auth = useAuthStore();
 const broadcast = useBroadcastStore();
+const sosSheet = useSosSheetStore();
 const theme = useThemeStore();
 const username = computed(() => auth.user?.username ?? "همراه");
 
