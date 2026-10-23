@@ -22,6 +22,7 @@ import { DrizzleIncidentTypeStore, type IncidentTypeStore } from "./db/incident-
 import { registerAdminIncidentRoutes } from "./admin/incidents";
 import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
 import { registerAdminCategoryRoutes } from "./admin/categories";
+import { registerAdminSosRoutes } from "./admin/sos";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
@@ -205,6 +206,11 @@ export async function createFastifyApp(
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret
   });
+  await registerAdminSosRoutes(app, {
+    store: sosRequestStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
+  });
 
   // Registered after the `/_user` authorization hook so share routes inherit the
   // access-token, account-state, and onboarding checks, and wired to `realtime.io` so revocations
@@ -222,11 +228,13 @@ export async function createFastifyApp(
   await registerMultipartParser(app, { maxBytes: config.sosPhotoMaxBytes });
   // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
   // has finished onboarding, which is exactly the state dispatch is entitled to trust.
-  await registerSosRequestRoutes(app, { store: sosRequestStore });
+  await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,
-    maxBytes: config.sosPhotoMaxBytes
+    maxBytes: config.sosPhotoMaxBytes,
+    sosRequests: sosRequestStore,
+    io: realtime.io
   });
   await registerLocationHistoryShareRoutes(app, {
     store: locationHistoryStore,

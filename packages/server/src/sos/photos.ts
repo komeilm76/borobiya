@@ -5,6 +5,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { sniffSosPhoto } from "../security/image-payload";
 import type { PhotoStorage } from "./photo-storage";
 import type { SosPhotoStore } from "../db/sos-photo-store";
+import { sosRequestRecordPayload, type SosRequestStore } from "../db/sos-request-store";
+import { emitSosNewRequest, type RoomEmitter } from "../realtime/socket";
 import { sosCreateRateLimit } from "./requests";
 
 export interface SosPhotoRouteDependencies {
@@ -12,6 +14,8 @@ export interface SosPhotoRouteDependencies {
   storage: PhotoStorage;
   /** Bytes, from `SOS_PHOTO_MAX_SIZE_MB`; defaults to the 5 MB the spec states. */
   maxBytes?: number;
+  sosRequests?: Pick<SosRequestStore, "getRequestById">;
+  io?: RoomEmitter;
 }
 
 /** The size the container will accept, in the words the caller needs. */
@@ -245,6 +249,11 @@ export async function registerSosPhotoRoutes(
         "SOS_REQUEST_NOT_FOUND",
         "No SOS request of yours has that id. A photo can only be attached to a request you filed."
       );
+    }
+
+    const refreshed = await dependencies.sosRequests?.getRequestById?.(parsedParams.data.id);
+    if (refreshed) {
+      emitSosNewRequest(dependencies.io, sosRequestRecordPayload(refreshed));
     }
 
     // The URL the row now holds, answered from the store rather than recomputed here, so a client

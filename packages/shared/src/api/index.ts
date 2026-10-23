@@ -13,7 +13,7 @@ export { publicRoutes } from "./public.routes";
 export { userRoutes } from "./user.routes";
 export { locationRoutes } from "./location.routes";
 export { sosRoutes, nearestResponderSchema, nearestRespondersResponseSchema } from "./sos.routes";
-export { adminRoutes } from "./admin.routes";
+export { adminRoutes, adminSosListQuerySchema, type AdminSosListQuery } from "./admin.routes";
 
 import { adminRoutes } from "./admin.routes";
 import { authRoutes } from "./auth.routes";

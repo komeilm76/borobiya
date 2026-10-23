@@ -120,12 +120,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_admin/dispatch",
     name: "admin-dispatch",
-    component: () => import("@client/views/_admin/PlaceholderView.vue"),
-    props: {
-      title: "اعزام نیرو",
-      description: "ابزارهای هماهنگی و اعزام نزدیک‌ترین گروه‌های امدادی در این صفحه قرار می‌گیرند.",
-      icon: "mdi-ambulance"
-    }
+    component: () => import("@client/views/_admin/AdminDispatchView.vue")
   },
   {
     path: "/:pathMatch(.*)*",

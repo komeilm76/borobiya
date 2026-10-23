@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
+import type { SosRequest } from "@borobiya/shared";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
@@ -17,6 +18,8 @@ export const SERVICE_UNAVAILABLE_CODE = "SERVICE_UNAVAILABLE";
 export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
 export const SHARE_ENDED_EVENT = "location:share-ended";
+export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
+export const ADMIN_ROOM = "admin";
 
 export type ShareEndedReason = "revoked" | "expired";
 
@@ -115,6 +118,18 @@ export function emitShareEnded(
     reason
   };
   io.to(userRoom(share.targetUserId)).emit(SHARE_ENDED_EVENT, payload);
+}
+
+/**
+ * Broadcasts an emergency SOS request (`{ sosRequest }`) exclusively to connected administrators
+ * in the `admin` room (`T3.2.5`). Non-admin sockets never join `admin` and never receive this payload.
+ */
+export function emitSosNewRequest(
+  io: RoomEmitter | undefined,
+  sosRequest: SosRequest
+): void {
+  if (!io) return;
+  io.to(ADMIN_ROOM).emit(SOS_NEW_REQUEST_EVENT, { sosRequest });
 }
 
 /**

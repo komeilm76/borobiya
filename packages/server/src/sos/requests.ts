@@ -3,14 +3,17 @@ import { createSosRequestSchema, type CreateSosRequestInput } from "@borobiya/sh
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   SosIncidentTypeUnavailableError,
+  sosRequestRecordPayload,
   type CreatedSosRequest,
   type NewSosRequest,
   type SosRequestStore
 } from "../db/sos-request-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
+import { emitSosNewRequest, type RoomEmitter } from "../realtime/socket";
 
 export interface SosRequestRouteDependencies {
   store: SosRequestStore;
+  io?: RoomEmitter;
 }
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -175,6 +178,27 @@ export async function registerSosRequestRoutes(
       }
       throw error;
     }
+
+    const persisted = await dependencies.store.getRequestById?.(created.requestId);
+    emitSosNewRequest(
+      dependencies.io,
+      persisted
+        ? sosRequestRecordPayload(persisted)
+        : {
+            id: created.requestId,
+            requesterId: user.userId,
+            severity: parsed.data.severity,
+            description: parsed.data.description,
+            incidentTypeId: parsed.data.incidentTypeId,
+            location: parsed.data.location,
+            photoUrl: null,
+            status: created.status,
+            cancellationReasonId: null,
+            cancellationCustomText: null,
+            cancelledAt: null,
+            createdAt: new Date().toISOString()
+          }
+    );
 
     return reply
       .code(201)

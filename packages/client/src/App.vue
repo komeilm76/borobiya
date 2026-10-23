@@ -97,6 +97,23 @@
     <SosTriggerButton v-if="showSosButton" @trigger="sosSheet.openSheet()" />
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
 
+    <v-snackbar
+      :model-value="Boolean(adminSos.latestAlert)"
+      color="error"
+      location="top"
+      multi-line
+      :timeout="-1"
+    >
+      <div v-if="adminSos.latestAlert" role="alert" aria-live="assertive">
+        <strong>هشدار اضطراری SOS جدید:</strong>
+        <span class="ms-1">{{ adminSos.latestAlert.description }}</span>
+      </div>
+      <template #actions>
+        <v-btn variant="text" @click="openAlertOnMap">مشاهده روی نقشه</v-btn>
+        <v-btn variant="text" @click="adminSos.dismissLatestAlert()">بستن</v-btn>
+      </template>
+    </v-snackbar>
+
     <footer class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
       <a
@@ -120,12 +137,14 @@ import { RouterLink, RouterView, useRouter } from "vue-router";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { pinia } from "./stores";
+import { useAdminSosStore } from "./stores/admin-sos";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
 import type { ThemePreference } from "./theme/theme-preference";
 
 const auth = useAuthStore(pinia);
+const adminSos = useAdminSosStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 const appTheme = useThemeStore(pinia);
 const showSosButton = computed(
@@ -147,7 +166,10 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     return [{ to: "/_user/complete-security-questions", label: "تکمیل حساب", icon: "mdi-shield-key-outline" }];
   }
   if (auth.user?.role === "admin") {
+    const dispatchLabel =
+      adminSos.pendingCount > 0 ? `مرکز امداد (${adminSos.pendingCount})` : "مرکز امداد";
     return [
+      { to: "/_admin/dispatch", label: dispatchLabel, icon: "mdi-radar" },
       { to: "/_admin/users", label: "مدیریت کاربران", icon: "mdi-account-group-outline" },
       { to: "/_admin/categories", label: "گروه‌های امدادگر", icon: "mdi-shape-outline" },
       { to: "/_admin/incidents", label: "نوع رویدادها", icon: "mdi-alert-rhombus-outline" }
@@ -161,6 +183,15 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   ];
 });
 const router = useRouter();
+
+async function openAlertOnMap(): Promise<void> {
+  const alertId = adminSos.latestAlert?.id;
+  adminSos.dismissLatestAlert();
+  if (alertId) {
+    adminSos.selectRequest(alertId);
+    await router.push({ path: "/_admin/dispatch", query: { request: alertId } });
+  }
+}
 
 async function logout(): Promise<void> {
   try {

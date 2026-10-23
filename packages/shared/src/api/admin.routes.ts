@@ -40,10 +40,11 @@ const adminUserDetailSchema = userProfileSchema.extend({
   missions: z.array(missionSchema)
 });
 
-const adminSosListQuerySchema = z.strictObject({
+export const adminSosListQuerySchema = z.strictObject({
   status: sosRequestStatusSchema.optional(),
   ...paginationQuerySchema.shape
 });
+export type AdminSosListQuery = z.output<typeof adminSosListQuerySchema>;
 
 const dispatchResponseSchema = z.strictObject({ proposals: z.array(missionProposalSchema) });
 const adminStatsResponseSchema = z.strictObject({

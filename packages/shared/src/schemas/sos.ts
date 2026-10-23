@@ -142,3 +142,9 @@ export const sosRequestRecordSchema = z.strictObject({
   createdAt: timestampSchema
 });
 export type SosRequest = z.infer<typeof sosRequestRecordSchema>;
+export type SosRequestRecord = SosRequest;
+
+export const sosNewRequestEventSchema = z.strictObject({
+  sosRequest: sosRequestRecordSchema
+});
+export type SosNewRequestEvent = z.infer<typeof sosNewRequestEventSchema>;

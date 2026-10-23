@@ -1,4 +1,5 @@
-import { eq } from "drizzle-orm";
+import { asc, count, desc, eq, sql } from "drizzle-orm";
+import type { AdminSosListQuery } from "@borobiya/shared/api";
 import type { Severity, SosRequestStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import { geographyPointSql } from "./location-history-store";
@@ -37,6 +38,51 @@ export interface CreatedSosRequest {
   status: SosRequestStatus;
 }
 
+export interface SosRequestRecord {
+  id: string;
+  requesterId: string;
+  severity: Severity;
+  description: string;
+  incidentTypeId: string;
+  location: SosRequestLocationInput;
+  photoUrl: string | null;
+  status: SosRequestStatus;
+  cancellationReasonId: string | null;
+  cancellationCustomText: string | null;
+  cancelledAt: Date | null;
+  createdAt: Date;
+}
+
+export interface SosRequestListResult {
+  items: SosRequestRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export function sosRequestRecordPayload(record: SosRequestRecord) {
+  return {
+    id: record.id,
+    requesterId: record.requesterId,
+    severity: record.severity,
+    description: record.description,
+    incidentTypeId: record.incidentTypeId,
+    location: {
+      lat: record.location.lat,
+      lon: record.location.lon,
+      ...(record.location.accuracy === null ? {} : { accuracy: record.location.accuracy }),
+      isManual: record.location.isManual
+    },
+    photoUrl: record.photoUrl,
+    status: record.status,
+    cancellationReasonId: record.cancellationReasonId,
+    cancellationCustomText: record.cancellationCustomText,
+    cancelledAt: record.cancelledAt ? record.cancelledAt.toISOString() : null,
+    createdAt: record.createdAt.toISOString()
+  };
+}
+
 /**
  * The named incident type is not one an SOS can be filed against: the catalog is data, and on a
  * fresh install it starts empty (nothing is seeded), so "you have not created any incident types
@@ -57,6 +103,8 @@ export class SosIncidentTypeUnavailableError extends Error {
 
 export interface SosRequestStore {
   createRequest(input: NewSosRequest): Promise<CreatedSosRequest>;
+  getRequestById?(id: string): Promise<SosRequestRecord | null>;
+  listRequests?(query: AdminSosListQuery): Promise<SosRequestListResult>;
 }
 
 /** The catalog probe, exported so its predicate is assertable without a live database. */
@@ -88,6 +136,62 @@ export function sosRequestInsertQuery(db: Database, input: NewSosRequest) {
     .returning({ requestId: sosRequests.id, status: sosRequests.status });
 }
 
+const sosRequestReadSelection = {
+  id: sosRequests.id,
+  requesterId: sosRequests.requesterId,
+  severity: sosRequests.severity,
+  description: sosRequests.description,
+  incidentTypeId: sosRequests.incidentTypeId,
+  lat: sql<number>`ST_Y("sos_requests"."location"::geometry)::float8`,
+  lon: sql<number>`ST_X("sos_requests"."location"::geometry)::float8`,
+  accuracy: sosRequests.accuracy,
+  isManual: sosRequests.isManual,
+  photoUrl: sosRequests.photoUrl,
+  status: sosRequests.status,
+  cancellationReasonId: sosRequests.cancellationReasonId,
+  cancellationCustomText: sosRequests.cancellationCustomText,
+  cancelledAt: sosRequests.cancelledAt,
+  createdAt: sosRequests.createdAt
+};
+
+function mapSosRequestRow(row: {
+  id: string;
+  requesterId: string;
+  severity: string;
+  description: string;
+  incidentTypeId: string;
+  lat: number;
+  lon: number;
+  accuracy: number | null;
+  isManual: boolean;
+  photoUrl: string | null;
+  status: string;
+  cancellationReasonId: string | null;
+  cancellationCustomText: string | null;
+  cancelledAt: Date | null;
+  createdAt: Date;
+}): SosRequestRecord {
+  return {
+    id: row.id,
+    requesterId: row.requesterId,
+    severity: row.severity as Severity,
+    description: row.description,
+    incidentTypeId: row.incidentTypeId,
+    location: {
+      lat: Number(row.lat),
+      lon: Number(row.lon),
+      accuracy: row.accuracy === null ? null : Number(row.accuracy),
+      isManual: row.isManual
+    },
+    photoUrl: row.photoUrl,
+    status: row.status as SosRequestStatus,
+    cancellationReasonId: row.cancellationReasonId,
+    cancellationCustomText: row.cancellationCustomText,
+    cancelledAt: row.cancelledAt,
+    createdAt: row.createdAt
+  };
+}
+
 export class DrizzleSosRequestStore implements SosRequestStore {
   constructor(private readonly db: Database) {}
 
@@ -112,5 +216,38 @@ export class DrizzleSosRequestStore implements SosRequestStore {
       }
       return created;
     });
+  }
+
+  async getRequestById(id: string): Promise<SosRequestRecord | null> {
+    const [row] = await this.db
+      .select(sosRequestReadSelection)
+      .from(sosRequests)
+      .where(eq(sosRequests.id, id))
+      .limit(1);
+    return row ? mapSosRequestRow(row) : null;
+  }
+
+  async listRequests(query: AdminSosListQuery): Promise<SosRequestListResult> {
+    const where = query.status ? eq(sosRequests.status, query.status) : undefined;
+    const [countRow] = await this.db
+      .select({ total: count() })
+      .from(sosRequests)
+      .where(where);
+    const total = countRow?.total ?? 0;
+    const rows = await this.db
+      .select(sosRequestReadSelection)
+      .from(sosRequests)
+      .where(where)
+      .orderBy(desc(sosRequests.createdAt), asc(sosRequests.id))
+      .limit(query.limit)
+      .offset((query.page - 1) * query.limit);
+
+    return {
+      items: rows.map(mapSosRequestRow),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit)
+    };
   }
 }
