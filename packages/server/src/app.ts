@@ -153,6 +153,13 @@ export async function createFastifyApp(
     shareStore: locationShareStore,
     historyStore: locationHistoryStore
   });
+  const realtime = attachRealtime(app.server, {
+    jwtSecret: config.jwtSecret,
+    users: securityQuestionsStore,
+    live: liveLocationService,
+    corsOrigins: config.corsOrigins,
+    logger: app.log
+  });
   await registerUserSecurityQuestionsRoute(app, {
     store: securityQuestionsStore,
     jwtSecret: config.jwtSecret,
@@ -172,18 +179,21 @@ export async function createFastifyApp(
   await registerSessionRoutes(app, {
     store: loginStore,
     jwtSecret: config.jwtSecret,
-    jwtRefreshSecret: config.jwtRefreshSecret
+    jwtRefreshSecret: config.jwtRefreshSecret,
+    io: realtime.io
   });
   await registerForgotPasswordRoutes(app, {
     store: recoveryStore,
     decoySecret: config.jwtSecret,
     hashPassword: dependencies.hashPassword,
-    verifyAnswer: dependencies.verifySecurityAnswer
+    verifyAnswer: dependencies.verifySecurityAnswer,
+    io: realtime.io
   });
   await registerAdminUserRoutes(app, {
     store: adminUserStore,
     jwtSecret: config.jwtSecret,
-    hashPassword: dependencies.hashPassword
+    hashPassword: dependencies.hashPassword,
+    io: realtime.io
   });
   await registerAdminIncidentRoutes(app, {
     store: incidentTypeStore,
@@ -195,9 +205,15 @@ export async function createFastifyApp(
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret
   });
+
   // Registered after the `/_user` authorization hook so share routes inherit the
-  // access-token, account-state, and onboarding checks.
-  await registerLocationShareRoutes(app, { store: locationShareStore, devices: userDeviceStore });
+  // access-token, account-state, and onboarding checks, and wired to `realtime.io` so revocations
+  // notify receivers immediately instead of waiting for their next share-list poll.
+  await registerLocationShareRoutes(app, {
+    store: locationShareStore,
+    devices: userDeviceStore,
+    io: realtime.io
+  });
   // multipart is only needed by the photo upload, but it must be on the app before that route is
   // created. The limits are the contract's, not a guess: `docs/SECURITY.md` §9 caps a photo at 5 MB,
   // and an SOS carries one — so the parser refuses anything bigger before a byte is buffered, and
@@ -218,19 +234,11 @@ export async function createFastifyApp(
     maxShareDays: config.locationHistoryMaxShareDays,
     defaultReadPoints: config.locationHistoryReadPoints
   });
-
-  const realtime = attachRealtime(app.server, {
-    jwtSecret: config.jwtSecret,
-    users: securityQuestionsStore,
-    live: liveLocationService,
-    corsOrigins: config.corsOrigins,
-    logger: app.log
-  });
   await registerLocationUpdateRoute(app, {
     service: liveLocationService,
     broadcast: (peerIds, update) => {
-      for (const peerId of peerIds) {
-        realtime.io.to(userRoom(peerId)).emit(PEER_UPDATE_EVENT, update);
+      for (const roomUserId of new Set([...peerIds, update.userId])) {
+        realtime.io.to(userRoom(roomUserId)).emit(PEER_UPDATE_EVENT, update);
       }
     }
   });
@@ -244,6 +252,7 @@ export async function createFastifyApp(
       shareStore: locationShareStore,
       historyStore: locationHistoryStore,
       retentionDays: config.locationHistoryRetentionDays,
+      io: realtime.io,
       logger: app.log
     });
     // One catch-up pass per listener turn: shares whose window closed while the API was down are

@@ -47,7 +47,20 @@
       </div>
 
       <div v-if="api.sourceKind.value === 'grant'" class="history-playback__grants">
-        <p v-if="api.grantsLoading.value" class="history-playback__hint" role="status">
+        <div class="history-playback__grants-bar">
+          <span class="history-playback__hint">اشتراک‌های دریافتی</span>
+          <v-btn
+            size="x-small"
+            variant="text"
+            color="primary"
+            :loading="api.grantsLoading.value"
+            aria-label="تازه‌سازی فهرست اشتراک‌های تاریخچه"
+            @click="api.loadShares()"
+          >
+            تازه‌سازی
+          </v-btn>
+        </div>
+        <p v-if="api.grantsLoading.value && !api.grants.value.length" class="history-playback__hint" role="status">
           در حال خواندن اشتراک‌ها…
         </p>
         <template v-else-if="api.grants.value.length">
@@ -62,12 +75,17 @@
             hide-details="auto"
             @update:model-value="chooseGrant"
           />
-          <p class="history-playback__hint">
+          <p v-if="api.grantsFailed.value" class="history-playback__hint">
+            آخرین تازه‌سازی فهرست ناموفق بود؛ فهرست قبلی نمایش داده می‌شود.
+          </p>
+          <p v-else class="history-playback__hint">
             بازه و چگالی را صاحب اشتراک تعیین کرده است؛ برای همین انتخاب بازه برای این بخش غیرفعال است.
           </p>
         </template>
+        <p v-else-if="api.grantsFailed.value" class="history-playback__hint" role="status">
+          خواندن فهرست اشتراک‌ها ناموفق بود؛ روی «تازه‌سازی» بزنید تا دوباره بررسی شود.
+        </p>
         <p v-else class="history-playback__hint">
-          <span v-if="api.grantsFailed.value">خواندن فهرست اشتراک‌ها ناموفق بود. </span>
           هنوز کسی مسیر گذشته‌اش را با شما به اشتراک نگذاشته است.
         </p>
       </div>
@@ -424,6 +442,13 @@ function scrub(value: number | readonly number[]): void {
 }
 
 .history-playback__status,
+.history-playback__grants-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .history-playback__hint {
   margin: 0;
   color: #536d6c;

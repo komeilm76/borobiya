@@ -7,7 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev"
+    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev",
+    "lint": "./scripts/check-repo.sh",
+    "typecheck": "bun --filter @borobiya/shared typecheck && bun --filter @borobiya/server typecheck && bun --filter @borobiya/client typecheck",
+    "test": "bun --filter @borobiya/shared test && bun --filter @borobiya/server test && bun --filter @borobiya/client test",
+    "build": "bun --filter @borobiya/client build"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

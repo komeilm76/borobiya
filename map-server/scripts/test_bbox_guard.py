@@ -43,6 +43,7 @@ def run_script(name: str, env: dict[str, str], home: Path) -> subprocess.Complet
         capture_output=True,
         text=True,
         timeout=120,
+        check=False,
     )
 
 

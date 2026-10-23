@@ -16,7 +16,6 @@ import subprocess
 import tempfile
 import threading
 import unittest
-import urllib.request
 import zipfile
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer

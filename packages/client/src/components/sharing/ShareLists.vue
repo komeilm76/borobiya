@@ -69,9 +69,9 @@
       <section class="share-lists__section" aria-labelledby="share-lists-received-title">
         <h3 id="share-lists-received-title">
           با من به اشتراک گذاشته‌اند
-          <v-chip size="x-small" variant="tonal">{{ receivedRows.length }}</v-chip>
+          <v-chip size="x-small" variant="tonal">{{ receivedRows.length + receivedHistoryRows.length }}</v-chip>
         </h3>
-        <p v-if="receivedRows.length === 0" class="share-lists__empty">
+        <p v-if="receivedRows.length === 0 && receivedHistoryRows.length === 0" class="share-lists__empty">
           اشتراک فعالی برای شما باز نیست.
         </p>
         <ul v-else class="share-lists__rows">
@@ -84,6 +84,22 @@
               </p>
               <p class="share-lists__row-sub">{{ receivedDetail(row).join(" • ") }}</p>
             </div>
+            <v-btn size="x-small" variant="text" color="primary" to="/_user/map">
+              نقشه
+            </v-btn>
+          </li>
+          <li v-for="row in receivedHistoryRows" :key="`rh-${row.id}`" class="share-lists__row">
+            <v-icon icon="mdi-map-marker-path" size="20" />
+            <div class="share-lists__row-main">
+              <p class="share-lists__row-title">
+                <bdi dir="ltr">{{ row.label }}</bdi>
+                <span class="share-lists__row-state">تاریخچه مسیر</span>
+              </p>
+              <p class="share-lists__row-sub">{{ historyDetail(row).join(" • ") }}</p>
+            </div>
+            <v-btn size="x-small" variant="text" color="primary" to="/_user/map">
+              پخش در نقشه
+            </v-btn>
           </li>
         </ul>
       </section>
@@ -120,9 +136,12 @@
 
     <v-dialog v-model="confirmOpen" max-width="420">
       <v-card rounded="xl" v-if="pendingRow">
-        <v-card-title>لغو این اشتراک؟</v-card-title>
+        <v-card-title>{{ pendingRow.history ? "حذف دسترسی تاریخچه؟" : "لغو این اشتراک؟" }}</v-card-title>
         <v-card-text>
-          <p class="share-lists__confirm">
+          <p v-if="pendingRow.history" class="share-lists__confirm">
+            دسترسی <bdi dir="ltr">{{ pendingRow.label }}</bdi> به این بازهٔ تاریخچهٔ مسیر بلافاصله قطع می‌شود.
+          </p>
+          <p v-else class="share-lists__confirm">
             <bdi dir="ltr">{{ pendingRow.label }}</bdi> از این پس موقعیت زندهٔ شما را نخواهد دید.
             تاریخچهٔ بازه‌های قبلی پاک نمی‌شود.
           </p>
@@ -131,7 +150,7 @@
           <v-spacer />
           <v-btn variant="text" :disabled="revoking" @click="confirmOpen = false">بازگشت</v-btn>
           <v-btn color="error" variant="flat" :loading="revoking" @click="confirmRevoke">
-            لغو اشتراک
+            {{ pendingRow.history ? "حذف دسترسی" : "لغو اشتراک" }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -172,7 +191,10 @@ import {
  * so the expiry arithmetic is the tested one, and the tick on every refresh is a real request:
  * a share can be revoked from another device at any moment.
  */
-const emit = defineEmits<{ (event: "create"): void }>();
+const emit = defineEmits<{
+  (event: "create"): void;
+  (event: "changed"): void;
+}>();
 
 interface LiveRowView {
   id: string;
@@ -285,6 +307,18 @@ const historyRows = computed<HistoryRowView[]>(() => {
   });
 });
 
+const receivedHistoryRows = computed<HistoryRowView[]>(() => {
+  const now = new Date(nowMs.value);
+  return receivedHistory.value.map((share) => {
+    const described = describeHistoryShareRow(share, now);
+    return {
+      ...described,
+      label: shareRowLabel(share.owner.id, names.value, share.owner.username),
+      history: true
+    };
+  });
+});
+
 async function refresh(): Promise<void> {
   const token = auth.accessToken;
   if (!token) return;
@@ -379,6 +413,7 @@ async function confirmRevoke(): Promise<void> {
     confirmOpen.value = false;
     pendingRow.value = null;
     await refresh();
+    emit("changed");
   } catch (error) {
     loadError.value = friendlyErrorMessage(error, "لغو اشتراک انجام نشد.");
     confirmOpen.value = false;

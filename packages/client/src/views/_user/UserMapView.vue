@@ -35,6 +35,7 @@
     </aside>
 
     <aside class="user-map-view__live">
+      <LiveBroadcastBar compact />
       <LiveCompanionPanel :api="live" />
     </aside>
   </section>
@@ -46,6 +47,7 @@ import type { Map as MapLibreMap } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
+import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
@@ -78,6 +80,7 @@ const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
  */
 const live = useLiveCompanions({
   accessToken: computed(() => auth.accessToken),
+  ensureSession: () => auth.ensureSession(),
   // The server echoes an accepted fix into the sender's own room, so without our own id a user who is
   // both broadcasting and receiving would draw themselves as one of their own companions.
   ownUserId: computed(() => auth.user?.id ?? null)
@@ -307,6 +310,9 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   inset-block-end: 1rem;
   inset-inline-start: 1rem;
   width: min(21rem, calc(100% - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 :global(:root.dark) .user-map-view__toolbar-card {

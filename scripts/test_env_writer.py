@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
 import stat
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -69,6 +69,7 @@ def run_set_env(env_dir: Path, key: str, value: str) -> subprocess.CompletedProc
         cwd=env_dir,
         capture_output=True,
         text=True,
+        check=False,
     )
 
 
@@ -166,6 +167,7 @@ class SetEnvValueTests(unittest.TestCase):
             cwd=self.env_dir,
             capture_output=True,
             text=True,
+            check=False,
         )
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertIn("would set", result.stdout)

@@ -242,7 +242,51 @@ export function buildOpenApiPaths(): OpenApiPaths {
   return paths;
 }
 
+/**
+ * Builds the `openapi.info.description` runtime summary directly from `x-borobiya-runtime-status`
+ * on the generated paths so prose in `/docs/json` can never drift behind `implementedOperationIds`.
+ */
+export function describeOpenApiRuntimeStatus(paths: OpenApiPaths = buildOpenApiPaths()): string {
+  let implementedCount = 0;
+  let contractOnlyCount = 0;
+  const implementedByTag = new Map<string, string[]>();
+  const contractOnlyByTag = new Map<string, string[]>();
+
+  for (const [openApiPath, methods] of Object.entries(paths)) {
+    for (const [method, operation] of Object.entries(methods)) {
+      const label = `${method.toUpperCase()} ${openApiPath}`;
+      const isImplemented = operation["x-borobiya-runtime-status"] === "implemented";
+      if (isImplemented) implementedCount += 1;
+      else contractOnlyCount += 1;
+
+      const tags = Array.isArray(operation.tags) ? (operation.tags as string[]) : [];
+      for (const tag of tags) {
+        const target = isImplemented ? implementedByTag : contractOnlyByTag;
+        const list = target.get(tag) ?? [];
+        list.push(label);
+        target.set(tag, list);
+      }
+    }
+  }
+
+  const totalCount = implementedCount + contractOnlyCount;
+  const sosImplemented = implementedByTag.get("sos") ?? [];
+  const sosClause = sosImplemented.length > 0
+    ? `SOS creation and evidence upload (${sosImplemented.join(", ")}) are live, while the remaining SOS, dispatch, proposal, mission, and place-search operations carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`
+    : "SOS and mission operations carry `x-borobiya-runtime-status: contract-only` and currently return 404.";
+
+  return (
+    `OpenAPI is generated from the shared Zod route contracts (${implementedCount} of ${totalCount} operations implemented at runtime, ` +
+    `${contractOnlyCount} marked \`x-borobiya-runtime-status: contract-only\`). Public health/security-question catalog, auth/session/recovery, ` +
+    `admin user list/detail/create/status, the admin incident-type catalog (list/create/update), the responder-category catalog with member assignment and removal, ` +
+    `authenticated profile/onboarding/devices, partial-username user search, live-location share creation, revocation, listing, history-share creation with its windowed reads, ` +
+    `grant lists, and delete, and the deprecated REST location-update fallback are implemented at runtime (live \`location:update\` and \`location:share-ended\` run over Socket.IO). ` +
+    sosClause
+  );
+}
+
 export async function registerSwagger(app: FastifyInstance, openApiServerPath = "/"): Promise<void> {
+  const paths = buildOpenApiPaths();
   const tags = [...new Set(allApiRoutes.flatMap((route) => route.meta.tags))].map((name) => ({
     name: name.replace(/^#/, "")
   }));
@@ -253,8 +297,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
       info: {
         title: "Borobiya API",
         version: process.env.npm_package_version ?? "0.2.0",
-        description:
-          "OpenAPI is generated from the shared Zod route contracts. Public health/security-question catalog, auth/session/recovery, admin user list/detail/create/status, the admin incident-type catalog (list/create/update), the responder-category catalog with member assignment and removal, authenticated profile/onboarding/devices, partial-username user search, live-location share creation, revocation, listing, history-share creation with its windowed reads, grant lists, and delete, and the deprecated REST location-update fallback are implemented at runtime (live `location:update` arrives over Socket.IO); SOS and mission operations are contract-only and currently return 404."
+        description: describeOpenApiRuntimeStatus(paths)
       },
       servers: [
         { url: openApiServerPath },
@@ -277,7 +320,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
       const openapiObject = document.openapiObject as Partial<OpenAPIV3_2.Document>;
       return {
         ...openapiObject,
-        paths: buildOpenApiPaths() as unknown as OpenAPIV3_2.Document["paths"]
+        paths: paths as unknown as OpenAPIV3_2.Document["paths"]
       };
     }
   };

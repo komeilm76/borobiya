@@ -315,7 +315,7 @@ class TestRefusals(ScriptCase):
 
     def test_ipv6_round_trips_through_bash_quoting(self) -> None:
         self.enable("--host", "[fd00::1]:3128", "--skip-checks")
-        line = next(l for l in self.block_lines() if "http_proxy" in l)
+        line = next(entry for entry in self.block_lines() if "http_proxy" in entry)
         self.assertIn('http_proxy="http://[fd00::1]:3128"', line)
         resolved = subprocess.run(
             ["bash", "-c", ". ~/.bashrc; printf '%s' \"$http_proxy\""],
@@ -542,7 +542,7 @@ class TestNoProxyCoversTheComposeNetwork(ScriptCase):
     def no_proxy_written(self, **env: str) -> str:
         fixture = self.root / "docker-compose.fixture.yml"
         fixture.write_text(self.FIXTURE)
-        result = self.enable("--yes", "10.0.2.5", "3128", BOROBIYA_PROXY_COMPOSE_FILE=str(fixture), **env)
+        result = self.enable("--yes", "--skip-checks", "10.0.2.5", "3128", BOROBIYA_PROXY_COMPOSE_FILE=str(fixture), **env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return json.loads(self.docker_config.read_text())["proxies"]["default"]["noProxy"]
 
@@ -579,7 +579,7 @@ class TestNoProxyCoversTheComposeNetwork(ScriptCase):
                 services.append(line.strip()[:-1])
         self.assertIn("osrm-car", services, "the shipped Compose file no longer has the service this bug is about")
         self.assertTrue(services, "no services found; the extractor this test guards needs updating")
-        result = self.enable("--yes", "10.0.2.5", "3128")
+        result = self.enable("--yes", "--skip-checks", "10.0.2.5", "3128")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         no_proxy = json.loads(self.docker_config.read_text())["proxies"]["default"]["noProxy"]
         for name in services:
@@ -593,7 +593,7 @@ class TestNoProxyCoversTheComposeNetwork(ScriptCase):
 
     def test_a_missing_compose_file_degrades_to_loopback_instead_of_failing(self) -> None:
         result = self.enable(
-            "--yes", "10.0.2.5", "3128",
+            "--yes", "--skip-checks", "10.0.2.5", "3128",
             BOROBIYA_PROXY_COMPOSE_FILE=str(self.root / "does-not-exist.yml"),
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

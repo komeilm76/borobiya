@@ -1,5 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
+import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { verifyAccessToken, type SessionTokenIdentity } from "../security/tokens";
@@ -15,6 +16,25 @@ export const LOCATION_UPDATE_WINDOW_MS = 60_000;
 export const SERVICE_UNAVAILABLE_CODE = "SERVICE_UNAVAILABLE";
 export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
+export const SHARE_ENDED_EVENT = "location:share-ended";
+
+export type ShareEndedReason = "revoked" | "expired";
+
+export interface ShareEndedPayload {
+  shareId: string;
+  userId: string;
+  reason: ShareEndedReason;
+}
+
+/** Structurally satisfied by Socket.IO's `Server` and test doubles. */
+export interface RoomEmitter {
+  to(room: string): { emit(event: string, payload: unknown): unknown };
+}
+
+/** Structurally satisfied by Socket.IO's `Server` (`io.in(room).disconnectSockets(true)`). */
+export interface SocketDisconnector {
+  in(room: string): { disconnectSockets(close?: boolean): void };
+}
 
 export type SocketError = { message: string; code: string };
 
@@ -49,6 +69,52 @@ function socketError(code: string, message: string): Error & { data: { code: str
 
 export function userRoom(userId: string): string {
   return `user:${userId}`;
+}
+
+export function sessionRoom(sessionId: string): string {
+  return `session:${sessionId}`;
+}
+
+/**
+ * Drops every open socket belonging to a single revoked session (logout) while leaving any
+ * other signed-in devices of the same account untouched.
+ */
+export function disconnectSessionSockets(
+  io: SocketDisconnector | undefined,
+  sessionId: string
+): void {
+  if (!io || !sessionId) return;
+  io.in(sessionRoom(sessionId)).disconnectSockets(true);
+}
+
+/**
+ * Drops every open socket of an account whose access has just been revoked globally (admin
+ * deactivation or password reset), stopping both outgoing updates and passive `user:<id>` reads.
+ */
+export function disconnectUserSockets(
+  io: SocketDisconnector | undefined,
+  userId: string
+): void {
+  if (!io || !userId) return;
+  io.in(userRoom(userId)).disconnectSockets(true);
+}
+
+/**
+ * Notifies a share's recipient room immediately when an active arrangement ends, whether the
+ * owner clicked Revoke or the minute sweep retired an overdue timed share.
+ */
+export function emitShareEnded(
+  io: RoomEmitter | undefined,
+  share: RetiredLocationShare,
+  reason: ShareEndedReason
+): void {
+  if (!io) return;
+  const payload: ShareEndedPayload = {
+    shareId: share.id,
+    userId: share.ownerId,
+    reason
+  };
+  io.to(userRoom(share.targetUserId)).emit(SHARE_ENDED_EVENT, payload);
 }
 
 /**
@@ -135,10 +201,16 @@ export interface LocationUpdateAck {
  * Handles one update and always resolves: the caller is an event listener with no reply object, and
  * a rejected promise there would be an unhandled rejection that takes the process down.
  */
+export interface HandleLocationUpdateDependencies {
+  live: LiveLocationService;
+  users?: Pick<UserSecurityQuestionsStore, "findUserById" | "hasActiveSession">;
+  logger?: RealtimeLogger;
+}
+
 export async function handleLocationUpdate(
   sender: UpdateSender,
   payload: unknown,
-  dependencies: Pick<RealtimeDependencies, "live" | "logger">
+  dependencies: HandleLocationUpdateDependencies
 ): Promise<LocationUpdateAck> {
   try {
     return await locationUpdateAck(sender, payload, dependencies);
@@ -156,11 +228,44 @@ export async function handleLocationUpdate(
 async function locationUpdateAck(
   sender: UpdateSender,
   payload: unknown,
-  dependencies: Pick<RealtimeDependencies, "live">
+  dependencies: Pick<HandleLocationUpdateDependencies, "live" | "users">
 ): Promise<LocationUpdateAck> {
   const identity = sender.data;
   if (!identity?.userId || !identity.deviceId) {
     return { ok: false, status: "rejected", code: "UNAUTHORIZED", message: "Reconnect with a valid session." };
+  }
+
+  // Re-check live session and account status beyond the initial handshake so a logged-out,
+  // deactivated, or newly suspended socket cannot keep streaming fixes over an old TCP pipe.
+  if (dependencies.users) {
+    const user = await dependencies.users.findUserById(identity.userId);
+    if (!user || (identity.role && user.role !== identity.role)) {
+      sender.disconnect(true);
+      return { ok: false, status: "rejected", code: "UNAUTHORIZED", message: "Reconnect with a valid session." };
+    }
+    if (!user.isActive) {
+      sender.disconnect(true);
+      return { ok: false, status: "rejected", code: "ACCOUNT_INACTIVE", message: "This account is inactive. Contact an administrator." };
+    }
+    if (user.isSuspended) {
+      sender.disconnect(true);
+      return { ok: false, status: "rejected", code: "ACCOUNT_SUSPENDED", message: "This account is suspended. Contact an administrator." };
+    }
+    if (user.mustCompleteSecurityQuestions) {
+      sender.disconnect(true);
+      return { ok: false, status: "rejected", code: "SECURITY_QUESTIONS_REQUIRED", message: "Complete your security questions first." };
+    }
+    if (
+      identity.sessionId &&
+      !(await dependencies.users.hasActiveSession({
+        userId: identity.userId,
+        deviceId: identity.deviceId,
+        sessionId: identity.sessionId
+      }))
+    ) {
+      sender.disconnect(true);
+      return { ok: false, status: "rejected", code: "UNAUTHORIZED", message: "Reconnect with a valid session." };
+    }
   }
 
   const now = Date.now();
@@ -228,6 +333,7 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
       return;
     }
     void socket.join(userRoom(identity.userId));
+    if (identity.sessionId) void socket.join(sessionRoom(identity.sessionId));
     if (identity.role === "admin") void socket.join("admin");
 
     socket.on(LOCATION_UPDATE_EVENT, async (payload: unknown, ack?: (response: LocationUpdateAck) => void) => {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { effectScope, nextTick, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationHistoryPoint } from "@shared/index";
@@ -446,5 +447,41 @@ describe("reloading a track", () => {
     expect(api.failed.value).toBe(false);
     expect(api.loadIssue.value).toBeNull();
     expect(api.bounds.value).toBeNull();
+  });
+
+  it("re-reads companion grants on re-entering grant mode and evicts a revoked active grant on refresh", async () => {
+    const { api } = mount();
+    autoRespond = () => ({ owned: [], sharedWithMe: [] });
+    api.selectSource("grant");
+    await settle();
+    expect(api.grants.value).toHaveLength(0);
+
+    // Companion creates a share while the viewer switched back to own history.
+    api.selectSource("own");
+    await settle();
+    autoRespond = (url) =>
+      url.includes("/shares")
+        ? { owned: [], sharedWithMe: [grantRow("c")] }
+        : historyBody([point(35.71, 51.41, new Date(NOW - HOUR).toISOString())]);
+    api.selectSource("grant");
+    await settle();
+    expect(api.grants.value).toHaveLength(1);
+
+    api.selectGrant(grantRow("c").id);
+    await settle();
+    expect(api.hasTrack.value).toBe(true);
+
+    // Companion revokes the grant; refreshing the list evicts the stale track immediately.
+    autoRespond = () => ({ owned: [], sharedWithMe: [] });
+    await api.loadShares();
+    await settle();
+    expect(api.grants.value).toHaveLength(0);
+    expect(api.grantId.value).toBe("");
+    expect(api.hasTrack.value).toBe(false);
+    expect(api.loadIssue.value).toBe("grant_gone");
+
+    const panelSource = readFileSync(new URL("../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
+    expect(panelSource).toContain("api.loadShares()");
+    expect(panelSource).toContain("v-else-if=\"api.grantsFailed.value\"");
   });
 });

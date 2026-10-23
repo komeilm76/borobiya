@@ -14,8 +14,14 @@
 
       <v-card-text class="share-dialog__body">
         <p class="share-dialog__lead">
-          هر همراهی که انتخاب کنید موقعیت زندهٔ شما را تا پایان بازهٔ انتخابی می‌بیند. می‌توانید هر
-          زمان که خواستید اشتراک را لغو کنید.
+          <template v-if="mode === 'history'">
+            هر همراهی که انتخاب کنید فقط نقاط ثبت‌شدهٔ شما در بازهٔ انتخابی را روی نقشه می‌بیند و هر
+            زمان بخواهید می‌توانید دسترسی این بازه را حذف کنید.
+          </template>
+          <template v-else>
+            هر همراهی که انتخاب کنید موقعیت زندهٔ شما را تا پایان بازهٔ انتخابی می‌بیند. می‌توانید هر
+            زمان که خواستید اشتراک را لغو کنید.
+          </template>
         </p>
 
         <v-alert v-if="formError" class="mb-4" type="error" variant="tonal" density="compact" role="alert">
@@ -136,7 +142,7 @@
         <v-divider class="my-5" />
 
         <div class="share-dialog__field">
-          <p class="share-dialog__label">چه مدتی؟</p>
+          <p class="share-dialog__label">نوع اشتراک</p>
           <v-btn-toggle v-model="mode" density="comfortable" divided mandatory>
             <v-btn value="timed">
               <v-icon class="me-1" icon="mdi-timer-outline" size="18" />
@@ -145,6 +151,10 @@
             <v-btn value="permanent">
               <v-icon class="me-1" icon="mdi-infinity" size="18" />
               تا لغو دستی
+            </v-btn>
+            <v-btn value="history">
+              <v-icon class="me-1" icon="mdi-map-marker-path" size="18" />
+              تاریخچه مسیر
             </v-btn>
           </v-btn-toggle>
 
@@ -180,9 +190,58 @@
               دستی» را انتخاب کنید.
             </p>
           </div>
+
+          <div v-else-if="mode === 'history'" class="share-dialog__duration">
+            <div class="share-dialog__presets" role="group" aria-label="میان‌برهای بازهٔ تاریخچه">
+              <button
+                v-for="hours in historyPresets"
+                :key="hours"
+                type="button"
+                class="share-dialog__chip"
+                :class="{ 'share-dialog__chip--on': activeHistoryPresetHours === hours }"
+                :aria-pressed="activeHistoryPresetHours === hours"
+                @click="applyHistoryPreset(hours)"
+              >
+                {{ durationWords(hours * 60) }} اخیر
+              </button>
+            </div>
+
+            <div class="share-dialog__history-fields">
+              <label class="share-dialog__history-field">
+                <span>از زمان</span>
+                <input
+                  v-model="historyFromInput"
+                  type="datetime-local"
+                  :max="historyToInput || undefined"
+                  @input="activeHistoryPresetHours = null"
+                />
+              </label>
+              <label class="share-dialog__history-field">
+                <span>تا زمان</span>
+                <input
+                  v-model="historyToInput"
+                  type="datetime-local"
+                  :min="historyFromInput || undefined"
+                  @input="activeHistoryPresetHours = null"
+                />
+              </label>
+            </div>
+
+            <v-text-field
+              v-model="historyMaxPointsInput"
+              class="mt-3"
+              type="number"
+              density="compact"
+              variant="outlined"
+              clearable
+              hide-details="auto"
+              label="حداکثر تعداد نقاط (اختیاری)"
+              :placeholder="`مثلاً ۱۰۰۰ (سقف ${maxHistoryPoints})`"
+            />
+          </div>
         </div>
 
-        <div class="share-dialog__field">
+        <div v-if="mode !== 'history'" class="share-dialog__field">
           <v-textarea
             v-model="note"
             label="یادداشت برای همراهان (اختیاری)"
@@ -253,22 +312,31 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import {
+  MAX_LOCATION_HISTORY_SHARE_POINTS,
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_NOTE_LENGTH,
   MAX_LOCATION_SHARE_TARGETS,
+  type UserDevice,
   type UserSearchResult
 } from "@shared/index";
+import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
-import { createLocationShare } from "@/api/location";
+import { createLocationHistoryShare, createLocationShare } from "@/api/location";
+import { isoToLocalInput, localInputToIso } from "@/history/playback";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
 import {
   addRecipient,
+  buildHistorySharePayload,
   buildLiveSharePayload,
   canSubmitShareDraft,
+  choiceDeviceOptionLabel,
   DURATION_PRESET_MINUTES,
   formatDuration,
+  HISTORY_PRESET_HOURS,
+  historyPresetWindow,
+  isHistoryRangeTooLarge,
   nameShareRejections,
   rejectionText,
   needsPriorityDevice,
@@ -318,18 +386,27 @@ const durationMinutes = ref(24 * 60);
 const note = ref("");
 const recipients = ref<UserSearchResult[]>([]);
 
+const initialHistoryWindow = historyPresetWindow(24);
+const activeHistoryPresetHours = ref<number | null>(24);
+const historyFromInput = ref(isoToLocalInput(initialHistoryWindow.from));
+const historyToInput = ref(isoToLocalInput(initialHistoryWindow.to));
+const historyMaxPointsInput = ref<string>("");
+
 const submitting = ref(false);
 const formError = ref<string | null>(null);
 const createdCount = ref(0);
 const reusedCount = ref(0);
 const deviceChooserOpen = ref(false);
 const deviceIds = ref<string[]>([]);
+const knownDevices = ref<UserDevice[]>([]);
 const chosenDeviceId = ref<string | null>(null);
 
 const maxMinutes = MAX_LOCATION_SHARE_MINUTES;
+const maxHistoryPoints = MAX_LOCATION_HISTORY_SHARE_POINTS;
 const maxNote = MAX_LOCATION_SHARE_NOTE_LENGTH;
 const maxTargets = MAX_LOCATION_SHARE_TARGETS;
 const presets = DURATION_PRESET_MINUTES;
+const historyPresets = HISTORY_PRESET_HOURS;
 const ratingOptions = [
   { title: "بدون فیلتر امتیاز", value: null },
   { title: "۳ و بالاتر", value: 3 },
@@ -337,12 +414,28 @@ const ratingOptions = [
   { title: "۴٫۵ و بالاتر", value: 4.5 }
 ];
 
+const parsedHistoryMaxPoints = computed<number | null>(() => {
+  const raw = String(historyMaxPointsInput.value ?? "").trim();
+  if (!raw) return null;
+  return Number(raw);
+});
+
 const draft = computed<ShareDraft>(() => ({
   mode: mode.value,
   recipients: recipients.value,
   durationMinutes: durationMinutes.value,
-  note: note.value
+  note: note.value,
+  historyFrom: localInputToIso(historyFromInput.value) ?? undefined,
+  historyTo: localInputToIso(historyToInput.value) ?? undefined,
+  historyMaxPoints: parsedHistoryMaxPoints.value
 }));
+
+function applyHistoryPreset(hours: number): void {
+  activeHistoryPresetHours.value = hours;
+  const window = historyPresetWindow(hours);
+  historyFromInput.value = isoToLocalInput(window.from);
+  historyToInput.value = isoToLocalInput(window.to);
+}
 
 const hasTerm = computed(() => searchTerm.value.trim().length > 0);
 const termTooShort = computed(() => !shouldSearch(searchTerm.value));
@@ -380,7 +473,7 @@ function subtitleFor(candidate: UserSearchResult): string {
 }
 
 function deviceLabel(deviceId: string, index: number): string {
-  return `دستگاه ${index + 1} (${deviceId.slice(0, 8)}…)`;
+  return choiceDeviceOptionLabel(deviceId, knownDevices.value, index);
 }
 
 function toggle(candidate: UserSearchResult): void {
@@ -410,15 +503,28 @@ async function submit(): Promise<void> {
     return;
   }
 
-  const payload = buildLiveSharePayload(current);
-  // Only send the chosen device while the chooser is up: once the account is down to one live
-  // device, a stale `priorityDeviceId` would be refused as unavailable.
-  const body = deviceChooserOpen.value && chosenDeviceId.value
-    ? { ...payload, priorityDeviceId: chosenDeviceId.value }
-    : payload;
-
   submitting.value = true;
   try {
+    if (current.mode === "history") {
+      const historyBody = buildHistorySharePayload(current, {
+        from: current.historyFrom!,
+        to: current.historyTo!,
+        maxPoints: current.historyMaxPoints
+      });
+      const created = await createLocationHistoryShare(historyBody, token);
+      createdCount.value = created.createdShareIds.length;
+      reusedCount.value = created.reusedShareIds.length;
+      emit("shared");
+      return;
+    }
+
+    const payload = buildLiveSharePayload(current);
+    // Only send the chosen device while the chooser is up: once the account is down to one live
+    // device, a stale `priorityDeviceId` would be refused as unavailable.
+    const body = deviceChooserOpen.value && chosenDeviceId.value
+      ? { ...payload, priorityDeviceId: chosenDeviceId.value }
+      : payload;
+
     const created = await createLocationShare(body, token);
     createdCount.value = created.createdShareIds.length;
     reusedCount.value = created.reusedShareIds.length;
@@ -431,10 +537,18 @@ async function submit(): Promise<void> {
       const ids = priorityDeviceIds(error);
       if (ids.length > 0) {
         deviceIds.value = ids;
-        chosenDeviceId.value = ids.length === 1 ? ids[0]! : null;
+        knownDevices.value = await fetchUserDevices(token).catch(() => []);
+        const currentDevice = knownDevices.value.find(
+          (device) => device.isCurrentDevice && ids.includes(device.deviceId)
+        );
+        chosenDeviceId.value = currentDevice?.deviceId ?? (ids.length === 1 ? ids[0]! : null);
         deviceChooserOpen.value = true;
         return;
       }
+    }
+    if (isHistoryRangeTooLarge(error)) {
+      formError.value = "بازهٔ زمانی انتخاب‌شده از سقف مجاز سرور بلندتر است؛ بازهٔ کوتاه‌تری انتخاب کنید.";
+      return;
     }
     // Server refusals first: they name the recipient at fault, which the recomputed draft issues never
     // can (a draft that failed client-side validation would not have been submitted at all).
@@ -461,6 +575,12 @@ function issueText(code: string | undefined): string {
       // The ceiling is phrased in the same units as the chips and the slider, because "43200 دقیقه"
       // is not a length anybody can judge at a glance.
       return `مدت باید عددی صحیح بین ۱ دقیقه تا ${durationWords(maxMinutes)} باشد.`;
+    case "history_window_required":
+      return "شروع و پایان بازهٔ تاریخچه را مشخص کنید.";
+    case "history_end_not_after_start":
+      return "زمان پایان بازه باید بعد از زمان شروع آن باشد.";
+    case "history_points_out_of_range":
+      return `حداکثر تعداد نقاط باید عددی صحیح بین ۱ تا ${maxHistoryPoints} باشد.`;
     case "note_too_long":
       return `یادداشت نمی‌تواند بیشتر از ${maxNote} نویسه باشد.`;
     default:
@@ -569,6 +689,32 @@ watch(
 
 .share-dialog__duration {
   margin-top: 0.85rem;
+}
+
+.share-dialog__history-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.share-dialog__history-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: #537879;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.share-dialog__history-field input {
+  min-height: 2.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.24);
+  border-radius: 10px;
+  color: rgba(var(--v-theme-on-surface), 0.88);
+  background: transparent;
+  font: inherit;
 }
 
 .share-dialog__duration-label {

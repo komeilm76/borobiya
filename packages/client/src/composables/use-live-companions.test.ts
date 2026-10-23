@@ -61,7 +61,14 @@ interface Harness {
   readonly scope: ReturnType<typeof effectScope>;
 }
 
-function mount(options: { token?: string | null; ownUserId?: string | null; blockReads?: boolean } = {}): Harness {
+function mount(
+  options: {
+    token?: string | null;
+    ownUserId?: string | null;
+    blockReads?: boolean;
+    ensureSession?: () => Promise<void>;
+  } = {}
+): Harness {
   const socket = fakeSocket();
   const close = vi.fn();
   const updateToken = vi.fn();
@@ -86,7 +93,9 @@ function mount(options: { token?: string | null; ownUserId?: string | null; bloc
       failNext = false;
       throw new Error("boom");
     }
-    return { sharedWithMe: owners.map((owner) => ({ owner })) } as unknown as LocationSharesResponse;
+    return {
+      sharedWithMe: owners.map((owner, index) => ({ id: `share-${index + 1}`, owner }))
+    } as unknown as LocationSharesResponse;
   });
 
   const token = ref<string | null>(options.token === undefined ? "token" : options.token);
@@ -97,6 +106,7 @@ function mount(options: { token?: string | null; ownUserId?: string | null; bloc
     api = useLiveCompanions({
       accessToken: token as Ref<string | null>,
       ownUserId: ownUserId as Ref<string | null>,
+      ensureSession: options.ensureSession,
       now: () => Date.now(),
       openSocket: () => ({
         socket,
@@ -356,13 +366,72 @@ describe("useLiveCompanions", () => {
     harness.scope.stop();
   });
 
+  it("refreshes the session and reconnects when a socket reconnect hits connect_error after 15m JWT expiry", async () => {
+    let harness!: ReturnType<typeof mount>;
+    const ensureSession = vi.fn(async () => {
+      harness.token.value = "fresh-access-jwt";
+    });
+    harness = mount({ ensureSession });
+    await settle();
+
+    harness.socket.dispatch("connect_error", new Error("INVALID_ACCESS_TOKEN"));
+    await settle();
+    await settle();
+
+    expect(ensureSession).toHaveBeenCalledTimes(1);
+    expect(harness.connectCalls()).toBe(2);
+    harness.scope.stop();
+  });
+
+  it("takes a peer off the map immediately on location:share-ended without polling, identically for revoke and expiry", async () => {
+    for (const reason of ["revoked", "expired"] as const) {
+      const harness = mount();
+      await settle();
+      harness.socket.dispatch("location:peer-update", { userId: ALICE, lat: 36.9, lon: 50.2, timestamp: Date.now() });
+      const readsBefore = harness.reads();
+
+      harness.socket.dispatch("location:share-ended", {
+        shareId: "share-1",
+        userId: ALICE,
+        reason
+      });
+
+      expect(harness.reads()).toBe(readsBefore);
+      expect(harness.peers()).toEqual([]);
+      expect(harness.api.overlay.value.features).toEqual([]);
+      expect(harness.api.shareCount.value).toBe(0);
+      expect(harness.api.status.value.line).toBe("هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.");
+      harness.scope.stop();
+    }
+  });
+
+  it("clears the remaining open-share count if a silent peer's timed share expires after dot discard", async () => {
+    const harness = mount();
+    await settle();
+    harness.socket.dispatch("location:peer-update", { userId: ALICE, lat: 35.75, lon: 51.42, timestamp: Date.now() });
+    await vi.advanceTimersByTimeAsync(DISCARD_AFTER_MS + PEER_TICK_MS);
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.status.value.line).toContain("1 اشتراک زنده باز است");
+
+    harness.socket.dispatch("location:share-ended", {
+      shareId: "share-1",
+      userId: ALICE,
+      reason: "expired"
+    });
+    expect(harness.api.shareCount.value).toBe(0);
+    expect(harness.api.status.value.line).toBe("هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.");
+    harness.scope.stop();
+  });
+
   it("detaches its listeners and stops its clock when the scope ends", async () => {
     const harness = mount();
     await settle();
     expect(harness.socket.listeners("location:peer-update")).toHaveLength(1);
+    expect(harness.socket.listeners("location:share-ended")).toHaveLength(1);
     harness.scope.stop();
     await settle();
     expect(harness.socket.listeners("location:peer-update")).toEqual([]);
+    expect(harness.socket.listeners("location:share-ended")).toEqual([]);
     expect(harness.socket.listeners("connect")).toEqual([]);
     expect(vi.getTimerCount()).toBe(0);
     expect(harness.closeCalls()).toBe(1);

@@ -53,7 +53,7 @@ export interface UserRecoveryStore {
     tokenHash: string;
     passwordHash: string;
     now: Date;
-  }): Promise<boolean>;
+  }): Promise<boolean | string>;
 }
 
 /** Drizzle-backed security-question recovery, one-time challenges, and one-time reset tokens. */
@@ -184,7 +184,7 @@ export class DrizzleUserRecoveryStore implements UserRecoveryStore {
     tokenHash: string;
     passwordHash: string;
     now: Date;
-  }): Promise<boolean> {
+  }): Promise<boolean | string> {
     return this.db.transaction(async (transaction) => {
       // DELETE ... RETURNING claims the token atomically; a concurrent replay gets no row.
       const claimedTokens = await transaction
@@ -217,7 +217,7 @@ export class DrizzleUserRecoveryStore implements UserRecoveryStore {
         .update(userSessions)
         .set({ refreshTokenHash: null, isOnline: false })
         .where(eq(userSessions.userId, token.userId));
-      return true;
+      return token.userId;
     });
   }
 }

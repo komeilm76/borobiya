@@ -8,6 +8,7 @@ import {
   STALE_AFTER_MS,
   ageWords,
   applyPeerUpdate,
+  applyShareEnded,
   applyShareList,
   countAwaiting,
   emptyRegistry,
@@ -185,6 +186,69 @@ describe("staleness", () => {
     const result = pruneRegistry(registry, NOW);
     expect(result.changed).toBe(true);
     expect(Object.keys(result.registry)).toEqual([BOB]);
+  });
+
+  it("removes a revoked dot, an expired-share dot, and a silence-discarded dot through the exact same rule", () => {
+    const initial = {
+      ...registryWith({ userId: ALICE, observedAtMs: NOW - DISCARD_AFTER_MS - 1 }),
+      ...registryWith({ userId: BOB, observedAtMs: NOW - 1_000 })
+    };
+
+    const byRevoke = applyShareEnded(initial, {
+      shareId: "share-alice",
+      userId: ALICE,
+      reason: "revoked"
+    });
+    const byExpiry = applyShareEnded(initial, {
+      shareId: "share-alice",
+      userId: ALICE,
+      reason: "expired"
+    });
+    const bySilence = pruneRegistry(initial, NOW);
+
+    expect(byRevoke).toMatchObject({ changed: true, shareEnded: true, reason: "removed" });
+    expect(byExpiry).toMatchObject({ changed: true, shareEnded: true, reason: "removed" });
+    expect(byRevoke.registry).toEqual(bySilence.registry);
+    expect(byExpiry.registry).toEqual(bySilence.registry);
+    expect(peersOf(byRevoke.registry, NOW)).toEqual(peersOf(byExpiry.registry, NOW));
+    expect(peersOverlay(byRevoke.registry, NOW)).toEqual(peersOverlay(byExpiry.registry, NOW));
+  });
+
+  it("ignores stale share ids once a fresh share has replaced them, and ignores malformed payloads", () => {
+    const seeded = applyShareList(emptyRegistry, [
+      { id: "share-current", owner: { id: ALICE, username: "مریم", lastLocation: { lat: 35.7, lon: 51.4 } } }
+    ]);
+
+    const stale = applyShareEnded(seeded, {
+      shareId: "share-previous",
+      userId: ALICE,
+      reason: "revoked"
+    });
+    expect(stale).toMatchObject({ changed: false, shareEnded: false, reason: "stale-share" });
+    expect(peersOf(stale.registry, NOW)).toHaveLength(1);
+
+    const matching = applyShareEnded(seeded, {
+      shareId: "share-current",
+      userId: ALICE,
+      reason: "expired"
+    });
+    expect(matching).toMatchObject({ changed: true, shareEnded: true, reason: "removed" });
+    expect(peersOf(matching.registry, NOW)).toEqual([]);
+
+    for (const bad of [
+      null,
+      undefined,
+      {},
+      { shareId: "", userId: ALICE, reason: "revoked" },
+      { shareId: "s1", userId: "", reason: "revoked" },
+      { shareId: "s1", userId: ALICE, reason: "other" }
+    ]) {
+      expect(applyShareEnded(seeded, bad as never)).toMatchObject({
+        changed: false,
+        shareEnded: false,
+        reason: "invalid"
+      });
+    }
   });
 
   it("never discards a seeded position, which has no age to judge", () => {

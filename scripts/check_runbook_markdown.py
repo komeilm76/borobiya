@@ -234,7 +234,7 @@ def check(path: Path) -> list[str]:
         body = block["body"]
         if block["indent"]:
             pad = SPACE * block["indent"]
-            body = NEWLINE.join(l.removeprefix(pad) for l in body.split(NEWLINE))
+            body = NEWLINE.join(entry.removeprefix(pad) for entry in body.split(NEWLINE))
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False) as handle:
             handle.write(body + NEWLINE)
             temp = Path(handle.name)
@@ -253,7 +253,7 @@ def check(path: Path) -> list[str]:
                     problems.append(f"line {block['start']}: inline python ({tag}) does not compile: {error}")
 
     # --- headings and inline code balance ---
-    heading_lines = [l for l in lines if l.lstrip(SPACE).startswith("##")]
+    heading_lines = [entry for entry in lines if entry.lstrip(SPACE).startswith("##")]
     for heading in sorted({h for h in heading_lines if heading_lines.count(h) > 1}):
         problems.append(f"duplicate heading: {heading.strip()}")
     paragraph: list[str] = []
@@ -261,10 +261,10 @@ def check(path: Path) -> list[str]:
         if line.strip(TRIM):
             paragraph.append(line)
         elif paragraph:
-            if sum(l.count(BACKTICK) for l in paragraph) % 2:
+            if sum(entry.count(BACKTICK) for entry in paragraph) % 2:
                 problems.append(f"unbalanced inline backticks in the paragraph starting {paragraph[0][:60]!r}")
             paragraph = []
-    if paragraph and sum(l.count(BACKTICK) for l in paragraph) % 2:
+    if paragraph and sum(entry.count(BACKTICK) for entry in paragraph) % 2:
         problems.append("unbalanced inline backticks in the last paragraph")
     return problems
 

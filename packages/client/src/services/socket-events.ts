@@ -8,3 +8,4 @@
  */
 export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
+export const SHARE_ENDED_EVENT = "location:share-ended";

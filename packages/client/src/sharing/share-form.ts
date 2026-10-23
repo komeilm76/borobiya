@@ -1,4 +1,5 @@
 import {
+  MAX_LOCATION_HISTORY_SHARE_POINTS,
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_NOTE_LENGTH,
   MAX_LOCATION_SHARE_TARGETS,
@@ -8,6 +9,7 @@ import {
   type LocationShare,
   type ReceivedLocationHistoryShare,
   type ReceivedLocationShare,
+  type UserDevice,
   type UserSearchResult
 } from "@shared/index";
 import { ApiError } from "../api/http";
@@ -17,8 +19,8 @@ import { ApiError } from "../api/http";
  * DOM. Copy (Persian strings) lives in the components: this module returns *codes* and numbers.
  */
 
-/** The picker's two modes. `permanent` never expires; `timed` needs a duration. */
-export type ShareMode = "timed" | "permanent";
+/** The picker's modes: live (`timed` / `permanent`) or past route window (`history`). */
+export type ShareMode = "timed" | "permanent" | "history";
 
 export interface ShareDraft {
   mode: ShareMode;
@@ -26,6 +28,10 @@ export interface ShareDraft {
   recipients: UserSearchResult[];
   durationMinutes: number;
   note: string;
+  /** Checked only when `mode === "history"`. */
+  historyFrom?: string;
+  historyTo?: string;
+  historyMaxPoints?: number | null;
 }
 
 export type ShareDraftIssueCode =
@@ -33,7 +39,10 @@ export type ShareDraftIssueCode =
   | "too_many_recipients"
   | "duration_required"
   | "duration_out_of_range"
-  | "note_too_long";
+  | "note_too_long"
+  | "history_window_required"
+  | "history_end_not_after_start"
+  | "history_points_out_of_range";
 
 export interface ShareDraftIssue {
   code: ShareDraftIssueCode;
@@ -55,6 +64,29 @@ export function shareDraftIssues(draft: ShareDraft): ShareDraftIssue[] {
   if (recipients === 0) issues.push({ code: "no_recipients" });
   if (recipients > MAX_LOCATION_SHARE_TARGETS) {
     issues.push({ code: "too_many_recipients", params: { max: MAX_LOCATION_SHARE_TARGETS } });
+  }
+
+  if (draft.mode === "history") {
+    const fromMs = draft.historyFrom ? Date.parse(draft.historyFrom) : Number.NaN;
+    const toMs = draft.historyTo ? Date.parse(draft.historyTo) : Number.NaN;
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs)) {
+      issues.push({ code: "history_window_required" });
+    } else if (toMs <= fromMs) {
+      issues.push({ code: "history_end_not_after_start" });
+    }
+    if (draft.historyMaxPoints !== undefined && draft.historyMaxPoints !== null) {
+      if (
+        !Number.isInteger(draft.historyMaxPoints) ||
+        draft.historyMaxPoints < 1 ||
+        draft.historyMaxPoints > MAX_LOCATION_HISTORY_SHARE_POINTS
+      ) {
+        issues.push({
+          code: "history_points_out_of_range",
+          params: { min: 1, max: MAX_LOCATION_HISTORY_SHARE_POINTS }
+        });
+      }
+    }
+    return issues;
   }
 
   if (draft.mode === "timed") {
@@ -118,11 +150,12 @@ export function removeRecipient(
  */
 export function buildLiveSharePayload(draft: ShareDraft): CreateLocationShareInput {
   const note = draft.note.trim();
+  const mode = draft.mode === "permanent" ? "permanent" : "timed";
   const payload: CreateLocationShareInput = {
     targetUserIds: uniqueRecipientIds(draft.recipients),
-    mode: draft.mode
+    mode
   };
-  if (draft.mode === "timed") payload.durationMinutes = Math.trunc(draft.durationMinutes);
+  if (mode === "timed") payload.durationMinutes = Math.trunc(draft.durationMinutes);
   if (note.length > 0) payload.note = note;
   return payload;
 }
@@ -235,6 +268,17 @@ export interface HistoryWindow {
   /** ISO instant; the picker sends this explicitly instead of relying on a server-side default. */
   from: string;
   to: string;
+  maxPoints?: number | null;
+}
+
+export const HISTORY_PRESET_HOURS: readonly number[] = [1, 6, 24, 72, 7 * 24];
+
+export function historyPresetWindow(hours: number, nowMs = Date.now()): { from: string; to: string } {
+  const clampedHours = Number.isFinite(hours) && hours > 0 ? hours : 1;
+  return {
+    from: new Date(nowMs - clampedHours * 60 * 60_000).toISOString(),
+    to: new Date(nowMs).toISOString()
+  };
 }
 
 export function buildHistorySharePayload(
@@ -243,11 +287,31 @@ export function buildHistorySharePayload(
 ): CreateLocationHistoryShareInput {
   // A history grant has no `note` column, so the draft's note is deliberately dropped rather than
   // sent: `historyShareSchema` is strict and an extra key would be a 400 the user cannot fix.
-  return {
+  const payload: CreateLocationHistoryShareInput = {
     targetUserIds: uniqueRecipientIds(draft.recipients),
     from: window.from,
     to: window.to
   };
+  if (window.maxPoints !== undefined && window.maxPoints !== null) {
+    payload.maxPoints = Math.trunc(window.maxPoints);
+  }
+  return payload;
+}
+
+export function isHistoryRangeTooLarge(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "SHARE_RANGE_TOO_LARGE";
+}
+
+export function choiceDeviceOptionLabel(
+  deviceId: string,
+  devices: readonly UserDevice[],
+  index: number,
+  currentDeviceSuffix = "همین دستگاه"
+): string {
+  const matched = devices.find((device) => device.deviceId === deviceId);
+  if (!matched) return `دستگاه ${index + 1} (${deviceId.slice(0, 8)}…)`;
+  const name = matched.deviceName ?? `دستگاه ${index + 1}`;
+  return matched.isCurrentDevice ? `${name} (${currentDeviceSuffix})` : name;
 }
 
 /**

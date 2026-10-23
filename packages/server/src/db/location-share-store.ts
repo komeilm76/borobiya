@@ -60,7 +60,17 @@ export interface CreatedLocationShares {
   reusedShareIds: string[];
 }
 
-export type LocationShareRevocation = "revoked" | "already-revoked" | "not-found";
+/** Minimal identity of a share row whose active state just ended. */
+export interface RetiredLocationShare {
+  id: string;
+  ownerId: string;
+  targetUserId: string;
+}
+
+export type LocationShareRevocation =
+  | { status: "revoked"; share: RetiredLocationShare }
+  | { status: "already-revoked" }
+  | { status: "not-found" };
 
 /** A received share plus the owner's identity and last known position. */
 export interface ReceivedLocationShareRecord extends LocationShareRecord {
@@ -90,11 +100,12 @@ export interface LocationShareStore {
    */
   createShares(input: CreateLocationSharesInput): Promise<CreatedLocationShares>;
   /**
-   * Marks every timed share whose window has closed as inactive and returns how many rows
-   * changed. Rows are kept for audit, and revocation is the same inactive flag, so readers
-   * that forgot an expiry filter still cannot see expired shares after this job has run.
+   * Marks every timed share whose window has closed as inactive and returns the retired share
+   * identities so receivers can be notified immediately. Rows are kept for audit, and revocation is
+   * the same inactive flag, so readers that forgot an expiry filter still cannot see expired shares
+   * after this job has run.
    */
-  expireOverdueShares(input: { now: Date }): Promise<number>;
+  expireOverdueShares(input: { now: Date }): Promise<RetiredLocationShare[]>;
   /**
    * Re-points the active shares of accounts that now have exactly one live device, when the device
    * they pin has no live session left. Returns how many rows were re-pointed. Without this, logging
@@ -408,10 +419,13 @@ export class DrizzleLocationShareStore implements LocationShareStore {
         priorityDeviceId: locationShares.priorityDeviceId
       })
       .from(locationShares)
+      .innerJoin(users, eq(users.id, locationShares.targetUserId))
       .where(and(
         eq(locationShares.ownerId, userId),
         eq(locationShares.isRevoked, false),
-        sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`
+        sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`,
+        eq(users.isActive, true),
+        eq(users.isSuspended, false)
       ))
       .orderBy(desc(locationShares.createdAt));
     return rows.map((row) => ({
@@ -467,9 +481,12 @@ export class DrizzleLocationShareStore implements LocationShareStore {
     };
   }
 
-  async expireOverdueShares(input: { now: Date }): Promise<number> {
-    const expired = await expireOverdueSharesQuery(this.db, input.now).returning({ id: locationShares.id });
-    return expired.length;
+  async expireOverdueShares(input: { now: Date }): Promise<RetiredLocationShare[]> {
+    return expireOverdueSharesQuery(this.db, input.now).returning({
+      id: locationShares.id,
+      ownerId: locationShares.ownerId,
+      targetUserId: locationShares.targetUserId
+    });
   }
 
   async repairStaleSharePins(input: { now: Date }): Promise<number> {
@@ -486,8 +503,12 @@ export class DrizzleLocationShareStore implements LocationShareStore {
         eq(locationShares.ownerId, input.ownerId),
         eq(locationShares.isRevoked, false)
       ))
-      .returning({ id: locationShares.id });
-    if (revoked) return "revoked";
+      .returning({
+        id: locationShares.id,
+        ownerId: locationShares.ownerId,
+        targetUserId: locationShares.targetUserId
+      });
+    if (revoked) return { status: "revoked", share: revoked };
 
     // Only a still-owned active or revoked row may report success; anything else is 404 so the
     // endpoint never reveals whether another account owns the requested id.
@@ -496,6 +517,6 @@ export class DrizzleLocationShareStore implements LocationShareStore {
       .from(locationShares)
       .where(and(eq(locationShares.id, input.shareId), eq(locationShares.ownerId, input.ownerId)))
       .limit(1);
-    return existing ? "already-revoked" : "not-found";
+    return existing ? { status: "already-revoked" } : { status: "not-found" };
   }
 }

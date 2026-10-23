@@ -1,8 +1,9 @@
 import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from "vue";
-import type { CreateLocationShareInput, LocationShare, UserDevice } from "@shared/index";
+import type { CreateLocationShareInput, LocationShare, OwnedLocationShare, UserDevice } from "@shared/index";
 import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { createLocationShare, listLocationShares } from "@/api/location";
+import { ownDeviceId } from "@/composables/device-identity";
 import { describeLiveShareRow, rejectionText, shareRejections } from "@/sharing/share-form";
 import {
   describeDeviceRows,
@@ -44,7 +45,7 @@ const faNumber = (value: number) => value.toLocaleString("fa-IR");
 
 export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const devices = ref<UserDevice[]>([]);
-  const liveShares = ref<LocationShare[]>([]);
+  const liveShares = ref<OwnedLocationShare[]>([]);
   const loading = ref(false);
   const failed = ref(false);
   const busyShareId = ref<string | null>(null);
@@ -61,6 +62,9 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }, DEVICE_CLOCK_INTERVAL_MS);
   onScopeDispose(() => clearInterval(clock));
 
+  const currentDeviceId = computed(
+    () => devices.value.find((device) => device.isCurrentDevice)?.deviceId ?? ownDeviceId(options.accessToken.value)
+  );
   const deviceRows = computed(() => describeDeviceRows(devices.value, liveShares.value, new Date(nowMs.value)));
   const shareRows = computed(() =>
     liveShares.value.map((share) => ({ share, row: describeLiveShareRow(share, new Date(nowMs.value)) }))
@@ -221,9 +225,19 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     await refresh();
   }
 
+  async function assignCurrentDevice(): Promise<void> {
+    const targetDeviceId = currentDeviceId.value;
+    if (!targetDeviceId) {
+      setStatus("warn", "نشست فعلی در فهرست دستگاه‌ها پیدا نشد؛ فهرست را تازه کنید.");
+      return;
+    }
+    await assignEverywhere(targetDeviceId);
+  }
+
   return {
     devices,
     liveShares,
+    currentDeviceId,
     deviceRows,
     shareRows,
     lastBulkSummary,
@@ -238,6 +252,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     choicesFor,
     refresh,
     assign,
-    assignEverywhere
+    assignEverywhere,
+    assignCurrentDevice
   };
 }

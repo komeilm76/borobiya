@@ -1,5 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { routeRecords } from "./index";
+
+function githubSlug(heading: string): string {
+  return heading
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s/g, "-");
+}
 
 describe("client route records", () => {
   it("registers the auth, public, user, and admin route groups", () => {
@@ -45,5 +54,44 @@ describe("client route records", () => {
     expect(routeRecords.find((route) => route.path === "/")).toMatchObject({
       redirect: "/_public/landing"
     });
+  });
+
+  it("keeps docs/USER_MANUAL.md headings, TOC anchors, and Quick Reference aligned with client routes", () => {
+    const manual = readFileSync(new URL("../../../../docs/USER_MANUAL.md", import.meta.url), "utf8");
+    const lines = manual.split("\n");
+
+    const headingSlugs = new Set(
+      lines
+        .filter((line) => /^#{2,3}\s+/.test(line))
+        .map((line) => githubSlug(line.replace(/^#{2,3}\s+/, "")))
+    );
+    const tocAnchors = [...manual.matchAll(/^\d+\.\s+\[[^\]]+\]\(#([^)]+)\)/gm)].map((match) => match[1]!);
+    expect(tocAnchors.length).toBeGreaterThanOrEqual(23);
+    for (const anchor of tocAnchors) {
+      expect(headingSlugs, `TOC anchor #${anchor}`).toContain(anchor);
+    }
+
+    for (const plannedSection of [9, 10, 14, 15, 16, 17, 18, 19]) {
+      const heading = lines.find((line) => line.startsWith(`## ${plannedSection}. `));
+      expect(heading, `section ${plannedSection}`).toMatch(/— Planned$/);
+    }
+
+    const byPath = new Map(routeRecords.map((route) => [route.path, route]));
+    const quickRefSection = manual.split("## 23. Quick Reference")[1] ?? "";
+    const tableRows = quickRefSection
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Action ") && !line.startsWith("|---"));
+    expect(tableRows.length).toBeGreaterThan(0);
+
+    for (const row of tableRows) {
+      const cells = row.split("|").map((cell) => cell.trim()).filter(Boolean);
+      const label = cells[0] ?? "";
+      const pathMatch = (cells[1] ?? "").match(/`(\/[^`]+)`/);
+      expect(pathMatch, row).not.toBeNull();
+      const route = byPath.get(pathMatch![1]!);
+      expect(route, `Quick Reference path ${pathMatch![1]}`).toBeDefined();
+      const isPlaceholder = String(route?.component ?? "").includes("PlaceholderView.vue");
+      expect(/\bplanned\b/i.test(label), `Quick Reference planned label for ${pathMatch![1]}`).toBe(isPlaceholder);
+    }
   });
 });

@@ -71,6 +71,8 @@ export interface CompanionPeer {
    * exactly the "share created a moment ago" case — would be dropped as unlisted, forever.
    */
   readonly fix: CompanionFix | null;
+  /** Active share ids backing this peer when seeded from full `sharedWithMe` rows. */
+  readonly shareIds?: readonly string[];
 }
 
 /** Keyed by owner id, so one peer is one dot however many shares or devices feed it. */
@@ -85,6 +87,25 @@ export interface ApplyResult {
   readonly changed: boolean;
   readonly reason: ApplyReason;
 }
+
+export type ShareEndedReason = "revoked" | "expired";
+
+export type ShareEndedApplyReason = "removed" | "retained" | "stale-share" | "absent" | "invalid";
+
+export interface ShareEndedResult {
+  readonly registry: CompanionRegistry;
+  readonly changed: boolean;
+  /** True when an active share arrangement we held has now ended. */
+  readonly shareEnded: boolean;
+  readonly reason: ShareEndedApplyReason;
+}
+
+export type ShareListEntry =
+  | { readonly id?: unknown; readonly username?: unknown; readonly lastLocation?: unknown }
+  | {
+      readonly id?: unknown;
+      readonly owner: { readonly id?: unknown; readonly username?: unknown; readonly lastLocation?: unknown };
+    };
 
 /** Why a peer is on the map, spelled out for the status line and the tests. */
 export interface CompanionView {
@@ -137,6 +158,31 @@ export function applyPeerUpdate(
   };
 }
 
+function isWrappedShareRow(
+  entry: ShareListEntry
+): entry is {
+  readonly id?: unknown;
+  readonly owner: { readonly id?: unknown; readonly username?: unknown; readonly lastLocation?: unknown };
+} {
+  return "owner" in entry && Boolean(entry.owner) && typeof entry.owner === "object";
+}
+
+function dropPeers(
+  registry: CompanionRegistry,
+  shouldDrop: (peer: CompanionPeer) => boolean
+): { registry: CompanionRegistry; changed: boolean } {
+  let changed = false;
+  const next: Record<string, CompanionPeer> = {};
+  for (const [userId, peer] of Object.entries(registry)) {
+    if (shouldDrop(peer)) {
+      changed = true;
+      continue;
+    }
+    next[userId] = peer;
+  }
+  return changed ? { registry: next, changed: true } : { registry, changed: false };
+}
+
 /**
  * Reconciles the registry with a fresh read of `sharedWithMe`.
  *
@@ -146,14 +192,25 @@ export function applyPeerUpdate(
  */
 export function applyShareList(
   registry: CompanionRegistry,
-  owners: readonly { id?: unknown; username?: unknown; lastLocation?: unknown }[]
+  entries: readonly ShareListEntry[]
 ): CompanionRegistry {
   const next: Record<string, CompanionPeer> = {};
-  for (const owner of owners) {
+  const shareIdsByUser = new Map<string, string[]>();
+
+  for (const entry of entries) {
+    const shareId = isWrappedShareRow(entry) && typeof entry.id === "string" && entry.id ? entry.id : null;
+    const owner = isWrappedShareRow(entry) ? entry.owner : entry;
     const userId = typeof owner.id === "string" ? owner.id : "";
     if (!userId) continue;
+
+    if (shareId) {
+      const recorded = shareIdsByUser.get(userId) ?? [];
+      if (!recorded.includes(shareId)) recorded.push(shareId);
+      shareIdsByUser.set(userId, recorded);
+    }
+
     const name = typeof owner.username === "string" && owner.username.trim() ? owner.username.trim() : UNKNOWN_NAME;
-    const existing = registry[userId];
+    const existing = next[userId] ?? registry[userId];
     if (existing) {
       next[userId] = existing.name === name ? existing : { ...existing, name };
       continue;
@@ -166,22 +223,74 @@ export function applyShareList(
     // A peer with no `lastLocation` at all is registered with `fix: null` rather than skipped.
     next[userId] = { userId, name, fix: seeded ? { ...seeded, observedAtMs: null } : null };
   }
+
+  for (const [userId, peer] of Object.entries(next)) {
+    const ids = shareIdsByUser.get(userId);
+    if (ids && ids.length > 0) {
+      next[userId] = { ...peer, shareIds: ids };
+    } else if ("shareIds" in peer) {
+      const { shareIds: _dropped, ...bare } = peer;
+      next[userId] = bare;
+    }
+  }
   return next;
+}
+
+/**
+ * Applies a server `location:share-ended` notification (`reason: "revoked" | "expired"`).
+ *
+ * Manual revocations and minute-sweep expiries pass through the exact same removal rule as
+ * `pruneRegistry`: once no active share remains for `userId`, the peer leaves `registry` immediately.
+ */
+export function applyShareEnded(
+  registry: CompanionRegistry,
+  event: { shareId?: unknown; userId?: unknown; reason?: unknown } | null | undefined,
+  openShareIds?: ReadonlySet<string>
+): ShareEndedResult {
+  if (!event || typeof event !== "object") {
+    return { registry, changed: false, shareEnded: false, reason: "invalid" };
+  }
+  const shareId = typeof event.shareId === "string" ? event.shareId : "";
+  const userId = typeof event.userId === "string" ? event.userId : "";
+  if (!shareId || !userId || (event.reason !== "revoked" && event.reason !== "expired")) {
+    return { registry, changed: false, shareEnded: false, reason: "invalid" };
+  }
+
+  const peer = registry[userId];
+  if (!peer) {
+    return {
+      registry,
+      changed: false,
+      shareEnded: Boolean(openShareIds?.has(shareId)),
+      reason: "absent"
+    };
+  }
+
+  if (peer.shareIds && peer.shareIds.length > 0) {
+    if (!peer.shareIds.includes(shareId)) {
+      return { registry, changed: false, shareEnded: false, reason: "stale-share" };
+    }
+    const remaining = peer.shareIds.filter((id) => id !== shareId);
+    if (remaining.length > 0) {
+      return {
+        registry: { ...registry, [userId]: { ...peer, shareIds: remaining } },
+        changed: false,
+        shareEnded: true,
+        reason: "retained"
+      };
+    }
+  }
+
+  const dropped = dropPeers(registry, (candidate) => candidate.userId === userId);
+  return { ...dropped, shareEnded: dropped.changed, reason: "removed" };
 }
 
 /** Drops peers whose last live fix is too old to call live. Seeded peers are kept: nothing says how old they are. */
 export function pruneRegistry(registry: CompanionRegistry, nowMs: number, discardAfterMs = DISCARD_AFTER_MS): { registry: CompanionRegistry; changed: boolean } {
-  let changed = false;
-  const next: Record<string, CompanionPeer> = {};
-  for (const [userId, peer] of Object.entries(registry)) {
+  return dropPeers(registry, (peer) => {
     const age = ageOf(peer.fix, nowMs);
-    if (age !== null && age > discardAfterMs) {
-      changed = true;
-      continue;
-    }
-    next[userId] = peer;
-  }
-  return changed ? { registry: next, changed: true } : { registry, changed: false };
+    return age !== null && age > discardAfterMs;
+  });
 }
 
 export function peersOf(registry: CompanionRegistry, nowMs: number): CompanionView[] {

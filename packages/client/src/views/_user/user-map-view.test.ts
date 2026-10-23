@@ -54,8 +54,13 @@ describe("UserMapView live overlay", () => {
     expect(view).not.toContain("هنوز روی این نقشه نمی‌آید");
   });
 
-  it("passes its own id to the composable, because the server echoes our fixes back to us", () => {
+  it("passes its own id and session-refresh hook to the composable, and renders the broadcast bar on both user views", () => {
+    const dashboard = readFileSync(new URL("./UserDashboardView.vue", import.meta.url), "utf8");
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
+    expect(view).toContain("ensureSession: () => auth.ensureSession()");
+    expect(view).toContain("<LiveBroadcastBar compact />");
+    expect(dashboard).toContain("<LiveBroadcastBar />");
+    expect(dashboard).not.toContain("نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند");
   });
 });
 

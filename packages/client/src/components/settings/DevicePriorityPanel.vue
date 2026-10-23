@@ -84,7 +84,7 @@
         <div v-for="entry in api.shareRows.value" :key="entry.share.id" class="device-priority__share">
           <div class="device-priority__share-head">
             <v-icon icon="mdi-crosshairs-gps" size="18" />
-            <span class="device-priority__share-name">{{ shareLabel(entry.share.targetUserId) }}</span>
+            <span class="device-priority__share-name">{{ shareLabel(entry.share) }}</span>
             <v-chip size="x-small" variant="tonal" :color="chipColor(entry.row.kind)">
               {{ stateLabel(entry.row.kind, entry.row.remainingMinutes) }}
             </v-chip>
@@ -155,9 +155,9 @@ const statusClass = computed(() =>
   props.api.status.value ? `device-priority__status--${props.api.status.value.tone}` : ""
 );
 
-function shareLabel(targetUserId: string): string {
+function shareLabel(share: { targetUserId: string; targetUsername?: string | null }): string {
   const names = props.names ?? new Map<string, string>();
-  return shareRowLabel(targetUserId, names);
+  return shareRowLabel(share.targetUserId, names, share.targetUsername);
 }
 
 function ageText(minutes: number): string {
@@ -202,11 +202,7 @@ function apply(shareId: string): void {
 }
 
 function applyToAll(): void {
-  const firstApplied = props.api.shareRows.value.find((entry) => {
-    const chosen = drafts[entry.share.id];
-    return chosen && chosen !== entry.share.priorityDeviceId;
-  });
-  const chosen = firstApplied ? drafts[firstApplied.share.id] : undefined;
+  const chosen = props.api.currentDeviceId.value;
   if (!chosen) return;
   void props.api.assignEverywhere(chosen);
 }

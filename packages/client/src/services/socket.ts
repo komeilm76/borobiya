@@ -1,10 +1,10 @@
 import { io, type Socket } from "socket.io-client";
-import { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT } from "./socket-events";
+import { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT, SHARE_ENDED_EVENT } from "./socket-events";
 import { realtimeConnectionOptions } from "./socket-options";
 
 // Re-exported so the broadcast composable and every existing caller keep their import path while the
 // constants themselves live in a module free of `socket.io-client` (see `socket-events.ts`).
-export { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT };
+export { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT, SHARE_ENDED_EVENT };
 
 export interface RealtimeClient {
   readonly socket: Socket;

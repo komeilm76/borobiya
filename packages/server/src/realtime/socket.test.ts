@@ -10,9 +10,14 @@ import type {
 import { createLiveLocationService, type LiveLocationService } from "../location/live";
 import {
   createAuthMiddleware,
+  disconnectSessionSockets,
+  disconnectUserSockets,
+  emitShareEnded,
   handleLocationUpdate,
   LOCATION_UPDATES_PER_MINUTE,
   PEER_UPDATE_EVENT,
+  sessionRoom,
+  SHARE_ENDED_EVENT,
   userRoom
 } from "./socket";
 
@@ -257,5 +262,85 @@ describe("location:update handling", () => {
     expect(accepted).toBe(LOCATION_UPDATES_PER_MINUTE);
     expect(throttled).toHaveLength(2);
     expect(throttled[0]!.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it("emits location:share-ended only to the recipient's private room for both revoke and expiry", () => {
+    const shareId = randomUUID();
+    const recipientId = randomUUID();
+    const emitted: { room: string; event: string; payload: unknown }[] = [];
+    const io = {
+      to: (room: string) => ({
+        emit: (event: string, payload: unknown) => {
+          emitted.push({ room, event, payload });
+        }
+      })
+    };
+
+    emitShareEnded(io, { id: shareId, ownerId: userId, targetUserId: recipientId }, "revoked");
+    emitShareEnded(io, { id: shareId, ownerId: userId, targetUserId: recipientId }, "expired");
+    emitShareEnded(undefined, { id: shareId, ownerId: userId, targetUserId: recipientId }, "revoked");
+
+    expect(emitted).toEqual([
+      {
+        room: userRoom(recipientId),
+        event: SHARE_ENDED_EVENT,
+        payload: { shareId, userId, reason: "revoked" }
+      },
+      {
+        room: userRoom(recipientId),
+        event: SHARE_ENDED_EVENT,
+        payload: { shareId, userId, reason: "expired" }
+      }
+    ]);
+  });
+
+  it("cuts off already-connected sockets whose session was logged out or whose account became inactive or suspended", async () => {
+    const live = makeLive([{ targetUserId: randomUUID(), priorityDeviceId: deviceId }]);
+
+    const loggedOut = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const loggedOutAck = await handleLocationUpdate(loggedOut as never, updatePayload(), {
+      live,
+      users: makeStore(userRecord(), false)
+    });
+    expect(loggedOutAck).toMatchObject({ ok: false, status: "rejected", code: "UNAUTHORIZED" });
+    expect(loggedOut.disconnects).toBe(1);
+    expect(loggedOut.emitted).toEqual([]);
+
+    const deactivated = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const deactivatedAck = await handleLocationUpdate(deactivated as never, updatePayload(), {
+      live,
+      users: makeStore(userRecord({ isActive: false }), true)
+    });
+    expect(deactivatedAck).toMatchObject({ ok: false, status: "rejected", code: "ACCOUNT_INACTIVE" });
+    expect(deactivated.disconnects).toBe(1);
+
+    const suspended = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const suspendedAck = await handleLocationUpdate(suspended as never, updatePayload(), {
+      live,
+      users: makeStore(userRecord({ isSuspended: true }), true)
+    });
+    expect(suspendedAck).toMatchObject({ ok: false, status: "rejected", code: "ACCOUNT_SUSPENDED" });
+    expect(suspended.disconnects).toBe(1);
+  });
+
+  it("disconnects session-scoped sockets on logout and user-scoped sockets on global revocation", () => {
+    const disconnectedRooms: { room: string; close?: boolean }[] = [];
+    const io = {
+      in: (room: string) => ({
+        disconnectSockets: (close?: boolean) => {
+          disconnectedRooms.push({ room, close });
+        }
+      })
+    };
+
+    disconnectSessionSockets(io, sessionId);
+    disconnectUserSockets(io, userId);
+    disconnectSessionSockets(undefined, sessionId);
+    disconnectUserSockets(io, "");
+
+    expect(disconnectedRooms).toEqual([
+      { room: sessionRoom(sessionId), close: true },
+      { room: userRoom(userId), close: true }
+    ]);
   });
 });

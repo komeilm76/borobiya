@@ -7,6 +7,7 @@ import {
 } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { UserRecoveryStore } from "../db/recovery-store";
+import { disconnectUserSockets, type SocketDisconnector } from "../realtime/socket";
 import {
   DUMMY_ARGON2ID_HASH,
   hashPassword as argon2HashPassword,
@@ -28,6 +29,7 @@ export interface ForgotPasswordRouteDependencies {
   decoySecret: string;
   hashPassword?: PasswordHasher;
   verifyAnswer?: SecurityAnswerVerifier;
+  io?: SocketDisconnector;
 }
 
 const RECOVERY_RATE_LIMIT_MAX = 5;
@@ -233,6 +235,9 @@ export async function registerForgotPasswordRoutes(
         "INVALID_RESET_TOKEN",
         "The reset token is invalid, expired, or already used."
       ));
+    }
+    if (typeof reset === "string") {
+      disconnectUserSockets(dependencies.io, reset);
     }
 
     return reply.code(200).header("cache-control", "no-store").send({ ok: true });

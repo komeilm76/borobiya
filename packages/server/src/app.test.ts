@@ -1,12 +1,19 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { allApiRoutes, apiRoutes } from "@borobiya/shared/api";
+import { SignJWT } from "jose";
+import { io as ioClient, type Socket as ClientSocket } from "socket.io-client";
+import { allApiRoutes, apiRoutes, type ApiRouteDefinition } from "@borobiya/shared/api";
 import type { SecurityQuestion } from "@borobiya/shared";
 import type { UserRecoveryStore } from "./db/recovery-store";
+import type { SecurityQuestionsUserRecord, UserSecurityQuestionsStore } from "./db/security-questions-store";
 import { createFastifyApp, type FastifyAppDependencies } from "./app";
 import { JOB_TICK_INTERVAL_MS } from "./location/jobs";
 import type { LocationHistoryStore } from "./db/location-history-store";
-import type { LocationShareStore } from "./db/location-share-store";
+import type { LocationShareStore, RetiredLocationShare } from "./db/location-share-store";
+import { describeOpenApiRuntimeStatus } from "./plugins/swagger";
+import { SHARE_ENDED_EVENT } from "./realtime/socket";
 import { parseServerEnv } from "./config/env";
 
 const serverConfig = parseServerEnv({
@@ -190,10 +197,14 @@ describe("Fastify server skeleton", () => {
   });
 
   it("catches up on expired shares once the API owns the maintenance timers", async () => {
-    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 3);
+    const retired: RetiredLocationShare[] = [
+      { id: randomUUID(), ownerId: randomUUID(), targetUserId: randomUUID() }
+    ];
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => retired);
+    const repairStaleSharePins = vi.fn(async () => 0);
     const pruneOlderThan = vi.fn(async () => 0);
     const app = await makeApp({}, {
-      locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
+      locationShareStore: { expireOverdueShares, repairStaleSharePins } as unknown as LocationShareStore,
       locationHistoryStore: { pruneOlderThan } as unknown as LocationHistoryStore,
       startMaintenanceJobs: true
     });
@@ -201,13 +212,126 @@ describe("Fastify server skeleton", () => {
     // `inject` implies `ready`, which is what triggers the startup pass.
     expect((await app.inject({ method: "GET", url: "/_public/health" })).statusCode).toBe(200);
     await vi.waitFor(() => expect(expireOverdueShares).toHaveBeenCalledTimes(1));
+    expect(repairStaleSharePins).toHaveBeenCalledTimes(1);
     expect(pruneOlderThan).toHaveBeenCalledTimes(1);
     expect(expireOverdueShares.mock.calls[0]?.[0]).toEqual({ now: expect.any(Date) });
   });
 
+  it("delivers location:share-ended over Socket.IO to the recipient room only on revoke and expiry", async () => {
+    const ownerId = randomUUID();
+    const recipientId = randomUUID();
+    const bystanderId = randomUUID();
+    const revokedShareId = randomUUID();
+    const expiredShareId = randomUUID();
+    const accounts = new Map<string, SecurityQuestionsUserRecord>([
+      [ownerId, { id: ownerId, username: "owner_one", role: "user", isActive: true, isSuspended: false, mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date() }],
+      [recipientId, { id: recipientId, username: "recipient_one", role: "user", isActive: true, isSuspended: false, mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date() }],
+      [bystanderId, { id: bystanderId, username: "bystander_one", role: "user", isActive: true, isSuspended: false, mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date() }]
+    ]);
+    const securityQuestionsStore: UserSecurityQuestionsStore = {
+      async findUserById(id) { return accounts.get(id) ?? null; },
+      async hasActiveSession() { return true; },
+      async securityQuestionsExist() { return true; },
+      async completeSecurityQuestions() { return true; }
+    };
+
+    let releaseExpirySweep!: () => void;
+    const expiryGate = new Promise<void>((resolve) => {
+      releaseExpirySweep = resolve;
+    });
+    const locationShareStore = {
+      async revokeShare(input: { ownerId: string; shareId: string }) {
+        return {
+          status: "revoked" as const,
+          share: { id: input.shareId, ownerId: input.ownerId, targetUserId: recipientId }
+        };
+      },
+      async expireOverdueShares() {
+        await expiryGate;
+        return [{ id: expiredShareId, ownerId, targetUserId: recipientId }];
+      },
+      async repairStaleSharePins() { return 0; }
+    } as unknown as LocationShareStore;
+
+    const app = await makeApp({}, {
+      securityQuestionsStore,
+      locationShareStore,
+      locationHistoryStore: { pruneOlderThan: async () => 0 } as unknown as LocationHistoryStore,
+      startMaintenanceJobs: true
+    });
+    const address = await app.listen({ host: "127.0.0.1", port: 0 });
+
+    const signAccess = async (sub: string) => {
+      const issuedAt = Math.floor(Date.now() / 1000);
+      return new SignJWT({
+        role: "user",
+        deviceId: randomUUID(),
+        sessionId: randomUUID(),
+        tokenUse: "access"
+      })
+        .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+        .setSubject(sub)
+        .setIssuedAt(issuedAt)
+        .setExpirationTime(issuedAt + 900)
+        .sign(new TextEncoder().encode(serverConfig.jwtSecret));
+    };
+
+    const sockets: ClientSocket[] = [];
+    const openClient = async (sub: string) => {
+      const token = await signAccess(sub);
+      const events: unknown[] = [];
+      const client = ioClient(address, {
+        path: "/socket.io",
+        transports: ["websocket"],
+        auth: { token },
+        reconnection: false
+      });
+      sockets.push(client);
+      client.on(SHARE_ENDED_EVENT, (payload: unknown) => {
+        events.push(payload);
+      });
+      await new Promise<void>((resolve, reject) => {
+        client.once("connect", () => resolve());
+        client.once("connect_error", reject);
+      });
+      return events;
+    };
+
+    try {
+      const recipientEvents = await openClient(recipientId);
+      const bystanderEvents = await openClient(bystanderId);
+      const ownerToken = await signAccess(ownerId);
+
+      const response = await app.inject({
+        method: "DELETE",
+        url: `/_user/location/share/${revokedShareId}`,
+        headers: { authorization: `Bearer ${ownerToken}` }
+      });
+      expect(response.statusCode).toBe(200);
+      await vi.waitFor(() =>
+        expect(recipientEvents).toContainEqual({
+          shareId: revokedShareId,
+          userId: ownerId,
+          reason: "revoked"
+        })
+      );
+
+      releaseExpirySweep();
+      await vi.waitFor(() =>
+        expect(recipientEvents).toEqual([
+          { shareId: revokedShareId, userId: ownerId, reason: "revoked" },
+          { shareId: expiredShareId, userId: ownerId, reason: "expired" }
+        ])
+      );
+      expect(bystanderEvents).toEqual([]);
+    } finally {
+      for (const client of sockets) client.close();
+    }
+  });
+
   it("starts no maintenance interval for apps that do not own the timers", async () => {
     const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
-    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => 0);
+    const expireOverdueShares = vi.fn(async (_input: { now: Date }) => []);
 
     const app = await makeApp({}, {
       locationShareStore: { expireOverdueShares } as unknown as LocationShareStore,
@@ -754,5 +878,53 @@ describe("Fastify server skeleton", () => {
     expect(firstClient.statusCode).toBe(200);
     expect(secondClient.statusCode).toBe(200);
     expect(repeatedClient.statusCode).toBe(429);
+  });
+
+  it("keeps Fastify's registered routes, OpenAPI runtime status, and docs/API.md in strict parity", async () => {
+    const app = await makeApp();
+    await app.ready();
+
+    const specResponse = await app.inject({ method: "GET", url: "/docs/json" });
+    expect(specResponse.statusCode).toBe(200);
+    const document = specResponse.json() as {
+      info: { description: string };
+      paths: NonNullable<Parameters<typeof describeOpenApiRuntimeStatus>[0]>;
+    };
+
+    // Every single shared route descriptor's `x-borobiya-runtime-status` must match whether a real
+    // Fastify handler is mounted on `app` — neither stale `contract-only` flags nor phantom `implemented`
+    // entries can slip past this assertion.
+    for (const route of allApiRoutes) {
+      const typed = route as ApiRouteDefinition & {
+        makeOpenApiPathShape: () => string;
+        makeExpressPathShape: () => string;
+      };
+      const openApiPath = typed.makeOpenApiPathShape();
+      const operation = document.paths[openApiPath]?.[typed.method.toLowerCase()];
+      const mounted = app.hasRoute({
+        method: typed.method,
+        url: typed.makeExpressPathShape()
+      });
+      expect(
+        operation?.["x-borobiya-runtime-status"],
+        `${typed.method} ${typed.url} (${typed.meta.operationId})`
+      ).toBe(mounted ? "implemented" : "contract-only");
+    }
+
+    expect(document.info.description).toBe(describeOpenApiRuntimeStatus(document.paths));
+    expect(document.info.description).toContain("POST /_user/sos/requests");
+    expect(document.info.description).toContain("POST /_user/sos/requests/{id}/photo");
+    expect(document.info.description).not.toContain("SOS and mission operations are contract-only");
+
+    const apiMarkdown = readFileSync(new URL("../../../docs/API.md", import.meta.url), "utf8");
+    const tldrLine = apiMarkdown.split("\n").find((line) => line.startsWith("> TL;DR:")) ?? "";
+    const stepFourLine = apiMarkdown.split("\n").find((line) => line.startsWith("4. The Swagger plugin")) ?? "";
+    for (const summaryLine of [tldrLine, stepFourLine]) {
+      expect(summaryLine).toContain("POST /_user/sos/requests");
+      expect(summaryLine).toContain("POST /_user/sos/requests/:id/photo");
+    }
+    expect(apiMarkdown).not.toContain("SOS, mission, and the remaining search operations");
+    expect(apiMarkdown).not.toContain("and the upload endpoint remain contract-only");
+    expect(apiMarkdown).toContain(SHARE_ENDED_EVENT);
   });
 });

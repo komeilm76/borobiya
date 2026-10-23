@@ -78,13 +78,13 @@ gantt
 
 **Exit criteria:** All numbered T1.0–T1.5 implementation tasks are checked complete. The user reported the core Phase 1 human tests passing on Ubuntu 24.04 on 2026-10-21: setup, admin login, user registration/login, light/dark/system theme, admin user list/deactivation, map display/zoom/fullscreen, and denied login after deactivation (see [`PROGRESS.md`](./PROGRESS.md#phase-1-human-acceptance)). The release proceeds with the remaining P1-G1 external-Internet-offline library run, P1-A1 live outage test, P1-A2 extended database-flow evidence, and P1-M1 latency measurement documented as non-blocking follow-ups. Their untested behavior is not claimed as passed.
 
-**Phase gate:** Phase 2 is complete in code and Phase 3 is underway. PR #2 was merged to `main` as `95a88a3` and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21; `v0.2.0` was cut on 2026-10-23 from the merge of the branch carrying Phase 2, Phase 3's M3.1/M3.2 work, and the map-pipeline and Ubuntu VM setup fixes (see `docs/PROGRESS.md`). Work started at T2.1.1; its `location_shares` table and migration are complete, while share APIs, realtime updates, expiry processing, history sharing, and multi-device UI remain future tasks. Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the release or Phase 2. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope.
+**Phase gate:** Phase 2 is complete in code and Phase 3 is underway. PR #2 was merged to `main` as `95a88a3` and the Phase 1 Foundation `v0.1.0` release was published on 2026-10-21; `v0.2.0` was cut on 2026-10-23 from PR #4 (merged as `a7fa830`), carrying Phase 2, Phase 3's M3.1 and M3.2 server/catalog work, and the map-pipeline and Ubuntu VM setup fixes (see `docs/PROGRESS.md`). Per the user's explicit 2026-10-21 decision, the remaining Phase 1 follow-ups do not block the release or Phase 2. P1-G1 remains a separate operational follow-up, not part of T1.4.7's map-cache, cache-removal, and area-selection scope.
 
 ---
 
 ## Phase 2 — Location Sharing (Weeks 3-4)
 
-**Status:** Active since 2026-10-21. T2.1.1 (`location_shares` schema and migration) is complete; API behavior and live sharing are not yet implemented.
+**Status:** Implementation complete in code (shipped in `v0.2.0` on 2026-10-23 across T2.1–T2.3 below, plus realtime `location:share-ended` on revoke and expiry). Live browser and PostGIS acceptance runs remain tracked under P2-A1 and P2-A2 in `docs/TASKS.md`.
 
 **Goal:** Users share live & history locations, manage shares, multi-device aware.
 
@@ -119,12 +119,12 @@ gantt
 ### M3.1 Admin Domain Model
 - [x] `incident_types` + `categories` + pivots `category_users` + `category_incident_types` — DDL generated as `drizzle/0010_complete_namor.sql`, 2026-10-22
 - [x] `POST /_admin/incidents`, `POST /_admin/categories`, `POST /_admin/categories/:id/users` — live as of T3.1.2/T3.1.3 (2026-10-22), with list/update reads and member removal too
-- [ ] Frontend: Admin /incidents & /categories CRUD + assign users — the server surface is in place; the screens are T3.1.5
+- [x] Frontend: Admin `/_admin/incidents` & `/_admin/categories` CRUD + assign users — completed with T3.1.5 (2026-10-23); category member read/list projection remains open under T3.1.4
 
 ### M3.2 SOS Request
 - [x] `sos_requests` table — `drizzle/0012_modern_sentry.sql`, 2026-10-22 (T3.2.1)
-- [ ] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback, optional photo 5MB)
-- [ ] Photo upload endpoint + storage (local volume → S3 later)
+- [x] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback; `photoUrl` rejected in favor of multipart upload) — completed 2026-10-22 (T3.2.2); client SOS button/form/picker remains open as T3.2.4
+- [x] Photo upload endpoint + storage (`POST /_user/sos/requests/:id/photo`, local `UPLOAD_DIR` volume → S3 later) — completed 2026-10-22 (T3.2.3); authenticated read path remains open as T3.2.6
 - [ ] Socket `sos:new-request` to `admin` room + pulsing marker + sound
 
 ### M3.3 Dispatch & Nearest Responders

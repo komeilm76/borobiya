@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { effectScope, nextTick, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useDeviceSettings, DEVICE_CLOCK_INTERVAL_MS } from "./use-device-settings";
@@ -347,5 +348,52 @@ describe("leaving the screen", () => {
     const before = api.deviceRows.value[0]!.minutesSinceActive;
     await vi.advanceTimersByTimeAsync(DEVICE_CLOCK_INTERVAL_MS * 5);
     expect(api.deviceRows.value[0]!.minutesSinceActive).toBe(before);
+  });
+
+  it("preserves targetUsername on shareRows and assigns the current device without needing a row draft", async () => {
+    responder = (url, method) => {
+      if (url.endsWith("/_user/devices")) return { status: 200, body: [deviceRow(PHONE), deviceRow(LAPTOP)] };
+      if (url.endsWith("/_user/location/shares") && method === "GET") {
+        return {
+          status: 200,
+          body: {
+            owned: [
+              shareRow(SHARE_ONE, TARGET, { priorityDeviceId: LAPTOP, targetUsername: "sara" }),
+              shareRow(SHARE_TWO, TARGET_TWO, { priorityDeviceId: PHONE, targetUsername: "hamid" })
+            ],
+            sharedWithMe: []
+          }
+        };
+      }
+      return {
+        status: 200,
+        body: {
+          shares: [createdRow(SHARE_ONE, TARGET, { priorityDeviceId: PHONE })],
+          createdShareIds: [],
+          reusedShareIds: [SHARE_ONE]
+        }
+      };
+    };
+
+    const { api } = mount();
+    await api.refresh();
+    await settle();
+
+    expect(api.shareRows.value.map((entry) => entry.share.targetUsername)).toEqual(["sara", "hamid"]);
+    expect(api.currentDeviceId.value).toBe(PHONE);
+
+    calls = [];
+    await api.assignCurrentDevice();
+    await settle();
+    expect(posts()).toHaveLength(1);
+    expect(posts()[0]!.body).toMatchObject({
+      targetUserIds: [TARGET],
+      priorityDeviceId: PHONE
+    });
+
+    const panelSource = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
+    expect(panelSource).toContain("share.targetUsername");
+    expect(panelSource).toContain("api.currentDeviceId.value");
+    expect(panelSource).toContain("api.assignEverywhere(");
   });
 });

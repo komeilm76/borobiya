@@ -149,6 +149,15 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       grants.value = response.sharedWithMe;
       grantsLoaded.value = true;
       grantsFailed.value = false;
+      if (grantId.value && !response.sharedWithMe.some((grant) => grant.id === grantId.value)) {
+        stopTimer();
+        grantId.value = "";
+        clearTrack();
+        if (sourceKind.value === "grant") {
+          failed.value = true;
+          loadIssue.value = "grant_gone";
+        }
+      }
     } catch {
       // A failed refresh keeps the list the user is already choosing from (and any track already on the
       // map playable): the panel reports `grantsFailed` next to a list that may be a moment stale,
@@ -292,7 +301,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     if (sourceKind.value === kind) return;
     sourceKind.value = kind;
     if (kind === "grant") {
-      if (!grantsLoaded.value) void loadShares();
+      void loadShares();
     } else {
       grantId.value = "";
     }

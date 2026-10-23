@@ -1,11 +1,12 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationSharesResponse } from "@shared/index";
-import { PEER_UPDATE_EVENT } from "@/services/socket-events";
+import { PEER_UPDATE_EVENT, SHARE_ENDED_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { listLocationShares } from "@/api/location";
 import {
   DISCARD_AFTER_MS,
   applyPeerUpdate,
+  applyShareEnded,
   applyShareList,
   emptyRegistry,
   liveStatus,
@@ -37,6 +38,8 @@ export interface UseLiveCompanionsOptions {
    * `useLiveCompanions` — and tests hand in a fake, which may be synchronous.
    */
   openSocket?: (token: string) => RealtimeClient | Promise<RealtimeClient>;
+  /** Refreshes the access token via the HttpOnly refresh cookie if a reconnect hits an expired JWT. */
+  ensureSession?: () => Promise<void>;
   readShares?: (token: string) => Promise<Pick<LocationSharesResponse, "sharedWithMe">>;
   now?: () => number;
   tickMs?: number;
@@ -83,7 +86,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   let client: RealtimeClient | null = null;
   let requestId = 0;
   let refreshing = false;
+  let refreshingAuth = false;
   let timer: ReturnType<typeof setInterval> | null = null;
+  let openShareIds = new Set<string>();
 
   const peers = computed(() => peersOf(registry.value, nowMs.value));
   const overlay = computed(() => peersOverlay(registry.value, nowMs.value));
@@ -100,6 +105,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     const token = options.accessToken.value;
     if (!token) {
       registry.value = emptyRegistry;
+      openShareIds = new Set();
       shareCount.value = 0;
       readFailed.value = false;
       return;
@@ -111,9 +117,13 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       if (request !== requestId) return;
       // Only `sharedWithMe` is a source of markers: `owned` rows are about who follows *me*, and drawing
       // my own followers' targets would put a dot on the map for somebody who never shared anything.
-      const owners = shares.sharedWithMe.map((row) => row.owner);
-      shareCount.value = owners.length;
-      registry.value = applyShareList(registry.value, owners);
+      openShareIds = new Set(
+        shares.sharedWithMe
+          .map((row) => row.id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      );
+      shareCount.value = shares.sharedWithMe.length;
+      registry.value = applyShareList(registry.value, shares.sharedWithMe);
       readFailed.value = false;
     } catch {
       if (request !== requestId) return;
@@ -141,6 +151,18 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     }
   }
 
+  function onShareEnded(payload: unknown): void {
+    const candidate = payload as { shareId?: unknown; userId?: unknown; reason?: unknown } | null | undefined;
+    const result = applyShareEnded(registry.value, candidate, openShareIds);
+    if (result.shareEnded) {
+      if (typeof candidate?.shareId === "string") openShareIds.delete(candidate.shareId);
+      shareCount.value = Math.max(0, shareCount.value - 1);
+    }
+    if (result.registry !== registry.value) {
+      registry.value = result.registry;
+    }
+  }
+
   function onConnect(): void {
     connected.value = true;
     // Re-reading after a (re)connect is what notices a share revoked while we were disconnected.
@@ -151,6 +173,25 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     connected.value = false;
   }
 
+  async function onConnectError(): Promise<void> {
+    connected.value = false;
+    if (!options.ensureSession || refreshingAuth) return;
+    const previousToken = options.accessToken.value;
+    refreshingAuth = true;
+    try {
+      await options.ensureSession();
+      const nextToken = options.accessToken.value;
+      if (nextToken && nextToken !== previousToken && client) {
+        client.updateToken(nextToken);
+        client.connect();
+      }
+    } catch {
+      // Next reconnect attempt or explicit user navigation will retry cleanly.
+    } finally {
+      refreshingAuth = false;
+    }
+  }
+
   function teardownClient(): void {
     // Bumped even when there is nothing to close, so a pending `ensureClient` cannot attach a socket the
     // view has already left behind.
@@ -158,7 +199,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     if (!client) return;
     client.socket.off("connect", onConnect);
     client.socket.off("disconnect", onDisconnect);
+    client.socket.off("connect_error", onConnectError);
     client.socket.off(PEER_UPDATE_EVENT, onPeerUpdate);
+    client.socket.off(SHARE_ENDED_EVENT, onShareEnded);
     client.close();
     client = null;
     connected.value = false;
@@ -186,8 +229,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     client = opened;
     client.socket.on("connect", onConnect);
     client.socket.on("disconnect", onDisconnect);
-    client.socket.on("connect_error", onDisconnect);
+    client.socket.on("connect_error", onConnectError);
     client.socket.on(PEER_UPDATE_EVENT, onPeerUpdate);
+    client.socket.on(SHARE_ENDED_EVENT, onShareEnded);
     client.connect();
   }
 
@@ -209,6 +253,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       // receiving their positions.
       teardownClient();
       registry.value = emptyRegistry;
+      openShareIds = new Set();
       shareCount.value = 0;
       readFailed.value = false;
     }

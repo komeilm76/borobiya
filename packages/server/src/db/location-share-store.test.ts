@@ -343,16 +343,21 @@ describe("DrizzleLocationShareStore", () => {
   });
 
   it("revokes an owned active share and distinguishes missing from already-revoked ids", async () => {
-    const revoked = makeDatabase([[{ id: targetId }]]);
-    expect(await revoked.store.revokeShare({ ownerId, shareId: targetId })).toBe("revoked");
+    const shareId = randomUUID();
+    const retired = { id: shareId, ownerId, targetUserId: targetId };
+    const revoked = makeDatabase([[retired]]);
+    expect(await revoked.store.revokeShare({ ownerId, shareId })).toEqual({
+      status: "revoked",
+      share: retired
+    });
     expect(revoked.mutations).toHaveLength(1);
     expect(revoked.mutations[0]).toMatchObject({ type: "update", values: { isRevoked: true } });
 
-    const already = makeDatabase([[], [{ id: targetId }]]);
-    expect(await already.store.revokeShare({ ownerId, shareId: targetId })).toBe("already-revoked");
+    const already = makeDatabase([[], [{ id: shareId }]]);
+    expect(await already.store.revokeShare({ ownerId, shareId })).toEqual({ status: "already-revoked" });
 
     const missing = makeDatabase([[], []]);
-    expect(await missing.store.revokeShare({ ownerId, shareId: randomUUID() })).toBe("not-found");
+    expect(await missing.store.revokeShare({ ownerId, shareId: randomUUID() })).toEqual({ status: "not-found" });
   });
 
   it("extends an active timed share only when the new expiry is later", async () => {
@@ -522,14 +527,27 @@ describe("repairStaleSharePinsQuery", () => {
 
 describe("expireOverdueSharesQuery", () => {
   it("retires only timed shares whose window has closed", () => {
-    const built = expireOverdueSharesQuery(offlineDb, new Date("2026-10-21T09:00:00.000Z")).toSQL();
+    const built = expireOverdueSharesQuery(offlineDb, new Date("2026-10-21T09:00:00.000Z"))
+      .returning({
+        id: locationShares.id,
+        ownerId: locationShares.ownerId,
+        targetUserId: locationShares.targetUserId
+      })
+      .toSQL();
     const sql = built.sql.replace(/\s+/g, " ");
 
     expect(sql).toContain('update "location_shares" set "is_revoked" = $1');
     expect(sql).toContain('"location_shares"."is_revoked" = $2');
     expect(sql).toContain('"location_shares"."expires_at" is not null');
     expect(sql).toContain('"location_shares"."expires_at" <= $3');
+    expect(sql).toContain('returning "id", "owner_id", "target_user_id"');
     // Booleans and the bound cutoff are parameters, never inlined SQL text.
     expect(built.params).toEqual([true, false, "2026-10-21T09:00:00.000Z"]);
+  });
+
+  it("returns the retired share identities from DrizzleLocationShareStore.expireOverdueShares", async () => {
+    const retired = [{ id: randomUUID(), ownerId, targetUserId: targetId }];
+    const fake = makeDatabase([retired]);
+    expect(await fake.store.expireOverdueShares({ now: new Date("2026-10-21T09:00:00.000Z") })).toEqual(retired);
   });
 });

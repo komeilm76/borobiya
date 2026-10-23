@@ -8,10 +8,10 @@ import copy
 import hashlib
 import io
 import json
-from contextlib import redirect_stdout
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import date
 from pathlib import Path
 

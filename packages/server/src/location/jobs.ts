@@ -1,5 +1,6 @@
 import type { LocationHistoryStore } from "../db/location-history-store";
 import type { LocationShareStore } from "../db/location-share-store";
+import { emitShareEnded, type RoomEmitter } from "../realtime/socket";
 
 /** Spec §7.1: timed shares are expired by a cron that runs every minute. */
 export const SHARE_EXPIRY_INTERVAL_MS = 60_000;
@@ -29,6 +30,7 @@ export interface LocationJobDependencies {
   historyStore: Pick<LocationHistoryStore, "pruneOlderThan">;
   /** `LOCATION_HISTORY_RETENTION_DAYS` (spec §17.2). */
   retentionDays: number;
+  io?: RoomEmitter;
   now?: () => Date;
   logger?: LocationJobLogger;
 }
@@ -68,7 +70,13 @@ export async function runLocationJobs(
   let repairedPins = 0;
   try {
     if (selection.expiry) {
-      expiredShares = await dependencies.shareStore.expireOverdueShares({ now });
+      const retired = await dependencies.shareStore.expireOverdueShares({ now });
+      expiredShares = retired.length;
+      // Notify receivers before pin repair runs so a subsequent repair error cannot silence an
+      // expiry that has already committed in the database.
+      for (const share of retired) {
+        emitShareEnded(dependencies.io, share, "expired");
+      }
       // Same cadence and the same table: a share pinned to a device that just logged out would
       // otherwise reject every incoming fix (T2.3.4) until the owner noticed the frozen marker.
       repairedPins = await dependencies.shareStore.repairStaleSharePins({ now });

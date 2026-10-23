@@ -1,7 +1,9 @@
 import { apiRoutes } from "@borobiya/shared/api";
 import { refreshBodySchema } from "@borobiya/shared";
+import { decodeJwt } from "jose";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { UserLoginStore } from "../db/login-store";
+import { disconnectSessionSockets, type SocketDisconnector } from "../realtime/socket";
 import {
   hashRefreshToken,
   signAccessToken,
@@ -14,6 +16,7 @@ export interface SessionRouteDependencies {
   store: UserLoginStore;
   jwtSecret: string;
   jwtRefreshSecret: string;
+  io?: SocketDisconnector;
 }
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -86,6 +89,7 @@ export async function registerSessionRoutes(
 
     if (!session.isActive || session.isSuspended) {
       await dependencies.store.revokeSession(session.id, session.userId);
+      disconnectSessionSockets(dependencies.io, session.id);
       const code = session.isActive ? "ACCOUNT_SUSPENDED" : "ACCOUNT_INACTIVE";
       const message = session.isActive
         ? "This account is suspended. Contact an administrator."
@@ -139,9 +143,20 @@ export async function registerSessionRoutes(
       if (tokenIdentity) {
         // Revoke by session as well as hash so logout racing with token rotation still ends the session.
         await dependencies.store.revokeSession(tokenIdentity.sessionId, tokenIdentity.userId);
+        disconnectSessionSockets(dependencies.io, tokenIdentity.sessionId);
       } else {
         // This also revokes an expired token still present in the session row.
-        await dependencies.store.revokeSessionByRefreshTokenHash(hashRefreshToken(refreshToken));
+        const revoked = await dependencies.store.revokeSessionByRefreshTokenHash(hashRefreshToken(refreshToken));
+        if (revoked) {
+          try {
+            const claims = decodeJwt(refreshToken);
+            if (typeof claims.sessionId === "string") {
+              disconnectSessionSockets(dependencies.io, claims.sessionId);
+            }
+          } catch {
+            // Malformed tokens have no valid session room to evict.
+          }
+        }
       }
     }
 

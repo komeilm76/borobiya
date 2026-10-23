@@ -10,21 +10,21 @@
 2. [Access & Requirements](#2-access--requirements)
 3. [Registration](#3-registration)
 4. [Login](#4-login)
-5. [Forgot Password (Security Questions)](#5-forgot-password)
+5. [Forgot Password](#5-forgot-password)
 6. [Onboarding After Admin-Created Account](#6-onboarding-after-admin-created-account)
-7. [Theme (Dark/Light)](#7-theme)
+7. [Theme](#7-theme)
 8. [Map Basics](#8-map-basics)
-9. [Search — Users & Places](#9-search--users--places)
-10. [Routing & Navigation](#10-routing--navigation)
+9. [Search — Planned](#9-search--planned)
+10. [Routing & Navigation — Planned](#10-routing--navigation--planned)
 11. [Live Location Sharing](#11-live-location-sharing)
 12. [History Sharing](#12-history-sharing)
 13. [Active Devices & Priority Device](#13-active-devices--priority-device)
-14. [SOS — Requesting Help](#14-sos--requesting-help)
-15. [SOS — Admin Dispatch (for Admins)](#15-sos--admin-dispatch)
-16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
-17. [Mission Statuses During Rescue](#17-mission-statuses-during-rescue)
-18. [Cancellation](#18-cancellation)
-19. [History & Rating](#19-history--rating)
+14. [SOS — Requesting Help — Planned](#14-sos--requesting-help--planned)
+15. [SOS — Admin Dispatch — Planned](#15-sos--admin-dispatch--planned)
+16. [SOS — Responding as Rescuer — Planned](#16-sos--responding-as-rescuer--planned)
+17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
+18. [Cancellation — Planned](#18-cancellation--planned)
+19. [History & Rating — Planned](#19-history--rating--planned)
 20. [Admin — User Management](#20-admin--user-management)
 21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
 22. [Troubleshooting](#22-troubleshooting)
@@ -160,36 +160,37 @@ Route selection, transport profiles, alternatives, and turn-by-turn navigation a
 
 ### Share
 
-1. Go to **Location Shares** → **New Share**.
-2. Select **Targets** (one or more users via search).
+1. Open **`/_user`** → click **اشتراک تازه** (**New Share**).
+2. Select **Targets** (one or more companions via debounced username search).
 3. Choose **Mode:**
-   - **Timed:** slider 60 min, 24h, etc. Auto-expires.
-   - **Permanent:** until you revoke.
-4. Add **Note** (optional) → **Share**.
+   - **Timed (`مدت‌دار`):** slider / presets from 15 min up to 30 days. Auto-expires.
+   - **Permanent (`تا لغو دستی`):** active until manually revoked.
+4. Add **Note** (optional) → **اشتراک‌گذاری** (**Share**). If multiple sessions are active on your account, choose which device broadcasts in the prompt.
+5. Start broadcasting your device's GPS from the **پخش زندهٔ موقعیت** bar on **`/_user`** or the compact control on **`/_user/map`** (**شروع پخش** / **توقف پخش**).
 
 [Screenshot: Share dialog with target picker + timed toggle]
 
 ### Manage
 
-- **My Shares** tab: list with green “Active” or “Expired” badges → **Revoke** to stop instantly.
-- **Shared With Me** tab: live markers on map with user name.
+- **اشتراک‌های من** (**My Shares**): active and permanent shares → **لغو** (**Revoke**) cuts off access immediately across live maps.
+- **با من به اشتراک گذاشته‌اند** (**Shared With Me**): incoming live shares and history grants, with direct links to **`/_user/map`**.
 
 ### Live Updates
 
-- Your device sends GPS every 3–5s (throttled to save battery).
-- Receiver sees your dot move; tapping dot shows “Last seen: just now” or “Offline · 2 min ago”.
+- When active, your device streams GPS fixes over Socket.IO every 3s while moving and refreshes stationary heartbeats automatically.
+- Companions viewing **`/_user/map`** see your live marker update in real time and disappear immediately upon revoke or timed expiry.
 
 ---
 
 ## 12. History Sharing
 
-1. **Location Shares** → **Share History**.
-2. Pick **Targets**, **Date range** (e.g., last 7 days) — cannot exceed 30 days at once.
-3. Send → receiver sees **polyline** on map with **time slider** to playback.
+1. Open **`/_user`** → **اشتراک تازه** → choose **تاریخچه مسیر** (**Route History**).
+2. Pick **Targets**, choose a quick preset (`1h`–`7d`) or custom **از زمان / تا زمان** window within the server's max share window, and optionally cap **حداکثر تعداد نقاط** (`maxPoints`).
+3. Submit → recipients see the grant under **با من به اشتراک گذاشته‌اند** and can play back the polyline on **`/_user/map`** (**مسیر همراهم** toggle in the **پخش حرکت** panel, with `1×` / `4×` / `16×` / `60×` transport, scrub slider, and **تازه‌سازی**).
 
 [Screenshot: History share date picker + polyline playback]
 
-> Old history older than 90 days is auto-deleted (configurable).
+> Old history older than 90 days is auto-deleted (configurable). Owners can delete any history grant at any time under **بازه‌های تاریخچه** on **`/_user`**.
 
 ---
 
@@ -214,7 +215,9 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ---
 
-## 14. SOS — Requesting Help
+## 14. SOS — Requesting Help — Planned
+
+> **Current status:** `POST /_user/sos/requests` (T3.2.2) and `POST /_user/sos/requests/:id/photo` (T3.2.3) are implemented on the API, while the client SOS button, bottom sheet, and manual map-pin picker are not yet shipped (tracked under T3.2.4; admin broadcast is T3.2.5 and photo read-back is T3.2.6). The steps below describe the planned end-user flow.
 
 ### Big red SOS button
 
@@ -237,9 +240,11 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ---
 
-## 15. SOS — Admin Dispatch
+## 15. SOS — Admin Dispatch — Planned
 
-*Admin only (`/_admin/dashboard`).*
+> **Current status:** Admin dispatch routes (`/_admin/sos/requests*`, `POST .../dispatch`) remain contract-only on the API, and `/_admin/dispatch` and `/_admin/dashboard` currently render placeholder screens in the client (tracked under T3.3).
+
+*Admin only (`/_admin/dispatch`).*
 
 1. New SOS appears: **pulsing red marker** + sidebar alert with severity color.
 2. Click alert → map zooms to SOS location, shows **Nearest Responders** (top 10 eligible by distance + category match).
@@ -253,7 +258,9 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ---
 
-## 16. SOS — Responding as Rescuer
+## 16. SOS — Responding as Rescuer — Planned
+
+> **Current status:** Rescuer proposal inbox, accept/decline handlers, and in-app navigation remain planned under T3.4–T3.5.
 
 ### Inbox
 
@@ -269,13 +276,15 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 1. Tap **Accept** on a proposal.
 2. Map **fits both points** (you + requester).
 3. Other proposals auto-declined.
-4. Tap **Go to Incident Location** → choose transport → see routes → **Start Navigation** (§10.5).
+4. Tap **Go to Incident Location** → choose transport → see routes → **Start Navigation** (§10).
 
 [Screenshot: Proposal inbox + Accept]
 
 ---
 
-## 17. Mission Statuses During Rescue
+## 17. Mission Statuses During Rescue — Planned
+
+> **Current status:** Mission tables, `PATCH /_user/missions/:id/status`, and the rescuer status bar remain planned under T3.5.
 
 Rescuer updates step-by-step (button in mission bar):
 
@@ -292,7 +301,9 @@ Each update appears as **timeline** to requester + admin.
 
 ---
 
-## 18. Cancellation
+## 18. Cancellation — Planned
+
+> **Current status:** Cancellation reasons are seeded in the database (T1.1.3), while requester/rescuer cancellation routes and UI remain planned under T3.6.
 
 ### If you are the requester (need to cancel SOS)
 
@@ -331,10 +342,12 @@ Each update appears as **timeline** to requester + admin.
 
 ---
 
-## 19. History & Rating
+## 19. History & Rating — Planned
 
-- **Request History** (`/_user/sos/history?role=requester`): SOS I created, status, rescuer, timeline.
-- **Mission History** (`/_user/sos/history?role=rescuer`): Missions I handled, rating received.
+> **Current status:** `/_user/sos-history` currently renders a placeholder screen in the client, and `GET /_user/sos/requests`, `GET /_user/sos/missions`, and `POST /_user/missions/:id/rate` remain contract-only (tracked under T4.1).
+
+- **Request History** (`/_user/sos-history`, planned): SOS I created, status, rescuer, timeline.
+- **Mission History** (`/_user/sos-history`, planned): Missions I handled, rating received.
 
 ### Rating
 
@@ -391,13 +404,16 @@ Each update appears as **timeline** to requester + admin.
 | Register | `/_auth/register` |
 | Login | `/_auth/login` |
 | Forgot password | `/_auth/forgot-password` |
-| Dashboard | `/_user/dashboard` |
-| Full map + routing | `/_user/map` |
-| Location shares | `/_user/location/shares` |
-| SOS History | `/_user/sos/history` |
-| Settings / Devices | `/_user/settings` |
-| Admin Dashboard | `/_admin/dashboard` |
+| Dashboard (live + history shares) | `/_user/dashboard` |
+| Full map (live companions + playback) | `/_user/map` |
+| Active Devices & Priority Device | `/_user/devices` |
+| SOS History *(planned)* | `/_user/sos-history` |
+| Settings *(planned)* | `/_user/settings` |
+| Admin Dashboard *(planned)* | `/_admin/dashboard` |
 | Admin Users | `/_admin/users` |
+| Admin Categories | `/_admin/categories` |
+| Admin Incidents | `/_admin/incidents` |
+| Admin Dispatch *(planned)* | `/_admin/dispatch` |
 
 Need help? Contact your Borobiya admin or open an issue at `github.com/komeilm76/borobiya` with steps & screenshot.
 

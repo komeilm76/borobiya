@@ -18,8 +18,11 @@ import {
   buildLiveSharePayload,
   buildShareNameMap,
   canSubmitShareDraft,
+  choiceDeviceOptionLabel,
   describeHistoryShareRow,
   describeLiveShareRow,
+  historyPresetWindow,
+  isHistoryRangeTooLarge,
   MINUTES_PER_HOUR,
   isAbortError,
   isLatestSearch,
@@ -456,5 +459,80 @@ describe("server refusals", () => {
     expect(source).toContain("durationWords(maxMinutes)");
     expect(source).not.toContain("${maxMinutes}");
     expect(source).toContain("rejectionText(rejection)");
+    expect(source).toContain("createLocationHistoryShare");
+    expect(source).toContain("buildHistorySharePayload");
+    expect(source).toContain("choiceDeviceOptionLabel");
+  });
+
+  it("validates history grants, builds maxPoints, and names priority devices cleanly", () => {
+    const window = historyPresetWindow(6, Date.parse("2026-10-23T12:00:00.000Z"));
+    expect(window).toEqual({
+      from: "2026-10-23T06:00:00.000Z",
+      to: "2026-10-23T12:00:00.000Z"
+    });
+
+    expect(
+      shareDraftIssues(
+        draft({
+          mode: "history",
+          historyFrom: window.from,
+          historyTo: window.to,
+          historyMaxPoints: 500,
+          note: "x".repeat(MAX_LOCATION_SHARE_NOTE_LENGTH + 50)
+        })
+      )
+    ).toEqual([]);
+
+    expect(
+      shareDraftIssues(
+        draft({
+          mode: "history",
+          historyFrom: window.to,
+          historyTo: window.from,
+          historyMaxPoints: 0
+        })
+      )
+    ).toEqual([
+      { code: "history_end_not_after_start" },
+      { code: "history_points_out_of_range", params: { min: 1, max: 10_000 } }
+    ]);
+
+    expect(
+      buildHistorySharePayload(draft({ mode: "history" }), {
+        from: window.from,
+        to: window.to,
+        maxPoints: 750
+      })
+    ).toEqual({
+      targetUserIds: ["11111111-1111-4111-8111-111111111111"],
+      from: window.from,
+      to: window.to,
+      maxPoints: 750
+    });
+
+    expect(isHistoryRangeTooLarge(new ApiError(400, "SHARE_RANGE_TOO_LARGE", "too large"))).toBe(true);
+    expect(isHistoryRangeTooLarge(new ApiError(409, "PRIORITY_DEVICE_REQUIRED", "choose"))).toBe(false);
+
+    expect(
+      choiceDeviceOptionLabel(
+        "11111111-1111-4111-8111-111111111111",
+        [
+          {
+            id: "11111111-1111-4111-8111-111111111111",
+            deviceId: "11111111-1111-4111-8111-111111111111",
+            deviceName: "Chrome on Android",
+            ip: "10.0.0.1",
+            isCurrentDevice: true,
+            lastActiveAt: "2026-10-23T11:55:00.000Z",
+            isOnline: true
+          }
+        ],
+        0
+      )
+    ).toBe("Chrome on Android (همین دستگاه)");
+
+    const listsSource = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
+    expect(listsSource).toContain("receivedHistoryRows");
+    expect(listsSource).toContain('/_user/map');
   });
 });

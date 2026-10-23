@@ -11,11 +11,13 @@ import { hashPassword as argon2HashPassword } from "../security/password";
 import type { SessionTokenIdentity } from "../security/tokens";
 import type { PasswordHasher } from "../auth/register";
 import { authorizeAdmin, errorResponse } from "./authorize";
+import { disconnectUserSockets, type SocketDisconnector } from "../realtime/socket";
 
 export interface AdminUsersRouteDependencies {
   store: AdminUserStore;
   jwtSecret: string;
   hashPassword?: PasswordHasher;
+  io?: SocketDisconnector;
 }
 
 // The bearer-token, current-account, and unrevoked-session checks live in ./authorize so every privileged
@@ -157,6 +159,9 @@ export async function registerAdminUserRoutes(
     });
     if (!user) {
       return reply.code(404).send(errorResponse("USER_NOT_FOUND", "The requested user does not exist."));
+    }
+    if (!user.isActive) {
+      disconnectUserSockets(dependencies.io, user.id);
     }
 
     return reply

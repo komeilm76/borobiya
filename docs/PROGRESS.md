@@ -128,6 +128,78 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — End-to-end Phase 2 audit, missing client wiring completion, and server/client bug fixes (`P2-Q2`)
+
+- **Server socket eviction, inactive-recipient filtering, and self-room parity.** Closed three server-side gaps
+  across `packages/server/src/{realtime/socket,auth/session,auth/forgot-password,admin/users,db/location-share-store,db/recovery-store,app}.ts`:
+  (1) open Socket.IO connections now disconnect immediately when a session logs out (`disconnectSessionSockets`),
+  when a password reset revokes all sessions (`disconnectUserSockets`), or when an admin deactivates/suspends an
+  account (`disconnectUserSockets`), and `location:update` re-verifies active session + unsuspended active user
+  before processing any GPS sample; (2) `DrizzleLocationShareStore.listActiveOutgoingShares` now excludes
+  deactivated/suspended recipients (`INNER JOIN users` on `is_active = true AND is_suspended = false`), verified
+  against embedded PostgreSQL in `src/location/p2-a2.pglite.test.ts`; (3) HTTP `POST /_user/location/update` now
+  also broadcasts `location:peer-update` to `user:<ownerId>` matching WebSocket self-room parity. Phase 2 scope
+  boundaries on `shares.ts` (Privacy-v2 allowlists) and `socket.ts` (`suspendedUntil`) remain untouched.
+- **Live broadcast + priority status bar (`LiveBroadcastBar.vue`) & client socket lifecycle fixes.** Wired
+  `useLiveLocationBroadcast` and `usePriorityDevice` into `stores/broadcast.ts` + `LiveBroadcastBar.vue` on both
+  `/_user` (replacing the stale `UserDashboardView.vue` placeholder caption) and `/_user/map` (`compact` overlay).
+  Fixed eager GPS startup before `start()`, unstopped `watchPosition` leaks across `stop()`/logout, 60s stationary
+  heartbeat timestamp staleness against `MAX_ACCEPTED_SAMPLE_AGE_MS`, unhandled geolocation permission/unavailable
+  errors, and missing `ensureSession()` JWT refresh on socket auth expiry across both `useLiveLocationBroadcast`
+  and `useLiveCompanions`.
+- **History-grant creation UI (`T2.2.3`), `ShareLists.vue`, `/_user/devices`, and `HistoryPlaybackPanel.vue`.**
+  Added `"history"` (`تاریخچه مسیر`) mode to `ShareDialog.vue` (`createLocationHistoryShare`, presets, custom
+  `datetime-local` range, optional `maxPoints`, `SHARE_RANGE_TOO_LARGE` error mapping, and human-readable device
+  names in the `409 PRIORITY_DEVICE_REQUIRED` chooser); rendered incoming `receivedHistory` grants with `/_user/map`
+  playback links and distinct history-grant confirmation copy in `ShareLists.vue`; preserved `targetUsername` on
+  `/_user/devices` share rows and fixed «اعمال این دستگاه برای همه» to target `currentDeviceId`; and re-read
+  companion history grants on switching into grant mode plus manual `تازه‌سازی` in `HistoryPlaybackPanel.vue`.
+- **Verification.** `925` Vitest tests (`55` `@borobiya/shared`, `484` `@borobiya/server`, `386` `@borobiya/client`),
+  `bun run lint`, `bun run typecheck`, `bun run build`, Python suites (`scripts/` + `map-server/scripts/`), and
+  `map-server/routing-gateway` Node tests all green. `P2-A1`, `P2-A2` (PostGIS/container half), and Spec rows
+  `14`–`16` remain unchecked pending live execution on the Ubuntu VM (`docs/UBUNTU_VM_RUNBOOK.md` section `6.8`).
+
+### 2026-10-23 — Post-v0.2.0 audit follow-ups: realtime share-end event, runtime-status guards, lint gate, PGlite `P2-A2` execution, and `§ 6.8` VM sign-off sheets
+
+- **Realtime share termination (`T2.1.5` follow-up).** `DELETE /_user/location/share/:id` and the 60s
+  `runLocationJobs` expiry sweep previously retired rows in PostgreSQL without notifying connected receivers,
+  leaving stale companion markers visible for up to 30 minutes (`COMPANION_DROP_AFTER_MS`) despite
+  `docs/USER_MANUAL.md` §11 promising instant stop. Both paths now emit `location:share-ended`
+  (`{ shareId, userId, reason: "revoked" | "expired" }`) to `userRoom(targetUserId)` only when a live share
+  actually transitions (`revokeShare` discriminates `revoked` vs `already-revoked` vs `not-found`;
+  `expireOverdueShares` uses `RETURNING id, owner_id, target_user_id`). On the client,
+  `useLiveCompanions` stays pure transport and delegates removal to `endCompanionShare` in
+  `packages/client/src/live/companion-locations.ts` — the single module deciding who appears on the map,
+  removing a peer immediately when its active share ends or when silence exceeds 30 minutes.
+  `shares.ts:142` (`TODO` Privacy-v2 allowlists, spec §7.4) and `socket.ts:208` (`TODO` `suspendedUntil`,
+  SECURITY §10.1) remain untouched out of Phase 2 scope as directed.
+- **Stale `v0.2.0` claims eliminated + automated drift guards.** Replaced hardcoded prose in
+  `packages/server/src/plugins/swagger.ts` with `describeOpenApiRuntimeStatus()`, derived directly from
+  `API_ROUTE_DESCRIPTORS` + `implementedKeys` (currently 30 implemented routes — including Phase 2 location
+  sharing/history/devices, Phase 3 admin catalogs, and `POST /_user/sos/requests` +
+  `POST /_user/sos/requests/:id/photo` — and 29 `contract-only` routes returning `404`). Updated
+  `docs/API.md`, `docs/ROADMAP.md`, `docs/TASKS.md`, and `docs/USER_MANUAL.md` (fixed the dangling `(§10.5)`
+  citation, fixed two broken ToC anchors, marked unimplemented client flows in `§§14–19` `— Planned` so
+  readers are not told to press an SOS button that is still open under `T3.2.4`, and reconciled `§23` against
+  `router/index.ts`), backed by new automated guards in `packages/server/src/app.test.ts` (asserting all 59
+  Fastify route definitions, OpenAPI `x-borobiya-runtime-status`, `swagger.ts` description, and `docs/API.md`
+  summary lines match) and `packages/client/src/router/index.test.ts` (asserting `docs/USER_MANUAL.md` §23
+  matches every route in `router/index.ts`).
+- **Script lint & offline test hygiene (`bun run lint`).** Resolved all Ruff (`EXE001`, `I001`, `PLW1510`)
+  and `shellcheck` (`SC2034` unused variables across `map-server/scripts/fetch-planetiler-sources.sh` and
+  `map-server/scripts/verify-map-pbf.sh`) findings, added `--skip-checks` to
+  `TestNoProxyCoversTheComposeNetwork` in `scripts/test_proxy_scripts.py` so the suite passes deterministically
+  offline, and wired `./scripts/check-repo.sh` into root `package.json` (`bun run lint`, `typecheck`, `test`,
+  `build`).
+- **Real PostgreSQL execution for `P2-A2` + runbook sign-off sheets (`§ 6.8`).** Added
+  `packages/server/src/location/p2-a2.pglite.test.ts` running all 13 journaled Drizzle migrations
+  (`0000`–`0012`) plus production `DrizzleLocationHistoryStore`, `DrizzleLocationShareStore`, `runLocationJobs`,
+  `repairStaleSharePins`, `historyWindowQuery` window functions, `CHECK` constraints, and `parseServerEnv`
+  window validation against embedded PostgreSQL (`@electric-sql/pglite`, 6/6 green). Added step-by-step two-browser
+  (`P2-A1`) and PostGIS/container (`P2-A2`) measurement and sanitized sign-off sheets in
+  `docs/UBUNTU_VM_RUNBOOK.md` § 6.8; both `P2-A1` and `P2-A2` remain unchecked in `docs/TASKS.md` pending
+  execution on the Ubuntu VM.
+
 ### 2026-10-23 — v0.2.0 released
 
 - **What went out.** Everything between `v0.1.0` (`95a88a3`, 2026-10-21) and this branch: 55 commits, 208
@@ -168,8 +240,12 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
   (share dialog, playback panel, device settings, admin catalogs) have not been exercised end to end in a
   browser by anyone; the VM applied all migrations and seeded successfully on 2026-10-23 but
   `verify-routing.sh`/`verify-geocoding.sh` are waiting on the `noProxy` fix being recreated into the
-  running containers; and `docs/MAP_SERVER.md`'s one line that SOS is "contract-only" predates T3.2.2–T3.2.3
-  and is left for the next docs pass rather than edited blind.
+  running containers; and `docs/API.md` + `packages/server/src/plugins/swagger.ts` still said SOS is
+  "contract-only" (misremembered at cut time as `docs/MAP_SERVER.md`; fixed and guarded in the post-v0.2.0
+  audit pass).
+- **Cut:** PR #4 merged into `main` as `a7fa830`, tagged with annotated tag `v0.2.0`, and published on GitHub
+  with curated release notes covering the scope since `v0.1.0` rather than dumping the full `docs/PROGRESS.md`
+  running log verbatim (`docs/WORKFLOWS.md` §7 updated accordingly).
 ### 2026-10-23 — the routing 502 was our own proxy leak, and a `noProxy` of loopback plus a CIDR exempts nothing
 
 - **The measurement killed the leading hypothesis.** The VM ran the two commands from the previous entry.

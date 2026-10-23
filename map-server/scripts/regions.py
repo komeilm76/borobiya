@@ -1678,7 +1678,7 @@ def command_verify_manifest(catalog: dict, args: argparse.Namespace) -> None:
             return False
         return all(math.isfinite(value) for value in numeric) and all(
             abs(value - float(want)) <= EPSILON
-            for value, want in zip(numeric, expected)
+            for value, want in zip(numeric, expected, strict=True)
         )
 
     if not bbox_matches(manifest.get("bbox"), resolved["bbox"]):

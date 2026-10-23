@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { randomUUID } from "node:crypto";
 import {
   HISTORY_PRUNE_BATCH_ROWS,
   HISTORY_PRUNE_MAX_BATCHES,
@@ -7,11 +8,34 @@ import {
   startLocationJobs,
   type LocationJobLogger
 } from "./jobs";
-import type { LocationShareStore } from "../db/location-share-store";
+import type { LocationShareStore, RetiredLocationShare } from "../db/location-share-store";
 import type { LocationHistoryStore } from "../db/location-history-store";
+import { SHARE_ENDED_EVENT, userRoom } from "../realtime/socket";
 
 const NOW = new Date("2026-10-21T09:00:00.000Z");
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+function retiredShares(count: number): RetiredLocationShare[] {
+  return Array.from({ length: count }, () => ({
+    id: randomUUID(),
+    ownerId: randomUUID(),
+    targetUserId: randomUUID()
+  }));
+}
+
+function makeEmitter() {
+  const emitted: { room: string; event: string; payload: unknown }[] = [];
+  return {
+    emitted,
+    io: {
+      to: (room: string) => ({
+        emit: (event: string, payload: unknown) => {
+          emitted.push({ room, event, payload });
+        }
+      })
+    }
+  };
+}
 
 function makeLogger(): LocationJobLogger & { info: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> } {
   return { info: vi.fn(), warn: vi.fn() } as unknown as LocationJobLogger & {
@@ -27,7 +51,7 @@ function makeStores(overrides: {
 } = {}) {
   return {
     shareStore: {
-      expireOverdueShares: overrides.expireOverdueShares ?? (async () => 0),
+      expireOverdueShares: overrides.expireOverdueShares ?? (async () => []),
       repairStaleSharePins: overrides.repairStaleSharePins ?? (async () => 0)
     } as unknown as LocationShareStore,
     historyStore: {
@@ -41,16 +65,19 @@ afterEach(() => {
 });
 
 describe("runLocationJobs", () => {
-  it("expires overdue shares and prunes history older than the retention window", async () => {
-    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 7);
+  it("expires overdue shares, emits share-ended per recipient, and prunes history older than the retention window", async () => {
+    const expired = retiredShares(7);
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => expired);
     const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => 2);
     const pruneOlderThan = vi.fn<LocationHistoryStore["pruneOlderThan"]>(async () => 120);
     const logger = makeLogger();
+    const { io, emitted } = makeEmitter();
 
     const outcome = await runLocationJobs({
       ...makeStores({ expireOverdueShares, repairStaleSharePins, pruneOlderThan }),
       now: () => NOW,
       retentionDays: 90,
+      io,
       logger
     });
 
@@ -67,6 +94,13 @@ describe("runLocationJobs", () => {
       prunedBatches: 1,
       failures: []
     });
+    expect(emitted).toEqual(
+      expired.map((share) => ({
+        room: userRoom(share.targetUserId),
+        event: SHARE_ENDED_EVENT,
+        payload: { shareId: share.id, userId: share.ownerId, reason: "expired" }
+      }))
+    );
     expect(logger.info).toHaveBeenCalledTimes(2);
     expect(logger.warn).not.toHaveBeenCalled();
   });
@@ -115,21 +149,25 @@ describe("runLocationJobs", () => {
     jobs.stop();
   });
 
-  it("still reports the shares it expired when the pin repair fails", async () => {
-    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 4);
+  it("still reports and emits the shares it expired when the pin repair fails", async () => {
+    const expired = retiredShares(4);
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => expired);
     const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => {
       throw new Error("device list unavailable");
     });
     const logger = makeLogger();
+    const { io, emitted } = makeEmitter();
 
     const outcome = await runLocationJobs({
       ...makeStores({ expireOverdueShares, repairStaleSharePins }),
       now: () => NOW,
       retentionDays: 90,
+      io,
       logger
     });
 
-    // The expiry statement already committed, so its count is kept and the repair retries next tick.
+    // The expiry statement already committed, so receivers are notified, its count is kept, and the repair retries next tick.
+    expect(emitted).toHaveLength(4);
     expect(outcome.expiredShares).toBe(4);
     expect(outcome.repairedPins).toBe(0);
     expect(outcome.failures).toEqual(["share-expiry"]);
@@ -182,7 +220,7 @@ describe("startLocationJobs", () => {
   it("runs due jobs on the tick and stops on demand", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
-    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 0);
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => []);
     const pruneOlderThan = vi.fn<LocationHistoryStore["pruneOlderThan"]>(async () => 0);
     const { shareStore, historyStore } = makeStores({ expireOverdueShares, pruneOlderThan });
 
@@ -249,7 +287,7 @@ describe("startLocationJobs", () => {
       maxInFlight = Math.max(maxInFlight, inFlight);
       await gate;
       inFlight -= 1;
-      return 0;
+      return [];
     });
     const { shareStore, historyStore } = makeStores({ expireOverdueShares });
     const jobs = startLocationJobs({ shareStore, historyStore, retentionDays: 90, now: () => NOW });

@@ -7,6 +7,7 @@ import type { LocationShareRecord, LocationShareStore, OwnedLocationShareRecord 
 import type { UserDeviceRecord, UserDeviceStore } from "../db/device-store";
 import type { SecurityQuestionsUserRecord, UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "../auth/user-security-questions";
+import { SHARE_ENDED_EVENT, userRoom } from "../realtime/socket";
 import { registerLocationShareRoutes, resolvePriorityDevice } from "./shares";
 
 const jwtSecret = "a".repeat(48);
@@ -115,9 +116,12 @@ async function makeApp(options: {
     }));
     return { shares, createdShareIds: shares.map((share) => share.id), reusedShareIds: [] };
   });
-  const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async () => "revoked");
+  const revokeShare = vi.fn<LocationShareStore["revokeShare"]>(async ({ shareId, ownerId: callerId }) => ({
+    status: "revoked",
+    share: { id: shareId, ownerId: callerId, targetUserId: targetId }
+  }));
   const listActiveOutgoingShares = vi.fn<LocationShareStore["listActiveOutgoingShares"]>(async () => []);
-  const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => 0);
+  const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => []);
   const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => 0);
   const listActiveShares = vi.fn<LocationShareStore["listActiveShares"]>(async () => ({
     owned: [],
@@ -137,14 +141,23 @@ async function makeApp(options: {
   const listDevices = vi.fn<UserDeviceStore["listDevices"]>(async ({ currentSessionId }) =>
     deviceRows(deviceIds, currentSessionId));
 
+  const emitted: { room: string; event: string; payload: unknown }[] = [];
+  const io = {
+    to: (room: string) => ({
+      emit: (event: string, payload: unknown) => {
+        emitted.push({ room, event, payload });
+      }
+    })
+  };
+
   const app = Fastify({ logger: false });
   await registerUserSecurityQuestionsRoute(app, {
     store: makeSecurityStore(options.user ?? userRow()),
     jwtSecret
   });
-  await registerLocationShareRoutes(app, { store, devices: { listDevices } });
+  await registerLocationShareRoutes(app, { store, devices: { listDevices }, io });
   apps.push(app);
-  return { app, assessShareTargets, createShares, revokeShare, listActiveShares, listDevices };
+  return { app, assessShareTargets, createShares, revokeShare, listActiveShares, listDevices, emitted };
 }
 
 async function authorizedHeaders() {
@@ -434,22 +447,32 @@ describe("POST /_user/location/share", () => {
 });
 
 describe("DELETE /_user/location/share/:shareId", () => {
-  it("revokes the caller's share immediately with an empty body", async () => {
-    const { app, revokeShare } = await makeApp();
+  it("revokes the caller's share immediately and notifies the recipient's room", async () => {
+    const shareId = randomUUID();
+    const { app, revokeShare, emitted } = await makeApp();
     const response = await app.inject({
       method: "DELETE",
-      url: `/_user/location/share/${targetId}`,
+      url: `/_user/location/share/${shareId}`,
       headers: await authorizedHeaders()
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("");
     expect(response.headers["cache-control"]).toBe("no-store");
-    expect(revokeShare.mock.calls[0]![0]).toEqual({ ownerId, shareId: targetId });
+    expect(revokeShare.mock.calls[0]![0]).toEqual({ ownerId, shareId });
+    expect(emitted).toEqual([
+      {
+        room: userRoom(targetId),
+        event: SHARE_ENDED_EVENT,
+        payload: { shareId, userId: ownerId, reason: "revoked" }
+      }
+    ]);
   });
 
-  it("treats an already-revoked share as a successful repeat revoke", async () => {
-    const { app } = await makeApp({ shareStore: { revokeShare: async () => "already-revoked" } });
+  it("treats an already-revoked share as a successful repeat revoke without re-emitting", async () => {
+    const { app, emitted } = await makeApp({
+      shareStore: { revokeShare: async () => ({ status: "already-revoked" }) }
+    });
     const response = await app.inject({
       method: "DELETE",
       url: `/_user/location/share/${targetId}`,
@@ -458,10 +481,13 @@ describe("DELETE /_user/location/share/:shareId", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.body).toBe("");
+    expect(emitted).toEqual([]);
   });
 
-  it("returns 404 for an unknown or foreign share id without leaking ownership", async () => {
-    const { app } = await makeApp({ shareStore: { revokeShare: async () => "not-found" } });
+  it("returns 404 for an unknown or foreign share id without leaking ownership or emitting", async () => {
+    const { app, emitted } = await makeApp({
+      shareStore: { revokeShare: async () => ({ status: "not-found" }) }
+    });
     const response = await app.inject({
       method: "DELETE",
       url: `/_user/location/share/${otherTargetId}`,
@@ -471,6 +497,7 @@ describe("DELETE /_user/location/share/:shareId", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toMatchObject({ code: "SHARE_NOT_FOUND" });
     expect(response.json().message).not.toContain("another");
+    expect(emitted).toEqual([]);
   });
 
   it("validates the path parameter and access token", async () => {

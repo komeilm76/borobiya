@@ -50,14 +50,13 @@
           />
         </div>
 
-        <div class="user-dashboard__map-caption" role="status">
-          <v-icon icon="mdi-information-outline" size="19" />
-          <span>در این نسخه نقشهٔ پایه نمایش داده می‌شود؛ نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند.</span>
+        <div class="user-dashboard__broadcast">
+          <LiveBroadcastBar />
         </div>
       </v-card>
 
       <aside class="user-dashboard__side" aria-label="وضعیت امکانات بوروبیا">
-        <ShareLists ref="shareLists" @create="shareOpen = true" />
+        <ShareLists ref="shareLists" @create="shareOpen = true" @changed="onSharesChanged" />
 
         <v-card class="user-dashboard__feature-card" elevation="0" rounded="xl">
           <v-chip class="user-dashboard__coming-soon" color="secondary" variant="tonal" size="small">
@@ -107,22 +106,30 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import ShareDialog from "@/components/sharing/ShareDialog.vue";
 import ShareLists from "@/components/sharing/ShareLists.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useAuthStore } from "@/stores/auth";
+import { useBroadcastStore } from "@/stores/broadcast";
 import { useThemeStore } from "@/stores/theme";
 
 const auth = useAuthStore();
+const broadcast = useBroadcastStore();
 const theme = useThemeStore();
 const username = computed(() => auth.user?.username ?? "همراه");
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const shareOpen = ref(false);
 const shareLists = ref<InstanceType<typeof ShareLists> | null>(null);
 
-/** The dialog reports success after a 201; the lists re-read rather than patch local state. */
+/** The dialog reports success after a 201; the lists and priority state re-read from the server. */
 function onShared(): void {
   void shareLists.value?.refresh();
+  void broadcast.refreshPriority();
+}
+
+function onSharesChanged(): void {
+  void broadcast.refreshPriority();
 }
 </script>
 
@@ -236,20 +243,8 @@ function onShared(): void {
   background: #e8efec;
 }
 
-.user-dashboard__map-caption {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.55rem;
-  padding: 0.95rem 1.3rem 1.1rem;
-  color: #718584;
-  font-size: 0.8rem;
-  line-height: 1.7;
-}
-
-.user-dashboard__map-caption :deep(.v-icon) {
-  flex: 0 0 auto;
-  margin-top: 0.08rem;
-  color: #0e6666;
+.user-dashboard__broadcast {
+  padding: 0.85rem 1rem 1rem;
 }
 
 .user-dashboard__side {

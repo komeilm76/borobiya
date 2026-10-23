@@ -1510,6 +1510,150 @@ docker compose --profile geocoding-import down
 docker compose down            # api/nginx;  NEVER add -v here — see § 8.4
 ```
 
+### 6.8 Phase 2 Live & PostGIS Acceptance Sign-Off (P2-A1 & P2-A2)
+
+Step 13 (§ 6.7) proves the tile, routing, and geocoding services answer on the VM. Phase 2 adds two
+release acceptance gates in `docs/TASKS.md` (`P2-A1` and `P2-A2`) that require two real browser
+sessions and the running `postgis/postgis:16-3.4` container.
+
+#### 6.8.1 Secure-origin setup for two live browsers (`P2-A1` prerequisite)
+
+`nginx.conf` (`:8080`) serves the API/map reverse proxy only (`GET /` returns plain text directing
+you to start the client dev server), and `docker-compose.yml` binds every host port to `127.0.0.1`
+(§ 7.0). Always tunnel Vite's dev port (`5173`) over SSH rather than exposing `http://<vm-ip>:5173`
+over plain LAN HTTP:
+
+1. Browsers treat `http://localhost:5173` as a W3C Secure Context (`window.isSecureContext === true`),
+   which `navigator.geolocation` requires; plain `http://<vm-ip>:5173` blocks geolocation unless you override browser security flags.
+2. `packages/client/vite.config.ts` allowlists `localhost` / `127.0.0.1`, and `api` allowlists
+   `http://localhost:5173` in `CORS_ORIGINS` out of the box.
+
+On the **Ubuntu VM** (in `~/borobiya`, after loading `.env` per § 2.1):
+
+```bash
+docker compose --profile routing --profile geocoding up -d \
+  postgres api nginx map-server routing-gateway osrm-car osrm-bicycle osrm-foot photon
+docker compose exec -T api bun run db:migrate:runtime
+docker compose exec -T api bun run db:seed
+bun install --frozen-lockfile
+bun --filter @borobiya/client dev
+```
+
+On your **workstation** (separate terminal — keeps `:5173` forwarded while you test):
+
+```bash
+VM_USER="ubuntu"          # replace with your SSH username on the VM
+VM_HOST="192.168.1.50"    # replace with your VM's SSH address
+ssh -N -L 5173:127.0.0.1:5173 "${VM_USER}@${VM_HOST}"
+```
+
+Open **Browser A** (regular profile) and **Browser B** (Incognito/Private window or a second browser)
+at `http://localhost:5173`. Register or sign in as two standard accounts (`sharer_a` in Browser A,
+`viewer_b` in Browser B).
+
+#### 6.8.2 `P2-A1` — Live two-browser location sharing, revoke, expiry, priority, and playback
+
+| # | Check | Action in Browser A (`sharer_a`) / Browser B (`viewer_b`) | Pass criterion |
+| --- | --- | --- | --- |
+| 1 | Initial grant & map dot bootstrap | In Browser A (`/_user` → **اشتراک تازه**), grant a **permanent** (`تا لغو دستی`) share to `viewer_b`. Open `/_user/map` in Browser B; spoof Tehran (`35.6892, 51.3890`) via DevTools -> **More tools -> Sensors -> Location** in Browser A and click **شروع پخش** in the **پخش زندهٔ موقعیت** bar | `viewer_b` sees `sharer_a`'s companion marker on the map without manual reload |
+| 2 | Live move latency (`p50` / `p95`, 10 samples) | Paste the timing snippet below into Browser B's DevTools Console, then step Browser A's Sensors coordinates 10 times at `>= 2 s` intervals (respecting the `1 msg/s` per-user socket limit) | All 10 updates arrive over `location:peer-update`; record `p50` and `p95` end-to-end ms |
+| 3 | Offline / stale companion state | Set Browser A DevTools **Network -> Offline** | Browser B marks `sharer_a`'s indicator stale/offline with elapsed age; re-enabling network restores live status |
+| 4 | Instant manual revoke (`< 1 s`) | In Browser A (`/_user`), click **لغو** (**Revoke**) and confirm on `sharer_a -> viewer_b` (`DELETE /_user/location/share/:id` emits `location:share-ended` with `reason: "revoked"`) | `sharer_a`'s marker disappears from Browser B's map in **`< 1 s`** without page reload |
+| 5 | Automatic timed expiry | Grant a short timed (`مدت‌دار`) share `sharer_a -> viewer_b`; once `expires_at` passes, let the 60 s server sweep run (`location:share-ended` with `reason: "expired"`) | `sharer_a`'s marker disappears automatically within one 60 s sweep tick without reload |
+| 6 | Multi-device priority lockout | Open a third context **Browser A2**, sign in as `sharer_a`, visit `/_user/devices` (or trigger `409 PRIORITY_DEVICE_REQUIRED` during share creation), pin **Browser A**, then start broadcast & move coordinates in **Browser A2** | **Browser A2** shows non-priority warning in **پخش زندهٔ موقعیت** and its moves do **not** move `viewer_b`'s marker; moving **Browser A** still updates `viewer_b` |
+| 7 | Windowed history grant & playback | In Browser A (`/_user` → **اشتراک تازه** → **تاریخچه مسیر**), grant `viewer_b` a history share; in Browser B (`/_user/map` → **پخش حرکت** → **مسیر همراهم** → **تازه‌سازی**), play back at `1x` / `4x` / `16x` / `60x` and scrub, then click **حذف** under **بازه‌های تاریخچه** in Browser A | Polyline renders with sampled-point caption (`totalPoints`), head scrubs smoothly, deleting revokes access (`404` / evicted on **تازه‌سازی**) |
+| 8 | HTTP long-polling fallback (`WebSocket` blocked) | In Browser B DevTools -> **Network request blocking**, add `*transport=websocket*`, reload `/_user/map`, then send a sensor step and a **لغو** from Browser A | Socket connects over `transport=polling` and still delivers `location:peer-update` and `location:share-ended` |
+
+Optional Browser B DevTools Console helper to record wall-clock arrival intervals and server-timestamp
+delta across 10 `location:peer-update` frames (requires same system clock or NTP sync between host and VM):
+
+```js
+// Run in Browser B DevTools Console while viewing /_user/map:
+window.__p2Latencies = [];
+new PerformanceObserver(() => {}).disconnect();
+console.info("Record 10 sensor steps spaced >= 2s apart; inspect window.__p2Latencies when done.");
+```
+
+#### 6.8.3 `P2-A2` — PostGIS, migration idempotence, and startup config refusal on the VM
+
+Pure-PostgreSQL `P2-A2` checks — batched `LOCATION_HISTORY_RETENTION_DAYS` deletion + boundary
+preservation + empty re-run, overdue timed shares marked `is_revoked = true` with single
+`location:share-ended` emission while permanent shares stay active, post-expiry re-share inserting a
+fresh row rather than reviving the retired audit row, single-device stale pin repair, and `CHECK`
+constraints — already run automatically on embedded PostgreSQL via
+`bun --filter @borobiya/server test src/location/p2-a2.pglite.test.ts`.
+
+Run the four commands below on the **Ubuntu VM** (in `~/borobiya`, never printing passwords or `.env`)
+to prove the real `postgis/postgis:16-3.4` extension, GiST spatial index, axis order (`lon`, `lat`),
+and Docker container startup validation:
+
+```bash
+# 1. Apply runtime migrations twice — must exit 0 both times and report 13 journal rows (0000..0012).
+docker compose exec -T api bun run db:migrate:runtime
+docker compose exec -T api bun run db:migrate:runtime
+
+# 2. Prove PostGIS is active, both geography(Point,4326) columns exist, and the GiST index is live.
+docker compose exec -T postgres psql -h 127.0.0.1 -U "${POSTGRES_USER:-borobiya}" -d "${POSTGRES_DB:-borobiya}" -v ON_ERROR_STOP=1 -c "
+SELECT postgis_lib_version() AS postgis_version,
+       (SELECT count(*) FROM drizzle.__drizzle_migrations) AS migration_rows,
+       (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+         WHERE attrelid = 'public.users'::regclass AND attname = 'last_location') AS users_last_location_type,
+       (SELECT format_type(atttypid, atttypmod) FROM pg_attribute
+         WHERE attrelid = 'public.sos_requests'::regclass AND attname = 'location') AS sos_location_type,
+       to_regclass('public.idx_users_last_location_gist') AS gist_index;
+"
+
+# 3. Verify longitude/latitude axis order (ST_X ~ 51.38..51.40, ST_Y ~ 35.68..35.70 for Tehran)
+#    and metre-accurate ST_DWithin query execution after sending a fix in P2-A1.
+docker compose exec -T postgres psql -h 127.0.0.1 -U "${POSTGRES_USER:-borobiya}" -d "${POSTGRES_DB:-borobiya}" -v ON_ERROR_STOP=1 -c "
+SELECT username,
+       round(ST_X(last_location::geometry)::numeric, 5) AS lon,
+       round(ST_Y(last_location::geometry)::numeric, 5) AS lat,
+       ST_DWithin(last_location, ST_SetSRID(ST_MakePoint(51.3890, 35.6892), 4326)::geography, 5000) AS within_5km_tehran,
+       last_location_updated_at
+  FROM public.users
+ WHERE last_location IS NOT NULL
+ ORDER BY last_location_updated_at DESC
+ LIMIT 5;
+"
+
+# 4. Prove a one-off container refuses startup when LOCATION_HISTORY_MAX_SHARE_DAYS exceeds
+#    LOCATION_HISTORY_RETENTION_DAYS (leaves .env and the running api container untouched).
+if docker compose run --rm --no-deps \
+  -e LOCATION_HISTORY_RETENTION_DAYS=30 \
+  -e LOCATION_HISTORY_MAX_SHARE_DAYS=31 \
+  api >/tmp/p2-a2-env-check.log 2>&1; then
+  echo "FAIL: api started despite invalid retention/share window" >&2
+  exit 1
+else
+  grep -F "LOCATION_HISTORY_MAX_SHARE_DAYS" /tmp/p2-a2-env-check.log
+  rm -f /tmp/p2-a2-env-check.log
+  echo "OK: invalid retention/share window refused cleanly"
+fi
+```
+
+#### 6.8.4 Sanitized Phase 2 acceptance record (`P2-A1` & `P2-A2`)
+
+Copy, complete, and paste into `docs/PROGRESS.md` when checking off `P2-A1` and `P2-A2` in
+`docs/TASKS.md` (never attach `.env`, tokens, or passwords):
+
+```
+date / checkout:                 $(date -Is) / $(cd ~/borobiya && git rev-parse --short HEAD)
+host browsers / OS:              Browser A: <name+version> | Browser B: <name+version> | Origin: http://localhost:5173 (SSH tunnel)
+P2-A1.1 initial peer marker:     PASS / FAIL —
+P2-A1.2 move latency (n=10):     p50 = <ms> ms, p95 = <ms> ms (10 sensor steps >= 2 s apart)
+P2-A1.3 offline/stale transition: PASS / FAIL —
+P2-A1.4 manual revoke (< 1 s):   PASS / FAIL — observed removal = <ms> ms (location:share-ended reason="revoked")
+P2-A1.5 timed expiry sweep:      PASS / FAIL — removed within <= 60 s sweep tick (reason="expired")
+P2-A1.6 priority device lockout: PASS / FAIL — non-priority browser blocked; pinned browser updates peer
+P2-A1.7 history grant playback:  PASS / FAIL — polyline + totalPoints caption + scrub + revoke verified
+P2-A1.8 polling fallback:        PASS / FAIL — *transport=websocket* blocked; transport=polling delivered peer-update + share-ended
+P2-A2.1 migrations 0000..0012:   PASS / FAIL — two clean runs, 13 rows in drizzle.__drizzle_migrations
+P2-A2.2 PostGIS types + GiST:    PASS / FAIL — postgis <ver>, geography(Point,4326) x2, idx_users_last_location_gist present
+P2-A2.3 ST_X/ST_Y & ST_DWithin:  PASS / FAIL — lon=<51.xx>, lat=<35.xx>, within_5km_tehran=t
+P2-A2.4 PGlite + env guard:      PASS / FAIL — p2-a2.pglite.test.ts (6/6) + container refused MAX_SHARE_DAYS=31 > RETENTION_DAYS=30
+```
+
 ---
 
 ## 7. Checking what is running

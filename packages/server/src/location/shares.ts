@@ -8,6 +8,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareRecord, LocationShareStore, ShareTargetAssessment } from "../db/location-share-store";
 import type { UserDeviceStore } from "../db/device-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
+import { emitShareEnded, type RoomEmitter } from "../realtime/socket";
 
 const MINUTE_MS = 60_000;
 
@@ -15,6 +16,7 @@ export interface LocationSharesRouteDependencies {
   store: LocationShareStore;
   /** Live sessions of the caller, i.e. the `activeDevices` set spec §7.3 counts. */
   devices: Pick<UserDeviceStore, "listDevices">;
+  io?: RoomEmitter;
 }
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -241,8 +243,6 @@ export async function registerLocationShareRoutes(
       });
   });
 
-  // TODO (T2.1.5 follow-up): the Socket.IO fan-out exists now, but there is no share-state event
-  // yet, so a revoked share's marker clears on the receiver's next list refresh rather than at once.
   app.delete(revokeRoute.url, async (request, reply) => {
     const user = currentUserIdentity(request);
     if (!user) {
@@ -264,13 +264,17 @@ export async function registerLocationShareRoutes(
       ownerId: user.userId,
       shareId: parsedParams.data.shareId
     });
-    if (outcome === "not-found") {
+    if (outcome.status === "not-found") {
       return sendError(
         reply,
         404,
         "SHARE_NOT_FOUND",
         "No share with that id belongs to this account."
       );
+    }
+
+    if (outcome.status === "revoked") {
+      emitShareEnded(dependencies.io, outcome.share, "revoked");
     }
 
     // An already-revoked id repeats the successful outcome so a retried revoke stays idempotent.

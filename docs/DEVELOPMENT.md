@@ -206,6 +206,10 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
 | `bun run dev` | root | Runs the API and Vite client concurrently with Bun's workspace runner; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
+| `bun run lint` | root | Runs `./scripts/check-repo.sh`: `bash -n` and `shellcheck` across `scripts/*.sh` and `map-server/scripts/*.sh`, `ruff` across both Python script trees, and `scripts/check_runbook_markdown.py` across `docs/*.md` and `README.md` |
+| `bun run typecheck` | root | Typechecks `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
+| `bun run test` | root | Runs the Vitest suites in `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
+| `bun run build` | root | Builds the `@borobiya/client` production bundle |
 | `bun --filter @borobiya/server dev` | root | Fastify API with database-backed auth, recovery, session, and account routes (`bun --watch`) |
 | `bun --filter @borobiya/server test` | root | Server environment and Fastify inject tests |
 | `bun --filter @borobiya/server typecheck` | root | Strict server TypeScript check |

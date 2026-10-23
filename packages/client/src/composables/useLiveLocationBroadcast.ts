@@ -1,6 +1,6 @@
-import { computed, onScopeDispose, ref, watch } from "vue";
+import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import { useGeolocation } from "@vueuse/core";
-import { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT, createRealtimeClient, type RealtimeClient } from "../services/socket";
+import { LOCATION_UPDATE_EVENT, PEER_UPDATE_EVENT, type RealtimeClient } from "../services/socket";
 import { useAuthStore } from "../stores/auth";
 import {
   LOCATION_UPDATE_INTERVAL_MS,
@@ -12,138 +12,303 @@ import { ownDeviceId } from "./device-identity";
 
 export type BroadcastStatus = "idle" | "connecting" | "broadcasting" | "stopped" | "rejected";
 
+export interface BroadcastGeolocationSource {
+  readonly coords: Ref<{
+    latitude: number | null;
+    longitude: number | null;
+    accuracy: number | null;
+  } | null>;
+  readonly error?: Ref<{ readonly code?: number; readonly message?: string } | null>;
+  readonly isSupported: Ref<boolean> | ComputedRef<boolean>;
+  resume?: () => void;
+  pause?: () => void;
+}
+
+export interface UseLiveLocationBroadcastOptions {
+  accessToken?: Ref<string | null> | ComputedRef<string | null>;
+  /** Refreshes an expired access token via the HttpOnly refresh cookie when a socket auth check fails. */
+  ensureSession?: () => Promise<void>;
+  geolocation?: BroadcastGeolocationSource;
+  openSocket?: (token: string) => RealtimeClient | Promise<RealtimeClient>;
+  now?: () => number;
+  intervalMs?: number;
+}
+
+function geolocationErrorCode(error: { readonly code?: number } | null | undefined): string {
+  // GeolocationPositionError.PERMISSION_DENIED === 1 in W3C Geolocation API.
+  return error?.code === 1 ? "GEOLOCATION_DENIED" : "GEOLOCATION_UNAVAILABLE";
+}
+
 /**
  * Owns the "my device is broadcasting my position" side of live sharing (T2.1.5): a single
- * Socket.IO connection, a throttled `location:update` every 3-5s, and the server's rejection
- * codes surfaced so a UI can explain why a broadcast stopped.
- *
- * The peer/recipient side (live markers T2.1.8, history playback T2.2.6) belongs to `/_user/map`.
+ * Socket.IO connection, a throttled `location:update` every 3-5s, hardware GPS start/stop symmetry,
+ * stationary heartbeat keepalive, and automatic access-token refresh on 15m JWT expiry.
  */
-export function useLiveLocationBroadcast() {
-  const auth = useAuthStore();
-  const geolocation = useGeolocation({ enableHighAccuracy: true, maximumAge: LOCATION_UPDATE_INTERVAL_MS });
+export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOptions = {}) {
+  const auth = options.accessToken ? null : useAuthStore();
+  const accessToken = options.accessToken ?? computed(() => auth!.accessToken);
+  const ensureSession = options.ensureSession ?? (auth ? () => auth.ensureSession() : undefined);
+  const clock = options.now ?? (() => Date.now());
+  const intervalMs = options.intervalMs ?? LOCATION_UPDATE_INTERVAL_MS;
+  const openSocket =
+    options.openSocket ??
+    (async (token: string) => {
+      const { createRealtimeClient } = await import("../services/socket");
+      return createRealtimeClient(token);
+    });
+  // `immediate: false` prevents waking GPS hardware or prompting for location permission before the
+  // user explicitly clicks "Start live broadcast", and lets `stop()` release the watcher immediately.
+  const geolocation: BroadcastGeolocationSource =
+    options.geolocation ??
+    (useGeolocation({
+      enableHighAccuracy: true,
+      maximumAge: intervalMs,
+      immediate: false
+    }) as unknown as BroadcastGeolocationSource);
 
   const status = ref<BroadcastStatus>("idle");
   const lastErrorCode = ref<string | null>(null);
   const lastSentAt = ref<number | null>(null);
   const peerCount = ref(0);
 
-  // VueUse exposes the coordinates but not the position timestamp, so the age of a fix is
-  // measured from the moment this tab received it.
   const sampledAt = ref<number | null>(null);
-
+  let hasLiveFix = false;
   let client: RealtimeClient | null = null;
   let ticker: ReturnType<typeof setInterval> | null = null;
+  let generation = 0;
+  let refreshingAuth = false;
 
   function requireToken(): string | null {
-    return auth.accessToken;
+    return accessToken.value;
   }
 
-  function ensureClient(): RealtimeClient | null {
+  function clearTicker(): void {
+    if (ticker !== null) {
+      clearInterval(ticker);
+      ticker = null;
+    }
+  }
+
+  async function tryRecoverAuth(): Promise<boolean> {
+    if (!ensureSession || refreshingAuth) return false;
+    const previousToken = requireToken();
+    refreshingAuth = true;
+    try {
+      await ensureSession();
+      const nextToken = requireToken();
+      if (!nextToken || nextToken === previousToken) return false;
+      client?.updateToken(nextToken);
+      client?.connect();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshingAuth = false;
+    }
+  }
+
+  function onConnect(): void {
+    if (status.value === "connecting") {
+      status.value = "broadcasting";
+      sendPendingUpdate();
+    }
+  }
+
+  function onDisconnect(): void {
+    if (status.value === "broadcasting") status.value = "connecting";
+  }
+
+  async function onConnectError(error?: { data?: { code?: unknown } }): Promise<void> {
+    const code = typeof error?.data?.code === "string" ? error.data.code : null;
+    if (await tryRecoverAuth()) return;
+    if (status.value === "connecting" || status.value === "broadcasting") {
+      clearTicker();
+      geolocation.pause?.();
+      lastErrorCode.value = code;
+      status.value = "rejected";
+    }
+  }
+
+  function teardownClient(): void {
+    generation += 1;
+    if (!client) return;
+    client.socket.off("connect", onConnect);
+    client.socket.off("disconnect", onDisconnect);
+    client.socket.off("connect_error", onConnectError);
+    client.close();
+    client = null;
+  }
+
+  async function ensureClient(): Promise<RealtimeClient | null> {
     const token = requireToken();
     if (!token) return null;
-    if (!client) {
-      client = createRealtimeClient(token);
-      client.socket.on("connect_error", () => {
-        if (status.value === "connecting") status.value = "rejected";
-      });
-      client.socket.on("connect", () => {
-        if (status.value === "connecting") status.value = "broadcasting";
-      });
-      client.socket.on("disconnect", () => {
-        if (status.value === "broadcasting") status.value = "connecting";
-      });
-    } else {
+    if (client) {
       client.updateToken(token);
+      return client;
     }
+    const currentGeneration = ++generation;
+    const opened = await openSocket(token);
+    if (currentGeneration !== generation) {
+      opened.close();
+      return null;
+    }
+    client = opened;
+    client.socket.on("connect", onConnect);
+    client.socket.on("disconnect", onDisconnect);
+    client.socket.on("connect_error", onConnectError);
     return client;
   }
 
   function sendPendingUpdate(): void {
     const activeClient = client;
     if (!activeClient?.socket.connected) return;
+    if (geolocation.error?.value) return;
 
+    const currentNow = clock();
     const deviceId = ownDeviceId(requireToken());
     if (!deviceId) {
-      // Without a session device id the server can only answer WRONG_DEVICE, so stop instead of
-      // burning the share rate limit on updates that are guaranteed to be ignored.
       status.value = "rejected";
       lastErrorCode.value = "PRIORITY_DEVICE_REQUIRED";
       stop();
       return;
     }
 
+    // While actively watching live geolocation without error, keep stationary users alive at the
+    // heartbeat interval instead of letting `sampledAt` go stale > 60s when standing still.
+    const effectiveSampledAt =
+      hasLiveFix && sampledAt.value !== null
+        ? Math.max(sampledAt.value, currentNow - intervalMs)
+        : sampledAt.value ?? undefined;
+
     const payload = buildLocationUpdate(
-      { coords: geolocation.coords.value ?? null, timestamp: sampledAt.value ?? undefined },
-      { deviceId }
+      { coords: geolocation.coords.value ?? null, timestamp: effectiveSampledAt },
+      { deviceId, now: currentNow }
     );
     if (!payload) return;
-    if (!shouldSendUpdate({ lastSentAt: lastSentAt.value, now: Date.now() })) return;
+    if (!shouldSendUpdate({ lastSentAt: lastSentAt.value, now: currentNow, intervalMs })) return;
 
-    const sentAt = Date.now();
-    activeClient.socket.timeout(5_000).emit(LOCATION_UPDATE_EVENT, payload, (error: Error | null, ack: unknown) => {
+    activeClient.socket.timeout(5_000).emit(LOCATION_UPDATE_EVENT, payload, async (error: Error | null, ack: unknown) => {
       const outcome = error ? { ok: false, code: "SOCKET_TIMEOUT" } : describeAck(ack);
+      if (!outcome.ok && (outcome.code === "UNAUTHORIZED" || outcome.code === "INVALID_ACCESS_TOKEN")) {
+        if (await tryRecoverAuth()) return;
+      }
       lastErrorCode.value = outcome.code;
       status.value = outcome.ok ? "broadcasting" : "rejected";
-      if (outcome.ok) {
-        lastSentAt.value = sentAt;
-        const peers = (ack as { peers?: unknown } | undefined)?.peers;
-        peerCount.value = Array.isArray(peers) ? peers.length : 0;
+      if (!outcome.ok) {
+        clearTicker();
+        geolocation.pause?.();
+        return;
       }
+      lastSentAt.value = currentNow;
+      const peers = (ack as { peers?: unknown } | undefined)?.peers;
+      peerCount.value = Array.isArray(peers) ? peers.length : 0;
     });
   }
 
-  function start(): void {
+  async function start(): Promise<void> {
     if (status.value === "broadcasting" || status.value === "connecting") return;
-    const activeClient = ensureClient();
-    if (!activeClient) {
+    if (!geolocation.isSupported.value) {
+      status.value = "rejected";
+      lastErrorCode.value = "GEOLOCATION_UNAVAILABLE";
+      return;
+    }
+    const token = requireToken();
+    if (!token) {
       status.value = "rejected";
       lastErrorCode.value = "UNAUTHORIZED";
       return;
     }
 
     lastErrorCode.value = null;
-    status.value = activeClient.socket.connected ? "broadcasting" : "connecting";
-    activeClient.connect();
-    if (status.value === "broadcasting") sendPendingUpdate();
-    ticker ??= setInterval(sendPendingUpdate, LOCATION_UPDATE_INTERVAL_MS);
+    hasLiveFix = geolocation.coords.value !== null && Number.isFinite(geolocation.coords.value.latitude);
+    if (hasLiveFix && sampledAt.value === null) sampledAt.value = clock();
+    status.value = "connecting";
+    geolocation.resume?.();
+    ticker ??= setInterval(sendPendingUpdate, intervalMs);
+
+    const activeClient = await ensureClient();
+    if (!activeClient) {
+      if (status.value === "connecting") {
+        clearTicker();
+        geolocation.pause?.();
+        status.value = "rejected";
+        lastErrorCode.value = "UNAUTHORIZED";
+      }
+      return;
+    }
+
+    if (activeClient.socket.connected) {
+      status.value = "broadcasting";
+      sendPendingUpdate();
+    } else {
+      activeClient.connect();
+    }
   }
 
   function stop(): void {
-    if (ticker) {
-      clearInterval(ticker);
-      ticker = null;
-    }
+    clearTicker();
+    hasLiveFix = false;
+    geolocation.pause?.();
     if (status.value !== "rejected") status.value = "stopped";
   }
 
-  // A rotated access token must not keep a socket bound to the previous session.
+  function toggle(): void {
+    if (status.value === "connecting" || status.value === "broadcasting") stop();
+    else void start();
+  }
+
   watch(
-    () => auth.accessToken,
+    () => accessToken.value,
     (token) => {
       if (!token) {
         stop();
-        client?.close();
-        client = null;
+        status.value = "idle";
+        lastErrorCode.value = null;
+        lastSentAt.value = null;
+        peerCount.value = 0;
+        sampledAt.value = null;
+        teardownClient();
         return;
       }
       client?.updateToken(token);
+      if ((status.value === "connecting" || status.value === "broadcasting") && client && !client.socket.connected) {
+        client.connect();
+      }
     }
   );
 
   watch(
     () => geolocation.coords.value,
-    () => {
-      sampledAt.value = Date.now();
-      if (status.value === "broadcasting") sendPendingUpdate();
+    (coords) => {
+      if (coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
+        hasLiveFix = true;
+        sampledAt.value = clock();
+        if (status.value === "broadcasting") sendPendingUpdate();
+      }
     },
     { deep: true }
   );
 
+  if (geolocation.error) {
+    watch(
+      () => geolocation.error!.value,
+      (geoError) => {
+        if (!geoError) return;
+        if (status.value === "connecting" || status.value === "broadcasting") {
+          clearTicker();
+          geolocation.pause?.();
+          lastErrorCode.value = geolocationErrorCode(geoError);
+          status.value = "rejected";
+        }
+      }
+    );
+  }
+
   onScopeDispose(() => {
-    stop();
-    client?.close();
-    client = null;
+    clearTicker();
+    hasLiveFix = false;
+    geolocation.pause?.();
+    teardownClient();
   });
 
   return {
@@ -154,6 +319,7 @@ export function useLiveLocationBroadcast() {
     isSupported: computed(() => geolocation.isSupported.value),
     start,
     stop,
+    toggle,
     PEER_UPDATE_EVENT
   };
 }
