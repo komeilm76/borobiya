@@ -742,39 +742,104 @@ The whole stack runs **offline** once built. The internet is needed only for ste
 route, the only fix is a proxy — and a wrong proxy is worse than no proxy, because every failure
 then looks like a broken link. So: set it, **prove it works**, and remove it afterwards.
 
-The `192.168.x.x` examples below are VMware NAT with the VM inside the host's own NAT block.
-Discover the gateway instead of assuming one — on the VM, `ip route show default` prints it in the
-`via` field, and your workstation *is* the host:
+Whether the gateway is the right address depends on VMware's network mode, and the wrong answer
+here looks exactly like a broken proxy. Work out which case you are in **before** setting anything:
+
+| VM adapter | VM address | What `PROXY_HOST` must be |
+| --- | --- | --- |
+| **NAT** (VMnet8, e.g. `192.168.66.x`) | inside the host's NAT block | the default gateway — the host's VMware adapter *is* that address |
+| **Bridged** (VM on the physical LAN, e.g. `192.168.100.x`) | same subnet as the host's Wi-Fi/Ethernet | **the host's LAN address** — `ip route`'s `via` here is your *router*, which has no proxy on it |
+| Host-only (VMnet1) | `192.168.132.x` | the host's VMnet1 address; the VM has no other egress at all |
 
 ```bash
-PROXY_HOST="$(ip route show default | awk '{print $3; exit}')"
-echo "host address: $PROXY_HOST"
+ip -4 addr show scope global            # the VM's own address and mask
+ip route show default                   # `via` = the gateway (the host only in NAT mode)
 ```
 
-If `ip route` prints no `via`, the VM has a direct route and you should not configure a proxy. If
-your host's IP is not in `ip addr show` (bridged VM, separate LAN), use that host's LAN IP and
-open the port in the host firewall — VMware's own NAT device will not forward it. If the proxy
-needs authentication, URL-encode the credentials
-(`http://user%40corp:p%40ss@$PROXY_HOST:3128` — `@` and `:` both become `%40`/`%3A`).
+In bridged mode the address you want is the one your *host* reports for the same interface family —
+on Windows, `ipconfig`'s IPv4 address for the adapter the VM is bridged onto. Write both numbers down
+from the two machines before continuing: they must share a subnet, or nothing below can work.
+
+Then prove the proxy port is reachable **before** configuring anything, because a refused socket is a
+different problem from a broken download:
+
+```bash
+PROXY_HOST="192.168.100.225"      # the host address you just confirmed
+PROXY_PORT="2080"                # whatever the client is listening on
+timeout 5 bash -c "</dev/tcp/$PROXY_HOST/$PROXY_PORT"   && echo "port open: the proxy accepts connections from the VM"   || echo "refused or filtered — see § 5.1a, do not go further yet"
+```
+
+Two ways to end up here with the right IP and the wrong result, both on a Windows host: the proxy is
+bound to `127.0.0.1` (so nothing outside the host can reach it), or Windows Firewall has no inbound
+rule for that port. **A timeout means the firewall is dropping; a "Connection refused" means nothing
+is listening on that address.** Fix that first (§ 5.1a) — setting `http_proxy` to a port nobody
+listens on turns every later error into a 5-second hang instead of an explanation.
+
+If `ip route` prints no `via` at all, the VM has a direct route and you should not configure a proxy.
+If the proxy needs authentication, URL-encode the credentials
+(`http://user%40corp:p%40ss@$PROXY_HOST:$PROXY_PORT` — `@` and `:` both become `%40`/`%3A`).
+
+### 5.1a When the port is not reachable from the VM (Windows host)
+
+Proxy clients usually bind loopback only, and a VM is *not* loopback. Two fixes, in order of
+preference — both belong to the host, not to this repository:
+
+1. **Enable the client's "allow connections from LAN" option**, which makes it bind `0.0.0.0`
+   instead of `127.0.0.1`. Confirm on Windows with `netstat -ano | findstr :2080`: `0.0.0.0:2080`
+   means it worked, `127.0.0.1:2080` means it did not (or the client needs a restart). Then allow the
+   port in the firewall for the LAN only — an elevated PowerShell:
+
+   ```powershell
+   New-NetFirewallRule -DisplayName "proxy for VM" -Direction Inbound -Action Allow `
+     -Protocol TCP -LocalPort 2080 -RemoteAddress 192.168.100.0/24 -Profile Any
+   ```
+
+2. **If the client cannot bind outside loopback, forward it on the host** with the built-in
+   `netsh` port proxy (needs the IP Helper service running, and admin rights to add):
+
+   ```powershell
+   netsh interface portproxy add v4tov4 listenaddress=192.168.100.225 listenport=2080 `
+     connectaddress=127.0.0.1 connectport=2080
+   netsh interface portproxy show all      # and the same firewall rule as above
+   ```
+
+   Remove it with `netsh interface portproxy delete v4tov4 listenaddress=192.168.100.225
+   listenport=2080`. A mixed HTTP+SOCKS listener (the usual single-port setup) is fine for
+   everything here, because `apt`, `curl`, `git` and Docker all speak HTTP `CONNECT`; a
+   **SOCKS-only** port is not — `apt` and the Docker daemon cannot use one, so get an HTTP port
+   before continuing rather than working around it.
+
+Either way, re-run the `/dev/tcp` probe above until it prints `port open`, and only then set
+`PROXY_HOST`/`PROXY_PORT` for real.
 
 ### 5.1 Set it for the terminal (covers `apt`, `curl`, `wget`, `git` and the download scripts)
 
 ```bash
-export http_proxy="http://$PROXY_HOST:3128" https_proxy="http://$PROXY_HOST:3128" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
-export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"
+: "${PROXY_HOST:=$(ip route show default | awk '/default/{print $3; exit}')}"   # § 5's one-liner
+: "${PROXY_PORT:=3128}"
+printf 'using http://%s:%s — on a bridged VM that address is your router, not your host;\n' "$PROXY_HOST" "$PROXY_PORT"
+printf 'if that is wrong, export PROXY_HOST (and PROXY_PORT) and re-run this block.\n'
+export http_proxy="http://$PROXY_HOST:$PROXY_PORT" https_proxy="http://$PROXY_HOST:$PROXY_PORT" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
+export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy" all_proxy="$http_proxy" ALL_PROXY="$https_proxy"
 # Persist it, delimited so removal can be exact (never pattern-delete a file you did not write):
 sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc      # drop a previous block
 {
   printf '# >>> borobiya proxy >>>\n'
-  printf 'export http_proxy="http://%s:3128" https_proxy="http://%s:3128" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_HOST"
+  printf 'export http_proxy="http://%s:%s" https_proxy="http://%s:%s" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT"
   printf 'export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"\n'
+  printf 'export all_proxy="$http_proxy" ALL_PROXY="$https_proxy"\n'
   printf '# <<< borobiya proxy <<<\n'
 } >> ~/.bashrc
 ```
 
 `no_proxy` must cover the pinned `172.30.0.0/24` Docker subnet and loopback, or every local
 `curl` health check and verification in steps 12–13 goes out to the proxy and comes back refused.
-Note that the exported values only affect **new** processes you start; an already-running
+Two honest caveats about that list: **curl matches hostnames and suffixes, and its support for CIDR
+ranges in `no_proxy` is newer than Ubuntu 24.04's curl**, so treat the `localhost,127.0.0.1` entries as
+the ones doing the work — which is enough, because every check in this runbook reaches local services
+by the name `localhost` (`verify-tiles.sh` uses `http://localhost:8000`, the gateway probes use
+`127.0.0.1`). The Docker daemon is a Go program and *does* understand the CIDR form, which is why § 5.3
+keeps it. And the exported values only affect **new** processes you start; an already-running
 `setup-ubuntu-vm.sh` will not pick them up.
 
 ### 5.2 Verify that the proxy itself works
@@ -812,16 +877,49 @@ Item 6 is the one that surprises people: `docker pull` failing while `curl` is f
 
 ```bash
 # apt (system-wide; a per-command -o Acquire::http::Proxy="…" also works):
-printf 'Acquire::http::Proxy "http://%s:3128";\nAcquire::https::Proxy "http://%s:3128";\n' "$PROXY_HOST" "$PROXY_HOST" | sudo tee /etc/apt/apt.conf.d/95proxy
+printf 'Acquire::http::Proxy "http://%s:%s";\nAcquire::https::Proxy "http://%s:%s";\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/apt/apt.conf.d/95proxy
 # Docker daemon — systemd does not read your shell environment, so it needs a drop-in:
 sudo mkdir -p /etc/systemd/system/docker.service.d
-printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:3128"\nEnvironment="HTTPS_PROXY=http://%s:3128"\nEnvironment="NO_PROXY=localhost,127.0.0.1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_HOST" | sudo tee /etc/systemd/system/docker.service.d/proxy.conf
+printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:%s"\nEnvironment="HTTPS_PROXY=http://%s:%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/systemd/system/docker.service.d/proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
 ```
 
 A **restart of Docker takes the running stack with it** — do it before step 12, or re-run
 `docker compose up -d` afterwards. If a pull still fails, also check for a stale
 `~/.docker/config.json` proxy block and `~/.wgetrc`.
+
+**Pulls and builds are two separate settings.** The drop-in above lets the *daemon* fetch images, but a
+`RUN` line in a Dockerfile executes inside the build container, which inherits neither your shell
+environment nor that `[Service]` block. Step 12 builds `borobiya/photon:1.3.0` and the api image, and
+the api build runs `bun install --frozen-lockfile --production` — so a proxied VM needs one more
+configuration for that to work. The client-side `proxies` default is the setting that reaches build
+containers, and it needs no change to the Compose file:
+
+```bash
+if [ -z "${PROXY_HOST:-}" ] || [ -z "${PROXY_PORT:-}" ]; then
+  echo "set PROXY_HOST and PROXY_PORT first (§ 5.1) — refusing to write an empty host into ~/.docker/config.json"
+else
+python3 - "$PROXY_HOST" "$PROXY_PORT" <<'JSONW'
+import json, os, pathlib, sys
+host, port = sys.argv[1], sys.argv[2]
+path = pathlib.Path(os.environ.get("DOCKER_CONFIG", os.path.expanduser("~/.docker"))) / "config.json"
+config = json.loads(path.read_text()) if path.is_file() else {}
+config["proxies"] = {"default": {
+    "httpProxy": f"http://{host}:{port}",
+    "httpsProxy": f"http://{host}:{port}",
+    "noProxy": "localhost,127.0.0.1,172.30.0.0/24",
+}}
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(config, indent=2) + "\n")
+print(f"wrote proxies.default into {path}")
+JSONW
+fi
+```
+
+Prove it on the thing that actually needs it, rather than on a pull: `docker compose build api` and
+watch `bun install` resolve packages. And when you remove the proxy (§ 5.4), **delete the `proxies` key
+as well** — a stale entry pointing at an address that no longer answers turns every future build into a
+timeout, and it is invisible in `docker info`, which only reports the daemon's own settings.
 
 **No JVM proxy flags are needed.** Step 9 fetches the reference layers with `curl` (the fetch
 script) and hands Java a `--download-dir` that is already populated, so Planetiler issues no request
@@ -832,7 +930,18 @@ downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.`
 
 ```bash
 sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc   # drop exactly the block § 5.1 added
-unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY all_proxy ALL_PROXY
+python3 - <<'JSONW'          # drop only the proxies key; leave any other docker client config alone
+import json, os, pathlib
+path = pathlib.Path(os.environ.get("DOCKER_CONFIG", os.path.expanduser("~/.docker"))) / "config.json"
+if path.is_file():
+    config = json.loads(path.read_text())
+    if config.pop("proxies", None) is not None:
+        path.write_text(json.dumps(config, indent=2) + "\n")
+        print(f"removed the proxies key from {path}")
+    else:
+        print(f"no proxies key in {path}; nothing to do")
+JSONW
 sudo rm -f /etc/apt/apt.conf.d/95proxy /etc/systemd/system/docker.service.d/proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
 ```
