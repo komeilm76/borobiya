@@ -99,8 +99,8 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
   }
 
   if (input.online !== null) {
-    // Same liveness rule as the device list (T2.3.1): a session that still holds a refresh token.
-    const liveSessions = sql`select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null`;
+    // Active session presence: a live refresh token plus an active online flag.
+    const liveSessions = sql`select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true`;
     conditions.push(input.online ? sql`exists (${liveSessions})` : sql`not exists (${liveSessions})`);
   }
 
@@ -139,7 +139,7 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
         username: users.username,
         category: categorySummary.as("category"),
         avgRating: users.avgRating,
-        isOnline: sql<boolean>`exists (select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null)`
+        isOnline: sql<boolean>`exists (select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true)`
           .mapWith(Boolean)
           .as("isOnline"),
         distanceKm: distanceKm.mapWith(readDistanceKm).as("distanceKm")

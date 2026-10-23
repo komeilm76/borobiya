@@ -87,6 +87,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   let requestId = 0;
   let refreshing = false;
   let refreshingAuth = false;
+  let inRefreshRetry = false;
   let timer: ReturnType<typeof setInterval> | null = null;
   let openShareIds = new Set<string>();
 
@@ -100,6 +101,19 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       readFailed: readFailed.value
     })
   );
+
+  function applyShares(shares: Awaited<ReturnType<typeof readShares>>): void {
+    // Only `sharedWithMe` is a source of markers: `owned` rows are about who follows *me*, and drawing
+    // my own followers' targets would put a dot on the map for somebody who never shared anything.
+    openShareIds = new Set(
+      shares.sharedWithMe
+        .map((row) => row.id)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+    );
+    shareCount.value = shares.sharedWithMe.length;
+    registry.value = applyShareList(registry.value, shares.sharedWithMe);
+    readFailed.value = false;
+  }
 
   async function refresh(): Promise<void> {
     let token = options.accessToken.value;
@@ -123,28 +137,25 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     try {
       const shares = await readShares(token);
       if (request !== requestId) return;
-      // Only `sharedWithMe` is a source of markers: `owned` rows are about who follows *me*, and drawing
-      // my own followers' targets would put a dot on the map for somebody who never shared anything.
-      openShareIds = new Set(
-        shares.sharedWithMe
-          .map((row) => row.id)
-          .filter((id): id is string => typeof id === "string" && id.length > 0)
-      );
-      shareCount.value = shares.sharedWithMe.length;
-      registry.value = applyShareList(registry.value, shares.sharedWithMe);
-      readFailed.value = false;
+      applyShares(shares);
     } catch (error) {
       const statusCode = (error as { status?: unknown } | null)?.status;
       if (statusCode === 401 && options.ensureSession && !refreshingAuth) {
         refreshingAuth = true;
+        inRefreshRetry = true;
         try {
           await options.ensureSession();
-          if (options.accessToken.value && options.accessToken.value !== token) {
+          const nextToken = options.accessToken.value;
+          if (nextToken && nextToken !== token) {
+            const retryRequest = ++requestId;
+            const retried = await readShares(nextToken);
+            if (retryRequest === requestId) applyShares(retried);
             return;
           }
         } catch {
           // Fall through to mark readFailed cleanly.
         } finally {
+          inRefreshRetry = false;
           refreshingAuth = false;
         }
       }
@@ -191,8 +202,12 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     void refresh();
   }
 
-  function onDisconnect(): void {
+  function onDisconnect(reason?: string): void {
     connected.value = false;
+    // Server-initiated disconnects (`socket.disconnect(true)`) disable automatic Socket.IO reconnection.
+    if (reason === "io server disconnect") {
+      void onConnectError();
+    }
   }
 
   async function onConnectError(): Promise<void> {
@@ -205,7 +220,8 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       const nextToken = options.accessToken.value;
       if (nextToken && nextToken !== previousToken && client) {
         client.updateToken(nextToken);
-        client.connect();
+        if (client.reconnect) client.reconnect();
+        else client.connect();
       }
     } catch {
       // Next reconnect attempt or explicit user navigation will retry cleanly.
@@ -268,7 +284,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     (token) => {
       if (token) {
         void ensureClient();
-        void refresh();
+        if (!inRefreshRetry) void refresh();
         return;
       }
       // Signing out must not leave somebody else's companions on the screen, nor a socket that keeps

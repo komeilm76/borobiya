@@ -7,8 +7,8 @@
         </p>
         <h1 class="text-2xl font-bold">گروه‌های امدادگر</h1>
         <p class="admin-categories-intro mt-1 max-w-prose opacity-80">
-          هر گروه می‌گوید کدام امدادگرها برای کدام نوع رویداد صدا زده می‌شوند. افزودن عضو اینجا انجام
-          می‌شود؛ پیشنهاد و اعزام در مرحلهٔ بعدی پروژه است.
+          هر گروه می‌گوید کدام امدادگرها برای کدام نوع رویداد پیشنهاد و اعزام می‌شوند. افزودن و حذف اعضای
+          گروه در همین صفحه انجام می‌شود.
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
@@ -439,7 +439,10 @@ async function searchMembers(): Promise<void> {
     }
     const response = await listAdminUsers({ q: term, page: 1, limit: 10 }, accessToken);
     if (version !== searchVersion) return;
-    candidates.value = response.items;
+    const assignedIds = new Set((membersFor.value?.members ?? []).map((member) => member.id));
+    candidates.value = response.items.filter(
+      (candidate) => candidate.isActive && !assignedIds.has(candidate.id)
+    );
   } catch (error) {
     if (version !== searchVersion) return;
     candidates.value = [];

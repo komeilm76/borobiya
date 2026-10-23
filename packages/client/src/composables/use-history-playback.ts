@@ -57,6 +57,7 @@ export type HistoryPlayback = ReturnType<typeof useHistoryPlayback>;
 export interface UseHistoryPlaybackOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<void>;
+  refreshSession?: () => Promise<boolean>;
 }
 
 export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
@@ -147,7 +148,21 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     if (!accessToken || grantsLoading.value) return;
     grantsLoading.value = true;
     try {
-      const response = await listLocationHistoryShares(accessToken);
+      let response;
+      try {
+        response = await listLocationHistoryShares(accessToken);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401 && options.refreshSession) {
+          const refreshed = await options.refreshSession();
+          if (refreshed && options.accessToken.value) {
+            response = await listLocationHistoryShares(options.accessToken.value);
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       grants.value = response.sharedWithMe;
       grantsLoaded.value = true;
       grantsFailed.value = false;
@@ -215,11 +230,26 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
 
     const requestIdForThisLoad = ++requestId;
     loading.value = true;
+    const runPlan = (token: string) =>
+      plan.kind === "own"
+        ? fetchMyLocationHistory(plan.window, token)
+        : fetchSharedLocationHistory(plan.shareId, token);
     try {
-      const response =
-        plan.kind === "own"
-          ? await fetchMyLocationHistory(plan.window, accessToken)
-          : await fetchSharedLocationHistory(plan.shareId, accessToken);
+      let response;
+      try {
+        response = await runPlan(accessToken);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401 && options.refreshSession) {
+          const refreshed = await options.refreshSession();
+          if (refreshed && options.accessToken.value) {
+            response = await runPlan(options.accessToken.value);
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       if (requestIdForThisLoad !== requestId) return;
       points.value = response.points;
       totalPoints.value = response.totalPoints;

@@ -97,7 +97,12 @@
               </p>
               <p class="share-lists__row-sub">{{ historyDetail(row).join(" • ") }}</p>
             </div>
-            <v-btn size="x-small" variant="text" color="primary" to="/_user/map">
+            <v-btn
+              size="x-small"
+              variant="text"
+              color="primary"
+              :to="{ path: '/_user/map', query: { historyShare: row.id } }"
+            >
               پخش در نقشه
             </v-btn>
           </li>
@@ -159,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   LocationHistoryShare,
   LocationShare,
@@ -425,6 +430,58 @@ async function confirmRevoke(): Promise<void> {
   }
 }
 
+let detachShareEnded: (() => void) | null = null;
+let socketSeq = 0;
+
+function detachRealtimeShareSync(): void {
+  socketSeq += 1;
+  detachShareEnded?.();
+  detachShareEnded = null;
+}
+
+function handleShareEnded(payload: unknown): void {
+  const candidate = payload as { shareId?: unknown } | null | undefined;
+  const shareId = typeof candidate?.shareId === "string" ? candidate.shareId : "";
+  if (!shareId) return;
+  const hadOwned = owned.value.some((row) => row.id === shareId);
+  const hadReceived = received.value.some((row) => row.id === shareId);
+  if (!hadOwned && !hadReceived) return;
+  if (hadOwned) owned.value = owned.value.filter((row) => row.id !== shareId);
+  if (hadReceived) received.value = received.value.filter((row) => row.id !== shareId);
+  emit("changed");
+}
+
+async function attachRealtimeShareSync(token: string): Promise<void> {
+  if (detachShareEnded) return;
+  const seq = ++socketSeq;
+  try {
+    const [{ createRealtimeClient }, { SHARE_ENDED_EVENT }] = await Promise.all([
+      import("@/services/socket"),
+      import("@/services/socket-events")
+    ]);
+    if (seq !== socketSeq || !auth.accessToken) return;
+    const client = createRealtimeClient(token);
+    client.socket.on(SHARE_ENDED_EVENT, handleShareEnded);
+    detachShareEnded = () => {
+      client.socket.off(SHARE_ENDED_EVENT, handleShareEnded);
+      client.close();
+    };
+    client.connect();
+  } catch {
+    // Manual refresh and 30s local countdown continue independently if socket creation fails.
+  }
+}
+
+watch(
+  () => auth.accessToken,
+  (token) => {
+    if (token) void attachRealtimeShareSync(token);
+    else detachRealtimeShareSync();
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(detachRealtimeShareSync);
 onMounted(refresh);
 
 defineExpose({ refresh });

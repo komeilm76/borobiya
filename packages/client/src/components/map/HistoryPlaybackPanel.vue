@@ -202,6 +202,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { formatDuration } from "@/sharing/share-form";
 import {
   formatLocalTime,
@@ -221,10 +222,24 @@ import type { HistoryPlayback } from "@/composables/use-history-playback";
  * copy names what the user can do about it (whose share, which field), not just that something failed.
  */
 const props = defineProps<{ api: HistoryPlayback }>();
+const route = useRoute();
 
 const isOpen = ref(true);
 const fromField = ref("");
 const toField = ref("");
+
+watch(
+  () => route.query.historyShare,
+  (shareQuery) => {
+    const shareId = Array.isArray(shareQuery) ? shareQuery[0] : shareQuery;
+    if (typeof shareId === "string" && shareId.trim().length > 0) {
+      isOpen.value = true;
+      props.api.selectSource("grant");
+      props.api.selectGrant(shareId.trim());
+    }
+  },
+  { immediate: true }
+);
 
 const presets = rangePresets();
 const speedOptions = PLAYBACK_SPEEDS.map((value) => ({ value, label: `${value}×` }));

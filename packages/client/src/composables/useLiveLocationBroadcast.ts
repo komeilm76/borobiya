@@ -97,8 +97,12 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       await ensureSession();
       const nextToken = requireToken();
       if (!nextToken || nextToken === previousToken) return false;
-      client?.updateToken(nextToken);
-      client?.connect();
+      if (client) {
+        status.value = "connecting";
+        client.updateToken(nextToken);
+        if (client.reconnect) client.reconnect();
+        else client.connect();
+      }
       return true;
     } catch {
       return false;
@@ -114,8 +118,11 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     }
   }
 
-  function onDisconnect(): void {
+  function onDisconnect(reason?: string): void {
     if (status.value === "broadcasting") status.value = "connecting";
+    if (reason === "io server disconnect" && status.value === "connecting") {
+      void tryRecoverAuth();
+    }
   }
 
   async function onConnectError(error?: { data?: { code?: unknown } }): Promise<void> {

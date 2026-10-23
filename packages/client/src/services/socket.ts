@@ -21,6 +21,8 @@ export interface RealtimeClient {
   /** Applies a rotated access token; Socket.IO re-reads `auth` on every (re)connect. */
   updateToken(accessToken: string): void;
   connect(): void;
+  /** Forces a fresh handshake when the server rejected or rotated an active connection's session. */
+  reconnect?(): void;
   close(): void;
 }
 
@@ -39,6 +41,10 @@ export function createRealtimeClient(accessToken: string | null): RealtimeClient
     },
     connect() {
       if (!socket.connected) socket.connect();
+    },
+    reconnect() {
+      if (socket.connected) socket.disconnect();
+      socket.connect();
     },
     close() {
       socket.removeAllListeners();

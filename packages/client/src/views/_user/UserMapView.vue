@@ -70,7 +70,8 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
  */
 const playback = useHistoryPlayback({
   accessToken: computed(() => auth.accessToken),
-  ensureSession: () => auth.ensureSession()
+  ensureSession: () => auth.ensureSession(),
+  refreshSession: () => auth.refreshSession()
 });
 const map = shallowRef<MapLibreMap | null>(null);
 let fittedFor: string | null = null;

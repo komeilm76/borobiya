@@ -324,8 +324,23 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       connected.value = true;
       void refreshRequests();
     };
-    const onDisconnect = () => {
+    const onDisconnect = (reason?: string) => {
       connected.value = false;
+      if (reason === "io server disconnect" && !refreshingSocketAuth && isAdminSession.value) {
+        refreshingSocketAuth = true;
+        void auth
+          .refreshSession()
+          .then((ok) => {
+            if (ok && attachedClient && auth.accessToken) {
+              attachedClient.updateToken(auth.accessToken);
+              if (attachedClient.reconnect) attachedClient.reconnect();
+              else attachedClient.connect();
+            }
+          })
+          .finally(() => {
+            refreshingSocketAuth = false;
+          });
+      }
     };
     const onConnectError = (err: Error & { data?: { code?: unknown } }) => {
       connected.value = false;
@@ -341,7 +356,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
           .then((ok) => {
             if (ok && attachedClient && auth.accessToken) {
               attachedClient.updateToken(auth.accessToken);
-              attachedClient.connect();
+              if (attachedClient.reconnect) attachedClient.reconnect();
+              else attachedClient.connect();
             }
           })
           .finally(() => {

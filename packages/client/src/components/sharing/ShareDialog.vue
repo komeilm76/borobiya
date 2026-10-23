@@ -120,8 +120,17 @@
             </v-list-item>
           </v-list>
 
-          <v-alert v-else-if="hasTerm && !searching" class="mt-2" type="info" variant="text" density="compact">
-            <template v-if="termTooShort">برای شروع جستجو حداقل دو نویسه بنویسید.</template>
+          <v-alert
+            v-else-if="
+              (hasTerm || incidentTypeChoice !== null || minRatingChoice !== null || onlineFilter === 'online') &&
+              !searching
+            "
+            class="mt-2"
+            type="info"
+            variant="text"
+            density="compact"
+          >
+            <template v-if="!hasTerm || termTooShort">برای شروع جستجو حداقل دو نویسه بنویسید.</template>
             <template v-else>هیچ حسابی با این نام پیدا نشد.</template>
           </v-alert>
         </div>

@@ -193,7 +193,7 @@ async function authenticateSocket(
   if (user.isSuspended) {
     return next(socketError("ACCOUNT_SUSPENDED", "This account is suspended. Contact an administrator."));
   }
-  if (user.mustCompleteSecurityQuestions) {
+  if (user.role !== "admin" && user.mustCompleteSecurityQuestions) {
     return next(socketError("SECURITY_QUESTIONS_REQUIRED", "Complete your security questions first."));
   }
   if (!(await dependencies.users.hasActiveSession(identity))) {
@@ -232,7 +232,7 @@ export interface LocationUpdateAck {
  */
 export interface HandleLocationUpdateDependencies {
   live: LiveLocationService;
-  users?: Pick<UserSecurityQuestionsStore, "findUserById" | "hasActiveSession">;
+  users?: Pick<UserSecurityQuestionsStore, "findUserById" | "hasActiveSession" | "touchSessionPresence">;
   logger?: RealtimeLogger;
 }
 
@@ -280,7 +280,7 @@ async function locationUpdateAck(
       sender.disconnect(true);
       return { ok: false, status: "rejected", code: "ACCOUNT_SUSPENDED", message: "This account is suspended. Contact an administrator." };
     }
-    if (user.mustCompleteSecurityQuestions) {
+    if (user.role !== "admin" && user.mustCompleteSecurityQuestions) {
       sender.disconnect(true);
       return { ok: false, status: "rejected", code: "SECURITY_QUESTIONS_REQUIRED", message: "Complete your security questions first." };
     }
@@ -328,6 +328,15 @@ async function locationUpdateAck(
     return { ok: false, status: "rejected", code: result.code, message: result.message };
   }
 
+  if (identity.sessionId && dependencies.users?.touchSessionPresence) {
+    await dependencies.users.touchSessionPresence({
+      userId: identity.userId,
+      sessionId: identity.sessionId,
+      deviceId: identity.deviceId,
+      isOnline: true
+    });
+  }
+
   const update: PeerLocationUpdate = { userId: identity.userId, ...result.fix };
   for (const peerId of result.peers) {
     sender.to(userRoom(peerId)).emit(PEER_UPDATE_EVENT, update);
@@ -364,6 +373,43 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
     void socket.join(userRoom(identity.userId));
     if (identity.sessionId) void socket.join(sessionRoom(identity.sessionId));
     if (identity.role === "admin") void socket.join("admin");
+
+    if (identity.sessionId && identity.deviceId && dependencies.users.touchSessionPresence) {
+      void dependencies.users
+        .touchSessionPresence({
+          userId: identity.userId,
+          sessionId: identity.sessionId,
+          deviceId: identity.deviceId,
+          isOnline: true
+        })
+        .catch((error) => {
+          dependencies.logger?.warn({ err: error }, "realtime session online update failed");
+        });
+    }
+
+    socket.on("disconnect", () => {
+      if (!identity.userId || !identity.sessionId || !identity.deviceId || !dependencies.users.touchSessionPresence) {
+        return;
+      }
+      const userId = identity.userId;
+      const sessionId = identity.sessionId;
+      const deviceId = identity.deviceId;
+      void io
+        .in(sessionRoom(sessionId))
+        .fetchSockets()
+        .then((remaining) => {
+          if (remaining.length > 0) return;
+          return dependencies.users.touchSessionPresence?.({
+            userId,
+            sessionId,
+            deviceId,
+            isOnline: false
+          });
+        })
+        .catch((error) => {
+          dependencies.logger?.warn({ err: error }, "realtime session offline update failed");
+        });
+    });
 
     socket.on(LOCATION_UPDATE_EVENT, async (payload: unknown, ack?: (response: LocationUpdateAck) => void) => {
       const response = await handleLocationUpdate(socket as unknown as UpdateSender, payload, dependencies);

@@ -219,7 +219,9 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           isOnMission: users.isOnMission
         })
         .from(users)
-        .where(inArray(users.id, input.rescuerIds));
+        .where(inArray(users.id, input.rescuerIds))
+        .orderBy(asc(users.id))
+        .for("update");
 
       const userById = new Map(candidateUsers.map((candidate) => [candidate.id, candidate]));
       const invalidIssues: DispatchValidationIssue[] = [];
