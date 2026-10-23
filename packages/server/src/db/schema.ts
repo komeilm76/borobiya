@@ -20,7 +20,14 @@ import {
   varchar
 } from "drizzle-orm/pg-core";
 
-/** Raw driver-string PostGIS geography; keep generated DDL unquoted and project app coordinates with spatial SQL. */
+/**
+ * Raw driver-string PostGIS geography. The spelling matters at the byte level: a reviewed migration
+ * once wrote the column type as one quoted identifier, "geography(Point,4326)", and Postgres read that
+ * as a type whose *name* contains the parentheses — `42704: type ... does not exist`, on every fresh
+ * database, while ALTER TABLE ADD COLUMN (which emits it bare) worked fine. scripts/test_migration_sql.py
+ * refuses that shape in the checked-in SQL now, so the rule is enforced and not just remembered.
+ * Project app coordinates with spatial SQL.
+ */
 const geographyPoint = customType<{ data: string; driverData: string }>({
   dataType: () => "geography(Point,4326)"
 });

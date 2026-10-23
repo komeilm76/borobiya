@@ -1879,6 +1879,17 @@ Symptom first, always — grep this section for the error text.
   Never resolve this by deleting `postgres-data` unless the database really is disposable: tiles, OSRM
   graphs, the Photon index and the Nominatim volume are elsewhere (§ 8.5), but every row an operator has
   entered since the install is not.
+- **Migration `42704: type "geography(Point,4326)" does not exist` while PostGIS is installed** — the
+  quotes are the whole bug. A migration once spelled the column type as one quoted identifier, and Postgres
+  reads that as a type whose *name* contains the parentheses, rather than as `geography` with a type
+  modifier. Every fresh database failed on it; `users.last_location`, added by `ALTER TABLE ... ADD COLUMN
+  geography(Point,4326)` in `0002`, was fine, which is how a machine can have geography columns and still
+  not have the table. `packages/server/drizzle/0012_modern_sentry.sql` is corrected and
+  `scripts/test_migration_sql.py` now refuses that shape anywhere in the folder. Pull, then re-run § 7.2's
+  migrate command **with `--build`** — the migration SQL ships inside the API image, so an unbuilt run
+  repeats the old file. Nothing has to be cleaned up first: the failed `CREATE TABLE` left no table, and a
+  migration that errors is not recorded as applied. (Only a database where `sos_requests` was created by
+  `db:push` instead needs that one table dropped.)
 - **Compose says the network must be recreated after a `git pull`** (the project subnet is pinned to
   `172.30.0.0/24`) — `docker compose down` once, **without** `-v`, then `up -d` again. Containers
   are recreated; volumes and built data stay.
@@ -1943,3 +1954,11 @@ Symptom first, always — grep this section for the error text.
   in `test_fetch_planetiler_sources.py` all run offline; they also caught two mawk-versus-gawk and
   `awk -v` escape bugs in the first draft of the fix, which is the argument for testing shell code at
   all.
+- The migration checks in `scripts/test_migration_sql.py` are **textual**: they read
+  `packages/server/drizzle/*.sql` for shapes a Postgres server rejects (a quoted type carrying a modifier,
+  a file whose statements are not separated the way the journal says, `CREATE EXTENSION` ordered after the
+  columns that need it) and they tie the journal to the folder. Nothing in this repository runs the folder
+  against a real PostGIS server, so a statement that parses but names something the catalog does not have is
+  only caught when somebody installs a fresh database — which is exactly how the `geography(Point,4326)`
+  quoting in `0012` survived review. Treat "the migrations applied cleanly" as evidence about *your*
+  database, not about the files; the fresh-VM run is the test that counts.

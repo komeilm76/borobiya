@@ -128,6 +128,41 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — a fresh database rejected `0012`: the column type was one quoted identifier
+
+- **The symptom, from the VM that got past the password.** `ALTER ROLE` + a re-probe of `1` settled the
+  credential, then the migration stopped at `CREATE TABLE "sos_requests"` with
+  `42704: type "geography(Point,4326)" does not exist` — in a database where `CREATE EXTENSION postgis` had
+  already run. Postgres reads `"geography(Point,4326)"` as a single quoted *name*, so it looked for a type
+  literally containing the parentheses instead of `geography` with a type modifier, and the whole column
+  definition was unresolvable. `0002_lazy_shiver_man.sql` writes the same type bare in
+  `ALTER TABLE ... ADD COLUMN` and worked, which is the tell that the type is fine and the spelling is not:
+  PostGIS documents `geography(Point,4326)`, and so does drizzle for `varchar(30)` / `numeric(2, 1)` in this
+  very folder. It had never run anywhere fresh — a migration that errors is not recorded as applied, so
+  `0012` was simply broken since it was checked in.
+- **Fixed where it hurts:** the file (`0012_modern_sentry.sql`, one line), and `packages/server/src/db/schema.ts`'s
+  comment on the `customType`, which told the reader to "keep generated DDL unquoted" as an aspiration with
+  no owner. Now `scripts/test_migration_sql.py` is that owner — 8 tests over the checked-in SQL: no quoted
+  identifier carrying a type modifier anywhere in the folder, every geography column spelled exactly the
+  string `schema.ts` returns, the journal and the folder describing the same migrations in `idx` order (an
+  orphan `.sql` never runs; a journal entry with no file fails the migrator), statements separated by the
+  breakpoint marker the runtime splits on whenever there is more than one, and `CREATE EXTENSION postgis`
+  ordered before the first file that uses the type. The guard was proved non-vacuous by hand: reintroducing
+  the quoted form fails it with `0012_modern_sentry.sql:7: "geography(Point,4326)"`, restoring passes.
+- **Why a single-statement file with `breakpoints: true` is not a defect** — drizzle-kit writes the flag for
+  everything, so that assertion is one-directional (more than one statement ⇒ the markers must be there),
+  and the check says so in the test rather than failing the next generated file.
+- **Docs.** § 9.3 gained the `42704` entry with the reason the API image must be rebuilt for a migration fix
+  to land (`run --rm --build`, because the SQL ships inside the image) and why no cleanup is needed after a
+  failed migration; § 10 now states plainly that these checks are textual — nothing in this repository runs
+  the folder against a real PostGIS server, so "the migrations applied cleanly" is evidence about a database,
+  not about the files, and a fresh VM is the test that counts.
+- **Measured**: 8 new tests, plus the 48 credential tests (twice), 42 proxy tests, env-writer tests, and
+  `pytest -q scripts/ map-server/scripts/` → 180 passed, 1 skipped, 12 subtests; `bash -n` on every tracked
+  `.sh`; shellcheck clean; all markdown clean under the structural checker. What remains unmeasured is the
+  one thing that would have caught this earlier — an actual `CREATE TABLE` against PostGIS — and it is
+  recorded as such in § 10 rather than papered over.
+
 ### 2026-10-23 — the credential probe lied: `127.0.0.1` is `trust`, and so was my new check
 
 - **What the VM said back.** After the previous commit, the manual triage printed `1` for the `.env`

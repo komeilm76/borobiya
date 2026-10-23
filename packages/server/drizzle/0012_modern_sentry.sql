@@ -4,7 +4,7 @@ CREATE TABLE "sos_requests" (
 	"severity" text NOT NULL,
 	"description" text NOT NULL,
 	"incident_type_id" uuid NOT NULL,
-	"location" "geography(Point,4326)" NOT NULL,
+	"location" geography(Point,4326) NOT NULL,
 	"accuracy" double precision,
 	"is_manual" boolean DEFAULT false NOT NULL,
 	"photo_url" text,
