@@ -32,6 +32,8 @@ export interface MapCanvasDisplayOptions {
   styleUrl?: string;
   center?: LngLatLike;
   zoom?: number;
+  /** Keep camera clamped inside `bbox` (default `true`; `false` for SOS coordinate pickers/dispatch). */
+  constrainBounds?: boolean;
 }
 
 /** Resolve a style URL consistently for both initial map creation and theme switches. */
@@ -61,6 +63,7 @@ export function createMapCanvasOptions(
   const maxZoom = runtimeConfig.maxZoom;
   const requestedZoom = Number.isFinite(display.zoom) ? display.zoom! : DEFAULT_MAP_ZOOM;
   const zoom = Math.min(maxZoom, Math.max(minZoom, requestedZoom));
+  const constrainBounds = display.constrainBounds !== false;
 
   return {
     style: resolveMapStyleUrl(display.styleUrl),
@@ -68,7 +71,7 @@ export function createMapCanvasOptions(
     zoom,
     minZoom,
     maxZoom,
-    maxBounds: runtimeConfig.bbox,
+    ...(constrainBounds ? { maxBounds: runtimeConfig.bbox } : {}),
     maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS,
     attributionControl: {}
   };

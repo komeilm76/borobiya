@@ -172,11 +172,18 @@ function frameCamera(): void {
   instance.easeTo({ center: [only.lon, only.lat], duration: 500 });
 }
 
+function repaintOverlays(): void {
+  paintLive();
+  paintPlayback();
+}
+
 function onMapReady(instance: MapLibreMap): void {
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
-  // `ready` (and every paint) re-ensures the overlay instead of assuming it is still there. Live markers
-  // go first because playback asks to be inserted beneath them.
+  // `ready` (and every `styledata`/`idle` after an async style reload) re-ensures the overlay instead
+  // of assuming it is still there. Live markers go first because playback asks to be inserted beneath them.
+  instance.on("styledata", repaintOverlays);
+  instance.on("idle", repaintOverlays);
   paintLive();
   paintPlayback();
   frameCamera();
@@ -215,6 +222,8 @@ onBeforeUnmount(() => {
   const instance = map.value;
   map.value = null;
   if (instance) {
+    instance.off("styledata", repaintOverlays);
+    instance.off("idle", repaintOverlays);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
   }

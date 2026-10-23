@@ -15,7 +15,7 @@ import { registerHttpSecurityPlugins } from "../plugins/security";
 import { registerMultipartParser } from "../plugins/multipart";
 import { registerSosRequestRoutes } from "./requests";
 import { createPhotoStorage } from "./photo-storage";
-import { photoSizeLimitMessage, registerSosPhotoRoutes } from "./photos";
+import { photoSizeLimitMessage, readPhotoPart, registerSosPhotoRoutes } from "./photos";
 
 const jwtSecret = "a".repeat(48);
 const requesterId = randomUUID();
@@ -449,5 +449,47 @@ describe("the photo route's share of the SECURITY §3 budget", () => {
     // A shared counter would answer 429 here, and the emergency it turns away is not the attacker's.
     expect(filed.statusCode).toBe(201);
     expect(createRequest).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("readPhotoPart stream drainage on early rejection", () => {
+  it("resumes unconsumed file streams on unexpected field names and duplicate file parts", async () => {
+    const resumeWrongField = vi.fn();
+    const wrongFieldResult = await readPhotoPart({
+      isMultipart: () => true,
+      async *parts() {
+        yield {
+          fieldname: "image",
+          type: "file",
+          file: { resume: resumeWrongField },
+          toBuffer: async () => Buffer.from(PNG)
+        };
+      }
+    } as unknown as Parameters<typeof readPhotoPart>[0]);
+
+    expect(wrongFieldResult).toMatchObject({ status: "error", code: "unexpected_field" });
+    expect(resumeWrongField).toHaveBeenCalledOnce();
+
+    const resumeDuplicate = vi.fn();
+    const duplicateResult = await readPhotoPart({
+      isMultipart: () => true,
+      async *parts() {
+        yield {
+          fieldname: SOS_PHOTO_FIELD_NAME,
+          type: "file",
+          file: { resume: vi.fn() },
+          toBuffer: async () => Buffer.from(PNG)
+        };
+        yield {
+          fieldname: SOS_PHOTO_FIELD_NAME,
+          type: "file",
+          file: { resume: resumeDuplicate },
+          toBuffer: async () => Buffer.from(PNG)
+        };
+      }
+    } as unknown as Parameters<typeof readPhotoPart>[0]);
+
+    expect(duplicateResult).toMatchObject({ status: "error", code: "multiple_photos" });
+    expect(resumeDuplicate).toHaveBeenCalledOnce();
   });
 });

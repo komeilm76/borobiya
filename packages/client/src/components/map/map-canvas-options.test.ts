@@ -94,4 +94,10 @@ describe("MapCanvas initial options", () => {
       zoom: DEFAULT_MAP_ZOOM
     });
   });
+
+  it("omits maxBounds when constrainBounds is disabled so real out-of-bbox SOS coordinates stay reachable", () => {
+    const options = createMapCanvasOptions(runtimeConfig, { constrainBounds: false });
+    expect(options.maxBounds).toBeUndefined();
+    expect(options.center).toEqual(bboxCenter(runtimeConfig.bbox));
+  });
 });

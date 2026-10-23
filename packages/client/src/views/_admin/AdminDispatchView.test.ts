@@ -9,6 +9,8 @@ describe("AdminDispatchView and App shell live SOS alert wiring (T3.2.5)", () =>
     expect(viewSource).toContain("requestAnimationFrame");
     expect(viewSource).toContain("cancelAnimationFrame");
     expect(viewSource).toContain("styledata");
+    expect(viewSource).toContain('"idle"');
+    expect(viewSource).toContain(":constrain-bounds=\"false\"");
     expect(viewSource).toContain("toggleSoundMuted");
     expect(viewSource).toContain("testAlertSound");
     expect(viewSource).toContain("#dc2626");

@@ -43,10 +43,12 @@ const props = withDefaults(defineProps<{
   center?: [number, number];
   zoom?: number;
   ariaLabel?: string;
+  constrainBounds?: boolean;
 }>(), {
   styleUrl: DEFAULT_MAP_STYLE,
   zoom: DEFAULT_MAP_ZOOM,
-  ariaLabel: "نقشهٔ تعاملی"
+  ariaLabel: "نقشهٔ تعاملی",
+  constrainBounds: true
 });
 
 const emit = defineEmits<{
@@ -147,7 +149,8 @@ async function initializeMap(controller: AbortController): Promise<void> {
     ...createMapCanvasOptions(null, {
       styleUrl: initialStyleUrl,
       center: props.center,
-      zoom: props.zoom
+      zoom: props.zoom,
+      constrainBounds: props.constrainBounds
     })
   });
   map.value = instance;
@@ -170,13 +173,15 @@ async function initializeMap(controller: AbortController): Promise<void> {
     if (controller.signal.aborted || !map.value) return;
     map.value.setMinZoom(config.minZoom);
     map.value.setMaxZoom(config.maxZoom);
-    map.value.setMaxBounds(config.bbox);
+    if (props.constrainBounds) {
+      map.value.setMaxBounds(config.bbox);
+    }
     // The map starts on the built-in fallback bounds until this config
     // arrives. When the deployment serves different areas (see
     // MAP_REGION_IDS) and the caller did not request an explicit center,
     // move once to the configured bounds instead of stranding the camera
     // outside them.
-    if (!props.center) {
+    if (!props.center && props.constrainBounds) {
       const current = map.value.getCenter();
       if (!lngLatInBbox([current.lng, current.lat], config.bbox)) {
         map.value.jumpTo({ center: bboxCenter(config.bbox) });

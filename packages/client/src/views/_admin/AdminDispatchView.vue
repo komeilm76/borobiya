@@ -83,6 +83,7 @@
             <MapCanvas
               aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
               :style-url="mapStyleUrl"
+              :constrain-bounds="false"
               :zoom="12"
               @ready="onMapReady"
             />
@@ -315,8 +316,12 @@ function ensureSosMapLayers(map: MapLibreMap): void {
 
 function syncMapData(): void {
   const map = mapInstance;
-  if (!map || !map.isStyleLoaded()) return;
-  ensureSosMapLayers(map);
+  if (!map || !map.getStyle()) return;
+  try {
+    ensureSosMapLayers(map);
+  } catch {
+    // If a new style JSON is still mid-fetch, the `styledata` / `idle` listener below applies the data immediately once ready.
+  }
 }
 
 function startPulseLoop(): void {
@@ -378,11 +383,15 @@ function onMapReady(map: MapLibreMap): void {
   }
 
   const onStyleData = () => {
-    if (map.isStyleLoaded()) ensureSosMapLayers(map);
+    syncMapData();
+  };
+  const onIdle = () => {
+    syncMapData();
   };
   const onMarkerClick = (event: MapMouseEvent) => {
+    if (!map.getLayer(SOS_CORE_LAYER_ID) && !map.getLayer(SOS_PULSE_LAYER_ID)) return;
     const features = map.queryRenderedFeatures(event.point, {
-      layers: [SOS_CORE_LAYER_ID, SOS_PULSE_LAYER_ID]
+      layers: [SOS_CORE_LAYER_ID, SOS_PULSE_LAYER_ID].filter((id) => Boolean(map.getLayer(id)))
     });
     const clickedId = features[0]?.properties?.id;
     if (typeof clickedId === "string") {
@@ -391,17 +400,28 @@ function onMapReady(map: MapLibreMap): void {
   };
 
   map.on("styledata", onStyleData);
+  map.on("idle", onIdle);
   map.on("click", onMarkerClick);
   detachMapEvents = () => {
     map.off("styledata", onStyleData);
+    map.off("idle", onIdle);
     map.off("click", onMarkerClick);
   };
 }
+
+let pendingDeepLinkId: string | null = null;
 
 watch(
   () => [adminSos.visibleRequests, adminSos.selectedId] as const,
   ([nextVisible]) => {
     syncMapData();
+    if (pendingDeepLinkId) {
+      const resolved = adminSos.requests.find((r) => r.id === pendingDeepLinkId);
+      if (resolved) {
+        pendingDeepLinkId = null;
+        focusRequest(resolved);
+      }
+    }
     if (nextVisible.length > 0 && mapInstance) {
       startPulseLoop();
     } else if (nextVisible.length === 0) {
@@ -416,8 +436,10 @@ watch(
     if (typeof requestQuery === "string" && requestQuery.length > 0) {
       const target = adminSos.requests.find((r) => r.id === requestQuery);
       if (target) {
+        pendingDeepLinkId = null;
         focusRequest(target);
       } else {
+        pendingDeepLinkId = requestQuery;
         adminSos.selectRequest(requestQuery);
       }
     }

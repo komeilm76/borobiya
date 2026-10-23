@@ -59,6 +59,13 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
   const ownLabel = computed(() => ownDevice.value?.deviceName ?? null);
   const hasData = computed(() => loadedAtMs.value !== null);
 
+  function clear(): void {
+    devices.value = [];
+    liveShares.value = [];
+    loadedAtMs.value = null;
+    failed.value = false;
+  }
+
   async function refresh(): Promise<void> {
     let accessToken = options.accessToken.value;
     if (!accessToken && options.ensureSession) {
@@ -70,10 +77,7 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
       accessToken = options.accessToken.value;
     }
     if (!accessToken) {
-      devices.value = [];
-      liveShares.value = [];
-      loadedAtMs.value = null;
-      failed.value = false;
+      clear();
       return;
     }
     loading.value = true;
@@ -121,6 +125,7 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
     loading,
     failed,
     loadedAtMs,
+    clear,
     refresh
   };
 }

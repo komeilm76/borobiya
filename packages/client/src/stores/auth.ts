@@ -131,7 +131,8 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const profile = userProfileSchema.parse(await requestJson<UserProfile>(userApiRoutes.me.url, {
         method: "GET",
-        accessToken: token
+        accessToken: token,
+        skipAuthRefresh: true
       }));
       userCategories.value = profile.categories;
       setUser(userFromProfile(profile));
@@ -204,7 +205,10 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
-  registerAccessTokenRefresher(async () => {
+  registerAccessTokenRefresher(async (failedToken: string) => {
+    if (accessToken.value && accessToken.value !== failedToken) {
+      return accessToken.value;
+    }
     const refreshed = await refreshSession();
     return refreshed ? accessToken.value : null;
   });

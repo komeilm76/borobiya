@@ -105,6 +105,9 @@ export async function readPhotoPart(
   try {
     for await (const part of request.parts()) {
       if (part.fieldname !== SOS_PHOTO_FIELD_NAME) {
+        if (part.type === "file") {
+          part.file.resume();
+        }
         // One refusal for a wrongly named part whether it carries a file or a value: a client that put
         // the photo in `image` and a client that added a `caption` have the same bug, which is sending
         // something this endpoint has no place for. Silently dropping the caption would be worse than
@@ -120,6 +123,7 @@ export async function readPhotoPart(
       }
       if (part.type === "file") {
         if (file) {
+          part.file.resume();
           return {
             status: "error",
             code: "multiple_photos",

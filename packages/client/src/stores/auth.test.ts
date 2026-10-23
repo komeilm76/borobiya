@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import { apiRoutes } from "@shared/api";
+import { requestJson } from "../api/http";
 import { useAuthStore } from "./auth";
+import { useBroadcastStore } from "./broadcast";
 
 const user = {
   id: "00000000-0000-4000-8000-000000000099",
@@ -198,5 +201,82 @@ describe("client auth store", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("never deadlocks refreshFromCookie if GET /_user/me answers 401 while hydrating", async () => {
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: "rotated-token" }),
+      jsonResponse({ error: true, code: "UNAUTHORIZED", message: "Revoked", issues: [] }, 401)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+
+    await auth.ensureSession();
+
+    expect(auth.accessToken).toBe("rotated-token");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses the already-rotated token without firing a second /_auth/refresh on staggered 401s", async () => {
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: "token-v1", user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse(profile),
+      // Request A gets 401 with token-v1 -> rotates to token-v2
+      jsonResponse({ error: true, code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] }, 401),
+      jsonResponse({ accessToken: "token-v2" }),
+      jsonResponse(profile),
+      jsonResponse({ items: ["ok-A"] }),
+      // Staggered Request B still held token-v1 -> gets 401 -> immediately retries with token-v2 without hitting /_auth/refresh again
+      jsonResponse({ error: true, code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] }, 401),
+      jsonResponse({ items: ["ok-B"] })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+
+    const first = await requestJson<{ items: string[] }>("/_user/devices", { accessToken: "token-v1" });
+    const second = await requestJson<{ items: string[] }>("/_user/devices", { accessToken: "token-v1" });
+
+    expect(first).toEqual({ items: ["ok-A"] });
+    expect(second).toEqual({ items: ["ok-B"] });
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === `/api${apiRoutes.auth.refresh.url}`);
+    expect(refreshCalls).toHaveLength(1);
+  });
+
+  it("does not resurrect a logged-out session via broadcast priority watcher even if /_auth/logout fails offline", async () => {
+    const fetchMock = fakeFetch(
+      // Initial login + profile + broadcast priority watcher (/devices + /location/shares)
+      jsonResponse({ accessToken: "token-live", user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse(profile),
+      jsonResponse([]),
+      jsonResponse({ owned: [], sharedWithMe: [] }),
+      // Offline logout failure — must NOT be followed by POST /_auth/refresh!
+      () => Promise.reject(new TypeError("offline"))
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    const broadcast = useBroadcastStore();
+
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    await nextTick();
+    await expect(auth.logout()).rejects.toThrow("offline");
+    await nextTick();
+
+    expect(auth.isAuthenticated).toBe(false);
+    expect(broadcast.priority.devices).toEqual([]);
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) => url === `/api${apiRoutes.auth.refresh.url}`);
+    expect(refreshCalls).toHaveLength(0);
+  });
+
+  it("skips broadcast device/share fetches while onboarding security questions are incomplete", async () => {
+    const fetchMock = fakeFetch(jsonResponse({ accessToken: "onboarding-token", user }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    useBroadcastStore();
+
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    await nextTick();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

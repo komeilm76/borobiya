@@ -5,6 +5,8 @@ export interface JsonRequestOptions {
   body?: unknown;
   accessToken?: string | null;
   signal?: AbortSignal;
+  /** Disables automatic 401 refresh retry for internal session-hydration calls inside `refreshFromCookie`. */
+  skipAuthRefresh?: boolean;
 }
 
 interface ErrorPayload {
@@ -13,7 +15,7 @@ interface ErrorPayload {
   issues?: unknown;
 }
 
-export type AccessTokenRefresher = () => Promise<string | null>;
+export type AccessTokenRefresher = (failedToken: string) => Promise<string | null>;
 
 let registeredRefresher: AccessTokenRefresher | null = null;
 
@@ -28,7 +30,7 @@ export function registerAccessTokenRefresher(refresher: AccessTokenRefresher | n
 export async function refreshAccessTokenAfterUnauthorized(failedToken: string): Promise<string | null> {
   if (!registeredRefresher) return null;
   try {
-    const refreshed = await registeredRefresher();
+    const refreshed = await registeredRefresher(failedToken);
     return refreshed && refreshed !== failedToken ? refreshed : null;
   } catch {
     return null;
@@ -81,7 +83,7 @@ export async function requestJson<T>(
   const initialToken = options.accessToken ?? null;
   let response = await fetch(url, buildJsonInit(options, initialToken));
 
-  if (response.status === 401 && initialToken && registeredRefresher) {
+  if (response.status === 401 && initialToken && !options.skipAuthRefresh && registeredRefresher) {
     const refreshedToken = await refreshAccessTokenAfterUnauthorized(initialToken);
     if (refreshedToken) {
       response = await fetch(url, buildJsonInit(options, refreshedToken));

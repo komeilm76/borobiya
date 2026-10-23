@@ -53,7 +53,12 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     await live.start();
   }
 
-  watch(accessToken, () => {
+  watch([accessToken, () => auth.mustCompleteSecurityQuestions], ([nextToken, onboardingIncomplete]) => {
+    if (!nextToken || onboardingIncomplete) {
+      live.stop();
+      priority.clear();
+      return;
+    }
     void priority.refresh();
   });
 

@@ -218,6 +218,7 @@
             <div class="sos-sheet__map-wrap">
               <MapCanvas
                 :style-url="mapStyleUrl"
+                :constrain-bounds="false"
                 aria-label="نقشهٔ انتخاب محل حادثه؛ برای تعیین دستی نقطه روی نقشه ضربه بزنید"
                 @ready="onPickerMapReady"
               />
