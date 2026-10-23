@@ -905,13 +905,21 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     // cannot carry its old reason into a newly pending decision.
     await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [accepted.missionId]);
     await pg.query(`UPDATE "users" SET "is_on_mission" = false WHERE "id" = $1`, [createdResponder.id]);
-    await callContract(apiRoutes.admin.dispatchSosRequest, 201, {
+    const redispatched = await callContract<{ proposals: Array<{ id: string }> }>(apiRoutes.admin.dispatchSosRequest, 201, {
       url: apiRoutes.admin.dispatchSosRequest.url.replace(":id", createdSos.requestId),
       headers: adminHeaders, payload: { rescuerIds: [createdResponder.id] }
     });
-    expect((await pg.query<{ status: string; decline_reason: string | null }>(
-      `SELECT "status", "decline_reason" FROM "mission_proposals" WHERE "id" = $1`, [inbox.items[0]!.id]
-    )).rows).toEqual([{ status: "pending", decline_reason: null }]);
+    const freshId = redispatched.proposals[0]!.id;
+    expect(freshId).not.toBe(inbox.items[0]!.id);
+    expect((await pg.query<{ id: string; status: string; decline_reason: string | null }>(
+      `SELECT "id", "status", "decline_reason" FROM "mission_proposals" WHERE "sos_request_id" = $1`, [createdSos.requestId]
+    )).rows).toEqual([{ id: freshId, status: "pending", decline_reason: null }]);
+    // The old decision URL is not a capability for the new dispatch generation.
+    expect((await app.inject({ method: "POST", url: proposalUrl, headers: responderHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url: apiRoutes.sos.acceptProposal.url.replace(":id", inbox.items[0]!.id),
+      headers: responderHeaders })).statusCode).toBe(404);
+    expect((await pg.query<{ status: string }>(`SELECT "status" FROM "mission_proposals" WHERE "id" = $1`, [freshId]))
+      .rows[0]?.status).toBe("pending");
 
     // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
     await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);

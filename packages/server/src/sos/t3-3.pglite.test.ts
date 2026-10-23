@@ -425,6 +425,48 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     ]);
   });
 
+  it("does not suggest or dispatch a rescuer with an active mission even when the busy flag is stale", async () => {
+    const rescuerId = "80000000-0000-4000-8000-000000000021";
+    await seedUser({ id: rescuerId, username: "rescuer_stale_flag", lat: 35.7, lon: 51.34 });
+    await pg.query(`INSERT INTO "category_users" ("category_id", "user_id") VALUES ($1, $2)`,
+      [CAT_MEDICAL_ALPHA_ID, rescuerId]);
+    const createSos = async () => {
+      const response = await app.inject({ method: "POST", url: "/_user/sos/requests",
+        headers: { authorization: `Bearer ${requesterToken}` },
+        payload: { severity: "high", description: "Medical team needed at the rescue site urgently.",
+          incidentTypeId: INCIDENT_MEDICAL_ID,
+          location: { lat: 35.6997, lon: 51.338, isManual: false } }
+      });
+      expect(response.statusCode).toBe(201);
+      return (response.json() as { requestId: string }).requestId;
+    };
+    const occupiedRequestId = "90000000-0000-4000-8000-000000000021";
+    await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
+      VALUES ($1, $2, 'high', 'Another emergency needs a rescuer.', $3, 'POINT(51.34 35.7)', 'accepted')`,
+      [occupiedRequestId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    const targetRequestId = await createSos();
+    const mission = await pg.query<{ id: string }>(
+      `INSERT INTO "missions" ("sos_request_id", "requester_id", "rescuer_id") VALUES ($1, $2, $3) RETURNING "id"`,
+      [occupiedRequestId, REQUESTER_ID, rescuerId]
+    );
+    const nearest = async () => app.inject({ method: "GET", url: `/_admin/sos/requests/${targetRequestId}/nearest`,
+      headers: { authorization: `Bearer ${adminToken}` } });
+    const dispatch = async () => app.inject({ method: "POST", url: `/_admin/sos/requests/${targetRequestId}/dispatch`,
+      headers: { authorization: `Bearer ${adminToken}` }, payload: { rescuerIds: [rescuerId] } });
+
+    const candidates = await nearest();
+    expect(candidates.statusCode).toBe(200);
+    expect(nearestRespondersResponseSchema.parse(candidates.json()).responders).toEqual([]);
+    const blocked = await dispatch();
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toMatchObject({ code: "RESCUER_BUSY" });
+    expect((await pg.query(`SELECT "id" FROM "mission_proposals" WHERE "sos_request_id" = $1`, [targetRequestId])).rows).toEqual([]);
+
+    await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [mission.rows[0]!.id]);
+    expect(nearestRespondersResponseSchema.parse((await nearest()).json()).responders.map((r) => r.userId)).toEqual([rescuerId]);
+    expect((await dispatch()).statusCode).toBe(201);
+  });
+
   it("dispatches proposals atomically, transitions SOS status, emits sos:proposal-received per rescuer room, handles re-dispatch idempotently, and enforces busy/invalid guards (T3.3.2 / T3.4.5)", async () => {
     const rescuer1Id = "80000000-0000-4000-8000-000000000001";
     const rescuer1Session = "81000000-0000-4000-8000-000000000001";

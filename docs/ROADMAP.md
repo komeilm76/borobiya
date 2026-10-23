@@ -135,7 +135,7 @@ gantt
 ### M3.4 Proposals
 - [x] `POST /_user/sos/proposals/:id/accept` (only if not `isOnMission`) + auto-decline others
 - [x] `POST /_user/sos/proposals/:id/decline`
-- [ ] Filter: `isOnMission=true` → no new proposals (query + runtime guard)
+- [x] Filter: `isOnMission=true` or active mission row → no new proposals (query + runtime guard)
 - [ ] UI: Bell inbox with count, proposal cards
 
 ### M3.5 Live Mission & Navigation

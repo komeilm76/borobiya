@@ -1,5 +1,5 @@
 import { and, asc, count, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
-import type { MissionProposalStatus, NearestResponder, SosRequestStatus } from "@borobiya/shared";
+import type { MissionProposalStatus, MissionStatus, NearestResponder, SosRequestStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import {
   adminAuditLog,
@@ -22,6 +22,9 @@ const DISPATCHABLE_SOS_STATUSES = new Set<SosRequestStatus>([
   "dispatched",
   "cancelled_by_rescuer"
 ]);
+
+/** Mission rows, not just the user's cached busy flag, are authoritative for availability. */
+const ACTIVE_MISSION_STATUSES: MissionStatus[] = ["pending", "on_the_way", "arrived", "in_progress"];
 
 export interface MissionProposalRecord {
   id: string;
@@ -162,6 +165,11 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           eq(users.isActive, true),
           eq(users.isSuspended, false),
           eq(users.isOnMission, false),
+          sql`NOT EXISTS (
+            SELECT 1 FROM ${missions}
+            WHERE ${missions.rescuerId} = ${users.id}
+              AND ${inArray(missions.status, ACTIVE_MISSION_STATUSES)}
+          )`,
           isNotNull(users.lastLocation),
           ne(users.id, targetRequest.requesterId),
           sql`EXISTS (
@@ -239,6 +247,15 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         .for("update");
 
       const userById = new Map(candidateUsers.map((candidate) => [candidate.id, candidate]));
+      // Match the nearest and acceptance guards even if is_on_mission was left stale.
+      // The ordered user locks above serialize this with competing acceptance transactions.
+      const activeMissionRows = await tx.select({ rescuerId: missions.rescuerId })
+        .from(missions)
+        .where(and(
+          inArray(missions.rescuerId, input.rescuerIds),
+          inArray(missions.status, ACTIVE_MISSION_STATUSES)
+        ));
+      const busyRescuerIds = new Set(activeMissionRows.map((row) => row.rescuerId));
       const invalidIssues: DispatchValidationIssue[] = [];
       const busyIssues: DispatchValidationIssue[] = [];
 
@@ -256,7 +273,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           invalidIssues.push({ code: "rescuer_unavailable", rescuerId, path: ["rescuerIds", idx] });
           return;
         }
-        if (candidate.isOnMission) {
+        if (candidate.isOnMission || busyRescuerIds.has(rescuerId)) {
           busyIssues.push({ code: "rescuer_on_mission", rescuerId, path: ["rescuerIds", idx] });
         }
       });
@@ -297,9 +314,12 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         }
 
         if (existing) {
+          // A previous decision may still be in flight or retried by a client. Rotating
+          // the public id makes it impossible for that stale accept/decline to decide
+          // this new dispatch generation (the unique SOS/rescuer pair remains intact).
           const [reopened] = await tx
             .update(missionProposals)
-            .set({ status: "pending", declineReason: null, createdAt: new Date() })
+            .set({ id: sql`gen_random_uuid()`, status: "pending", declineReason: null, createdAt: new Date() })
             .where(eq(missionProposals.id, existing.id))
             .returning({
               id: missionProposals.id,
@@ -424,8 +444,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       if (proposal.status !== "pending") return { status: "not_pending" };
       if (request.status !== "dispatched" && request.status !== "accepted") return { status: "sos_closed" };
       const activeMissions = await tx.select({ id: missions.id }).from(missions)
-        .where(and(eq(missions.rescuerId, rescuerId), inArray(missions.status,
-          ["pending", "on_the_way", "arrived", "in_progress"]))).limit(1);
+        .where(and(eq(missions.rescuerId, rescuerId), inArray(missions.status, ACTIVE_MISSION_STATUSES))).limit(1);
       if (rescuer.isOnMission || activeMissions.length > 0) return { status: "on_mission" };
 
       const [created] = await tx.insert(missions).values({
