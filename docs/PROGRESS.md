@@ -128,6 +128,50 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — the routing 502 was unreadable, so the gateway now reports what the upstream said
+
+- **What the VM reported**: after the migration fix, `verify-routing.sh` failed with
+  `car route returned HTTP 502: {"error":"routing_failed","message":"OSRM returned an error."}` while
+  `routing-gateway` and `api` were healthy and tiles for the same area returned 200. That message is the
+  gateway's *own* fallback string, which is the finding: `handleRoutingRequest` did `await response.json()`
+  and then `osrmResponse?.message ?? "OSRM returned an error."`, so an OSRM 4xx, an OSRM 200 with an
+  unexpected shape, and a body that is not a routing answer at all all collapsed into one sentence. Nothing
+  was logged either, so `docker compose logs routing-gateway` had no record of the failure at all.
+- **The contract change, deliberately narrow** (`map-server/routing-gateway/upstream.mjs`, shared with the
+  Photon proxy that had the same blindness): the body is read once as text and then parsed, and every 502
+  carries `upstream` (host + path, never the query string — a Photon search is user data and must not be
+  echoed to a browser or into a log), `upstream_status`, `upstream_code`, `message` (OSRM's own when present,
+  otherwise a sentence saying it was absent), and a 400-character `upstream_body` excerpt only when the body
+  was not an OSRM object — `upstream_body: null` when it could not be read at all. `no_route` (422) and the
+  two 503s keep their fixed two-key shape, because a client cannot act on more than that; the reason for a
+  refused or timed-out connection goes to the log instead. The routing 502 and geocoding 502 bodies are the
+  only shapes that changed.
+- **A new module in that image is a Dockerfile trap, guarded instead of trusted**: the gateway image
+  `COPY`s four named files, so a fifth imported module builds fine and dies at container start with
+  `Cannot find module` — an unhealthy service and no test failure. `packaging.test.mjs` now walks the
+  `CMD` entrypoint's relative imports transitively and fails if any is not in the `COPY` list, that every
+  copied file exists and is non-empty, and that compose still builds with the gateway directory as its
+  context (the bare `COPY` names depend on it). Proved by deleting `upstream.mjs` from the `COPY` line: the
+  guard reports `upstream.mjs is imported by the entrypoint but is not in the Dockerfile COPY list`; put back,
+  it passes.
+- **`verify-routing.sh` prints the request body and the two commands that separate a gateway fault from a
+  data fault**, and was run against a stand-in gateway returning this exact 502 to confirm the output and the
+  exit code. § 6.7's spot checks gained a direct replay of the gateway's own request against
+  `osrm-car:5000` (so a gateway bug cannot hide a data bug) and the `osrm-routed` provenance read —
+  `cat /data/${MAP_REGION}.metadata.json` is the `region`/`areas`/`bbox` that `build-routing.sh` recorded
+  for the graph actually mounted, which is the only way to see "a healthy OSRM is serving a different area".
+  Those spot-check `curl`s also stopped using plain `-f`, which throws the body away — on this endpoint the
+  body is the whole message.
+- **Not claimed**: no root cause for *this* 502 was established here. The repository cannot start OSRM, and
+  the same script and profile URLs passed on this VM on 2026-10-20 for all three profiles, so the
+  difference is in the machine — most likely the graph `MAP_OSRM_DATA_DIR` now points at. The commands above
+  are the measurement; § 9.3 names the three readings that decide it, and says restarting the container is
+  not one of them because it reloads the same graph.
+- **Measured**: `node --test map-server/routing-gateway/*.test.mjs` — the command `docs/MAP_SERVER.md`
+  documents — goes from 19 to 36 passing tests (Node v22, no network, no Docker); `bash -n` and shellcheck
+  clean on the changed script; the migration/credential/proxy suites and `pytest -q scripts/
+  map-server/scripts/` unchanged and green; both touched docs clean under `check_runbook_markdown.py`.
+
 ### 2026-10-23 — a fresh database rejected `0012`: the column type was one quoted identifier
 
 - **The symptom, from the VM that got past the password.** `ALTER ROLE` + a re-probe of `1` settled the

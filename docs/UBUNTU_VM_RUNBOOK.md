@@ -1460,16 +1460,21 @@ has not finished; `MARTIN_URL` and `MARTIN_TILE_PATH` are its two override knobs
 when a script fails and you need to see the response itself
 (`python3 map-server/scripts/regions.py verify-point <area-id>` prints the coordinates for any area):
 
+They use `--fail-with-body`, not plain `-f`: on a failing gateway the body **is** the diagnosis, and `-f`
+discards it.
+
 ```bash
 curl -fS -H 'Accept: application/x-protobuf' -o /tmp/tile.pbf \
   -w 'tile HTTP %{http_code}; %{size_download} bytes\n' \
   http://localhost:8000/borobiya/12/2632/1612                     # 200 + non-empty protobuf
-curl -fsS -H 'Content-Type: application/json' \
+curl --fail-with-body -sS -H 'Content-Type: application/json' \
   -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car","alternatives":true}' \
   http://localhost:8001/route | python3 -m json.tool               # swap car → bicycle → foot
-curl -fsS -G --data-urlencode 'q=Azadi Square' --data-urlencode 'limit=5' \
+docker compose exec -T routing-gateway bun -e 'fetch("http://osrm-car:5000/route/v1/car",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({coordinates:[[51.38,35.68],[51.41,35.7]],steps:true,geometries:"polyline",overview:"full",alternatives:true})}).then(async (r) => console.log("osrm HTTP", r.status, (await r.text()).slice(0, 400)), (e) => console.log("no answer:", e.message))'
+docker compose exec -T osrm-car cat "/data/${MAP_REGION}.metadata.json" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("graph region", d["region"], "areas", d["areas"], "bbox", d["bbox"])'   # which selection the mounted graph really covers
+curl --fail-with-body -sS -G --data-urlencode 'q=Azadi Square' --data-urlencode 'limit=5' \
   http://localhost:8001/geocode | python3 -m json.tool             # non-empty FeatureCollection
-curl -fsS -G --data-urlencode 'lat=35.70' --data-urlencode 'lon=51.40' \
+curl --fail-with-body -sS -G --data-urlencode 'lat=35.70' --data-urlencode 'lon=51.40' \
   http://localhost:8001/reverse | python3 -m json.tool             # a FeatureCollection with a name
 curl -fsS http://localhost:8080/health                             # gateway liveness ("ok", answered by nginx itself)
 curl -fsS http://localhost:8080/api/_public/health                   # the API's own health, through the gateway
@@ -1890,6 +1895,19 @@ Symptom first, always — grep this section for the error text.
   repeats the old file. Nothing has to be cleaned up first: the failed `CREATE TABLE` left no table, and a
   migration that errors is not recorded as applied. (Only a database where `sos_requests` was created by
   `db:push` instead needs that one table dropped.)
+- **`verify-routing` fails with `502 routing_failed` while every container is healthy** — a 502 from the
+  gateway means an OSRM container *answered*, so this is not a startup or a network problem; it is the graph
+  refusing the request. The gateway's response now carries the upstream's own `upstream_status`,
+  `upstream_code` and `message`, and the same summary is written to the container log, so read those before
+  changing anything: `docker compose logs --tail 40 routing-gateway osrm-car`. A message about *matching
+  edges* / *coordinates near* a point means the loaded graph does not cover those coordinates — which a
+  rebuilt or redirected `MAP_OSRM_DATA_DIR` can do silently, because a healthy `osrm-routed` only proves that
+  *a* graph loaded. § 6.7's spot checks hold the two commands that settle it: the `bun -e` fetch replays the
+  gateway's own request against `osrm-car:5000` (bypassing the gateway, so a gateway fault cannot be confused
+  with a data fault), and `cat /data/${MAP_REGION}.metadata.json` inside the container prints the `region`,
+  `areas` and `bbox` that `build-routing.sh` recorded for the graph actually mounted. If that bbox is not the
+  area under test, point `MAP_OSRM_DATA_DIR` at the matching routing directory or rebuild it (§ 6.5) —
+  restarting the container reloads the same graph and proves nothing.
 - **Compose says the network must be recreated after a `git pull`** (the project subnet is pinned to
   `172.30.0.0/24`) — `docker compose down` once, **without** `-v`, then `up -d` again. Containers
   are recreated; volumes and built data stay.

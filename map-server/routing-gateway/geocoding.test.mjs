@@ -90,20 +90,51 @@ test("geocode and reverse reject malformed/unknown query parameters before upstr
   assert.equal(calls, 0);
 });
 
-test("returns 503 when the local Photon service is unavailable", async () => {
+test("returns 503 when the local Photon service is unavailable, and logs why for the operator", async () => {
+  const lines = [];
   const response = await handleGeocodeRequest(get("/geocode?q=Tehran"), {
-    fetchImpl: async () => { throw new Error("connection refused"); }
+    fetchImpl: async () => { throw new Error("connection refused"); },
+    log: (line) => lines.push(line)
   });
   assert.equal(response.status, 503);
+  // The client-visible 503 body is a fixed shape on purpose; the reason belongs in the container log.
   assert.deepEqual(await response.json(), { error: "geocoding_unavailable" });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /no HTTP answer from http:\/\/photon:2322\/api\?q=Tehran/);
+  assert.match(lines[0], /Error: connection refused/);
 });
 
-test("returns 502 when Photon returns malformed JSON GeoJSON", async () => {
+test("returns 502 when Photon returns malformed JSON GeoJSON, naming the upstream answer", async () => {
   const response = await handleGeocodeRequest(get("/reverse?lat=35.7&lon=51.4"), {
-    fetchImpl: async () => Response.json({ type: "Feature", features: [] })
+    fetchImpl: async () => Response.json({ type: "Feature", features: [] }),
+    log: () => {}
   });
   assert.equal(response.status, 502);
-  assert.deepEqual(await response.json(), { error: "invalid_geocoder_response" });
+  const body = await response.json();
+  assert.equal(body.error, "invalid_geocoder_response");
+  assert.equal(body.upstream, "photon:2322/reverse");
+  assert.equal(body.upstream_status, 200);
+  assert.match(body.message, /FeatureCollection/);
+});
+
+test("keeps Photon's own error message out of neither the log nor the client body's query text", async () => {
+  const lines = [];
+  const response = await handleGeocodeRequest(get("/geocode?q=Azadi%20Square"), {
+    fetchImpl: async () => new Response('{"code":"InternalServerError","message":"db is busy"}', {
+      status: 500,
+      headers: { "content-type": "application/json" }
+    }),
+    log: (line) => lines.push(line)
+  });
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.error, "geocoding_failed");
+  assert.equal(body.message, "db is busy");
+  assert.equal(body.upstream_status, 500);
+  // A search string is user data: the query must not be echoed into the response or the log line.
+  const text = JSON.stringify(body) + lines.join("\n");
+  assert.doesNotMatch(text, /Azadi/);
+  assert.match(body.upstream, /^photon:2322\/api$/);
 });
 
 test("uses fixed offline Photon upstreams by default", () => {

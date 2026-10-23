@@ -1,5 +1,6 @@
 import { parseMapConfig } from "./map-config.mjs";
 import { DEFAULT_PHOTON_UPSTREAMS, handleGeocodeRequest } from "./geocoding.mjs";
+import { describeUpstream, formatUpstreamLog, readUpstreamBody } from "./upstream.mjs";
 
 const DEFAULT_UPSTREAMS = Object.freeze({
   car: "http://osrm-car:5000/route/v1/car",
@@ -39,9 +40,14 @@ function validAlternatives(value) {
     (Number.isInteger(value) && value >= 0 && value <= 3);
 }
 
-function routeResult(osrmResponse, profile) {
+function routeResult(osrmResponse, profile, diagnosis = {}) {
   if (!Array.isArray(osrmResponse.routes)) {
-    return json({ error: "invalid_upstream_response", message: "OSRM omitted routes." }, 502);
+    return json({
+      error: "invalid_upstream_response",
+      profile,
+      message: "OSRM answered code=Ok without a routes array.",
+      ...diagnosis
+    }, 502);
   }
   if (osrmResponse.routes.length === 0) {
     return json({ error: "no_route", message: "OSRM returned no routes." }, 422);
@@ -51,7 +57,13 @@ function routeResult(osrmResponse, profile) {
   for (const route of osrmResponse.routes) {
     if (!Number.isFinite(route.distance) || !Number.isFinite(route.duration) ||
         typeof route.geometry !== "string" || !Array.isArray(route.legs)) {
-      return json({ error: "invalid_upstream_response", message: "OSRM returned an incomplete route." }, 502);
+      return json({
+        error: "invalid_upstream_response",
+        profile,
+        message: "OSRM returned an incomplete route.",
+        route_index: routes.length,
+        ...diagnosis
+      }, 502);
     }
     routes.push({
       distance_m: route.distance,
@@ -69,7 +81,8 @@ export async function handleRoutingRequest(request, {
   geocodingUpstreams = configuredGeocodingUpstreams(),
   mapConfig = parseMapConfig(process.env),
   fetchImpl = globalThis.fetch,
-  timeoutMs = 15_000
+  timeoutMs = 15_000,
+  log = console.error
 } = {}) {
   const { pathname } = new URL(request.url);
   if (pathname === "/health") {
@@ -79,7 +92,7 @@ export async function handleRoutingRequest(request, {
     return request.method === "GET" ? json(mapConfig) : json({ error: "method_not_allowed" }, 405);
   }
   if (pathname === "/geocode" || pathname === "/reverse") {
-    return handleGeocodeRequest(request, { upstreams: geocodingUpstreams, fetchImpl, timeoutMs });
+    return handleGeocodeRequest(request, { upstreams: geocodingUpstreams, fetchImpl, timeoutMs, log });
   }
   if (pathname !== "/route") return json({ error: "not_found" }, 404);
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -129,25 +142,34 @@ export async function handleRoutingRequest(request, {
       body: JSON.stringify(osrmRequest),
       signal: AbortSignal.timeout(timeoutMs)
     });
-  } catch {
+  } catch (error) {
+    // The 503 body stays a fixed shape for clients; the container log is where "connection refused" and
+    // "timed out after 15s" have to be told apart, because that difference is the whole diagnosis.
+    const reason = `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
+    log(`${input.profile} routing: no HTTP answer from ${endpoint} (${reason})`);
     return json({ error: "routing_unavailable", profile: input.profile }, 503);
   }
 
-  let osrmResponse;
-  try {
-    osrmResponse = await response.json();
-  } catch {
-    return json({ error: "invalid_upstream_response" }, 502);
+  const { text, parsed, readFailed } = await readUpstreamBody(response);
+  const upstream = describeUpstream({ endpoint, status: response.status, text, parsed, readFailed });
+  const report = (error, fallback) => {
+    log(formatUpstreamLog(`${input.profile} routing`, { status: response.status, endpoint, ...upstream }));
+    return json({ error, profile: input.profile, message: upstream.message ?? fallback, ...upstream.fields }, 502);
+  };
+
+  if (readFailed || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return report("invalid_upstream_response", readFailed
+      ? "The OSRM response body could not be read."
+      : "OSRM answered with something that is not a JSON object.");
+  }
+  if (parsed.code === "NoRoute" || parsed.code === "NoSegment") {
+    return json({ error: "no_route", message: parsed.message ?? "No route was found." }, 422);
+  }
+  if (!response.ok || parsed.code !== "Ok") {
+    return report("routing_failed", "The OSRM profile answered with an error and no message.");
   }
 
-  if (osrmResponse?.code === "NoRoute" || osrmResponse?.code === "NoSegment") {
-    return json({ error: "no_route", message: osrmResponse.message ?? "No route was found." }, 422);
-  }
-  if (!response.ok || osrmResponse?.code !== "Ok") {
-    return json({ error: "routing_failed", message: osrmResponse?.message ?? "OSRM returned an error." }, 502);
-  }
-
-  return routeResult(osrmResponse, input.profile);
+  return routeResult(parsed, input.profile, upstream.fields);
 }
 
 export { DEFAULT_UPSTREAMS, configuredGeocodingUpstreams, DEFAULT_PHOTON_UPSTREAMS };

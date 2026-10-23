@@ -252,6 +252,16 @@ The project contract remains a simple `POST /route`; its body is translated to O
 
 `profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, and OSRM `legs`, plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
 
+A failure that reaches the client says what the upstream said. `map-server/routing-gateway/upstream.mjs`
+reads the profile's body once as text and parses it, so every 502 carries `upstream` (the container and path
+that answered), `upstream_status`, `upstream_code` when OSRM sent one, and `message` — OSRM's own text when
+it has one, otherwise a sentence that says so; a body that is not JSON adds a bounded `upstream_body`
+excerpt, and a body that could not be read at all reports `upstream_body: null`. `no_route` (422) and
+`routing_unavailable` / `geocoding_unavailable` (503) keep their fixed two-key shape, because a client can do
+nothing with more detail there; the reason for a refused or timed-out connection is written to the container
+log instead, along with the same upstream summary. Photon query text is deliberately never copied into a
+response or a log line — only the upstream host and path, never the query string.
+
 `GET /map-config` is the public, same-origin configuration endpoint (gateway path `/config`). It returns only `{ region, bbox, dataVersion, minZoom, maxZoom }`; invalid region, bounds, version, or zoom environment values prevent the gateway from starting. Both Nginx and Vite proxy this endpoint to the same routing gateway, and the client validates the response before using it.
 
 Run the deterministic, network-free gateway tests with Node.js; they exercise all three OSRM profile mappings and Photon geocode/reverse forwarding against local fixtures:
