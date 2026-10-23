@@ -362,6 +362,31 @@ describe("P2-A2 execution against real PostgreSQL (PGlite)", () => {
     expect(row.rows[0]?.priority_device_id).toBe(laptopDevice);
   });
 
+  it("reads a receiver's history only while a matching grant is held, and refuses it after revocation", async () => {
+    const fromTime = new Date("2026-10-20T00:00:00.000Z");
+    const toTime = new Date("2026-10-21T00:00:00.000Z");
+    await pg.query(`INSERT INTO "location_history" ("user_id", "lat", "lon", "timestamp")
+      VALUES ($1, 35.7, 51.4, $2), ($1, 35.8, 51.5, $3)`,
+      [aliceId, fromTime.toISOString(), new Date(fromTime.getTime() + MINUTE_MS).toISOString()]);
+    const grant = await historyStore.createHistoryShares({
+      ownerId: aliceId, targetUserIds: [bobId], fromTime, toTime, maxPoints: 1
+    });
+    const shareId = grant.shares[0]!.id;
+    expect(await historyStore.readSharedHistoryWindow({
+      shareId, targetUserId: carolId, defaultReadPoints: 100
+    })).toBeNull();
+    const window = await historyStore.readSharedHistoryWindow({
+      shareId, targetUserId: bobId, defaultReadPoints: 100
+    });
+    expect(window?.totalPoints).toBe(2);
+    expect(window?.points).toHaveLength(1);
+    expect(window?.points[0]?.lat).toBe(35.7);
+    expect(await historyStore.deleteHistoryShare({ shareId, ownerId: aliceId })).toBe(true);
+    expect(await historyStore.readSharedHistoryWindow({
+      shareId, targetUserId: bobId, defaultReadPoints: 100
+    })).toBeNull();
+  });
+
   it("executes historyWindowQuery window functions, stride sampling, and revokeShare ownership checks on PostgreSQL", async () => {
     const start = new Date("2026-10-20T00:00:00.000Z");
     const end = new Date("2026-10-20T01:00:00.000Z");

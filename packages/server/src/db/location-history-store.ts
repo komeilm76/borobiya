@@ -65,6 +65,12 @@ export interface ReadLocationHistoryWindowInput {
   maxPoints: number;
 }
 
+export interface ReadSharedHistoryWindowInput {
+  shareId: string;
+  targetUserId: string;
+  defaultReadPoints: number;
+}
+
 export interface LocationHistoryWindowResult {
   points: LocationHistoryPointRecord[];
   /** Rows the window holds before sampling, so a client can tell a sampled view from the whole record. */
@@ -90,7 +96,10 @@ export interface LocationHistoryStore {
    */
   readHistoryWindow(input: ReadLocationHistoryWindowInput): Promise<LocationHistoryWindowResult>;
 
-  /** The grant itself, without ownership conditions — the caller decides what the requester may read. */
+  /** A receiver's read, authorized and sampled under the same locked grant row. Null means no access. */
+  readSharedHistoryWindow(input: ReadSharedHistoryWindowInput): Promise<LocationHistoryWindowResult | null>;
+
+  /** Metadata lookup only; NEVER use a separate lookup to authorize a history read (use readSharedHistoryWindow). */
   findHistoryShare(shareId: string): Promise<LocationHistoryShareRecord | null>;
 
   /** Deletes one grant of one owner and reports whether a row was there; the receiver's read starts 404-ing. */
@@ -305,6 +314,31 @@ export class DrizzleLocationHistoryStore implements LocationHistoryStore {
 
   async readHistoryWindow(input: ReadLocationHistoryWindowInput): Promise<LocationHistoryWindowResult> {
     return historyWindowResult(await historyWindowQuery(this.db, input));
+  }
+
+  async readSharedHistoryWindow(input: ReadSharedHistoryWindowInput): Promise<LocationHistoryWindowResult | null> {
+    return this.db.transaction(async (tx) => {
+      // A naked find followed by a second query can return the owner's history *after*
+      // the owner revokes the grant. FOR SHARE conflicts with DELETE/UPDATE: either
+      // revocation commits first and this read returns null, or it waits until the
+      // authorized history read finishes. The target predicate is part of the lock.
+      const [grant] = await tx.select({
+        ownerId: locationHistoryShares.ownerId,
+        fromTime: locationHistoryShares.fromTime,
+        toTime: locationHistoryShares.toTime,
+        maxPoints: locationHistoryShares.maxPoints
+      }).from(locationHistoryShares).where(and(
+        eq(locationHistoryShares.id, input.shareId),
+        eq(locationHistoryShares.targetUserId, input.targetUserId)
+      )).for("share").limit(1);
+      if (!grant) return null;
+      return historyWindowResult(await historyWindowQuery(tx as unknown as Database, {
+        userId: grant.ownerId,
+        fromTime: grant.fromTime,
+        toTime: grant.toTime,
+        maxPoints: grant.maxPoints ?? input.defaultReadPoints
+      }));
+    });
   }
 
   async findHistoryShare(shareId: string): Promise<LocationHistoryShareRecord | null> {

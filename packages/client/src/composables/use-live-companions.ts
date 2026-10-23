@@ -86,6 +86,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   let client: RealtimeClient | null = null;
   let requestId = 0;
   let refreshing = false;
+  let activeReads = 0;
   let refreshingAuth = false;
   let inRefreshRetry = false;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -116,6 +117,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   }
 
   async function refresh(): Promise<void> {
+    // Invalidate older HTTP replies before even awaiting a session refresh. Otherwise
+    // a sign-out/revocation during that await can resurrect another account's peers.
+    const request = ++requestId;
     let token = options.accessToken.value;
     if (!token && options.ensureSession) {
       try {
@@ -125,6 +129,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       }
       token = options.accessToken.value;
     }
+    if (request !== requestId) return;
     if (!token) {
       registry.value = emptyRegistry;
       openShareIds = new Set();
@@ -132,11 +137,11 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       readFailed.value = false;
       return;
     }
-    const request = ++requestId;
+    activeReads++;
     refreshing = true;
     try {
       const shares = await readShares(token);
-      if (request !== requestId) return;
+      if (request !== requestId || options.accessToken.value !== token) return;
       applyShares(shares);
     } catch (error) {
       const statusCode = (error as { status?: unknown } | null)?.status;
@@ -149,7 +154,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
           if (nextToken && nextToken !== token) {
             const retryRequest = ++requestId;
             const retried = await readShares(nextToken);
-            if (retryRequest === requestId) applyShares(retried);
+            if (retryRequest === requestId && options.accessToken.value === nextToken) applyShares(retried);
             return;
           }
         } catch {
@@ -159,10 +164,11 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
           refreshingAuth = false;
         }
       }
-      if (request !== requestId) return;
+      if (request !== requestId || options.accessToken.value !== token) return;
       readFailed.value = true;
     } finally {
-      refreshing = false;
+      activeReads--;
+      refreshing = activeReads > 0;
     }
   }
 
@@ -194,6 +200,10 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     if (result.registry !== registry.value) {
       registry.value = result.registry;
     }
+    // A GET started before this event may still return a revoked share, even if
+    // the initial list has not populated openShareIds yet. Recheck only when a
+    // read is in flight; the new request invalidates its older response.
+    if (result.reason !== "invalid" && refreshing) void refresh();
   }
 
   function onConnect(): void {
@@ -288,7 +298,8 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
         return;
       }
       // Signing out must not leave somebody else's companions on the screen, nor a socket that keeps
-      // receiving their positions.
+      // receiving their positions. Invalidate reads that started under the old bearer too.
+      requestId++;
       teardownClient();
       registry.value = emptyRegistry;
       openShareIds = new Set();
@@ -298,6 +309,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   );
 
   onScopeDispose(() => {
+    requestId++;
     if (timer) clearInterval(timer);
     timer = null;
     teardownClient();

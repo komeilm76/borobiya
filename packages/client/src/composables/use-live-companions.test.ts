@@ -66,6 +66,7 @@ function mount(
     token?: string | null;
     ownUserId?: string | null;
     blockReads?: boolean;
+    captureReadSnapshot?: boolean;
     ensureSession?: () => Promise<void>;
   } = {}
 ): Harness {
@@ -83,6 +84,8 @@ function mount(
 
   const readShares = vi.fn(async () => {
     reads += 1;
+    // Model an HTTP response computed before a later revoke, but delivered after its socket event.
+    const snapshot = options.captureReadSnapshot ? [...owners] : null;
     if (options.blockReads) {
       await new Promise<void>((resolve) => {
         pending.push(resolve);
@@ -94,7 +97,7 @@ function mount(
       throw new Error("boom");
     }
     return {
-      sharedWithMe: owners.map((owner, index) => ({ id: `share-${index + 1}`, owner }))
+      sharedWithMe: (snapshot ?? owners).map((owner, index) => ({ id: `share-${index + 1}`, owner }))
     } as unknown as LocationSharesResponse;
   });
 
@@ -415,6 +418,50 @@ describe("useLiveCompanions", () => {
     expect(readShares).toHaveBeenCalledWith("fresh-map-token");
     expect(api.status.value.line).not.toContain("خوانده نشد");
     scope.stop();
+  });
+
+  it("does not restore a signed-out account's companions when an older share read finishes late", async () => {
+    const harness = mount({ blockReads: true, captureReadSnapshot: true });
+    await settle();
+    expect(harness.reads()).toBe(1);
+    harness.token.value = null;
+    await nextTick();
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.shareCount.value).toBe(0);
+    harness.scope.stop();
+  });
+
+  it("cannot seed a share revoked while its first list read was still loading", async () => {
+    const harness = mount({ blockReads: true, captureReadSnapshot: true });
+    await settle();
+    harness.setShares([]);
+    harness.socket.dispatch("location:share-ended", { shareId: "share-1", userId: ALICE, reason: "revoked" });
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.shareCount.value).toBe(0);
+    harness.scope.stop();
+  });
+
+  it("cannot restore a revoked share from an HTTP reply started before the share-ended event", async () => {
+    const harness = mount({ blockReads: true, captureReadSnapshot: true });
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+
+    const staleRead = harness.api.refresh();
+    await settle();
+    harness.setShares([]);
+    harness.socket.dispatch("location:share-ended", { shareId: "share-1", userId: ALICE, reason: "revoked" });
+    expect(harness.peers()).toEqual([]);
+    harness.resolveRead();
+    await staleRead;
+    await settle();
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.shareCount.value).toBe(0);
+    harness.scope.stop();
   });
 
   it("takes a peer off the map immediately on location:share-ended without polling, identically for revoke and expiry", async () => {

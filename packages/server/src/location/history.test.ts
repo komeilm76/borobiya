@@ -58,6 +58,7 @@ async function makeApp(
     createHistoryShares?: LocationHistoryStore["createHistoryShares"];
     assessShareTargets?: () => Promise<ShareTargetAssessment>;
     readHistoryWindow?: LocationHistoryStore["readHistoryWindow"];
+    readSharedHistoryWindow?: LocationHistoryStore["readSharedHistoryWindow"];
     findHistoryShare?: LocationHistoryStore["findHistoryShare"];
     deleteHistoryShare?: LocationHistoryStore["deleteHistoryShare"];
     listHistoryShares?: LocationHistoryStore["listHistoryShares"];
@@ -89,6 +90,17 @@ async function makeApp(
   const findHistoryShare = vi.fn<LocationHistoryStore["findHistoryShare"]>(
     options.findHistoryShare ?? (async () => grant())
   );
+  const readSharedHistoryWindow = vi.fn<LocationHistoryStore["readSharedHistoryWindow"]>(
+    options.readSharedHistoryWindow ?? (async ({ shareId, targetUserId, defaultReadPoints }) => {
+      // Test double only. The real store locks this grant and reads history in one transaction.
+      const row = await findHistoryShare(shareId);
+      if (!row || row.targetUserId !== targetUserId) return null;
+      return readHistoryWindow({
+        userId: row.ownerId, fromTime: row.fromTime, toTime: row.toTime,
+        maxPoints: row.maxPoints ?? defaultReadPoints
+      });
+    })
+  );
   const deleteHistoryShare = vi.fn<LocationHistoryStore["deleteHistoryShare"]>(
     options.deleteHistoryShare ?? (async () => true)
   );
@@ -109,6 +121,7 @@ async function makeApp(
     store: {
       createHistoryShares,
       readHistoryWindow,
+      readSharedHistoryWindow,
       findHistoryShare,
       deleteHistoryShare,
       listHistoryShares
@@ -123,6 +136,7 @@ async function makeApp(
     createHistoryShares,
     assessShareTargets,
     readHistoryWindow,
+    readSharedHistoryWindow,
     findHistoryShare,
     deleteHistoryShare,
     listHistoryShares
@@ -323,6 +337,19 @@ describe("GET /_user/location/history", () => {
 });
 
 describe("GET /_user/location/history/shared/:shareId", () => {
+  it("uses the store's atomic authorized read rather than a separate grant lookup", async () => {
+    const { app, readSharedHistoryWindow, findHistoryShare, readHistoryWindow } = await makeApp({
+      readSharedHistoryWindow: async () => windowResult()
+    });
+    const response = await call(app, "GET", `/_user/location/history/shared/${shareId}`);
+    expect(response.statusCode).toBe(200);
+    expect(readSharedHistoryWindow).toHaveBeenCalledWith({
+      shareId, targetUserId: ownerId, defaultReadPoints: DEFAULT_READ_POINTS
+    });
+    expect(findHistoryShare).not.toHaveBeenCalled();
+    expect(readHistoryWindow).not.toHaveBeenCalled();
+  });
+
   it("answers the same 404 for an unknown id and a grant somebody else received", async () => {
     const unknown = await makeApp({ findHistoryShare: async () => null });
     const foreign = await makeApp({ findHistoryShare: async () => grant({ targetUserId: randomUUID() }) });

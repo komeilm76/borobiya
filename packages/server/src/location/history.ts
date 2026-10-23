@@ -16,7 +16,7 @@ const DAY_MS = 24 * 60 * 60_000;
 export interface LocationHistoryRouteDependencies {
   store: Pick<
     LocationHistoryStore,
-    "createHistoryShares" | "readHistoryWindow" | "findHistoryShare" | "deleteHistoryShare" | "listHistoryShares"
+    "createHistoryShares" | "readHistoryWindow" | "readSharedHistoryWindow" | "deleteHistoryShare" | "listHistoryShares"
   >;
   /** Recipient classification is the live-share rule, so both endpoints refuse the same targets. */
   shares: Pick<LocationShareStore, "assessShareTargets">;
@@ -221,11 +221,15 @@ export async function registerLocationHistoryShareRoutes(
       );
     }
 
-    const shareId = parsedParams.data.shareId;
-    const share = await dependencies.store.findHistoryShare(shareId);
-    // The same answer for "no such grant" and "a grant somebody else received": this endpoint is the
-    // only way to probe whether another account holds a history grant, so it must not confirm either way.
-    if (!share || share.targetUserId !== user.userId) {
+    // The authorization row remains locked until its history window is read. A revoke
+    // cannot land between a separate grant lookup and a later owner-history query.
+    const window = await dependencies.store.readSharedHistoryWindow({
+      shareId: parsedParams.data.shareId,
+      targetUserId: user.userId,
+      defaultReadPoints: dependencies.defaultReadPoints
+    });
+    // Unknown and foreign grants are deliberately indistinguishable.
+    if (!window) {
       return sendError(
         reply,
         404,
@@ -233,13 +237,6 @@ export async function registerLocationHistoryShareRoutes(
         "No shared history with that id is available to this account."
       );
     }
-
-    const window = await dependencies.store.readHistoryWindow({
-      userId: share.ownerId,
-      fromTime: share.fromTime,
-      toTime: share.toTime,
-      maxPoints: historyReadPoints(share.maxPoints, dependencies.defaultReadPoints)
-    });
 
     return reply.code(200).header("cache-control", "no-store").send(historyWindowPayload(window));
   });
