@@ -88,6 +88,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   let socketGeneration = 0;
   let refreshGeneration = 0;
   let nearestGeneration = 0;
+  let dispatchGeneration = 0;
   let refreshingSocketAuth = false;
 
   const isAdminSession = computed(
@@ -187,15 +188,18 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   async function loadNearestResponders(requestId?: string | null): Promise<void> {
+    // Even an empty selection invalidates the previous request: otherwise a late HTTP reply
+    // repopulates the picker with responders for an SOS that is no longer selected.
+    const gen = ++nearestGeneration;
     const targetId = requestId ?? selectedId.value;
     if (!isAdminSession.value || !targetId) {
       nearestResponders.value = [];
+      selectedResponderIds.value = [];
       nearestError.value = null;
       nearestLoading.value = false;
       return;
     }
 
-    const gen = ++nearestGeneration;
     nearestLoading.value = true;
     nearestError.value = null;
 
@@ -243,6 +247,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
 
     const idsToDispatch = [...selectedResponderIds.value];
+    const gen = ++dispatchGeneration;
     dispatchSubmitting.value = true;
     dispatchFeedback.value = null;
 
@@ -251,7 +256,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       const response = await withAdminAuthRetry((token) =>
         dispatchFn(activeRequest.id, idsToDispatch, token)
       );
-      if (!response) return false;
+      // Logout/reset may occur while the request is on the wire. Never hydrate private SOS
+      // data into a newly initialized admin session from an earlier session's response.
+      if (!response || gen !== dispatchGeneration || !isAdminSession.value) return false;
 
       proposalsByRequestId.value = {
         ...proposalsByRequestId.value,
@@ -264,20 +271,26 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       };
       const { items } = upsertSosAlert(requests.value, updatedRecord);
       requests.value = items;
-      selectedResponderIds.value = [];
-      dispatchFeedback.value = {
-        type: "success",
-        message: `پیشنهاد مأموریت با موفقیت برای ${response.proposals.length} امدادگر ارسال شد.`
-      };
+      // The dispatcher may have selected another SOS while this request was in flight. The
+      // first SOS still needs its updated status, but the new selection and banner are its own.
+      if (selectedId.value === activeRequest.id) {
+        selectedResponderIds.value = [];
+        dispatchFeedback.value = {
+          type: "success",
+          message: `پیشنهاد مأموریت با موفقیت برای ${response.proposals.length} امدادگر ارسال شد.`
+        };
+      }
       return true;
     } catch (err) {
-      dispatchFeedback.value = {
-        type: "error",
-        message: friendlyErrorMessage(err, "ارسال پیشنهاد مأموریت انجام نشد.")
-      };
+      if (gen === dispatchGeneration && isAdminSession.value && selectedId.value === activeRequest.id) {
+        dispatchFeedback.value = {
+          type: "error",
+          message: friendlyErrorMessage(err, "ارسال پیشنهاد مأموریت انجام نشد.")
+        };
+      }
       return false;
     } finally {
-      dispatchSubmitting.value = false;
+      if (gen === dispatchGeneration) dispatchSubmitting.value = false;
     }
   }
 
@@ -410,6 +423,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   function resetState(): void {
     refreshGeneration++;
     nearestGeneration++;
+    dispatchGeneration++;
     detachRealtime();
     requests.value = [];
     selectedId.value = null;
@@ -451,6 +465,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   watch(selectedId, (nextId) => {
+    // A responder list is scoped to its SOS, not to the dispatch page as a whole. Do not
+    // display or allow selecting the previous SOS's candidates while the next read is pending.
+    nearestResponders.value = [];
     selectedResponderIds.value = [];
     dispatchFeedback.value = null;
     void loadNearestResponders(nextId);
@@ -461,6 +478,19 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     (nextToken) => {
       if (nextToken && attachedClient) {
         attachedClient.updateToken(nextToken);
+      }
+    }
+  );
+
+  watch(
+    () => auth.user?.id,
+    (nextId, previousId) => {
+      // Two admin logins can replace one another without isAdminSession ever becoming false.
+      // The socket is authenticated as the previous account, and its SOS state must not leak
+      // into the new account's view. A normal token rotation leaves the user id unchanged.
+      if (previousId && nextId && previousId !== nextId && isAdminSession.value) {
+        resetState();
+        startMonitoring();
       }
     }
   );

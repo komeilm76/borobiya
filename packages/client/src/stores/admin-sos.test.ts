@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { createPinia, setActivePinia } from "pinia";
+import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SosRequestRecord } from "@shared/index";
 import { ApiError } from "@/api/http";
@@ -224,6 +225,172 @@ describe("useAdminSosStore (T3.2.5)", () => {
       expect(refreshSpy).toHaveBeenCalledOnce();
       expect(updateToken).toHaveBeenCalledWith("rotated-ws-token");
     });
+  });
+
+  it("discards a pending nearest-responder reply when the selected SOS is cleared", async () => {
+    const request = makeSosRecord();
+    let resolveNearest!: (result: { responders: { userId: string; username: string; distance: number; avgRating: number; categoryName: string; lastActiveAt: string }[] }) => void;
+    const pendingNearest = new Promise<{
+      responders: { userId: string; username: string; distance: number; avgRating: number; categoryName: string; lastActiveAt: string }[];
+    }>((resolve) => { resolveNearest = resolve; });
+    const getNearestResponders = vi.fn(() => pendingNearest);
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }),
+      getNearestResponders
+    });
+
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
+    store.selectRequest(null);
+    await nextTick();
+    expect(store.nearestResponders).toEqual([]);
+    expect(store.nearestLoading).toBe(false);
+
+    resolveNearest({ responders: [{
+      userId: "44444444-4444-4444-8444-444444444441",
+      username: "rescuer_one", distance: 380, avgRating: 4.9,
+      categoryName: "امداد شهری", lastActiveAt: "2026-10-23T12:10:00.000Z"
+    }] });
+    await pendingNearest;
+    await nextTick();
+    expect(store.nearestResponders).toEqual([]);
+    expect(store.selectedResponderIds).toEqual([]);
+  });
+
+  it("hides the previous SOS's responders while loading a different SOS", async () => {
+    const first = makeSosRecord();
+    const second = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
+    const firstRescuer = {
+      userId: "44444444-4444-4444-8444-444444444441", username: "rescuer_one",
+      distance: 380, avgRating: 4.9, categoryName: "امداد شهری",
+      lastActiveAt: "2026-10-23T12:10:00.000Z"
+    };
+    let finishSecond!: (result: { responders: typeof firstRescuer[] }) => void;
+    const secondNearest = new Promise<{ responders: typeof firstRescuer[] }>((resolve) => { finishSecond = resolve; });
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [first, second], total: 2 }),
+      getNearestResponders: (id) => id === first.id
+        ? Promise.resolve({ responders: [firstRescuer] }) : secondNearest
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.nearestResponders).toEqual([firstRescuer]));
+
+    store.selectRequest(second.id);
+    await nextTick();
+    expect(store.nearestLoading).toBe(true);
+    expect(store.nearestResponders).toEqual([]);
+    expect(store.canDispatchSelected).toBe(false);
+    finishSecond({ responders: [] });
+    await secondNearest;
+  });
+
+  it("does not clear another SOS's selection or show its dispatch feedback when a previous dispatch finishes", async () => {
+    const first = makeSosRecord();
+    const second = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
+    const firstRescuer = "44444444-4444-4444-8444-444444444441";
+    const secondRescuer = "44444444-4444-4444-8444-444444444442";
+    let completeDispatch!: (value: { proposals: { id: string; sosRequestId: string; rescuerId: string; status: "pending"; createdAt: string }[] }) => void;
+    const pendingDispatch = new Promise<{ proposals: { id: string; sosRequestId: string; rescuerId: string; status: "pending"; createdAt: string }[] }>((resolve) => { completeDispatch = resolve; });
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [first, second], total: 2 }),
+      getNearestResponders: async (requestId) => ({ responders: requestId === second.id ? [{
+        userId: secondRescuer, username: "rescuer_two", distance: 200,
+        avgRating: 4.5, categoryName: "امداد شهری", lastActiveAt: "2026-10-23T12:10:00.000Z"
+      }] : [] }),
+      dispatchResponders: () => pendingDispatch
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toHaveLength(2));
+    store.selectRequest(first.id);
+    await nextTick();
+    store.selectedResponderIds = [firstRescuer];
+    const dispatch = store.dispatchSelectedResponders();
+    store.selectRequest(second.id);
+    await vi.waitFor(() => {
+      expect(store.selectedId).toBe(second.id);
+      expect(store.nearestResponders.map((responder) => responder.userId)).toEqual([secondRescuer]);
+      expect(store.nearestLoading).toBe(false);
+    });
+    store.selectedResponderIds = [secondRescuer];
+
+    completeDispatch({ proposals: [{
+      id: "55555555-5555-4555-8555-555555555551",
+      sosRequestId: first.id, rescuerId: firstRescuer,
+      status: "pending", createdAt: "2026-10-23T12:12:00.000Z"
+    }] });
+    expect(await dispatch).toBe(true);
+    expect(store.requests.find((item) => item.id === first.id)?.status).toBe("dispatched");
+    expect(store.selectedResponderIds).toEqual([secondRescuer]);
+    expect(store.dispatchFeedback).toBeNull();
+  });
+
+  it("resets private SOS state and reconnects when switching directly between admin accounts", async () => {
+    const first = makeSosRecord();
+    const close = vi.fn();
+    const openSocket = vi.fn(async () => ({
+      socket: socketEmitter as never,
+      updateToken: vi.fn(),
+      connect: vi.fn(),
+      close
+    }));
+    const listRequests = vi.fn(async (token: string) => ({
+      items: token === "admin-one-token" ? [first] : [], total: token === "admin-one-token" ? 1 : 0
+    }));
+    configureAdminSosRuntimeForTests({ openSocket, listRequests, getNearestResponders: async () => ({ responders: [] }) });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-one-token";
+    auth.user = { id: "admin-1", username: "first_admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.requests).toEqual([first]));
+    await vi.waitFor(() => expect(openSocket).toHaveBeenCalledOnce());
+
+    // A fresh login can replace a session without an intervening unauthenticated render.
+    auth.accessToken = "admin-two-token";
+    auth.user = { id: "admin-2", username: "second_admin", role: "admin", mustCompleteSecurityQuestions: false };
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledWith("admin-two-token", expect.anything()));
+    expect(store.requests).toEqual([]);
+    expect(store.selectedId).toBeNull();
+    expect(close).toHaveBeenCalled();
+    await vi.waitFor(() => expect(openSocket).toHaveBeenCalledWith("admin-two-token"));
+  });
+
+  it("ignores a dispatch reply arriving after admin logout instead of restoring private SOS data", async () => {
+    const request = makeSosRecord();
+    let finishDispatch!: (value: { proposals: never[] }) => void;
+    const pendingDispatch = new Promise<{ proposals: never[] }>((resolve) => { finishDispatch = resolve; });
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }),
+      getNearestResponders: async () => ({ responders: [] }),
+      dispatchResponders: () => pendingDispatch
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(request.id));
+    store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
+    const dispatch = store.dispatchSelectedResponders();
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    finishDispatch({ proposals: [] });
+    expect(await dispatch).toBe(false);
+    expect(store.requests).toEqual([]);
+    expect(store.dispatchFeedback).toBeNull();
+    expect(store.dispatchSubmitting).toBe(false);
   });
 
   it("loads nearest responders on selection, supports multi-select, and dispatches proposals cleanly (T3.3.4)", async () => {
