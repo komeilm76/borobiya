@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "./client";
-import { sosRequests } from "./schema";
+import { missionProposals, sosRequests } from "./schema";
 
 /**
  * Pointing one SOS request at one stored photo (T3.2.3).
@@ -19,6 +19,8 @@ export type AttachSosPhotoResult = { status: "attached"; photoUrl: string } | { 
 
 export interface SosPhotoStore {
   attachPhoto(input: AttachSosPhotoInput): Promise<AttachSosPhotoResult>;
+  /** Only pending or accepted proposals grant their rescuer evidence access. */
+  hasReadableProposal?(requestId: string, rescuerId: string): Promise<boolean>;
 }
 
 /**
@@ -36,6 +38,16 @@ export function attachSosPhotoQuery(db: Database, input: AttachSosPhotoInput) {
 
 export class DrizzleSosPhotoStore implements SosPhotoStore {
   constructor(private readonly db: Database) {}
+
+  async hasReadableProposal(requestId: string, rescuerId: string): Promise<boolean> {
+    const rows = await this.db.select({ id: missionProposals.id }).from(missionProposals)
+      .where(and(
+        eq(missionProposals.sosRequestId, requestId),
+        eq(missionProposals.rescuerId, rescuerId),
+        inArray(missionProposals.status, ["pending", "accepted"])
+      )).limit(1);
+    return rows.length > 0;
+  }
 
   async attachPhoto(input: AttachSosPhotoInput): Promise<AttachSosPhotoResult> {
     const [updated] = await attachSosPhotoQuery(this.db, input);

@@ -46,6 +46,10 @@ const syncResponseSchema = z.strictObject({
   missions: z.array(missionSchema)
 });
 const photoUploadResponseSchema = z.strictObject({ photoUrl: z.string().trim().min(1) });
+export const photoAccessResponseSchema = z.strictObject({
+  url: z.string().startsWith("/uploads/"),
+  expiresAt: timestampSchema
+});
 
 export const sosRoutes = {
   createRequest: defineRoute({
@@ -125,6 +129,20 @@ export const sosRoutes = {
       tags: ["sos", "user"],
       access: "authenticated",
       requestContentType: "multipart/form-data"
+    }
+  }),
+  getPhotoAccess: defineRoute({
+    method: "GET",
+    url: "/_user/sos/requests/:id/photo-access",
+    schema: {
+      params: sosRequestParamsSchema,
+      responses: { 200: photoAccessResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "sosGetPhotoAccess",
+      summary: "Issue a short-lived SOS photo URL for a participant or admin",
+      tags: ["sos", "user"],
+      access: "authenticated"
     }
   }),
   listProposals: defineRoute({

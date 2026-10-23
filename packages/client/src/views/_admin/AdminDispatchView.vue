@@ -417,8 +417,16 @@
               <p class="mt-1 mb-0">{{ adminSos.selectedRequest.description }}</p>
             </div>
             <div v-if="adminSos.selectedRequest.photoUrl" class="text-caption text-medium-emphasis">
-              <strong>شناسهٔ پیوست تصویری ثبت‌شده:</strong>
-              <code dir="ltr" class="ms-1">{{ adminSos.selectedRequest.photoUrl }}</code>
+              <strong>تصویر پیوست حادثه:</strong>
+              <img
+                v-if="photoSrc"
+                :src="photoSrc"
+                alt="تصویر پیوست درخواست امداد"
+                class="d-block mt-2 rounded-lg"
+                style="max-width: 100%; max-height: 360px; object-fit: contain"
+                referrerpolicy="no-referrer"
+              >
+              <span v-else class="ms-1">{{ photoLoading ? "در حال دریافت تصویر…" : "تصویر در دسترس نیست." }}</span>
             </div>
             <div v-if="adminSos.selectedRequestProposals.length > 0" class="pt-2">
               <strong>پیشنهادهای ارسال‌شده در این نشست:</strong>
@@ -439,6 +447,7 @@ import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
 import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
+import { getSosPhotoSrc } from "@/api/admin-sos";
 import {
   buildSosAlertsGeoJson,
   formatResponderDistance,
@@ -449,6 +458,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
+import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
 const SOS_SOURCE_ID = "admin-sos-requests";
@@ -457,7 +467,25 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
+const auth = useAuthStore(pinia);
 const themeStore = useThemeStore(pinia);
+const photoSrc = ref<string | null>(null);
+const photoLoading = ref(false);
+watch(
+  () => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.photoUrl, auth.accessToken] as const,
+  ([requestId, photoUrl, token], _previous, onCleanup) => {
+    let active = true;
+    onCleanup(() => { active = false; });
+    photoSrc.value = null;
+    photoLoading.value = Boolean(requestId && photoUrl && token);
+    if (!requestId || !photoUrl || !token) return;
+    void getSosPhotoSrc(requestId, token)
+      .then((src) => { if (active) photoSrc.value = src; })
+      .catch(() => { if (active) photoSrc.value = null; })
+      .finally(() => { if (active) photoLoading.value = false; });
+  },
+  { immediate: true }
+);
 
 const incidentTypes = ref<IncidentType[]>([]);
 const mapStyleUrl = computed(() =>

@@ -36,6 +36,7 @@ import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
 import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
 import { registerSosPhotoRoutes } from "./sos/photos";
+import { registerSosPhotoAccessRoutes } from "./sos/photo-access";
 import { DrizzleLocationShareStore, type LocationShareStore } from "./db/location-share-store";
 import { DrizzleLocationHistoryStore, type LocationHistoryStore } from "./db/location-history-store";
 import { createLiveLocationService, registerLocationUpdateRoute } from "./location/live";
@@ -247,6 +248,13 @@ export async function createFastifyApp(
     maxBytes: config.sosPhotoMaxBytes,
     sosRequests: sosRequestStore,
     io: realtime.io
+  });
+  await registerSosPhotoAccessRoutes(app, {
+    sosRequests: sosRequestStore,
+    photos: photoStore,
+    storage: photoStorage,
+    jwtSecret: config.jwtSecret,
+    maxBytes: config.sosPhotoMaxBytes
   });
   await registerLocationHistoryShareRoutes(app, {
     store: locationHistoryStore,

@@ -177,14 +177,12 @@ export async function readPhotoPart(
  * 4. **A photo is written only when the row accepts it, and unlinked when it does not.** Bytes on disk
  *    that no request points at are readable-by-luck evidence, so the failed write is cleaned up.
  *
- * What the file is *served* from is the other half of §9 and is not implemented here: there is no
- * `GET /uploads/:id` route, because an image load in a browser carries no bearer token and the
- * mechanism that authorizes one (session cookie versus short-lived signed URL) is a decision the docs
- * do not contain. Until T3.2.6 lands, the bytes are durable and referenced, and not yet readable.
+ * The read path lives separately in `photo-access.ts`: it checks participants before issuing a
+ * short-lived signed URL and rechecks the database pointer before serving bytes. This upload route
+ * never grants read permission by returning the bare path.
  *
- * A re-post replaces which photo the request points at; the previous file stays on the volume, because
- * silently destroying a picture somebody sent as evidence of an emergency is worse than a stale object,
- * and no retention rule for orphans exists yet.
+ * A re-post replaces which photo the request points at; the previous file stays privately on the
+ * volume as evidence, unreachable via the read API. Deletion needs a separate retention policy.
  */
 export async function registerSosPhotoRoutes(
   app: FastifyInstance,

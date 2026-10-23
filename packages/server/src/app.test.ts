@@ -181,8 +181,10 @@ describe("Fastify server skeleton", () => {
       413: expect.any(Object),
       429: expect.any(Object)
     });
-    // The read half is still a promise: no `GET /uploads/{id}` operation exists in the document.
-    expect(document.json().paths).not.toHaveProperty("/uploads/{id}");
+    // The read half is a signed binary route, not a static directory.
+    expect(document.json().paths["/uploads/{id}"]?.get?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(document.json().paths["/uploads/{id}"]?.get?.responses?.["200"]?.content?.["application/octet-stream"]?.schema)
+      .toEqual({ type: "string", format: "binary" });
   });
 
   it("serves the public health endpoint with security headers", async () => {

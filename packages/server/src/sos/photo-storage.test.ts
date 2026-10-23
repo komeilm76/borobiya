@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { chmod, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, readFile, rm, stat, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createPhotoStorage, photoPartFileName, photoUrlFor } from "./photo-storage";
@@ -34,6 +34,20 @@ describe("createPhotoStorage", () => {
     expect(stored.photoUrl.startsWith("/uploads/")).toBe(true);
     expect(stored.byteLength).toBe(bytes.byteLength);
     expect(new Uint8Array(await readFile(join(directory, stored.fileName)))).toEqual(bytes);
+  });
+
+  it("reads only bounded server-generated files, refusing traversals and symlinks", async () => {
+    const directory = await tempDir();
+    const storage = createPhotoStorage(directory);
+    const bytes = Uint8Array.from([0x01, 0x02, 0x03]);
+    const stored = await storage.save(bytes, "png");
+    expect(await storage.read?.(stored.fileName, 3)).toEqual(Buffer.from(bytes));
+    expect(await storage.read?.(stored.fileName, 2)).toBeNull();
+    expect(await storage.read?.("../../etc/passwd", 100)).toBeNull();
+    expect(await storage.read?.("not-a-uuid.png", 100)).toBeNull();
+    const linkName = stored.fileName.replace(/^[0-9a-f]{8}/, "ffffffff");
+    await symlink(join(directory, stored.fileName), join(directory, linkName));
+    expect(await storage.read?.(linkName, 100)).toBeNull();
   });
 
   it("leaves the file readable only by the account that runs the API", async () => {

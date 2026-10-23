@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rename, unlink, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { mkdir, open, rename, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
@@ -21,6 +22,8 @@ export interface PhotoStorage {
   save(bytes: Uint8Array, extension: string): Promise<StoredPhoto>;
   /** Remove bytes whose database write failed, so a refused upload leaves nothing behind. */
   discard(fileName: string): Promise<void>;
+  /** Never opens a caller-derived path; only server-generated filenames with no symlink following. */
+  read?(fileName: string, maxBytes: number): Promise<Buffer | null>;
 }
 
 /**
@@ -74,6 +77,22 @@ export function createPhotoStorage(directory: string): PhotoStorage {
     async discard(fileName) {
       // Deliberately not `join(directory, fileName)`-validating: the name came from `save` above.
       await unlink(join(directory, fileName)).catch(() => undefined);
+    },
+
+    async read(fileName, maxBytes) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:jpg|png|webp)$/.test(fileName)) return null;
+      let handle;
+      try {
+        handle = await open(join(directory, fileName), constants.O_RDONLY | constants.O_NOFOLLOW);
+        const stat = await handle.stat();
+        if (!stat.isFile() || stat.size === 0 || stat.size > maxBytes) return null;
+        return await handle.readFile();
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ELOOP") return null;
+        throw error;
+      } finally {
+        await handle?.close();
+      }
     }
   };
 }

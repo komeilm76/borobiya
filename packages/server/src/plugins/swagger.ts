@@ -51,7 +51,9 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "locationListShares",
   "locationUpdateRestFallback",
   "sosCreateRequest",
-  "sosUploadRequestPhoto"
+  "sosUploadRequestPhoto",
+  "sosGetPhotoAccess",
+  "publicReadSosPhoto"
 ]);
 
 interface JsonObjectSchema {
@@ -156,17 +158,21 @@ function responseDescription(statusCode: number, noContent: boolean): string {
 
 function buildResponses(route: ApiRouteDefinition): Record<string, OpenApiResponse> {
   const responses: Record<string, OpenApiResponse> = {};
-  const responseContentType = route.meta.responseContentType ?? "application/json";
-
   for (const [status, schema] of Object.entries(route.schema.responses)) {
     const statusCode = Number(status);
     const noContent = isNoContentSchema(statusCode, schema);
+    const binary = statusCode >= 200 && statusCode < 300 && route.meta.responseContentType === "application/octet-stream";
+    const responseContentType = statusCode >= 200 && statusCode < 300
+      ? route.meta.responseContentType ?? "application/json"
+      : "application/json";
     responses[status] = {
       description: responseDescription(statusCode, noContent),
       ...(!noContent
         ? {
             content: {
-              [responseContentType]: { schema: toJsonSchema(schema, "output") }
+              [responseContentType]: {
+                schema: binary ? { type: "string", format: "binary" } : toJsonSchema(schema, "output")
+              }
             }
           }
         : {})

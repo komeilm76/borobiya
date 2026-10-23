@@ -10,9 +10,18 @@ import {
   type SosRequestStatus
 } from "@shared/index";
 import { apiRoutes } from "@shared/api";
-import { requestJson } from "./http";
+import { apiBasePath, requestJson } from "./http";
 
 const paginatedSosRequestsSchema = paginatedResponseSchema(sosRequestRecordSchema);
+
+/** Issue a 60-second same-origin URL after the live bearer/session and participant checks. */
+export async function getSosPhotoSrc(requestId: string, accessToken: string): Promise<string> {
+  const path = apiRoutes.sos.getPhotoAccess.url.replace(":id", encodeURIComponent(requestId));
+  const response = await requestJson<unknown>(path, { accessToken });
+  const access = apiRoutes.sos.getPhotoAccess.schema.responses[200].parse(response);
+  // The server-chosen URL is app-relative; never turn an untrusted photoUrl into a browser origin.
+  return `${apiBasePath()}${access.url}`;
+}
 
 export type PaginatedSosRequests = z.infer<typeof paginatedSosRequestsSchema>;
 

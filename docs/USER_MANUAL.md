@@ -217,7 +217,7 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ## 14. SOS — Requesting Help
 
-> **Current status:** End-to-end requester SOS filing is live across API and client (`POST /_user/sos/requests` T3.2.2, `POST /_user/sos/requests/:id/photo` T3.2.3, and the global floating red SOS button + bottom-sheet form T3.2.4). Live `sos:new-request` admin broadcast (T3.2.5), authenticated photo read-back (T3.2.6), and request history pages (T3.7) remain queued.
+> **Current status:** End-to-end requester SOS filing is live across API and client (`POST /_user/sos/requests` T3.2.2, `POST /_user/sos/requests/:id/photo` T3.2.3, and the global floating red SOS button + bottom-sheet form T3.2.4). Live `sos:new-request` admin broadcast (T3.2.5), signed photo read-back (T3.2.6) is available to participants and admins; request history pages (T3.7) remain queued.
 
 ### Big red SOS button
 

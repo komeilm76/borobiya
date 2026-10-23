@@ -124,7 +124,7 @@ gantt
 ### M3.2 SOS Request
 - [x] `sos_requests` table — `drizzle/0012_modern_sentry.sql`, 2026-10-22 (T3.2.1)
 - [x] `POST /_user/sos/requests` (severity, description, incidentTypeId, lat/lon manual fallback; `photoUrl` rejected in favor of multipart upload) — completed 2026-10-22 (T3.2.2); client SOS button/form/picker remains open as T3.2.4
-- [x] Photo upload endpoint + storage (`POST /_user/sos/requests/:id/photo`, local `UPLOAD_DIR` volume → S3 later) — completed 2026-10-22 (T3.2.3); authenticated read path remains open as T3.2.6
+- [x] Photo upload endpoint + storage (`POST /_user/sos/requests/:id/photo`, local `UPLOAD_DIR` volume → S3 later) — completed 2026-10-22 (T3.2.3); signed photo read path completed as T3.2.6 (2026-10-24)
 - [ ] Socket `sos:new-request` to `admin` room + pulsing marker + sound
 
 ### M3.3 Dispatch & Nearest Responders

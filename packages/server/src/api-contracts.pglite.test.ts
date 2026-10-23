@@ -31,6 +31,7 @@ import { DrizzleSosPhotoStore } from "./db/sos-photo-store";
 import { DrizzleSosRequestStore } from "./db/sos-request-store";
 import { DrizzleUserSearchStore } from "./db/user-search-store";
 import { createPhotoStorage } from "./sos/photo-storage";
+import { signedPhotoPath } from "./sos/photo-access";
 
 const JWT_SECRET = "all-apis-contract-secret-with-at-least-48-bytes-0123456789";
 const JWT_REFRESH_SECRET = "all-apis-refresh-secret-with-at-least-48-bytes-0123456789";
@@ -703,6 +704,39 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     );
     expect(uploadedPhoto.photoUrl).toMatch(/^\/uploads\/.+\.png$/);
 
+    const requesterPhotoAccess = await callContract<{ url: string; expiresAt: string }>(
+      apiRoutes.sos.getPhotoAccess, 200, {
+        url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
+        headers: requesterHeaders
+      }
+    );
+    expect(requesterPhotoAccess.url).toContain(uploadedPhoto.photoUrl);
+    expect(Date.parse(requesterPhotoAccess.expiresAt)).toBeGreaterThan(Date.now());
+    const binaryResponse = await app.inject({ method: "GET", url: requesterPhotoAccess.url });
+    expect(binaryResponse.statusCode).toBe(200);
+    expect(binaryResponse.headers["content-type"]).toMatch(/^image\/png/);
+    expect(binaryResponse.rawPayload).toEqual(Buffer.from(PNG_FIXTURE));
+    expect(binaryResponse.headers["cache-control"]).toBe("no-store");
+    apiRoutes.public.readSosPhoto.schema.responses[200].parse(binaryResponse.rawPayload.toString("binary"));
+    verifiedOperationIds.add(apiRoutes.public.readSosPhoto.meta.operationId);
+
+    const deniedPhoto = await app.inject({
+      method: "GET", url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
+      headers: responderHeaders
+    });
+    expect(deniedPhoto.statusCode).toBe(404);
+    const tamperedPhoto = await app.inject({ method: "GET", url: `${requesterPhotoAccess.url}x` });
+    expect(tamperedPhoto.statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: uploadedPhoto.photoUrl })).statusCode).toBe(404);
+    const expiredUrl = signedPhotoPath(JWT_SECRET, createdSos.requestId, uploadedPhoto.photoUrl, Date.now() - 61_000);
+    expect(expiredUrl).not.toBeNull();
+    expect((await app.inject({ method: "GET", url: expiredUrl! })).statusCode).toBe(404);
+    const adminPhotoAccess = await callContract<{ url: string }>(apiRoutes.sos.getPhotoAccess, 200, {
+      url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
+      headers: adminHeaders
+    });
+    expect((await app.inject({ method: "GET", url: adminPhotoAccess.url })).statusCode).toBe(200);
+
     const sosQueue = await callContract<{ items: Array<{ id: string; photoUrl: string | null }> }>(
       apiRoutes.admin.listSosRequests,
       200,
@@ -745,6 +779,22 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     );
     expect(dispatched.proposals).toHaveLength(1);
     expect(dispatched.proposals[0]?.rescuerId).toBe(createdResponder.id);
+
+    const rescuerPhotoAccess = await callContract<{ url: string }>(apiRoutes.sos.getPhotoAccess, 200, {
+      url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
+      headers: responderHeaders
+    });
+    expect((await app.inject({ method: "GET", url: rescuerPhotoAccess.url })).rawPayload)
+      .toEqual(Buffer.from(PNG_FIXTURE));
+    await pg.query(`UPDATE "mission_proposals" SET "status" = 'declined' WHERE "sos_request_id" = $1`, [createdSos.requestId]);
+    expect((await app.inject({
+      method: "GET", url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
+      headers: responderHeaders
+    })).statusCode).toBe(404);
+
+    // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
+    await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);
+    expect((await app.inject({ method: "GET", url: requesterPhotoAccess.url })).statusCode).toBe(404);
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);
