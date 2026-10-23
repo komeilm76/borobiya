@@ -787,7 +787,8 @@ preference — both belong to the host, not to this repository:
 1. **Enable the client's "allow connections from LAN" option**, which makes it bind `0.0.0.0`
    instead of `127.0.0.1`. Confirm on Windows with `netstat -ano | findstr :2080`: `0.0.0.0:2080`
    means it worked, `127.0.0.1:2080` means it did not (or the client needs a restart). Then allow the
-   port in the firewall for the LAN only — an elevated PowerShell:
+   port in the firewall for the LAN only — in an elevated PowerShell, substituting your own subnet and
+   port for `192.168.100.0/24` and `2080`:
 
    ```powershell
    New-NetFirewallRule -DisplayName "proxy for VM" -Direction Inbound -Action Allow `
@@ -815,38 +816,43 @@ Either way, re-run the `/dev/tcp` probe above until it prints `port open`, and o
 ### 5.1 Set it for the terminal (covers `apt`, `curl`, `wget`, `git` and the download scripts)
 
 ```bash
-: "${PROXY_HOST:=$(ip route show default | awk '/default/{print $3; exit}')}"   # § 5's one-liner
-: "${PROXY_PORT:=3128}"
-printf 'using http://%s:%s — on a bridged VM that address is your router, not your host;\n' "$PROXY_HOST" "$PROXY_PORT"
-printf 'if that is wrong, export PROXY_HOST (and PROXY_PORT) and re-run this block.\n'
-export http_proxy="http://$PROXY_HOST:$PROXY_PORT" https_proxy="http://$PROXY_HOST:$PROXY_PORT" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
-export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy" all_proxy="$http_proxy" ALL_PROXY="$https_proxy"
-# Persist it, delimited so removal can be exact (never pattern-delete a file you did not write):
-sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc      # drop a previous block
-{
-  printf '# >>> borobiya proxy >>>\n'
-  printf 'export http_proxy="http://%s:%s" https_proxy="http://%s:%s" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT"
-  printf 'export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"\n'
-  printf 'export all_proxy="$http_proxy" ALL_PROXY="$https_proxy"\n'
-  printf '# <<< borobiya proxy <<<\n'
-} >> ~/.bashrc
+if [ -z "${PROXY_HOST:-}" ] || [ -z "${PROXY_PORT:-}" ]; then
+  echo "PROXY_HOST/PROXY_PORT are not set in this shell — nothing was changed."
+  echo "export them first, using § 5's table: a bridged VM needs the host's own LAN address"
+  echo "(e.g. 192.168.100.225), a NAT VM needs the default gateway; then the client's listen"
+  echo "port (a Throne/v2ray mixed listener is one port, usually 2080). The probe above sets both."
+else
+  export http_proxy="http://$PROXY_HOST:$PROXY_PORT" https_proxy="http://$PROXY_HOST:$PROXY_PORT" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
+  export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy" all_proxy="$http_proxy" ALL_PROXY="$https_proxy"
+  echo "this shell now uses $http_proxy; bypassing: $no_proxy"
+  # Persist it, delimited so removal can be exact (never pattern-delete a file you did not write):
+  sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc   # drop a previous block
+  {
+    printf '# >>> borobiya proxy >>>\n'
+    printf 'export http_proxy="http://%s:%s" https_proxy="http://%s:%s" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT"
+    printf 'export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"\n'
+    printf 'export all_proxy="$http_proxy" ALL_PROXY="$https_proxy"\n'
+    printf '# <<< borobiya proxy <<<\n'
+  } >> ~/.bashrc
+fi
 ```
 
 `no_proxy` must cover the pinned `172.30.0.0/24` Docker subnet and loopback, or every local
 `curl` health check and verification in steps 12–13 goes out to the proxy and comes back refused.
-Two honest caveats about that list: **curl matches hostnames and suffixes, and its support for CIDR
-ranges in `no_proxy` is newer than Ubuntu 24.04's curl**, so treat the `localhost,127.0.0.1` entries as
-the ones doing the work — which is enough, because every check in this runbook reaches local services
-by the name `localhost` (`verify-tiles.sh` uses `http://localhost:8000`, the gateway probes use
-`127.0.0.1`). The Docker daemon is a Go program and *does* understand the CIDR form, which is why § 5.3
-keeps it. And the exported values only affect **new** processes you start; an already-running
-`setup-ubuntu-vm.sh` will not pick them up.
+That CIDR entry is not decoration: **curl matches names, suffixes and CIDR blocks**. Verified with a
+canary proxy on curl 7.88.1 — `no_proxy=127.0.0.0/8` bypassed the proxy, `no_proxy=127.0.0.0/32`
+deliberately did not, `no_proxy=10.0.0.0/8` did not, and an empty `no_proxy` always went through — and
+the Docker daemon's Go parser reads the same form, which is why § 5.3 keeps it. Keep the
+`localhost,127.0.0.1,::1` entries regardless: those match on every curl version, and every check in this
+runbook reaches a local service by one of those names (`verify-tiles.sh` uses `http://localhost:8000`,
+the gateway probes use `127.0.0.1`). And the exported values only affect **new** processes you start; an
+already-running `setup-ubuntu-vm.sh` will not pick them up.
 
 ### 5.2 Verify that the proxy itself works
 
 ```bash
 # 1. What does this shell think its proxy is? (empty = exports not loaded in THIS terminal)
-env | grep -iE '^(http|https|no)_proxy=' || echo "no proxy in this shell"
+env | grep -iE '^(http|https|no|all)_proxy=' || echo "no proxy in this shell"
 # 2. Direct egress: does the VM reach the internet without the proxy? (000/timeout = needs it)
 curl --noproxy '*' -sS --max-time 10 -o /dev/null -w 'direct: %{http_code}\n' https://github.com/ || echo "direct: failed"
 # 3. Through the proxy: the proxy must answer, and curl must name the proxy it used (curl >= 8.3)
@@ -873,7 +879,7 @@ session; re-source `~/.bashrc` (`set -a; source .env; set +a` does **not** resto
 Item 6 is the one that surprises people: `docker pull` failing while `curl` is fine means the
 **daemon** has no proxy (§ 5.3).
 
-### 5.3 apt and Docker (only if step 2/6 above failed)
+### 5.3 apt and the Docker daemon (only if § 5.2's items 5 and 6 failed)
 
 ```bash
 # apt (system-wide; a per-command -o Acquire::http::Proxy="…" also works):
@@ -890,10 +896,15 @@ A **restart of Docker takes the running stack with it** — do it before step 12
 
 **Pulls and builds are two separate settings.** The drop-in above lets the *daemon* fetch images, but a
 `RUN` line in a Dockerfile executes inside the build container, which inherits neither your shell
-environment nor that `[Service]` block. Step 12 builds `borobiya/photon:1.3.0` and the api image, and
-the api build runs `bun install --frozen-lockfile --production` — so a proxied VM needs one more
-configuration for that to work. The client-side `proxies` default is the setting that reaches build
-containers, and it needs no change to the Compose file:
+environment nor that `[Service]` block. Step 12's `--build` builds three images and exactly one of them
+needs the network: `packages/server/Dockerfile`'s `RUN bun install --frozen-lockfile --production` runs
+after the manifests are copied and before any source, so it fails with a registry error if
+`registry.npmjs.org` is unreachable. `map-server/photon/Dockerfile` (`COPY` of the JAR you already
+downloaded plus its SHA-256 check) and `map-server/routing-gateway/Dockerfile` (`COPY` of five `.mjs`
+files) fetch nothing at build time — their only network need is the base-image pull, which the daemon
+drop-in already covers. So the one missing setting shows up as a *build* failure on `api` while
+everything else starts. The client-side `proxies` default is the setting that reaches build containers,
+and it needs no change to the Compose file:
 
 ```bash
 if [ -z "${PROXY_HOST:-}" ] || [ -z "${PROXY_PORT:-}" ]; then
@@ -916,10 +927,11 @@ JSONW
 fi
 ```
 
-Prove it on the thing that actually needs it, rather than on a pull: `docker compose build api` and
-watch `bun install` resolve packages. And when you remove the proxy (§ 5.4), **delete the `proxies` key
-as well** — a stale entry pointing at an address that no longer answers turns every future build into a
-timeout, and it is invisible in `docker info`, which only reports the daemon's own settings.
+Prove it on the thing that actually needs it rather than on a pull: `docker compose build api` works
+from the moment A6 has written `.env`, and its `bun install` either resolves packages or hangs. And
+when you remove the proxy (§ 5.4), **delete the `proxies` key as well** — a stale entry pointing at an
+address that no longer answers turns every future build into a timeout, and it is invisible in
+`docker info`, which only reports the daemon's own settings.
 
 **No JVM proxy flags are needed.** Step 9 fetches the reference layers with `curl` (the fetch
 script) and hands Java a `--download-dir` that is already populated, so Planetiler issues no request
@@ -949,6 +961,15 @@ sudo systemctl daemon-reload && sudo systemctl restart docker
 The removal of the apt/systemd files is only safe if the system-wide proxy was **not** set
 elsewhere — check `systemctl show docker --property=Environment` before you delete the drop-in, or
 you will break the daemon's real configuration. Verify the removal with § 5.2 item 2 (`direct: 200`).
+
+Nothing in that block touches the **host**, because this repository cannot. If you followed § 5.1a,
+undo the two host-side changes yourself once the downloads are finished — a proxy that any machine on
+the LAN can reach is worth removing rather than leaving:
+
+```powershell
+Remove-NetFirewallRule -DisplayName "proxy for VM"
+netsh interface portproxy delete v4tov4 listenaddress=192.168.100.225 listenport=2080   # only if you added it
+```
 
 ---
 
