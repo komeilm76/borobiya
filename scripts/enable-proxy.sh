@@ -273,9 +273,9 @@ else
   proxy_note "shell block skipped (--no-shell)"
 fi
 
-# ---------- 4. Docker builds: the setting the daemon drop-in does not cover ----------
+# ---------- 4. Docker's client config: builds *and* the runtime containers compose creates ----------
 if (( DO_DOCKER_CONFIG )); then
-  proxy_log "Build containers ($PROXY_DOCKER_CONFIG)"
+  proxy_log "Docker client config, applied to builds and to every container compose starts ($PROXY_DOCKER_CONFIG)"
   proxy_docker_client_apply "$PROXY_URL" "$PROXY_NO_PROXY"
 else
   proxy_note "skipped (--no-docker-config): the step-12 image build gets no proxy network, so bun install will fail"

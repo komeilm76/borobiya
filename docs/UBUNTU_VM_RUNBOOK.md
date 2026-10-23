@@ -871,7 +871,8 @@ else
 fi
 ```
 
-`no_proxy` must cover the pinned `172.30.0.0/24` Docker subnet and loopback, or every local
+`no_proxy` must cover the pinned `172.30.0.0/24` Docker subnet, loopback **and the Compose service names**,
+or every local
 `curl` health check and verification in steps 12–13 goes out to the proxy and comes back refused.
 That CIDR entry is not decoration: **curl matches names, suffixes and CIDR blocks**. Verified with a
 canary proxy on curl 7.88.1 — `no_proxy=127.0.0.0/8` bypassed the proxy, `no_proxy=127.0.0.0/32`
@@ -972,22 +973,30 @@ after the manifests are copied and before any source, so it fails with a registr
 downloaded plus its SHA-256 check) and `map-server/routing-gateway/Dockerfile` (`COPY` of five `.mjs`
 files) fetch nothing at build time — their only network need is the base-image pull, which the daemon
 drop-in already covers. So the one missing setting shows up as a *build* failure on `api` while
-everything else starts. The client-side `proxies` default is the setting that reaches build containers,
-and it needs no change to the Compose file:
+everything else starts. Read the scope of that key before writing it: the client-side `proxies` default is
+merged into **every container the client creates** — build containers *and* the `docker compose up`
+services — so its `noProxy` list decides whether service-to-service calls stay on the network. Compose
+services address each other by name (`http://osrm-car:5000`, `http://photon:2322`), and curl/libcurl match
+a CIDR only against a numeric host, so a `noProxy` of `localhost,127.0.0.1,::1,172.30.0.0/24` exempts
+nothing that matters: the request goes to the proxy, the proxy cannot resolve `osrm-car`, and the service
+gets a 502 that has nothing to do with its own data. `scripts/enable-proxy.sh` therefore builds the list
+from `docker-compose.yml`; the manual form below does the same. It needs no change to the Compose file:
 
 ```bash
 if [ -z "${PROXY_HOST:-}" ] || [ -z "${PROXY_PORT:-}" ]; then
   echo "set PROXY_HOST and PROXY_PORT first (§ 5.1) — refusing to write an empty host into ~/.docker/config.json"
 else
-python3 - "$PROXY_HOST" "$PROXY_PORT" <<'JSONW'
-import json, os, pathlib, sys
+python3 - "$PROXY_HOST" "$PROXY_PORT" <<'JSONW'      # run from the repository root: it reads the service names
+import json, os, pathlib, re, sys
 host, port = sys.argv[1], sys.argv[2]
+services = re.findall(r"^  ([A-Za-z0-9][A-Za-z0-9_.-]*):", pathlib.Path("docker-compose.yml").read_text(), re.M)
+no_proxy = ",".join(["localhost", "127.0.0.1", "::1", "host.docker.internal", "172.30.0.0/24", *services])
 path = pathlib.Path(os.environ.get("DOCKER_CONFIG", os.path.expanduser("~/.docker"))) / "config.json"
 config = json.loads(path.read_text()) if path.is_file() else {}
 config["proxies"] = {"default": {
     "httpProxy": f"http://{host}:{port}",
     "httpsProxy": f"http://{host}:{port}",
-    "noProxy": "localhost,127.0.0.1,::1,172.30.0.0/24",
+    "noProxy": no_proxy,
 }}
 path.parent.mkdir(parents=True, exist_ok=True)
 path.write_text(json.dumps(config, indent=2) + "\n")
@@ -1895,19 +1904,31 @@ Symptom first, always — grep this section for the error text.
   repeats the old file. Nothing has to be cleaned up first: the failed `CREATE TABLE` left no table, and a
   migration that errors is not recorded as applied. (Only a database where `sos_requests` was created by
   `db:push` instead needs that one table dropped.)
-- **`verify-routing` fails with `502 routing_failed` while every container is healthy** — a 502 from the
-  gateway means an OSRM container *answered*, so this is not a startup or a network problem; it is the graph
-  refusing the request. The gateway's response now carries the upstream's own `upstream_status`,
-  `upstream_code` and `message`, and the same summary is written to the container log, so read those before
-  changing anything: `docker compose logs --tail 40 routing-gateway osrm-car`. A message about *matching
-  edges* / *coordinates near* a point means the loaded graph does not cover those coordinates — which a
-  rebuilt or redirected `MAP_OSRM_DATA_DIR` can do silently, because a healthy `osrm-routed` only proves that
-  *a* graph loaded. § 6.7's spot checks hold the two commands that settle it: the `bun -e` fetch replays the
-  gateway's own request against `osrm-car:5000` (bypassing the gateway, so a gateway fault cannot be confused
-  with a data fault), and `cat /data/${MAP_REGION}.metadata.json` inside the container prints the `region`,
-  `areas` and `bbox` that `build-routing.sh` recorded for the graph actually mounted. If that bbox is not the
-  area under test, point `MAP_OSRM_DATA_DIR` at the matching routing directory or rebuild it (§ 6.5) —
-  restarting the container reloads the same graph and proves nothing.
+- **`verify-routing` fails with `502 routing_failed` while every container is healthy** — do not read that
+  502 as "OSRM answered". Two opposite faults look the same from the outside, and the gateway's response now
+  shows which: `upstream_status: 502` with **no** `upstream_code` and an empty `upstream_body` was not
+  produced by `osrm-routed`, which answers its own errors with a JSON body.
+  - **A proxy sitting inside the container** (this is what the VM measured on 2026-10-23, and it is *our*
+    bug: `enable-proxy.sh` used to write a `noProxy` that exempts nothing a running stack calls). The client
+    config `~/.docker/config.json`'s `proxies.default` reaches every container the client creates, not only
+    build containers (§ 5.3), and a service calls its neighbour by name (`http://osrm-car:5000`), which a
+    `172.30.0.0/24` entry cannot match because CIDR entries apply to numeric hosts only. The request then
+    goes to the proxy, the proxy cannot resolve the name, and the service is never asked. Measure before
+    changing anything:
+    `docker compose exec -T routing-gateway env | grep -i proxy`,
+    then replay § 6.7's `bun -e` probe as
+    `docker compose exec -T -e HTTP_PROXY= -e http_proxy= -e HTTPS_PROXY= -e https_proxy= -e ALL_PROXY= -e all_proxy= routing-gateway bun -e '<same fetch>'`.
+    A route from that replay means the proxy, not the data. Fix: `./scripts/enable-proxy.sh` (it now derives
+    `noProxy` from `docker-compose.yml`'s service names) or `./scripts/disable-proxy.sh`, then
+    `docker compose up -d --force-recreate` — **never** `-v`, and an `exec -e` override only ever proves the
+    diagnosis, because a container's environment is fixed when it is created.
+  - **A graph that does not cover the test points.** If the probe reaches OSRM (the gateway reports an
+    `upstream_code`, or the message mentions matching edges / coordinates near a point), read what is
+    mounted: `docker compose exec -T osrm-car cat "/data/${MAP_REGION}.metadata.json"` prints the `region`,
+    `areas` and `bbox` `build-routing.sh` recorded for the graph that container is serving. If that bbox is
+    not the area under test, point `MAP_OSRM_DATA_DIR` at the matching routing directory or rebuild it
+    (§ 6.5).
+  Restarting a container is not a step in either branch: it reloads the same graph into the same environment.
 - **Compose says the network must be recreated after a `git pull`** (the project subnet is pinned to
   `172.30.0.0/24`) — `docker compose down` once, **without** `-v`, then `up -d` again. Containers
   are recreated; volumes and built data stay.

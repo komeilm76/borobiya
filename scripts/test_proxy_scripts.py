@@ -108,7 +108,7 @@ class ScriptCase(unittest.TestCase):
         bashrc = self.bashrc.read_text()
         self.assertIn(BLOCK_BEGIN, bashrc)
         self.assertIn(f'http_proxy="{url}"', bashrc)
-        self.assertIn('no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"', bashrc)
+        self.assertIn('no_proxy="localhost,127.0.0.1,::1,host.docker.internal,gateway.docker.internal,172.30.0.0/24', bashrc)
         self.assertIn("# my own bashrc line", bashrc)
         self.assertIn(MARKER, self.apt_file.read_text())
         self.assertIn(f'Acquire::http::Proxy "{url}";', self.apt_file.read_text())
@@ -527,6 +527,89 @@ class TestWhereAPortComesFrom(ScriptCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("http://1.2.3.4:2080", result.stdout)
 
+
+
+class TestNoProxyCoversTheComposeNetwork(ScriptCase):
+    """The `proxies` key in ~/.docker/config.json is merged into every container the client creates, so
+    its noProxy list decides whether service-to-service calls stay on the Compose network. Compose services
+    address each other by name (`http://osrm-car:5000`), and curl matches a CIDR only against a numeric
+    host — so a list of loopback plus `172.30.0.0/24` exempts nothing that a running stack actually calls,
+    and the symptom is a 502 from the proxy on a machine where every container is healthy (seen on the VM
+    with `verify-routing.sh`). The names are therefore read from docker-compose.yml, not remembered."""
+
+    FIXTURE = "services:\n  alpha-svc:\n    image: x\n# a comment at column zero\n  beta_svc:\n    image: y\n"
+
+    def no_proxy_written(self, **env: str) -> str:
+        fixture = self.root / "docker-compose.fixture.yml"
+        fixture.write_text(self.FIXTURE)
+        result = self.enable("--yes", "10.0.2.5", "3128", BOROBIYA_PROXY_COMPOSE_FILE=str(fixture), **env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(self.docker_config.read_text())["proxies"]["default"]["noProxy"]
+
+    def test_service_names_from_the_compose_file_reach_docker_and_the_shell(self) -> None:
+        no_proxy = self.no_proxy_written()
+        for name in ("alpha-svc", "beta_svc"):
+            self.assertIn(name, no_proxy)
+        # A comment line at column zero is not the end of the services block.
+        self.assertIn("localhost", no_proxy)
+        self.assertIn("127.0.0.1", no_proxy)
+        self.assertIn("172.30.0.0/24", no_proxy)
+        # The exported shell value and the JSON value must be the same list, or `curl` from a terminal and a
+        # fetch from a container disagree about what bypasses the proxy.
+        bashrc = self.bashrc.read_text()
+        for name in ("alpha-svc", "beta_svc"):
+            self.assertIn(name, bashrc)
+        self.assertIn(no_proxy, bashrc)
+
+    def test_the_shipped_compose_file_is_the_default_source(self) -> None:
+        # Scoped to the `services:` block: a two-space key elsewhere (an anchor's `default:`, a subnet
+        # entry) is not a hostname anything will ever call, and counting it would make this test a
+        # restatement of the script's own parser rather than a check on it.
+        services: list[str] = []
+        inside = False
+        for line in (REPO_ROOT / "docker-compose.yml").read_text().splitlines():
+            if not inside:
+                inside = line.rstrip() == "services:"
+                continue
+            if line[:1].strip() and not line.startswith(" "):
+                break
+            if line.startswith("  #"):
+                continue
+            if line.startswith("  ") and not line.startswith("   ") and line.rstrip().endswith(":"):
+                services.append(line.strip()[:-1])
+        self.assertIn("osrm-car", services, "the shipped Compose file no longer has the service this bug is about")
+        self.assertTrue(services, "no services found; the extractor this test guards needs updating")
+        result = self.enable("--yes", "10.0.2.5", "3128")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        no_proxy = json.loads(self.docker_config.read_text())["proxies"]["default"]["noProxy"]
+        for name in services:
+            self.assertIn(name, no_proxy.split(","))
+
+    def test_an_explicit_no_proxy_is_used_verbatim(self) -> None:
+        # BOROBIYA_PROXY_NO_PROXY is the documented override; appending derived names to it would quietly
+        # route something the operator excluded on purpose.
+        no_proxy = self.no_proxy_written(BOROBIYA_PROXY_NO_PROXY="internal.example")
+        self.assertEqual(no_proxy, "internal.example")
+
+    def test_a_missing_compose_file_degrades_to_loopback_instead_of_failing(self) -> None:
+        result = self.enable(
+            "--yes", "10.0.2.5", "3128",
+            BOROBIYA_PROXY_COMPOSE_FILE=str(self.root / "does-not-exist.yml"),
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        no_proxy = json.loads(self.docker_config.read_text())["proxies"]["default"]["noProxy"]
+        self.assertEqual(
+            no_proxy,
+            "localhost,127.0.0.1,::1,host.docker.internal,gateway.docker.internal,172.30.0.0/24",
+        )
+
+    def test_the_library_says_the_client_key_reaches_runtime_containers(self) -> None:
+        # The claim this whole class exists to keep true: an earlier comment called this key "the builder's",
+        # which is exactly the misunderstanding that leaves a healthy stack unable to talk to itself.
+        library = (REPO_ROOT / "scripts" / "proxy-common.sh").read_text()
+        self.assertRegex(library, r"every\n#\s+container `docker compose up`")
+        enable = (REPO_ROOT / "scripts" / "enable-proxy.sh").read_text()
+        self.assertIn("applied to builds and to every container compose starts", enable)
 
 class TestStatusReports(ScriptCase):
     def stub(self, names: dict[str, str]) -> str:

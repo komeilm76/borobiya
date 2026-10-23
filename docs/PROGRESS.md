@@ -128,6 +128,55 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — the routing 502 was our own proxy leak, and a `noProxy` of loopback plus a CIDR exempts nothing
+
+- **The measurement killed the leading hypothesis.** The VM ran the two commands from the previous entry.
+  `cat /data/${MAP_REGION}.metadata.json` inside `osrm-car` reported
+  `region: borobiya`, `areas: [ir-tehran]`, `bbox: [51.0, 35.5, 51.7, 35.9]`, `algorithm: mld`, and the full
+  set of MLD artifacts with matching mtimes — the graph *is* Tehran's. The direct `bun -e` replay of the
+  gateway's own request printed `osrm HTTP 502` **with an empty body**, and `docker compose logs osrm-car`
+  showed a server that started, bound :5000, and printed nothing about the request. An empty 502 is not
+  something `osrm-routed` produces: it answers its own failures with a JSON object carrying `code`, which is
+  why the gateway's old `osrmResponse?.message ?? "…"` fell back to a canned sentence.
+- **What was in the way instead.** The gateway container's own environment. `~/.docker/config.json`'s
+  `proxies.default` is merged into every container the client creates — not only build containers — and
+  `scripts/enable-proxy.sh` writes that key with `noProxy` = `localhost,127.0.0.1,::1,172.30.0.0/24`.
+  Compose services address each other by name (`http://osrm-car:5000`, `http://photon:2322`), and a CIDR
+  entry matches a *numeric* host only, so that list exempts nothing a running stack actually calls, while
+  `localhost` exempts exactly the one hop (the healthcheck) that makes the service look healthy. bun's
+  `fetch` honours `HTTP_PROXY`/`ALL_PROXY`, so the request went to the proxy, the proxy could not resolve
+  `osrm-car`, and the reply was the proxy's 502 with no body — while psql and postgres.js, which ignore proxy
+  variables, kept working, which is why the database half of the same stack was healthy throughout.
+- **Fixed at the source, in the direction the user asked for.** `PROXY_NO_PROXY_DEFAULT` now keeps loopback,
+  the two Docker Desktop host aliases and the pinned subnet, and **appends every service name read out of
+  `docker-compose.yml`** (`proxy_compose_service_names`, overridable with `BOROBIYA_PROXY_COMPOSE_FILE`),
+  so a renamed or added service follows automatically and no list is remembered in two places. A missing or
+  unparseable Compose file degrades to the old loopback-only value instead of failing a proxy enable, the
+  scan skips a comment at column zero (a fixture caught that on the first run), and an explicit
+  `BOROBIYA_PROXY_NO_PROXY` is still used verbatim — appending derived names to an operator's exclusion list
+  would route something they excluded on purpose. `enable-proxy.sh`'s section 4 and `proxy-common.sh`'s
+  header no longer call this "the builder's" setting, which is the misunderstanding that caused the fault.
+- **Tests** (`TestNoProxyCoversTheComposeNetwork`, 5): the fixture-derived names appear in both
+  `~/.docker/config.json` and the shell block (one list, or a terminal's curl and a container's fetch would
+  disagree about what bypasses the proxy); every name in the *shipped* Compose file is present, with the
+  test's own parser scoped to `services:` so it is a check and not a restatement; the override wins
+  verbatim; a missing file degrades rather than failing; and the library text still states the runtime scope.
+  Proved non-vacuous by deleting the derivation: the two coverage tests fail, restore, all 5 pass.
+- **Docs.** § 5.3 now explains the key's real reach and why names-not-ranges is the requirement, and its
+  manual snippet derives `noProxy` from the Compose file instead of shipping a literal; § 5.2's `no_proxy`
+  sentence names the service list; § 9.3's 502 entry was rewritten — yesterday it asserted "a 502 from the
+  gateway means an OSRM container answered", which this measurement disproves, so it now branches on
+  `upstream_code`/`upstream_body` being absent (proxy: measure the container env, replay with the vars
+  cleared, recreate the containers because environment is fixed at creation) versus present (data: read the
+  mounted graph's `metadata.json`), and says restarting a container is a step in neither branch.
+- **Still open on the VM**: the diagnosis is inferred from an empty-body 502 plus the shipped script's
+  behaviour, not read from the user's container env. The confirming commands are `docker compose exec -T
+  routing-gateway env | grep -i proxy` and the same probe with the proxy variables cleared; if the first is
+  empty, this theory is dead and the gateway's new `upstream_*` fields are the next measurement.
+- **Measured**: `pytest -q scripts/test_proxy_scripts.py` → 46 passed, 1 skipped, 4 subtests; the gateway's
+  `node --test` suite still 36/36; `bash -n` on every tracked `.sh`; shellcheck clean on `scripts/*.sh`;
+  the runbook clean under `check_runbook_markdown.py` at 2003 lines.
+
 ### 2026-10-23 — the routing 502 was unreadable, so the gateway now reports what the upstream said
 
 - **What the VM reported**: after the migration fix, `verify-routing.sh` failed with

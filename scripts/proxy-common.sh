@@ -14,14 +14,17 @@
 #   2. apt         — /etc/apt/apt.conf.d/, because apt ignores this file when you only export
 #                    http_proxy, and ignores your shell environment when it drops privileges;
 #   3. the daemon  — a systemd drop-in, because dockerd pulls images and reads neither of the above;
-#   4. the builder — ~/.docker/config.json `proxies`, because a RUN line in a Dockerfile gets its
-#                    environment from there, not from the daemon's.
+#   4. the client  — ~/.docker/config.json `proxies`, because a RUN line in a Dockerfile gets its
+#                    environment from there, not from the daemon's. The same key is applied to every
+#                    container `docker compose up`/`run` creates, not only to builds: the proxy env in
+#                    that block is what a service's own outbound fetch sees at runtime. That is why
+#                    no_proxy has to name the Compose services (see proxy_compose_service_names).
 #
 # Roots are overridable so the pair can be tested without touching a real machine:
 #   BOROBIYA_PROXY_HOME, BOROBIYA_PROXY_BASHRC, BOROBIYA_PROXY_ETC, BOROBIYA_PROXY_DOCKER_CONFIG,
 #   BOROBIYA_PROXY_SUDO (empty = run privileged commands directly), BOROBIYA_PROXY_NO_SYSTEMD=1,
 #   BOROBIYA_PROXY_SKIP_PROBE=1, BOROBIYA_PROXY_CHECK_URL, BOROBIYA_PROXY_PROBE_TIMEOUT,
-#   BOROBIYA_PROXY_CHECK_TIMEOUT, BOROBIYA_PROXY_NO_PROXY.
+#   BOROBIYA_PROXY_CHECK_TIMEOUT, BOROBIYA_PROXY_NO_PROXY, BOROBIYA_PROXY_COMPOSE_FILE.
 
 if [[ -z "${PROXY_PROG:-}" ]]; then
   printf 'proxy-common.sh is a library — run scripts/enable-proxy.sh or scripts/disable-proxy.sh\n' >&2
@@ -50,7 +53,47 @@ PROXY_DOCKER_BACKUP="$PROXY_CONFIG_DIR/proxy.docker-config.bak"
 PROXY_BLOCK_BEGIN='# >>> borobiya proxy >>>'
 PROXY_BLOCK_END='# <<< borobiya proxy <<<'
 PROXY_FILE_MARKER='managed by borobiya scripts/enable-proxy.sh'
-PROXY_NO_PROXY_DEFAULT='localhost,127.0.0.1,::1,172.30.0.0/24'
+PROXY_REPO_ROOT="${BOROBIYA_PROXY_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+PROXY_COMPOSE_FILE="${BOROBIYA_PROXY_COMPOSE_FILE:-$PROXY_REPO_ROOT/docker-compose.yml}"
+
+# Loopback and the pinned subnet are not enough. curl matches a NO_PROXY CIDR only against a *numeric*
+# host, and Compose services address each other by name (`http://osrm-car:5000`, `http://photon:2322`),
+# so a name never matches an IP range and the request goes to the proxy instead — which answers with its
+# own 502 and never reaches the service. The names therefore have to be listed, and the list is read from
+# docker-compose.yml rather than remembered here, because a service renamed in one place has to follow in
+# the other. A missing or unreadable file degrades to loopback-only, which is what this default used to be.
+proxy_compose_service_names() {
+  python3 - "$PROXY_COMPOSE_FILE" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+try:
+    lines = path.read_text(encoding="utf-8").splitlines()
+except OSError:
+    raise SystemExit(0)
+
+names = []
+in_services = False
+for line in lines:
+    if not in_services:
+        in_services = re.match(r"^services:\s*(?:#.*)?$", line) is not None
+        continue
+    if line.startswith("#"):
+        continue                     # a comment at column 0 is not the end of the services block
+    if line and not line[0].isspace():
+        break
+    match = re.match(r"^  ([A-Za-z0-9][A-Za-z0-9_.-]*):\s*(?:#.*)?$", line)
+    if match:
+        names.append(match.group(1))
+print(",".join(dict.fromkeys(names)))
+PY
+}
+
+PROXY_LOCAL_HOSTS='localhost,127.0.0.1,::1,host.docker.internal,gateway.docker.internal,172.30.0.0/24'
+_proxy_services="$(proxy_compose_service_names 2>/dev/null || true)"   # never fail a proxy enable over a config parse
+PROXY_NO_PROXY_DEFAULT="$PROXY_LOCAL_HOSTS${_proxy_services:+,$_proxy_services}"
 PROXY_NO_PROXY="${BOROBIYA_PROXY_NO_PROXY:-$PROXY_NO_PROXY_DEFAULT}"
 
 DRY_RUN="${DRY_RUN:-0}"
