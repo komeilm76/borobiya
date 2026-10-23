@@ -32,6 +32,31 @@ export const SOS_SEVERITY_PRESENTATION: Record<Severity, SeverityAlertPresentati
   }
 };
 
+export interface SosStatusPresentation {
+  label: string;
+  badgeColor: "warning" | "info" | "success" | "error" | "secondary";
+}
+
+export const SOS_STATUS_PRESENTATION: Record<SosRequestRecord["status"], SosStatusPresentation> = {
+  pending: { label: "در انتظار اعزام", badgeColor: "warning" },
+  dispatched: { label: "در انتظار پذیرش امدادگر", badgeColor: "info" },
+  accepted: { label: "پذیرفته‌شده در مأموریت", badgeColor: "success" },
+  cancelled_by_requester: { label: "لغوشده توسط امدادخواه", badgeColor: "secondary" },
+  cancelled_by_rescuer: { label: "لغو توسط امدادگر (نیازمند اعزام مجدد)", badgeColor: "error" },
+  expired: { label: "منقضی‌شده", badgeColor: "secondary" },
+  completed: { label: "تکمیل‌شده", badgeColor: "success" }
+};
+
+export function isDispatchableSosStatus(status: SosRequestRecord["status"]): boolean {
+  return status === "pending" || status === "dispatched" || status === "cancelled_by_rescuer";
+}
+
+export function formatResponderDistance(metres: number): string {
+  if (!Number.isFinite(metres) || metres < 0) return "نامشخص";
+  if (metres < 1000) return `${Math.round(metres)} متر`;
+  return `${(metres / 1000).toFixed(1)} کیلومتر`;
+}
+
 export interface SosAlertGeoFeature {
   type: "Feature";
   id: string;

@@ -2,10 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { SosRequestRecord } from "@shared/index";
 import {
   buildSosAlertsGeoJson,
+  formatResponderDistance,
+  isDispatchableSosStatus,
   mergeSosAlertSnapshot,
   parseSosNewRequestPayload,
   playSosAlertSound,
   SOS_SEVERITY_PRESENTATION,
+  SOS_STATUS_PRESENTATION,
   upsertSosAlert,
   type AlertAudioContextLike
 } from "./sos-alerts";
@@ -138,5 +141,18 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
 
     closeCallback?.();
     expect(closeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("formats responder distances cleanly in metres/kilometres and gates dispatchable SOS statuses (T3.3.4)", () => {
+    expect(formatResponderDistance(423.4)).toBe("423 متر");
+    expect(formatResponderDistance(1480)).toBe("1.5 کیلومتر");
+    expect(formatResponderDistance(-5)).toBe("نامشخص");
+
+    expect(isDispatchableSosStatus("pending")).toBe(true);
+    expect(isDispatchableSosStatus("dispatched")).toBe(true);
+    expect(isDispatchableSosStatus("cancelled_by_rescuer")).toBe(true);
+    expect(isDispatchableSosStatus("accepted")).toBe(false);
+    expect(isDispatchableSosStatus("completed")).toBe(false);
+    expect(SOS_STATUS_PRESENTATION.dispatched.label).toContain("انتظار پذیرش");
   });
 });

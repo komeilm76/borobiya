@@ -1,7 +1,11 @@
 import { z } from "zod";
 import {
+  dispatchResponseSchema,
+  nearestRespondersResponseSchema,
   paginatedResponseSchema,
   sosRequestRecordSchema,
+  type DispatchResponse,
+  type NearestRespondersResponse,
   type SosRequestRecord,
   type SosRequestStatus
 } from "@shared/index";
@@ -52,4 +56,34 @@ export async function getAdminSosRequest(
     signal
   });
   return sosRequestRecordSchema.parse(response);
+}
+
+/** Fetches the top 10 nearest qualified, active, non-busy responders (`GET /_admin/sos/requests/:id/nearest`). */
+export async function getNearestSosResponders(
+  id: string,
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<NearestRespondersResponse> {
+  const path = apiRoutes.admin.getNearestResponders.url.replace(":id", encodeURIComponent(id));
+  const response = await requestJson<unknown>(path, {
+    method: "GET",
+    accessToken,
+    signal
+  });
+  return nearestRespondersResponseSchema.parse(response);
+}
+
+/** Dispatches one or more selected responders to an SOS request (`POST /_admin/sos/requests/:id/dispatch`). */
+export async function dispatchSosResponders(
+  id: string,
+  rescuerIds: string[],
+  accessToken: string
+): Promise<DispatchResponse> {
+  const path = apiRoutes.admin.dispatchSosRequest.url.replace(":id", encodeURIComponent(id));
+  const response = await requestJson<unknown>(path, {
+    method: "POST",
+    accessToken,
+    body: { rescuerIds }
+  });
+  return dispatchResponseSchema.parse(response);
 }

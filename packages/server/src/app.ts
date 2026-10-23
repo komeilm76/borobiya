@@ -220,7 +220,8 @@ export async function createFastifyApp(
     store: sosRequestStore,
     dispatchStore: sosDispatchStore,
     adminStore: adminUserStore,
-    jwtSecret: config.jwtSecret
+    jwtSecret: config.jwtSecret,
+    io: realtime.io
   });
 
   // Registered after the `/_user` authorization hook so share routes inherit the

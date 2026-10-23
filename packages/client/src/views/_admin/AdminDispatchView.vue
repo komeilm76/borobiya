@@ -4,7 +4,7 @@
       <div>
         <div class="d-flex align-center ga-2">
           <v-icon color="error" icon="mdi-radar" size="28" />
-          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و هشدار اضطراری (SOS)</h1>
+          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
           <v-chip
             :color="adminSos.connected ? 'success' : 'warning'"
             size="small"
@@ -14,7 +14,7 @@
           </v-chip>
         </div>
         <p class="text-body-2 text-medium-emphasis mt-1 mb-0">
-          درخواست‌های SOS به‌صورت بلادرنگ با نشانگر تپنده، رنگ‌بندی شدت و هشدار صوتی دریافت می‌شوند.
+          درخواست‌های SOS به‌صورت بلادرنگ دریافت می‌شوند؛ نزدیک‌ترین امدادگران هم‌تخصص را انتخاب و اعزام کنید.
         </p>
       </div>
 
@@ -29,6 +29,9 @@
         >
           <v-btn value="pending">
             در انتظار رسیدگی ({{ adminSos.pendingCount }})
+          </v-btn>
+          <v-btn value="dispatched">
+            اعزام‌شده ({{ adminSos.dispatchedCount }})
           </v-btn>
           <v-btn value="all">
             همه ({{ adminSos.requests.length }})
@@ -78,7 +81,7 @@
 
     <v-row>
       <v-col cols="12" lg="7">
-        <v-card class="overflow-hidden" rounded="xl" variant="outlined">
+        <v-card class="overflow-hidden mb-4" rounded="xl" variant="outlined">
           <div class="dispatch-map-wrapper">
             <MapCanvas
               aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
@@ -87,6 +90,57 @@
               :zoom="12"
               @ready="onMapReady"
             />
+
+            <v-card
+              v-if="adminSos.selectedRequest"
+              class="map-selected-alert-card"
+              elevation="4"
+              rounded="lg"
+            >
+              <v-card-text class="pa-3">
+                <div class="d-flex align-center justify-space-between ga-2 mb-1">
+                  <div class="d-flex align-center ga-2">
+                    <v-chip
+                      :color="severityMeta(adminSos.selectedRequest.severity).badgeColor"
+                      size="x-small"
+                      variant="flat"
+                    >
+                      {{ severityMeta(adminSos.selectedRequest.severity).label }}
+                    </v-chip>
+                    <span class="text-subtitle-2 font-weight-bold">
+                      {{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}
+                    </span>
+                  </div>
+                  <v-chip
+                    :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ statusMeta(adminSos.selectedRequest.status).label }}
+                  </v-chip>
+                </div>
+                <p class="text-caption text-medium-emphasis text-truncate mb-2">
+                  {{ adminSos.selectedRequest.description }}
+                </p>
+                <div class="d-flex align-center justify-space-between text-caption">
+                  <span dir="ltr">
+                    {{ adminSos.selectedRequest.location.lat.toFixed(5) }},
+                    {{ adminSos.selectedRequest.location.lon.toFixed(5) }}
+                  </span>
+                  <v-btn
+                    color="primary"
+                    density="compact"
+                    prepend-icon="mdi-crosshairs-gps"
+                    size="small"
+                    variant="text"
+                    @click="focusRequest(adminSos.selectedRequest)"
+                  >
+                    تمرکز روی نقشه
+                  </v-btn>
+                </div>
+              </v-card-text>
+            </v-card>
+
             <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
               <span class="legend-item">
                 <span class="legend-dot legend-dot--high" /> بحرانی
@@ -99,6 +153,147 @@
               </span>
             </div>
           </div>
+        </v-card>
+
+        <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
+          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
+            <div class="d-flex align-center ga-2">
+              <v-icon color="primary" icon="mdi-account-group-outline" />
+              <span>نزدیک‌ترین امدادگران واجد شرایط</span>
+              <v-chip color="primary" size="x-small" variant="tonal">
+                {{ adminSos.nearestResponders.length }} نفر
+              </v-chip>
+            </div>
+
+            <div class="d-flex align-center ga-1">
+              <v-btn
+                :disabled="adminSos.nearestResponders.length === 0"
+                size="small"
+                variant="text"
+                @click="adminSos.selectAllNearestResponders()"
+              >
+                انتخاب همه
+              </v-btn>
+              <v-btn
+                v-if="adminSos.selectedResponderIds.length > 0"
+                size="small"
+                variant="text"
+                @click="adminSos.clearResponderSelection()"
+              >
+                پاک‌سازی انتخاب
+              </v-btn>
+              <v-btn
+                :loading="adminSos.nearestLoading"
+                aria-label="بازخوانی امدادگران نزدیک"
+                icon="mdi-refresh"
+                size="small"
+                variant="text"
+                @click="adminSos.loadNearestResponders()"
+              />
+            </div>
+          </v-card-title>
+          <v-divider />
+
+          <v-alert
+            v-if="adminSos.dispatchFeedback"
+            :type="adminSos.dispatchFeedback.type"
+            class="ma-4 mb-0"
+            closable
+            density="comfortable"
+            variant="tonal"
+            @click:close="adminSos.dispatchFeedback = null"
+          >
+            {{ adminSos.dispatchFeedback.message }}
+          </v-alert>
+
+          <v-alert
+            v-if="adminSos.nearestError"
+            class="ma-4 mb-0"
+            type="error"
+            variant="tonal"
+          >
+            {{ adminSos.nearestError }}
+          </v-alert>
+
+          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis">
+            <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
+            در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
+          </v-card-text>
+
+          <v-card-text
+            v-else-if="adminSos.nearestResponders.length === 0"
+            class="py-6 text-center text-medium-emphasis"
+          >
+            در حال حاضر امدادگر فعال، آزاد و دارای موقعیت مکانی ثبت‌شده برای این نوع حادثه یافت نشد.
+          </v-card-text>
+
+          <v-list v-else class="responder-list py-0" lines="two">
+            <template v-for="(responder, rIndex) in adminSos.nearestResponders" :key="responder.userId">
+              <v-divider v-if="rIndex > 0" />
+              <v-list-item
+                :active="adminSos.selectedResponderIds.includes(responder.userId)"
+                class="py-3"
+                @click="adminSos.toggleResponderSelection(responder.userId)"
+              >
+                <template #prepend>
+                  <v-checkbox-btn
+                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
+                    color="primary"
+                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
+                  />
+                </template>
+
+                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
+                  <div class="d-flex align-center ga-2">
+                    <span dir="ltr">@{{ responder.username }}</span>
+                    <v-chip
+                      v-if="proposedRescuerIdSet.has(responder.userId)"
+                      color="info"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      پیشنهاد ارسال‌شده
+                    </v-chip>
+                  </div>
+
+                  <div class="d-flex align-center ga-2">
+                    <v-chip color="primary" size="x-small" variant="flat">
+                      {{ formatDistance(responder.distance) }}
+                    </v-chip>
+                    <v-chip color="amber-darken-2" size="x-small" variant="tonal">
+                      {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
+                    </v-chip>
+                  </div>
+                </v-list-item-title>
+
+                <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
+                  <span v-if="responder.categoryName">
+                    تخصص: {{ responder.categoryName }}
+                  </span>
+                  <span>•</span>
+                  <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
+                </v-list-item-subtitle>
+              </v-list-item>
+            </template>
+          </v-list>
+
+          <v-divider />
+          <v-card-actions class="pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
+            <span class="text-caption text-medium-emphasis">
+              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
+            </span>
+            <v-btn
+              :disabled="!adminSos.canDispatchSelected"
+              :loading="adminSos.dispatchSubmitting"
+              color="error"
+              prepend-icon="mdi-send-check-outline"
+              rounded="lg"
+              variant="flat"
+              @click="adminSos.dispatchSelectedResponders()"
+            >
+              اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
+            </v-btn>
+          </v-card-actions>
         </v-card>
       </v-col>
 
@@ -134,13 +329,22 @@
 
                 <v-list-item-title class="d-flex align-center justify-space-between ga-2 font-weight-bold">
                   <span>{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <v-chip
-                    :color="severityMeta(item.severity).badgeColor"
-                    size="x-small"
-                    variant="flat"
-                  >
-                    {{ severityMeta(item.severity).label }}
-                  </v-chip>
+                  <div class="d-flex align-center ga-1">
+                    <v-chip
+                      :color="statusMeta(item.status).badgeColor"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      {{ statusMeta(item.status).label }}
+                    </v-chip>
+                    <v-chip
+                      :color="severityMeta(item.severity).badgeColor"
+                      size="x-small"
+                      variant="flat"
+                    >
+                      {{ severityMeta(item.severity).label }}
+                    </v-chip>
+                  </div>
                 </v-list-item-title>
 
                 <v-list-item-subtitle class="mt-1">
@@ -181,7 +385,14 @@
             </div>
             <div>
               <strong>وضعیت فعلی:</strong>
-              {{ adminSos.selectedRequest.status }}
+              <v-chip
+                :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
+                class="ms-1"
+                size="x-small"
+                variant="tonal"
+              >
+                {{ statusMeta(adminSos.selectedRequest.status).label }}
+              </v-chip>
             </div>
             <div>
               <strong>موقعیت جغرافیایی:</strong>
@@ -209,6 +420,12 @@
               <strong>شناسهٔ پیوست تصویری ثبت‌شده:</strong>
               <code dir="ltr" class="ms-1">{{ adminSos.selectedRequest.photoUrl }}</code>
             </div>
+            <div v-if="adminSos.selectedRequestProposals.length > 0" class="pt-2">
+              <strong>پیشنهادهای ارسال‌شده در این نشست:</strong>
+              <span class="ms-1 text-caption text-medium-emphasis">
+                ({{ adminSos.selectedRequestProposals.length }} پیشنهاد در وضعیت انتظار)
+              </span>
+            </div>
           </v-card-text>
         </v-card>
       </v-col>
@@ -224,7 +441,9 @@ import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
 import {
   buildSosAlertsGeoJson,
-  SOS_SEVERITY_PRESENTATION
+  formatResponderDistance,
+  SOS_SEVERITY_PRESENTATION,
+  SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -247,6 +466,9 @@ const mapStyleUrl = computed(() =>
 const incidentNameById = computed(
   () => new Map(incidentTypes.value.map((item) => [item.id, item.name]))
 );
+const proposedRescuerIdSet = computed(
+  () => new Set(adminSos.selectedRequestProposals.map((proposal) => proposal.rescuerId))
+);
 
 let mapInstance: MapLibreMap | null = null;
 let pulseAnimationFrame: number | null = null;
@@ -255,6 +477,14 @@ let detachMapEvents: (() => void) | null = null;
 
 function severityMeta(severity: Severity) {
   return SOS_SEVERITY_PRESENTATION[severity];
+}
+
+function statusMeta(status: SosRequestRecord["status"]) {
+  return SOS_STATUS_PRESENTATION[status];
+}
+
+function formatDistance(metres: number): string {
+  return formatResponderDistance(metres);
 }
 
 function incidentLabel(incidentTypeId: string): string {
@@ -267,7 +497,7 @@ function formatTimestamp(iso: string): string {
 }
 
 function onFilterChange(value: unknown): void {
-  if (value === "pending" || value === "all") {
+  if (value === "pending" || value === "dispatched" || value === "all") {
     adminSos.setFilterStatus(value);
   }
 }
@@ -471,8 +701,22 @@ onBeforeUnmount(() => {
   min-height: 360px;
 }
 
+.map-selected-alert-card {
+  position: absolute;
+  top: 12px;
+  inset-inline-start: 12px;
+  z-index: 2;
+  width: min(360px, calc(100% - 24px));
+  backdrop-filter: blur(8px);
+}
+
 .dispatch-request-list {
   max-height: 360px;
+  overflow-y: auto;
+}
+
+.responder-list {
+  max-height: 380px;
   overflow-y: auto;
 }
 

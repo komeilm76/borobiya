@@ -10,3 +10,4 @@ export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
 export const SHARE_ENDED_EVENT = "location:share-ended";
 export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
+export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";

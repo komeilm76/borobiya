@@ -925,10 +925,12 @@ describe("Fastify server skeleton", () => {
       expect(summaryLine).toContain("GET /_admin/sos/requests");
       expect(summaryLine).toContain("GET /_admin/sos/requests/:id");
       expect(summaryLine).toContain("GET /_admin/sos/requests/:id/nearest");
+      expect(summaryLine).toContain("POST /_admin/sos/requests/:id/dispatch");
     }
     expect(apiMarkdown).not.toContain("SOS, mission, and the remaining search operations");
     expect(apiMarkdown).not.toContain("and the upload endpoint remain contract-only");
     expect(apiMarkdown).toContain(SHARE_ENDED_EVENT);
     expect(apiMarkdown).toContain("sos:new-request");
+    expect(apiMarkdown).toContain("sos:proposal-received");
   });
 });

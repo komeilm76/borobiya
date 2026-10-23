@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import type { SosRequest } from "@borobiya/shared";
+import type { SosProposalReceivedEvent, SosRequest } from "@borobiya/shared";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
@@ -19,6 +19,7 @@ export const LOCATION_UPDATE_EVENT = "location:update";
 export const PEER_UPDATE_EVENT = "location:peer-update";
 export const SHARE_ENDED_EVENT = "location:share-ended";
 export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
+export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
 export const ADMIN_ROOM = "admin";
 
 export type ShareEndedReason = "revoked" | "expired";
@@ -130,6 +131,19 @@ export function emitSosNewRequest(
 ): void {
   if (!io) return;
   io.to(ADMIN_ROOM).emit(SOS_NEW_REQUEST_EVENT, { sosRequest });
+}
+
+/**
+ * Emits a newly created or reopened mission proposal (`{ proposal, sosRequest }`) exclusively
+ * to the dispatched responder's `user:<rescuerId>` room (`T3.3.2`).
+ */
+export function emitSosProposalReceived(
+  io: RoomEmitter | undefined,
+  rescuerId: string,
+  payload: SosProposalReceivedEvent
+): void {
+  if (!io || !rescuerId) return;
+  io.to(userRoom(rescuerId)).emit(SOS_PROPOSAL_RECEIVED_EVENT, payload);
 }
 
 /**

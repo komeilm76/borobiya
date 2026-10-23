@@ -209,14 +209,19 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 3.3 Dispatch & Nearest (Admin)
 
-- [ ] **T3.3.1** Nearest SQL using `ST_Distance(lastLocation, sos.location)`, filter `category ∩ incidentType`, `isActive`, `!isSuspended`, `!isOnMission`, `lastLocation!=null`, order distance, `avgRating` tie-break, limit 10 → *AI*
-- [ ] **T3.3.2** `POST /_admin/sos/requests/:id/dispatch` {rescuerIds: string[]} → create `mission_proposals` (pending) + emit `sos:proposal-received` per rescuer
-- [ ] **T3.3.3** Also `GET /_admin/sos/requests/:id/nearest` suggestion endpoint
-- [ ] **T3.3.4** Admin panel: alert card on map + proposal list (distance, rating, lastActiveAt, categoryName) + multi-select dispatch
+- [x] **T3.3.1** Nearest SQL using `ST_Distance(lastLocation, sos.location)`, filter `category ∩ incidentType`, `isActive`, `!isSuspended`, `!isOnMission`, `lastLocation!=null`, order distance, `avgRating` tie-break, limit 10 → *AI* ✅ 2026-10-23
+  - **Delivered:** `packages/server/src/db/schema.ts` + migration `0013_stiff_rhodey.sql` adding `users.is_on_mission` (`NOT NULL DEFAULT false`), and `packages/server/src/db/sos-dispatch-store.ts` (`DrizzleSosDispatchStore.findNearestResponders`) projecting geodetic `ST_Distance("users"."last_location", sos.location)::double precision`, filtering `is_active = true`, `is_suspended = false`, `is_on_mission = false`, `last_location IS NOT NULL`, `users.id <> sos.requester_id`, and `category_users ∩ category_incident_types`, deduplicating multi-category memberships (`string_agg`), breaking ties by `COALESCE(avg_rating, 0) DESC, users.id ASC`, and capping at `LIMIT 10`. Verified against real WASM PostgreSQL (`PGlite`) in `packages/server/src/sos/t3-3.pglite.test.ts`.
+- [x] **T3.3.2** `POST /_admin/sos/requests/:id/dispatch` {rescuerIds: string[]} → create `mission_proposals` (pending) + emit `sos:proposal-received` per rescuer ✅ 2026-10-23
+  - **Delivered:** `DrizzleSosDispatchStore.dispatchResponders` row-locks `sos_requests` (`FOR UPDATE`), rejects terminal/accepted statuses (`409 INVALID_SOS_STATUS`), self-dispatch / inactive / suspended / unknown accounts (`400 VALIDATION_ERROR`), and busy responders (`409 RESCUER_BUSY`), idempotently creates/reopens `mission_proposals` (`status = 'pending'`), updates `sos_requests.status = 'dispatched'`, writes `admin_audit_log`, emits `sos:proposal-received` (`{ proposal, sosRequest }`) to each dispatched responder's `user:<rescuerId>` room, and broadcasts the updated request state to `admin`.
+- [x] **T3.3.3** Also `GET /_admin/sos/requests/:id/nearest` suggestion endpoint ✅ 2026-10-23
+  - **Delivered:** Mounted `GET /_admin/sos/requests/:id/nearest` in `packages/server/src/admin/sos.ts`, enriched `nearestResponderSchema` with `username`, marked both `adminGetNearestResponders` and `adminDispatchSosRequest` `"implemented"` in `packages/server/src/plugins/swagger.ts`, and verified OpenAPI + `docs/API.md` parity in `app.test.ts`.
+- [x] **T3.3.4** Admin panel: alert card on map + proposal list (distance, rating, lastActiveAt, categoryName) + multi-select dispatch ✅ 2026-10-23
+  - **Delivered:** `packages/client/src/api/admin-sos.ts`, `admin/sos-alerts.ts`, `stores/admin-sos.ts`, and `views/_admin/AdminDispatchView.vue` with floating map alert overlay card, automatic nearest-responder loading per selected SOS request, formatted metre/kilometre distance, star rating, specialty category names, last-active timestamp, multi-select checkboxes + select-all, and live multi-responder dispatch submission.
 
 ### 3.4 Proposals (Rescuer)
 
-- [ ] **T3.4.1** Table `mission_proposals` (sosRequestId, rescuerId, status: pending|accepted|declined|expired)
+- [x] **T3.4.1** Table `mission_proposals` (sosRequestId, rescuerId, status: pending|accepted|declined|expired) ✅ 2026-10-23
+  - **Delivered:** Declared `missionProposals` in `packages/server/src/db/schema.ts` and generated `drizzle/0013_stiff_rhodey.sql` with `ON DELETE CASCADE` on `sos_request_id`, `NO ACTION` on `rescuer_id`, `UNIQUE ("sos_request_id", "rescuer_id")`, `CHECK ("status" IN ('pending', 'accepted', 'declined', 'expired'))`, and `INDEX "mission_proposals_rescuer_status_idx" ("rescuer_id", "status")`.
 - [ ] **T3.4.2** `GET /_user/sos/proposals` inbox (poll + socket) — bell count
 - [ ] **T3.4.3** `POST /_user/sos/proposals/:id/accept` — guard `isOnMission=false`, set proposal accepted, create `missions`, `rescuer.isOnMission=true`, auto-decline own other pendings
 - [ ] **T3.4.4** `POST /_user/sos/proposals/:id/decline` {reason?}

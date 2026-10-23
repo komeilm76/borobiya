@@ -4,8 +4,16 @@ import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import type { FastifyInstance } from "fastify";
+import { io as createClientSocket, type Socket as ClientSocket } from "socket.io-client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { nearestRespondersResponseSchema } from "@borobiya/shared";
+import {
+  dispatchResponseSchema,
+  nearestRespondersResponseSchema,
+  sosNewRequestEventSchema,
+  sosProposalReceivedEventSchema,
+  type SosNewRequestEvent,
+  type SosProposalReceivedEvent
+} from "@borobiya/shared";
 import { createFastifyApp } from "../app";
 import { parseServerEnv } from "../config/env";
 import * as schema from "../db/schema";
@@ -24,6 +32,7 @@ import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
 import { DrizzleUserSearchStore } from "../db/user-search-store";
+import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT } from "../realtime/socket";
 import { signAccessToken } from "../security/tokens";
 import { createPhotoStorage } from "./photo-storage";
 
@@ -45,6 +54,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
   let pg: PGlite;
   let db: Database;
   let uploadDir: string;
+  let serverUrl: string;
   let app: FastifyInstance;
   let adminToken: string;
   let requesterToken: string;
@@ -183,7 +193,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir)
     });
-    await app.ready();
+    serverUrl = await app.listen({ host: "127.0.0.1", port: 0 });
 
     adminToken = await signAccessToken(
       { userId: ADMIN_ID, role: "admin", sessionId: ADMIN_SESSION_ID, deviceId: `dev-${ADMIN_ID.slice(-6)}` },
@@ -413,5 +423,161 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       "medic_ring_07",
       "medic_ring_08"
     ]);
+  });
+
+  it("dispatches proposals atomically, transitions SOS status, emits sos:proposal-received per rescuer room, handles re-dispatch idempotently, and enforces busy/invalid guards (T3.3.2 / T3.4.5)", async () => {
+    const rescuer1Id = "80000000-0000-4000-8000-000000000001";
+    const rescuer1Session = "81000000-0000-4000-8000-000000000001";
+    const rescuer2Id = "80000000-0000-4000-8000-000000000002";
+    const rescuer2Session = "81000000-0000-4000-8000-000000000002";
+    const rescuer3Id = "80000000-0000-4000-8000-000000000003";
+    const rescuer3Session = "81000000-0000-4000-8000-000000000003";
+    const busyRescuerId = "80000000-0000-4000-8000-000000000004";
+    const bystanderId = "80000000-0000-4000-8000-000000000005";
+    const bystanderSession = "81000000-0000-4000-8000-000000000005";
+
+    await seedUser({ id: rescuer1Id, username: "rescuer_alpha", lat: 35.701, lon: 51.339, sessionId: rescuer1Session });
+    await seedUser({ id: rescuer2Id, username: "rescuer_beta", lat: 35.703, lon: 51.34, sessionId: rescuer2Session });
+    await seedUser({ id: rescuer3Id, username: "rescuer_gamma", lat: 35.706, lon: 51.342, sessionId: rescuer3Session });
+    await seedUser({ id: busyRescuerId, username: "rescuer_busy_1", isOnMission: true, lat: 35.702, lon: 51.339 });
+    await seedUser({ id: bystanderId, username: "bystander_user", lat: 35.71, lon: 51.35, sessionId: bystanderSession });
+
+    const r1Token = await signAccessToken(
+      { userId: rescuer1Id, role: "user", sessionId: rescuer1Session, deviceId: `dev-${rescuer1Id.slice(-6)}` },
+      JWT_SECRET
+    );
+    const r2Token = await signAccessToken(
+      { userId: rescuer2Id, role: "user", sessionId: rescuer2Session, deviceId: `dev-${rescuer2Id.slice(-6)}` },
+      JWT_SECRET
+    );
+    const bystanderToken = await signAccessToken(
+      { userId: bystanderId, role: "user", sessionId: bystanderSession, deviceId: `dev-${bystanderId.slice(-6)}` },
+      JWT_SECRET
+    );
+
+    const openSocket = (token: string) =>
+      new Promise<ClientSocket>((resolve, reject) => {
+        const sock = createClientSocket(serverUrl, {
+          auth: { token },
+          transports: ["websocket"],
+          reconnection: false
+        });
+        sock.once("connect", () => resolve(sock));
+        sock.once("connect_error", reject);
+      });
+
+    const adminSocket = await openSocket(adminToken);
+    const r1Socket = await openSocket(r1Token);
+    const r2Socket = await openSocket(r2Token);
+    const bystanderSocket = await openSocket(bystanderToken);
+
+    const r1Events: SosProposalReceivedEvent[] = [];
+    const r2Events: SosProposalReceivedEvent[] = [];
+    const bystanderEvents: unknown[] = [];
+    const adminEvents: SosNewRequestEvent[] = [];
+
+    r1Socket.on(SOS_PROPOSAL_RECEIVED_EVENT, (payload) => {
+      r1Events.push(sosProposalReceivedEventSchema.parse(payload));
+    });
+    r2Socket.on(SOS_PROPOSAL_RECEIVED_EVENT, (payload) => {
+      r2Events.push(sosProposalReceivedEventSchema.parse(payload));
+    });
+    bystanderSocket.on(SOS_PROPOSAL_RECEIVED_EVENT, (payload) => {
+      bystanderEvents.push(payload);
+    });
+    adminSocket.on(SOS_NEW_REQUEST_EVENT, (payload) => {
+      adminEvents.push(sosNewRequestEventSchema.parse(payload));
+    });
+
+    try {
+      const createRes = await app.inject({
+        method: "POST",
+        url: "/_user/sos/requests",
+        headers: { authorization: `Bearer ${requesterToken}` },
+        payload: {
+          severity: "high",
+          description: "ریزش آوار در ساختمان مسکونی و نیاز فوری به امدادگر",
+          incidentTypeId: INCIDENT_MEDICAL_ID,
+          location: { lat: 35.6997, lon: 51.338, accuracy: 5, isManual: false }
+        }
+      });
+      expect(createRes.statusCode).toBe(201);
+      const { requestId } = createRes.json() as { requestId: string };
+
+      // 1. Dispatching busy responder rejects with 409 RESCUER_BUSY and writes zero proposals:
+      const busyDispatch = await app.inject({
+        method: "POST",
+        url: `/_admin/sos/requests/${requestId}/dispatch`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { rescuerIds: [rescuer1Id, busyRescuerId] }
+      });
+      expect(busyDispatch.statusCode).toBe(409);
+      expect(busyDispatch.json()).toMatchObject({ code: "RESCUER_BUSY" });
+
+      // 2. Dispatching requester to rescue themselves rejects with 400 VALIDATION_ERROR:
+      const selfDispatch = await app.inject({
+        method: "POST",
+        url: `/_admin/sos/requests/${requestId}/dispatch`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { rescuerIds: [REQUESTER_ID] }
+      });
+      expect(selfDispatch.statusCode).toBe(400);
+      expect(selfDispatch.json()).toMatchObject({ code: "VALIDATION_ERROR" });
+
+      // 3. Valid multi-responder dispatch succeeds with 201 and notifies only r1 & r2:
+      const dispatch1 = await app.inject({
+        method: "POST",
+        url: `/_admin/sos/requests/${requestId}/dispatch`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { rescuerIds: [rescuer1Id, rescuer2Id] }
+      });
+      expect(dispatch1.statusCode).toBe(201);
+      const parsed1 = dispatchResponseSchema.parse(dispatch1.json());
+      expect(parsed1.proposals).toHaveLength(2);
+      expect(parsed1.proposals.map((p) => p.rescuerId)).toEqual([rescuer1Id, rescuer2Id]);
+      expect(parsed1.proposals.every((p) => p.status === "pending")).toBe(true);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(r1Events).toHaveLength(1);
+      expect(r1Events[0]?.proposal.rescuerId).toBe(rescuer1Id);
+      expect(r1Events[0]?.sosRequest.status).toBe("dispatched");
+      expect(r2Events).toHaveLength(1);
+      expect(r2Events[0]?.proposal.rescuerId).toBe(rescuer2Id);
+      expect(bystanderEvents).toHaveLength(0);
+      expect(adminEvents.some((e) => e.sosRequest.id === requestId && e.sosRequest.status === "dispatched")).toBe(
+        true
+      );
+
+      // 4. Re-dispatching [rescuer1, rescuer3] reuses rescuer1's pending proposal without re-emitting to r1:
+      const dispatch2 = await app.inject({
+        method: "POST",
+        url: `/_admin/sos/requests/${requestId}/dispatch`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { rescuerIds: [rescuer1Id, rescuer3Id] }
+      });
+      expect(dispatch2.statusCode).toBe(201);
+      const parsed2 = dispatchResponseSchema.parse(dispatch2.json());
+      expect(parsed2.proposals).toHaveLength(2);
+      expect(parsed2.proposals[0]?.id).toBe(parsed1.proposals[0]?.id);
+
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(r1Events).toHaveLength(1);
+
+      // 5. Once accepted/completed, further dispatch attempts reject with 409 INVALID_SOS_STATUS:
+      await pg.query(`UPDATE "sos_requests" SET "status" = 'accepted' WHERE "id" = $1`, [requestId]);
+      const closedDispatch = await app.inject({
+        method: "POST",
+        url: `/_admin/sos/requests/${requestId}/dispatch`,
+        headers: { authorization: `Bearer ${adminToken}` },
+        payload: { rescuerIds: [rescuer3Id] }
+      });
+      expect(closedDispatch.statusCode).toBe(409);
+      expect(closedDispatch.json()).toMatchObject({ code: "INVALID_SOS_STATUS" });
+    } finally {
+      adminSocket.close();
+      r1Socket.close();
+      r2Socket.close();
+      bystanderSocket.close();
+    }
   });
 });

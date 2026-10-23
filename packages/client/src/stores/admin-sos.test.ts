@@ -225,4 +225,74 @@ describe("useAdminSosStore (T3.2.5)", () => {
       expect(updateToken).toHaveBeenCalledWith("rotated-ws-token");
     });
   });
+
+  it("loads nearest responders on selection, supports multi-select, and dispatches proposals cleanly (T3.3.4)", async () => {
+    const reqRow = makeSosRecord({
+      id: "33333333-3333-4333-8333-333333333333",
+      status: "pending"
+    });
+    const nearestA = {
+      userId: "44444444-4444-4444-8444-444444444441",
+      username: "rescuer_one",
+      distance: 380,
+      avgRating: 4.9,
+      categoryName: "امداد شهری",
+      lastActiveAt: "2026-10-23T12:10:00.000Z"
+    };
+    const nearestB = {
+      userId: "44444444-4444-4444-8444-444444444442",
+      username: "rescuer_two",
+      distance: 1450,
+      avgRating: 4.3,
+      categoryName: "امداد کوهستان",
+      lastActiveAt: "2026-10-23T12:00:00.000Z"
+    };
+    const getNearestResponders = vi.fn(async () => ({ responders: [nearestA, nearestB] }));
+    const dispatchResponders = vi.fn(async (_requestId: string, rescuerIds: string[]) => ({
+      proposals: rescuerIds.map((rescuerId, idx) => ({
+        id: `55555555-5555-4555-8555-55555555555${idx + 1}`,
+        sosRequestId: reqRow.id,
+        rescuerId,
+        status: "pending" as const,
+        createdAt: "2026-10-23T12:12:00.000Z"
+      }))
+    }));
+
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [reqRow], total: 1 }),
+      getNearestResponders,
+      dispatchResponders
+    });
+
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt-dispatch";
+    auth.user = {
+      id: "admin-1",
+      username: "admin",
+      role: "admin",
+      mustCompleteSecurityQuestions: false
+    };
+
+    const store = useAdminSosStore();
+    await vi.waitFor(() => {
+      expect(store.nearestResponders).toHaveLength(2);
+    });
+    expect(getNearestResponders).toHaveBeenCalledWith(reqRow.id, "admin-jwt-dispatch");
+
+    store.selectAllNearestResponders();
+    expect(store.selectedResponderIds).toEqual([nearestA.userId, nearestB.userId]);
+    store.toggleResponderSelection(nearestB.userId);
+    expect(store.selectedResponderIds).toEqual([nearestA.userId]);
+    expect(store.canDispatchSelected).toBe(true);
+
+    const ok = await store.dispatchSelectedResponders();
+    expect(ok).toBe(true);
+    expect(dispatchResponders).toHaveBeenCalledWith(reqRow.id, [nearestA.userId], "admin-jwt-dispatch");
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.dispatchedCount).toBe(1);
+    expect(store.selectedResponderIds).toEqual([]);
+    expect(store.selectedRequestProposals).toHaveLength(1);
+    expect(store.dispatchFeedback?.type).toBe("success");
+  });
 });
