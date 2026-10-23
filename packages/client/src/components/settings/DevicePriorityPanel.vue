@@ -161,6 +161,7 @@ function shareLabel(share: { targetUserId: string; targetUsername?: string | nul
 }
 
 function ageText(minutes: number): string {
+  if (minutes <= 0) return "همین الان";
   return `${formatDuration(minutes)} پیش`;
 }
 

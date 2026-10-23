@@ -315,5 +315,96 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
 
     expect(adminCategories).toContain("!assignedIds.has(candidate.id)");
     expect(adminCategories).not.toContain("در مرحلهٔ بعدی پروژه است");
+
+    const devicePriorityPanel = readFileSync(
+      new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url),
+      "utf8"
+    );
+    expect(devicePriorityPanel).toContain('if (minutes <= 0) return "همین الان"');
+  });
+
+  it("useAdminSosStore hydrates cancelled_by_rescuer + dispatched counts accurately on initial load and prefers visible requests", async () => {
+    setActivePinia(createPinia());
+    const auth = useAuthStore();
+    auth.accessToken = makeJwt("admin-dev-initial");
+    auth.user = {
+      id: "44444444-4444-4444-8444-444444444444",
+      username: "dispatch_ops",
+      role: "admin",
+      mustCompleteSecurityQuestions: true
+    };
+
+    const listRequests = vi.fn(async (_token, params) => {
+      // Unfiltered initial fetch returns all statuses including cancelled_by_rescuer + dispatched:
+      expect(params.status).toBeUndefined();
+      return {
+        total: 3,
+        items: [
+          {
+            id: "66666666-6666-4666-8666-666666666661",
+            requesterId: "11111111-1111-4111-8111-111111111111",
+            severity: "low" as const,
+            description: "مأموریت تکمیل‌شده قدیمی‌تر برای تست اولویت انتخاب",
+            incidentTypeId: "77777777-7777-4777-8777-777777777777",
+            location: { lat: 35.71, lon: 51.41, accuracy: 8, isManual: false },
+            photoUrl: null,
+            status: "completed" as const,
+            cancellationReasonId: null,
+            cancellationCustomText: null,
+            cancelledAt: null,
+            createdAt: "2026-10-23T13:05:00.000Z"
+          },
+          {
+            id: "66666666-6666-4666-8666-666666666662",
+            requesterId: "11111111-1111-4111-8111-111111111111",
+            severity: "high" as const,
+            description: "درخواست لغوشده توسط امدادگر و نیازمند اعزام فوری مجدد",
+            incidentTypeId: "77777777-7777-4777-8777-777777777777",
+            location: { lat: 35.72, lon: 51.42, accuracy: 6, isManual: false },
+            photoUrl: null,
+            status: "cancelled_by_rescuer" as const,
+            cancellationReasonId: null,
+            cancellationCustomText: null,
+            cancelledAt: "2026-10-23T13:02:00.000Z",
+            createdAt: "2026-10-23T13:00:00.000Z"
+          },
+          {
+            id: "66666666-6666-4666-8666-666666666663",
+            requesterId: "11111111-1111-4111-8111-111111111111",
+            severity: "medium" as const,
+            description: "درخواست در حال انتظار پذیرش امدادگران اعزامی",
+            incidentTypeId: "77777777-7777-4777-8777-777777777777",
+            location: { lat: 35.73, lon: 51.43, accuracy: 10, isManual: false },
+            photoUrl: null,
+            status: "dispatched" as const,
+            cancellationReasonId: null,
+            cancellationCustomText: null,
+            cancelledAt: null,
+            createdAt: "2026-10-23T12:55:00.000Z"
+          }
+        ]
+      };
+    });
+
+    const sock = makeFakeSocket();
+    configureAdminSosRuntimeForTests({
+      openSocket: async () => ({
+        socket: sock as unknown as RealtimeClient["socket"],
+        connect: vi.fn(),
+        updateToken: vi.fn(),
+        close: vi.fn()
+      }),
+      listRequests
+    });
+
+    const store = useAdminSosStore();
+    await store.refreshRequests();
+
+    expect(store.pendingCount).toBe(1);
+    expect(store.dispatchedCount).toBe(1);
+    expect(store.requests).toHaveLength(3);
+    expect(store.visibleRequests).toHaveLength(1);
+    expect(store.selectedId).toBe("66666666-6666-4666-8666-666666666662");
+    store.resetState();
   });
 });

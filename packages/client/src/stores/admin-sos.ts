@@ -160,15 +160,17 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     loading.value = true;
     errorMessage.value = null;
 
-    const targetFilter = statusOverride ?? filterStatus.value;
+    const targetFilter = statusOverride;
     try {
       const response = await fetchListWithAuthRetry(
-        targetFilter === "all" ? undefined : targetFilter
+        targetFilter && targetFilter !== "all" && targetFilter !== "pending"
+          ? targetFilter
+          : undefined
       );
       if (gen !== refreshGeneration || !response) return;
       requests.value = mergeSosAlertSnapshot(requests.value, response.items);
       if (!selectedId.value && requests.value.length > 0) {
-        selectedId.value = requests.value[0]!.id;
+        selectedId.value = (visibleRequests.value[0] ?? requests.value[0])!.id;
       }
     } catch (err) {
       if (gen !== refreshGeneration) return;

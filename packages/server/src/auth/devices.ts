@@ -35,8 +35,8 @@ export function devicePayload(device: UserDeviceRecord) {
  *
  * `devices.length > 1` is the exact condition the client uses to require the priority-device
  * selection (T2.3.3), which is why the list is deliberately live sessions rather than login history.
- * `ip` is the address seen at the last credential exchange (login or refresh rotation), and
- * `isOnline` mirrors session liveness until socket presence (T2.1.5) drives it separately.
+ * `ip` is the address seen at the last credential exchange (login or refresh rotation), while
+ * `isOnline` and `lastActiveAt` reflect real-time Socket.IO session presence (`attachRealtime`).
  */
 export async function registerUserDevicesRoute(
   app: FastifyInstance,
