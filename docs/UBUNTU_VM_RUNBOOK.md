@@ -64,7 +64,7 @@ snapshot). The `Check` column is how you prove to yourself that the step worked 
 | A5 | Get the code and prove the pipeline files are in it | `git clone` + the § A5 preflight loop | `PREFLIGHT OK` | seconds |
 | A5b | **Bun**, pinned from the clone's `package.json` | the GitHub release zip + `install` | `bun --version` matches the pin | one download |
 | A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `cp -n .env.example .env` + `chmod 600` + the § A6 blocks | `resolve` prints the same selection you chose | seconds |
-| — | *(optional)* proxy for downloads, and proof that it works | § 5 | § 5.2's six checks pass | seconds |
+| — | *(optional)* proxy for downloads, and proof that it works | `./scripts/enable-proxy.sh` (undo: `./scripts/disable-proxy.sh`) | § 5.2's six checks pass | seconds |
 | 7 | *(optional)* pre-download the big files: Geofabrik extracts + Planetiler's reference layers (≈230 MB + 1.3 GB) | `./map-server/scripts/fetch-planetiler-sources.sh` (steps 8 and 9 otherwise fetch what they need themselves) | Each line ends `cached` or `verified` | it skips already-verified files |
 | 8 | Download + verify + crop + merge the OSM extracts | `./map-server/scripts/prepare-regions-pbf.sh` | `PBF OK` from `verify-map-pbf.sh` | downloads skip, crop+merge re-run |
 | 9 | Build the vector tiles (PMTiles) | `PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh` | `Wrote build metadata …` and both tile files exist; the HTTP proof is step 13 | the longest CPU step; no re-download of reference layers |
@@ -742,6 +742,20 @@ The whole stack runs **offline** once built. The internet is needed only for ste
 route, the only fix is a proxy — and a wrong proxy is worse than no proxy, because every failure
 then looks like a broken link. So: set it, **prove it works**, and remove it afterwards.
 
+Two scripts do that, and they are the recommended path:
+
+```bash
+./scripts/enable-proxy.sh      # asks for the address and port, proves the port answers, then writes
+./scripts/disable-proxy.sh     # removes exactly what that wrote, and nothing that it did not write
+```
+
+Neither one contains an address or a port, and this file does not either: a bridged VM needs the host's
+LAN address while a NAT VM needs the gateway, so any value either of them shipped would be wrong for
+one of the two. Both accept `--status` (what is configured now) and `--dry-run` (what would change)
+without a network or root rights. The sections below stay the reference: they say what each of the four
+settings is for, they are what to fall back on when a script's assumption does not fit the machine, and
+§ 5.1a is the host-side half that no script in this repository can do for you.
+
 Whether the gateway is the right address depends on VMware's network mode, and the wrong answer
 here looks exactly like a broken proxy. Work out which case you are in **before** setting anything:
 
@@ -764,9 +778,11 @@ Then prove the proxy port is reachable **before** configuring anything, because 
 different problem from a broken download:
 
 ```bash
-PROXY_HOST="192.168.100.225"      # the host address you just confirmed
-PROXY_PORT="2080"                # whatever the client is listening on
-timeout 5 bash -c "</dev/tcp/$PROXY_HOST/$PROXY_PORT"   && echo "port open: the proxy accepts connections from the VM"   || echo "refused or filtered — see § 5.1a, do not go further yet"
+read -r -p 'proxy host (the address you just confirmed): ' PROXY_HOST
+read -r -p 'proxy port (what the client listens on): '     PROXY_PORT
+timeout 5 bash -c "</dev/tcp/$PROXY_HOST/$PROXY_PORT" \
+  && echo "port open: the proxy accepts connections from the VM" \
+  || echo "refused or filtered — see § 5.1a, do not go further yet"
 ```
 
 Two ways to end up here with the right IP and the wrong result, both on a Windows host: the proxy is
@@ -785,27 +801,28 @@ Proxy clients usually bind loopback only, and a VM is *not* loopback. Two fixes,
 preference — both belong to the host, not to this repository:
 
 1. **Enable the client's "allow connections from LAN" option**, which makes it bind `0.0.0.0`
-   instead of `127.0.0.1`. Confirm on Windows with `netstat -ano | findstr :2080`: `0.0.0.0:2080`
-   means it worked, `127.0.0.1:2080` means it did not (or the client needs a restart). Then allow the
-   port in the firewall for the LAN only — in an elevated PowerShell, substituting your own subnet and
-   port for `192.168.100.0/24` and `2080`:
+   instead of `127.0.0.1`. Confirm on Windows with `netstat -ano | findstr :<port>`: `0.0.0.0:<port>`
+   means it worked, `127.0.0.1:<port>` means it did not (or the client needs a restart). Then allow that
+   port in the firewall for the LAN only — in an elevated PowerShell, with your own port and LAN range:
 
    ```powershell
-   New-NetFirewallRule -DisplayName "proxy for VM" -Direction Inbound -Action Allow `
-     -Protocol TCP -LocalPort 2080 -RemoteAddress 192.168.100.0/24 -Profile Any
+   New-NetFirewallRule -DisplayName "borobiya proxy" -Direction Inbound -Action Allow `
+     -Protocol TCP -LocalPort <port> -RemoteAddress <LAN address>/<mask> -Profile Any
    ```
+
+   `enable-proxy.sh` prints both commands above with the values you typed already filled in, when the
+   port turns out not to answer — which is the only moment they are worth copying.
 
 2. **If the client cannot bind outside loopback, forward it on the host** with the built-in
    `netsh` port proxy (needs the IP Helper service running, and admin rights to add):
 
    ```powershell
-   netsh interface portproxy add v4tov4 listenaddress=192.168.100.225 listenport=2080 `
-     connectaddress=127.0.0.1 connectport=2080
-   netsh interface portproxy show all      # and the same firewall rule as above
+   netsh interface portproxy add v4tov4 listenaddress=<host LAN address> listenport=<port> `
+     connectaddress=127.0.0.1 connectport=<port>
+   netsh interface portproxy show all      # plus the same firewall rule as above
    ```
 
-   Remove it with `netsh interface portproxy delete v4tov4 listenaddress=192.168.100.225
-   listenport=2080`. A mixed HTTP+SOCKS listener (the usual single-port setup) is fine for
+   Remove it with the same command and `delete` instead of `add`. A mixed HTTP+SOCKS listener (the usual single-port setup) is fine for
    everything here, because `apt`, `curl`, `git` and Docker all speak HTTP `CONNECT`; a
    **SOCKS-only** port is not — `apt` and the Docker daemon cannot use one, so get an HTTP port
    before continuing rather than working around it.
@@ -818,9 +835,8 @@ Either way, re-run the `/dev/tcp` probe above until it prints `port open`, and o
 ```bash
 if [ -z "${PROXY_HOST:-}" ] || [ -z "${PROXY_PORT:-}" ]; then
   echo "PROXY_HOST/PROXY_PORT are not set in this shell — nothing was changed."
-  echo "export them first, using § 5's table: a bridged VM needs the host's own LAN address"
-  echo "(e.g. 192.168.100.225), a NAT VM needs the default gateway; then the client's listen"
-  echo "port (a Throne/v2ray mixed listener is one port, usually 2080). The probe above sets both."
+  echo "Set them from the probe above, or re-run it; § 5's table says which address applies."
+  echo "No port is assumed here on purpose: it is whatever your client listens on."
 else
   export http_proxy="http://$PROXY_HOST:$PROXY_PORT" https_proxy="http://$PROXY_HOST:$PROXY_PORT" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
   export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy" all_proxy="$http_proxy" ALL_PROXY="$https_proxy"
@@ -881,12 +897,15 @@ Item 6 is the one that surprises people: `docker pull` failing while `curl` is f
 
 ### 5.3 apt and the Docker daemon (only if § 5.2's items 5 and 6 failed)
 
+`./scripts/enable-proxy.sh` writes both files below, refuses to overwrite either one if it exists
+without its marker line, and asks before restarting Docker. Manual equivalent:
+
 ```bash
 # apt (system-wide; a per-command -o Acquire::http::Proxy="…" also works):
-printf 'Acquire::http::Proxy "http://%s:%s";\nAcquire::https::Proxy "http://%s:%s";\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/apt/apt.conf.d/95proxy
+printf 'Acquire::http::Proxy "http://%s:%s";\nAcquire::https::Proxy "http://%s:%s";\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/apt/apt.conf.d/95borobiya-proxy
 # Docker daemon — systemd does not read your shell environment, so it needs a drop-in:
 sudo mkdir -p /etc/systemd/system/docker.service.d
-printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:%s"\nEnvironment="HTTPS_PROXY=http://%s:%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/systemd/system/docker.service.d/proxy.conf
+printf '[Service]\nEnvironment="HTTP_PROXY=http://%s:%s"\nEnvironment="HTTPS_PROXY=http://%s:%s"\nEnvironment="NO_PROXY=localhost,127.0.0.1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_PORT" "$PROXY_HOST" "$PROXY_PORT" | sudo tee /etc/systemd/system/docker.service.d/borobiya-proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
 ```
 
@@ -927,6 +946,9 @@ JSONW
 fi
 ```
 
+`enable-proxy.sh` writes that key too, keeps a copy of any `proxies` value it replaced, and hands it
+back on disable — a build proxy you configured yourself is not this script's to delete. Manual form:
+
 Prove it on the thing that actually needs it rather than on a pull: `docker compose build api` works
 from the moment A6 has written `.env`, and its `bun install` either resolves packages or hangs. And
 when you remove the proxy (§ 5.4), **delete the `proxies` key as well** — a stale entry pointing at an
@@ -939,6 +961,13 @@ at all. A future Planetiler bump that adds a fourth source changes that, and the
 downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.` pair) is what applies.
 
 ### 5.4 Remove it
+
+```bash
+./scripts/disable-proxy.sh        # --status to look first, --dry-run to see the plan
+```
+
+Then the manual equivalent, if you configured any of it by hand (the order is the same as § 5.1–§ 5.3,
+and every line is safe to run when the thing it removes was never there):
 
 ```bash
 sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc   # drop exactly the block § 5.1 added
@@ -954,7 +983,7 @@ if path.is_file():
     else:
         print(f"no proxies key in {path}; nothing to do")
 JSONW
-sudo rm -f /etc/apt/apt.conf.d/95proxy /etc/systemd/system/docker.service.d/proxy.conf
+sudo rm -f /etc/apt/apt.conf.d/95borobiya-proxy /etc/systemd/system/docker.service.d/borobiya-proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
 ```
 
@@ -967,8 +996,8 @@ undo the two host-side changes yourself once the downloads are finished — a pr
 the LAN can reach is worth removing rather than leaving:
 
 ```powershell
-Remove-NetFirewallRule -DisplayName "proxy for VM"
-netsh interface portproxy delete v4tov4 listenaddress=192.168.100.225 listenport=2080   # only if you added it
+Remove-NetFirewallRule -DisplayName "borobiya proxy"
+netsh interface portproxy delete v4tov4 listenaddress=<host LAN address> listenport=<port>   # only if you added it
 ```
 
 ---

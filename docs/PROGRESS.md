@@ -128,6 +128,59 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-23 — the runbook's proxy section became two scripts, because its numbers were not portable
+
+- **Why scripts rather than prose.** § 5 had become a section holding one machine's address and port — a
+  Windows host running a Throne-style client, with a bridged VM — as if they were the project's. They
+  cannot be right for both modes (a bridged VM needs the host's own LAN address, a NAT VM the default
+  gateway), and four config files pasted by hand is where a proxy setup ends up half-applied.
+  `scripts/enable-proxy.sh` asks for the address and the port at run time and writes all four settings;
+  `scripts/disable-proxy.sh` removes exactly what it wrote. Neither file contains an address, a port, or
+  a default port: the port prompt has no fallback, because a guessed one looks like a broken mirror later.
+- **The order is the feature.** Everything that can fail runs before anything is written: the TCP probe
+  (a refused port and a dropped port get different advice), a real HTTP request through the port (a
+  SOCKS-only listener is refused with an explanation, because `apt` and dockerd cannot use one), and an
+  ownership test on the two root-owned files. The first draft wrote `~/.bashrc` first and only then
+  noticed an administrator's `/etc/apt/apt.conf.d` file, leaving a half-configured proxy behind; the
+  suite caught it (`test_a_refusal_leaves_nothing_half_configured`), which is the entire argument for
+  testing shell scripts.
+- **Removal is exact, not hopeful.** The `~/.bashrc` block is deleted between its own begin/end markers,
+  and the script refuses outright when it finds a begin without an end, because a range delete would
+  have eaten the rest of the file. The apt file and the dockerd drop-in are removed only if they carry
+  this project's marker line, so a file an admin wrote is reported "left alone". `~/.docker/config.json`
+  is rewritten through JSON with unrelated keys intact, and a `proxies` value that predates the first
+  enable is backed up and handed back rather than deleted — restoring our own last output would have
+  been the bug that resurrects a dead proxy. The two file names changed to `95borobiya-proxy` and
+  `borobiya-proxy.conf` so the scripted and manual paths cannot write to different places and disagree
+  about what removal deletes.
+- **Credentials, because an authenticating client is not exotic.** `--username`/`--password` are
+  percent-encoded by the script instead of asking the reader to hand-write `%40`, land in a 0600
+  `~/.config/borobiya/proxy.env` that the bashrc block sources, force the root-owned files to 0600 as
+  well, and are masked in every line the scripts print. A password of `a$b` + backtick + `c"d` survives
+  `source ~/.bashrc` unchanged — asserted in a test, not assumed in a comment.
+- **A checker that outlives the session.** `scripts/check_runbook_markdown.py` runs the sweeps this
+  project has been doing by hand (table column counts, `§` cross-references resolving to a real heading,
+  placeholders outside code, `bash -n` on every shell fence, `compile()` on the python embedded in them,
+  duplicate headings, unbalanced inline backticks). Two of its first findings were bugs in itself: it only
+  recognised fences at column 0, which had made four indented blocks invisible to every earlier sweep, and
+  it matched a 3-backtick line as the closer of README's 4-backtick wrapper, turning 1,100 lines into
+  apparent prose. Both fixed — fences now carry their length, like CommonMark — and table cells are
+  counted after inline code is stripped, so a `||` inside a version range is no longer two columns.
+- **What it found elsewhere in the docs.** `git checkout <prev-sha>` in `docs/WORKFLOWS.md` was a shell
+  redirection rather than a placeholder (quoted, and the block parses now); `docs/PROGRESS.md` cited
+  a section 3.4.1 that the runbook never created (retargeted to its real home, § 3.4, where the
+  last-resort fixtures text lives); README.md closed its wrapper with three backticks against an opener of four (matched).
+  One finding is left alone on purpose: `docs/USER_MANUAL.md:272` points at a section 10.5 that no
+  document defines, and fixing it means deciding where the navigation walkthrough belongs — guessing is
+  how this project keeps generating stale references.
+- **Verification.** 29 new tests (`python3 scripts/test_proxy_scripts.py`) drive both scripts
+  end-to-end against a throwaway `$HOME`/`/etc` and a canary proxy that records whether it was asked,
+  including the refusal paths; every markdown file in the repository (14 in docs/ plus README.md) is now
+  clean under the checker except that one dangling USER_MANUAL reference, which is reported rather than
+  guessed at. Not verifiable from here, and labelled as such in the runbook: what a
+  real `docker build` does with the config key, anything on the Windows side, and whether a given proxy is
+  reachable at all.
+
 ### 2026-10-23 — the audit turned on the scripts themselves: 4 real bugs fixed, 2 suspected ones disproved, 16 new tests
 
 - **Scope changed at the user's request:** from "is the runbook right" to "are the scripts right". Every `.sh`/`.py`/`.mjs` in the pipeline was syntax-checked, linted (shellcheck at `-S style`, ruff with bug-oriented rules), and the suites were run green: python **83** (16 of them new, below), gateway **19**, shared **55**, server **472**, client **370**. shellcheck's finding count did not move (the 4 remaining are known-benign: `REPO_ROOT` fed to a sibling, `eval`-assigned vars, an awk string).
@@ -153,10 +206,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ### 2026-10-23 — second audit pass: the doc had also *deleted* two facts and *added* one it could not support
 
 - **Found by re-reading the pre-rewrite version of the file, not only the code.** My first audit checked the runbook against the scripts; this one checked it against its own earlier self, and that caught a different class of bug — verified knowledge the rewrite dropped or flattened. Three items: the rule **never to hand-substitute a moving `*-latest.osm.pbf` URL** (the pipeline addresses everything by date + checksum, so a `-latest` URL silently redefines "the same dataset" for the next person to run step 8); the concrete **runtime parameters of step 12** (`osrm-routed --algorithm mld --threads $OSRM_RUNTIME_THREADS --max-table-size 100`, and Photon's `-Xms256m -Xmx1536m`) including the fact that `--max-table-size` bounds the `/table` plugin and is **not** a memory dial, which reads exactly like one; and the **last-resort fixture route**, which the rewrite had turned into a flat prohibition.
-- **The fixture correction matters because the old doc allowed it deliberately.** Planetiler's Monaco test resources are what its own README points `--water-polygons-url`/`--natural-earth-url` at, and the fetch script honors those variables — so for a Tehran *smoke test* (no sea in the bbox) the run still proves the pipeline. My rewrite said "not the answer", which lost both halves: the permission *and* its cost. § 3.4.1 now carries it as a labelled last resort with the blast radius spelled out (lakes, rivers and every low-zoom Natural Earth boundary layer really are wrong; the build succeeds; `verify-tiles.sh` passes) and the three rules that come with it: record the substitution in the acceptance notes, know that it is invisible to the manifest, and rebuild before treating any dataset as deliverable.
+- **The fixture correction matters because the old doc allowed it deliberately.** Planetiler's Monaco test resources are what its own README points `--water-polygons-url`/`--natural-earth-url` at, and the fetch script honors those variables — so for a Tehran *smoke test* (no sea in the bbox) the run still proves the pipeline. My rewrite said "not the answer", which lost both halves: the permission *and* its cost. § 3.4 now carries it as a labelled last resort with the blast radius spelled out (lakes, rivers and every low-zoom Natural Earth boundary layer really are wrong; the build succeeds; `verify-tiles.sh` passes) and the three rules that come with it: record the substitution in the acceptance notes, know that it is invisible to the manifest, and rebuild before treating any dataset as deliverable.
 - **One number I had invented, removed:** "images: ~2.3 GB before step 12" appeared nowhere in the repo — it is now `docker system df`, in real numbers. Likewise the "≥ 2 Gi available" RAM line is now labelled as this runbook's guidance rather than a gate, with the two floors the setup script really enforces named beside it (15 GiB free, 50 000 inodes, checked on the library filesystem and on Docker's storage root).
 - **A broken cross-reference and a broken table.** Item 3 of § 3.4 pointed at "the § A6 guide" for the offline failure; the guide is printed by the fetch script, and § 6.1's own text quotes it — fixed. And § 3.1's Photon row had collapsed into 5 cells inside a 6-column table (a whole `URL as the repo uses it` column disappeared), which markdown renders as a mangled row rather than an error: it now says what is true — no registry, no download URL, only a `Dockerfile` whose `ARG PHOTON_SHA256` must match row 6's JAR.
-- **Honesty about the fixtures' liveness, from a check that only half-worked:** both override URLs were probed here and GitHub answers `302` for each path, but the redirect target is outside this workspace's allowed hosts, so the bytes were never fetched. The doc now states exactly that, in § 3.4.1, under the same standard § 3.1's legend uses — "the path still exists" is not "the content was reviewed".
+- **Honesty about the fixtures' liveness, from a check that only half-worked:** both override URLs were probed here and GitHub answers `302` for each path, but the redirect target is outside this workspace's allowed hosts, so the bytes were never fetched. The doc now states exactly that, in § 3.4, under the same standard § 3.1's legend uses — "the path still exists" is not "the content was reviewed".
 - **Re-verified after the edits:** 55 bash blocks pass `bash -n`, no table in the file has inconsistent column counts, no bare `<placeholder>` survives outside a code span or fence, every `§` reference resolves, and every cited repo path exists or is labelled generated/legacy.
 
 ### 2026-10-23 — audit pass on the rewritten runbook: nine claims were wrong, and two of them were load-bearing

@@ -1104,4 +1104,4 @@ stateDiagram-v2
 ---
 
 **This document is the single source of truth for initial documentation and development of Borobiya. Use it as the prompt for AI Assistant to generate docs, structure, and tasks.**
-```
+````

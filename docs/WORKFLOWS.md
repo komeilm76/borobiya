@@ -238,7 +238,7 @@ docker compose up --build -d
 ```bash
 # On VPS
 docker compose down
-git checkout <prev-sha>
+git checkout "<prev-sha>"  # quoted, because <prev-sha> alone is a shell redirection
 docker compose up -d
 # Or GHCR tags: docker pull ghcr.io/...:prev-sha
 ```
