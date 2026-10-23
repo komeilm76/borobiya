@@ -1,7 +1,7 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import type { UserRole } from "@borobiya/shared";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import type { UserCategorySummary, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
-import { securityQuestions, userSecurityAnswers, userSessions, users } from "./schema";
+import { categories, categoryUsers, securityQuestions, userSecurityAnswers, userSessions, users } from "./schema";
 
 export interface SecurityQuestionsUserRecord {
   id: string;
@@ -21,6 +21,7 @@ export interface SecurityQuestionAnswerHash {
 
 export interface UserSecurityQuestionsStore {
   findUserById(id: string): Promise<SecurityQuestionsUserRecord | null>;
+  listUserCategories?(userId: string): Promise<UserCategorySummary[]>;
   hasActiveSession(input: { userId: string; sessionId: string; deviceId: string }): Promise<boolean>;
   securityQuestionsExist(questionIds: readonly string[]): Promise<boolean>;
   completeSecurityQuestions(input: {
@@ -49,6 +50,15 @@ export class DrizzleUserSecurityQuestionsStore implements UserSecurityQuestionsS
       .where(eq(users.id, id))
       .limit(1);
     return matchingUsers[0] ?? null;
+  }
+
+  async listUserCategories(userId: string): Promise<UserCategorySummary[]> {
+    return this.db
+      .select({ id: categories.id, name: categories.name })
+      .from(categoryUsers)
+      .innerJoin(categories, eq(categories.id, categoryUsers.categoryId))
+      .where(eq(categoryUsers.userId, userId))
+      .orderBy(asc(categories.name), asc(categories.id));
   }
 
   async hasActiveSession(input: { userId: string; sessionId: string; deviceId: string }): Promise<boolean> {

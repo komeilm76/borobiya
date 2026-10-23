@@ -34,6 +34,7 @@ function profilePayload(user: AdminUserRecord) {
     mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
     isActive: user.isActive,
     avgRating: user.avgRating,
+    categories: user.categories ?? [],
     createdAt: user.createdAt.toISOString()
   };
 }

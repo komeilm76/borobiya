@@ -142,6 +142,7 @@ describe("GET /_admin/users", () => {
         mustCompleteSecurityQuestions: true,
         isActive: true,
         avgRating: null,
+        categories: [],
         createdAt: createdAt.toISOString()
       }],
       total: 6,
@@ -251,6 +252,7 @@ describe("GET /_admin/users/:id", () => {
       mustCompleteSecurityQuestions: true,
       isActive: true,
       avgRating: null,
+      categories: [],
       createdAt: createdAt.toISOString(),
       devices: [{
         id: sessionId,
@@ -307,6 +309,7 @@ describe("POST /_admin/users", () => {
       mustCompleteSecurityQuestions: true,
       isActive: true,
       avgRating: null,
+      categories: [],
       createdAt: createdAt.toISOString()
     });
     expect(hashPassword).toHaveBeenCalledWith(validBody.password);
@@ -476,6 +479,7 @@ describe("PATCH /_admin/users/:id/status", () => {
       mustCompleteSecurityQuestions: true,
       isActive: false,
       avgRating: null,
+      categories: [],
       createdAt: createdAt.toISOString()
     });
     expect(mocks.findAdminActorById).toHaveBeenCalledWith(userId);

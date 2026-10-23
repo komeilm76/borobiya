@@ -10,6 +10,7 @@ const user = {
   mustCompleteSecurityQuestions: false,
   isActive: true,
   avgRating: null,
+  categories: [],
   createdAt: "2026-10-19T10:00:00.000Z"
 };
 

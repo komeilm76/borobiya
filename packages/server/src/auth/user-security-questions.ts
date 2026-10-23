@@ -126,6 +126,8 @@ export async function registerUserSecurityQuestionsRoute(
     const user = request.authenticatedUser;
     if (!user) return sendUnauthorized(reply, "UNAUTHORIZED");
 
+    const categories = (await dependencies.store.listUserCategories?.(user.userId)) ?? [];
+
     return reply.header("cache-control", "no-store").send({
       id: user.userId,
       username: user.username,
@@ -133,6 +135,7 @@ export async function registerUserSecurityQuestionsRoute(
       mustCompleteSecurityQuestions: user.mustCompleteSecurityQuestions,
       isActive: user.isActive,
       avgRating: user.avgRating,
+      categories,
       createdAt: user.createdAt.toISOString()
     });
   });

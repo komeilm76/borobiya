@@ -12,6 +12,7 @@ import {
   type AuthUser,
   type CompleteSecurityQuestionsInput,
   type LoginInput,
+  type UserCategorySummary,
   type UserProfile
 } from "@shared/index";
 import { ApiError, authApiRoutes, requestJson, userApiRoutes } from "../api/http";
@@ -65,6 +66,7 @@ function userFromProfile(profile: UserProfile): AuthUser {
 export const useAuthStore = defineStore("auth", () => {
   const accessToken = ref<string | null>(null);
   const user = ref<AuthUser | null>(null);
+  const userCategories = ref<UserCategorySummary[]>([]);
   const onboardingRequired = ref(false);
   const initialized = ref(false);
   const isAuthenticated = computed(() => accessToken.value !== null);
@@ -114,6 +116,7 @@ export const useAuthStore = defineStore("auth", () => {
     clearProactiveRefresh();
     accessToken.value = null;
     expiresAt = null;
+    userCategories.value = [];
     setUser(null);
     initialized.value = true;
   }
@@ -124,6 +127,7 @@ export const useAuthStore = defineStore("auth", () => {
         method: "GET",
         accessToken: token
       }));
+      userCategories.value = profile.categories;
       setUser(userFromProfile(profile));
     } catch (error) {
       if (error instanceof ApiError && error.code === "SECURITY_QUESTIONS_REQUIRED") {
@@ -227,14 +231,23 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function refreshProfile(): Promise<void> {
+    await ensureSession();
+    if (accessToken.value) {
+      await loadCurrentUser(accessToken.value);
+    }
+  }
+
   return {
     accessToken,
     user,
+    userCategories,
     initialized,
     isAuthenticated,
     mustCompleteSecurityQuestions,
     userRole,
     ensureSession,
+    refreshProfile,
     login,
     completeSecurityQuestions,
     logout

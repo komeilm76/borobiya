@@ -6,6 +6,8 @@ import {
   createIncidentType,
   listCategories,
   listIncidentTypes,
+  listPublicIncidentTypes,
+  removeCategoryUser,
   updateCategory,
   updateIncidentType
 } from "./admin-catalog";
@@ -25,6 +27,7 @@ const CATEGORY = {
   name: "River team",
   description: null,
   incidentTypeIds: [INCIDENT.id],
+  members: [],
   createdAt: "2026-10-22T09:00:00.000Z"
 };
 
@@ -167,5 +170,21 @@ describe("category calls", () => {
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).code).toBe("CATEGORY_NOT_FOUND");
     expect((error as ApiError).status).toBe(404);
+  });
+
+  it("removes a member through DELETE /_admin/categories/:id/users/:userId and reads public incident types", async () => {
+    const memberId = "44444444-4444-4444-8444-444444444444";
+    const deleteFetch = stubFetch(() => new Response(null, { status: 200 }));
+    await expect(removeCategoryUser(CATEGORY.id, memberId, "admin-token")).resolves.toBeUndefined();
+    const [deleteUrl, deleteInit] = call(deleteFetch);
+    expect([deleteUrl, deleteInit.method]).toEqual([
+      `/api/_admin/categories/${CATEGORY.id}/users/${memberId}`,
+      "DELETE"
+    ]);
+
+    const publicFetch = stubFetch(() => jsonResponse([INCIDENT]));
+    await expect(listPublicIncidentTypes()).resolves.toEqual([INCIDENT]);
+    const [publicUrl, publicInit] = call(publicFetch);
+    expect([publicUrl, publicInit.method]).toEqual(["/api/_public/incident-types", "GET"]);
   });
 });

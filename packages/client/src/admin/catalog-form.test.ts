@@ -32,6 +32,7 @@ const CATEGORY: Category = {
   name: "River team",
   description: "Boats and dry suits.",
   incidentTypeIds: [INCIDENT.id],
+  members: [],
   createdAt: "2026-10-22T09:00:00.000Z"
 };
 

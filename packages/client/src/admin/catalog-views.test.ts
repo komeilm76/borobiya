@@ -20,7 +20,7 @@ describe("the admin catalog views' load-bearing markup", () => {
       expect(source.match(/auth\.accessToken/g)).toHaveLength(1);
     }
     expect(incidents.match(/await adminToken\(\)/g)).toHaveLength(2);
-    expect(categories.match(/await adminToken\(\)/g)).toHaveLength(4);
+    expect(categories.match(/await adminToken\(\)/g)).toHaveLength(5);
   });
 
   it("lets an admin rename a slug, because the API does", () => {
@@ -36,14 +36,12 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(incidents).toContain("incidentSlugPreview");
   });
 
-  it("does not offer to remove a member it cannot list", () => {
-    // `categorySchema` carries `incidentTypeIds` and no member list, so there is no way to show who is
-    // already in a group, and a remove control would need a uuid typed by hand. The note in the dialog and
-    // the absence of the DELETE call are one decision; T3.1.4's membership projection adds both.
+  it("lists current members by username and removes them by click without raw uuid entry", () => {
     expect(categories).toContain("افزودن عضو");
-    expect(categories).not.toContain("removeCategoryUser");
-    expect(categories).not.toContain("data-test=\"member-id\"");
-    // One text field in that dialog, and it is the username search.
+    expect(categories).toContain("removeCategoryUser");
+    expect(categories).toContain('data-test="current-members"');
+    expect(categories).not.toContain('data-test="member-id"');
+    // One text field in that dialog, and it is still the username search.
     const dialog = categories.slice(categories.indexOf("v-model=\"membersOpen\""), categories.indexOf("<v-snackbar"));
     expect(dialog.match(/<v-text-field/g)).toHaveLength(1);
     expect(dialog).toContain('data-test="member-search"');

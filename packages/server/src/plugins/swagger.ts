@@ -20,6 +20,7 @@ const implementedOperationIds = new Set([
   "authForgotPasswordVerify",
   "authForgotPasswordReset",
   "publicSecurityQuestions",
+  "publicIncidentTypes",
   "userGetMe",
   "adminListUsers",
   "adminGetUser",
@@ -277,7 +278,7 @@ export function describeOpenApiRuntimeStatus(paths: OpenApiPaths = buildOpenApiP
 
   return (
     `OpenAPI is generated from the shared Zod route contracts (${implementedCount} of ${totalCount} operations implemented at runtime, ` +
-    `${contractOnlyCount} marked \`x-borobiya-runtime-status: contract-only\`). Public health/security-question catalog, auth/session/recovery, ` +
+    `${contractOnlyCount} marked \`x-borobiya-runtime-status: contract-only\`). Public health/security-question/incident-type catalogs, auth/session/recovery, ` +
     `admin user list/detail/create/status, the admin incident-type catalog (list/create/update), the responder-category catalog with member assignment and removal, ` +
     `authenticated profile/onboarding/devices, partial-username user search, live-location share creation, revocation, listing, history-share creation with its windowed reads, ` +
     `grant lists, and delete, and the deprecated REST location-update fallback are implemented at runtime (live \`location:update\` and \`location:share-ended\` run over Socket.IO). ` +

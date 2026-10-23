@@ -33,6 +33,7 @@ function categoryRow(overrides: Partial<CategoryRecord> = {}): CategoryRecord {
     name: "Mountain Rescue",
     description: "alpine",
     incidentTypeIds: [typeA],
+    members: [],
     createdAt: new Date("2026-10-22T10:00:00.000Z"),
     ...overrides
   };
@@ -131,20 +132,29 @@ describe("category store", () => {
         [
           { categoryId, incidentTypeId: typeA },
           { categoryId, incidentTypeId: typeB }
-        ]
+        ],
+        [{ categoryId, id: userA, username: "alpine_1" }]
       ]
     });
 
     const result = await store.listCategories();
 
-    expect(log.selects, "two statements total, not one per row").toBe(2);
+    expect(log.selects, "three statements total (rows + incident links + members), not N+1").toBe(3);
     expect(result).toEqual([
-      expect.objectContaining({ id: categoryId, name: "Mountain Rescue", description: null, incidentTypeIds: [typeA, typeB] })
+      expect.objectContaining({
+        id: categoryId,
+        name: "Mountain Rescue",
+        description: null,
+        incidentTypeIds: [typeA, typeB],
+        members: [{ id: userA, username: "alpine_1" }]
+      })
     ]);
-    // A category with no links still appears, with an empty set: the admin list must not hide it.
-    const empty = makeStore({ selects: [[{ id: categoryId, name: "General", description: null, createdAt: new Date() }], []] });
+    // A category with no links still appears, with empty sets: the admin list must not hide it.
+    const empty = makeStore({
+      selects: [[{ id: categoryId, name: "General", description: null, createdAt: new Date() }], [], []]
+    });
     await expect(empty.store.listCategories()).resolves.toEqual([
-      expect.objectContaining({ id: categoryId, name: "General", description: null, incidentTypeIds: [] })
+      expect.objectContaining({ id: categoryId, name: "General", description: null, incidentTypeIds: [], members: [] })
     ]);
   });
 
@@ -153,6 +163,10 @@ describe("category store", () => {
     expect(categoryListQueries(offlineDb).incidentTypes.toSQL().sql).toContain('inner join "incident_types"');
     expect(categoryListQueries(offlineDb).incidentTypes.toSQL().sql).toContain(
       'order by "incident_types"."name" asc, "incident_types"."id" asc'
+    );
+    expect(categoryListQueries(offlineDb).members.toSQL().sql).toContain('inner join "users"');
+    expect(categoryListQueries(offlineDb).members.toSQL().sql).toContain(
+      'order by "users"."username" asc, "users"."id" asc'
     );
     // A guard on the bug this file nearly shipped with: the links query has no `categories` in its FROM, so
     // any reference to it in the SQL is an error Postgres raises at runtime, not one a test would otherwise see.
@@ -192,7 +206,7 @@ describe("category store", () => {
     expect(transaction, "the set and its audit entry are one unit").toHaveBeenCalledOnce();
     expect(result).toEqual({
       status: "created",
-      record: { ...stored, incidentTypeIds: [typeA, typeB] }
+      record: { ...stored, incidentTypeIds: [typeA, typeB], members: [] }
     });
     expect(log.inserts.map((entry) => entry.table)).toEqual([categories, categoryIncidentTypes, adminAuditLog]);
     expect(log.inserts[1]?.values).toEqual([
@@ -228,7 +242,7 @@ describe("category store", () => {
 
     expect(result).toEqual({
       status: "updated",
-      record: { ...existing, incidentTypeIds: [typeA] },
+      record: { ...existing, incidentTypeIds: [typeA], members: [] },
       changed: false
     });
     expect(log.updates).toEqual([]);

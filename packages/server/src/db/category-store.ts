@@ -17,12 +17,19 @@ import {
  * the only shape) and half-diffing a field the caller named is how a stale admin list quietly deletes
  * assignments it never showed.
  */
+export interface CategoryMemberRecord {
+  id: string;
+  username: string;
+}
+
 export interface CategoryRecord {
   id: string;
   name: string;
   description: string | null;
   /** Ordered by the incident type's name, so the same set always renders in the same sequence. */
   incidentTypeIds: string[];
+  /** Ordered by username then id so membership lists render deterministically. */
+  members: CategoryMemberRecord[];
   createdAt: Date;
 }
 
@@ -91,7 +98,12 @@ export function categoryListQueries(db: Database) {
       .select({ categoryId: categoryIncidentTypes.categoryId, incidentTypeId: incidentTypes.id })
       .from(categoryIncidentTypes)
       .innerJoin(incidentTypes, eq(incidentTypes.id, categoryIncidentTypes.incidentTypeId))
-      .orderBy(asc(incidentTypes.name), asc(incidentTypes.id))
+      .orderBy(asc(incidentTypes.name), asc(incidentTypes.id)),
+    members: db
+      .select({ categoryId: categoryUsers.categoryId, id: users.id, username: users.username })
+      .from(categoryUsers)
+      .innerJoin(users, eq(users.id, categoryUsers.userId))
+      .orderBy(asc(users.username), asc(users.id))
   };
 }
 
@@ -156,6 +168,15 @@ async function readIncidentTypeIds(db: Database, categoryId: string): Promise<st
   return rows.map((row) => row.id);
 }
 
+async function readCategoryMembers(db: Database, categoryId: string): Promise<CategoryMemberRecord[]> {
+  return db
+    .select({ id: users.id, username: users.username })
+    .from(categoryUsers)
+    .innerJoin(users, eq(users.id, categoryUsers.userId))
+    .where(eq(categoryUsers.categoryId, categoryId))
+    .orderBy(asc(users.username), asc(users.id));
+}
+
 /** The audit entry's before/after for exactly the columns a PATCH wrote. */
 function auditChanges(
   fields: string[],
@@ -173,7 +194,11 @@ export class DrizzleCategoryStore implements CategoryStore {
 
   async listCategories(): Promise<CategoryRecord[]> {
     const queries = categoryListQueries(this.db);
-    const [rows, links] = await Promise.all([queries.rows, queries.incidentTypes]);
+    const [rows, links, memberLinks] = await Promise.all([
+      queries.rows,
+      queries.incidentTypes,
+      queries.members
+    ]);
 
     const byCategory = new Map<string, string[]>();
     for (const link of links) {
@@ -181,7 +206,18 @@ export class DrizzleCategoryStore implements CategoryStore {
       if (bucket) bucket.push(link.incidentTypeId);
       else byCategory.set(link.categoryId, [link.incidentTypeId]);
     }
-    return rows.map((row) => ({ ...row, incidentTypeIds: byCategory.get(row.id) ?? [] }));
+    const membersByCategory = new Map<string, CategoryMemberRecord[]>();
+    for (const member of memberLinks) {
+      const item: CategoryMemberRecord = { id: member.id, username: member.username };
+      const bucket = membersByCategory.get(member.categoryId);
+      if (bucket) bucket.push(item);
+      else membersByCategory.set(member.categoryId, [item]);
+    }
+    return rows.map((row) => ({
+      ...row,
+      incidentTypeIds: byCategory.get(row.id) ?? [],
+      members: membersByCategory.get(row.id) ?? []
+    }));
   }
 
   /**
@@ -221,7 +257,10 @@ export class DrizzleCategoryStore implements CategoryStore {
         meta: { name: row.name, incidentTypeCount: input.incidentTypeIds.length }
       });
 
-      return { status: "created" as const, record: { ...row, incidentTypeIds: input.incidentTypeIds } };
+      return {
+        status: "created" as const,
+        record: { ...row, incidentTypeIds: input.incidentTypeIds, members: [] }
+      };
     });
   }
 
@@ -255,9 +294,10 @@ export class DrizzleCategoryStore implements CategoryStore {
       const writtenFields = [...Object.keys(set), ...(idsDiffer ? ["incidentTypeIds"] : [])].sort();
 
       if (writtenFields.length === 0) {
+        const members = await readCategoryMembers(db, input.id);
         return {
           status: "updated" as const,
-          record: { ...existing, incidentTypeIds: currentIds },
+          record: { ...existing, incidentTypeIds: currentIds, members },
           changed: false
         };
       }
@@ -293,7 +333,8 @@ export class DrizzleCategoryStore implements CategoryStore {
         }
       });
 
-      return { status: "updated" as const, record: { ...after, incidentTypeIds }, changed: true };
+      const members = await readCategoryMembers(db, after.id);
+      return { status: "updated" as const, record: { ...after, incidentTypeIds, members }, changed: true };
     });
   }
 

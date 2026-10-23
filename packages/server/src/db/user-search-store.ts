@@ -1,6 +1,6 @@
 import { and, asc, eq, gte, ilike, ne, sql, type SQLWrapper } from "drizzle-orm";
 import type { Database } from "./client";
-import { userSessions, users } from "./schema";
+import { users } from "./schema";
 
 /**
  * The read behind `GET /_user/users/search` (spec §5, T4.1.1's first slice). It answers the question
@@ -30,6 +30,7 @@ export function readDistanceKm(value: unknown): number | null {
 export interface UserSearchRow {
   id: string;
   username: string;
+  category?: string | null;
   avgRating: number | null;
   isOnline: boolean;
   /**
@@ -43,6 +44,8 @@ export interface UserSearchRow {
 export interface UserSearchInput {
   /** Trimmed partial username match; at least 2 characters, enforced by the route. */
   term: string;
+  category?: string | null;
+  incidentType?: string | null;
   minRating: number | null;
   online: boolean | null;
   /** The requesting account, whose stored position is the fallback reference point. */
@@ -97,8 +100,18 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
 
   if (input.online !== null) {
     // Same liveness rule as the device list (T2.3.1): a session that still holds a refresh token.
-    const liveSessions = sql`select 1 from ${userSessions} where ${userSessions.userId} = ${users.id} and ${userSessions.refreshTokenHash} is not null`;
+    const liveSessions = sql`select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null`;
     conditions.push(input.online ? sql`exists (${liveSessions})` : sql`not exists (${liveSessions})`);
+  }
+
+  if (input.category) {
+    const matchingCategory = sql`select 1 from "category_users" where "category_users"."user_id" = "users"."id" and "category_users"."category_id" = ${input.category}`;
+    conditions.push(sql`exists (${matchingCategory})`);
+  }
+
+  if (input.incidentType) {
+    const matchingSpecialty = sql`select 1 from "category_users" inner join "category_incident_types" on "category_incident_types"."category_id" = "category_users"."category_id" where "category_users"."user_id" = "users"."id" and "category_incident_types"."incident_type_id" = ${input.incidentType}`;
+    conditions.push(sql`exists (${matchingSpecialty})`);
   }
 
   const where = and(...conditions);
@@ -107,20 +120,26 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
   // query one statement when the caller sent no coordinates and just uses their own last position.
   const reference = input.reference
     ? sql`ST_SetSRID(ST_MakePoint(${input.reference.lon}, ${input.reference.lat}), 4326)::geography`
-    : sql`(select ${users.lastLocation} from ${users} where ${users.id} = ${input.callerId})`;
+    : sql`(select "users"."last_location" from "users" where "users"."id" = ${input.callerId})`;
   // Geography distance is metres; the contract's `distance` is what a list renders as "12.4 km away".
   // `::numeric` before the round is not style: `round(double precision, integer)` is an unresolved
   // function in PostgreSQL (42883), which turned every search into a 500 until a live instance said
   // so. `::float8` afterwards keeps the value a driver parses as a number rather than a string.
-  const distanceKm = sql<number | null>`round((ST_Distance(${users.lastLocation}, ${reference}) / 1000.0)::numeric, 1)::float8`;
+  const distanceKm = sql<number | null>`round((ST_Distance("users"."last_location", ${reference}) / 1000.0)::numeric, 1)::float8`;
+  // Every column inside a correlated scalar subquery MUST be explicitly table-qualified: Drizzle's
+  // `sql\`...\`` column interpolation strips table qualifiers inside `.select()`, which would otherwise
+  // turn `${categoryUsers.userId} = ${users.id}` into `"user_id" = "id"` and let `"categories"."id"`
+  // shadow the outer `"users"."id"` row without raising a SQL error.
+  const categorySummary = sql<string | null>`(select string_agg("categories"."name", '، ' order by "categories"."name" asc, "categories"."id" asc) from "category_users" inner join "categories" on "categories"."id" = "category_users"."category_id" where "category_users"."user_id" = "users"."id")`;
 
   return {
     items: db
       .select({
         id: users.id,
         username: users.username,
+        category: categorySummary.as("category"),
         avgRating: users.avgRating,
-        isOnline: sql<boolean>`exists (${sql`select 1 from ${userSessions} where ${userSessions.userId} = ${users.id} and ${userSessions.refreshTokenHash} is not null`})`
+        isOnline: sql<boolean>`exists (select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null)`
           .mapWith(Boolean)
           .as("isOnline"),
         distanceKm: distanceKm.mapWith(readDistanceKm).as("distanceKm")
@@ -150,6 +169,7 @@ export class DrizzleUserSearchStore implements UserSearchStore {
       items: rows.map((row) => ({
         id: row.id,
         username: row.username,
+        category: row.category ?? null,
         avgRating: row.avgRating,
         isOnline: row.isOnline,
         distanceKm: row.distanceKm

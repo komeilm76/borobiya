@@ -15,7 +15,7 @@ import {
   type IncidentTypeCreateInput,
   type IncidentTypeUpdateInput
 } from "@shared/index";
-import { apiRoutes } from "@shared/api";
+import { apiRoutes, categoryUserParamsSchema } from "@shared/api";
 import { requestJson } from "./http";
 
 const incidentTypeListSchema = z.array(incidentTypeSchema);
@@ -36,6 +36,11 @@ function catalogPath(route: { url: string }, id: string) {
 
 export async function listIncidentTypes(accessToken: string, signal?: AbortSignal): Promise<IncidentType[]> {
   const response = await requestJson<unknown>(apiRoutes.admin.listIncidentTypes.url, { accessToken, signal });
+  return incidentTypeListSchema.parse(response);
+}
+
+export async function listPublicIncidentTypes(signal?: AbortSignal): Promise<IncidentType[]> {
+  const response = await requestJson<unknown>(apiRoutes.public.incidentTypes.url, { signal });
   return incidentTypeListSchema.parse(response);
 }
 
@@ -99,12 +104,6 @@ export async function updateCategory(
 
 /**
  * Adds members; the server treats an already-assigned user as a success rather than a conflict.
- *
- * Only the *addition* half of membership is exposed here. `DELETE /_admin/categories/:id/users/:userId`
- * needs a user id the admin cannot currently learn from this screen: no read returns a category's
- * members (`categorySchema` carries `incidentTypeIds` and no member list), so a remove button would be
- * a text box for a uuid. That changes with T3.1.4's membership projection, and this module will gain the
- * call in the same commit as the button.
  */
 export async function assignCategoryUsers(
   id: string,
@@ -115,6 +114,22 @@ export async function assignCategoryUsers(
   await requestJson<unknown>(catalogPath(apiRoutes.admin.assignCategoryUsers, id), {
     method: "POST",
     body,
+    accessToken
+  });
+}
+
+/** Removes one user from a responder category (`DELETE /_admin/categories/:id/users/:userId`). */
+export async function removeCategoryUser(
+  id: string,
+  userId: string,
+  accessToken: string
+): Promise<void> {
+  const params = categoryUserParamsSchema.parse({ id, userId });
+  const url = apiRoutes.admin.removeCategoryUser.url
+    .replace(":id", encodeURIComponent(params.id))
+    .replace(":userId", encodeURIComponent(params.userId));
+  await requestJson<unknown>(url, {
+    method: "DELETE",
     accessToken
   });
 }

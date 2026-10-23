@@ -4,13 +4,6 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 import type { UserSearchRow, UserSearchStore } from "../db/user-search-store";
 
-/**
- * The filters this build cannot honor because their tables do not exist yet. Silently ignoring a filter
- * would return a list that looks filtered and is not, which is worse than a refusal: `category` and
- * `incidentType` depend on the domain migrations scheduled with T4.1.1.
- */
-const UNSUPPORTED_FILTERS = ["category", "incidentType"] as const;
-
 /** Below this length a partial username match on an unindexed column returns more noise than signal. */
 const MIN_SEARCH_TERM_LENGTH = 2;
 
@@ -41,25 +34,17 @@ export function userSearchPayload(row: UserSearchRow) {
   return {
     id: row.id,
     username: row.username,
-    // No category tables exist yet (T4.1.1), and the contract types this field nullable for exactly
-    // that reason: the field is present and empty rather than absent, so a client never guesses.
-    category: null,
+    category: row.category ?? null,
     avgRating: row.avgRating,
     isOnline: row.isOnline,
     distance: row.distanceKm
   };
 }
 
-function isPresent(query: Record<string, unknown>, key: string) {
-  const value = query[key];
-  return value !== undefined && value !== null && value !== "";
-}
-
 /**
- * User search (spec §5) in the form the location-share picker needs: a partial username match over
- * reachable accounts, with the rating and online filters, and distance from the caller or an explicit
- * point. Advanced browsing — no term at all, category and incident specialty, radius limits — remains
- * T4.1.1, and this route says so instead of pretending to filter.
+ * User search (spec §5): partial username match over reachable accounts, with responder category and
+ * incident specialty filters (`category_users` / `category_incident_types`), rating floor, online state,
+ * and distance from the caller or an explicit point.
  */
 export async function registerUserSearchRoute(
   app: FastifyInstance,
@@ -71,18 +56,6 @@ export async function registerUserSearchRoute(
     const user: AuthenticatedUserContext | null = request.authenticatedUser;
     if (!user) {
       return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
-    }
-
-    const rawQuery = (request.query ?? {}) as Record<string, unknown>;
-    const unsupported = UNSUPPORTED_FILTERS.filter((key) => isPresent(rawQuery, key));
-    if (unsupported.length > 0) {
-      return sendError(
-        reply,
-        400,
-        "SEARCH_FILTER_UNSUPPORTED",
-        `User search cannot filter by ${unsupported.join(", ")} yet.`,
-        [{ code: "filter_unsupported", filters: unsupported, path: [unsupported[0]!] }]
-      );
     }
 
     const parsed = userSearchSchema.safeParse(request.query);
@@ -107,9 +80,11 @@ export async function registerUserSearchRoute(
       );
     }
 
-    const { page, limit, minRating, online, lat, lon } = parsed.data;
+    const { page, limit, category, incidentType, minRating, online, lat, lon } = parsed.data;
     const { items, total } = await dependencies.store.searchUsers({
       term,
+      category: category ?? null,
+      incidentType: incidentType ?? null,
       minRating: minRating ?? null,
       online: online ?? null,
       callerId: user.userId,

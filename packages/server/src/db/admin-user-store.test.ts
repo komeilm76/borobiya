@@ -37,6 +37,7 @@ function makeStore(returnedUsers: unknown[]) {
 
 class ReadQueryBuilder implements PromiseLike<unknown> {
   readonly from = vi.fn((_table: unknown) => this);
+  readonly innerJoin = vi.fn((_table: unknown, _on: unknown) => this);
   readonly where = vi.fn((_condition?: unknown) => this);
   readonly orderBy = vi.fn((..._order: unknown[]) => this);
   readonly limit = vi.fn((_limit: number) => this);
@@ -77,10 +78,16 @@ function makeStatusStore(currentUser: AdminUserRecord | null, updatedUser: Admin
   const selectResult = vi.fn(async () => currentUser === null ? [] : [currentUser]);
   const limit = vi.fn(() => selectResult());
   const forUpdate = vi.fn(() => ({ limit }));
+  const orderByCategories = vi.fn(async () => []);
+  const whereCategories = vi.fn(() => ({ orderBy: orderByCategories }));
+  const innerJoinCategories = vi.fn(() => ({ where: whereCategories }));
   const whereSelect = vi.fn(() => ({ for: forUpdate }));
   const from = vi.fn((table: unknown) => {
-    selectedTable = table;
-    return { where: whereSelect };
+    if (table === users) {
+      selectedTable = table;
+      return { where: whereSelect };
+    }
+    return { innerJoin: innerJoinCategories };
   });
   const select = vi.fn(() => ({ from }));
 
@@ -137,6 +144,7 @@ const createdUser: AdminUserRecord = {
   isActive: true,
   mustCompleteSecurityQuestions: true,
   avgRating: null,
+  categories: [],
   createdAt: new Date("2026-10-18T12:00:00.000Z")
 };
 
@@ -160,7 +168,7 @@ describe("DrizzleAdminUserStore", () => {
   });
 
   it("searches users by username/status and returns stable paginated results", async () => {
-    const mocks = makeReadStore([[{ total: 6 }], [createdUser]]);
+    const mocks = makeReadStore([[{ total: 6 }], [createdUser], []]);
     const query: AdminUserListQuery = {
       q: "ali%_",
       isActive: false,
@@ -177,7 +185,7 @@ describe("DrizzleAdminUserStore", () => {
       limit: 5,
       totalPages: 2
     });
-    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(mocks.select).toHaveBeenCalledTimes(3);
     expect(mocks.builders[0]?.where).toHaveBeenCalledOnce();
     expect(mocks.builders[1]?.where).toHaveBeenCalledOnce();
     expect(mocks.builders[1]?.orderBy).toHaveBeenCalledOnce();
@@ -185,12 +193,25 @@ describe("DrizzleAdminUserStore", () => {
     expect(mocks.builders[1]?.offset).toHaveBeenCalledWith(5);
   });
 
-  it("returns no users for hasCategory=true until category assignments are introduced", async () => {
-    const mocks = makeReadStore([]);
-    const result = await mocks.store.listUsers({ hasCategory: true, page: 3, limit: 10 });
+  it("queries assigned accounts and projects their categories when hasCategory=true", async () => {
+    const mountain = { id: "91e5295a-9381-4bc5-844c-3cf0f52df30e", name: "Mountain Rescue" };
+    const mocks = makeReadStore([
+      [{ total: 1 }],
+      [createdUser],
+      [{ userId: createdUser.id, ...mountain }]
+    ]);
+    const result = await mocks.store.listUsers({ hasCategory: true, page: 1, limit: 10 });
 
-    expect(result).toEqual({ items: [], total: 0, page: 3, limit: 10, totalPages: 0 });
-    expect(mocks.select).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      items: [{ ...createdUser, categories: [mountain] }],
+      total: 1,
+      page: 1,
+      limit: 10,
+      totalPages: 1
+    });
+    expect(mocks.select).toHaveBeenCalledTimes(3);
+    expect(mocks.builders[0]?.where).toHaveBeenCalledOnce();
+    expect(mocks.builders[1]?.where).toHaveBeenCalledOnce();
   });
 
   it("returns account devices and marks only the requesting admin's session as current", async () => {
@@ -203,7 +224,7 @@ describe("DrizzleAdminUserStore", () => {
       lastActiveAt: createdUser.createdAt,
       isOnline: true
     };
-    const mocks = makeReadStore([[createdUser], [session]]);
+    const mocks = makeReadStore([[createdUser], [session], []]);
     const result = await mocks.store.getUserDetails(createdUser.id, sessionId);
 
     expect(result).toEqual({
@@ -211,7 +232,7 @@ describe("DrizzleAdminUserStore", () => {
       devices: [{ ...session, isCurrentDevice: true }],
       missions: []
     });
-    expect(mocks.select).toHaveBeenCalledTimes(2);
+    expect(mocks.select).toHaveBeenCalledTimes(3);
   });
 
   it("returns null without querying device sessions when the user is missing", async () => {

@@ -292,6 +292,20 @@ export async function createFastifyApp(
       .header("cache-control", "public, max-age=3600")
       .send(questions.map(({ questionId, text }) => ({ id: questionId, text })));
   });
+  app.get(apiRoutes.public.incidentTypes.url, async (_request, reply) => {
+    const items = await incidentTypeStore.listIncidentTypes();
+    return reply.header("cache-control", "no-store").send(
+      items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        icon: item.icon,
+        color: item.color,
+        description: item.description,
+        createdAt: item.createdAt.toISOString()
+      }))
+    );
+  });
 
   return app;
 }

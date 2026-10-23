@@ -29,6 +29,7 @@ function categoryPayload(record: CategoryRecord): Category {
     name: record.name,
     description: record.description,
     incidentTypeIds: record.incidentTypeIds,
+    members: record.members,
     createdAt: record.createdAt.toISOString()
   };
 }

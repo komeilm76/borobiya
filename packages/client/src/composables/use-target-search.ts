@@ -17,6 +17,8 @@ import { isAbortError, isLatestSearch, SEARCH_DEBOUNCE_MS, shouldSearch } from "
 export interface UseTargetSearchOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
   /** Optional narrowing controls from the dialog. Undefined means "not filtered". */
+  category?: Ref<string | undefined>;
+  incidentType?: Ref<string | undefined>;
   minRating?: Ref<number | undefined>;
   online?: Ref<boolean | undefined>;
   /** Page size; the picker shows one page and asks the user to refine rather than paginating. */
@@ -78,6 +80,8 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
         {
           q: query,
           limit: options.limit ?? 20,
+          ...(options.category?.value ? { category: options.category.value } : {}),
+          ...(options.incidentType?.value ? { incidentType: options.incidentType.value } : {}),
           ...(options.minRating?.value === undefined ? {} : { minRating: options.minRating.value }),
           ...(options.online?.value === undefined ? {} : { online: options.online.value })
         },
@@ -128,7 +132,12 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
   // Narrowing controls are not debounced: they are clicked, not typed, and a stale list under a
   // newly-set filter is worse than the half-second it takes to refetch.
   watch(
-    () => [options.minRating?.value, options.online?.value],
+    () => [
+      options.category?.value,
+      options.incidentType?.value,
+      options.minRating?.value,
+      options.online?.value
+    ],
     () => searchNow()
   );
 

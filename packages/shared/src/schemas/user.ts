@@ -17,9 +17,16 @@ export const registeredUserSchema = z.strictObject({
 });
 export type RegisteredUser = z.infer<typeof registeredUserSchema>;
 
+export const userCategorySummarySchema = z.strictObject({
+  id: idSchema,
+  name: z.string().trim().min(1)
+});
+export type UserCategorySummary = z.infer<typeof userCategorySummarySchema>;
+
 export const userProfileSchema = authUserSchema.extend({
   isActive: z.boolean(),
   avgRating: z.number().finite().min(0).max(5).nullable(),
+  categories: z.array(userCategorySummarySchema).default([]),
   createdAt: timestampSchema
 });
 export type UserProfile = z.infer<typeof userProfileSchema>;

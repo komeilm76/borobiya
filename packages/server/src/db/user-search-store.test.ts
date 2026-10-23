@@ -195,6 +195,7 @@ describe("DrizzleUserSearchStore.searchUsers", () => {
       {
         id: expect.any(String),
         username: "field_responder",
+        category: null,
         avgRating: 4.5,
         isOnline: true,
         distanceKm: 12.4
@@ -202,6 +203,7 @@ describe("DrizzleUserSearchStore.searchUsers", () => {
       {
         id: expect.any(String),
         username: "field_volunteer",
+        category: null,
         avgRating: null,
         isOnline: false,
         distanceKm: null

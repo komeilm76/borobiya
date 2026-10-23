@@ -190,6 +190,7 @@ describe("POST /_user/complete-security-questions and user onboarding guard", ()
       mustCompleteSecurityQuestions: false,
       isActive: true,
       avgRating: null,
+      categories: [],
       createdAt: "2026-10-18T00:00:00.000Z"
     });
   });

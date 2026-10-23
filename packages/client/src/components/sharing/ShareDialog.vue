@@ -51,6 +51,17 @@
 
           <div class="share-dialog__filters">
             <v-select
+              v-model="incidentTypeChoice"
+              :items="incidentTypeOptions"
+              item-title="title"
+              item-value="value"
+              density="compact"
+              variant="outlined"
+              hide-details
+              class="share-dialog__rating"
+              label="نوع رویداد"
+            />
+            <v-select
               v-model="minRatingChoice"
               :items="ratingOptions"
               item-title="title"
@@ -78,9 +89,6 @@
             </template>
             <template v-else-if="resultTotal > resultCount">
               {{ resultTotal }} نتیجه؛ برای دیدن بقیه جستجو را دقیق‌تر کنید.
-            </template>
-            <template v-else>
-              فیلترهای «دستهٔ امدادگر» و «نوع امداد» هنوز در سرور پیاده نشده‌اند، پس اینجا نبودند.
             </template>
           </p>
 
@@ -316,9 +324,11 @@ import {
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_NOTE_LENGTH,
   MAX_LOCATION_SHARE_TARGETS,
+  type IncidentType,
   type UserDevice,
   type UserSearchResult
 } from "@shared/index";
+import { listPublicIncidentTypes } from "@/api/admin-catalog";
 import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
@@ -364,8 +374,14 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const accessToken = computed(() => auth.accessToken);
 
+const incidentTypes = ref<IncidentType[]>([]);
+const incidentTypeChoice = ref<string | null>(null);
 const minRatingChoice = ref<number | null>(null);
 const onlineFilter = ref<"all" | "online">("all");
+const incidentTypeOptions = computed(() => [
+  { title: "همهٔ تخصص‌ها", value: null as string | null },
+  ...incidentTypes.value.map((item) => ({ title: item.name, value: item.id }))
+]);
 const {
   term: searchTerm,
   results,
@@ -377,6 +393,7 @@ const {
   cancelPending
 } = useTargetSearch({
   accessToken,
+  incidentType: computed(() => incidentTypeChoice.value ?? undefined),
   minRating: computed(() => minRatingChoice.value ?? undefined),
   online: computed(() => (onlineFilter.value === "online" ? true : undefined))
 });
@@ -466,6 +483,7 @@ function isSelected(candidate: UserSearchResult): boolean {
 
 function subtitleFor(candidate: UserSearchResult): string {
   const parts: string[] = [];
+  if (candidate.category) parts.push(candidate.category);
   if (candidate.distance !== null) parts.push(`${candidate.distance} کیلومتر فاصله`);
   if (candidate.avgRating !== null) parts.push(`امتیاز ${candidate.avgRating}`);
   parts.push(candidate.isOnline ? "آنلاین" : "آفلاین");
@@ -597,6 +615,15 @@ function close(): void {
   emit("update:modelValue", false);
 }
 
+async function loadIncidentTypes(): Promise<void> {
+  if (incidentTypes.value.length > 0) return;
+  try {
+    incidentTypes.value = await listPublicIncidentTypes();
+  } catch {
+    // Keep search operational even if the public specialty catalog is temporarily unreachable.
+  }
+}
+
 watch(
   () => props.modelValue,
   (open) => {
@@ -604,10 +631,12 @@ watch(
       formError.value = null;
       createdCount.value = 0;
       reusedCount.value = 0;
+      void loadIncidentTypes();
       return;
     }
     cancelPending();
     searchTerm.value = "";
+    incidentTypeChoice.value = null;
     deviceChooserOpen.value = false;
     deviceIds.value = [];
     chosenDeviceId.value = null;

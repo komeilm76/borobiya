@@ -10,6 +10,18 @@
         <p class="user-dashboard__welcome">
           خوش آمدید، <bdi class="user-dashboard__username" dir="ltr">{{ username }}</bdi>
         </p>
+        <div v-if="auth.userCategories.length > 0" class="mt-2 flex flex-wrap items-center gap-1">
+          <span class="text-xs opacity-75">گروه امدادگر:</span>
+          <v-chip
+            v-for="category in auth.userCategories"
+            :key="category.id"
+            size="small"
+            color="primary"
+            variant="tonal"
+          >
+            {{ category.name }}
+          </v-chip>
+        </div>
       </div>
       <v-btn
         class="user-dashboard__map-action"
@@ -104,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import ShareDialog from "@/components/sharing/ShareDialog.vue";
@@ -118,6 +130,10 @@ const auth = useAuthStore();
 const broadcast = useBroadcastStore();
 const theme = useThemeStore();
 const username = computed(() => auth.user?.username ?? "همراه");
+
+onMounted(() => {
+  void auth.refreshProfile();
+});
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const shareOpen = ref(false);
 const shareLists = ref<InstanceType<typeof ShareLists> | null>(null);

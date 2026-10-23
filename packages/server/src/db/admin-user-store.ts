@@ -1,7 +1,7 @@
-import { and, asc, count, desc, eq, ilike, isNotNull, type SQL } from "drizzle-orm";
-import type { AdminUserListQuery, Mission, UserRole } from "@borobiya/shared";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import type { AdminUserListQuery, Mission, UserCategorySummary, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
-import { adminAuditLog, userSessions, users } from "./schema";
+import { adminAuditLog, categories, categoryUsers, userSessions, users } from "./schema";
 
 export interface AdminActorRecord {
   role: UserRole;
@@ -16,6 +16,7 @@ export interface AdminUserRecord {
   isActive: boolean;
   mustCompleteSecurityQuestions: boolean;
   avgRating: number | null;
+  categories?: UserCategorySummary[];
   createdAt: Date;
 }
 
@@ -74,6 +75,31 @@ function escapeLikeSearchTerm(value: string): string {
   return value.replace(/[\\%_]/g, "\\$&");
 }
 
+async function readCategoriesByUserIds(
+  db: Database,
+  userIds: string[]
+): Promise<Map<string, UserCategorySummary[]>> {
+  const map = new Map<string, UserCategorySummary[]>();
+  if (userIds.length === 0) return map;
+  const rows = await db
+    .select({
+      userId: categoryUsers.userId,
+      id: categories.id,
+      name: categories.name
+    })
+    .from(categoryUsers)
+    .innerJoin(categories, eq(categories.id, categoryUsers.categoryId))
+    .where(inArray(categoryUsers.userId, userIds))
+    .orderBy(asc(categories.name), asc(categories.id));
+  for (const row of rows) {
+    const entry: UserCategorySummary = { id: row.id, name: row.name };
+    const bucket = map.get(row.userId);
+    if (bucket) bucket.push(entry);
+    else map.set(row.userId, [entry]);
+  }
+  return map;
+}
+
 /** Drizzle persistence for privileged user lookups/status changes and current admin checks. */
 export class DrizzleAdminUserStore implements AdminUserStore {
   constructor(private readonly db: Database) {}
@@ -102,19 +128,16 @@ export class DrizzleAdminUserStore implements AdminUserStore {
   }
 
   async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
-    // This read does not consult `categories`/`category_users` yet — the tables arrived with T3.1.1, and
-    // joining them belongs to the assignment task (T3.1.3). The short-circuit below is therefore still the
-    // truthful answer, but it is a placeholder with an owner, not the shape of the final predicate.
-    if (query.hasCategory === true) {
-      return { items: [], total: 0, page: query.page, limit: query.limit, totalPages: 0 };
-    }
-
     const conditions: SQL[] = [];
     if (query.q) {
       conditions.push(ilike(users.username, `%${escapeLikeSearchTerm(query.q)}%`));
     }
     if (query.isActive !== undefined) {
       conditions.push(eq(users.isActive, query.isActive));
+    }
+    if (query.hasCategory !== undefined) {
+      const membership = sql`select 1 from "category_users" where "category_users"."user_id" = "users"."id"`;
+      conditions.push(query.hasCategory ? sql`exists (${membership})` : sql`not exists (${membership})`);
     }
     const where = and(...conditions);
 
@@ -123,13 +146,19 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       .from(users)
       .where(where);
     const total = countResult?.total ?? 0;
-    const items = await this.db
+    const rows = await this.db
       .select(adminUserSelection)
       .from(users)
       .where(where)
       .orderBy(desc(users.createdAt), asc(users.id))
       .limit(query.limit)
       .offset((query.page - 1) * query.limit);
+
+    const categoriesByUser = await readCategoriesByUserIds(this.db, rows.map((row) => row.id));
+    const items = rows.map((row) => ({
+      ...row,
+      categories: categoriesByUser.get(row.id) ?? []
+    }));
 
     return {
       items,
@@ -149,21 +178,25 @@ export class DrizzleAdminUserStore implements AdminUserStore {
     const user = matchingUsers[0];
     if (!user) return null;
 
-    const sessions = await this.db
-      .select({
-        id: userSessions.id,
-        deviceId: userSessions.deviceId,
-        deviceName: userSessions.deviceName,
-        ip: userSessions.ip,
-        lastActiveAt: userSessions.lastActiveAt,
-        isOnline: userSessions.isOnline
-      })
-      .from(userSessions)
-      .where(eq(userSessions.userId, id))
-      .orderBy(desc(userSessions.lastActiveAt), asc(userSessions.id));
+    const [sessions, categoriesByUser] = await Promise.all([
+      this.db
+        .select({
+          id: userSessions.id,
+          deviceId: userSessions.deviceId,
+          deviceName: userSessions.deviceName,
+          ip: userSessions.ip,
+          lastActiveAt: userSessions.lastActiveAt,
+          isOnline: userSessions.isOnline
+        })
+        .from(userSessions)
+        .where(eq(userSessions.userId, id))
+        .orderBy(desc(userSessions.lastActiveAt), asc(userSessions.id)),
+      readCategoriesByUserIds(this.db, [id])
+    ]);
 
     return {
       ...user,
+      categories: categoriesByUser.get(id) ?? [],
       devices: sessions.map((session) => ({
         ...session,
         isCurrentDevice: session.id === currentSessionId
@@ -189,7 +222,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       })
       .onConflictDoNothing({ target: users.username })
       .returning(adminUserSelection);
-    return createdUsers[0] ?? null;
+    return createdUsers[0] ? { ...createdUsers[0], categories: [] } : null;
   }
 
   /** Change status, invalidate refresh sessions on deactivation, and append an audit event atomically. */
@@ -199,6 +232,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
     isActive: boolean;
   }): Promise<AdminUserRecord | null> {
     return this.db.transaction(async (tx) => {
+      const db = tx as unknown as Database;
       const matchingUsers = await tx
         .select(adminUserSelection)
         .from(users)
@@ -208,8 +242,13 @@ export class DrizzleAdminUserStore implements AdminUserStore {
       const currentUser = matchingUsers[0];
       if (!currentUser) return null;
 
+      const categoriesByUser = await readCategoriesByUserIds(db, [input.userId]);
+      const userCategories = categoriesByUser.get(input.userId) ?? [];
+
       // Treat repeated requests as idempotent: don't emit an audit event for a no-op.
-      if (currentUser.isActive === input.isActive) return currentUser;
+      if (currentUser.isActive === input.isActive) {
+        return { ...currentUser, categories: userCategories };
+      }
 
       const updatedUsers = await tx
         .update(users)
@@ -234,7 +273,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
         meta: { previousIsActive: currentUser.isActive, isActive: input.isActive }
       });
 
-      return updatedUser;
+      return { ...updatedUser, categories: userCategories };
     });
   }
 }

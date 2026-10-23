@@ -27,6 +27,7 @@ const catalogRow: CategoryRecord = {
   name: "Mountain Rescue",
   description: "alpine and cliff",
   incidentTypeIds: [incidentTypeId],
+  members: [],
   createdAt
 };
 const catalogPayload = {
@@ -34,6 +35,7 @@ const catalogPayload = {
   name: "Mountain Rescue",
   description: "alpine and cliff",
   incidentTypeIds: [incidentTypeId],
+  members: [],
   createdAt: "2026-10-22T10:00:00.000Z"
 };
 

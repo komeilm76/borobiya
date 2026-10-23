@@ -36,6 +36,7 @@
             <th>نام</th>
             <th>توضیح</th>
             <th>نوع رویدادها</th>
+            <th>اعضا</th>
             <th aria-label="عملیات"></th>
           </tr>
         </thead>
@@ -51,15 +52,29 @@
                 <span v-if="category.incidentTypeIds.length === 0" class="opacity-50">هیچ‌کدام</span>
               </div>
             </td>
+            <td>
+              <div class="flex flex-wrap items-center gap-1">
+                <v-chip
+                  v-for="member in category.members"
+                  :key="member.id"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                >
+                  <span dir="ltr">{{ member.username }}</span>
+                </v-chip>
+                <span v-if="category.members.length === 0" class="opacity-50">بدون عضو</span>
+              </div>
+            </td>
             <td class="text-start whitespace-nowrap">
               <v-btn size="small" variant="text" prepend-icon="mdi-account-plus-outline" @click="openMembers(category)">
-                افزودن عضو
+                افزودن عضو ({{ category.members.length }})
               </v-btn>
               <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category)">ویرایش</v-btn>
             </td>
           </tr>
           <tr v-if="!loading && categories.length === 0">
-            <td colspan="4" class="py-6 text-center opacity-60">هنوز گروهی ساخته نشده است.</td>
+            <td colspan="5" class="py-6 text-center opacity-60">هنوز گروهی ساخته نشده است.</td>
           </tr>
         </tbody>
       </v-table>
@@ -118,12 +133,28 @@
     </v-dialog>
 
     <v-dialog v-model="membersOpen" max-width="640" persistent>
-      <v-card rounded="xl" :title="`افزودن عضو به ${membersFor?.name ?? ''}`">
+      <v-card rounded="xl" :title="`مدیریت اعضا — ${membersFor?.name ?? ''}`">
         <v-card-text>
-          <v-alert type="info" variant="tonal" rounded="lg" class="mb-3">
-            این صفحه هنوز نمی‌تواند فهرست اعضای فعلی گروه را نشان دهد؛ خواندن عضویت ساخته نشده است.
-            افزودنِ کسی که از قبل عضو است خطا نیست و گروه را خراب نمی‌کند.
-          </v-alert>
+          <div class="mb-4" data-test="current-members">
+            <p class="mb-2 text-sm font-medium">اعضای فعلی ({{ membersFor?.members.length ?? 0 }})</p>
+            <p v-if="!membersFor || membersFor.members.length === 0" class="text-sm opacity-60">
+              هنوز عضوی در این گروه ثبت نشده است.
+            </p>
+            <div v-else class="flex flex-wrap gap-2">
+              <v-chip
+                v-for="member in membersFor.members"
+                :key="member.id"
+                closable
+                variant="tonal"
+                color="primary"
+                :disabled="saving || removingMemberId === member.id"
+                :aria-label="`حذف ${member.username} از ${membersFor.name}`"
+                @click:close="removeMember(member)"
+              >
+                <span dir="ltr">{{ member.username }}</span>
+              </v-chip>
+            </div>
+          </div>
           <v-text-field
             v-model="memberSearch"
             label="جست‌وجوی نام کاربری"
@@ -181,10 +212,17 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import type { Category, IncidentType, UserProfile } from "@shared/index";
+import type { Category, CategoryMember, IncidentType, UserProfile } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { listAdminUsers } from "../../api/admin-users";
-import { assignCategoryUsers, createCategory, listCategories, listIncidentTypes, updateCategory } from "../../api/admin-catalog";
+import {
+  assignCategoryUsers,
+  createCategory,
+  listCategories,
+  listIncidentTypes,
+  removeCategoryUser,
+  updateCategory
+} from "../../api/admin-catalog";
 import {
   categoryCreateBody,
   categoryDraftFromCategory,
@@ -220,6 +258,7 @@ const selectedIds = ref<string[]>([]);
 const searching = ref(false);
 const searchError = ref("");
 const membersError = ref("");
+const removingMemberId = ref<string | null>(null);
 
 const successVisible = ref(false);
 const successMessage = ref("");
@@ -264,6 +303,9 @@ async function load(): Promise<void> {
     if (version !== requestVersion) return;
     categories.value = categoryRecords;
     incidentTypes.value = typeRecords;
+    if (membersFor.value) {
+      membersFor.value = categoryRecords.find((item) => item.id === membersFor.value?.id) ?? membersFor.value;
+    }
   } catch (error) {
     if (controller.signal.aborted || version !== requestVersion) return;
     listError.value = friendlyErrorMessage(error, "بارگذاری گروه‌ها انجام نشد. دوباره تلاش کنید.");
@@ -427,8 +469,11 @@ async function addMembers(): Promise<void> {
       return;
     }
     await assignCategoryUsers(category.id, selectedIds.value, accessToken);
+    const addedCount = selectedIds.value.length;
+    selectedIds.value = [];
+    await load();
     membersOpen.value = false;
-    successMessage.value = `${selectedIds.value.length} عضو به ${category.name} اضافه شد.`;
+    successMessage.value = `${addedCount} عضو به ${category.name} اضافه شد.`;
     successVisible.value = true;
   } catch (error) {
     // A refused id is named from the picker's own rows, because `path: ["userIds", 2]` means nothing
@@ -439,6 +484,29 @@ async function addMembers(): Promise<void> {
       : friendlyErrorMessage(error, "افزودن عضو انجام نشد. دوباره تلاش کنید.");
   } finally {
     saving.value = false;
+  }
+}
+
+async function removeMember(member: CategoryMember): Promise<void> {
+  const category = membersFor.value;
+  if (!category || removingMemberId.value !== null) return;
+
+  removingMemberId.value = member.id;
+  membersError.value = "";
+  try {
+    const accessToken = await adminToken();
+    if (!accessToken) {
+      membersError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
+      return;
+    }
+    await removeCategoryUser(category.id, member.id, accessToken);
+    await load();
+    successMessage.value = `${member.username} از ${category.name} حذف شد.`;
+    successVisible.value = true;
+  } catch (error) {
+    membersError.value = friendlyErrorMessage(error, "حذف عضو انجام نشد. دوباره تلاش کنید.");
+  } finally {
+    removingMemberId.value = null;
   }
 }
 

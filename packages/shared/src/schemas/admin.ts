@@ -147,11 +147,18 @@ export const categoryUpdateSchema = categoryCreateSchema.partial().refine(
 );
 export type CategoryUpdateInput = z.infer<typeof categoryUpdateSchema>;
 
+export const categoryMemberSchema = z.strictObject({
+  id: idSchema,
+  username: usernameSchema
+});
+export type CategoryMember = z.infer<typeof categoryMemberSchema>;
+
 export const categorySchema = z.strictObject({
   id: idSchema,
   name: nonEmptyNameSchema,
   description: z.string().nullable(),
   incidentTypeIds: uniqueIdsSchema,
+  members: z.array(categoryMemberSchema).default([]),
   createdAt: timestampSchema
 });
 export type Category = z.infer<typeof categorySchema>;

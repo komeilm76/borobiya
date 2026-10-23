@@ -123,15 +123,29 @@ describe("GET /_user/users/search", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
   });
 
-  it("refuses filters it cannot honor rather than returning an unfiltered list that looks filtered", async () => {
-    const { app, searchUsers } = await makeApp();
+  it("forwards category and incidentType filters to the search store and projects category names", async () => {
+    const categoryId = randomUUID();
+    const specialtyId = randomUUID();
+    const { app, searchUsers } = await makeApp({
+      searchUsers: async () => ({
+        items: [hit({ category: "Mountain Rescue، Road Rescue" })],
+        total: 1
+      })
+    });
 
-    const response = await search(app, `q=field&category=${randomUUID()}`);
+    const response = await search(app, `q=field&category=${categoryId}&incidentType=${specialtyId}`);
 
-    expect(response.statusCode).toBe(400);
-    expect(response.json().code).toBe("SEARCH_FILTER_UNSUPPORTED");
-    expect(response.json().issues[0]).toMatchObject({ filters: ["category"] });
-    expect(searchUsers).not.toHaveBeenCalled();
+    expect(response.statusCode).toBe(200);
+    expect(searchUsers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        term: "field",
+        category: categoryId,
+        incidentType: specialtyId
+      })
+    );
+    expect(response.json().items[0]).toMatchObject({
+      category: "Mountain Rescue، Road Rescue"
+    });
   });
 
   it("treats a cleared control as no filter at all", async () => {
@@ -151,6 +165,8 @@ describe("GET /_user/users/search", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(searchUsers).toHaveBeenCalledWith({
       term: "field_resp",
+      category: null,
+      incidentType: null,
       minRating: null,
       online: null,
       callerId,

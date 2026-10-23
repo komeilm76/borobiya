@@ -54,6 +54,20 @@
           :disabled="loading && !users.length"
           @update:model-value="updateStatusFilter"
         />
+        <v-select
+          :model-value="categoryFilter"
+          class="admin-users-filter"
+          label="گروه امدادگر"
+          :items="categoryFilterOptions"
+          item-title="title"
+          item-value="value"
+          variant="outlined"
+          rounded="lg"
+          density="comfortable"
+          hide-details
+          :disabled="loading && !users.length"
+          @update:model-value="updateCategoryFilter"
+        />
       </div>
 
       <div class="admin-users-table-area">
@@ -61,6 +75,9 @@
           <span>{{ resultsLabel }}</span>
           <span v-if="statusFilter !== 'all'" class="admin-filter-chip">
             {{ statusFilter === "active" ? "حساب‌های فعال" : "حساب‌های غیرفعال" }}
+          </span>
+          <span v-if="categoryFilter !== 'all'" class="admin-filter-chip">
+            {{ categoryFilter === "assigned" ? "دارای گروه امدادگر" : "بدون گروه امدادگر" }}
           </span>
         </div>
 
@@ -85,8 +102,8 @@
 
         <div v-else-if="users.length === 0" class="admin-users-state" role="status">
           <span class="admin-users-empty-icon"><v-icon icon="mdi-account-search-outline" size="28" /></span>
-          <strong>{{ search.trim() || statusFilter !== "all" ? "کاربری با این مشخصات پیدا نشد" : "هنوز کاربری ثبت نشده است" }}</strong>
-          <span>عبارت جست‌وجو یا فیلتر وضعیت را تغییر دهید.</span>
+          <strong>{{ search.trim() || statusFilter !== "all" || categoryFilter !== "all" ? "کاربری با این مشخصات پیدا نشد" : "هنوز کاربری ثبت نشده است" }}</strong>
+          <span>عبارت جست‌وجو یا فیلترها را تغییر دهید.</span>
         </div>
 
         <div v-else class="admin-users-table-wrap">
@@ -95,6 +112,7 @@
               <tr>
                 <th scope="col">کاربر</th>
                 <th scope="col">نقش</th>
+                <th scope="col">گروه‌های امدادگر</th>
                 <th scope="col">وضعیت</th>
                 <th scope="col">تاریخ عضویت</th>
                 <th scope="col" class="admin-actions-heading">فعال‌سازی</th>
@@ -117,6 +135,20 @@
                   <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
                     {{ user.role === "admin" ? "مدیر" : "کاربر" }}
                   </span>
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    <v-chip
+                      v-for="cat in user.categories"
+                      :key="cat.id"
+                      size="x-small"
+                      variant="tonal"
+                      color="primary"
+                    >
+                      {{ cat.name }}
+                    </v-chip>
+                    <span v-if="!user.categories || user.categories.length === 0" class="opacity-60">بدون گروه</span>
+                  </div>
                 </td>
                 <td>
                   <span :class="['admin-account-status', user.isActive ? 'is-active' : 'is-inactive']">
@@ -223,6 +255,7 @@ const PAGE_SIZE = 20;
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" });
 type StatusFilter = "all" | "active" | "inactive";
+type CategoryFilter = "all" | "assigned" | "unassigned";
 
 const statusFilterOptions: Array<{ title: string; value: StatusFilter }> = [
   { title: "همهٔ حساب‌ها", value: "all" },
@@ -230,10 +263,17 @@ const statusFilterOptions: Array<{ title: string; value: StatusFilter }> = [
   { title: "غیرفعال", value: "inactive" }
 ];
 
+const categoryFilterOptions: Array<{ title: string; value: CategoryFilter }> = [
+  { title: "همهٔ گروه‌ها", value: "all" },
+  { title: "دارای گروه امدادگر", value: "assigned" },
+  { title: "بدون گروه امدادگر", value: "unassigned" }
+];
+
 const auth = useAuthStore();
 const users = ref<UserProfile[]>([]);
 const search = ref("");
 const statusFilter = ref<StatusFilter>("all");
+const categoryFilter = ref<CategoryFilter>("all");
 const page = ref(1);
 const total = ref(0);
 const totalPages = ref(0);
@@ -316,9 +356,11 @@ async function loadUsers(): Promise<void> {
     controller = new AbortController();
     activeListController = controller;
     const isActive = statusFilter.value === "all" ? undefined : statusFilter.value === "active";
+    const hasCategory = categoryFilter.value === "all" ? undefined : categoryFilter.value === "assigned";
     const response = await listAdminUsers({
       q: search.value.trim() || undefined,
       isActive,
+      hasCategory,
       page: page.value,
       limit: PAGE_SIZE
     }, accessToken, controller.signal);
@@ -360,6 +402,15 @@ function updateStatusFilter(value: unknown): void {
   if (value !== "all" && value !== "active" && value !== "inactive") return;
   if (statusFilter.value === value) return;
   statusFilter.value = value;
+  clearSearchTimer();
+  if (page.value !== 1) page.value = 1;
+  else void loadUsers();
+}
+
+function updateCategoryFilter(value: unknown): void {
+  if (value !== "all" && value !== "assigned" && value !== "unassigned") return;
+  if (categoryFilter.value === value) return;
+  categoryFilter.value = value;
   clearSearchTimer();
   if (page.value !== 1) page.value = 1;
   else void loadUsers();
