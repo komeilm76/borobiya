@@ -69,6 +69,37 @@ describe("useSosRequest composable", () => {
     expect(sos.createdRequestId.value).toBe(REQUEST_ID);
   });
 
+  it("does not create duplicate emergencies on double submit during session refresh or after success", async () => {
+    let releaseSession!: () => void;
+    const waitingForSession = new Promise<void>((resolve) => { releaseSession = resolve; });
+    const createSpy = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({ accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "An urgent rescue is needed at the incident location.";
+    sos.setManualLocation(35.7, 51.4);
+
+    const first = sos.submit();
+    const second = sos.submit();
+    const lockedDuringSessionRefresh = sos.submitting.value;
+    releaseSession();
+    const results = await Promise.all([first, second]);
+    expect(lockedDuringSessionRefresh).toBe(true);
+    expect(results).toEqual([true, false]);
+    expect(createSpy).toHaveBeenCalledOnce();
+    expect(sos.canSubmit.value).toBe(false);
+    expect(await sos.submit()).toBe(false);
+    expect(createSpy).toHaveBeenCalledOnce();
+
+    sos.reset();
+    expect(sos.canSubmit.value).toBe(false);
+    sos.setManualLocation(35.7, 51.4);
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A second, separate emergency is at a new location.";
+    expect(await sos.submit()).toBe(true);
+    expect(createSpy).toHaveBeenCalledTimes(2);
+  });
+
   it("supports manual coordinate fallback when GPS fails and retries photo upload without duplicating SOS rows", async () => {
     vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([
       {
@@ -128,6 +159,24 @@ describe("useSosRequest composable", () => {
     expect(sos.awaitingPhotoRetry.value).toBe(false);
     expect(sos.isCompleted.value).toBe(true);
     expect(sos.photoUploadedUrl.value).toBe(`/uploads/sos/${REQUEST_ID}.png`);
+  });
+
+  it("keeps photo retry single-flight while refreshing the access token", async () => {
+    let releaseSession!: () => void;
+    const waitingForSession = new Promise<void>((resolve) => { releaseSession = resolve; });
+    const uploadSpy = vi.spyOn(sosApi, "uploadSosRequestPhoto")
+      .mockResolvedValue({ photoUrl: `/uploads/${REQUEST_ID}.png` });
+    const sos = useSosRequest({ accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
+    sos.createdRequestId.value = REQUEST_ID;
+    sos.awaitingPhotoRetry.value = true;
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+
+    const first = sos.retryPhotoUpload();
+    const second = sos.retryPhotoUpload();
+    releaseSession();
+    expect(await Promise.all([first, second])).toEqual([true, false]);
+    expect(uploadSpy).toHaveBeenCalledOnce();
+    expect(sos.awaitingPhotoRetry.value).toBe(false);
   });
 
   it("preserves trailing zeros while typing coordinates and clears stale GPS coordinates when invalidated", async () => {

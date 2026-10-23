@@ -83,7 +83,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }));
 
   const issues = computed(() => sosDraftIssues(draft.value));
-  const canSubmit = computed(() => !submitting.value && !awaitingPhotoRetry.value && canSubmitSosDraft(draft.value));
+  const canSubmit = computed(() => !submitting.value && createdRequestId.value === null && canSubmitSosDraft(draft.value));
   const isCompleted = computed(() => createdRequestId.value !== null && !awaitingPhotoRetry.value);
 
   async function loadCatalog(): Promise<void> {
@@ -213,8 +213,10 @@ export function useSosRequest(options: UseSosRequestOptions) {
     if (submitting.value) return false;
     submitError.value = null;
 
-    if (awaitingPhotoRetry.value && createdRequestId.value) {
-      return retryPhotoUpload();
+    if (createdRequestId.value) {
+      // Once the create call succeeded, this sheet must never file the same emergency
+      // again. A photo failure has its own retry path; a new SOS requires reset().
+      return awaitingPhotoRetry.value ? retryPhotoUpload() : false;
     }
 
     const foundIssues = sosDraftIssues(draft.value);
@@ -223,14 +225,15 @@ export function useSosRequest(options: UseSosRequestOptions) {
       return false;
     }
 
-    const token = await requireToken();
-    if (!token) {
-      submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
-      return false;
-    }
-
+    // Lock before an asynchronous session refresh. Two taps while a refresh is pending
+    // must not each create a separate emergency (and consume the 3/minute quota).
     submitting.value = true;
     try {
+      const token = await requireToken();
+      if (!token) {
+        submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
+        return false;
+      }
       const payload = buildSosCreatePayload(draft.value);
       const created = await createSosRequest(payload, token);
       createdRequestId.value = created.requestId;
@@ -266,14 +269,14 @@ export function useSosRequest(options: UseSosRequestOptions) {
     if (submitting.value || !createdRequestId.value || !photoFile.value) return false;
     submitError.value = null;
 
-    const token = await requireToken();
-    if (!token) {
-      submitError.value = "برای ارسال تصویر دوباره وارد حساب کاربری شوید.";
-      return false;
-    }
-
+    // The photo retry is also single-flight across an asynchronous token refresh.
     submitting.value = true;
     try {
+      const token = await requireToken();
+      if (!token) {
+        submitError.value = "برای ارسال تصویر دوباره وارد حساب کاربری شوید.";
+        return false;
+      }
       const uploaded = await uploadSosRequestPhoto(createdRequestId.value, photoFile.value, token);
       photoUploadedUrl.value = uploaded.photoUrl;
       awaitingPhotoRetry.value = false;
