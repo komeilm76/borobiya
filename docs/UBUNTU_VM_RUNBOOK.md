@@ -260,7 +260,7 @@ below is a value to copy into a config file: **the pins live in `map-server/regi
 | 10 | Nominatim image | `docker-compose.yml` (service `nominatim`, profile `geocoding-import`) | `mediagis/nominatim:5.3-2026-06-23T09-03` | `docker-compose.yml` | date-tagged build, pinned so a re-import reproduces |
 | 11 | PostGIS / nginx images | `docker-compose.yml` | `postgis/postgis:16-3.4`, `nginx:1.30.6-alpine` | `docker-compose.yml` | immutable tags |
 | 12 | apt: `openjdk-21-jdk-headless`, `osmium-tool`, `git`, `curl`, `wget`, `unzip`, `ca-certificates`, `openssl`, `python3`, `openssh-server`, `docker-ce*` | `apt` | Ubuntu archive + `download.docker.com` | Ubuntu release pockets | ⚠️ `osmium-tool` is **1.16.0** in the Noble archive; see § 6.2 |
-| 13 | Photon image | not fetched — `docker-compose.yml` **builds** `borobiya/photon:1.3.0` from `map-server/photon/Dockerfile`: an `eclipse-temurin:21-jre-jammy` base plus the JAR from row 6, whose SHA-256 is re-checked inside the build (`PHOTON_SHA256`). The **index is not baked in** — it is bind-mounted from `$MAP_PHOTON_DATA_DIR` | `map-server/photon/Dockerfile` | no registry involved; `docker compose build photon` needs the base image only |
+| 13 | Photon image | not fetched — `docker-compose.yml` **builds** it (`context: ./map-server/photon`) | none: no registry, no download URL | the `Dockerfile`'s base image (`eclipse-temurin:21-jre-jammy`) and its `ARG PHOTON_SHA256`, which must match row 6's JAR | the index is **not** baked in — it is bind-mounted from `$MAP_PHOTON_DATA_DIR`; `docker compose build photon` needs the base image only |
 
 Legend: ✅ checked from this workspace today · ⚠️ could not be reached from this workspace (the
 sandbox is allowed to reach GitHub and the package registries only), so the note is from the
@@ -295,7 +295,9 @@ Geofabrik keeps dated files for a rolling window, so a `pinned` snapshot stops r
 That failure is loud, and the remedy is one `.env` line: `MAP_SNAPSHOT=latest` means "the newest common
 dated snapshot for all selected sources" (the resolver's own words) and **requires an online check** —
 in offline mode it fails and tells you to use `pinned` or a specific date instead.
-`MAP_SNAPSHOT=YYYY-MM-DD` asks for one date you chose. **Do not hand-edit an `md5` in
+`MAP_SNAPSHOT=YYYY-MM-DD` asks for one date you chose. What you must **not** do is hand-point a source at
+a moving `*-latest.osm.pbf` URL: everything here is addressed by a date plus a checksum, and `-latest`
+silently changes what "the same dataset" means the next time anyone re-runs step 8. **Do not hand-edit an `md5` in
 `map-server/regions.json`, or the `borobiya.source.json` manifest in the dataset directory, to make a
 check pass** — the catalog is the reviewed pin and the manifest is the provenance record of what was
 actually used; editing either is falsifying the build record.
@@ -312,14 +314,15 @@ look like a proxy problem — § 5.2 item 2 answers that in one line.
 
 What is *not* the answer:
 
-- **`--water-polygons-url` pointed at Planetiler's own test fixtures.** Planetiler's README lists
-  them, and `fetch-planetiler-sources.sh` will never offer them: they are Monaco-only sample data,
-  so tiles for Iran would draw coastlines for a country it isn't in. The real failure mode is
-  worse than missing polygons — the build succeeds and the ocean renders as land.
-- **`--force` on the fetch script, or a bigger `--http_timeout`.** Neither changes a server that
-  isn't answering, and the 10 s HEAD probe that decides "reachable" is hard-coded in Java.
+- **`--force` on the fetch script, or a bigger `--http_timeout`.** Neither changes a server that isn't
+  answering. (The 10 s probe that Planetiler's Java downloader uses to size each source is
+  `Future.get(10, SECONDS)` — hard-coded, with no flag to widen it, which is also why this project
+  fetches these three files with `curl` instead of letting Java try.)
+- **Doing it silently.** If a build ends up on substitute layers, the substitution belongs in the
+  acceptance notes: the dataset metadata records the dataset PBF hash, not these archives, so
+  `verify-tiles.sh` cannot detect the swap and neither can anyone reading the manifest.
 
-What is:
+What is, in order of preference:
 
 1. **Retry later with `MAP_SOURCE_POLICY=cache-first`** (the default): a file that already
    verified is never re-fetched. If a previous run downloaded it, this step is a no-op.
@@ -341,9 +344,41 @@ What is:
    source of record, and it is deliberately *not* wired into `fetch-planetiler-sources.sh` as a
    fallback URL. Its archive is unversioned upstream, so unlike the other sources there is no
    checksum of record for it — the only staleness signal is the SHA-256 the script prints.
-3. **`MAP_SOURCE_POLICY=refresh`** re-downloads from the canonical URL once osmdata is back,
-   replacing the staged copy. `MAP_SOURCE_POLICY=offline` is how you prove the library is
-   self-sufficient (and it fails with the § A6 guide instead of touching the network).
+3. **`MAP_SOURCE_POLICY=refresh`** re-downloads from the canonical URL once osmdata is back, replacing
+   the staged copy. **`MAP_SOURCE_POLICY=offline`** is how you prove the library is self-sufficient: the
+   fetch step refuses to reach out and prints the exact path each missing archive wants.
+
+#### Last resort for a *development* run only: Planetiler's test fixtures
+
+Planetiler publishes small copies of two of these archives as test resources, and its own README points
+`--water-polygons-url` / `--natural-earth-url` at them for exactly this purpose — and because
+`fetch-planetiler-sources.sh` honors those same two override variables, you can point it there yourself:
+
+```bash
+export MAP_WATER_POLYGONS_URL=https://github.com/onthegomap/planetiler/raw/main/planetiler-core/src/test/resources/water-polygons-split-3857.zip
+export MAP_NATURAL_EARTH_URL=https://github.com/onthegomap/planetiler/raw/main/planetiler-core/src/test/resources/natural_earth_vector.sqlite.zip
+./map-server/scripts/fetch-planetiler-sources.sh
+```
+
+Know exactly what that buys. The fixtures cover **Monaco**, so water outside that box is simply
+missing: for a Tehran smoke test the sea is not in the bbox and the run still proves the pipeline, but
+lakes, rivers and every low-zoom country/boundary layer that comes from Natural Earth are **wrong**, and
+for a whole-country dataset this is unusable. The failure mode is the bad kind — the build succeeds,
+`verify-tiles.sh` passes, and coastlines or borders render as land. Three rules come with it: the script
+writes whatever URL you give it into the cache filename Planetiler expects (so a differently-named or
+pre-staged copy behaves identically), the substitution has to be written into the acceptance notes
+because nothing in the build records it, and the tiles get rebuilt from the real archive before any
+dataset is treated as deliverable. Nothing in the pipeline offers these URLs on its own —
+`fetch-planetiler-sources.sh` has no fallback entry for water polygons at all, which is why the
+staged-copy route above exists.
+
+Two consequences to accept before you run it. The two URLs above were checked on 2026-10-23 and still
+resolve (GitHub answers `302` for both paths), but their bytes could not be pulled from this
+workspace, so treat them as "the path still exists", not "the content was reviewed" — the same
+standard § 3.1's legend applies to every row. And because the override writes into the cache under the
+**real** filenames, the substitutes become the cached layers: `MAP_SOURCE_POLICY=refresh`, or deleting
+those two files from `$MAP_PLANETILER_SOURCES_DIR`, is how you get rid of them — and the rebuild is not
+optional if these tiles were ever used to sign off anything.
 
 ---
 
@@ -371,9 +406,12 @@ ssh-copy-id <your-user>@192.168.105.179   # optional, but it makes the 40-minute
 ssh <your-user>@192.168.105.179 'echo ok; nproc; free -h | head -2; df -h /home'
 ```
 
-The remote `echo ok` proves the key and the login work; `nproc` should be **4**, `free -h`
-should show ≈**6 Gi** total and ≥**2 Gi** available, `df -h` should show **≥15 GB free** on the
-filesystem holding `/home` (that is where the map library lives). If the floor is not met, § A4
+The remote `echo ok` proves the key and the login work. `nproc` should be **4** and `free -h` should
+show ≈**6 Gi** total; with the guest idle and `available` already under ~2 Gi, the serving stack in
+step 12 will not fit (§ 9.4 — that 2 Gi is this runbook's guidance, not a gate anything enforces).
+`df -h` should show **≥15 GB free** on the filesystem holding `/home`, which is where the map library
+lives; the floors `setup-ubuntu-vm.sh` *does* enforce are 15 GiB free and 50,000 free inodes, checked
+on the repository filesystem and on Docker's own storage root. If the floor is not met, § A4
 tells you what to delete; do not start the imports anyway — a disk that fills mid-import leaves a
 truncated archive that the next run must re-download.
 
@@ -467,10 +505,12 @@ out of the clone's own `package.json`.
 ### A4. Preflight: tool versions against *this checkout's* pins, plus capacity
 
 Do not trust this document's version numbers: read them out of the checkout and compare them with
-what is installed. Paste the whole block. The first three lines are what the repository demands; the
-next seven are what the machine has; the last six are the capacity floors this runbook sets (≥ 15 GiB
-free, ≥ 50 000 free inodes, Java ≥ 21, osmium == the pin). Read them as pairs: a pin and a value that
-do not match is the thing to fix *now*, not in step 9.
+what is installed. Paste the whole block. The lines above `# What is actually installed` are what the
+repository demands, the lines after it are what the machine has, and the last group is capacity. Read
+them as pairs: a pin and a value that do not match is the thing to fix *now*, not in step 9. The floors
+this runbook works to are **≥ 15 GiB free and ≥ 50 000 free inodes** on both the library filesystem and
+Docker's storage root (the two the setup script enforces), Java **≥ 21**, and `osmium` **equal to the
+pin**.
 
 ```bash
 cd ~/borobiya
@@ -494,7 +534,8 @@ df -i "${HOME}" | tail -1                                              # IUsed% 
 free -g | awk '/Mem:/ {print "total GiB: "$2"  available GiB: "$7}'
 DOCKER_ROOT="$(docker system info --format '{{.DockerRootDir}}' 2>/dev/null)"   # empty = daemon unreachable (A2's docker-group note)
 printf 'Docker data-root: %s  storage: %s\n' "${DOCKER_ROOT:-unknown}" "$(docker system info --format '{{.Driver}}' 2>/dev/null)"
-df -h "${DOCKER_ROOT:-/var/lib/docker}" | tail -1                       # images: ~2.3 GB before step 12
+df -h "${DOCKER_ROOT:-/var/lib/docker}" | tail -1                       # images and build cache live here
+docker system df                                                        # reusable cache vs volumes, in real numbers
 df -h "$(pwd)" | tail -1                                                # the repo itself is small; downloads land in the library, not here
 ```
 
@@ -1069,6 +1110,13 @@ docker compose --profile routing --profile geocoding ps      # summary; § 7 has
 | `osrm-car` / `osrm-bicycle` / `osrm-foot` | `Up (healthy)` after the graphs load | the probe is a TCP connect to `:5000`, which `osrm-routed` only binds once a graph is loaded — so `health: starting` for the first seconds is normal (`start_period: 10s`, 5 retries) |
 | `routing-gateway` | `Up (healthy)` as soon as it answers | its healthcheck fetches the gateway's own `GET /health`, and that handler returns a plain `{"status":"ok"}` **without touching the OSRM backends** — `healthy` here proves the process and its routes exist, nothing more |
 | `photon` | `Up (healthy)` after the index opens | `/status` probed over `/dev/tcp` (the JRE image has no curl), `start_period: 30s`, 12 retries — an index that needs a minute is expected |
+
+What those services are started *with*, from the same file: each `osrm-*` runs
+`osrm-routed --algorithm mld --threads $OSRM_RUNTIME_THREADS --max-table-size 100 /data/borobiya.osrm`
+(one runtime worker per profile by default; and note that `--max-table-size` bounds the `/table`
+plugin — it is **not** a memory dial, despite reading like one), and Photon runs under
+`JAVA_TOOL_OPTIONS=$PHOTON_JAVA_TOOL_OPTIONS`, i.e. `-Xms256m -Xmx1536m` on purpose. Nominatim is not a
+serving dependency and stays stopped; under memory pressure, do not start it alongside this stack.
 
 This command does **not** start `postgres`, `api` or `nginx`: only `api` depends on anything
 (`postgres`, `condition: service_healthy`), and no map service depends on Postgres — Martin lost that
