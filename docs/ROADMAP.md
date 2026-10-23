@@ -133,8 +133,8 @@ gantt
 - [ ] Admin panel: map alert + list with distance/rating/category
 
 ### M3.4 Proposals
-- [ ] `POST /_user/sos/proposals/:id/accept` (only if not `isOnMission`) + auto-decline others
-- [ ] `POST /_user/sos/proposals/:id/decline`
+- [x] `POST /_user/sos/proposals/:id/accept` (only if not `isOnMission`) + auto-decline others
+- [x] `POST /_user/sos/proposals/:id/decline`
 - [ ] Filter: `isOnMission=true` → no new proposals (query + runtime guard)
 - [ ] UI: Bell inbox with count, proposal cards
 

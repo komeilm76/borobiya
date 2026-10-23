@@ -83,7 +83,7 @@ export const missionParamsSchema = idParamsSchema;
 export type MissionParams = z.infer<typeof missionParamsSchema>;
 
 export const proposalDeclineSchema = z.strictObject({
-  reason: z.string().trim().optional()
+  reason: z.string().trim().min(1).max(500).optional()
 });
 export type ProposalDeclineInput = z.infer<typeof proposalDeclineSchema>;
 

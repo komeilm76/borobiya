@@ -1,0 +1,2 @@
+ALTER TABLE "mission_proposals" ADD COLUMN "decline_reason" text;--> statement-breakpoint
+ALTER TABLE "mission_proposals" ADD CONSTRAINT "mission_proposals_decline_reason_check" CHECK ("decline_reason" IS NULL OR ("status" = 'declined' AND char_length("decline_reason") BETWEEN 1 AND 500));

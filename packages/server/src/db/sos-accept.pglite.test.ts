@@ -75,5 +75,33 @@ describe("atomic proposal acceptance (migrated PGlite)", () => {
     await pg.query(`UPDATE "users" SET "is_on_mission" = false WHERE "id" = $1`, [RESCUER]);
     expect(await store.acceptProposal(thirdProposal, RESCUER)).toEqual({ status: "on_mission" });
     expect((await pg.query(`SELECT "id" FROM "missions"`)).rows).toHaveLength(1);
+    await expect(pg.query(`UPDATE "mission_proposals" SET "decline_reason" = 'stale' WHERE "id" = $1`, [thirdProposal]))
+      .rejects.toThrow();
+  });
+
+  it("races decline against accept without overwriting a committed decision", async () => {
+    const secondRescuer = "20000000-0000-4000-8000-000000000007";
+    const proposal = "50000000-0000-4000-8000-000000000007";
+    await pg.query(`INSERT INTO "users" ("id", "username", "password_hash", "role")
+      VALUES ($1, 'accept_race_rescuer', 'hash', 'user')`, [secondRescuer]);
+    await pg.query(`INSERT INTO "mission_proposals" ("id", "sos_request_id", "rescuer_id") VALUES ($1, $2, $3)`,
+      [proposal, SOS[1], secondRescuer]);
+    const outcomes = await Promise.all([
+      store.acceptProposal(proposal, secondRescuer),
+      store.declineProposal(proposal, secondRescuer, "Unsafe crossing")
+    ]);
+    const proposalRow = await pg.query<{ status: string; decline_reason: string | null }>(
+      `SELECT "status", "decline_reason" FROM "mission_proposals" WHERE "id" = $1`, [proposal]
+    );
+    const missions = await pg.query(`SELECT "id" FROM "missions" WHERE "rescuer_id" = $1`, [secondRescuer]);
+    if (proposalRow.rows[0]?.status === "accepted") {
+      expect(outcomes).toMatchObject([{ status: "accepted" }, "not_pending"]);
+      expect(proposalRow.rows[0]?.decline_reason).toBeNull();
+      expect(missions.rows).toHaveLength(1);
+    } else {
+      expect(outcomes).toEqual([{ status: "not_pending" }, "declined"]);
+      expect(proposalRow.rows).toEqual([{ status: "declined", decline_reason: "Unsafe crossing" }]);
+      expect(missions.rows).toHaveLength(0);
+    }
   });
 });

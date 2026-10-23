@@ -62,4 +62,28 @@ export async function registerSosProposalRoutes(
     }
     return response.send({ missionId: result.missionId });
   });
+
+  const declineRoute = apiRoutes.sos.declineProposal;
+  app.post(declineRoute.url, async (request, reply) => {
+    const response = reply.header("cache-control", "no-store");
+    const user = request.authenticatedUser;
+    if (!user) return response.code(401)
+      .send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const parsedParams = declineRoute.schema.params.safeParse(request.params);
+    if (!parsedParams.success) return response.code(404)
+      .send({ error: true, code: "PROPOSAL_NOT_FOUND", message: "Proposal not found.", issues: [] });
+    const parsedBody = declineRoute.schema.body.safeParse(request.body ?? {});
+    if (!parsedBody.success) return response.code(400).send({
+      error: true, code: "VALIDATION_ERROR", message: "Invalid decline reason.",
+      issues: parsedBody.error.issues.map(({ code, message, path }) => ({ code, message, path }))
+    });
+    const result = await store.declineProposal?.(
+      parsedParams.data.id, user.userId, parsedBody.data.reason
+    ) ?? "not_found";
+    if (result === "not_found") return response.code(404)
+      .send({ error: true, code: "PROPOSAL_NOT_FOUND", message: "Proposal not found.", issues: [] });
+    if (result === "not_pending") return response.code(409)
+      .send({ error: true, code: "PROPOSAL_UNAVAILABLE", message: "Proposal is no longer available.", issues: [] });
+    return response.code(200).send();
+  });
 }

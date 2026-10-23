@@ -197,7 +197,7 @@ sequenceDiagram
   API->>Socket: emit sos:proposal-received to each rescuer room user:{rescuerId}
   Rescuer->>API: POST /_user/sos/proposals/:id/accept (only if isOnMission=false)
   API->>API: create mission, set rescuer.isOnMission=true, decline other proposals for rescuer
-  API->>Socket: mission:proposal-accepted → Requester+Admin; mission:status-updated
+  API->>Socket: sos:proposal-accepted → Requester+Admin; mission:status-updated
   Rescuer->>OSRM: POST /route {from: rescuer.lastLocation, to: sos.location, profile: car/bike/foot}
   OSRM-->>Rescuer: 2-3 alternatives {distance,duration,polyline}
   Rescuer->>Rescuer: Start Navigation → pitch 60/45/0, map.fitBounds + follow

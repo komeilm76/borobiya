@@ -192,6 +192,7 @@ CREATE TABLE mission_proposals (
   sos_request_id UUID NOT NULL REFERENCES sos_requests(id) ON DELETE CASCADE,
   rescuer_id UUID NOT NULL REFERENCES users(id),
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired')),
+  decline_reason TEXT CHECK (decline_reason IS NULL OR (status = 'declined' AND char_length(decline_reason) BETWEEN 1 AND 500)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (sos_request_id, rescuer_id)
 );

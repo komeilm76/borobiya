@@ -84,6 +84,7 @@ export type AcceptProposalResult =
 
 export interface SosDispatchStore {
   acceptProposal?(proposalId: string, rescuerId: string): Promise<AcceptProposalResult>;
+  declineProposal?(proposalId: string, rescuerId: string, reason?: string): Promise<"declined" | "not_found" | "not_pending">;
   findNearestResponders(sosRequestId: string, limit?: number): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
@@ -100,7 +101,8 @@ export function createPlaceholderSosDispatchStore(): SosDispatchStore {
     dispatchResponders: async () => ({ status: "not_found" }),
     listProposalsByRequest: async () => [],
     listPendingProposals: async () => ({ items: [], total: 0 }),
-    acceptProposal: async () => ({ status: "not_found" })
+    acceptProposal: async () => ({ status: "not_found" }),
+    declineProposal: async () => "not_found"
   };
 }
 
@@ -297,7 +299,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         if (existing) {
           const [reopened] = await tx
             .update(missionProposals)
-            .set({ status: "pending", createdAt: new Date() })
+            .set({ status: "pending", declineReason: null, createdAt: new Date() })
             .where(eq(missionProposals.id, existing.id))
             .returning({
               id: missionProposals.id,
@@ -453,6 +455,30 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         requesterId: request.requesterId, proposal: { ...proposal, status: "accepted" }
       };
     });
+  }
+
+  public async declineProposal(
+    proposalId: string,
+    rescuerId: string,
+    reason?: string
+  ): Promise<"declined" | "not_found" | "not_pending"> {
+    // The conditional update is the decision's linearization point. A concurrent accept
+    // either sees the declined row or wins and makes this update affect zero rows.
+    const [updated] = await this.db.update(missionProposals)
+      .set({ status: "declined", declineReason: reason ?? null })
+      .where(and(
+        eq(missionProposals.id, proposalId),
+        eq(missionProposals.rescuerId, rescuerId),
+        eq(missionProposals.status, "pending")
+      ))
+      .returning({ id: missionProposals.id });
+    if (updated) return "declined";
+    const [existing] = await this.db.select({ status: missionProposals.status })
+      .from(missionProposals)
+      .where(and(eq(missionProposals.id, proposalId), eq(missionProposals.rescuerId, rescuerId)))
+      .limit(1);
+    if (!existing) return "not_found";
+    return existing.status === "declined" ? "declined" : "not_pending";
   }
 
   public async listPendingProposals(rescuerId: string, page: number, limit: number): Promise<{ items: MissionProposalRecord[]; total: number }> {

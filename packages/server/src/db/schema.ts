@@ -429,11 +429,13 @@ export const missionProposals = pgTable(
       .notNull()
       .references(() => users.id),
     status: text("status").$type<MissionProposalStatus>().notNull().default("pending"),
+    declineReason: text("decline_reason"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => [
     unique("mission_proposals_request_rescuer_unique").on(table.sosRequestId, table.rescuerId),
     check("mission_proposals_status_check", sql`"status" IN ('pending', 'accepted', 'declined', 'expired')`),
+    check("mission_proposals_decline_reason_check", sql`"decline_reason" IS NULL OR ("status" = 'declined' AND char_length("decline_reason") BETWEEN 1 AND 500)`),
     index("mission_proposals_rescuer_status_idx").on(table.rescuerId, table.status)
   ]
 );

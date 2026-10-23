@@ -482,7 +482,9 @@ describe("mission_proposals table and users.is_on_mission flag (T3.3.1 / T3.4.1)
     expect(columns.get("created_at")?.hasDefault).toBe(true);
 
     expect(config.uniqueConstraints.map(({ name }) => name)).toEqual(["mission_proposals_request_rescuer_unique"]);
-    expect(config.checks.map(({ name }) => name)).toEqual(["mission_proposals_status_check"]);
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "mission_proposals_status_check", "mission_proposals_decline_reason_check"
+    ]);
     expect(config.indexes.map(({ config: idx }) => idx.name)).toEqual(["mission_proposals_rescuer_status_idx"]);
 
     const requestFk = config.foreignKeys.find((fk) => fk.getName().includes("sos_request_id"));

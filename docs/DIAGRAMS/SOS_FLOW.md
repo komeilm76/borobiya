@@ -48,7 +48,7 @@ sequenceDiagram
   API->>Socket: sos:proposal-received → each rescuer
   Rescuer->>API: POST /_user/sos/proposals/:id/accept
   API->>API: create mission, isOnMission=true
-  API->>Socket: mission:proposal-accepted → R+Admin
+  API->>Socket: sos:proposal-accepted → R+Admin
   Rescuer->>Map: POST /route {from: rescuerLoc, to: sosLoc, profile}
   Map-->>Rescuer: 2–3 alternatives {distance,duration,polyline}
   Rescuer->>API: PATCH /_user/missions/:id/status {on_the_way}

@@ -786,7 +786,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(dispatched.proposals).toHaveLength(1);
     expect(dispatched.proposals[0]?.rescuerId).toBe(createdResponder.id);
 
-    const inbox = await callContract<{ items: Array<{ rescuerId: string; status: string }>; total: number; totalPages: number }>(
+    const inbox = await callContract<{ items: Array<{ id: string; rescuerId: string; status: string }>; total: number; totalPages: number }>(
       apiRoutes.sos.listProposals, 200, { url: apiRoutes.sos.listProposals.url, headers: responderHeaders }
     );
     expect(inbox.total).toBe(1);
@@ -808,7 +808,21 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     });
     expect((await app.inject({ method: "GET", url: rescuerPhotoAccess.url })).rawPayload)
       .toEqual(Buffer.from(PNG_FIXTURE));
-    await pg.query(`UPDATE "mission_proposals" SET "status" = 'declined' WHERE "sos_request_id" = $1`, [createdSos.requestId]);
+    const proposalUrl = apiRoutes.sos.declineProposal.url.replace(":id", inbox.items[0]!.id);
+    expect((await app.inject({ method: "POST", url: proposalUrl, headers: requesterHeaders, payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url: proposalUrl, headers: responderHeaders, payload: { reason: "   " } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: proposalUrl, headers: responderHeaders, payload: { reason: "x".repeat(501) } })).statusCode).toBe(400);
+    await callContract(apiRoutes.sos.declineProposal, 200, {
+      url: proposalUrl, headers: responderHeaders, payload: { reason: "  Unsafe approach  " }
+    });
+    const declinedRow = await pg.query<{ status: string; decline_reason: string | null }>(
+      `SELECT "status", "decline_reason" FROM "mission_proposals" WHERE "id" = $1`, [inbox.items[0]!.id]
+    );
+    expect(declinedRow.rows).toEqual([{ status: "declined", decline_reason: "Unsafe approach" }]);
+    await callContract(apiRoutes.sos.declineProposal, 200, { url: proposalUrl, headers: responderHeaders });
+    expect((await pg.query<{ decline_reason: string | null }>(
+      `SELECT "decline_reason" FROM "mission_proposals" WHERE "id" = $1`, [inbox.items[0]!.id]
+    )).rows[0]?.decline_reason).toBe("Unsafe approach");
     expect((await app.inject({
       method: "GET", url: apiRoutes.sos.getPhotoAccess.url.replace(":id", createdSos.requestId),
       headers: responderHeaders
@@ -861,6 +875,9 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect((await callContract<{ missionId: string }>(apiRoutes.sos.acceptProposal, 200, {
       url: firstUrl, headers: responderHeaders
     })).missionId).toBe(accepted.missionId);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.declineProposal, 409, {
+      url: apiRoutes.sos.declineProposal.url.replace(":id", competing[0]!.proposalId), headers: responderHeaders
+    })).code).toBe("PROPOSAL_UNAVAILABLE");
     const otherUrl = apiRoutes.sos.acceptProposal.url.replace(":id", competing[1]!.proposalId);
     expect((await callContract<{ code: string }>(apiRoutes.sos.acceptProposal, 409, {
       url: otherUrl, headers: responderHeaders
@@ -884,6 +901,17 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       url: apiRoutes.sos.listProposals.url, headers: responderHeaders
     });
     expect(inboxAfterAccept.total).toBe(0);
+    // A later re-dispatch after mission completion reopens the declined proposal but
+    // cannot carry its old reason into a newly pending decision.
+    await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [accepted.missionId]);
+    await pg.query(`UPDATE "users" SET "is_on_mission" = false WHERE "id" = $1`, [createdResponder.id]);
+    await callContract(apiRoutes.admin.dispatchSosRequest, 201, {
+      url: apiRoutes.admin.dispatchSosRequest.url.replace(":id", createdSos.requestId),
+      headers: adminHeaders, payload: { rescuerIds: [createdResponder.id] }
+    });
+    expect((await pg.query<{ status: string; decline_reason: string | null }>(
+      `SELECT "status", "decline_reason" FROM "mission_proposals" WHERE "id" = $1`, [inbox.items[0]!.id]
+    )).rows).toEqual([{ status: "pending", decline_reason: null }]);
 
     // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
     await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);
