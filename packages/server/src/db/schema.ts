@@ -2,6 +2,7 @@ import type {
   CancellationType,
   LocationShareMode,
   MissionProposalStatus,
+  MissionStatus,
   Severity,
   SosRequestStatus,
   UserRole
@@ -437,6 +438,50 @@ export const missionProposals = pgTable(
   ]
 );
 
+// Missions are durable incidents, not disposable category memberships: deleting a user or SOS
+// must not silently erase a rescue record. Only the history rows cascade with their mission.
+export const missions = pgTable(
+  "missions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sosRequestId: uuid("sos_request_id").notNull().references(() => sosRequests.id),
+    rescuerId: uuid("rescuer_id").notNull().references(() => users.id),
+    requesterId: uuid("requester_id").notNull().references(() => users.id),
+    status: text("status").$type<MissionStatus>().notNull().default("pending"),
+    cancelledBy: text("cancelled_by").$type<"requester" | "rescuer" | "admin" | "system">(),
+    cancellationReasonId: uuid("cancellation_reason_id").references(() => cancellationReasons.id),
+    cancellationCustomText: text("cancellation_custom_text"),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    check("missions_status_check", sql`"status" IN ('pending', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired')`),
+    check("missions_cancelled_by_check", sql`"cancelled_by" IS NULL OR "cancelled_by" IN ('requester', 'rescuer', 'admin', 'system')`),
+    check("missions_distinct_participants_check", sql`"rescuer_id" <> "requester_id"`),
+    index("missions_sos_request_id_idx").on(table.sosRequestId),
+    index("missions_rescuer_status_idx").on(table.rescuerId, table.status),
+    index("missions_requester_id_idx").on(table.requesterId)
+  ]
+);
+
+export const missionStatusHistory = pgTable(
+  "mission_status_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    missionId: uuid("mission_id").notNull().references(() => missions.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status").$type<MissionStatus>(),
+    toStatus: text("to_status").$type<MissionStatus>().notNull(),
+    changedBy: uuid("changed_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    check("mission_status_history_from_check", sql`"from_status" IS NULL OR "from_status" IN ('pending', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired')`),
+    check("mission_status_history_to_check", sql`"to_status" IN ('pending', 'on_the_way', 'arrived', 'in_progress', 'completed', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired')`),
+    index("mission_status_history_mission_created_idx").on(table.missionId, table.createdAt)
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
@@ -462,3 +507,7 @@ export type SosRequestRow = typeof sosRequests.$inferSelect;
 export type NewSosRequestRow = typeof sosRequests.$inferInsert;
 export type MissionProposalRow = typeof missionProposals.$inferSelect;
 export type NewMissionProposalRow = typeof missionProposals.$inferInsert;
+export type MissionRow = typeof missions.$inferSelect;
+export type NewMissionRow = typeof missions.$inferInsert;
+export type MissionStatusHistoryRow = typeof missionStatusHistory.$inferSelect;
+export type NewMissionStatusHistoryRow = typeof missionStatusHistory.$inferInsert;

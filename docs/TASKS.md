@@ -227,7 +227,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 3.5 Live Mission & Navigation
 
-- [ ] **T3.5.1** Table `missions` (sosRequestId, rescuerId, requesterId, status, cancelledBy..., createdAt/updatedAt) + `mission_status_history`
+- [x] **T3.5.1** Table `missions` (sosRequestId, rescuerId, requesterId, status, cancelledBy..., createdAt/updatedAt) + `mission_status_history` ✅ 2026-10-24
+  - **Delivered:** `packages/server/src/db/schema.ts`, generated migration `0014_modern_wrecker.sql`, and PGlite migration/constraint tests. Missions retain non-cascading SOS and participant FKs, validated status/cancellation values, creation/update timestamps, participant indexes; history has a cascading mission FK, validated transitions, and chronological index. No handler inserts a mission before T3.4.3.
 - [ ] **T3.5.2** `PATCH /_user/missions/:id/status` — enum `on_the_way → arrived → in_progress → completed` (strict order, see §11.6 table)
 - [ ] **T3.5.3** Emit `mission:status-updated` to `mission:{id}` room (requester+rescuer+admin)
 - [ ] **T3.5.4** On accept: `map.fitBounds([rescuerCoords, requesterCoords])` with padding
