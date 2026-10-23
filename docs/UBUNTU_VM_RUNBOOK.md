@@ -54,17 +54,18 @@ snapshot). The `Check` column is how you prove to yourself that the step worked 
 | A0 | Reach the VM over SSH; install `openssh-server` | `ssh` + `systemctl is-active ssh` | You have a shell on the VM and its IP | one package |
 | A1 | Ubuntu package index up to date | `sudo apt update` | No `Failed to fetch` lines | seconds |
 | A2 | Docker Engine + Compose v2 from the official apt repo | Docker's `get.docker.com` script **or** the manual `apt` block | `docker compose version` prints v2.x | seconds |
-| A3 | Toolchain: Java 21, **Bun**, Osmium, git, curl, wget, unzip, openssl, Python, `openssh-server` | one `apt install` + the pinned Bun installer | A4 reports every one of them | minutes |
+| A3 | Toolchain: Java 21, Osmium, git, curl, wget, unzip, openssl, Python, `openssh-server` | one `apt install` | A4 reports every one of them | minutes |
 | A4 | Preflight: tool versions vs the pins in this repo, disk, inodes, Docker storage | the § A4 paste block | each pin above matches the value below it; capacity floors met | seconds |
 | A5 | Get the code and prove the pipeline files are in it | `git clone` + the § A5 preflight loop | `PREFLIGHT OK` | seconds |
+| A5b | **Bun**, pinned from the clone's `package.json` | the GitHub release zip + `install` | `bun --version` matches the pin | one download |
 | A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `cp .env.example .env` + the § A6 blocks | `resolve` prints the same selection you chose | seconds |
-| — | *(optional)* proxy for downloads, and proof that it works | § 5 | § 5.2's three checks pass | seconds |
+| — | *(optional)* proxy for downloads, and proof that it works | § 5 | § 5.2's six checks pass | seconds |
 | 7 | *(optional)* pre-download the big files: Geofabrik extracts + Planetiler's reference layers (≈230 MB + 1.3 GB) | `./map-server/scripts/fetch-planetiler-sources.sh` (steps 8 and 9 otherwise fetch what they need themselves) | Each line ends `cached` or `verified` | it skips already-verified files |
 | 8 | Download + verify + crop + merge the OSM extracts | `./map-server/scripts/prepare-regions-pbf.sh` | `PBF OK` from `verify-map-pbf.sh` | downloads skip, crop+merge re-run |
-| 9 | Build the vector tiles (PMTiles) | `PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh` | `verify-tiles.sh` exits 0 | 30–50 min (no re-download of reference layers) |
+| 9 | Build the vector tiles (PMTiles) | `PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh` | `Wrote build metadata …` and both tile files exist; the HTTP proof is step 13 | 30–50 min (no re-download of reference layers) |
 | 10 | Build the OSRM road graphs | `OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh` | `car/`, `bicycle/` and `foot/` each full of `*.osrm*` files in `$MAP_OSRM_DATA_DIR` | 25–45 min |
 | 11 | Geocoding: Photon JAR+index, Nominatim import, Nominatim→Photon | `./map-server/scripts/download-photon.sh` + the § 6.5 commands | Photon index dir + its dataset stamp exist; `verify-geocoding.sh` in step 13 passes | hours; volumes are reused unless you clear them |
-| 12 | Start the serving stack | `docker compose --profile routing --profile geocoding up -d …` | § 7.1's table shows every service `Up (healthy)` | seconds |
+| 12 | Start the serving stack | `docker compose --profile routing --profile geocoding up -d …` | § 7.1's table shows six `Up`; the five with healthchecks `healthy` (Martin has none) | seconds |
 | 13 | Acceptance checks + sign-off | three `verify-*.sh` scripts + the § 6.7 curls | All exit 0; notes written down | seconds |
 
 `Steps 1–6` do not exist: the data pipeline is numbered 7–13 because those numbers are used in
@@ -122,12 +123,18 @@ cd ~/borobiya
 that step below. The table version of the same thing, for the case where you don't know which
 step failed:
 
-| `verify-map-pbf.sh` says | `verify-tiles.sh` says | Go to |
+| `verify-map-pbf.sh` says | tiles look like | Go to |
 | --- | --- | --- |
-| no dataset file / manifest mismatch | — | step 8 |
-| `PBF OK` | PMTiles missing or stale | step 9 |
-| `PBF OK` | `PMTILES OK` | step 10 (routing) or 11 (geocoding) |
-| `PBF OK` | `PMTILES OK`, containers wrong | step 12 |
+| `verify-map-pbf: dataset PBF is missing or empty` | — | step 8 (then re-read § 9.1 item 2) |
+| `OK: … matches areas … snapshot …` | no `borobiya.pmtiles` in `$MAP_DATA_DIR` | step 9 |
+| `OK: … matches areas …` | the archive is there | step 10 (routing) or 11 (geocoding) |
+| `OK: … matches areas …` | both tile files present | step 12, then 13's `verify-tiles.sh` |
+
+The success line you are looking for from step 8 is, verbatim:
+`OK: <…>/borobiya.osm.pbf matches areas ir-tehran bbox [51.0, 35.5, 51.7, 35.9] snapshot 2026-10-18
+(SHA-256 …)` — areas, bbox and snapshot follow your selection. It is printed by `regions.py
+verify-manifest` (the resolver is the only thing allowed to judge a manifest), which is why the
+phrasing is worth quoting: any other text means the selection, the file or the manifest disagrees.
 
 **Don't "fix" a failed download by adding `--force`.** The three JAR/script downloaders
 (`fetch-planetiler-sources.sh`, `download-photon.sh`) are already skip-if-present, so `--force`
@@ -146,7 +153,7 @@ truncated download is detected by checksum and re-fetched on the next run by its
 | `$MAP_LIBRARY_DIR/sources/` | | the per-source `.osm.pbf` extracts, each with the Geofabrik `.md5` sidecar and a `source.json` provenance record in the same directory |
 | `$MAP_LIBRARY_DIR/crops/` | | the per-area bbox crops (`<area-id>.osm.pbf`), each with a `<area-id>.source.json` record of the source hash, bbox and Osmium version that produced it |
 | `$MAP_LIBRARY_DIR/datasets/<date>-<fingerprint>/` | | the merged dataset PBF (`borobiya.osm.pbf`), its provenance manifest (`borobiya.source.json`), `borobiya.pmtiles` + `borobiya.metadata.json`, and the `routing/` + `geocoding/` directories below. `MAP_DATA_DIR` and `MAP_DATASET_DIR` are the same directory |
-| `$MAP_LIBRARY_DIR/planetiler-sources/` | | Planetiler's reference layers (Natural Earth, water polygons, lake centerlines) — ≈1.3 GB (step 7) |
+| `$MAP_LIBRARY_DIR/planetiler-sources/` | | Planetiler's reference layers (Natural Earth, water polygons, lake centerlines) — ≈1.3 GB — each with the `.sha256` sidecar the fetch script wrote at download time (step 7) |
 | `$MAP_OSRM_DATA_DIR` | | = `<dataset dir>/routing`: `car/`, `bicycle/`, `foot/` graph directories (step 10) |
 | `$MAP_PHOTON_DATA_DIR` | | = `<dataset dir>/geocoding`: `photon_data/` index + the `.borobiya-pbf.sha256` stamp (step 11) |
 | `map-server/` (in the repo) | | `regions.json` — the area catalog: ids, Geofabrik `url`+`md5` pins, bboxes, languages — plus `styles/`, `sprites/`, `fonts/`, `martin.yaml`, `routing-gateway/`, `photon/Dockerfile`. **Committed inputs, never cache** |
@@ -247,7 +254,7 @@ below is a value to copy into a config file: **the pins live in `map-server/regi
 | 4 | Lake centerlines | same | `https://github.com/acalcutt/osm-lakelines/releases/download/v12/lake_centerline.shp.zip` | same table | ✅ GitHub release assets are permanent; MapTiler mirror is the fallback |
 | 5 | **Water polygons** | same | `https://osmdata.openstreetmap.de/download/water-polygons-split-3857.zip` | `MAP_WATER_POLYGONS_URL` (blank = default) | ❌ **`osmdata.openstreetmap.de` has been down since 2026-10-22 for the whole Internet**, not just your VM. No official mirror. See § 3.4 |
 | 6 | Photon JAR | `download-photon.sh` | `https://github.com/komoot/photon/releases/download/1.3.0/photon-1.3.0.jar` (note: tag has **no** `v`) | `PHOTON_VERSION` in `map-server/scripts/download-photon.sh` | ✅ live — 98,219,380 bytes, published 2026-08-07 |
-| 7 | Bun (this runbook installs it) | you, § A3 | `https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip` | `packageManager` in the root `package.json` | ✅ live — 42,015,139 bytes; upstream latest is newer, which is fine |
+| 7 | Bun (this runbook installs it) | you, § A5b | `https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip` | `packageManager` in the root `package.json` | ✅ live — 42,015,139 bytes; upstream latest is newer, which is fine |
 | 8 | Martin image | `docker-compose.yml` | `ghcr.io/maplibre/martin:1.16.1` | `docker-compose.yml` | registry not checked from here; an immutable tag, so it does not move |
 | 9 | OSRM image | `docker-compose.yml`, `build-routing.sh` | `ghcr.io/project-osrm/osrm-backend:v26.10.0-debian` | both files, identical | ⚠️ the bare `v26.10.0` tag **does not exist** upstream (only suffixed tags + `latest`) — if you see `No such image`, this is why |
 | 10 | Nominatim image | `docker-compose.yml` (service `nominatim`, profile `geocoding-import`) | `mediagis/nominatim:5.3-2026-06-23T09-03` | `docker-compose.yml` | date-tagged build, pinned so a re-import reproduces |
@@ -431,10 +438,10 @@ docker context ls                                    # should be `default` → u
 The Compose file also **pins the project to subnet `172.30.0.0/24`** so Fastify can trust
 `X-Forwarded-For` from Nginx's exact container address. If that subnet is already taken
 (`docker network ls`, `ip route`), a fresh `docker compose up` fails with `Pool overlaps with
-other one(s)` and no service starts; change the subnet and `TRUSTED_PROXY_IPS` **together** in
+other one on this address space` and no service starts; change the subnet and `TRUSTED_PROXY_IPS` **together** in
 `docker-compose.yml` and `.env`.
 
-### A3. Toolchain: Java 21, Bun, Osmium, git, curl, wget, unzip, openssl, Python, SSH
+### A3. Toolchain: Java 21, Osmium, git, curl, wget, unzip, openssl, Python, SSH
 
 ```bash
 sudo apt install -y openjdk-21-jdk-headless osmium-tool git curl wget unzip ca-certificates openssl python3 openssh-server
@@ -442,41 +449,20 @@ sudo apt install -y openjdk-21-jdk-headless osmium-tool git curl wget unzip ca-c
 
 | Package | Why this runbook needs it |
 | --- | --- |
-| `openjdk-21-jdk-headless` | Planetiler's JAR needs Java **21+** (step 9). Headless = no X dependencies on a server. |
+| `openjdk-21-jdk-headless` | Planetiler's JAR needs Java **21+** (step 9). Headless = no X dependencies on a server. (Bun is installed in A5b, not here: its version is read from the clone.) |
 | `osmium-tool` | The boundary crop in step 8. Ubuntu 24.04 provides **1.16.0**, which is what `.env.example` pins (`MAP_OSMIUM_VERSION=1.16.0`). |
 | `git` | Clone and update the repo (A5), and every `git log`/`git diff` a developer runs afterwards. |
 | `curl` | Every download in steps 7–11 (`fetch-planetiler-sources.sh`, `prepare-regions-pbf.sh`, `download-photon.sh`) and the `verify-*.sh` HTTP checks. |
 | `wget` | Kept because `setup-ubuntu-vm.sh` checks for it; the scripts themselves use `curl`. |
-| `unzip` | The Bun zip below, and Planetiler's reference-layer archives. |
+| `unzip` | A5b unpacks the Bun zip with it, and you may want it to inspect a staged reference archive by hand (§ 3.4). No pipeline script needs it: Planetiler reads the zips in `--download-dir` itself. |
 | `ca-certificates` | TLS for every HTTPS download; missing it turns `curl` failures into certificate errors. |
 | `openssl` | Secret generation in A6 (`openssl rand -hex 32`) — the setup script needs it too. |
 | `python3` | `map-server/scripts/regions.py` (selection, manifest, provenance) and `scripts/clear-map-cache.py`. |
 | `openssh-server` | A0. Install it before you need it; after a 40-minute build you do not want to be back at the hypervisor console. |
 
-Then **Bun**, pinned to the version the repository declares instead of "latest":
-
-```bash
-BUN_VERSION="v$(python3 -c 'import json;print(json.load(open("package.json"))["packageManager"].split("@")[1])')"
-echo "installing Bun $BUN_VERSION"                       # 1.4.3 today, from package.json's packageManager field
-arch=$([ "$(uname -m)" = x86_64 ] && echo x64 || echo aarch64)
-grep -q avx2 /proc/cpuinfo || echo "NOTE: no AVX2 on this CPU — use the -baseline zip instead"
-curl -fL --retry 3 -o /tmp/bun.zip \
-  "https://github.com/oven-sh/bun/releases/download/bun-$BUN_VERSION/bun-linux-$arch.zip"
-unzip -o /tmp/bun.zip -d /tmp && sudo install -m 0755 /tmp/bun-linux-$arch/bun /usr/local/bin/bun && rm -rf /tmp/bun.zip /tmp/bun-linux-$arch
-bun --version
-```
-
-Why Bun is in the list at all: the API container has its own Bun baked into its image, so the map
-stack works without it — but every command in `docs/DEVELOPMENT.md` that you will type on the host
-(`bun install`, `bun run dev`, `bunx vitest run`, `bunx tsc --noEmit`) needs it, and a missing Bun
-on a fresh VM is discovered at the worst possible moment (after the imports). It is **not**
-required by `scripts/setup-ubuntu-vm.sh`, whose own prerequisite check looks for
-`docker git curl wget python3 openssl java osmium` and stops if any is missing — that list is why
-this step exists.
-
-Ubuntu's `curl -fsSL https://bun.sh/install | bash` also works and installs the newest release; the
-zip above is documented because it is pinned, auditable (a GitHub release asset), and needs no
-shell-pipe-to-bash.
+`curl`/`wget`/`git`/`unzip`/`openssl`/`python3`/`openssh-server` are the boring ones and A4 will
+confirm them; **Bun** is installed in **A5b**, after the clone, because the version to install is read
+out of the clone's own `package.json`.
 
 ### A4. Preflight: tool versions against *this checkout's* pins, plus capacity
 
@@ -497,7 +483,8 @@ grep -n '"packageManager"' package.json
 # What is actually installed:
 java -version 2>&1 | head -1            # must be 21 or newer
 osmium --version | head -1              # must match MAP_OSMIUM_VERSION above
-bun --version; git --version; curl --version | head -1; wget --version | head -1 | cut -d' ' -f1-3
+bun --version 2>/dev/null || echo "bun: not yet (installed in A5b, after the clone)"   # expected here
+git --version; curl --version | head -1; wget --version | head -1 | cut -d' ' -f1-3
 python3 --version; openssl version; unzip -v | head -1 | awk '{print $2}'
 docker --version; docker compose version
 systemctl is-active ssh                 # active
@@ -552,6 +539,34 @@ done
 Record that commit in your acceptance notes (§ 6.7). Do **not** `git pull` between steps 9 and 12
 of a run: `docker-compose.yml` mounts, image pins and script arguments move together, and a
 half-updated pipeline is the classic "it worked ten minutes ago".
+
+### A5b. Install Bun, pinned by the clone you just made
+
+A3 cannot do this: the pin lives in `package.json`, which only exists after A5. The step is still
+worth doing here, before any import, because the first thing you will want after the map stack is
+running is `bunx vitest run` / `bunx tsc --noEmit` / `bun run dev` on this host, and a missing Bun is
+discovered at the worst possible moment (forty minutes into something else).
+
+```bash
+cd ~/borobiya
+BUN_VERSION="v$(python3 -c 'import json;print(json.load(open("package.json"))["packageManager"].split("@")[1])')"
+echo "installing Bun $BUN_VERSION"        # the version this checkout declares (1.4.3 today)
+arch=$([ "$(uname -m)" = x86_64 ] && echo x64 || echo aarch64)
+grep -q avx2 /proc/cpuinfo || echo "NOTE: no AVX2 here — use the -baseline zip; bun would otherwise die with 'Illegal instruction'"
+curl -fL --retry 3 -o /tmp/bun.zip \
+  "https://github.com/oven-sh/bun/releases/download/bun-$BUN_VERSION/bun-linux-$arch.zip"
+unzip -o /tmp/bun.zip -d /tmp
+sudo install -m 0755 "/tmp/bun-linux-$arch/bun" /usr/local/bin/bun
+rm -rf /tmp/bun.zip "/tmp/bun-linux-$arch"
+bun --version                             # must print 1.4.3 (or whatever the pin says)
+```
+
+Why the GitHub asset and not the one-line installer: `curl -fsSL https://bun.sh/install | bash` works
+and installs the *newest* release, which is not the release this repository's lockfile was written
+against. The zip is pinned, auditable, and needs no shell-piped-to-bash. Why it is optional for the
+map stack itself: the API container has its own Bun in its image, and
+`scripts/setup-ubuntu-vm.sh` never looks for a host Bun — its prerequisite check is
+`docker git curl wget python3 openssl java osmium`, which is exactly the list A3 installs.
 
 ### A6. Configure `.env`: secrets, area, snapshot policy, library location
 
@@ -665,8 +680,14 @@ needs authentication, URL-encode the credentials
 ```bash
 export http_proxy="http://$PROXY_HOST:3128" https_proxy="http://$PROXY_HOST:3128" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"
 export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"
-printf 'export http_proxy="http://%s:3128" https_proxy="http://%s:3128" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_HOST" >> ~/.bashrc
-printf 'export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"\n' >> ~/.bashrc
+# Persist it, delimited so removal can be exact (never pattern-delete a file you did not write):
+sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc      # drop a previous block
+{
+  printf '# >>> borobiya proxy >>>\n'
+  printf 'export http_proxy="http://%s:3128" https_proxy="http://%s:3128" no_proxy="localhost,127.0.0.1,::1,172.30.0.0/24"\n' "$PROXY_HOST" "$PROXY_HOST"
+  printf 'export HTTP_PROXY="$http_proxy" HTTPS_PROXY="$https_proxy" NO_PROXY="$no_proxy"\n'
+  printf '# <<< borobiya proxy <<<\n'
+} >> ~/.bashrc
 ```
 
 `no_proxy` must cover the pinned `172.30.0.0/24` Docker subnet and loopback, or every local
@@ -728,7 +749,7 @@ downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.`
 ### 5.4 Remove it
 
 ```bash
-sed -i '/PROXY_HOST\|_proxy\|_PROXY/d' ~/.bashrc      # drop the two lines added above
+sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc   # drop exactly the block § 5.1 added
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY
 sudo rm -f /etc/apt/apt.conf.d/95proxy /etc/systemd/system/docker.service.d/proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker
@@ -762,8 +783,11 @@ python3 map-server/scripts/regions.py sources "$MAP_REGION_IDS" \
 ```
 
 For the default pinned selection that is `iran-261018.osm.pbf` (229,852,435 bytes, MD5
-`a23eb2f21e426677bd243b2712ec1bc8`). With `wget` a stalled transfer is resumable, which the scripts'
-`curl` handles only with retries:
+`a23eb2f21e426677bd243b2712ec1bc8`). This part exists because of one asymmetry in the scripts: the
+Geofabrik fetch in step 8 runs `curl -fL --retry 3 --retry-delay 2` into a temporary file **without
+`-C -`**, so a retry re-downloads all 230 MB from the beginning; the reference-layer fetcher in 7b
+does pass `-C -` and resumes on its own. `wget --continue` into the library path is what makes a bad
+link survivable:
 
 ```bash
 SOURCE_PATH="$MAP_LIBRARY_DIR/sources/asia/ir/iran/2026-10-18/iran-261018.osm.pbf"
@@ -787,12 +811,28 @@ cd ~/borobiya
 ./map-server/scripts/fetch-planetiler-sources.sh
 ```
 
-**Good output (7b).** one line per source, each ending `cached` (already present, nothing fetched)
-or `verified` (downloaded now, with its SHA-256 and byte count); `ls -l` of the directory then shows
-`natural_earth_vector.sqlite.zip`, `lake_centerline.shp.zip` and
-`water-polygons-split-3857.zip`. An **exit 1 with a guide** names which source could not be fetched
-and the override variable that fixes it (`MAP_NATURAL_EARTH_URL`, `MAP_LAKE_CENTERLINES_URL`,
-`MAP_WATER_POLYGONS_URL` — all three also in `.env.example`, blank by default).
+**Good output (7b).** one line per source, in one of exactly these two shapes:
+
+```
+OSM water polygons: cached <dir>/water-polygons-split-3857.zip (SHA-256 <digest>)
+OSM water polygons: verified <dir>/water-polygons-split-3857.zip (SHA-256 <digest>, 929162760 bytes)
+```
+
+`cached` = already present and readable, nothing fetched (the digest is printed for your record, not
+compared against a pin — these three archives are unversioned upstream, so there is nothing to compare
+them to). `verified` = fetched now, and its `.sha256` sidecar written beside it. `ls -l` of the
+directory then shows `natural_earth_vector.sqlite.zip`, `lake_centerline.shp.zip` and
+`water-polygons-split-3857.zip`, each with a `.sha256` next to it.
+
+On failure the script exits 1 after `the Planetiler overlap sources below are not available and are
+required to build tiles:`, one line per missing item naming the **exact path it wants**
+(`<label>  [network|offline]  ->  <SOURCES_DIR>/<filename>`), and a three-option guide: copy the file
+in yourself, re-run with a proxy exported, or point the build at a mirror with the matching override
+variable (`MAP_NATURAL_EARTH_URL`, `MAP_LAKE_CENTERLINES_URL`, `MAP_WATER_POLYGONS_URL` — all three in
+`.env.example`, blank by default, and a set value replaces the public URL completely). A host that
+answers with something that is not a readable archive gets
+`<label>: <url> is not a readable archive; trying the next source` and the fallback URL, so a 200 that
+is really an error page cannot poison the cache.
 
 **Redo just this step.** 7a: delete the named file and step 8 re-downloads and re-verifies it. 7b:
 `rm` the one file, or `MAP_SOURCE_POLICY=refresh ./map-server/scripts/fetch-planetiler-sources.sh`
@@ -849,18 +889,26 @@ at `free -h` and the last log lines first; on this machine the heap has to share
 cache and the Docker daemon.
 
 **Expected output.** `Generating <…>/borobiya.pmtiles (version <snapshot date>, zoom 0-14, bbox
-<union bbox>) from <…>/borobiya.osm.pbf`, then Planetiler's per-stage progress, then `Wrote build
-metadata …`. 30–50 minutes for the default Tehran selection (longer for a whole country).
+<union bbox>) from <…>/borobiya.osm.pbf`, then Planetiler's per-stage progress, then
+`Created <…>/borobiya.pmtiles (<n> bytes)` and `Wrote build metadata <…>/borobiya.metadata.json`.
+30–50 minutes for the default Tehran selection (longer for a whole country).
 
 **Check.**
 
 ```bash
-./map-server/scripts/verify-tiles.sh            # exit 0 = archive readable + metadata matches this selection
 ls -lh "$MAP_DATA_DIR/borobiya.pmtiles" "$MAP_DATA_DIR/borobiya.metadata.json"
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print("areas", d["areas"], "snapshot", d["snapshotDate"], "bbox", d["bbox"])'   "$MAP_DATA_DIR/borobiya.metadata.json"                      # must name THIS selection and snapshot
+[[ "$(sha256sum "$MAP_PBF" | cut -d' ' -f1)" == "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sourcePbfSha256"])'   "$MAP_DATA_DIR/borobiya.metadata.json")" ]] && echo "tiles were built from the verified dataset PBF"
 ```
 
-**Redo just this step** — the PMTiles file and its metadata are the only outputs; the dataset PBF
-and the reference layers are untouched, so a re-run costs build time only:
+`verify-tiles.sh` is deliberately **not** step 9's check: it asks Martin over HTTP
+(`localhost:8000`), so it belongs to step 13 once step 12 has published that port. Running it here
+fails with "Tile request failed", which is a correct answer about a service you have not started yet
+and a waste of an evening to debug.
+
+**Redo just this step** — the PMTiles file and its metadata are the only outputs (both are written by
+an atomic `mv` at the end, so an interrupted build leaves nothing behind to clean); the dataset PBF and
+the reference layers are untouched, so a re-run costs build time only:
 
 ```bash
 rm -f -- "$MAP_DATA_DIR/borobiya.pmtiles" "$MAP_DATA_DIR/borobiya.metadata.json"
@@ -869,7 +917,10 @@ PLANETILER_HEAP=3g ./map-server/scripts/generate-tiles.sh
 
 **If it fails.** `Could not download …`/`Could not HEAD …` for a reference layer → § 3.4.
 `UnsupportedClassVersionError` → Java < 21 (A3). `OutOfMemoryError` or the process simply vanishing
-→ heap vs free RAM (`free -h`); re-run, it resumes from its own `.pmtiles` temp dir being discarded.
+→ heap vs free RAM (`free -h`). There is no partial archive to clean up: Planetiler writes into a temp
+directory that `generate-tiles.sh`'s own `EXIT` trap removes, and the finished `.pmtiles` is only moved
+into place at the end — so a re-run rebuilds the archive from scratch, but it re-fetches neither the
+reference layers nor the dataset PBF.
 `Map data file … does not exist` → step 8 never succeeded.
 
 ### 6.4 Step 10 — Build the OSRM road graphs (car, bicycle, foot)
@@ -884,8 +935,17 @@ death.
 OSRM_BUILD_THREADS=2 ./map-server/scripts/build-routing.sh
 ```
 
-**Expected output.** for each of `car`, `bicycle`, `foot`: `extracting` → `partitioning` →
-`customizing`, then the graph files. 25–45 minutes total for the default selection.
+**Expected output.** one header line per profile — `Extracting car graph for borobiya from the
+approved PBF (2 threads)...`, then bicycle, then foot (partition and customize run between those
+lines without their own banner) — and at the end
+`Created car, bicycle, and foot graphs for borobiya under <…>/routing`. 25–45 minutes total for the
+default selection.
+
+Two things the script does that you would otherwise debug: every graph is built in a temporary
+**staging** directory and moved into `$MAP_OSRM_DATA_DIR/<profile>` only at the end (so an interrupted
+run leaves no half-written profile), and every `docker run` passes
+`--user "$(id -u):$(id -g)"`, because the OSRM image runs as root and would otherwise leave
+root-owned graph files that § 8.1's `rm -rf` cannot delete without `sudo`.
 
 **Check.**
 
@@ -904,13 +964,19 @@ setup script does this for you, and prunes them after acceptance).
 Three sub-parts, in this order, and the two imports are the slowest thing in this runbook (hours
 for a country; the setup script prints the same warning).
 
-**11a. The Photon JAR** (pinned in `.env.example`, from a GitHub release asset — § 3.1 row 6):
+**11a. The Photon JAR** (a GitHub release asset — § 3.1 row 6):
 
 ```bash
-./map-server/scripts/download-photon.sh      # -> map-server/photon/photon-1.3.0.jar + .sha256 verify
+./map-server/scripts/download-photon.sh      # -> map-server/photon/photon-1.3.0.jar
 ```
 
-Skip-if-present; it prints the path it kept. Redo: `rm map-server/photon/photon-1.3.0.jar`.
+It is skip-if-present *and* hash-checked: the script compares the file against a `PHOTON_SHA256`
+pinned **inside the script**, not against a checksum it also downloads — so an already-present JAR is
+re-hashed rather than trusted. On success it prints `Verified Photon JAR: <path> (SHA-256 <hash>)`, and
+when it skips, `Photon 1.3.0 JAR already present and verified: <path>`. That same hash is the
+Dockerfile's own `ARG PHOTON_SHA256`, so the JAR the host imports with and the JAR baked into
+`borobiya/photon:1.3.0` are proven to be the same file. A mismatch aborts before anything is written;
+redo after replacing the file with `rm map-server/photon/photon-1.3.0.jar`.
 
 **11b. Nominatim import** (starts only the one-shot import service, profile `geocoding-import`):
 
@@ -933,9 +999,10 @@ shell**: the dataset directory is mounted read-only at `/osm` from `${MAP_DATASE
 `PBF_PATH=/osm/${MAP_REGION}.osm.pbf` (so a blank `MAP_DATASET_DIR` in `.env` falls back to the
 `.compose-unconfigured/dataset` placeholder and the import finds no file), and
 `NOMINATIM_PASSWORD` is what the database is created with (§ A6's write-back). The tunables are
-`NOMINATIM_IMPORT_STYLE` (default `full`), `NOMINATIM_THREADS=2`, `NOMINATIM_SHM_SIZE=1g` and the four
-`NOMINATIM_POSTGRES_*` memory values in `.env.example` — they exist because this import is the single
-heaviest thing in the runbook on a 6 GiB VM.
+`NOMINATIM_THREADS=2`, `NOMINATIM_SHM_SIZE=1g` and the four `NOMINATIM_POSTGRES_*` memory values, all
+of which are in `.env.example`; `NOMINATIM_IMPORT_STYLE` (default `full`) and `IMPORT_WIKIPEDIA`
+(`false`) exist **only** as Compose defaults, so changing them means adding them to `.env`. These exist
+because this import is the single heaviest thing in the runbook on a 6 GiB VM.
 
 **11c. Photon index**, run on the host against Nominatim's database while Nominatim keeps running.
 `-languages` must cover every selected country plus `en`, and `regions.py resolve "$MAP_REGION_IDS"` is
@@ -993,11 +1060,20 @@ docker compose --profile routing --profile geocoding up -d \
 docker compose --profile routing --profile geocoding ps      # summary; § 7 has the full set
 ```
 
-**Expected output.** seven services `Up`, all eventually `(healthy)`: `postgres`, `map-server`,
-`routing-gateway`, `osrm-car`, `osrm-bicycle`, `osrm-foot`, `photon`. The OSRMs turn healthy once
-their graphs are loaded and Photon after its index opens — give it a minute. This command does not
-start `api` or `nginx`; a crash-looping `api` container from an earlier attempt may still be in the
-list (§ 9.3). Martin serves tiles from files and does not need Postgres at all.
+**Expected output.** six services `Up`: `map-server`, `routing-gateway`, `osrm-car`, `osrm-bicycle`,
+`osrm-foot`, `photon` — and **five** of them reporting `(healthy)`.
+
+| Service | Health in `docker compose ps` | Why |
+| --- | --- | --- |
+| `map-server` | `Up`, **no `(healthy)` status, ever** | Martin has no healthcheck in `docker-compose.yml` by design: it serves PMTiles/styles/sprites/fonts from files, so "the container is running" is the whole statement Docker can make. The real proof is step 13's `verify-tiles.sh` |
+| `osrm-car` / `osrm-bicycle` / `osrm-foot` | `Up (healthy)` after the graphs load | the probe is a TCP connect to `:5000`, which `osrm-routed` only binds once a graph is loaded — so `health: starting` for the first seconds is normal (`start_period: 10s`, 5 retries) |
+| `routing-gateway` | `Up (healthy)` as soon as it answers | its healthcheck fetches the gateway's own `GET /health`, and that handler returns a plain `{"status":"ok"}` **without touching the OSRM backends** — `healthy` here proves the process and its routes exist, nothing more |
+| `photon` | `Up (healthy)` after the index opens | `/status` probed over `/dev/tcp` (the JRE image has no curl), `start_period: 30s`, 12 retries — an index that needs a minute is expected |
+
+This command does **not** start `postgres`, `api` or `nginx`: only `api` depends on anything
+(`postgres`, `condition: service_healthy`), and no map service depends on Postgres — Martin lost that
+connection on purpose, so tiles keep serving even with the application database down. A crash-looping
+`api` container left from an earlier attempt may still show in `ps` (§ 9.3).
 
 Add the app gateway and API when you want the whole product, not just the map stack:
 
@@ -1005,6 +1081,13 @@ Add the app gateway and API when you want the whole product, not just the map st
 docker compose up -d --build api nginx
 docker compose ps
 ```
+
+One consequence of that table is worth stating plainly, because it is the difference between a
+passing check and a passing system: **`routing-gateway` being `healthy` does not mean a single road
+graph loaded.** Its `/health` handler answers `{"status":"ok"}` on its own. The proofs that the
+graphs are live are the three `osrm-*` containers' own TCP healthchecks (which only connect once
+`osrm-routed` has loaded a graph) and, end to end, step 13's `verify-routing.sh` — which asks for a
+real route on each profile and checks the returned distance, duration, polyline and legs.
 
 **Redo just this step:** `docker compose --profile routing --profile geocoding down` (never `-v`!)
 then the `up -d` command again. Nothing built is lost — see § 8.3 for what each reset actually costs.
@@ -1025,17 +1108,22 @@ Each script checks one area — the first of `MAP_REGION_IDS` unless you pass an
 (`localhost:8000`) and the local gateway (`localhost:8001`), and validating non-empty
 MVT/GeoJSON/route geometry. For a multi-area selection, run the trio once per area.
 
-| Script | Proves | Fails when |
+| Script | Prints on success | What it actually checks |
 | --- | --- | --- |
-| `verify-tiles.sh` | step 9 + Martin: a real z12 tile exists at the area's test point | PMTiles missing/stale, Martin not up, bbox/selection mismatch |
-| `verify-routing.sh` | step 10 + `osrm-*` + gateway: a route with distance/geometry for `car`, `bicycle`, `foot` | a graph dir empty, gateway can't reach a profile |
-| `verify-geocoding.sh` | step 11 + Photon: forward and reverse geocoding return named features | index absent, `PHOTON_LANGUAGES` didn't cover the area, Photon still opening |
+| `verify-tiles.sh` | `OK: http://localhost:8000/borobiya/12/… (Tehran) returned HTTP 200, application/vnd.mapbox-vector-tile, 4321 bytes` | HTTP 200, a **non-empty** body, and an MVT content type — a 200 with an empty tile is a failure, which is the difference between "Martin answered" and "the archive has this tile" |
+| `verify-routing.sh` | `Verifying routing in Tehran (ir-tehran)...` then per profile `OK: car returned 1 route(s), 5123 m, 900 s` | the response's own `profile` matches the request, `routes[0].distance_m > 0`, `duration_s > 0`, a non-empty polyline, and `legs` present — so a gateway that reaches *an* OSRM but not the right one cannot pass |
+| `verify-geocoding.sh` | `OK: GET /geocode returned 5 feature(s); first result: …` and `OK: GET /reverse returned 1 feature(s); first result: …` | a forward query for the area's test place and a reverse query at its test point each return features with a name — from `regions.py verify-point`, not from a remembered coordinate |
 
-Raw spot checks, when a script fails and you need to see the response itself
+`verify-tiles.sh` is also the only check that retries a connection
+(`--retry 5 --retry-connrefused` against `$MARTIN_URL/health`, `http://localhost:8000` by default),
+which is why it reports "Martin health endpoint is unreachable" rather than a bare 404 when step 12
+has not finished; `MARTIN_URL` and `MARTIN_TILE_PATH` are its two override knobs. Raw spot checks,
+when a script fails and you need to see the response itself
 (`python3 map-server/scripts/regions.py verify-point <area-id>` prints the coordinates for any area):
 
 ```bash
-curl -fS -o /tmp/tile.pbf -w 'tile HTTP %{http_code}; %{size_download} bytes\n' \
+curl -fS -H 'Accept: application/x-protobuf' -o /tmp/tile.pbf \
+  -w 'tile HTTP %{http_code}; %{size_download} bytes\n' \
   http://localhost:8000/borobiya/12/2632/1612                     # 200 + non-empty protobuf
 curl -fsS -H 'Content-Type: application/json' \
   -d '{"from":{"lat":35.68,"lon":51.38},"to":{"lat":35.70,"lon":51.41},"profile":"car","alternatives":true}' \
@@ -1085,8 +1173,8 @@ docker compose top map-server                      # processes inside one servic
 docker compose logs --tail=50 map-server           # the first real error if it died or restarted
 ```
 
-A one-glance health table, derived from the running containers instead of a hand-typed list — it
-prints name, state, Compose health, restart count and OOM flag for every container of this project:
+A one-glance health table, derived from the running containers instead of a hand-typed list: service,
+state, Compose health and the status line, for whatever this project has containers for:
 
 ```bash
 docker compose ps -a --format json | python3 -c '
@@ -1112,8 +1200,8 @@ is added. Then the four things that explain almost every "it's unhealthy":
 docker stats --no-stream                                  # RAM/CPU right now; a service near its limit is about to be killed
 docker inspect $(docker compose ps -q) --format \
   '{{.Name}}: running={{.State.Running}} oom={{.State.OOMKilled}} exit={{.State.ExitCode}} restarts={{.RestartCount}}'
-ss -ltnp 2>/dev/null | grep -E ':(5432|5433|8000|8001|8080|8081|2322|3000)\b'   # which ports are actually listening on 127.0.0.1
-docker volume ls --filter "label=com.docker.compose.project=$(basename "$PWD")"   # the data that must survive
+ss -ltn | grep -E ':(5432|5433|8000|8001|8080|8081|2322|3000)\b'            # what is listening; add sudo (-ltnp) for the process column
+docker volume ls --filter "label=com.docker.compose.project=$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name",""))')"   # the data that must survive
 ```
 
 Reading it: `oom=true` → the VM is out of RAM, see § 9.4 · `exit=1` with a rising `restarts` → a
@@ -1145,13 +1233,23 @@ set -a; source .env; set +a
 docker compose run --rm --build api bun src/db/migrate.ts
 ```
 
-`reset-admin-password` is the documented way back into an account. The setup script prints the
-generated admin login once, at the end of a run; the password is kept only as
-`ADMIN_SEED_PASSWORD_B64` in the local `.env` and decoded for the seed process, never committed:
+`reset-admin-password` is the documented way back into an account: it sets the bootstrap `admin`'s
+password and revokes that user's existing sessions. The setup script prints the generated admin login
+once, at the end of a run; the password is kept only as `ADMIN_SEED_PASSWORD_B64` in the local `.env`
+and decoded for the seed process, never committed.
 
 ```bash
-docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts '<new-password>'
+docker compose run --rm api bun src/db/reset-admin-password.ts '<new-password>'
+# or, if the password is already exported in this shell:
+ADMIN_SEED_PASSWORD='<new-password>' docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts
 ```
+
+The password is validated by the same `passwordSchema` registration uses — 8–1024 characters with at
+least a letter and a digit — so a weak recovery password is refused by the tool rather than stored and
+then rejected at login. It also refuses to set the documented local default outside
+development/test, and it refuses to run at all if no `admin` user exists yet (that case is the seed:
+`docker compose run --rm api bun src/db/seed.ts`). Every `run` here is a **new** container, which is
+why it reads the current `.env`; `exec` would reuse the running one's older environment.
 
 ---
 
@@ -1216,11 +1314,15 @@ Order matters; run each line and read it before the next:
 
 ```bash
 cd ~/borobiya
-docker compose --profile routing --profile geocoding down          # 1. stop containers (no -v)
+docker compose --profile routing --profile geocoding --profile geocoding-import down   # 1a. map containers
+docker compose down                                                # 1b. api/nginx/postgres (still no -v)
+#     Both lines matter: a volume a container still references cannot be removed, so step 5/6 below
+#     would fail with "volume is in use" if only the profile command had been run.
 ./scripts/clear-map-cache.sh --yes                                  # 2. map library (L2 above)
 ./scripts/clear-map-cache.sh --yes --include-nominatim-volume       # 3. only if you want the Nominatim import gone too
 docker builder prune -f                                            # 4. reclaimable build cache
-docker volume ls --filter "label=com.docker.compose.project=$(basename "$PWD")"   # 5. what is left, by name
+PROJECT="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"
+docker volume ls --filter "label=com.docker.compose.project=$PROJECT"   # 5. what is left, by name
 # 6. only if you deliberately want the APPLICATION database gone (users, SOS rows, sessions):
 docker volume rm <project>_postgres-data
 ```
@@ -1348,7 +1450,7 @@ Symptom first, always — grep this section for the error text.
 - **Compose says the network must be recreated after a `git pull`** (the project subnet is pinned to
   `172.30.0.0/24`) — `docker compose down` once, **without** `-v`, then `up -d` again. Containers
   are recreated; volumes and built data stay.
-- **`Pool overlaps with other one(s)`** — something already uses `172.30.0.0/24`; change the subnet
+- **`Pool overlaps with other one on this address space`** — something already uses `172.30.0.0/24`; change the subnet
   and `TRUSTED_PROXY_IPS` together (§ A2's note).
 
 ### 9.4 Everything else
@@ -1358,8 +1460,9 @@ Symptom first, always — grep this section for the error text.
   `docker compose restart` is not a fix; `free -h` before and after is the evidence.
 - **A script fails with an empty-looking path** (`cannot open '' `, `/borobiya.pmtiles`) — this
   terminal never ran the loader block, § 2.1.
-- **`bun: command not found`** on a host where you expected it — A3 installs it into
+- **`bun: command not found`** on a host where you expected it — **A5b** installs it into
   `/usr/local/bin`; `/usr/local/bin/bun --version` proves the binary is there and your `PATH` is not.
+  If A5b was skipped because the clone is not there yet, that is the expected state, not a failure.
 - **The setup script says `prerequisites missing`** — it lists exactly which (run A3), or which
   service is unreachable (`Docker daemon unreachable` → § A2's group note). Re-run it after fixing;
   completed stages are skipped.
@@ -1385,3 +1488,9 @@ Symptom first, always — grep this section for the error text.
 - This runbook covers the reference Ubuntu VM. It is not the containerized `bun run dev` loop in
   `docs/DEVELOPMENT.md`, and it does not open the app in a browser: a green step 13 means the map
   services answer, not that the UI was exercised.
+- This document was rewritten and then audited against the pipeline scripts on 2026-10-23 (every
+  quoted output line, flag, path and Compose field below was re-read from `map-server/scripts/`,
+  `docker-compose.yml`, `.env.example` and `scripts/`). **No step has been executed end-to-end on the
+  VM since that rewrite**, so a step failing on the VM is information about the VM *or* about this
+  document — report it either way, and the section that describes that step is the first thing to
+  re-check.
