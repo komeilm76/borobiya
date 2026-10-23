@@ -12,7 +12,11 @@ fail() {
 # MAP_REGION_IDS carries the selected areas from regions.json.
 MAP_REGION="${MAP_REGION:-borobiya}"
 MAP_REGION_IDS="${MAP_REGION_IDS:-ir-tehran}"
-MAP_BBOX="${MAP_BBOX:-51.0,35.5,51.7,35.9}"
+# The bounds must describe THIS selection. The historical Tehran default is kept only for the
+# default selection: as an unconditional fallback it made every other area look invalid to
+# verify-map-pbf.sh, which then blamed the dataset for a value this script had invented.
+MAP_BBOX="${MAP_BBOX:-}"
+MAP_BBOX_WAS_SET="${MAP_BBOX:-}"
 MAP_DATA_VERSION="${MAP_DATA_VERSION:-}"
 MAP_SNAPSHOT_DATE="${MAP_SNAPSHOT_DATE:-$MAP_DATA_VERSION}"
 if [[ -n "${MAP_LIBRARY_DIR:-}" ]]; then
@@ -49,6 +53,17 @@ if [[ -z "$MAP_DATA_DIR" ]]; then
   fi
   eval "$library_paths"
   MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE"
+  # The resolver already computed the selection's real union bounds; use them instead of a default.
+  [[ -n "$MAP_BBOX_WAS_SET" ]] || MAP_BBOX="${UNION_BBOX:-}"
+fi
+if [[ -z "$MAP_BBOX" && "$MAP_REGION_IDS" == "ir-tehran" ]]; then
+  MAP_BBOX="51.0,35.5,51.7,35.9"
+fi
+if [[ -z "$MAP_BBOX" ]]; then
+  fail 'MAP_BBOX is not set and the selection was not resolved (MAP_DATA_DIR was given explicitly). ' \
+       'Run the loader block from docs/UBUNTU_VM_RUNBOOK.md § 2.1, which exports MAP_BBOX from the ' \
+       'resolver, or pass MAP_BBOX=west,south,east,north for this selection. ' \
+       'A non-default selection must never fall back to another area'"'"'s bounds.'
 fi
 if [[ -z "$MAP_SNAPSHOT_DATE" ]]; then
   command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required to resolve the pinned snapshot'

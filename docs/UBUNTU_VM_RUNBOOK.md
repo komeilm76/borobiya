@@ -63,7 +63,7 @@ snapshot). The `Check` column is how you prove to yourself that the step worked 
 | A4 | Preflight: tool versions vs the pins in this repo, disk, inodes, Docker storage | the § A4 paste block | each pin above matches the value below it; capacity floors met | seconds |
 | A5 | Get the code and prove the pipeline files are in it | `git clone` + the § A5 preflight loop | `PREFLIGHT OK` | seconds |
 | A5b | **Bun**, pinned from the clone's `package.json` | the GitHub release zip + `install` | `bun --version` matches the pin | one download |
-| A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `cp .env.example .env` + the § A6 blocks | `resolve` prints the same selection you chose | seconds |
+| A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `cp -n .env.example .env` + `chmod 600` + the § A6 blocks | `resolve` prints the same selection you chose | seconds |
 | — | *(optional)* proxy for downloads, and proof that it works | § 5 | § 5.2's six checks pass | seconds |
 | 7 | *(optional)* pre-download the big files: Geofabrik extracts + Planetiler's reference layers (≈230 MB + 1.3 GB) | `./map-server/scripts/fetch-planetiler-sources.sh` (steps 8 and 9 otherwise fetch what they need themselves) | Each line ends `cached` or `verified` | it skips already-verified files |
 | 8 | Download + verify + crop + merge the OSM extracts | `./map-server/scripts/prepare-regions-pbf.sh` | `PBF OK` from `verify-map-pbf.sh` | downloads skip, crop+merge re-run |
@@ -647,6 +647,7 @@ map stack itself: the API container has its own Bun in its image, and
 ```bash
 cd ~/borobiya
 cp -n .env.example .env
+chmod 600 .env                     # secrets go in here; a plain `cp` hands them the umask (0644)
 # Generate every secret once. Never reuse one, and never commit the result.
 for KEY in NOMINATIM_PASSWORD POSTGRES_PASSWORD JWT_SECRET JWT_REFRESH_SECRET; do
   grep -q "^$KEY=" .env || printf '%s=\n' "$KEY" >> .env
@@ -659,6 +660,13 @@ TMP=$(mktemp); sed "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://borobiya:$PGPAS
 # then the loader block (§ 2.1), and a one-line proof that all four secrets are non-empty:
 grep -E '^(JWT_SECRET|JWT_REFRESH_SECRET|POSTGRES_PASSWORD|NOMINATIM_PASSWORD)=' .env | awk -F= 'length($2)>20 {n++} END {print n" of 4 secrets look real"}'
 ```
+
+`mode 600` is not ceremony: `.env` is where the generated database, Nominatim and JWT secrets live,
+and `setup-ubuntu-vm.sh` now creates it with `install -m 600` for the same reason (it also rewrites it
+through a temp file rather than `sed -i`, because a value containing `&` or `|` used to be either
+expanded or fatal — see § 10). The `sed` forms below are safe precisely because every value they
+insert is hex or a number; if you ever script this file, keep that invariant or use the `awk` form the
+script uses.
 
 `POSTGRES_PASSWORD` and `NOMINATIM_PASSWORD` are written **once**: the volumes keep whatever they
 were initialized with, so changing them later makes the containers fail authentication while
@@ -1514,13 +1522,19 @@ Symptom first, always — grep this section for the error text.
 2. **`verify-map-pbf: dataset PBF is missing or empty`** — a knock-on of a failed step 8, not a
    second bug. Fix the preparation error, re-run step 8 until it prints
    `Prepared shared dataset PBF: …`, then verify.
-3. **`Could not download … water-polygons-split-3857.zip` / `Could not HEAD …`** — upstream host
+3. **`generate-tiles: MAP_BBOX is not set and the selection was not resolved`** (steps 9 and 10) —
+   you gave `MAP_DATA_DIR` explicitly (so the scripts had no chance to ask the resolver for the
+   selection's bounds) on a selection that is not Tehran, and skipped the § 2.1 loader block. This is
+   the *good* outcome: the alternative was building every tile clipped to some other area's rectangle.
+   Paste the loader block, or pass `MAP_BBOX=west,south,east,north` for this selection — and do not
+   copy the values from another area to make the message go away.
+4. **`Could not download … water-polygons-split-3857.zip` / `Could not HEAD …`** — upstream host
    outage, § 3.4. Nothing in this repo is broken, and `--force` is not a re-download fix.
-4. **`Geofabrik … 404`** (step 8) — the pinned dated extract aged out of the mirror's window;
+5. **`Geofabrik … 404`** (step 8) — the pinned dated extract aged out of the mirror's window;
    § 3.3.
-5. **A step says everything is fine but the tiles look wrong (ocean drawn as land)** — the reference
+6. **A step says everything is fine but the tiles look wrong (ocean drawn as land)** — the reference
    layers are placeholder/stale data; re-fetch with `MAP_SOURCE_POLICY=refresh` and rebuild step 9.
-6. **Planetiler "insufficient disk/RAM" warnings** — `--force` in `generate-tiles.sh` already means
+7. **Planetiler "insufficient disk/RAM" warnings** — `--force` in `generate-tiles.sh` already means
    "overwrite the output and ignore those warnings"; it does not re-download anything, and
    `--refresh_sources` is deliberately never passed because it is the flag that makes Planetiler
    HEAD every source on every run.
@@ -1629,3 +1643,17 @@ Symptom first, always — grep this section for the error text.
   VM since that rewrite**, so a step failing on the VM is information about the VM *or* about this
   document — report it either way, and the section that describes that step is the first thing to
   re-check.
+- Auditing this document also turned up **four bugs in the scripts it describes**, fixed on 2026-10-23
+  with tests written first in the repo's existing shell-script-testing style:
+  `setup-ubuntu-vm.sh` interpolated each value straight into a `sed` replacement (a library path
+  containing `|` aborted the run with a bare sed error and left `.env` untouched; `&` expanded to the
+  whole match), and created `.env` with `cp`, handing every generated secret the process umask (0644)
+  on a machine that may have other users; `fetch-planetiler-sources.sh` announced
+  `moved the copy that was inside the dataset directory` for a `mv -n` that had **not** moved anything
+  (the exit status is success), then re-downloaded 900 MB past a perfectly good local archive; and
+  `generate-tiles.sh` / `build-routing.sh` hardcoded **Tehran's bbox as the default for every
+  selection**, which is what made a correctly prepared Frankfurt dataset look invalid. The two new
+  test files (`scripts/test_env_writer.py`, `map-server/scripts/test_bbox_guard.py`) and the added case
+  in `test_fetch_planetiler_sources.py` all run offline; they also caught two mawk-versus-gawk and
+  `awk -v` escape bugs in the first draft of the fix, which is the argument for testing shell code at
+  all.

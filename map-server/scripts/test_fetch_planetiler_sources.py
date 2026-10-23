@@ -205,6 +205,39 @@ class FetchPlanetilerSourcesTest(unittest.TestCase):
         with zipfile.ZipFile(self.cache / "water-polygons-split-3857.zip") as archive:
             self.assertEqual(archive.read("content.txt"), b"already here")
 
+    def test_a_corrupt_cache_file_does_not_swallow_the_good_legacy_copy(self) -> None:
+        """The move must be proven, not assumed.
+
+        `mv -n` exits 0 *without moving anything* when the destination exists, so the first version of this
+        path printed "moved the copy that was inside the dataset directory" for a move that had not happened,
+        left the good 900 MB archive in the dataset directory, kept the unusable file in the cache, and fell
+        through to a full re-download — while telling the reader the opposite. The recovery now replaces only
+        a target that is itself unreadable, and announces only after the file has arrived.
+        """
+        data_dir = self.root / "dataset"
+        legacy = data_dir / "data" / "sources"
+        write_zip(legacy / "water-polygons-split-3857.zip", "already here")
+        corrupt = self.cache / "water-polygons-split-3857.zip"
+        corrupt.parent.mkdir(parents=True, exist_ok=True)
+        corrupt.write_bytes(b"an error page saved under a .zip name")
+
+        result = self.run_script(data_dir=data_dir)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        combined = result.stdout + result.stderr
+        self.assertIn("is not a readable archive; replacing it", combined)
+        self.assertIn("moved the copy that was inside the dataset directory", result.stdout)
+        self.assertFalse(
+            (legacy / "water-polygons-split-3857.zip").exists(),
+            "the legacy copy must not be left behind after a successful move",
+        )
+        with zipfile.ZipFile(corrupt) as archive:
+            self.assertEqual(archive.read("content.txt"), b"already here")
+        # The recovered file is recorded like any other cached one, so provenance survives the move.
+        self.assertTrue((self.cache / "water-polygons-split-3857.zip.sha256").is_file())
+        # Only the two genuinely missing sources hit the network; the 900 MB one never does.
+        self.assertEqual(len(self.requests), 2, self.requests)
+
     def test_cache_directory_override_is_honored(self) -> None:
         elsewhere = self.root / "shared-external-cache"
 

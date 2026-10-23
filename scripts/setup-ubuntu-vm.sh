@@ -252,12 +252,40 @@ EXPLICIT_ADMIN_SEED_PASSWORD="${ADMIN_SEED_PASSWORD:-}"
 set_env() {
   local key="$1" value="$2"
   if (( DRY_RUN )); then note "would set ${key}=${value} in .env"; return 0; fi
-  if grep -q "^# ${key}=" .env; then
-    sed -i "s|^# ${key}=.*|${key}=${value}|" .env
-  elif grep -q "^${key}=" .env; then
-    sed -i "s|^${key}=.*|${key}=${value}|" .env
+  # A value is never interpolated into a sed replacement here. Paths are user input, and a
+  # library directory containing `&` would expand to the whole match while one containing the
+  # `|` delimiter aborts sed with "unknown option to `s`" — which, under `set -e`, ends the whole
+  # setup run with a bare sed error and .env left untouched. awk -v assigns both fields
+  # literally; the rewrite goes through a temp file in the same directory (same filesystem, so
+  # the rename is atomic) and .env keeps 0600 because the secrets in it are generated below.
+  local tmp
+  if [[ ! -f .env ]]; then
+    printf '%s=%s\n' "$key" "$value" > .env
+    chmod 600 .env
+    return 0
+  fi
+  tmp="$(mktemp ".env.borobiya.XXXXXX")" || fail "could not create a temporary file next to .env"
+  chmod 600 "$tmp"
+  # One statement per line, and the value through the environment rather than `awk -v`, both
+  # deliberately: Ubuntu's default awk is mawk, which refuses a pattern continued onto the next
+  # line ("missing ) near end of line") where gawk accepts it, and POSIX `awk -v` processes
+  # backslash escapes in the assigned text — `/srv/a\b` would arrive as a backspace. ENVIRON
+  # assignments are literal. A rewrite that only works on the developer's laptop is worse than the
+  # sed it replaced, because .env has already been created by then.
+  if BOROBIYA_ENV_KEY="$key" BOROBIYA_ENV_VALUE="$value" awk '
+      BEGIN { key = ENVIRON["BOROBIYA_ENV_KEY"]; value = ENVIRON["BOROBIYA_ENV_VALUE"] }
+      BEGIN { prefix = key "="; commented = "# " prefix; done = 0 }
+      {
+        if (done) { print; next }
+        if (substr($0, 1, length(prefix)) == prefix || substr($0, 1, length(commented)) == commented) { print prefix value; done = 1; next }
+        print
+      }
+      END { if (!done) print prefix value }
+     ' .env > "$tmp"; then
+    mv -f -- "$tmp" .env
   else
-    printf '%s=%s\n' "$key" "$value" >> .env
+    rm -f -- "$tmp"
+    fail "could not rewrite ${key} in .env"
   fi
 }
 
@@ -268,8 +296,10 @@ if [[ ! -f .env ]]; then
     set -a; # shellcheck disable=SC1091
     source .env.example; set +a
   else
-    cp .env.example .env
-    note "created .env from .env.example"
+    # 0600 from the first write: .env is about to receive generated database, JWT and
+    # Nominatim passwords, and `cp` would otherwise hand them the process umask (0644 by default).
+    install -m 600 .env.example .env
+    note "created .env from .env.example (mode 600)"
     db_pass="$(openssl rand -hex 24)"
     sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
     sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env

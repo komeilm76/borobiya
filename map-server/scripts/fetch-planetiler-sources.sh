@@ -134,12 +134,33 @@ for entry in "${SOURCES[@]}"; do
   elif [[ -n "$LEGACY_DIR" && -s "$LEGACY_DIR/$filename" ]] && is_readable_archive "$LEGACY_DIR/$filename"; then
     # An earlier checkout kept these inside the dataset directory. Move the verified copy rather than
     # asking anyone to re-download 900 MB, and keep the digest so provenance survives the move.
-    if mv -n -- "$LEGACY_DIR/$filename" "$target" 2>/dev/null; then
-      printf '%s: moved the copy that was inside the dataset directory to %s\n' "$label" "$target"
-    else
-      cp -- "$LEGACY_DIR/$filename" "$target" && printf '%s: copied the dataset-local archive into the library cache\n' "$label"
+    # `mv -n` reports success while refusing to touch an existing target, so the old form could
+    # print "moved the copy…" for a move that never happened, leave the legacy archive in place,
+    # and fall through to a full re-download. Move only what is proven readable, replace only a
+    # target that is proven unusable, and announce only after the file is where it should be.
+    recovered=""
+    if is_readable_archive "$LEGACY_DIR/$filename"; then
+      if [[ -e "$target" ]] && ! is_readable_archive "$target"; then
+        printf '%s: %s is not a readable archive; replacing it with the copy from the dataset directory\n' "$label" "$target" >&2
+        rm -f -- "$target"
+      fi
+      if [[ ! -e "$target" ]]; then
+        if mv -- "$LEGACY_DIR/$filename" "$target" 2>/dev/null; then
+          recovered=moved
+        elif cp -- "$LEGACY_DIR/$filename" "$target"; then
+          recovered=copied
+        fi
+      fi
     fi
-    if is_readable_archive "$target"; then
+    if [[ -n "$recovered" ]] && is_readable_archive "$target"; then
+      # The comment above promises provenance survives the move, and the sidecar is the only record
+      # of the digest — a file that arrived this way was never fetched, so nothing else writes it.
+      printf '%s\n' "$(sha256_file "$target")" >"$target.sha256"
+      if [[ "$recovered" == moved ]]; then
+        printf '%s: moved the copy that was inside the dataset directory to %s\n' "$label" "$target"
+      else
+        printf '%s: copied the dataset-local archive into the library cache\n' "$label"
+      fi
       printf '%s: cached %s (SHA-256 %s)\n' "$label" "$target" "$(sha256_file "$target")"
       continue
     fi
