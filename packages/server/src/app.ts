@@ -243,7 +243,7 @@ export async function createFastifyApp(
   // Also behind the `/_user` hook: filing an SOS requires a live session on an active account that
   // has finished onboarding, which is exactly the state dispatch is entitled to trust.
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
-  await registerSosProposalRoutes(app, sosDispatchStore);
+  await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,

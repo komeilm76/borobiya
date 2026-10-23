@@ -164,7 +164,7 @@ export const sosRoutes = {
     url: "/_user/sos/proposals/:id/accept",
     schema: {
       params: missionProposalParamsSchema,
-      responses: { 200: proposalAcceptResponseSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema }
+      responses: { 200: proposalAcceptResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "sosAcceptProposal",

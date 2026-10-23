@@ -818,6 +818,73 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     });
     expect(afterDeclineInbox.total).toBe(0);
 
+    // Accept is caller-scoped, repeatable only for the accepted proposal, and atomic
+    // even when two outstanding SOS proposals race for the same rescuer.
+    const declinedProposal = await pg.query<{ id: string }>(
+      `SELECT "id" FROM "mission_proposals" WHERE "sos_request_id" = $1`, [createdSos.requestId]
+    );
+    const declinedUrl = apiRoutes.sos.acceptProposal.url.replace(":id", declinedProposal.rows[0]!.id);
+    expect((await app.inject({ method: "POST", url: declinedUrl, headers: requesterHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "POST", url: declinedUrl, headers: responderHeaders })).statusCode).toBe(409);
+    expect((await app.inject({ method: "POST", url: declinedUrl })).statusCode).toBe(401);
+    expect((await app.inject({ method: "POST", url: apiRoutes.sos.acceptProposal.url.replace(":id", "invalid"), headers: responderHeaders })).statusCode).toBe(404);
+
+    const competing: Array<{ sosId: string; proposalId: string }> = [];
+    for (let index = 0; index < 2; index += 1) {
+      const sos = await callContract<{ requestId: string }>(apiRoutes.sos.createRequest, 201, {
+        url: apiRoutes.sos.createRequest.url, headers: requesterHeaders,
+        payload: {
+          severity: "high", description: `Emergency number ${index + 1}: stranded walker needs help.`,
+          incidentTypeId: createdIncident.id,
+          location: { lat: 35.8005, lon: 51.427, isManual: false }
+        }
+      });
+      await callContract(apiRoutes.admin.dispatchSosRequest, 201, {
+        url: apiRoutes.admin.dispatchSosRequest.url.replace(":id", sos.requestId),
+        headers: adminHeaders, payload: { rescuerIds: [createdResponder.id] }
+      });
+      const rows = await pg.query<{ id: string }>(
+        `SELECT "id" FROM "mission_proposals" WHERE "sos_request_id" = $1`, [sos.requestId]
+      );
+      competing.push({ sosId: sos.requestId, proposalId: rows.rows[0]!.id });
+    }
+    const firstUrl = apiRoutes.sos.acceptProposal.url.replace(":id", competing[0]!.proposalId);
+    await pg.query(`UPDATE "users" SET "is_on_mission" = true WHERE "id" = $1`, [createdResponder.id]);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.acceptProposal, 400, {
+      url: firstUrl, headers: responderHeaders
+    })).code).toBe("RESCUER_ON_MISSION");
+    expect((await pg.query(`SELECT "id" FROM "missions" WHERE "rescuer_id" = $1`, [createdResponder.id])).rows).toHaveLength(0);
+    await pg.query(`UPDATE "users" SET "is_on_mission" = false WHERE "id" = $1`, [createdResponder.id]);
+    const accepted = await callContract<{ missionId: string }>(apiRoutes.sos.acceptProposal, 200, {
+      url: firstUrl, headers: responderHeaders
+    });
+    expect((await callContract<{ missionId: string }>(apiRoutes.sos.acceptProposal, 200, {
+      url: firstUrl, headers: responderHeaders
+    })).missionId).toBe(accepted.missionId);
+    const otherUrl = apiRoutes.sos.acceptProposal.url.replace(":id", competing[1]!.proposalId);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.acceptProposal, 409, {
+      url: otherUrl, headers: responderHeaders
+    })).code).toBe("PROPOSAL_UNAVAILABLE");
+    const missionRows = await pg.query<{ id: string; sos_request_id: string; requester_id: string; status: string }>(
+      `SELECT "id", "sos_request_id", "requester_id", "status" FROM "missions" WHERE "rescuer_id" = $1`, [createdResponder.id]
+    );
+    expect(missionRows.rows).toMatchObject([{ id: accepted.missionId, sos_request_id: competing[0]!.sosId, status: "pending" }]);
+    const history = await pg.query<{ from_status: string | null; to_status: string; changed_by: string }>(
+      `SELECT "from_status", "to_status", "changed_by" FROM "mission_status_history" WHERE "mission_id" = $1`, [accepted.missionId]
+    );
+    expect(history.rows).toEqual([{ from_status: null, to_status: "pending", changed_by: createdResponder.id }]);
+    const proposalStates = await pg.query<{ status: string }>(
+      `SELECT "status" FROM "mission_proposals" WHERE "id" = ANY($1::uuid[]) ORDER BY "status"`,
+      [competing.map((entry) => entry.proposalId)]
+    );
+    expect(proposalStates.rows.map((row) => row.status)).toEqual(["accepted", "declined"]);
+    const busyState = await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [createdResponder.id]);
+    expect(busyState.rows[0]?.is_on_mission).toBe(true);
+    const inboxAfterAccept = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
+      url: apiRoutes.sos.listProposals.url, headers: responderHeaders
+    });
+    expect(inboxAfterAccept.total).toBe(0);
+
     // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
     await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);
     expect((await app.inject({ method: "GET", url: requesterPhotoAccess.url })).statusCode).toBe(404);

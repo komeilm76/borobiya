@@ -13,6 +13,8 @@ import {
   disconnectSessionSockets,
   disconnectUserSockets,
   emitShareEnded,
+  emitSosProposalAccepted,
+  SOS_PROPOSAL_ACCEPTED_EVENT,
   handleLocationUpdate,
   LOCATION_UPDATES_PER_MINUTE,
   PEER_UPDATE_EVENT,
@@ -20,6 +22,18 @@ import {
   SHARE_ENDED_EVENT,
   userRoom
 } from "./socket";
+
+it("notifies only the requester and admin room about an accepted proposal", () => {
+  const io = makeSocket();
+  const requesterId = randomUUID();
+  const proposal = { id: randomUUID(), rescuerId: randomUUID(), sosRequestId: randomUUID(), status: "accepted" as const, createdAt: new Date().toISOString() };
+  const payload = { proposal, missionId: randomUUID() };
+  emitSosProposalAccepted(io, requesterId, payload);
+  expect(io.emitted).toEqual([
+    { room: userRoom(requesterId), event: SOS_PROPOSAL_ACCEPTED_EVENT, payload },
+    { room: "admin", event: SOS_PROPOSAL_ACCEPTED_EVENT, payload }
+  ]);
+});
 
 const jwtSecret = "a".repeat(48);
 const userId = randomUUID();

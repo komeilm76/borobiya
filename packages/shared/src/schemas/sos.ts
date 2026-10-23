@@ -175,3 +175,9 @@ export const sosProposalReceivedEventSchema = z.strictObject({
   sosRequest: sosRequestRecordSchema
 });
 export type SosProposalReceivedEvent = z.infer<typeof sosProposalReceivedEventSchema>;
+
+export const sosProposalAcceptedEventSchema = z.strictObject({
+  proposal: missionProposalSchema,
+  missionId: idSchema
+});
+export type SosProposalAcceptedEvent = z.infer<typeof sosProposalAcceptedEventSchema>;

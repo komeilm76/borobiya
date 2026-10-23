@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import type { SosProposalReceivedEvent, SosRequest } from "@borobiya/shared";
+import type { SosProposalAcceptedEvent, SosProposalReceivedEvent, SosRequest } from "@borobiya/shared";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
@@ -20,6 +20,7 @@ export const PEER_UPDATE_EVENT = "location:peer-update";
 export const SHARE_ENDED_EVENT = "location:share-ended";
 export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
 export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
+export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted";
 export const ADMIN_ROOM = "admin";
 
 export type ShareEndedReason = "revoked" | "expired";
@@ -144,6 +145,17 @@ export function emitSosProposalReceived(
 ): void {
   if (!io || !rescuerId) return;
   io.to(userRoom(rescuerId)).emit(SOS_PROPOSAL_RECEIVED_EVENT, payload);
+}
+
+/** Notify the requester and admins only after the accept transaction commits. */
+export function emitSosProposalAccepted(
+  io: RoomEmitter | undefined,
+  requesterId: string,
+  payload: SosProposalAcceptedEvent
+): void {
+  if (!io) return;
+  io.to(userRoom(requesterId)).emit(SOS_PROPOSAL_ACCEPTED_EVENT, payload);
+  io.to(ADMIN_ROOM).emit(SOS_PROPOSAL_ACCEPTED_EVENT, payload);
 }
 
 /**

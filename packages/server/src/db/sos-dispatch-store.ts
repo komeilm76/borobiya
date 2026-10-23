@@ -6,6 +6,8 @@ import {
   categories,
   categoryIncidentTypes,
   categoryUsers,
+  missions,
+  missionStatusHistory,
   missionProposals,
   sosRequests,
   userSessions,
@@ -73,7 +75,15 @@ export interface DispatchSosInput {
   adminId: string;
 }
 
+export type AcceptProposalResult =
+  | { status: "not_found" }
+  | { status: "not_pending" }
+  | { status: "on_mission" }
+  | { status: "sos_closed" }
+  | { status: "accepted" | "already_accepted"; missionId: string; sosRequestId: string; requesterId: string; proposal: MissionProposalRecord };
+
 export interface SosDispatchStore {
+  acceptProposal?(proposalId: string, rescuerId: string): Promise<AcceptProposalResult>;
   findNearestResponders(sosRequestId: string, limit?: number): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
@@ -89,7 +99,8 @@ export function createPlaceholderSosDispatchStore(): SosDispatchStore {
     findNearestResponders: async () => ({ status: "not_found" }),
     dispatchResponders: async () => ({ status: "not_found" }),
     listProposalsByRequest: async () => [],
-    listPendingProposals: async () => ({ items: [], total: 0 })
+    listPendingProposals: async () => ({ items: [], total: 0 }),
+    acceptProposal: async () => ({ status: "not_found" })
   };
 }
 
@@ -369,6 +380,77 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         proposals,
         notifiedProposals,
         sosRequest
+      };
+    });
+  }
+
+  public async acceptProposal(proposalId: string, rescuerId: string): Promise<AcceptProposalResult> {
+    return this.db.transaction(async (tx): Promise<AcceptProposalResult> => {
+      // Follow dispatch's lock order: SOS first, then rescuer. A different accept/dispatch
+      // transaction cannot create two missions for one rescuer or deadlock by reversing the order.
+      const [candidate] = await tx.select({ sosRequestId: missionProposals.sosRequestId })
+        .from(missionProposals)
+        .where(and(eq(missionProposals.id, proposalId), eq(missionProposals.rescuerId, rescuerId)))
+        .limit(1);
+      if (!candidate) return { status: "not_found" };
+
+      const [request] = await tx.select({ id: sosRequests.id, requesterId: sosRequests.requesterId, status: sosRequests.status })
+        .from(sosRequests).where(eq(sosRequests.id, candidate.sosRequestId)).for("update");
+      if (!request) return { status: "not_found" };
+      const [rescuer] = await tx.select({ id: users.id, isOnMission: users.isOnMission })
+        .from(users).where(eq(users.id, rescuerId)).for("update");
+      if (!rescuer) return { status: "not_found" };
+      const [proposal] = await tx.select({
+        id: missionProposals.id,
+        sosRequestId: missionProposals.sosRequestId,
+        rescuerId: missionProposals.rescuerId,
+        status: missionProposals.status,
+        createdAt: missionProposals.createdAt
+      }).from(missionProposals)
+        .where(and(eq(missionProposals.id, proposalId), eq(missionProposals.rescuerId, rescuerId)))
+        .for("update");
+      if (!proposal || proposal.sosRequestId !== request.id) return { status: "not_found" };
+
+      if (proposal.status === "accepted") {
+        const [existing] = await tx.select({ id: missions.id }).from(missions)
+          .where(and(eq(missions.sosRequestId, request.id), eq(missions.rescuerId, rescuerId)))
+          .orderBy(desc(missions.createdAt)).limit(1);
+        return existing
+          ? { status: "already_accepted", missionId: existing.id, sosRequestId: request.id, requesterId: request.requesterId, proposal }
+          : { status: "not_pending" };
+      }
+      if (proposal.status !== "pending") return { status: "not_pending" };
+      if (request.status !== "dispatched" && request.status !== "accepted") return { status: "sos_closed" };
+      const activeMissions = await tx.select({ id: missions.id }).from(missions)
+        .where(and(eq(missions.rescuerId, rescuerId), inArray(missions.status,
+          ["pending", "on_the_way", "arrived", "in_progress"]))).limit(1);
+      if (rescuer.isOnMission || activeMissions.length > 0) return { status: "on_mission" };
+
+      const [created] = await tx.insert(missions).values({
+        sosRequestId: request.id,
+        requesterId: request.requesterId,
+        rescuerId
+      }).returning({ id: missions.id });
+      if (!created) throw new Error("Mission insert returned no row.");
+      await tx.insert(missionStatusHistory).values({
+        missionId: created.id,
+        toStatus: "pending",
+        changedBy: rescuerId
+      });
+      const [accepted] = await tx.update(missionProposals).set({ status: "accepted" })
+        .where(eq(missionProposals.id, proposal.id))
+        .returning({ id: missionProposals.id, status: missionProposals.status });
+      if (!accepted) throw new Error("Accepted proposal disappeared inside transaction.");
+      await tx.update(missionProposals).set({ status: "declined" }).where(and(
+        eq(missionProposals.rescuerId, rescuerId),
+        eq(missionProposals.status, "pending"),
+        ne(missionProposals.id, proposal.id)
+      ));
+      await tx.update(users).set({ isOnMission: true }).where(eq(users.id, rescuerId));
+      await tx.update(sosRequests).set({ status: "accepted" }).where(eq(sosRequests.id, request.id));
+      return {
+        status: "accepted", missionId: created.id, sosRequestId: request.id,
+        requesterId: request.requesterId, proposal: { ...proposal, status: "accepted" }
       };
     });
   }
