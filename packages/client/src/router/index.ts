@@ -63,12 +63,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_user/location-shares",
     name: "user-location-shares",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "اشتراک موقعیت",
-      description: "مدیریت اشتراک‌های زنده و تاریخچهٔ موقعیت با کنترل کامل در اختیار شما خواهد بود.",
-      icon: "mdi-crosshairs-gps"
-    }
+    component: () => import("@client/views/_user/UserLocationSharesView.vue")
   },
   {
     path: "/_user/sos-history",

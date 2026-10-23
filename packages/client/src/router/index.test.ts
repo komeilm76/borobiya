@@ -94,4 +94,23 @@ describe("client route records", () => {
       expect(/\bplanned\b/i.test(label), `Quick Reference planned label for ${pathMatch![1]}`).toBe(isPlaceholder);
     }
   });
+
+  it("exposes desktop and mobile navigation links for user and admin views and allows multipart uploads in nginx", () => {
+    const appVue = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
+    for (const target of [
+      "/_admin/users",
+      "/_admin/categories",
+      "/_admin/incidents",
+      "/_user/dashboard",
+      "/_user/map",
+      "/_user/location-shares",
+      "/_user/devices",
+      "d-sm-none"
+    ]) {
+      expect(appVue).toContain(target);
+    }
+
+    const nginx = readFileSync(new URL("../../../../nginx.conf", import.meta.url), "utf8");
+    expect(nginx).toContain("client_max_body_size 10m;");
+  });
 });

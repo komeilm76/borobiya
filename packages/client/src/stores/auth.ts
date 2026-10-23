@@ -75,10 +75,33 @@ export const useAuthStore = defineStore("auth", () => {
   let initializationPromise: Promise<void> | null = null;
   let refreshPromise: Promise<void> | null = null;
   let expiresAt: number | null = null;
+  let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearProactiveRefresh(): void {
+    if (proactiveRefreshTimer !== null) {
+      clearTimeout(proactiveRefreshTimer);
+      proactiveRefreshTimer = null;
+    }
+  }
+
+  function scheduleProactiveRefresh(nextExpiresAt: number | null): void {
+    clearProactiveRefresh();
+    if (nextExpiresAt === null) return;
+    const delayMs = nextExpiresAt - Date.now() - ACCESS_TOKEN_REFRESH_MARGIN_MS;
+    if (delayMs <= 0) return;
+    proactiveRefreshTimer = setTimeout(() => {
+      proactiveRefreshTimer = null;
+      void refreshFromCookie().catch(() => {
+        // Leave reactive recovery to the next user operation or socket reconnect if offline.
+      });
+    }, delayMs);
+    proactiveRefreshTimer.unref?.();
+  }
 
   function setAccessToken(token: string): void {
     accessToken.value = token;
     expiresAt = accessTokenExpiry(token);
+    scheduleProactiveRefresh(expiresAt);
   }
 
   function setUser(nextUser: AuthUser | null): void {
@@ -88,6 +111,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function clearSession(): void {
+    clearProactiveRefresh();
     accessToken.value = null;
     expiresAt = null;
     setUser(null);

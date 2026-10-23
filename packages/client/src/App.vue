@@ -39,45 +39,43 @@
             />
           </v-list>
         </v-menu>
-        <v-btn class="nav-button" to="/_public/landing" variant="text" rounded="lg">
+        <v-btn class="nav-button d-none d-sm-flex" to="/_public/landing" variant="text" rounded="lg">
           خانه
         </v-btn>
         <v-btn
-          v-if="auth.isAuthenticated && auth.mustCompleteSecurityQuestions"
+          v-for="item in navItems"
+          :key="item.to"
           class="nav-button d-none d-sm-flex"
-          to="/_user/complete-security-questions"
+          :to="item.to"
           variant="text"
           rounded="lg"
         >
-          تکمیل حساب
+          {{ item.label }}
         </v-btn>
-        <v-btn
-          v-else-if="auth.isAuthenticated && auth.user?.role === 'admin'"
-          class="nav-button d-none d-sm-flex"
-          to="/_admin/users"
-          variant="text"
-          rounded="lg"
-        >
-          مدیریت کاربران
-        </v-btn>
-        <v-btn
-          v-else-if="auth.isAuthenticated"
-          class="nav-button d-none d-sm-flex"
-          to="/_user/dashboard"
-          variant="text"
-          rounded="lg"
-        >
-          پیشخوان
-        </v-btn>
-        <v-btn
-          v-if="auth.isAuthenticated && !auth.mustCompleteSecurityQuestions && auth.user?.role === 'user'"
-          class="nav-button d-none d-sm-flex"
-          to="/_user/map"
-          variant="text"
-          rounded="lg"
-        >
-          نقشه
-        </v-btn>
+        <v-menu v-if="navItems.length > 0" location="bottom end">
+          <template #activator="{ props: menuProps }">
+            <v-btn
+              v-bind="menuProps"
+              class="d-sm-none"
+              icon
+              variant="text"
+              aria-label="باز کردن فهرست بخش‌ها"
+              title="فهرست بخش‌ها"
+            >
+              <v-icon icon="mdi-menu" />
+            </v-btn>
+          </template>
+          <v-list density="compact" min-width="210" aria-label="بخش‌های برنامه">
+            <v-list-item prepend-icon="mdi-home-outline" title="خانه" to="/_public/landing" />
+            <v-list-item
+              v-for="item in navItems"
+              :key="`mobile-${item.to}`"
+              :prepend-icon="item.icon"
+              :title="item.label"
+              :to="item.to"
+            />
+          </v-list>
+        </v-menu>
         <v-btn v-if="!auth.isAuthenticated" class="login-button" to="/_auth/login" color="primary" variant="flat" rounded="lg">
           <v-icon class="me-1" icon="mdi-account-outline" />
           ورود
@@ -129,6 +127,25 @@ const themeOptions: { value: ThemePreference; title: string; icon: string }[] = 
   { value: "light", title: "روشن", icon: "mdi-white-balance-sunny" },
   { value: "dark", title: "تیره", icon: "mdi-weather-night" }
 ];
+const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
+  if (!auth.isAuthenticated) return [];
+  if (auth.mustCompleteSecurityQuestions) {
+    return [{ to: "/_user/complete-security-questions", label: "تکمیل حساب", icon: "mdi-shield-key-outline" }];
+  }
+  if (auth.user?.role === "admin") {
+    return [
+      { to: "/_admin/users", label: "مدیریت کاربران", icon: "mdi-account-group-outline" },
+      { to: "/_admin/categories", label: "گروه‌های امدادگر", icon: "mdi-shape-outline" },
+      { to: "/_admin/incidents", label: "نوع رویدادها", icon: "mdi-alert-rhombus-outline" }
+    ];
+  }
+  return [
+    { to: "/_user/dashboard", label: "پیشخوان", icon: "mdi-view-dashboard-outline" },
+    { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
+    { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
+    { to: "/_user/devices", label: "دستگاه‌ها", icon: "mdi-devices" }
+  ];
+});
 const router = useRouter();
 
 async function logout(): Promise<void> {

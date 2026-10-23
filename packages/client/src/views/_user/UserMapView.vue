@@ -68,7 +68,10 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
  * The view owns the composable rather than the panel because the *map* has to follow the cursor, not a
  * control: the panel is a renderer and this file is where a `MapLibreMap` exists.
  */
-const playback = useHistoryPlayback({ accessToken: computed(() => auth.accessToken) });
+const playback = useHistoryPlayback({
+  accessToken: computed(() => auth.accessToken),
+  ensureSession: () => auth.ensureSession()
+});
 const map = shallowRef<MapLibreMap | null>(null);
 let fittedFor: string | null = null;
 

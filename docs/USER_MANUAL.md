@@ -405,6 +405,7 @@ Each update appears as **timeline** to requester + admin.
 | Login | `/_auth/login` |
 | Forgot password | `/_auth/forgot-password` |
 | Dashboard (live + history shares) | `/_user/dashboard` |
+| Location Shares | `/_user/location-shares` |
 | Full map (live companions + playback) | `/_user/map` |
 | Active Devices & Priority Device | `/_user/devices` |
 | SOS History *(planned)* | `/_user/sos-history` |

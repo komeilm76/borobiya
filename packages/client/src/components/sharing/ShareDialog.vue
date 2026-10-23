@@ -497,6 +497,7 @@ async function submit(): Promise<void> {
     return;
   }
 
+  await auth.ensureSession();
   const token = accessToken.value;
   if (!token) {
     formError.value = "برای ثبت اشتراک دوباره وارد شوید.";

@@ -320,6 +320,7 @@ const receivedHistoryRows = computed<HistoryRowView[]>(() => {
 });
 
 async function refresh(): Promise<void> {
+  await auth.ensureSession();
   const token = auth.accessToken;
   if (!token) return;
   loading.value = true;
@@ -402,6 +403,7 @@ function askRevokeHistory(row: HistoryRowView): void {
 
 async function confirmRevoke(): Promise<void> {
   const row = pendingRow.value;
+  await auth.ensureSession();
   const token = auth.accessToken;
   if (!row || !token) return;
 

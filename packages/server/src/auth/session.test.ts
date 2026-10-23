@@ -450,4 +450,44 @@ describe("POST /_auth/logout", () => {
     expect(state.calls.revocations).toEqual([]);
     expect(state.calls.hashRevocations).toEqual([]);
   });
+
+  it("clears an expired refresh cookie on browser refresh attempts without touching rotation conflicts", async () => {
+    const validToken = await refreshToken();
+    const expiredToken = await new SignJWT({
+      role: identity.role,
+      deviceId: identity.deviceId,
+      sessionId: identity.sessionId,
+      tokenUse: "refresh"
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setSubject(identity.userId)
+      .setIssuedAt(100)
+      .setExpirationTime(200)
+      .sign(new TextEncoder().encode(testConfig.jwtRefreshSecret));
+
+    const state = makeSessionStore({ refreshTokenHash: null });
+    const app = await makeApp(state.store);
+
+    const invalidBrowserRefresh = await app.inject({
+      method: "POST",
+      url: "/_auth/refresh",
+      headers: {
+        origin: "http://localhost:5173",
+        cookie: `refreshToken=${expiredToken}`
+      }
+    });
+    expect(invalidBrowserRefresh.statusCode).toBe(401);
+    expect(invalidBrowserRefresh.headers["set-cookie"]).toContain("Max-Age=0");
+
+    const racedTabRefresh = await app.inject({
+      method: "POST",
+      url: "/_auth/refresh",
+      headers: {
+        origin: "http://localhost:5173",
+        cookie: `refreshToken=${validToken}`
+      }
+    });
+    expect(racedTabRefresh.statusCode).toBe(401);
+    expect(racedTabRefresh.headers["set-cookie"]).toBeUndefined();
+  });
 });

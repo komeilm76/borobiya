@@ -39,6 +39,7 @@ export type DeviceSettings = ReturnType<typeof useDeviceSettings>;
 
 export interface UseDeviceSettingsOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  ensureSession?: () => Promise<void>;
 }
 
 const faNumber = (value: number) => value.toLocaleString("fa-IR");
@@ -83,8 +84,13 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     status.value = { tone, text };
   }
 
+  async function currentAccessToken(): Promise<string | null> {
+    if (options.ensureSession) await options.ensureSession();
+    return options.accessToken.value;
+  }
+
   async function refresh(): Promise<void> {
-    const accessToken = options.accessToken.value;
+    const accessToken = await currentAccessToken();
     if (!accessToken) {
       setStatus("warn", "برای دیدن دستگاه‌ها وارد حساب شوید.");
       return;
@@ -143,7 +149,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }
 
   async function assign(shareId: string, deviceId: string): Promise<boolean> {
-    const accessToken = options.accessToken.value;
+    const accessToken = await currentAccessToken();
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
       return false;
@@ -188,7 +194,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
    * the pin the server actually kept.
    */
   async function assignEverywhere(deviceId: string): Promise<void> {
-    const accessToken = options.accessToken.value;
+    const accessToken = await currentAccessToken();
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
       return;

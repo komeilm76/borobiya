@@ -42,10 +42,9 @@ function invalidRefreshReply(reply: FastifyReply, request: FastifyRequest, reaso
   // The client only ever sees INVALID_REFRESH; the reason exists so operators
   // can tell a missing cookie from a stale/rotated token while debugging.
   request.log.info({ refreshRejectionReason: reason }, "refresh token rejected");
-  return reply
-    .code(401)
-    .header("cache-control", "no-store")
-    .send(errorResponse("INVALID_REFRESH", "The refresh token is invalid or expired."));
+  const base = reply.code(401).header("cache-control", "no-store");
+  const target = reason === "token_invalid" ? clearCookieOnBrowserResponse(base, request) : base;
+  return target.send(errorResponse("INVALID_REFRESH", "The refresh token is invalid or expired."));
 }
 
 function clearCookieOnBrowserResponse(reply: FastifyReply, request: FastifyRequest): FastifyReply {

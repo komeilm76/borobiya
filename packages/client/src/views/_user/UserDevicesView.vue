@@ -42,7 +42,10 @@ import { useAuthStore } from "@/stores/auth";
  * screen-local rule to lose.
  */
 const auth = useAuthStore();
-const settings = useDeviceSettings({ accessToken: computed(() => auth.accessToken) });
+const settings = useDeviceSettings({
+  accessToken: computed(() => auth.accessToken),
+  ensureSession: () => auth.ensureSession()
+});
 
 const deviceCount = computed(() => `${settings.devices.value.length.toLocaleString("fa-IR")} دستگاه`);
 

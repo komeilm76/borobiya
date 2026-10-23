@@ -157,4 +157,36 @@ describe("client auth store", () => {
     expect(auth.isAuthenticated).toBe(false);
     expect(auth.user).toBeNull();
   });
+
+  it("proactively rotates an access token 60s before expiry on long-lived tabs", async () => {
+    vi.useFakeTimers();
+    try {
+      const nowSec = 1_760_000_000;
+      vi.setSystemTime(nowSec * 1000);
+      const makeTokenWithExp = (exp: number) =>
+        `e30.${btoa(JSON.stringify({ exp })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "")}.sig`;
+      const initialToken = makeTokenWithExp(nowSec + 900);
+      const rotatedToken = makeTokenWithExp(nowSec + 1800);
+
+      const fetchMock = fakeFetch(
+        jsonResponse({ accessToken: initialToken, user: { ...user, mustCompleteSecurityQuestions: false } }),
+        jsonResponse({ accessToken: rotatedToken }),
+        jsonResponse(profile)
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const auth = useAuthStore();
+
+      await auth.login({ username: "rescue_user1", password: "safePass123" });
+      expect(auth.accessToken).toBe(initialToken);
+
+      await vi.advanceTimersByTimeAsync(839_000);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(auth.accessToken).toBe(rotatedToken);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

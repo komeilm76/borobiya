@@ -56,6 +56,7 @@ export type HistoryPlayback = ReturnType<typeof useHistoryPlayback>;
 
 export interface UseHistoryPlaybackOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  ensureSession?: () => Promise<void>;
 }
 
 export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
@@ -141,6 +142,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   }
 
   async function loadShares(): Promise<void> {
+    if (options.ensureSession) await options.ensureSession();
     const accessToken = options.accessToken.value;
     if (!accessToken || grantsLoading.value) return;
     grantsLoading.value = true;
@@ -170,6 +172,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
 
   async function load(): Promise<void> {
     stopTimer();
+    if (options.ensureSession) await options.ensureSession();
     const accessToken = options.accessToken.value;
     windowIssue.value = null;
     loadIssue.value = null;
