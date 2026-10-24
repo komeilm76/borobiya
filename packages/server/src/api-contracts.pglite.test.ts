@@ -695,7 +695,6 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       }
     );
     expect(createdSos.status).toBe("pending");
-
     const multipart = buildMultipartPhotoBody(SOS_PHOTO_FIELD_NAME, PNG_FIXTURE);
     const uploadedPhoto = await callContract<{ photoUrl: string }>(
       apiRoutes.sos.uploadRequestPhoto,
@@ -973,6 +972,23 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     });
     expect((await pg.query<{ status: string }>(`SELECT status FROM "sos_requests" WHERE id=$1`, [competing[1]!.sosId])).rows[0]?.status)
       .toBe("cancelled_by_requester");
+
+    // An accepted request is also cancellable, but only together with its mission and busy flag.
+    const activeCancelId = "99000000-0000-4000-8000-000000000010";
+    await pg.query(`INSERT INTO sos_requests (id, requester_id, severity, description, incident_type_id, location, status)
+      VALUES ($1,$2,'high','The requester no longer needs help.', $3,'POINT(51.4 35.7)','accepted')`,
+      [activeCancelId, requesterSession.user.id, createdIncident.id]);
+    await pg.query(`INSERT INTO missions (sos_request_id,rescuer_id,requester_id)
+      VALUES ($1,$2,$3)`, [activeCancelId, createdResponder.id, requesterSession.user.id]);
+    await pg.query(`UPDATE users SET is_on_mission=true WHERE id=$1`, [createdResponder.id]);
+    await callContract(apiRoutes.sos.cancelRequest, 200, {
+      url: apiRoutes.sos.cancelRequest.url.replace(":id", activeCancelId), headers: requesterHeaders,
+      payload: { cancellationReasonId: cancelReasonId }
+    });
+    expect((await pg.query<{ status: string }>(`SELECT status FROM missions WHERE sos_request_id=$1`, [activeCancelId]))
+      .rows[0]?.status).toBe("cancelled_by_requester");
+    expect((await pg.query<{ is_on_mission: boolean }>(`SELECT is_on_mission FROM users WHERE id=$1`,
+      [createdResponder.id])).rows[0]?.is_on_mission).toBe(false);
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);

@@ -35,11 +35,13 @@ describe("requester SOS cancellation confirmation", () => {
   it("keeps the reason selector and explicit confirmation in the post-submit sheet", () => {
     const sheet = readFileSync(new URL("../components/sos/SosRequestSheet.vue", import.meta.url), "utf8");
     expect(sheet).toContain('v-if="cancellation.cancelled.value"');
-    expect(sheet).toContain('v-radio-group v-if="cancellation.reasons.value.length"');
-    expect(sheet).toContain(':disabled="!cancellation.canConfirm.value"');
-    expect(sheet).toContain('cancellation.selected.value?.requiresCustomText');
-    expect(sheet).toContain('cancellation.confirm()');
-    expect(sheet).toContain('cancellation.error.value');
+    expect(sheet).toContain('<SosCancellationDialog :cancellation="cancellation" />');
+    const dialog = readFileSync(new URL("../components/sos/SosCancellationDialog.vue", import.meta.url), "utf8");
+    expect(dialog).toContain('v-radio-group v-if="cancellation.reasons.value.length"');
+    expect(dialog).toContain(':disabled="!cancellation.canConfirm.value"');
+    expect(dialog).toContain('cancellation.selected.value?.requiresCustomText');
+    expect(dialog).toContain('cancellation.confirm()');
+    expect(dialog).toContain('cancellation.error.value');
   });
 
   it("requires an explicit reason, validates Other, and never sends twice while saving", async () => {
@@ -90,7 +92,7 @@ describe("requester SOS cancellation confirmation", () => {
     vi.mocked(cancelSosRequest).mockRejectedValueOnce(new ApiError(409, "SOS_ALREADY_IN_PROGRESS", "In progress"));
     await cancel.confirm();
     expect(cancel.cancelled.value).toBe(false);
-    expect(cancel.error.value).toContain("امدادگر");
+    expect(cancel.error.value).toContain("لغوی ثبت نشد");
     expect(cancel.canConfirm.value).toBe(false);
     await cancel.confirm();
     expect(cancelSosRequest).toHaveBeenCalledTimes(1);

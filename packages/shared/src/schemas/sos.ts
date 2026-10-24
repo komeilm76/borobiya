@@ -217,3 +217,13 @@ export const rescuerCancellationEventSchema = z.strictObject({
   reviewRequired: z.boolean().optional()
 });
 export type RescuerCancellationEvent = z.infer<typeof rescuerCancellationEventSchema>;
+
+export const requesterCancellationEventSchema = z.strictObject({
+  missionId: idSchema,
+  sosRequestId: idSchema,
+  requesterId: idSchema,
+  rescuerId: idSchema,
+  reason: z.string().min(1),
+  at: timestampSchema
+});
+export type RequesterCancellationEvent = z.infer<typeof requesterCancellationEventSchema>;

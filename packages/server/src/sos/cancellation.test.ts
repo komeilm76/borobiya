@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import type { SosCancellationStore } from "../db/sos-cancellation-store";
+import type { RequestCancellationResult, SosCancellationStore } from "../db/sos-cancellation-store";
 import { MISSION_CANCELLED_BY_RESCUER_EVENT, type RoomEmitter } from "../realtime/socket";
 import { registerSosCancellationRoutes } from "./cancellation";
 
@@ -15,7 +15,7 @@ const notice = { missionId, sosRequestId: sosId, requesterId, rescuerId: userId,
   rescuerLocation: { lat: 35.7, lon: 51.4 }, at, reviewRequired: false };
 
 async function appFor(status: Awaited<ReturnType<SosCancellationStore["cancelMissionAsRescuer"]>>,
-  io?: RoomEmitter, signedIn = true) {
+  io?: RoomEmitter, signedIn = true, requestResult: RequestCancellationResult = { status: "not_found" }) {
   const app = Fastify({ logger: false });
   const cancelMissionAsRescuer = vi.fn(async () => status);
   app.addHook("onRequest", async (request) => {
@@ -26,7 +26,7 @@ async function appFor(status: Awaited<ReturnType<SosCancellationStore["cancelMis
     } : null;
   });
   await registerSosCancellationRoutes(app, {
-    listReasons: async () => [], cancelUnaccepted: async () => ({ status: "not_found" }), cancelMissionAsRescuer
+    listReasons: async () => [], cancelRequestAsRequester: async () => requestResult, cancelMissionAsRescuer
   }, io);
   await app.ready();
   return { app, cancelMissionAsRescuer };
@@ -34,6 +34,33 @@ async function appFor(status: Awaited<ReturnType<SosCancellationStore["cancelMis
 
 const url = `/_user/missions/${missionId}/cancel`;
 const payload = { cancellationReasonId: reasonId };
+
+describe("requester cancellation broadcast", () => {
+  it("acknowledges a committed active-mission cancellation even if socket delivery fails", async () => {
+    const emit = vi.fn(() => { throw new Error("socket unavailable"); });
+    const io: RoomEmitter = { to: () => ({ emit }) };
+    const { app } = await appFor({ status: "not_found" }, io, true, { status: "cancelled", notices: [{
+      missionId, sosRequestId: sosId, requesterId: userId, rescuerId: requesterId,
+      reason: "Resolved", at
+    }] });
+    try {
+      const response = await app.inject({ method: "POST", url: `/_user/sos/requests/${sosId}/cancel`, payload });
+      expect(response.statusCode).toBe(200);
+      expect(response.body).toBe("");
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(emit.mock.calls[0]).toMatchObject(["mission:cancelled-by-requester", { missionId }]);
+    } finally { await app.close(); }
+  });
+
+  it("does not emit a second cancellation notice on idempotent retry", async () => {
+    const emit = vi.fn();
+    const { app } = await appFor({ status: "not_found" }, { to: () => ({ emit }) }, true, { status: "unchanged" });
+    try {
+      expect((await app.inject({ method: "POST", url: `/_user/sos/requests/${sosId}/cancel`, payload })).statusCode).toBe(200);
+      expect(emit).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+});
 
 describe("rescuer mission cancellation route", () => {
   it("acknowledges committed cancellation even if a recipient broadcast fails", async () => {

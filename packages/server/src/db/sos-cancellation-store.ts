@@ -1,11 +1,20 @@
-import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { CancellationInput, CancellationReason } from "@borobiya/shared";
 import type { Database } from "./client";
 import { adminAlerts, cancellationReasons, missionProposals, missions, missionStatusHistory, sosRequests, users } from "./schema";
 
+export interface RequesterCancellationNotice {
+  missionId: string;
+  sosRequestId: string;
+  requesterId: string;
+  rescuerId: string;
+  reason: string;
+  at: string;
+}
+
 export type RequestCancellationResult =
-  | { status: "not_found" | "invalid_reason" | "custom_reason_required" | "custom_reason_not_allowed" | "already_in_progress" }
-  | { status: "cancelled" | "unchanged" };
+  | { status: "not_found" | "invalid_reason" | "custom_reason_required" | "custom_reason_not_allowed" | "already_in_progress" | "unchanged" }
+  | { status: "cancelled"; notices: RequesterCancellationNotice[] };
 
 export interface RescuerCancellationNotice {
   missionId: string;
@@ -24,7 +33,7 @@ export type RescuerCancellationResult =
 
 export interface SosCancellationStore {
   listReasons(type: "requester" | "rescuer"): Promise<CancellationReason[]>;
-  cancelUnaccepted(requestId: string, requesterId: string, input: CancellationInput): Promise<RequestCancellationResult>;
+  cancelRequestAsRequester(requestId: string, requesterId: string, input: CancellationInput): Promise<RequestCancellationResult>;
   cancelMissionAsRescuer(missionId: string, rescuerId: string, input: CancellationInput): Promise<RescuerCancellationResult>;
 }
 
@@ -37,36 +46,67 @@ export class DrizzleSosCancellationStore implements SosCancellationStore {
       .orderBy(cancellationReasons.key);
   }
 
-  async cancelUnaccepted(requestId: string, requesterId: string, input: CancellationInput): Promise<RequestCancellationResult> {
+  async cancelRequestAsRequester(requestId: string, requesterId: string, input: CancellationInput): Promise<RequestCancellationResult> {
     return this.db.transaction(async (tx): Promise<RequestCancellationResult> => {
-      // Dispatch and acceptance lock the SOS first. The requester must use the same lock
-      // order: accepting the last offer and cancelling the request cannot both win.
+      // All acceptance, progress and cancellation paths lock SOS before responder/mission.
+      // The request cannot gain a newly accepted mission while this row is locked.
       const [request] = await tx.select().from(sosRequests)
         .where(and(eq(sosRequests.id, requestId), eq(sosRequests.requesterId, requesterId)))
         .for("update");
       if (!request) return { status: "not_found" };
       if (request.status === "cancelled_by_requester") return { status: "unchanged" };
-      // Active mission cancellation is T3.6.4, and must release the rescuer atomically.
-      // Never mark an accepted SOS cancelled without also handling its mission.
-      if (request.status !== "pending" && request.status !== "dispatched") return { status: "already_in_progress" };
-      const [activeMission] = await tx.select({ id: missions.id }).from(missions)
-        .where(and(eq(missions.sosRequestId, request.id), inArray(missions.status, ["pending", "on_the_way", "arrived", "in_progress"])))
-        .limit(1);
-      if (activeMission) return { status: "already_in_progress" };
+      if (!["pending", "dispatched", "accepted"].includes(request.status)) return { status: "already_in_progress" };
+      const active = ["pending", "on_the_way", "arrived", "in_progress"] as const;
+      const activeRows = await tx.select({ id: missions.id, rescuerId: missions.rescuerId })
+        .from(missions).where(and(eq(missions.sosRequestId, request.id), inArray(missions.status, [...active])))
+        .orderBy(asc(missions.rescuerId), asc(missions.id));
+      // An accepted SOS with no active mission must not be rewritten as a requester cancel.
+      // Treat unexpected pending/dispatched+active rows as live missions, not stale offers.
+      if (request.status === "accepted" && !activeRows.length) return { status: "already_in_progress" };
       const [reason] = await tx.select().from(cancellationReasons)
-        .where(and(eq(cancellationReasons.id, input.cancellationReasonId), eq(cancellationReasons.type, "requester"), eq(cancellationReasons.isActive, true)));
+        .where(and(eq(cancellationReasons.id, input.cancellationReasonId), eq(cancellationReasons.type, "requester"),
+          eq(cancellationReasons.isActive, true)));
       if (!reason) return { status: "invalid_reason" };
       if (reason.requiresCustomText && !input.customReason) return { status: "custom_reason_required" };
       if (!reason.requiresCustomText && input.customReason) return { status: "custom_reason_not_allowed" };
+      const rescuerIds = [...new Set(activeRows.map((row) => row.rescuerId))].sort();
+      if (rescuerIds.length) {
+        const lockedUsers = await tx.select({ id: users.id }).from(users)
+          .where(inArray(users.id, rescuerIds)).orderBy(asc(users.id)).for("update");
+        if (lockedUsers.length !== rescuerIds.length) throw new Error("An active mission rescuer disappeared during cancellation.");
+      }
+      const lockedMissions = activeRows.length ? await tx.select().from(missions)
+        .where(inArray(missions.id, activeRows.map((row) => row.id)))
+        .orderBy(asc(missions.id)).for("update") : [];
+      if (lockedMissions.length !== activeRows.length || lockedMissions.some((row) =>
+        row.sosRequestId !== request.id || !active.includes(row.status as typeof active[number]))) {
+        throw new Error("Active mission changed under a locked SOS.");
+      }
       const now = new Date();
-      await tx.update(sosRequests).set({
-        status: "cancelled_by_requester", cancellationReasonId: reason.id,
+      await tx.update(sosRequests).set({ status: "cancelled_by_requester", cancellationReasonId: reason.id,
         cancellationCustomText: input.customReason ?? null, cancelledAt: now
       }).where(eq(sosRequests.id, request.id));
-      // Withdraw pending offers so they immediately disappear from responder inboxes.
+      // Pending proposals remain non-actionable whether this SOS had a mission or not.
       await tx.update(missionProposals).set({ status: "expired" })
-        .where(and(eq(missionProposals.sosRequestId, request.id), inArray(missionProposals.status, ["pending"])));
-      return { status: "cancelled" };
+        .where(and(eq(missionProposals.sosRequestId, request.id), eq(missionProposals.status, "pending")));
+      for (const mission of lockedMissions) {
+        await tx.update(missions).set({ status: "cancelled_by_requester", cancelledBy: "requester",
+          cancellationReasonId: reason.id, cancellationCustomText: input.customReason ?? null,
+          cancelledAt: now, updatedAt: now
+        }).where(eq(missions.id, mission.id));
+        await tx.insert(missionStatusHistory).values({ missionId: mission.id,
+          fromStatus: mission.status, toStatus: "cancelled_by_requester", changedBy: requesterId, createdAt: now
+        });
+      }
+      for (const rescuerId of rescuerIds) {
+        const [otherActive] = await tx.select({ id: missions.id }).from(missions)
+          .where(and(eq(missions.rescuerId, rescuerId), inArray(missions.status, [...active]))).limit(1);
+        if (!otherActive) await tx.update(users).set({ isOnMission: false }).where(eq(users.id, rescuerId));
+      }
+      return { status: "cancelled", notices: lockedMissions.map((mission) => ({
+        missionId: mission.id, sosRequestId: request.id, requesterId, rescuerId: mission.rescuerId,
+        reason: reason.label, at: now.toISOString()
+      })) };
     });
   }
 

@@ -11,7 +11,7 @@ import {
   nearestRespondersResponseSchema,
   sosNewRequestEventSchema,
   sosProposalReceivedEventSchema,
-  missionStatusUpdatedEventSchema, rescuerCancellationEventSchema,
+  missionStatusUpdatedEventSchema, rescuerCancellationEventSchema, requesterCancellationEventSchema,
   type SosNewRequestEvent,
   type SosProposalReceivedEvent
 } from "@borobiya/shared";
@@ -35,7 +35,7 @@ import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
 import { DrizzleUserSearchStore } from "../db/user-search-store";
-import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT } from "../realtime/socket";
+import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT } from "../realtime/socket";
 import { signAccessToken } from "../security/tokens";
 import { createPhotoStorage } from "./photo-storage";
 
@@ -728,23 +728,67 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     expect((await send(requesterToken, reasonId)).statusCode).toBe(200);
   });
 
-  it("rejects requester cancellation of an accepted SOS without orphaning its active mission", async () => {
+  it("cancels every active mission of an accepted SOS, releases responders and emits one event per mission after commit", async () => {
     const sosId = "93000000-0000-4000-8000-000000000001";
     const rescuerId = "93000000-0000-4000-8000-000000000002";
+    const secondId = "93000000-0000-4000-8000-000000000004";
+    const sessionId = "93000000-0000-4000-8000-000000000005";
+    const missionId = "93000000-0000-4000-8000-000000000006";
+    const secondMissionId = "93000000-0000-4000-8000-000000000007";
     const reasonId = "93000000-0000-4000-8000-000000000003";
-    await seedUser({ id: rescuerId, username: "active_rescuer", isOnMission: true });
+    await seedUser({ id: rescuerId, username: "active_rescuer", isOnMission: true, sessionId });
+    await seedUser({ id: secondId, username: "second_active_rescuer", isOnMission: true });
     await pg.query(`INSERT INTO "cancellation_reasons" ("id", "type", "key", "label") VALUES ($1, 'requester', 'resolved', 'Resolved')`, [reasonId]);
     await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
       VALUES ($1, $2, 'high', 'An active rescue mission is underway.', $3, 'POINT(51.4 35.7)', 'accepted')`, [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
-    await pg.query(`INSERT INTO "missions" ("sos_request_id", "rescuer_id", "requester_id") VALUES ($1,$2,$3)`, [sosId, rescuerId, REQUESTER_ID]);
-    const reply = await app.inject({ method: "POST", url: `/_user/sos/requests/${sosId}/cancel`,
-      headers: { authorization: `Bearer ${requesterToken}` }, payload: { cancellationReasonId: reasonId } });
-    expect(reply.statusCode).toBe(409);
-    expect(reply.json().code).toBe("SOS_ALREADY_IN_PROGRESS");
-    const stored = await pg.query<{ status: string }>(`SELECT status FROM "sos_requests" WHERE "id"=$1`, [sosId]);
-    expect(stored.rows[0]?.status).toBe("accepted");
-    const mission = await pg.query<{ status: string }>(`SELECT status FROM "missions" WHERE "sos_request_id"=$1`, [sosId]);
-    expect(mission.rows[0]?.status).toBe("pending");
+    await pg.query(`INSERT INTO "missions" (id,sos_request_id,rescuer_id,requester_id,status) VALUES
+      ($1,$3,$4,$5,'on_the_way'),($2,$3,$6,$5,'pending')`,
+      [missionId, secondMissionId, sosId, rescuerId, REQUESTER_ID, secondId]);
+    const otherSosId = "93000000-0000-4000-8000-000000000008";
+    await pg.query(`INSERT INTO sos_requests (id,requester_id,severity,description,incident_type_id,location,status)
+      VALUES ($1,$2,'high','Another requester still needs this responder.', $3,'POINT(51.4 35.7)','accepted')`,
+      [otherSosId, ADMIN_ID, INCIDENT_MEDICAL_ID]);
+    await pg.query(`INSERT INTO missions (sos_request_id,rescuer_id,requester_id) VALUES ($1,$2,$3)`,
+      [otherSosId, rescuerId, ADMIN_ID]);
+    const token = await signAccessToken({ userId: rescuerId, role: "user", sessionId,
+      deviceId: `dev-${rescuerId.slice(-6)}` }, JWT_SECRET);
+    const rescuer = createClientSocket(serverUrl, { auth: { token }, transports: ["websocket"], reconnection: false });
+    const admin = createClientSocket(serverUrl, { auth: { token: adminToken }, transports: ["websocket"], reconnection: false });
+    const rescuerEvents: unknown[] = [];
+    const adminEvents: unknown[] = [];
+    rescuer.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (event) => rescuerEvents.push(event));
+    admin.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (event) => adminEvents.push(event));
+    await Promise.all([rescuer, admin].map((sock) => new Promise<void>((resolve, reject) => {
+      sock.once("connect", () => resolve()); sock.once("connect_error", reject);
+    })));
+    try {
+      const send = () => app.inject({ method: "POST", url: `/_user/sos/requests/${sosId}/cancel`,
+        headers: { authorization: `Bearer ${requesterToken}` }, payload: { cancellationReasonId: reasonId } });
+      expect((await send()).statusCode).toBe(200);
+      const stored = await pg.query<{ status: string; cancellation_reason_id: string }>(
+        `SELECT status,cancellation_reason_id FROM sos_requests WHERE id=$1`, [sosId]);
+      expect(stored.rows[0]).toEqual({ status: "cancelled_by_requester", cancellation_reason_id: reasonId });
+      const missionRows = await pg.query<{ status: string; cancelled_by: string }>(
+        `SELECT status,cancelled_by FROM missions WHERE sos_request_id=$1 ORDER BY id`, [sosId]);
+      expect(missionRows.rows).toEqual([
+        { status: "cancelled_by_requester", cancelled_by: "requester" },
+        { status: "cancelled_by_requester", cancelled_by: "requester" }
+      ]);
+      expect((await pg.query<{ count: number }>(`SELECT count(*) FROM mission_status_history WHERE mission_id=ANY($1::uuid[])`,
+        [[missionId, secondMissionId]])).rows[0]?.count).toBe(2);
+      const freed = await pg.query<{ is_on_mission: boolean }>(`SELECT is_on_mission FROM users
+        WHERE id=ANY($1::uuid[]) ORDER BY id`, [[rescuerId, secondId]]);
+      expect(freed.rows.map((row) => row.is_on_mission)).toEqual([true, false]);
+      expect((await pg.query<{ status: string }>(`SELECT status FROM sos_requests WHERE id=$1`,
+        [otherSosId])).rows[0]?.status).toBe("accepted");
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(rescuerEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId)).toEqual([missionId]);
+      expect(adminEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId).sort())
+        .toEqual([missionId, secondMissionId]);
+      expect((await send()).statusCode).toBe(200);
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(adminEvents).toHaveLength(2);
+    } finally { rescuer.close(); admin.close(); }
   });
 
   it("atomically cancels rescuer missions, releases the responder, keeps location admin-only, flags repeated/Other reasons and limits bursts", async () => {

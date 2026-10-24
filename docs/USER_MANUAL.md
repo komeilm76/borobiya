@@ -302,7 +302,7 @@ Each update appears as **timeline** to requester + admin.
 
 ## 18. Cancellation — Partially available
 
-> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation after acceptance (T3.6.4), persistent SOS History (T3.7.1), and the admin red-flash/sound replacement UI (T3.6.5) remain planned.
+> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation also works after an accepted mission (T3.6.4). Persistent SOS History (T3.7.1) and the admin red-flash/sound replacement UI (T3.6.5) remain planned.
 
 ### If you are the requester (need to cancel SOS)
 
@@ -313,7 +313,7 @@ Each update appears as **timeline** to requester + admin.
    - Someone else helped
    - Sent by mistake
    - Other (→ type custom 10–200 chars)
-3. Read the warning and select **تأیید لغو درخواست** (Confirm cancellation). The pending SOS is marked `cancelled_by_requester`, and any pending rescuer offers are withdrawn. If a rescuer has already accepted, the server refuses cancellation with a conflict rather than leaving them on an orphaned mission.
+3. Read the warning and select **تأیید لغو درخواست** (Confirm cancellation). The SOS is marked `cancelled_by_requester`, pending offers are withdrawn, and any accepted active missions are stopped safely with their rescuers released unless they have another active mission.
 
 ### If you are the rescuer (cannot continue)
 

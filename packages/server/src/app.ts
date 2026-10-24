@@ -178,7 +178,7 @@ export async function createFastifyApp(
   const sosCancellationStore = dependencies.sosCancellationStore ??
     (database ? new DrizzleSosCancellationStore(database.db) : {
       listReasons: async () => [],
-      cancelUnaccepted: async () => ({ status: "not_found" as const }),
+      cancelRequestAsRequester: async () => ({ status: "not_found" as const }),
       cancelMissionAsRescuer: async () => ({ status: "not_found" as const })
     });
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);

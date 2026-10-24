@@ -65,7 +65,7 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
       if (requestId.value === id && token.value === currentToken) {
         blocked.value = cause instanceof ApiError && cause.code === "SOS_ALREADY_IN_PROGRESS";
         error.value = blocked.value
-          ? "یک امدادگر درخواست را پذیرفته است. درخواست لغو نشد؛ وضعیت مأموریت را بررسی کنید."
+          ? "وضعیت درخواست تغییر کرده است؛ لغوی ثبت نشد. درخواست را دوباره بررسی کنید."
           : sosApiErrorMessage(cause, "لغو درخواست انجام نشد؛ وضعیت درخواست را بررسی کنید و دوباره تلاش کنید.");
       }
     } finally {
