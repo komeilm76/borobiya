@@ -1,5 +1,7 @@
 # Ubuntu 24.04 VM Runbook — Offline Map Stack
 
+> **Want to launch instead of reading the reference manual?** Use the [short VM quickstart](./UBUNTU_VM_QUICKSTART.md) and its [diagnostics guide](./UBUNTU_VM_DIAGNOSTICS.md). This long runbook remains the detailed manual/recovery reference.
+
 Step-by-step build of the Borobiya map stack (tiles, routing, geocoding) on the reference VM:
 **Ubuntu Server 24.04 LTS, 4 vCPU, 6 GiB RAM, 50 GB disk, x86_64**, inside the
 `borobiya/` clone of this repository.

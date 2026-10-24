@@ -1,0 +1,6 @@
+# VM quickstart only: mount the built browser client. Base Compose keeps its gateway-only root.
+services:
+  nginx:
+    volumes:
+      - ./nginx.vm.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./packages/client/dist:/usr/share/nginx/html:ro

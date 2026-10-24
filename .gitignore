@@ -12,6 +12,9 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+.vm-map.json
+.vm-map-*
+.env-vm-*
 
 # Local map and user data (never commit large/private datasets)
 data/maps/

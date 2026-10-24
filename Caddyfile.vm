@@ -1,0 +1,10 @@
+# PUBLIC_DOMAIN is supplied by vm-env.py after HTTPS/DNS validation.
+# Caddy terminates TLS (ACME), and the gateway stays on the private Compose network.
+{$PUBLIC_DOMAIN} {
+    encode zstd gzip
+    reverse_proxy nginx:80 {
+        header_up Host {host}
+        # Never trust a client-supplied forwarded scheme: the browser scheme is Caddy's.
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

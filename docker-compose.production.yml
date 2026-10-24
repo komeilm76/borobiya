@@ -1,0 +1,23 @@
+# Enabled only by scripts/vm.py when NODE_ENV=production. Requires PUBLIC_DOMAIN,
+# public DNS and ports 80/443. Caddy stores ACME account/certs in its own named volume.
+services:
+  edge:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    profiles: [production]
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-invalid.example}
+    volumes:
+      - ./Caddyfile.vm:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      nginx:
+        condition: service_started
+
+volumes:
+  caddy-data: {}
+  caddy-config: {}

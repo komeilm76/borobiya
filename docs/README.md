@@ -35,7 +35,9 @@
 | [SECURITY.md](./SECURITY.md) | Hashing, rate-limit, suspension, secrets | Backend |
 | [MAP_SERVER.md](./MAP_SERVER.md) | Martin/OSRM/Photon setup, tile pipeline, update | DevOps, Backend |
 | [MAP_LIBRARY.md](./MAP_LIBRARY.md) | External standardized map storage, snapshots, cache/update/offline policy, pruning | DevOps, Backend |
-| [UBUNTU_VM_RUNBOOK.md](./UBUNTU_VM_RUNBOOK.md) | Ubuntu 24.04 / 6 GiB step-by-step installation, builds, and acceptance checks | DevOps, User |
+| [UBUNTU_VM_QUICKSTART.md](./UBUNTU_VM_QUICKSTART.md) | Short Ubuntu VM installer, configuration, map selection and safe operations | DevOps, User |
+| [UBUNTU_VM_DIAGNOSTICS.md](./UBUNTU_VM_DIAGNOSTICS.md) | Read-only launch and runtime troubleshooting | DevOps, User |
+| [UBUNTU_VM_RUNBOOK.md](./UBUNTU_VM_RUNBOOK.md) | Detailed Ubuntu 24.04 / 6 GiB build and recovery reference | DevOps, User |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | Dev on Ubuntu (Docker) vs Windows (no Docker) | Dev |
 | [WORKFLOWS.md](./WORKFLOWS.md) | Git hooks, CI/CD, deploy, Android build | DevOps |
 | [USER_MANUAL.md](./USER_MANUAL.md) | End-user guide with screenshots placeholders | QA, User |
