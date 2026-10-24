@@ -74,7 +74,12 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
     }
   }
 
-  watch([() => mission.value?.id, () => mission.value?.status, token, userId], () => { void load(); }, { immediate: true });
+  // Access-token rotation for the same account is not a new mission. In particular,
+  // ensureSession() can refresh the token during submit; watching its raw value
+  // cancels that submission before it reaches the API. Logout/restoration still
+  // invalidates the read through the presence bit, while userId scopes accounts.
+  watch([() => mission.value?.id, () => mission.value?.status, () => Boolean(token.value), userId],
+    () => { void load(); }, { immediate: true });
   onScopeDispose(() => { ++generation; });
   return { rating, score, comment, loading, loaded, submitting, error, eligible, canSubmit, load, submit };
 }

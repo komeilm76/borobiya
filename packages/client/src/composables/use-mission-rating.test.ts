@@ -58,6 +58,23 @@ describe("requester rating composable", () => {
       expect(state2.canSubmit.value).toBe(false);
     } finally { scope2.stop(); }
   });
+  it("does not discard a rating submission when ensuring the same session rotates its token", async () => {
+    const token = ref<string | null>("old-token");
+    let rotates = false;
+    const scope = effectScope();
+    const state = scope.run(() => useMissionRating(ref(mission), token, ref(requesterId), async () => {
+      if (rotates) { token.value = "new-token"; await nextTick(); }
+    }))!;
+    try {
+      await flush();
+      rotates = true;
+      state.score.value = 5;
+      await state.submit();
+      expect(rateMission).toHaveBeenCalledWith("new-token", id, { rating: 5 });
+      expect(state.rating.value).toBe(5);
+    } finally { scope.stop(); }
+  });
+
   it("does not offer an unrated form when the existing-rating read failed", async () => {
     vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
     const scope = effectScope();

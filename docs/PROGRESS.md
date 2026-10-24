@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — Rating submission survives same-account token rotation
+
+- Fixed a requester rating form race: `ensureSession()` can rotate the bearer token during a submit, but the composable watched the raw token value and treated the rotation as a new account/mission. That reset the form and discarded the intended POST. Rating state now reloads only when token *presence*, mission, or account changes; the submit uses the refreshed token while logout still invalidates the old response. A regression reproduces the lost write before the fix and verifies the refreshed-token submission afterward.
+
 ### 2026-10-24 — Navigation exit restores the map camera (T4.2.3)
 
 - Manual Stop, closing the route panel, permission denial, and mission/account changes dispose the foreground watch and return the route map to `pitch: 0, bearing: 0`; redundant stops and initial starts do not animate a camera that was never following. The reset is wired to the actual MapLibre instance in the mission view, with pure navigation tests and a source-pinned binding check. A VM/browser run remains outstanding. T3.5.5 remains blocked on real offline elevation data and OSRM cannot guarantee multiple route alternatives.
