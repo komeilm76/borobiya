@@ -467,6 +467,24 @@ export const missions = pgTable(
   ]
 );
 
+/** Durable, uniquely keyed responder abuse/review flag; written in the cancellation transaction. */
+export const adminAlerts = pgTable(
+  "admin_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: text("type").notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id),
+    missionId: uuid("mission_id").notNull().references(() => missions.id),
+    details: jsonb("details").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true })
+  },
+  (table) => [
+    unique("admin_alerts_type_mission_unique").on(table.type, table.missionId),
+    index("admin_alerts_unresolved_idx").on(table.resolvedAt, table.createdAt)
+  ]
+);
+
 export const missionStatusHistory = pgTable(
   "mission_status_history",
   {

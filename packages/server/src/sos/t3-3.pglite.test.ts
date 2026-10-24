@@ -11,7 +11,7 @@ import {
   nearestRespondersResponseSchema,
   sosNewRequestEventSchema,
   sosProposalReceivedEventSchema,
-  missionStatusUpdatedEventSchema,
+  missionStatusUpdatedEventSchema, rescuerCancellationEventSchema,
   type SosNewRequestEvent,
   type SosProposalReceivedEvent
 } from "@borobiya/shared";
@@ -35,7 +35,7 @@ import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
 import { DrizzleUserSearchStore } from "../db/user-search-store";
-import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT } from "../realtime/socket";
+import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT } from "../realtime/socket";
 import { signAccessToken } from "../security/tokens";
 import { createPhotoStorage } from "./photo-storage";
 
@@ -225,6 +225,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     await pg.exec(`
       TRUNCATE TABLE
         "mission_proposals",
+        "cancellation_reasons",
         "sos_requests",
         "category_users",
         "category_incident_types",
@@ -744,6 +745,75 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     expect(stored.rows[0]?.status).toBe("accepted");
     const mission = await pg.query<{ status: string }>(`SELECT status FROM "missions" WHERE "sos_request_id"=$1`, [sosId]);
     expect(mission.rows[0]?.status).toBe("pending");
+  });
+
+  it("atomically cancels rescuer missions, releases the responder, keeps location admin-only, flags repeated/Other reasons and limits bursts", async () => {
+    const rescuerId = "94000000-0000-4000-8000-000000000001";
+    const sessionId = "94000000-0000-4000-8000-000000000002";
+    const reasonId = "94000000-0000-4000-8000-000000000003";
+    const otherId = "94000000-0000-4000-8000-000000000004";
+    await seedUser({ id: rescuerId, username: "cancel_rescuer", sessionId, isOnMission: true, lat: 35.7, lon: 51.4 });
+    await pg.query(`INSERT INTO "cancellation_reasons" (id,type,key,label,requires_custom_text) VALUES
+      ($1,'rescuer','physical_inability','Unable to reach',false),($2,'rescuer','other','Other',true)`, [reasonId, otherId]);
+    const token = await signAccessToken({ userId: rescuerId, role: "user", sessionId,
+      deviceId: `dev-${rescuerId.slice(-6)}` }, JWT_SECRET);
+    const admin = createClientSocket(serverUrl, { auth: { token: adminToken }, transports: ["websocket"], reconnection: false });
+    const requester = createClientSocket(serverUrl, { auth: { token: requesterToken }, transports: ["websocket"], reconnection: false });
+    const adminEvents: unknown[] = [];
+    const requesterEvents: unknown[] = [];
+    admin.on(MISSION_CANCELLED_BY_RESCUER_EVENT, (event) => adminEvents.push(event));
+    requester.on(MISSION_CANCELLED_BY_RESCUER_EVENT, (event) => requesterEvents.push(event));
+    await Promise.all([admin, requester].map((sock) => new Promise<void>((resolve, reject) => {
+      if (sock.connected) return resolve();
+      sock.once("connect", () => resolve()); sock.once("connect_error", reject);
+    })));
+    async function missionFor(n: number) {
+      const sosId = `95000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+      const missionId = `96000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+      await pg.query(`INSERT INTO "sos_requests" (id,requester_id,severity,description,incident_type_id,location,status)
+        VALUES ($1,$2,'high','A rescue mission is in progress.', $3,'POINT(51.4 35.7)','accepted')`,
+        [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+      await pg.query(`INSERT INTO "missions" (id,sos_request_id,rescuer_id,requester_id)
+        VALUES ($1,$2,$3,$4)`, [missionId, sosId, rescuerId, REQUESTER_ID]);
+      await pg.query(`UPDATE users SET is_on_mission=true WHERE id=$1`, [rescuerId]);
+      return { sosId, missionId };
+    }
+    try {
+      const first = await missionFor(1);
+      const cancel = (id: string, reason: string, customReason?: string) => app.inject({
+        method: "POST", url: `/_user/missions/${id}/cancel`, headers: { authorization: `Bearer ${token}` },
+        payload: { cancellationReasonId: reason, ...(customReason ? { customReason } : {}) }
+      });
+      expect((await cancel(first.missionId, reasonId)).statusCode).toBe(200);
+      expect((await pg.query<{ status: string; cancelled_by: string }>(`SELECT status, cancelled_by FROM missions WHERE id=$1`,
+        [first.missionId])).rows[0]).toEqual({ status: "cancelled_by_rescuer", cancelled_by: "rescuer" });
+      expect((await pg.query<{ status: string }>(`SELECT status FROM sos_requests WHERE id=$1`, [first.sosId])).rows[0]?.status)
+        .toBe("cancelled_by_rescuer");
+      expect((await pg.query<{ is_on_mission: boolean }>(`SELECT is_on_mission FROM users WHERE id=$1`,
+        [rescuerId])).rows[0]?.is_on_mission).toBe(false);
+      expect((await pg.query<{ to_status: string }>(`SELECT to_status FROM mission_status_history WHERE mission_id=$1`,
+        [first.missionId])).rows).toEqual([{ to_status: "cancelled_by_rescuer" }]);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(adminEvents).toHaveLength(1);
+      expect(requesterEvents).toHaveLength(1);
+      expect(rescuerCancellationEventSchema.parse(adminEvents[0])).toMatchObject({ missionId: first.missionId,
+        rescuerLocation: { lat: 35.7, lon: 51.4 }, reviewRequired: false });
+      expect(rescuerCancellationEventSchema.parse(requesterEvents[0])).not.toHaveProperty("rescuerLocation");
+      const second = await missionFor(2);
+      expect((await cancel(second.missionId, otherId, "My situation makes rescue unsafe.")).statusCode).toBe(200);
+      const third = await missionFor(3);
+      expect((await cancel(third.missionId, reasonId)).statusCode).toBe(200);
+      const flags = await pg.query<{ type: string; mission_id: string }>(`SELECT type,mission_id FROM admin_alerts ORDER BY type`);
+      expect(flags.rows).toEqual([
+        { type: "rescuer_cancel_review", mission_id: third.missionId },
+        { type: "rescuer_other_reason_approval", mission_id: second.missionId }
+      ]);
+      expect((await cancel(third.missionId, reasonId)).statusCode).toBe(429);
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      expect(adminEvents).toHaveLength(3);
+      expect(requesterEvents).toHaveLength(3);
+      expect(rescuerCancellationEventSchema.parse(adminEvents[2]).reviewRequired).toBe(true);
+    } finally { admin.close(); requester.close(); }
   });
 
 });

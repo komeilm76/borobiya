@@ -44,4 +44,27 @@ export async function registerMissionProgressRoutes(
     }
     return response.code(200).send(result.mission);
   });
+
+
+  const listRoute = apiRoutes.sos.listMissions;
+  app.get(listRoute.url, async (request, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return reply.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const query = listRoute.schema.query.safeParse(request.query);
+    if (!query.success) return reply.code(400).send({ error: true, code: "VALIDATION_ERROR", message: "Invalid mission list filters.",
+      issues: query.error.issues.map(({ code, message, path }) => ({ code, message, path })) });
+    return reply.code(200).send(await store.listMissions(user.userId, query.data.role ?? "requester",
+      query.data.page, query.data.limit));
+  });
+
+  const getRoute = apiRoutes.sos.getMission;
+  app.get(getRoute.url, async (request, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return reply.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const params = getRoute.schema.params.safeParse(request.params);
+    if (!params.success) return reply.code(404).send({ error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: [] });
+    const found = await store.findMission(params.data.id, user.userId, user.role === "admin" ? "admin" : "user");
+    if (!found) return reply.code(404).send({ error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: [] });
+    return reply.code(200).send(found);
+  });
 }

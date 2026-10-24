@@ -26,7 +26,10 @@ async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceSt
       mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date()
     } : null;
   });
-  await registerMissionProgressRoutes(app, { advanceStatus }, io);
+  await registerMissionProgressRoutes(app, {
+    advanceStatus, findMission: async () => null,
+    listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 })
+  }, io);
   await app.ready();
   return { app, advanceStatus };
 }

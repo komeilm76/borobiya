@@ -170,12 +170,16 @@ export async function createFastifyApp(
     (database ? new DrizzleSosDispatchStore(database.db) : createPlaceholderSosDispatchStore());
   const missionProgressStore = dependencies.missionProgressStore ??
     (database ? new DrizzleMissionProgressStore(database.db) : {
-      advanceStatus: async () => ({ status: "not_found" as const })
+      advanceStatus: async () => ({ status: "not_found" as const }),
+      findMission: async () => null,
+      listMissions: async (_userId: string, _role: "requester" | "rescuer", page: number, limit: number) =>
+        ({ items: [], total: 0, page, limit, totalPages: 0 })
     });
   const sosCancellationStore = dependencies.sosCancellationStore ??
     (database ? new DrizzleSosCancellationStore(database.db) : {
       listReasons: async () => [],
-      cancelUnaccepted: async () => ({ status: "not_found" as const })
+      cancelUnaccepted: async () => ({ status: "not_found" as const }),
+      cancelMissionAsRescuer: async () => ({ status: "not_found" as const })
     });
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
@@ -263,7 +267,7 @@ export async function createFastifyApp(
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerMissionProgressRoutes(app, missionProgressStore, realtime.io);
-  await registerSosCancellationRoutes(app, sosCancellationStore);
+  await registerSosCancellationRoutes(app, sosCancellationStore, realtime.io);
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,

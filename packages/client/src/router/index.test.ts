@@ -108,9 +108,10 @@ describe("client route records", () => {
       "/_admin/incidents",
       "/_user/dashboard",
       "/_user/map",
+      "/_user/mission",
       "/_user/location-shares",
       "/_user/devices",
-      "d-sm-none"
+      "d-lg-none"
     ]) {
       expect(appVue).toContain(target);
     }

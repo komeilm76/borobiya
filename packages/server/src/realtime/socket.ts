@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import { idSchema, type MissionStatusUpdatedEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
+import { idSchema, type MissionStatusUpdatedEvent, type RescuerCancellationEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
 import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
@@ -24,6 +24,7 @@ export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
 export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted";
 export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated";
 export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe";
+export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer";
 export const ADMIN_ROOM = "admin";
 
 export type ShareEndedReason = "revoked" | "expired";
@@ -166,6 +167,26 @@ export function emitMissionStatusUpdated(
   } catch (error) {
     onError(error);
   }
+}
+
+const emitToRooms = (io: RoomEmitter, rooms: string[], event: string, payload: unknown) =>
+  (io.to as unknown as (targets: string[]) => { emit(name: string, value: unknown): unknown })(rooms).emit(event, payload);
+
+/** Keep the responder's last known coordinates and review flag in the admin event only. */
+export function emitRescuerCancellation(
+  io: RoomEmitter | undefined,
+  payload: RescuerCancellationEvent & { rescuerLocation: { lat: number; lon: number } | null; reviewRequired: boolean },
+  requesterId: string,
+  onError: (error: unknown) => void
+): void {
+  if (!io) return;
+  const { rescuerLocation: _location, reviewRequired: _review, ...publicPayload } = payload;
+  try {
+    emitToRooms(io, [userRoom(requesterId), userRoom(payload.rescuerId)], MISSION_CANCELLED_BY_RESCUER_EVENT, publicPayload);
+  } catch (error) { onError(error); }
+  try {
+    io.to(ADMIN_ROOM).emit(MISSION_CANCELLED_BY_RESCUER_EVENT, payload);
+  } catch (error) { onError(error); }
 }
 
 /**

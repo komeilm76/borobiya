@@ -59,7 +59,10 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "sosDeclineProposal",
   "sosUpdateMissionStatus",
   "sosListCancellationReasons",
-  "sosCancelRequest"
+  "sosCancelRequest",
+  "sosListMissions",
+  "sosGetMission",
+  "sosCancelMission"
 ]);
 
 interface JsonObjectSchema {

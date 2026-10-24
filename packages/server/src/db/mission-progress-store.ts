@@ -1,4 +1,4 @@
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import type { Mission, MissionProgressStatus, MissionStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import { missions, missionStatusHistory, sosRequests, users } from "./schema";
@@ -17,6 +17,10 @@ export type MissionProgressResult =
   | { status: "updated" | "unchanged"; mission: Mission };
 
 export interface MissionProgressStore {
+  findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
+  listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number): Promise<{
+    items: Mission[]; total: number; page: number; limit: number; totalPages: number
+  }>;
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
   /** Only a participant or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
@@ -30,6 +34,25 @@ export function missionTransition(current: MissionStatus, requested: MissionProg
 
 export class DrizzleMissionProgressStore implements MissionProgressStore {
   constructor(private readonly db: Database) {}
+
+  async findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null> {
+    const [row] = await this.db.select().from(missions).where(and(eq(missions.id, id),
+      role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
+    return row ? toMission(row) : null;
+  }
+
+  async listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number) {
+    const filter = role === "rescuer" ? eq(missions.rescuerId, userId) : eq(missions.requesterId, userId);
+    const [rows, totals] = await Promise.all([
+      this.db.select().from(missions).where(filter)
+        .orderBy(sql`CASE WHEN ${missions.status} IN ('pending','on_the_way','arrived','in_progress') THEN 0 ELSE 1 END`,
+          desc(missions.updatedAt), desc(missions.id))
+        .limit(limit).offset((page - 1) * limit),
+      this.db.select({ total: count() }).from(missions).where(filter)
+    ]);
+    const total = totals[0]?.total ?? 0;
+    return { items: rows.map(toMission), total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
 
   async canJoinMissionRoom(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean> {
     const [row] = await this.db.select({ id: missions.id }).from(missions)

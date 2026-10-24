@@ -205,3 +205,15 @@ export const missionStatusUpdatedEventSchema = z.strictObject({
   at: timestampSchema
 });
 export type MissionStatusUpdatedEvent = z.infer<typeof missionStatusUpdatedEventSchema>;
+
+/** Admins receive the location/review fields; requester and rescuer receive only the common fields. */
+export const rescuerCancellationEventSchema = z.strictObject({
+  missionId: idSchema,
+  sosRequestId: idSchema,
+  rescuerId: idSchema,
+  reason: z.string().min(1),
+  at: timestampSchema,
+  rescuerLocation: coordinatesSchema.pick({ lat: true, lon: true }).nullable().optional(),
+  reviewRequired: z.boolean().optional()
+});
+export type RescuerCancellationEvent = z.infer<typeof rescuerCancellationEventSchema>;

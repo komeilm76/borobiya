@@ -901,6 +901,16 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(proposalStates.rows.map((row) => row.status)).toEqual(["accepted", "declined"]);
     const busyState = await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [createdResponder.id]);
     expect(busyState.rows[0]?.is_on_mission).toBe(true);
+    const ownMissions = await callContract<{ items: Array<{ id: string }>; total: number }>(apiRoutes.sos.listMissions, 200, {
+      url: `${apiRoutes.sos.listMissions.url}?role=rescuer`, headers: responderHeaders
+    });
+    expect(ownMissions.items[0]?.id).toBe(accepted.missionId);
+    expect(ownMissions.total).toBe(1);
+    expect((await callContract<{ id: string }>(apiRoutes.sos.getMission, 200, {
+      url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId), headers: requesterHeaders
+    })).id).toBe(accepted.missionId);
+    expect((await app.inject({ method: "GET", url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId),
+      headers: responderHeaders })).statusCode).toBe(200);
     const statusUrl = apiRoutes.sos.updateMissionStatus.url.replace(":id", accepted.missionId);
     expect((await callContract<{ code: string }>(apiRoutes.sos.updateMissionStatus, 409, {
       url: statusUrl, headers: responderHeaders, payload: { status: "arrived" }
@@ -917,10 +927,17 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       url: apiRoutes.sos.listProposals.url, headers: responderHeaders
     });
     expect(inboxAfterAccept.total).toBe(0);
-    // A later re-dispatch after mission completion reopens the declined proposal but
-    // cannot carry its old reason into a newly pending decision.
-    await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [accepted.missionId]);
-    await pg.query(`UPDATE "users" SET "is_on_mission" = false WHERE "id" = $1`, [createdResponder.id]);
+    // A rescuer unable to continue is released atomically, before a later dispatch.
+    const rescuerCancelReasonId = "99000000-0000-4000-8000-000000000002";
+    await pg.query(`INSERT INTO "cancellation_reasons" ("id", "type", "key", "label")
+      VALUES ($1, 'rescuer', 'physical_inability', 'Unable to reach')`, [rescuerCancelReasonId]);
+    await callContract(apiRoutes.sos.cancelMission, 200, {
+      url: apiRoutes.sos.cancelMission.url.replace(":id", accepted.missionId),
+      headers: responderHeaders, payload: { cancellationReasonId: rescuerCancelReasonId }
+    });
+    expect((await pg.query<{ status: string }>(`SELECT status FROM missions WHERE id=$1`, [accepted.missionId]))
+      .rows[0]?.status).toBe("cancelled_by_rescuer");
+    // A later re-dispatch reopens the declined proposal, never its old decision id.
     const redispatched = await callContract<{ proposals: Array<{ id: string }> }>(apiRoutes.admin.dispatchSosRequest, 201, {
       url: apiRoutes.admin.dispatchSosRequest.url.replace(":id", createdSos.requestId),
       headers: adminHeaders, payload: { rescuerIds: [createdResponder.id] }

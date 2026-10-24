@@ -302,7 +302,7 @@ Each update appears as **timeline** to requester + admin.
 
 ## 18. Cancellation — Partially available
 
-> **Current status:** A requester can now cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. Cancellation after acceptance, the persistent SOS History entry point, rescuer cancellation and admin replacement alert remain planned (T3.6.3–T3.6.5, T3.7.1).
+> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation after acceptance (T3.6.4), persistent SOS History (T3.7.1), and the admin red-flash/sound replacement UI (T3.6.5) remain planned.
 
 ### If you are the requester (need to cancel SOS)
 
@@ -317,7 +317,7 @@ Each update appears as **timeline** to requester + admin.
 
 ### If you are the rescuer (cannot continue)
 
-1. In active mission → **More → Unable to continue** (hidden, requires confirm).
+1. Open **مأموریت من** (`/_user/mission`), then in your active mission choose **بیشتر → قادر به ادامه نیستم** (More → Unable to continue).
 2. **Must pick reason:**
    - Physical inability to reach
    - Vehicle breakdown
@@ -325,8 +325,8 @@ Each update appears as **timeline** to requester + admin.
    - Insufficient expertise
    - Unsafe conditions
    - Other → (requires custom text, **needs admin approval** if “other”)
-3. **Confirm** → Admin gets **urgent alert** and will re-dispatch.
-   - Do this rarely: max 3/hour; >2/day flagged for review.
+3. Read the warning and **confirm** → your mission stops, you become eligible for another offer, and the server sends an urgent event to the admin room. The dispatcher’s red-flash/sound replacement interface is not yet built; do not assume re-dispatch has happened.
+   - Do this rarely: max 3 requests/hour; the third cancellation in a UTC day is flagged for review. “Other” additionally needs admin approval of the reason.
 
 [Screenshot: Cancel with reason picker — requester vs rescuer]
 

@@ -19,6 +19,7 @@
       <v-alert v-if="inbox.acceptedMissionId" class="mb-5" type="success" variant="tonal" role="status">
         مأموریت پذیرفته شد. پیشنهادهای دیگر شما به‌صورت خودکار بسته شدند. شناسهٔ مأموریت:
         <bdi dir="ltr">{{ inbox.acceptedMissionId }}</bdi>
+        <v-btn class="ms-3" to="/_user/mission" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
       </v-alert>
 
       <div class="offers__toolbar">
