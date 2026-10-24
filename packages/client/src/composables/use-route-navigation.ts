@@ -48,7 +48,11 @@ export function useRouteNavigation(
     // Stop (manual, permission loss, mission/account change or closing the route)
     // always returns the map to a level, north-up overview. Starting a fresh
     // watch calls stop() first, but must not reset a camera that was never following.
-    if (wasActive) resetCamera?.();
+    if (wasActive) {
+      // A map may already be disposing while a route/mission switch stops GPS.
+      // Camera failure must never interrupt the watch cleanup or mask the original error.
+      try { resetCamera?.(); } catch { /* Map no longer exists. GPS is already stopped. */ }
+    }
   }
   function start(): boolean {
     if (active.value || !owner.value || !missionId.value || !selectedRoute.value) return false;

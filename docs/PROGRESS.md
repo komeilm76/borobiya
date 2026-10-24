@@ -131,6 +131,7 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ### 2026-10-24 — Navigation exit restores the map camera (T4.2.3)
 
 - Manual Stop, closing the route panel, permission denial, and mission/account changes dispose the foreground watch and return the route map to `pitch: 0, bearing: 0`; redundant stops and initial starts do not animate a camera that was never following. The reset is wired to the actual MapLibre instance in the mission view, with pure navigation tests and a source-pinned binding check. A VM/browser run remains outstanding. T3.5.5 remains blocked on real offline elevation data and OSRM cannot guarantee multiple route alternatives.
+- Follow-up safety fix: a disposed map can reject `easeTo` while an account or route changes. The camera reset now fails closed without interrupting watch disposal or hiding the original navigation error; a regression injects a throwing reset callback.
 
 ### 2026-10-24 — Rating and rescuer history UI (T3.7.4)
 

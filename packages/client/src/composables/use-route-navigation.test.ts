@@ -121,6 +121,18 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(clear).toHaveBeenCalledTimes(3);
   });
 
+  it("does not let a disposed map's camera error mask GPS cleanup", () => {
+    const clear = vi.fn();
+    const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
+      subscribe: () => clear, now: () => 1000
+    }, () => { throw new Error("map removed"); });
+    expect(nav.start()).toBe(true);
+    expect(() => nav.stop()).not.toThrow();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(nav.active.value).toBe(false);
+    expect(nav.fix.value).toBeNull();
+  });
+
   it("clears the GPS watch when subscription reports denial synchronously", () => {
     const clear = vi.fn();
     const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
