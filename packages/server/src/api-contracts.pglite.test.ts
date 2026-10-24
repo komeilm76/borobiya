@@ -27,6 +27,7 @@ import { DrizzleUserRecoveryStore } from "./db/recovery-store";
 import { DrizzleUserRegistrationStore } from "./db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "./db/security-questions-store";
 import { DrizzleSosDispatchStore } from "./db/sos-dispatch-store";
+import { DrizzleMissionProgressStore } from "./db/mission-progress-store";
 import { DrizzleSosPhotoStore } from "./db/sos-photo-store";
 import { DrizzleSosRequestStore } from "./db/sos-request-store";
 import { DrizzleUserSearchStore } from "./db/user-search-store";
@@ -171,6 +172,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       categoryStore: new DrizzleCategoryStore(db),
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
+      missionProgressStore: new DrizzleMissionProgressStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir),
       hashPassword: fastTestHash,
@@ -897,6 +899,18 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(proposalStates.rows.map((row) => row.status)).toEqual(["accepted", "declined"]);
     const busyState = await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [createdResponder.id]);
     expect(busyState.rows[0]?.is_on_mission).toBe(true);
+    const statusUrl = apiRoutes.sos.updateMissionStatus.url.replace(":id", accepted.missionId);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.updateMissionStatus, 409, {
+      url: statusUrl, headers: responderHeaders, payload: { status: "arrived" }
+    })).code).toBe("INVALID_MISSION_TRANSITION");
+    const progressed = await callContract<{ status: string }>(apiRoutes.sos.updateMissionStatus, 200, {
+      url: statusUrl, headers: responderHeaders, payload: { status: "on_the_way" }
+    });
+    expect(progressed.status).toBe("on_the_way");
+    expect((await pg.query<{ from_status: string; to_status: string }>(
+      `SELECT "from_status", "to_status" FROM "mission_status_history" WHERE "mission_id" = $1 AND "to_status" = 'on_the_way'`,
+      [accepted.missionId]
+    )).rows).toEqual([{ from_status: "pending", to_status: "on_the_way" }]);
     const inboxAfterAccept = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
       url: apiRoutes.sos.listProposals.url, headers: responderHeaders
     });

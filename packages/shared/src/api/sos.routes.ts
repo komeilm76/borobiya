@@ -223,7 +223,7 @@ export const sosRoutes = {
     schema: {
       params: missionParamsSchema,
       body: missionStatusUpdateSchema,
-      responses: { 200: missionSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 409: errorSchema }
+      responses: { 200: missionSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "sosUpdateMissionStatus",

@@ -94,6 +94,20 @@ describe("Fastify server skeleton", () => {
     expect(paths["/_admin/incidents/{id}"]?.patch?.responses, "rename gained 409").toHaveProperty("409");
   });
 
+  it("mounts rescuer-only mission progress and advertises its 404/409 outcomes", async () => {
+    const app = await makeApp();
+    const reply = await app.inject({
+      method: "PATCH", url: "/_user/missions/00000000-0000-4000-8000-000000000001/status",
+      payload: { status: "on_the_way" }
+    });
+    expect(reply.statusCode).toBe(401);
+    const spec = (await app.inject({ method: "GET", url: "/docs/json" })).json();
+    const operation = spec.paths["/_user/missions/{id}/status"]?.patch;
+    expect(operation?.["x-borobiya-runtime-status"]).toBe("implemented");
+    expect(operation?.responses).toHaveProperty("404");
+    expect(operation?.responses).toHaveProperty("409");
+  });
+
   it("registers the SOS creation route, so it answers 401 rather than the contract-only 404", async () => {
     // T3.2.2 mounted a real handler at `POST /_user/sos/requests`. The store below refuses to run
     // without a session, so reaching 401 instead of 404 is the proof the route exists and that the

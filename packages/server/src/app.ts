@@ -33,6 +33,8 @@ import {
 } from "./db/sos-dispatch-store";
 import { registerSosRequestRoutes } from "./sos/requests";
 import { registerSosProposalRoutes } from "./sos/proposals";
+import { registerMissionProgressRoutes } from "./sos/mission-progress";
+import { DrizzleMissionProgressStore, type MissionProgressStore } from "./db/mission-progress-store";
 import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
 import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
@@ -91,6 +93,8 @@ export interface FastifyAppDependencies {
   sosRequestStore?: SosRequestStore;
   /** Override SOS nearest-responder & dispatch persistence in tests. */
   sosDispatchStore?: SosDispatchStore;
+  /** Override the mission progress write in tests. */
+  missionProgressStore?: MissionProgressStore;
   /** Override the photo attach write in tests. */
   photoStore?: SosPhotoStore;
   /** Override where uploaded photos are written in tests. */
@@ -160,6 +164,10 @@ export async function createFastifyApp(
   const sosDispatchStore =
     dependencies.sosDispatchStore ??
     (database ? new DrizzleSosDispatchStore(database.db) : createPlaceholderSosDispatchStore());
+  const missionProgressStore = dependencies.missionProgressStore ??
+    (database ? new DrizzleMissionProgressStore(database.db) : {
+      advanceStatus: async () => ({ status: "not_found" as const })
+    });
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
   const liveLocationService = createLiveLocationService({
@@ -244,6 +252,7 @@ export async function createFastifyApp(
   // has finished onboarding, which is exactly the state dispatch is entitled to trust.
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
+  await registerMissionProgressRoutes(app, missionProgressStore);
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,
