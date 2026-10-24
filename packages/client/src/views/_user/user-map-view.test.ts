@@ -82,6 +82,30 @@ describe("UserMapView live overlay", () => {
   });
 });
 
+describe("Map reverse-address sheet", () => {
+  it("opens for map clicks and long presses and unregisters both listeners on teardown", () => {
+    const ready = body("onMapReady");
+    const teardown = view.slice(view.indexOf("onBeforeUnmount("));
+    expect(ready).toContain('instance.on("click", onMapClick)');
+    expect(ready).toContain('instance.on("contextmenu", onMapLongPress)');
+    expect(body("onMapClick")).toContain("reverse.select(event.lngLat.lat, event.lngLat.lng)");
+    expect(body("onMapLongPress")).toContain("reverse.select(event.lngLat.lat, event.lngLat.lng)");
+    expect(teardown).toContain('instance.off("click", onMapClick)');
+    expect(teardown).toContain('instance.off("contextmenu", onMapLongPress)');
+    expect(view).toContain('<ReverseAddressSheet :api="reverse" />');
+  });
+
+  it("exposes a selectable address and clear copy failures without mounting Vue", () => {
+    const sheet = readFileSync(new URL("../../components/map/ReverseAddressSheet.vue", import.meta.url), "utf8");
+    expect(sheet).toContain("api.address.value.formattedAddress");
+    expect(sheet).toContain("readonly");
+    expect(sheet).toContain("api.copy()");
+    expect(sheet).toContain("api.copyFailed.value");
+    expect(sheet).toContain("api.load()");
+    expect(sheet).toContain("api.close()");
+  });
+});
+
 describe("LiveCompanionPanel", () => {
   it("renders and dispatches only — the sentences come from the pure module", () => {
     // If the component could invent an empty state, "nobody shared with you" and "our read failed" would

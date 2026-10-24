@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { geocodeQuerySchema, geocodeResponseSchema, geocodeResultSchema,
-  type GeocodeQueryInput, type GeocodeResponse } from "@shared/index";
+  reverseGeocodeQuerySchema, reverseGeocodeResultSchema,
+  type GeocodeQueryInput, type GeocodeResponse, type ReverseGeocodeQuery,
+  type ReverseGeocodeResult } from "@shared/index";
 
 /** Photon returns GeoJSON, while the app's place-search contract uses named, bounded results. */
 const collectionSchema = z.object({
@@ -59,4 +61,39 @@ export async function searchPlaces(input: GeocodeQueryInput, signal?: AbortSigna
   });
   if (!response.ok) throw new Error("PLACE_SEARCH_UNAVAILABLE");
   return photonPlaces(await response.json(), query.limit);
+}
+
+/** Photon reverse returns a GeoJSON collection, not the app's single-address contract. */
+export function photonAddress(payload: unknown): ReverseGeocodeResult | null {
+  const collection = collectionSchema.parse(payload);
+  for (const raw of collection.features) {
+    const parsed = pointSchema.safeParse(raw);
+    if (!parsed.success) continue;
+    const [lon, lat] = parsed.data.geometry.coordinates;
+    const props = parsed.data.properties;
+    const parts = [props.name, props.housenumber, props.street, props.district,
+      props.city, props.state, props.country].map(text);
+    const formattedAddress = parts.filter((part, index) => part !== null && parts.indexOf(part) === index).join(", ");
+    const candidate = reverseGeocodeResultSchema.safeParse({
+      formattedAddress,
+      ...(text(props.country) ? { country: text(props.country) } : {}),
+      ...(text(props.city) ? { city: text(props.city) } : {}),
+      ...(text(props.street) ? { street: text(props.street) } : {}),
+      ...(text(props.housenumber) ? { houseNumber: text(props.housenumber) } : {})
+    });
+    if (candidate.success && geocodeResultSchema.shape.lon.safeParse(lon).success &&
+      geocodeResultSchema.shape.lat.safeParse(lat).success) return candidate.data;
+  }
+  return null;
+}
+
+/** Same-origin offline reverse endpoint; null means Photon found no usable address. */
+export async function reversePlace(input: ReverseGeocodeQuery, signal?: AbortSignal): Promise<ReverseGeocodeResult | null> {
+  const { lat, lon } = reverseGeocodeQuerySchema.parse(input);
+  const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+  const response = await fetch(`/reverse?${params}`, {
+    method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
+  });
+  if (!response.ok) throw new Error("REVERSE_GEOCODE_UNAVAILABLE");
+  return photonAddress(await response.json());
 }

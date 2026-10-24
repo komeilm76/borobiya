@@ -36,6 +36,8 @@
         variant="tonal" @click="showTrack">بازگشت به مسیر</v-btn>
     </aside>
 
+    <ReverseAddressSheet :api="reverse" />
+
     <aside class="user-map-view__playback">
       <HistoryPlaybackPanel :api="playback" />
     </aside>
@@ -49,10 +51,12 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import type { Map as MapLibreMap } from "maplibre-gl";
+import type { Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
+import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
+import { useReversePlace } from "@/composables/use-reverse-place";
 import type { GeocodeResult } from "@shared/index";
 import { usePlaceSearch } from "@/composables/use-place-search";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
@@ -83,6 +87,7 @@ const playback = useHistoryPlayback({
   refreshSession: () => auth.refreshSession()
 });
 const map = shallowRef<MapLibreMap | null>(null);
+const reverse = useReversePlace();
 const placeSearch = usePlaceSearch({
   // Search the loaded library's coverage, not just the currently visible few streets. MapCanvas
   // updates these bounds after /map-config arrives; the gateway keeps the query local to Photon.
@@ -211,6 +216,18 @@ function repaintOverlays(): void {
   paintPlayback();
 }
 
+let lastLongPressAt = 0;
+function onMapClick(event: MapMouseEvent): void {
+  // Some touch browsers synthesize a click after a long-press contextmenu event.
+  if (Date.now() - lastLongPressAt < 700) return;
+  reverse.select(event.lngLat.lat, event.lngLat.lng);
+}
+function onMapLongPress(event: MapMouseEvent): void {
+  event.preventDefault();
+  lastLongPressAt = Date.now();
+  reverse.select(event.lngLat.lat, event.lngLat.lng);
+}
+
 function onMapReady(instance: MapLibreMap): void {
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
@@ -218,6 +235,8 @@ function onMapReady(instance: MapLibreMap): void {
   // of assuming it is still there. Live markers go first because playback asks to be inserted beneath them.
   instance.on("styledata", repaintOverlays);
   instance.on("idle", repaintOverlays);
+  instance.on("click", onMapClick);
+  instance.on("contextmenu", onMapLongPress);
   paintLive();
   paintPlayback();
   frameCamera();
@@ -258,6 +277,8 @@ onBeforeUnmount(() => {
   if (instance) {
     instance.off("styledata", repaintOverlays);
     instance.off("idle", repaintOverlays);
+    instance.off("click", onMapClick);
+    instance.off("contextmenu", onMapLongPress);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
   }

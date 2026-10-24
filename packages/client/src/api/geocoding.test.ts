@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { photonPlaces, searchPlaces } from "./geocoding";
+import { photonAddress, photonPlaces, reversePlace, searchPlaces } from "./geocoding";
 
 const feature = (name: string, coordinates: number[] = [51.38, 35.7], extras = {}) => ({
   type: "Feature", geometry: { type: "Point", coordinates },
@@ -52,5 +52,34 @@ describe("local Photon place search", () => {
     await expect(searchPlaces({ q: "Azadi" })).rejects.toThrow("PLACE_SEARCH_UNAVAILABLE");
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ type: "FeatureCollection", features: {} })));
     await expect(searchPlaces({ q: "Azadi" })).rejects.toThrow();
+  });
+});
+
+describe("local Photon reverse geocoding", () => {
+  it("calls only the same-origin reverse gateway with validated coordinates and abort signal", async () => {
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
+      Response.json(collection([feature("Azadi Square", [51.38, 35.7], { housenumber: "12", street: "Azadi" })])));
+    vi.stubGlobal("fetch", fetcher);
+    const controller = new AbortController();
+    const result = await reversePlace({ lat: 35.7, lon: 51.38 }, controller.signal);
+    expect(fetcher.mock.calls[0]?.[0]).toBe("/reverse?lat=35.7&lon=51.38");
+    expect(fetcher.mock.calls[0]?.[1]).toMatchObject({ credentials: "same-origin", signal: controller.signal });
+    expect(result).toEqual({ formattedAddress: "Azadi Square, 12, Azadi, Tehran, Iran", country: "Iran",
+      city: "Tehran", street: "Azadi", houseNumber: "12" });
+    await expect(reversePlace({ lat: 91, lon: 51 })).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("distinguishes no address from unavailable gateway or invalid GeoJSON", async () => {
+    expect(photonAddress(collection([]))).toBeNull();
+    expect(photonAddress(collection([feature("", [51, 35], { city: null, country: null })]))).toBeNull();
+    expect(photonAddress(collection([feature("outside", [51, 91]), feature("valid")]))?.formattedAddress)
+      .toBe("valid, Tehran, Iran");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json(collection([]))));
+    await expect(reversePlace({ lat: 35, lon: 51 })).resolves.toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "offline" }, { status: 503 })));
+    await expect(reversePlace({ lat: 35, lon: 51 })).rejects.toThrow("REVERSE_GEOCODE_UNAVAILABLE");
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ type: "FeatureCollection", features: null })));
+    await expect(reversePlace({ lat: 35, lon: 51 })).rejects.toThrow();
   });
 });
