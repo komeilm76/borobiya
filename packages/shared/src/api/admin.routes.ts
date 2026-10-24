@@ -23,6 +23,7 @@ import {
   dispatchResponseSchema,
   dispatchSosRequestSchema,
   missionSchema,
+  missionTimelineSchema,
   sosRequestRecordSchema
 } from "../schemas/sos";
 import { sosRequestStatusSchema } from "../types/enums";
@@ -272,13 +273,27 @@ export const adminRoutes = {
     url: "/_admin/sos/requests/:id/missions",
     schema: {
       params: uuidPathParamsSchema,
-      responses: { 200: z.array(missionSchema), 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      query: z.strictObject({ includeTerminal: z.enum(["true", "false"]).optional() }),
+      responses: { 200: z.array(missionSchema), 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "adminListSosMissions",
       summary: "List active missions for private dispatch monitoring",
       tags: ["admin", "sos"],
       access: "admin"
+    }
+  }),
+  getMissionTimeline: defineRoute({
+    method: "GET",
+    url: "/_admin/sos/missions/:id/timeline",
+    schema: {
+      params: uuidPathParamsSchema,
+      responses: { 200: missionTimelineSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "adminGetMissionTimeline",
+      summary: "Read committed mission steps as a dispatch admin",
+      tags: ["admin", "sos"], access: "admin"
     }
   }),
   getNearestResponders: defineRoute({

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { missionSchema } from "@borobiya/shared";
+import { missionSchema, missionTimelineSchema } from "@borobiya/shared";
 import type { Database } from "./client";
 import * as schema from "./schema";
 import { DrizzleMissionProgressStore, missionTransition } from "./mission-progress-store";
@@ -90,6 +90,10 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "user")).toBe(false);
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "admin")).toBe(true);
     expect(await store.canJoinMissionRoom("90000000-0000-4000-8000-000000000009", REQUESTER, "admin")).toBe(false);
+    const timeline = await store.findTimeline(MISSION, REQUESTER, "user");
+    expect(missionTimelineSchema.parse(timeline).map((entry) => entry.toStatus)).toEqual([]);
+    expect(await store.findTimeline(MISSION, "90000000-0000-4000-8000-000000000009", "user")).toBeNull();
+    expect(await store.findTimeline("90000000-0000-4000-8000-000000000009", REQUESTER, "admin")).toBeNull();
     expect(await store.missionLocationRole(MISSION, RESCUER)).toBe("rescuer");
     expect(await store.missionLocationRole(MISSION, REQUESTER, "admin")).toBe("admin");
     expect(await store.missionLocationRole(MISSION, REQUESTER)).toBe("requester");
@@ -120,6 +124,10 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(await store.findNavigationTarget(MISSION, RESCUER)).toBeNull();
     expect(await store.canJoinMissionRoom(MISSION, RESCUER, "user")).toBe(false);
     expect(await store.canJoinMissionRoom(MISSION, REQUESTER, "admin")).toBe(false);
+    expect(missionTimelineSchema.parse(await store.findTimeline(MISSION, RESCUER, "user"))
+      .map((entry) => entry.toStatus)).toEqual(["pending", "on_the_way", "arrived", "in_progress", "completed"]);
+    expect((await store.listActiveRequestMissions(SOS)).length).toBe(0);
+    expect((await store.listActiveRequestMissions(SOS, true)).map((entry) => entry.status)).toEqual(["completed"]);
     expect(await store.missionLocationRole(MISSION, RESCUER)).toBeNull();
     expect(await store.missionLocationRole(MISSION, REQUESTER, "admin")).toBeNull();
     expect(await store.advanceStatus(MISSION, RESCUER, "on_the_way")).toEqual({

@@ -16,8 +16,8 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    // 66 = the previous 65 operations plus the active SOS mission read for admin dispatch (T3.5.7).
-    expect(allApiRoutes).toHaveLength(66);
+    // 68 = the previous 66 operations plus participant/admin timeline reads (T3.5.8).
+    expect(allApiRoutes).toHaveLength(68);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 

@@ -187,6 +187,16 @@
         <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
           {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
         </v-alert>
+        <div v-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
+          <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
+          <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
+            <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
+              {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
+            </option>
+          </select>
+          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
+            :mission="selectedTimelineMission" audience="admin" />
+        </div>
         <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
           :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
         <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
@@ -510,6 +520,8 @@ import {
 } from "@/admin/sos-alerts";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
+import { statusLabel } from "@/mission/timeline-presentation";
 import { listActiveSosMissions } from "@/api/mission";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { pinia } from "@/stores";
@@ -524,22 +536,29 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
 const auth = useAuthStore(pinia);
-const activeMissions = ref<Mission[]>([]);
+const requestMissions = ref<Mission[]>([]);
+const activeMissions = computed(() => requestMissions.value.filter((mission) =>
+  ["pending", "on_the_way", "arrived", "in_progress"].includes(mission.status)));
+const timelineMissionId = ref<string | null>(null);
+const selectedTimelineMission = computed(() => requestMissions.value.find((mission) => mission.id === timelineMissionId.value) ?? null);
 const missionError = ref<string | null>(null);
 let missionGeneration = 0;
 async function loadActiveMissions() {
   const id = adminSos.selectedRequest?.id;
   const token = auth.accessToken;
   const generation = ++missionGeneration;
-  activeMissions.value = [];
+  requestMissions.value = [];
+  timelineMissionId.value = null;
   missionError.value = null;
-  if (!id || !token || adminSos.selectedRequest?.status !== "accepted") return;
+  if (!id || !token) return;
   try {
-    const missions = await listActiveSosMissions(token, id);
-    if (generation === missionGeneration && adminSos.selectedRequest?.id === id && auth.accessToken === token)
-      activeMissions.value = missions;
+    const missions = await listActiveSosMissions(token, id, true);
+    if (generation === missionGeneration && adminSos.selectedRequest?.id === id && auth.accessToken === token) {
+      requestMissions.value = missions;
+      timelineMissionId.value = missions[0]?.id ?? null;
+    }
   } catch {
-    if (generation === missionGeneration) missionError.value = "مأموریت‌های زنده بارگذاری نشدند.";
+    if (generation === missionGeneration) missionError.value = "سابقهٔ مأموریت‌ها بارگذاری نشد.";
   }
 }
 watch(() => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.status, auth.accessToken] as const,
@@ -909,4 +928,5 @@ onBeforeUnmount(() => {
     box-shadow: 0 0 0 0 transparent;
   }
 }
+.mission-timeline-select { width: 100%; padding: 11px; border: 1px solid rgba(98,146,137,.4); border-radius: 10px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); }
 </style>

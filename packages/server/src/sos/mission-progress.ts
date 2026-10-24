@@ -54,7 +54,21 @@ export async function registerMissionProgressRoutes(
     if (!query.success) return reply.code(400).send({ error: true, code: "VALIDATION_ERROR", message: "Invalid mission list filters.",
       issues: query.error.issues.map(({ code, message, path }) => ({ code, message, path })) });
     return reply.code(200).send(await store.listMissions(user.userId, query.data.role ?? "requester",
-      query.data.page, query.data.limit));
+      query.data.page, query.data.limit, query.data.sosRequestId));
+  });
+
+  const timelineRoute = apiRoutes.sos.getMissionTimeline;
+  app.get(timelineRoute.url, async (request, reply) => {
+    const response = reply.header("cache-control", "no-store");
+    const user = request.authenticatedUser;
+    if (!user) return response.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const params = timelineRoute.schema.params.safeParse(request.params);
+    const timeline = params.success && user.role === "user"
+      ? await store.findTimeline?.(params.data.id, user.userId, "user") : null;
+    if (!timeline) return response.code(404).send({
+      error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
+    });
+    return response.code(200).send(timeline);
   });
 
   const navigationRoute = apiRoutes.sos.getMissionNavigationTarget;

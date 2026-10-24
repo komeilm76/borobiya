@@ -12,9 +12,9 @@ describe("three-role mission live UI (T3.5.7)", () => {
       expect(source).toContain('import MissionLivePanel from "@/components/mission/MissionLivePanel.vue"');
     }
     expect(readFileSync(new URL("../../views/_user/UserSosHistoryView.vue", import.meta.url), "utf8"))
-      .toContain("listRequesterMissions(token, page)");
+      .toContain("listRequesterMissions(token, page, id)");
     expect(readFileSync(new URL("../../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8"))
-      .toContain("listActiveSosMissions(token, id)");
+      .toContain("listActiveSosMissions(token, id, true)");
   });
 
   it("keeps explicit sharing consent, three markers, last-seen text and an accessible stale badge", () => {

@@ -136,6 +136,19 @@ export const missionNavigationTargetSchema = z.strictObject({
 });
 export type MissionNavigationTarget = z.infer<typeof missionNavigationTargetSchema>;
 
+/** The immutable committed status steps, including terminal cancellation rows. */
+export const missionTimelineEntrySchema = z.strictObject({
+  id: idSchema,
+  missionId: idSchema,
+  fromStatus: missionStatusSchema.nullable(),
+  toStatus: missionStatusSchema,
+  changedBy: idSchema.nullable(),
+  createdAt: timestampSchema
+});
+export type MissionTimelineEntry = z.infer<typeof missionTimelineEntrySchema>;
+export const missionTimelineSchema = z.array(missionTimelineEntrySchema);
+export type MissionTimeline = z.infer<typeof missionTimelineSchema>;
+
 export const missionSchema = z.strictObject({
   id: idSchema,
   sosRequestId: idSchema,

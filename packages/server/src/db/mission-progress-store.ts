@@ -1,5 +1,5 @@
-import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus } from "@borobiya/shared";
+import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
+import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline } from "@borobiya/shared";
 import type { Database } from "./client";
 import { missions, missionStatusHistory, sosRequests, users } from "./schema";
 
@@ -19,10 +19,11 @@ export type MissionProgressResult =
 export interface MissionProgressStore {
   findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
   findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null>;
-  listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number): Promise<{
+  listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number, sosRequestId?: string): Promise<{
     items: Mission[]; total: number; page: number; limit: number; totalPages: number
   }>;
-  listActiveRequestMissions?(sosRequestId: string): Promise<Mission[]>;
+  listActiveRequestMissions?(sosRequestId: string, includeTerminal?: boolean): Promise<Mission[]>;
+  findTimeline?(missionId: string, userId: string, role: "admin" | "user"): Promise<MissionTimeline | null>;
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
   /** Only active-mission participants or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
@@ -58,8 +59,9 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     return row ? { missionId: row.missionId, incident: { lat: row.lat, lon: row.lon } } : null;
   }
 
-  async listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number) {
-    const filter = role === "rescuer" ? eq(missions.rescuerId, userId) : eq(missions.requesterId, userId);
+  async listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number, sosRequestId?: string) {
+    const filter = and(role === "rescuer" ? eq(missions.rescuerId, userId) : eq(missions.requesterId, userId),
+      sosRequestId ? eq(missions.sosRequestId, sosRequestId) : undefined);
     const [rows, totals] = await Promise.all([
       this.db.select().from(missions).where(filter)
         .orderBy(sql`CASE WHEN ${missions.status} IN ('pending','on_the_way','arrived','in_progress') THEN 0 ELSE 1 END`,
@@ -71,10 +73,25 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     return { items: rows.map(toMission), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async listActiveRequestMissions(sosRequestId: string): Promise<Mission[]> {
+  async listActiveRequestMissions(sosRequestId: string, includeTerminal = false): Promise<Mission[]> {
     const rows = await this.db.select().from(missions).where(and(eq(missions.sosRequestId, sosRequestId),
-      inArray(missions.status, ACTIVE_STATUSES))).orderBy(desc(missions.createdAt));
+      includeTerminal ? undefined : inArray(missions.status, ACTIVE_STATUSES)))
+      .orderBy(desc(missions.createdAt), desc(missions.id));
     return rows.map(toMission);
+  }
+
+  async findTimeline(missionId: string, userId: string, role: "admin" | "user"): Promise<MissionTimeline | null> {
+    // Authorization is performed before the history read; unlike a bare history-table lookup,
+    // an empty timeline must not make a foreign mission look different from an unknown one.
+    const owned = await this.findMission(missionId, userId, role);
+    if (!owned) return null;
+    const rows = await this.db.select({
+      id: missionStatusHistory.id, missionId: missionStatusHistory.missionId,
+      fromStatus: missionStatusHistory.fromStatus, toStatus: missionStatusHistory.toStatus,
+      changedBy: missionStatusHistory.changedBy, createdAt: missionStatusHistory.createdAt
+    }).from(missionStatusHistory).where(eq(missionStatusHistory.missionId, missionId))
+      .orderBy(asc(missionStatusHistory.createdAt), asc(missionStatusHistory.id));
+    return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   }
 
   async canJoinMissionRoom(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean> {

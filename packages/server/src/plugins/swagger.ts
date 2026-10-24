@@ -37,6 +37,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "adminListSosRequests",
   "adminGetSosRequest",
   "adminListSosMissions",
+  "adminGetMissionTimeline",
   "adminGetNearestResponders",
   "adminDispatchSosRequest",
   "userCompleteSecurityQuestions",
@@ -64,6 +65,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "sosListCancellationReasons",
   "sosCancelRequest",
   "sosListMissions",
+  "sosGetMissionTimeline",
   "sosGetMission",
   "sosGetMissionNavigationTarget",
   "sosCancelMission"

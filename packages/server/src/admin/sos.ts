@@ -117,11 +117,28 @@ export async function registerAdminSosRoutes(
     const parsed = missionsRoute.schema.params.safeParse(request.params);
     if (!parsed.success) return reply.code(404).header("cache-control", "no-store")
       .send(errorResponse("SOS_REQUEST_NOT_FOUND", "SOS request not found."));
+    const filters = missionsRoute.schema.query.safeParse(request.query);
+    if (!filters.success) return reply.code(400).header("cache-control", "no-store")
+      .send(errorResponse("VALIDATION_ERROR", "Invalid mission list filters."));
     const record = await dependencies.store.getRequestById?.(parsed.data.id);
     if (!record) return reply.code(404).header("cache-control", "no-store")
       .send(errorResponse("SOS_REQUEST_NOT_FOUND", "SOS request not found."));
     return reply.code(200).header("cache-control", "no-store")
-      .send(await dependencies.missionStore?.listActiveRequestMissions?.(parsed.data.id) ?? []);
+      .send(await dependencies.missionStore?.listActiveRequestMissions?.(parsed.data.id, filters.data.includeTerminal === "true") ?? []);
+  });
+
+  const timelineRoute = apiRoutes.admin.getMissionTimeline;
+  app.get(timelineRoute.url, async (request, reply) => {
+    const actor = await authorizeAdmin(request, reply, {
+      store: dependencies.adminStore, jwtSecret: dependencies.jwtSecret
+    });
+    if (!actor) return;
+    const parsed = timelineRoute.schema.params.safeParse(request.params);
+    const timeline = parsed.success
+      ? await dependencies.missionStore?.findTimeline?.(parsed.data.id, actor.userId, "admin") : null;
+    if (!timeline) return reply.code(404).header("cache-control", "no-store")
+      .send(errorResponse("MISSION_NOT_FOUND", "Mission not found."));
+    return reply.code(200).header("cache-control", "no-store").send(timeline);
   });
 
   app.get(nearestRoute.url, async (request, reply) => {

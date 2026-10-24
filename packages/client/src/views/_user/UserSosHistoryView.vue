@@ -78,6 +78,16 @@
             <v-alert v-if="missionError" type="warning" variant="tonal" class="mt-5" role="alert">
               {{ missionError }} <v-btn size="small" variant="text" @click="loadSelectedMission()">تلاش دوباره</v-btn>
             </v-alert>
+            <div v-if="selectedMissions.length" class="history__mission-selector">
+              <label for="request-mission-timeline">سابقهٔ کدام مأموریت را ببینیم؟</label>
+              <select id="request-mission-timeline" v-model="timelineMissionId">
+                <option v-for="mission in selectedMissions" :key="mission.id" :value="mission.id">
+                  {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
+                </option>
+              </select>
+            </div>
+            <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
+              :mission="selectedTimelineMission" audience="user" />
             <MissionLivePanel v-if="selectedMission" :mission="selectedMission"
               :center="[history.selected.value.location.lon, history.selected.value.location.lat]" />
             <div class="history__actions">
@@ -103,6 +113,8 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import type { Mission, SosRequest, SosRequestStatus } from "@shared/index";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
+import { statusLabel } from "@/mission/timeline-presentation";
 import { listRequesterMissions } from "@/api/mission";
 import SosCancellationDialog from "@/components/sos/SosCancellationDialog.vue";
 import { getSosPhotoSrc } from "@/api/admin-sos";
@@ -113,7 +125,11 @@ const auth = useAuthStore();
 const route = useRoute();
 const history = useSosHistory(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   () => auth.ensureSession());
-const selectedMission = ref<Mission | null>(null);
+const selectedMissions = ref<Mission[]>([]);
+const timelineMissionId = ref<string | null>(null);
+const selectedTimelineMission = computed(() => selectedMissions.value.find((mission) => mission.id === timelineMissionId.value) ?? null);
+const selectedMission = computed(() => selectedMissions.value.find((mission) =>
+  ["pending", "on_the_way", "arrived", "in_progress"].includes(mission.status)) ?? null);
 const missionError = ref<string | null>(null);
 let missionGeneration = 0;
 async function loadSelectedMission() {
@@ -121,23 +137,22 @@ async function loadSelectedMission() {
   const token = auth.accessToken;
   const owner = auth.user?.id;
   const generation = ++missionGeneration;
-  selectedMission.value = null;
+  selectedMissions.value = [];
+  timelineMissionId.value = null;
   missionError.value = null;
-  if (!id || !token || !owner || history.selected.value?.status !== "accepted") return;
+  if (!id || !token || !owner) return;
   try {
+    const all: Mission[] = [];
     for (let page = 1; ; page++) {
-      const result = await listRequesterMissions(token, page);
+      const result = await listRequesterMissions(token, page, id);
       if (generation !== missionGeneration || auth.user?.id !== owner || history.selected.value?.id !== id) return;
-      const found = result.items.find((item) => item.sosRequestId === id &&
-        ["pending", "on_the_way", "arrived", "in_progress"].includes(item.status));
-      if (found) { selectedMission.value = found; return; }
-      // The backend sorts all active missions first. Once a page has no active row,
-      // further (older terminal) pages cannot contain the selected active mission.
-      if (page >= result.totalPages || !result.items.some((item) =>
-        ["pending", "on_the_way", "arrived", "in_progress"].includes(item.status))) return;
+      all.push(...result.items);
+      if (page >= result.totalPages) break;
     }
+    selectedMissions.value = all;
+    timelineMissionId.value = all[0]?.id ?? null;
   } catch {
-    if (generation === missionGeneration) missionError.value = "مأموریت زنده بارگذاری نشد.";
+    if (generation === missionGeneration) missionError.value = "سابقهٔ مأموریت‌ها بارگذاری نشد.";
   }
 }
 const photoSrc = ref<string | null>(null);
@@ -173,7 +188,7 @@ async function loadPhoto() {
   }
 }
 onMounted(() => { void history.load(1, typeof route.query.request === "string" ? route.query.request : undefined); });
-watch(() => auth.user?.id, () => { ++missionGeneration; selectedMission.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); });
+watch(() => auth.user?.id, () => { ++missionGeneration; selectedMissions.value = []; timelineMissionId.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); });
 watch(() => history.selected.value?.id, () => { clearPhoto(); void loadSelectedMission(); });
 watch(() => [history.selected.value?.status, auth.accessToken] as const, () => { void loadSelectedMission(); });
 watch(() => history.cancellation.cancelled.value, (value) => { if (value) history.markCancelled(); });
@@ -202,6 +217,8 @@ onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 .history__panel-head h2 { margin: 12px 0 14px; font-size: clamp(1.23rem,2.5vw,1.7rem); line-height: 1.6; overflow-wrap: anywhere; }
 .history__panel-body { padding: clamp(22px,3vw,34px); }.history__facts { display: grid; gap: 10px; }.history__facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-bottom: 1px solid rgba(98,146,137,.18); font-size: .85rem; }.history__facts span { opacity: .7; }.history__facts bdi { overflow-wrap: anywhere; }
 .history__evidence { padding-top: 20px; }.history__evidence h3 { display: flex; align-items: center; gap: 8px; font-size: 1rem; margin-bottom: 14px; }.history__evidence img { display: block; width: 100%; max-height: 370px; object-fit: contain; border-radius: 13px; background: rgba(98,146,137,.09); }
+.history__mission-selector { display: grid; gap: 8px; margin-top: 22px; font-size: .82rem; font-weight: 700; }
+.history__mission-selector select { width: 100%; padding: 11px; border: 1px solid rgba(98,146,137,.4); border-radius: 10px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); }
 .history__actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; padding-top: 24px; }.history__actions p { margin: 0; font-size: .83rem; opacity: .74; }.history__hint { font-size: .8rem; opacity: .74; }
 .history__empty { text-align: center; padding: 62px 24px; }.history__empty h3 { margin: 16px 0 5px; }.history__empty p { opacity: .72; }
 @media(max-width:880px) { .history__grid { grid-template-columns: 1fr; }.history__list { grid-template-columns: repeat(2,minmax(0,1fr)); }.history__pages { grid-column: 1 / -1; } }

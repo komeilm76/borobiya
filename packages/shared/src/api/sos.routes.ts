@@ -12,6 +12,7 @@ import {
   missionProposalSchema,
   missionRatingSchema,
   missionSchema,
+  missionTimelineSchema,
   missionNavigationTargetSchema,
   missionStatusUpdateSchema,
   nearestResponderSchema,
@@ -32,11 +33,13 @@ export { nearestResponderSchema, nearestRespondersResponseSchema };
 
 const sosRequestListQuerySchema = z.strictObject({
   role: z.enum(["requester", "rescuer"]).optional(),
+  sosRequestId: missionParamsSchema.shape.id.optional(),
   ...paginationQuerySchema.shape
 });
 
 const missionListQuerySchema = z.strictObject({
   role: z.enum(["requester", "rescuer"]).optional(),
+  sosRequestId: missionParamsSchema.shape.id.optional(),
   ...paginationQuerySchema.shape
 });
 
@@ -231,6 +234,19 @@ export const sosRoutes = {
       summary: "Get a mission",
       tags: ["sos", "user"],
       access: "authenticated"
+    }
+  }),
+  getMissionTimeline: defineRoute({
+    method: "GET",
+    url: "/_user/sos/missions/:id/timeline",
+    schema: {
+      params: missionParamsSchema,
+      responses: { 200: missionTimelineSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "sosGetMissionTimeline",
+      summary: "Read committed mission steps as a participant",
+      tags: ["sos", "user"], access: "authenticated"
     }
   }),
   getMissionNavigationTarget: defineRoute({

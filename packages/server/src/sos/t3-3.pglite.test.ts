@@ -731,6 +731,23 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [missionId]);
       expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
       expect((await listMissions()).json()).toEqual([]);
+      const historyUrl = `/_user/sos/missions/${missionId}/timeline`;
+      const adminHistoryUrl = `/_admin/sos/missions/${missionId}/timeline`;
+      for (const [bearer, url] of [[requesterToken, historyUrl],
+        [await tokenFor(rescuerId, rescuerSession), historyUrl], [adminToken, adminHistoryUrl]]) {
+        const response = await app.inject({ method: "GET", url, headers: { authorization: `Bearer ${bearer}` } });
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["cache-control"]).toBe("no-store");
+        expect(response.json().map((entry: { toStatus: string }) => entry.toStatus)).toEqual(["pending", "on_the_way"]);
+      }
+      for (const [bearer, url] of [[await tokenFor(outsiderId, outsiderSession), historyUrl],
+        [requesterToken, adminHistoryUrl]]) {
+        const response = await app.inject({ method: "GET", url, headers: { authorization: `Bearer ${bearer}` } });
+        expect(response.statusCode).not.toBe(200);
+      }
+      const allMissions = await app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions?includeTerminal=true`,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect(allMissions.json().map((row: { id: string }) => row.id)).toEqual([missionId]);
       expect(positions.admin).toHaveLength(3);
 
     } finally {
@@ -837,6 +854,27 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       expect(rescuerEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId)).toEqual([missionId]);
       expect(adminEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId).sort())
         .toEqual([missionId, secondMissionId]);
+      const history = await app.inject({ method: "GET", url: `/_user/sos/missions/${missionId}/timeline`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(history.statusCode).toBe(200);
+      expect(history.json()).toMatchObject([{
+        missionId, fromStatus: "on_the_way", toStatus: "cancelled_by_requester", changedBy: REQUESTER_ID
+      }]);
+      const adminHistory = await app.inject({ method: "GET", url: `/_admin/sos/missions/${secondMissionId}/timeline`,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect(adminHistory.json()).toMatchObject([{ missionId: secondMissionId, toStatus: "cancelled_by_requester" }]);
+      const filtered = await app.inject({ method: "GET",
+        url: `/_user/sos/missions?role=requester&sosRequestId=${sosId}`, headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(filtered.json()).toMatchObject({ total: 2 });
+      const foreign = await app.inject({ method: "GET",
+        url: `/_user/sos/missions?role=requester&sosRequestId=${otherSosId}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(foreign.json()).toMatchObject({ total: 0, items: [] });
+      const terminal = await app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions?includeTerminal=true`,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect(terminal.json().map((mission: { status: string }) => mission.status)).toEqual([
+        "cancelled_by_requester", "cancelled_by_requester"
+      ]);
       expect((await send()).statusCode).toBe(200);
       await new Promise((resolve) => setTimeout(resolve, 40));
       expect(adminEvents).toHaveLength(2);
