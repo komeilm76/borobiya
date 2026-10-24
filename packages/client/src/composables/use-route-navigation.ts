@@ -26,7 +26,8 @@ const browserRuntime: NavigationRuntime = {
 export function useRouteNavigation(
   owner: Ref<string | null>, missionId: Ref<string | null>, selectedRoute: Ref<RouteChoice | null>,
   profile: Ref<TransportProfile>, follow: (camera: NavigationCamera) => void,
-  runtime: NavigationRuntime = browserRuntime
+  runtime: NavigationRuntime = browserRuntime,
+  resetCamera?: () => void
 ) {
   const active = ref(false);
   const fix = ref<NavigationFix | null>(null);
@@ -38,11 +39,16 @@ export function useRouteNavigation(
   function stop(): void {
     generation++;
     const cleanup = unsubscribe;
+    const wasActive = active.value;
     unsubscribe = null;
     active.value = false;
     cleanup?.();
     fix.value = null;
     lastCameraAt = Number.NEGATIVE_INFINITY;
+    // Stop (manual, permission loss, mission/account change or closing the route)
+    // always returns the map to a level, north-up overview. Starting a fresh
+    // watch calls stop() first, but must not reset a camera that was never following.
+    if (wasActive) resetCamera?.();
   }
   function start(): boolean {
     if (active.value || !owner.value || !missionId.value || !selectedRoute.value) return false;

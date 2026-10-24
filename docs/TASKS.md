@@ -295,7 +295,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 - [ ] **T4.2.1** Multi-destination (waypoint) routing: A→B→C slider, drag reorder, `optimize=true` TSP toggle
 - [ ] **T4.2.2** Alternative routes UI (2-3 cards with distance/duration/elevation chart for bike/foot)
-- [ ] **T4.2.3** Exit navigation → reset `pitch 0, bearing 0`
+- [x] **T4.2.3** Exit navigation → reset `pitch 0, bearing 0` ✅ 2026-10-24
+  - **Delivered:** Stopping GPS-follow returns the active route map to a north-up, level camera (450 ms). It applies to the Stop button, closed panel, permission denial and mission/account change, but never on an initial start or redundant stop. The location watch is disposed before the camera reset; old watch callbacks remain ignored. Pure composable regressions and a source-pinned mission-view test cover the behavior. Offline elevation (T3.5.5/T4.2.2) remains open; VM/browser acceptance is pending.
 
 ### 4.3 Realtime & Disconnection
 

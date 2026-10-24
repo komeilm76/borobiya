@@ -1,4 +1,5 @@
 import { ref, nextTick } from "vue";
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { useRouteNavigation, type NavigationRuntime } from "./use-route-navigation";
 
@@ -6,6 +7,13 @@ const route = { distance_m: 1420, duration_s: 420, polyline: "_p~iF~ps|U_ulLnnqC
 const mission = "50000000-0000-4000-8000-000000000005";
 
 describe("foreground mission navigation (T3.5.6)", () => {
+  it("wires the active mission map to north-up reset on navigation exit", () => {
+    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    expect(view).toContain('routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 })');
+    expect(view).toContain('@click="navigation.stop()"');
+    expect(view).toContain('navigation.stop();'); // also closes on mission/account/unmount
+  });
+
   it("starts only with an owned selected route, follows at most once per second, and clears watch on stop", () => {
     let onFix!: (fix: { lat: number; lon: number }) => void;
     let now = 1000;
@@ -84,6 +92,33 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(camera).toHaveBeenCalledOnce();
     nav.stop();
     expect(clear).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns to a level north-up camera once on exit, denial, and mission change", async () => {
+    let deny!: (denied: boolean) => void;
+    const clear = vi.fn();
+    const reset = vi.fn();
+    const owner = ref<string | null>("rescuer");
+    const missionId = ref<string | null>(mission);
+    const nav = useRouteNavigation(owner, missionId, ref(route), ref("car"), vi.fn(), {
+      subscribe: (_fix, onError) => { deny = onError; return clear; }, now: () => 1000
+    }, reset);
+    nav.stop(); // never started: no camera movement
+    expect(reset).not.toHaveBeenCalled();
+    expect(nav.start()).toBe(true);
+    expect(reset).not.toHaveBeenCalled();
+    nav.stop();
+    expect(reset).toHaveBeenCalledTimes(1);
+    nav.stop(); // repeated stop is idempotent
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(nav.start()).toBe(true);
+    deny(true);
+    expect(reset).toHaveBeenCalledTimes(2);
+    expect(nav.start()).toBe(true);
+    missionId.value = null;
+    await nextTick();
+    expect(reset).toHaveBeenCalledTimes(3);
+    expect(clear).toHaveBeenCalledTimes(3);
   });
 
   it("clears the GPS watch when subscription reports denial synchronously", () => {

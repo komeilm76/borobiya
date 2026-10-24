@@ -193,7 +193,8 @@ const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() =
 const mapReady = ref(false);
 const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
-  (camera) => routeMap?.easeTo(camera));
+  (camera) => routeMap?.easeTo(camera), undefined,
+  () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
 function onProfileChange(value: unknown): void {
   if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
 }
