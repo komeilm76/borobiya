@@ -32,6 +32,8 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain('aria-live="assertive"');
     expect(viewSource).toContain("rescuerLocation");
     expect(viewSource).toContain("prefers-reduced-motion");
+    expect(viewSource).toContain("redispatchNearest(requestId)");
+    expect(viewSource).toContain("quickDispatchFeedback");
 
     const appSource = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
     expect(appSource).toContain("/_admin/dispatch");

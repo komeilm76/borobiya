@@ -79,6 +79,10 @@
       {{ adminSos.errorMessage }}
     </v-alert>
 
+    <v-alert v-if="adminSos.quickDispatchFeedback" :type="adminSos.quickDispatchFeedback.type"
+      variant="tonal" rounded="lg" role="status" class="mb-4">
+      {{ adminSos.quickDispatchFeedback.message }}
+    </v-alert>
     <v-alert
       v-if="adminSos.urgentReplacement"
       class="replacement-flash mb-4"
@@ -100,7 +104,12 @@
           </p>
         </div>
         <div class="d-flex flex-wrap ga-2">
-          <v-btn color="error" variant="flat" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
+          <v-btn color="error" variant="flat" :loading="adminSos.dispatchSubmitting"
+            :disabled="adminSos.dispatchSubmitting"
+            @click="quickRedispatch(adminSos.urgentReplacement.sosRequestId)">
+            اعزام فوری به امدادگران جدید
+          </v-btn>
+          <v-btn color="error" variant="tonal" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
             مشاهدهٔ درخواست و اعزام
           </v-btn>
           <v-btn color="error" variant="text" @click="adminSos.dismissUrgentReplacement()">بستن هشدار</v-btn>
@@ -197,6 +206,12 @@
           <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
             :mission="selectedTimelineMission" audience="admin" />
         </div>
+        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
+          color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
+          :disabled="adminSos.dispatchSubmitting"
+          @click="quickRedispatch(adminSos.selectedRequest.id)">
+          اعزام فوری به امدادگران جدید
+        </v-btn>
         <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
           :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
         <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
@@ -710,6 +725,11 @@ function stopPulseLoop(): void {
     cancelAnimationFrame(pulseAnimationFrame);
   }
   pulseAnimationFrame = null;
+}
+
+function quickRedispatch(requestId: string): void {
+  focusReplacement(requestId);
+  void adminSos.redispatchNearest(requestId);
 }
 
 function focusReplacement(requestId: string): void {

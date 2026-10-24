@@ -1,11 +1,13 @@
 import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
 import type {
+  Mission,
   MissionProposal,
   NearestResponder,
   SosRequestRecord,
   SosRequestStatus
 } from "@shared/index";
+import { listActiveSosMissions } from "@/api/mission";
 import {
   dispatchSosResponders,
   getAdminSosRequest,
@@ -47,6 +49,7 @@ export interface AdminSosRuntime {
     requestId: string,
     accessToken: string
   ) => Promise<{ responders: NearestResponder[] }>;
+  listRequestMissions?: (accessToken: string, requestId: string, includeTerminal: boolean) => Promise<Mission[]>;
   dispatchResponders?: (
     requestId: string,
     rescuerIds: string[],
@@ -88,6 +91,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const selectedResponderIds = ref<string[]>([]);
   const dispatchSubmitting = ref(false);
   const dispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
+  const quickDispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
   const proposalsByRequestId = ref<Record<string, MissionProposal[]>>({});
 
   let attachedClient: RealtimeClient | null = null;
@@ -333,6 +337,64 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
   }
 
+  /** A deliberate one-click replacement action, not an automatic response to a socket alert. */
+  async function redispatchNearest(requestId: string): Promise<boolean> {
+    if (!isAdminSession.value || !auth.accessToken || dispatchSubmitting.value ||
+      !(replacementByRequest.value[requestId] || requests.value.some((item) =>
+        item.id === requestId && item.status === "cancelled_by_rescuer"))) return false;
+    const session = sessionGeneration;
+    const alertMissionId = replacementByRequest.value[requestId]?.missionId ?? null;
+    const gen = ++dispatchGeneration;
+    dispatchSubmitting.value = true;
+    quickDispatchFeedback.value = null;
+    const current = () => gen === dispatchGeneration && session === sessionGeneration && isAdminSession.value &&
+      (replacementByRequest.value[requestId]?.missionId ?? null) === alertMissionId;
+    const fail = (message: string) => {
+      if (current()) quickDispatchFeedback.value = { type: "error", message };
+      return false;
+    };
+    try {
+      const getRequest = activeOverrides.getRequest ?? getAdminSosRequest;
+      const record = await withAdminAuthRetry((token) => getRequest(requestId, token));
+      if (!record || !current()) return false;
+      if (record.id !== requestId) return fail("شناسهٔ درخواست پاسخ سرور مطابقت ندارد.");
+      requests.value = upsertSosAlert(requests.value, record).items;
+      if (record.status !== "cancelled_by_rescuer") {
+        const denied = fail("وضعیت درخواست تغییر کرده است؛ اعزام جایگزین مجاز نیست. صفحه را تازه‌سازی کنید.");
+        resolveReplacement(requestId);
+        return denied;
+      }
+      // Exclude every previously assigned rescuer, not only the latest cancel event: a
+      // freed rescuer can otherwise reappear among the nearest ten immediately after cancelling.
+      const listMissions = activeOverrides.listRequestMissions ?? listActiveSosMissions;
+      const past = await withAdminAuthRetry((token) => listMissions(token, requestId, true));
+      if (!past || !current()) return false;
+      const excluded = new Set(past.map((mission) => mission.rescuerId));
+      const latestCancelledRescuer = replacementByRequest.value[requestId]?.rescuerId;
+      if (latestCancelledRescuer) excluded.add(latestCancelledRescuer);
+      const nearest = activeOverrides.getNearestResponders ?? getNearestSosResponders;
+      const result = await withAdminAuthRetry((token) => nearest(requestId, token));
+      if (!result || !current()) return false;
+      const candidates = [...new Set(result.responders.map((responder) => responder.userId))]
+        .filter((id) => !excluded.has(id)).slice(0, 10);
+      if (!candidates.length) return fail("امدادگر جدید واجد شرایطی در میان نزدیک‌ترین افراد یافت نشد؛ انتخاب دستی را بررسی کنید.");
+      const dispatch = activeOverrides.dispatchResponders ?? dispatchSosResponders;
+      const sent = await withAdminAuthRetry((token) => dispatch(requestId, candidates, token));
+      if (!sent || !current()) return false;
+      proposalsByRequestId.value = { ...proposalsByRequestId.value, [requestId]: sent.proposals };
+      requests.value = upsertSosAlert(requests.value, { ...record, status: "dispatched" }).items;
+      refreshGeneration++; // An older queue response cannot undo this dispatch.
+      resolveReplacement(requestId);
+      quickDispatchFeedback.value = { type: "success",
+        message: `پیشنهاد جایگزین برای ${sent.proposals.length} امدادگر جدید ارسال شد.` };
+      return true;
+    } catch (err) {
+      return fail(friendlyErrorMessage(err, "اعزام جایگزین انجام نشد؛ دوباره تلاش کنید."));
+    } finally {
+      if (gen === dispatchGeneration) dispatchSubmitting.value = false;
+    }
+  }
+
   function resolveReplacement(requestId: string): void {
     if (!replacementByRequest.value[requestId]) return;
     const next = { ...replacementByRequest.value };
@@ -495,6 +557,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     urgentReplacement.value = null;
     nearestGeneration++;
     dispatchGeneration++;
+    quickDispatchFeedback.value = null;
     detachRealtime();
     requests.value = [];
     selectedId.value = null;
@@ -599,6 +662,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     selectedResponderIds,
     dispatchSubmitting,
     dispatchFeedback,
+    quickDispatchFeedback,
     proposalsByRequestId,
     selectedRequestProposals,
     canDispatchSelected,
@@ -612,6 +676,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     selectAllNearestResponders,
     clearResponderSelection,
     dispatchSelectedResponders,
+    redispatchNearest,
     handleIncomingPayload,
     selectRequest,
     setFilterStatus,

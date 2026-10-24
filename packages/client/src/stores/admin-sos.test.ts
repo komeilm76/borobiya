@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SosRequestRecord } from "@shared/index";
+import type { Mission, SosRequestRecord } from "@shared/index";
 import { ApiError } from "@/api/http";
 import { MISSION_CANCELLED_BY_RESCUER_EVENT, SOS_NEW_REQUEST_EVENT } from "@/services/socket-events";
 import { useAuthStore } from "./auth";
@@ -142,6 +142,74 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.selectedRequest?.status).toBe("dispatched");
     expect(store.urgentReplacement).toBeNull();
     expect(store.replacementByRequest[cancelled.id]).toBeUndefined();
+  });
+
+  it("re-dispatches immediately to up to ten new nearby responders, never a previously assigned rescuer", async () => {
+    const row = makeSosRecord({ status: "cancelled_by_rescuer" });
+    const old = "22222222-2222-4222-8222-222222222222";
+    const newId = "44444444-4444-4444-8444-444444444441";
+    const another = "44444444-4444-4444-8444-444444444442";
+    const past: Mission = { id: "11111111-1111-4111-8111-111111111111", sosRequestId: row.id,
+      requesterId: row.requesterId, rescuerId: old, status: "cancelled_by_rescuer", cancelledBy: "rescuer",
+      cancellationReasonId: null, cancellationCustomText: null, cancelledAt: row.createdAt,
+      createdAt: row.createdAt, updatedAt: row.createdAt };
+    const getRequest = vi.fn(async () => row);
+    const listRequestMissions = vi.fn(async () => [past]);
+    const getNearestResponders = vi.fn(async () => ({ responders: [old, newId, another].map((userId) => ({
+      userId, username: `r_${userId.slice(-4)}`, categoryName: "rescue", distance: 100,
+      avgRating: null, lastActiveAt: row.createdAt
+    })) }));
+    const dispatchResponders = vi.fn(async () => ({ proposals: [] }));
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [row], total: 1 }),
+      getRequest, listRequestMissions, getNearestResponders, dispatchResponders });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    expect(await store.redispatchNearest(row.id)).toBe(true); // works after reload without a socket alert
+    expect(listRequestMissions).toHaveBeenCalledWith("admin-jwt", row.id, true);
+    expect(getNearestResponders).toHaveBeenCalledWith(row.id, "admin-jwt");
+    expect(dispatchResponders).toHaveBeenCalledWith(row.id, [newId, another], "admin-jwt");
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.quickDispatchFeedback?.type).toBe("success");
+    expect(await store.redispatchNearest(row.id)).toBe(false); // no repeat after success
+  });
+
+  it("rechecks replacement status and refuses stale SOS, empty candidates, and late logout responses", async () => {
+    const row = makeSosRecord({ status: "cancelled_by_rescuer" });
+    const dispatchResponders = vi.fn(async () => ({ proposals: [] }));
+    let current = makeSosRecord({ status: "accepted" });
+    let finish!: (value: SosRequestRecord) => void;
+    const getRequest = vi.fn(async () => current);
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [row], total: 1 }), getRequest,
+      getNearestResponders: async () => ({ responders: [] }),
+      listRequestMissions: async () => [], dispatchResponders });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    expect(await store.redispatchNearest(row.id)).toBe(false);
+    expect(store.selectedRequest?.status).toBe("accepted");
+    expect(dispatchResponders).not.toHaveBeenCalled();
+    store.requests = [row];
+    current = row;
+    expect(await store.redispatchNearest(row.id)).toBe(false);
+    expect(store.quickDispatchFeedback?.message).toContain("یافت نشد");
+    const pending = new Promise<SosRequestRecord>((resolve) => { finish = resolve; });
+    getRequest.mockImplementationOnce(() => pending);
+    const running = store.redispatchNearest(row.id);
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    finish(row);
+    expect(await running).toBe(false);
+    expect(store.requests).toEqual([]);
+    expect(store.quickDispatchFeedback).toBeNull();
+    expect(dispatchResponders).not.toHaveBeenCalled();
   });
 
   it("does not expose dispatch while another mission remains active, or rehydrate after logout", async () => {

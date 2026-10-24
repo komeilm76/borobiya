@@ -95,7 +95,7 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | 3.3 Dispatch + nearest | 100% (4/4) | ✅ `T3.3.1`–`T3.3.4` complete: geodetic `ST_Distance` nearest qualified responder query (`0013`), `GET /_admin/sos/requests/:id/nearest`, row-locked `POST /_admin/sos/requests/:id/dispatch` emitting `sos:proposal-received` to `user:<id>`, and full `/_admin/dispatch` multi-select dispatch console |
 | 3.4 Proposals | 100% (6/6) | ✅ `T3.4.1`–`T3.4.6` (DDL, inbox, accept/decline, both busy guards, detailed rescuer UI); incident details are rescuer-scoped and photo access uses signed URLs. Next: mission status and cancellation. |
 | 3.5 Live mission + navigation | 88% (7/8) | ✅ `T3.5.1`–`T3.5.3` mission persistence, ordered progress and private updates; `T3.5.4` consent-based two-point post-accept map framing. Partial `T3.5.5` supplies an active-rescuer-scoped destination and car/bicycle/foot route preview; offline elevation is unavailable and OSRM cannot guarantee multiple alternatives, so T3.5.5 remains open. T3.5.6 supplies a selected-route GPS-follow camera with stop/cleanup; T3.5.7 adds consented requester/rescuer/admin location markers and last-seen badges in active mission rooms. T3.5.8 adds requester/admin committed-status timelines (including terminal missions) with server timestamps and live-notice re-reads; T3.5.5 remains partial |
-| 3.6 Cancellation + re-dispatch | 86% (6/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Cancellation detail reads expose actor/time/resolved reason; re-dispatch polish remains open |
+| 3.6 Cancellation + re-dispatch | 100% (7/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Cancellation detail reads expose actor/time/resolved reason; T3.6.6 adds explicit one-click replacement re-dispatch to previously unassigned nearest responders |
 | 3.7 History + rating | 25% (1/4) | ✅ `T3.7.1` scoped mission and SOS histories, indexed requester reads, deep-linked requester list/detail with signed-photo access and guarded cancellation; rating and full rescuer history/timeline remain pending |
 
 ### Phase 4 — Polish — 0%
@@ -127,6 +127,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-24 — Immediate admin replacement dispatch (T3.6.6)
+
+- The urgent replacement alert and a persisted cancelled-rescuer SOS now offer a deliberate one-click dispatch. The admin store rechecks the exact SOS (`cancelled_by_rescuer` required), reads all of its prior mission assignments, refreshes the nearest qualified responders, excludes all previously assigned rescuers, then immediately calls the existing row-locked dispatch endpoint with up to 10 new IDs. No socket event dispatches by itself. A newer alert/session invalidates stale replies, simultaneous submissions are suppressed, and a status conflict, zero new candidates or HTTP failure displays an actionable error while leaving the manual picker available. Success updates proposals and the queue and clears the replacement state. Pure store tests cover reload, previous rescuer exclusion, changed SOS status, no candidates and logout; no browser/VM acceptance run is claimed.
 
 ### 2026-10-24 — Cancellation detail reads (T3.6.7)
 
