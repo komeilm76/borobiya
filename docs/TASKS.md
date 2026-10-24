@@ -290,7 +290,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 - [x] **T4.1.2** Place search via Map Server: `GET /geocode?q=&limit=5&bbox=` → local Photon — completed 2026-10-24
   - The already-live Map Server `/geocode` gateway validates and bounds the query, proxies only to local Photon and returns GeoJSON (with 503/502 on upstream failures). The client now has a same-origin `searchPlaces` adapter: shared query validation, optional abort signal, bounded Photon point conversion into the shared place-result contract, malformed-hit filtering and OSM/fallback identity deduplication. Gateway, integration, and pure-TS adapter tests cover this path. The map search bar, result list and fly-to are **not** delivered here; they remain T4.1.4. No real VM/browser Photon run was performed in this task.
 - [ ] **T4.1.3** Reverse: `GET /reverse?lat=&lon=` on map click/long-press → bottom sheet copyable address
-- [ ] **T4.1.4** Frontend: search bar + result list + “fly to” on select
+- [x] **T4.1.4** Frontend: search bar + result list + “fly to” on select — completed 2026-10-24
+  - The map now offers a Persian-labeled place search panel, debounced 300 ms and bounded to the loaded map library; loading, empty, offline/retry and clear states are distinct. An abort plus generation guard invalidates old results immediately on edit, prevents a late reply from offering a stale target, and cancels on unmount. Results outside the map’s camera bounds are not offered. Selecting a current hit flies to it without a later history-load auto-frame pulling the camera back; an explicit “return to track” control restores track framing. Pure composable regressions and source-pinned view/panel invariants cover the behavior (no Vue mounting per repo convention). Real browser/VM verification remains pending; reverse-on-click is T4.1.3.
 
 ### 4.2 Routing Polish
 

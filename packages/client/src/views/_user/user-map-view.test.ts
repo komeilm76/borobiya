@@ -43,10 +43,28 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain("planOverlayRemoval");
   });
 
-  it("never moves the camera for a peer, only for a loaded track", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo)\(/g)).toHaveLength(2);
+  it("never moves the camera for a peer; only track framing and explicit place selection move it", () => {
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(3);
     expect(body("frameCamera")).toContain("fitBounds");
-    expect(body("paintLive")).not.toMatch(/fitBounds|easeTo/);
+    expect(body("frameCamera")).toContain("userPickedPlace.value");
+    expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
+    expect(body("selectPlace")).toContain("placeSearch.results.value.some");
+    expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
+    expect(body("selectPlace")).toContain("placeSearch.clear()");
+    expect(body("selectPlace")).toContain("instance.flyTo(");
+  });
+
+  it("renders search results and an explicit return-to-track action without mounting the map", () => {
+    const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
+    expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />');
+    expect(view).toContain('usePlaceSearch({');
+    expect(view).toContain('getMaxBounds()?.toArray().flat().join(",")');
+    expect(view).toContain('بازگشت به مسیر');
+    expect(search).toContain('v-for="place in api.results.value"');
+    expect(search).toContain("$emit('select', place)");
+    expect(search).toContain("api.failed.value");
+    expect(search).toContain("api.searched.value");
+    expect(search).toContain("api.run()");
   });
 
   it("renders the live panel and no longer claims that live positions are missing", () => {

@@ -30,6 +30,12 @@
       </v-card>
     </header>
 
+    <aside class="user-map-view__search">
+      <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
+      <v-btn v-if="userPickedPlace && playback.frames.value.length" size="small" color="primary"
+        variant="tonal" @click="showTrack">بازگشت به مسیر</v-btn>
+    </aside>
+
     <aside class="user-map-view__playback">
       <HistoryPlaybackPanel :api="playback" />
     </aside>
@@ -42,10 +48,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
+import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
+import type { GeocodeResult } from "@shared/index";
+import { usePlaceSearch } from "@/composables/use-place-search";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
 import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
@@ -74,7 +83,25 @@ const playback = useHistoryPlayback({
   refreshSession: () => auth.refreshSession()
 });
 const map = shallowRef<MapLibreMap | null>(null);
+const placeSearch = usePlaceSearch({
+  // Search the loaded library's coverage, not just the currently visible few streets. MapCanvas
+  // updates these bounds after /map-config arrives; the gateway keeps the query local to Photon.
+  bbox: () => map.value?.getMaxBounds()?.toArray().flat().join(","),
+  withinBounds: (place) => map.value?.getMaxBounds()?.contains([place.lon, place.lat]) ?? true
+});
 let fittedFor: string | null = null;
+const userPickedPlace = ref(false);
+
+function selectPlace(place: GeocodeResult): void {
+  const instance = map.value;
+  if (!instance || !placeSearch.results.value.some((result) => result.placeId === place.placeId)) return;
+  // A map restricted to an installed region would silently clamp a hit outside that region.
+  const bounds = instance.getMaxBounds();
+  if (bounds && !bounds.contains([place.lon, place.lat])) return;
+  userPickedPlace.value = true;
+  placeSearch.clear();
+  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(15, instance.getMaxZoom()), duration: 700 });
+}
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
 
@@ -158,7 +185,7 @@ function paintPlayback(): void {
 function frameCamera(): void {
   const instance = map.value;
   const track = playback.frames.value;
-  if (!instance || track.length === 0) return;
+  if (!instance || track.length === 0 || userPickedPlace.value) return;
   const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}`;
   if (fittedFor === key) return;
   fittedFor = key;
@@ -171,6 +198,12 @@ function frameCamera(): void {
   }
   const only = track[0]!;
   instance.easeTo({ center: [only.lon, only.lat], duration: 500 });
+}
+
+function showTrack(): void {
+  userPickedPlace.value = false;
+  fittedFor = null;
+  frameCamera();
 }
 
 function repaintOverlays(): void {
@@ -302,6 +335,17 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   flex: 0 0 auto;
 }
 
+.user-map-view__search {
+  position: absolute;
+  z-index: 3;
+  inset-block-start: 6rem;
+  inset-inline-end: 1rem;
+  width: min(25rem, calc(100% - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .user-map-view__playback {
   position: absolute;
   z-index: 2;
@@ -352,11 +396,17 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
     width: min(24rem, calc(100% - 1.3rem));
   }
 
+  .user-map-view__search {
+    inset-block-start: 5.7rem;
+    inset-inline-end: 0.65rem;
+    width: min(24rem, calc(100% - 1.3rem));
+  }
+
   .user-map-view__playback {
-    inset-block-start: 5.9rem;
+    inset-block-start: 11rem;
     inset-inline-start: 0.65rem;
     width: min(20rem, calc(100% - 1.3rem));
-    max-height: calc(100% - 7rem);
+    max-height: calc(100% - 12rem);
   }
 
   .user-map-view__toolbar-card {
