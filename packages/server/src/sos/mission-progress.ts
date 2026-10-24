@@ -46,6 +46,32 @@ export async function registerMissionProgressRoutes(
   });
 
 
+  const ratingRoute = apiRoutes.sos.rateMission;
+  app.post(ratingRoute.url, async (request, reply) => {
+    const response = reply.header("cache-control", "no-store");
+    const user = request.authenticatedUser;
+    if (!user) return response.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const params = ratingRoute.schema.params.safeParse(request.params);
+    if (!params.success || user.role !== "user") return response.code(404).send({
+      error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
+    });
+    const body = ratingRoute.schema.body.safeParse(request.body);
+    if (!body.success) return response.code(400).send({ error: true, code: "VALIDATION_ERROR",
+      message: "Invalid mission rating.",
+      issues: body.error.issues.map(({ code, message, path }) => ({ code, message, path })) });
+    const result = await store.rateMission?.(params.data.id, user.userId, body.data) ?? "not_found";
+    if (result === "not_found") return response.code(404).send({
+      error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
+    });
+    if (result === "not_completed") return response.code(409).send({
+      error: true, code: "MISSION_NOT_COMPLETED", message: "Only completed missions may be rated.", issues: []
+    });
+    if (result === "already_rated") return response.code(409).send({
+      error: true, code: "MISSION_ALREADY_RATED", message: "You have already rated this mission.", issues: []
+    });
+    return response.code(200).send();
+  });
+
   const listRoute = apiRoutes.sos.listMissions;
   app.get(listRoute.url, async (request, reply) => {
     const user = request.authenticatedUser;

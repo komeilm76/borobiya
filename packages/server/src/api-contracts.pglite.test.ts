@@ -964,6 +964,52 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       `SELECT "from_status", "to_status" FROM "mission_status_history" WHERE "mission_id" = $1 AND "to_status" = 'on_the_way'`,
       [accepted.missionId]
     )).rows).toEqual([{ from_status: "pending", to_status: "on_the_way" }]);
+    const rateUrl = apiRoutes.sos.rateMission.url.replace(":id", accepted.missionId);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 409, {
+      url: rateUrl, headers: requesterHeaders, payload: { rating: 5 }
+    })).code).toBe("MISSION_NOT_COMPLETED");
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 404, {
+      url: rateUrl, headers: responderHeaders, payload: { rating: 5 }
+    })).code).toBe("MISSION_NOT_FOUND");
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 404, {
+      url: rateUrl, headers: adminHeaders, payload: { rating: 5 }
+    })).code).toBe("MISSION_NOT_FOUND");
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 400, {
+      url: rateUrl, headers: requesterHeaders, payload: { rating: 0 }
+    })).code).toBe("VALIDATION_ERROR");
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 400, {
+      url: rateUrl, headers: requesterHeaders, payload: { rating: 5, comment: "x".repeat(501) }
+    })).code).toBe("VALIDATION_ERROR");
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 404, {
+      url: apiRoutes.sos.rateMission.url.replace(":id", "00000000-0000-4000-8000-000000000099"),
+      headers: requesterHeaders, payload: { rating: 5 }
+    })).code).toBe("MISSION_NOT_FOUND");
+    // An independent completed request exercises the writer without changing the
+    // active request subsequently used to audit rescuer cancellation and replacement.
+    const ratedRequestId = "99000000-0000-4000-8000-000000000004";
+    const ratedMissionId = "99000000-0000-4000-8000-000000000003";
+    await pg.query(`INSERT INTO sos_requests (id,requester_id,severity,description,incident_type_id,location,status)
+      SELECT $1,requester_id,severity,description,incident_type_id,location,'completed'
+      FROM sos_requests WHERE id=$2`, [ratedRequestId, competing[0]!.sosId]);
+    await pg.query(`INSERT INTO missions (id,sos_request_id,requester_id,rescuer_id,status)
+      SELECT $1,$2,requester_id,rescuer_id,'completed' FROM missions WHERE id=$3`,
+    [ratedMissionId, ratedRequestId, accepted.missionId]);
+    const completedRateUrl = apiRoutes.sos.rateMission.url.replace(":id", ratedMissionId);
+    await callContract(apiRoutes.sos.rateMission, 200, {
+      url: completedRateUrl, headers: requesterHeaders, payload: { rating: 4, comment: "  Thank you!  " }
+    });
+    expect((await pg.query<{ rating: number; comment: string | null }>(
+      `SELECT rating,comment FROM mission_ratings WHERE mission_id=$1`, [ratedMissionId]
+    )).rows).toEqual([{ rating: 4, comment: "Thank you!" }]);
+    expect(Number((await pg.query<{ avg_rating: string | null }>(
+      `SELECT avg_rating FROM users WHERE id=$1`, [createdResponder.id]
+    )).rows[0]?.avg_rating)).toBe(4);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.rateMission, 409, {
+      url: completedRateUrl, headers: requesterHeaders, payload: { rating: 1 }
+    })).code).toBe("MISSION_ALREADY_RATED");
+    expect((await pg.query<{ rating: number }>(
+      `SELECT rating FROM mission_ratings WHERE mission_id=$1`, [ratedMissionId]
+    )).rows).toEqual([{ rating: 4 }]);
     const inboxAfterAccept = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
       url: apiRoutes.sos.listProposals.url, headers: responderHeaders
     });

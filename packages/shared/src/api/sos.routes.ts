@@ -301,7 +301,7 @@ export const sosRoutes = {
     schema: {
       params: missionParamsSchema,
       body: missionRatingSchema,
-      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 404: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "sosRateMission",

@@ -1,8 +1,8 @@
 import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail } from "@borobiya/shared";
+import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail, MissionRatingInput } from "@borobiya/shared";
 import { readCancellationReason } from "./cancellation-detail";
 import type { Database } from "./client";
-import { missions, missionStatusHistory, sosRequests, users } from "./schema";
+import { missions, missionRatings, missionStatusHistory, sosRequests, users } from "./schema";
 
 const NEXT_STATUS: Partial<Record<MissionStatus, MissionProgressStatus>> = {
   pending: "on_the_way",
@@ -17,6 +17,8 @@ export type MissionProgressResult =
   | { status: "invalid_transition"; currentStatus: MissionStatus }
   | { status: "updated" | "unchanged"; mission: Mission };
 
+export type MissionRatingResult = "rated" | "not_found" | "not_completed" | "already_rated";
+
 export interface MissionProgressStore {
   findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
   findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null>;
@@ -27,6 +29,8 @@ export interface MissionProgressStore {
   findTimeline?(missionId: string, userId: string, role: "admin" | "user"): Promise<MissionTimeline | null>;
   getCancellationReason?(id: string | null, customText: string | null): Promise<CancellationReasonDetail | null>;
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
+  /** Atomic insert; only the requester may rate a completed mission once. */
+  rateMission?(missionId: string, requesterId: string, input: MissionRatingInput): Promise<MissionRatingResult>;
   /** Only active-mission participants or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
   /** Active, participant-scoped sender role; admins observe but never publish GPS to a mission. */
@@ -50,6 +54,23 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     const [row] = await this.db.select().from(missions).where(and(eq(missions.id, id),
       role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
     return row ? toMission(row) : null;
+  }
+
+  async rateMission(missionId: string, requesterId: string, input: MissionRatingInput): Promise<MissionRatingResult> {
+    // This lookup is requester-scoped: foreign and unknown missions have the same result.
+    const [mission] = await this.db.select({ status: missions.status, rescuerId: missions.rescuerId })
+      .from(missions).where(and(eq(missions.id, missionId), eq(missions.requesterId, requesterId))).limit(1);
+    if (!mission) return "not_found";
+    if (mission.status !== "completed") return "not_completed";
+    // The unique index is the concurrency arbiter. A read-then-insert duplicate check
+    // would allow simultaneous retries to race into a 500; the trigger also verifies
+    // the completed mission and participant identities in the writing transaction.
+    const inserted = await this.db.insert(missionRatings).values({
+      missionId, raterId: requesterId, rateeId: mission.rescuerId,
+      rating: input.rating, comment: input.comment || null
+    }).onConflictDoNothing({ target: [missionRatings.missionId, missionRatings.raterId] })
+      .returning({ id: missionRatings.id });
+    return inserted.length ? "rated" : "already_rated";
   }
 
   async findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null> {

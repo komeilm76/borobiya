@@ -62,6 +62,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "sosAcceptProposal",
   "sosDeclineProposal",
   "sosUpdateMissionStatus",
+  "sosRateMission",
   "sosListCancellationReasons",
   "sosCancelRequest",
   "sosListMissions",

@@ -125,7 +125,7 @@ export type RescuerCancellationInput = z.infer<typeof rescuerCancellationSchema>
 
 export const missionRatingSchema = z.strictObject({
   rating: z.number().int().min(1).max(5),
-  comment: z.string().trim().optional()
+  comment: z.string().trim().max(500).optional()
 });
 export type MissionRatingInput = z.infer<typeof missionRatingSchema>;
 

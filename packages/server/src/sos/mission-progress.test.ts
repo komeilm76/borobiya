@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import { describe, expect, it, vi } from "vitest";
-import type { MissionProgressStore } from "../db/mission-progress-store";
+import type { MissionProgressStore, MissionRatingResult } from "../db/mission-progress-store";
 import { registerMissionProgressRoutes } from "./mission-progress";
 import { MISSION_STATUS_UPDATED_EVENT, missionRoom, userRoom, type RoomEmitter } from "../realtime/socket";
 import { missionStatusUpdatedEventSchema } from "@borobiya/shared";
@@ -16,9 +16,10 @@ const mission = {
   cancellationCustomText: null, cancelledAt: null, createdAt: now, updatedAt: now
 };
 
-async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceStatus"]>>, signedIn = true, io?: RoomEmitter) {
+async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceStatus"]>>, signedIn = true, io?: RoomEmitter, rating: MissionRatingResult = "rated") {
   const app = Fastify({ logger: false });
   const advanceStatus = vi.fn(async () => result);
+  const rateMission = vi.fn(async () => rating);
   app.addHook("onRequest", async (request) => {
     request.authenticatedUser = signedIn ? {
       userId: rescuerId, role: "user", sessionId: randomUUID(), deviceId: randomUUID(),
@@ -27,11 +28,11 @@ async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceSt
     } : null;
   });
   await registerMissionProgressRoutes(app, {
-    advanceStatus, findMission: async () => null, findNavigationTarget: async () => null,
+    advanceStatus, rateMission, findMission: async () => null, findNavigationTarget: async () => null,
     listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 })
   }, io);
   await app.ready();
-  return { app, advanceStatus };
+  return { app, advanceStatus, rateMission };
 }
 
 describe("PATCH /_user/missions/:id/status", () => {
@@ -144,5 +145,50 @@ describe("PATCH /_user/missions/:id/status", () => {
       expect((await app.inject({ method: "PATCH", url: `/_user/missions/${missionId}/status`, payload: { status: "on_the_way" } })).statusCode).toBe(401);
       expect(advanceStatus).not.toHaveBeenCalled();
     } finally { await app.close(); }
+  });
+});
+
+
+describe("POST /_user/missions/:id/rate", () => {
+  const url = `/_user/missions/${missionId}/rate`;
+  it("rejects unauthenticated, invalid, and malformed requests before reaching storage", async () => {
+    const { app: anonymous, rateMission: anonymousWrite } = await appFor({ status: "not_found" }, false);
+    try {
+      const reply = await anonymous.inject({ method: "POST", url, payload: { rating: 5 } });
+      expect(reply.statusCode).toBe(401);
+      expect(reply.headers["cache-control"]).toBe("no-store");
+      expect(anonymousWrite).not.toHaveBeenCalled();
+    } finally { await anonymous.close(); }
+    const { app, rateMission } = await appFor({ status: "not_found" });
+    try {
+      for (const payload of [
+        { rating: 0 }, { rating: 6 }, { rating: 2.5 }, { rating: "5" },
+        { rating: 5, comment: "x".repeat(501) }, { rating: 5, unwanted: true }
+      ]) {
+        const reply = await app.inject({ method: "POST", url, payload });
+        expect(reply.statusCode).toBe(400);
+        expect(reply.json().code).toBe("VALIDATION_ERROR");
+      }
+      expect((await app.inject({ method: "POST", url: "/_user/missions/bad-id/rate", payload: { rating: 5 } })).statusCode).toBe(404);
+      expect(rateMission).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+
+  it("trims comments, returns an empty success and maps ownership/state/duplicate outcomes", async () => {
+    for (const [result, status, code] of [
+      ["rated", 200, null], ["not_found", 404, "MISSION_NOT_FOUND"],
+      ["not_completed", 409, "MISSION_NOT_COMPLETED"],
+      ["already_rated", 409, "MISSION_ALREADY_RATED"]
+    ] as const) {
+      const { app, rateMission } = await appFor({ status: "not_found" }, true, undefined, result);
+      try {
+        const reply = await app.inject({ method: "POST", url, payload: { rating: 5, comment: "  thanks  " } });
+        expect(reply.statusCode).toBe(status);
+        expect(reply.headers["cache-control"]).toBe("no-store");
+        if (code) expect(reply.json().code).toBe(code);
+        else expect(reply.body).toBe("");
+        expect(rateMission).toHaveBeenCalledWith(missionId, rescuerId, { rating: 5, comment: "thanks" });
+      } finally { await app.close(); }
+    }
   });
 });
