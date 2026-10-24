@@ -62,6 +62,75 @@ describe("proposal inbox", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("serializes accept clicks, remembers a committed mission and clears other pending offers", async () => {
+    let resolve!: (id: string) => void;
+    const waiting = new Promise<string>((done) => { resolve = done; });
+    const accept = vi.fn(async () => waiting);
+    configureProposalInboxForTests({
+      list: async () => page([proposal, { ...proposal, id: "66666666-6666-4666-8666-666666666666" }]),
+      accept,
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() })
+    });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(2));
+    auth.initialized = true;
+    const first = inbox.decide(proposal.id, "accept");
+    expect(inbox.decidingId).toBe(proposal.id);
+    expect(await inbox.decide(proposal.id, "accept")).toBe(false);
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledOnce());
+    resolve("77777777-7777-4777-8777-777777777777");
+    expect(await first).toBe(true);
+    expect(inbox.acceptedMissionId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(inbox.proposals).toEqual([]);
+  });
+
+  it("passes an optional decline reason and loads further pages instead of hiding offers beyond twenty", async () => {
+    const decline = vi.fn(async () => undefined);
+    const list = vi.fn(async (_token: string, currentPage = 1) => ({
+      ...page([proposal]), page: currentPage, total: 21, totalPages: 2
+    }));
+    configureProposalInboxForTests({ list, decline, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.totalPages).toBe(2));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(list).toHaveBeenCalledWith("rescuer-token", 2));
+    expect(await inbox.decide(proposal.id, "decline", "Unavailable today")).toBe(true);
+    expect(decline).toHaveBeenCalledWith("rescuer-token", proposal.id, "Unavailable today");
+  });
+
+  it("does not let a late decision response restore another account's inbox", async () => {
+    let resolve!: (id: string) => void;
+    const waiting = new Promise<string>((done) => { resolve = done; });
+    configureProposalInboxForTests({
+      list: async () => page([proposal]), accept: async () => waiting,
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() })
+    });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(1));
+    auth.initialized = true;
+    const decision = inbox.decide(proposal.id, "accept");
+    await vi.waitFor(() => expect(inbox.decidingId).toBe(proposal.id));
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    resolve("77777777-7777-4777-8777-777777777777");
+    await decision;
+    expect(inbox.acceptedMissionId).toBeNull();
+    expect(inbox.total).toBe(0);
+  });
+
   it("ignores a late inbox reply from the previous account", async () => {
     let resolve!: (result: ReturnType<typeof page>) => void;
     const pending = new Promise<ReturnType<typeof page>>((done) => { resolve = done; });

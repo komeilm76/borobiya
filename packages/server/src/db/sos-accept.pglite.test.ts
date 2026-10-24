@@ -4,7 +4,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "./client";
 import * as schema from "./schema";
-import { DrizzleSosDispatchStore } from "./sos-dispatch-store";
+import { DrizzleSosDispatchStore, missionProposalPayload } from "./sos-dispatch-store";
+import { proposalInboxItemSchema } from "@borobiya/shared";
 
 const REQUESTER = "10000000-0000-4000-8000-000000000001";
 const RESCUER = "20000000-0000-4000-8000-000000000002";
@@ -43,6 +44,33 @@ describe("atomic proposal acceptance (migrated PGlite)", () => {
     store = new DrizzleSosDispatchStore(drizzle(pg, { schema }) as unknown as Database);
   });
   afterAll(async () => { await pg.close(); });
+
+  it("lists only this rescuer's pending offers with incident, requester, photo and coordinates", async () => {
+    await pg.exec(`CREATE FUNCTION ST_X(point geometry) RETURNS double precision LANGUAGE SQL IMMUTABLE AS $$
+      SELECT split_part(split_part(point::text, '(', 2), ' ', 1)::double precision $$;
+      CREATE FUNCTION ST_Y(point geometry) RETURNS double precision LANGUAGE SQL IMMUTABLE AS $$
+      SELECT split_part(split_part(point::text, ' ', 2), ')', 1)::double precision $$;`);
+    await pg.query(`UPDATE "sos_requests" SET "photo_url" = '/uploads/evidence.png' WHERE "id" = $1`, [SOS[0]]);
+    const first = await store.listPendingProposals(RESCUER, 1, 1);
+    expect(first.total).toBe(2);
+    expect(first.items).toHaveLength(1);
+    expect(proposalInboxItemSchema.parse({ ...missionProposalPayload(first.items[0]!), details: first.items[0]!.details })).toMatchObject({
+      id: first.items[0]?.id
+    });
+    expect(first.items[0]?.details).toMatchObject({
+      incidentTypeName: "Rescue", requesterName: "accept_requester",
+      sosRequest: {
+        severity: "high", description: "A person needs urgent rescue.",
+        location: { lat: 35.7, lon: 51.4, isManual: false }
+      }
+    });
+    const second = await store.listPendingProposals(RESCUER, 2, 1);
+    expect(second.total).toBe(2);
+    expect(second.items).toHaveLength(1);
+    expect(second.items[0]?.id).not.toBe(first.items[0]?.id);
+    expect([first.items[0], second.items[0]].some((item) => item?.details?.sosRequest.photoUrl === '/uploads/evidence.png')).toBe(true);
+    expect(await store.listPendingProposals(REQUESTER, 1, 20)).toEqual({ items: [], total: 0 });
+  });
 
   it("rolls back all acceptance writes if the history insert fails", async () => {
     await pg.exec(`CREATE FUNCTION reject_accept_history() RETURNS trigger LANGUAGE plpgsql AS $$

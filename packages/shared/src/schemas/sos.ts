@@ -73,6 +73,22 @@ export const missionProposalSchema = z.strictObject({
 });
 export type MissionProposal = z.infer<typeof missionProposalSchema>;
 
+/** The inbox includes only the incident attached to the caller's own pending offer. */
+export const proposalInboxItemSchema = missionProposalSchema.extend({
+  details: z.strictObject({
+    incidentTypeName: z.string(),
+    requesterName: usernameSchema,
+    sosRequest: z.strictObject({
+      severity: severitySchema,
+      description: z.string(),
+      location: sosLocationSchema,
+      photoUrl: z.string().nullable(),
+      createdAt: timestampSchema
+    })
+  }).optional()
+});
+export type ProposalInboxItem = z.infer<typeof proposalInboxItemSchema>;
+
 export const sosRequestParamsSchema = idParamsSchema;
 export type SosRequestParams = z.infer<typeof sosRequestParamsSchema>;
 

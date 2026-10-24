@@ -66,6 +66,11 @@ export const routeRecords: RouteRecordRaw[] = [
     component: () => import("@client/views/_user/UserLocationSharesView.vue")
   },
   {
+    path: "/_user/proposals",
+    name: "user-proposals",
+    component: () => import("@client/views/_user/UserProposalsView.vue")
+  },
+  {
     path: "/_user/sos-history",
     name: "user-sos-history",
     component: () => import("@client/views/_user/PlaceholderView.vue"),

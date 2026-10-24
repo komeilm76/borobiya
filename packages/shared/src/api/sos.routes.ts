@@ -17,6 +17,7 @@ import {
   nearestRespondersResponseSchema,
   proposalAcceptResponseSchema,
   proposalDeclineSchema,
+  proposalInboxItemSchema,
   sosRequestCreatedSchema,
   sosRequestParamsSchema,
   sosRequestRecordSchema,
@@ -150,7 +151,7 @@ export const sosRoutes = {
     url: "/_user/sos/proposals",
     schema: {
       query: proposalListQuerySchema,
-      responses: { 200: paginatedResponseSchema(missionProposalSchema), 400: errorSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 200: paginatedResponseSchema(proposalInboxItemSchema), 400: errorSchema, 401: errorSchema, 403: errorSchema }
     },
     meta: {
       operationId: "sosListProposals",

@@ -21,7 +21,7 @@
 13. [Active Devices & Priority Device](#13-active-devices--priority-device)
 14. [SOS — Requesting Help](#14-sos--requesting-help)
 15. [SOS — Admin Dispatch — Planned](#15-sos--admin-dispatch--planned)
-16. [SOS — Responding as Rescuer — Planned](#16-sos--responding-as-rescuer--planned)
+16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
 18. [Cancellation — Planned](#18-cancellation--planned)
 19. [History & Rating — Planned](#19-history--rating--planned)
@@ -258,13 +258,13 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ---
 
-## 16. SOS — Responding as Rescuer — Planned
+## 16. SOS — Responding as Rescuer
 
-> **Current status:** Rescuer proposal inbox, accept/decline handlers, and in-app navigation remain planned under T3.4–T3.5.
+> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. Post-accept navigation and mission status controls remain planned under T3.5.
 
 ### Inbox
 
-- **Bell icon** with unread count → click → list of proposals (incident, severity, distance, requester, photo, description).
+- **Bell icon** with pending count → choose an offer or open `/_user/proposals` for all pages. Select an offer to see its incident and requester, description, on-map location, and photo (if attached). Choose “محاسبهٔ فاصله با اجازهٔ شما” for an optional straight-line distance; it is **not** a travel-time estimate. The photo uses a short-lived participant-only URL; you can request it again if it expires.
 
 ### Rules
 
@@ -274,9 +274,8 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 ### Accept
 
 1. Tap **Accept** on a proposal.
-2. Map **fits both points** (you + requester).
-3. Other proposals auto-declined.
-4. Tap **Go to Incident Location** → choose transport → see routes → **Start Navigation** (§10).
+2. Confirm the decision; other proposals auto-decline after acceptance.
+3. The accepted mission ID is shown. Navigation, mission status controls, and routing are not yet available (T3.5).
 
 [Screenshot: Proposal inbox + Accept]
 
@@ -407,6 +406,7 @@ Each update appears as **timeline** to requester + admin.
 | Location Shares | `/_user/location-shares` |
 | Full map (live companions + playback) | `/_user/map` |
 | Active Devices & Priority Device | `/_user/devices` |
+| Rescue proposal inbox | `/_user/proposals` |
 | SOS History *(planned)* | `/_user/sos-history` |
 | Settings *(planned)* | `/_user/settings` |
 | Admin Dashboard *(planned)* | `/_admin/dashboard` |

@@ -55,11 +55,13 @@
             <v-list-item
               v-for="proposal in proposalInbox.proposals"
               :key="proposal.id"
-              :title="`درخواست امداد ${proposal.sosRequestId.slice(0, 8)}`"
+              :title="proposal.details?.incidentTypeName ?? `درخواست امداد ${proposal.sosRequestId.slice(0, 8)}`"
               :subtitle="new Date(proposal.createdAt).toLocaleString('fa-IR')"
               prepend-icon="mdi-lifebuoy"
+              :to="{ path: '/_user/proposals', query: { offer: proposal.id } }"
             />
-            <v-list-item v-if="proposalInbox.total > proposalInbox.proposals.length" title="۲۰ مورد نخست نمایش داده می‌شود؛ فهرست کامل در مرحلهٔ بعد اضافه می‌شود." />
+            <v-divider />
+            <v-list-item title="مشاهدهٔ همهٔ پیشنهادها" prepend-icon="mdi-arrow-left" to="/_user/proposals" />
           </v-list>
         </v-menu>
         <v-btn class="nav-button d-none d-sm-flex" to="/_public/landing" variant="text" rounded="lg">
@@ -203,6 +205,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   return [
     { to: "/_user/dashboard", label: "پیشخوان", icon: "mdi-view-dashboard-outline" },
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
+    { to: "/_user/proposals", label: proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
     { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
     { to: "/_user/devices", label: "دستگاه‌ها", icon: "mdi-devices" }
   ];

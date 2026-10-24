@@ -4,6 +4,7 @@ import type { Database } from "./client";
 import {
   adminAuditLog,
   categories,
+  incidentTypes,
   categoryIncidentTypes,
   categoryUsers,
   missions,
@@ -32,6 +33,20 @@ export interface MissionProposalRecord {
   rescuerId: string;
   status: MissionProposalStatus;
   createdAt: Date;
+}
+
+export interface PendingProposalRecord extends MissionProposalRecord {
+  details?: {
+    incidentTypeName: string;
+    requesterName: string;
+    sosRequest: {
+      severity: SosRequestRecord["severity"];
+      description: string;
+      location: { lat: number; lon: number; accuracy?: number; isManual: boolean };
+      photoUrl: string | null;
+      createdAt: string;
+    };
+  };
 }
 
 export function missionProposalPayload(proposal: MissionProposalRecord) {
@@ -91,7 +106,7 @@ export interface SosDispatchStore {
   findNearestResponders(sosRequestId: string, limit?: number): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
-  listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: MissionProposalRecord[]; total: number }>;
+  listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }>;
 }
 
 function toValidDate(value: Date | string): Date {
@@ -500,21 +515,52 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
     return existing.status === "declined" ? "declined" : "not_pending";
   }
 
-  public async listPendingProposals(rescuerId: string, page: number, limit: number): Promise<{ items: MissionProposalRecord[]; total: number }> {
+  public async listPendingProposals(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }> {
     const where = and(eq(missionProposals.rescuerId, rescuerId), eq(missionProposals.status, "pending"));
-    const [items, totals] = await Promise.all([
+    const [rows, totals] = await Promise.all([
       this.db.select({
         id: missionProposals.id,
         sosRequestId: missionProposals.sosRequestId,
         rescuerId: missionProposals.rescuerId,
         status: missionProposals.status,
-        createdAt: missionProposals.createdAt
-      }).from(missionProposals).where(where)
+        createdAt: missionProposals.createdAt,
+        incidentTypeName: incidentTypes.name,
+        requesterName: users.username,
+        severity: sosRequests.severity,
+        description: sosRequests.description,
+        lat: sql<number>`ST_Y(${sosRequests.location}::geometry)`,
+        lon: sql<number>`ST_X(${sosRequests.location}::geometry)`,
+        accuracy: sosRequests.accuracy,
+        isManual: sosRequests.isManual,
+        photoUrl: sosRequests.photoUrl,
+        requestCreatedAt: sosRequests.createdAt
+      }).from(missionProposals)
+        .innerJoin(sosRequests, eq(sosRequests.id, missionProposals.sosRequestId))
+        .innerJoin(incidentTypes, eq(incidentTypes.id, sosRequests.incidentTypeId))
+        .innerJoin(users, eq(users.id, sosRequests.requesterId))
+        .where(where)
         .orderBy(desc(missionProposals.createdAt), asc(missionProposals.id))
         .limit(limit).offset((page - 1) * limit),
       this.db.select({ total: count() }).from(missionProposals).where(where)
     ]);
-    return { items, total: totals[0]?.total ?? 0 };
+    // The WHERE is scoped to the verified rescuer before any joined incident, photo or
+    // requester details can enter the response. Coordinates are returned only for that offer.
+    return { items: rows.map((row) => ({
+      id: row.id, sosRequestId: row.sosRequestId, rescuerId: row.rescuerId,
+      status: row.status, createdAt: toValidDate(row.createdAt),
+      details: {
+        incidentTypeName: row.incidentTypeName,
+        requesterName: row.requesterName,
+        sosRequest: {
+          severity: row.severity, description: row.description,
+          location: {
+            lat: Number(row.lat), lon: Number(row.lon), isManual: row.isManual,
+            ...(row.accuracy === null ? {} : { accuracy: Number(row.accuracy) })
+          },
+          photoUrl: row.photoUrl, createdAt: toValidDate(row.requestCreatedAt).toISOString()
+        }
+      }
+    })), total: totals[0]?.total ?? 0 };
   }
 
   public async listProposalsByRequest(sosRequestId: string): Promise<MissionProposalRecord[]> {

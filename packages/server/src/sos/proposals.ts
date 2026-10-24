@@ -23,7 +23,7 @@ export async function registerSosProposalRoutes(
     const { page, limit } = parsed.data;
     const result = await store.listPendingProposals?.(user.userId, page, limit) ?? { items: [], total: 0 };
     return reply.header("cache-control", "no-store").send({
-      items: result.items.map(missionProposalPayload),
+      items: result.items.map((item) => ({ ...missionProposalPayload(item), ...(item.details ? { details: item.details } : {}) })),
       total: result.total,
       page, limit,
       totalPages: Math.ceil(result.total / limit)

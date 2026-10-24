@@ -1,13 +1,17 @@
 import { computed, ref, watch } from "vue";
 import { defineStore } from "pinia";
-import { sosProposalReceivedEventSchema, type MissionProposal } from "@shared/index";
-import { listPendingProposals } from "@/api/proposals";
+import { sosProposalReceivedEventSchema, type ProposalInboxItem } from "@shared/index";
+import { acceptProposal, declineProposal, listPendingProposals } from "@/api/proposals";
+import { ApiError } from "@/api/http";
+import { friendlyErrorMessage } from "@/api/error-message";
 import { SOS_PROPOSAL_RECEIVED_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { useAuthStore } from "./auth";
 
 export interface ProposalInboxRuntime {
   list?: typeof listPendingProposals;
+  accept?: typeof acceptProposal;
+  decline?: typeof declineProposal;
   openSocket?: (token: string) => Promise<RealtimeClient>;
 }
 let runtime: ProposalInboxRuntime = {};
@@ -19,7 +23,12 @@ const POLL_INTERVAL_MS = 30_000;
 
 export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   const auth = useAuthStore();
-  const proposals = ref<MissionProposal[]>([]);
+  const proposals = ref<ProposalInboxItem[]>([]);
+  const page = ref(1);
+  const totalPages = ref(0);
+  const decidingId = ref<string | null>(null);
+  const decisionError = ref<string | null>(null);
+  const acceptedMissionId = ref<string | null>(null);
   const total = ref(0);
   const loading = ref(false);
   const failed = ref(false);
@@ -34,19 +43,68 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   async function refresh(): Promise<void> {
     const userId = identity.value;
     const token = auth.accessToken;
-    if (!userId || !token) return;
+    if (!userId || !token || acceptedMissionId.value) return;
     const gen = ++generation;
     loading.value = true;
     try {
-      const page = await (runtime.list ?? listPendingProposals)(token);
+      const result = await (runtime.list ?? listPendingProposals)(token, page.value);
       if (gen !== generation || identity.value !== userId) return;
-      proposals.value = page.items;
-      total.value = page.total;
+      proposals.value = result.items;
+      total.value = result.total;
+      totalPages.value = result.totalPages;
       failed.value = false;
     } catch {
       if (gen === generation && identity.value === userId) failed.value = true;
     } finally {
       if (gen === generation) loading.value = false;
+    }
+  }
+
+  function setPage(next: number): void {
+    if (!Number.isInteger(next) || next < 1 || next === page.value) return;
+    page.value = next;
+    void refresh();
+  }
+
+  async function decide(id: string, action: "accept" | "decline", reason?: string): Promise<boolean> {
+    // Lock before the first await; a double-click cannot create two concurrent writes.
+    const userId = identity.value;
+    if (decidingId.value || acceptedMissionId.value || !userId || !proposals.value.some((item) => item.id === id)) return false;
+    decidingId.value = id;
+    decisionError.value = null;
+    const session = sessionGeneration;
+    try {
+      await auth.ensureSession();
+      if (identity.value !== userId || session !== sessionGeneration || !auth.accessToken) return false;
+      if (action === "accept") {
+        const missionId = await (runtime.accept ?? acceptProposal)(auth.accessToken, id);
+        if (identity.value === userId && session === sessionGeneration) {
+          generation++; // invalidate any pre-accept inbox read
+          loading.value = false;
+          acceptedMissionId.value = missionId;
+          proposals.value = [];
+          total.value = 0;
+          totalPages.value = 0;
+        }
+      } else {
+        await (runtime.decline ?? declineProposal)(auth.accessToken, id, reason);
+        if (identity.value === userId && session === sessionGeneration) {
+          proposals.value = proposals.value.filter((item) => item.id !== id);
+          total.value = Math.max(0, total.value - 1);
+        }
+      }
+      if (identity.value === userId && session === sessionGeneration) void refresh();
+      return true;
+    } catch (error) {
+      if (identity.value === userId && session === sessionGeneration) {
+        decisionError.value = error instanceof ApiError && [404, 409].includes(error.status)
+          ? "این پیشنهاد دیگر در دسترس نیست. فهرست تازه می‌شود."
+          : friendlyErrorMessage(error, "پاسخ ثبت نشد؛ دوباره تلاش کنید.");
+        if (error instanceof ApiError && [404, 409].includes(error.status)) void refresh();
+      }
+      return false;
+    } finally {
+      if (session === sessionGeneration) decidingId.value = null;
     }
   }
 
@@ -59,6 +117,11 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     client = null;
     proposals.value = [];
     total.value = 0;
+    page.value = 1;
+    totalPages.value = 0;
+    decidingId.value = null;
+    decisionError.value = null;
+    acceptedMissionId.value = null;
     loading.value = false;
     failed.value = false;
   }
@@ -103,5 +166,5 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     }
   });
 
-  return { proposals, total, loading, failed, refresh, stop };
+  return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, refresh, setPage, decide, stop };
 });
