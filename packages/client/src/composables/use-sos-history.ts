@@ -19,7 +19,7 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   const error = ref<string | null>(null);
   const linkError = ref<string | null>(null);
   let generation = 0;
-  const cancellation = useSosCancellation(token, computed(() => selected.value?.id ?? null));
+  const cancellation = useSosCancellation(token, computed(() => selected.value?.id ?? null), userId);
   const canCancelSelected = computed(() => !!selected.value && CANCELLABLE.has(selected.value.status) && !cancellation.cancelled.value);
 
   async function load(nextPage = page.value, deepLink?: string): Promise<void> {

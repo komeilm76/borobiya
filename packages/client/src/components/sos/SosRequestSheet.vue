@@ -383,7 +383,7 @@ const sos = useSosRequest({
   ensureSession: () => auth.ensureSession()
 });
 
-const cancellation = useSosCancellation(computed(() => auth.accessToken), sos.createdRequestId);
+const cancellation = useSosCancellation(computed(() => auth.accessToken), sos.createdRequestId, computed(() => auth.user?.id ?? null));
 
 const severityOptions = SOS_SEVERITY_OPTIONS;
 const maxDescriptionLength = SOS_DESCRIPTION_MAX_LENGTH;

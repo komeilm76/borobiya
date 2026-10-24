@@ -5,7 +5,8 @@ import { sosApiErrorMessage } from "../sos/sos-form";
 import { ApiError } from "../api/http";
 
 /** The cancellation dialog never sends a request before the user has selected and confirmed a reason. */
-export function useSosCancellation(token: Ref<string | null>, requestId: Ref<string | null>) {
+export function useSosCancellation(token: Ref<string | null>, requestId: Ref<string | null>,
+  userId: Ref<string | null>) {
   const open = ref(false);
   const loading = ref(false);
   const submitting = ref(false);
@@ -17,11 +18,12 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
   const blocked = ref(false);
   let generation = 0;
   const selected = computed(() => reasons.value.find((reason) => reason.id === reasonId.value));
-  const canConfirm = computed(() => !!requestId.value && !!token.value && !blocked.value && !loading.value && !submitting.value && !!selected.value &&
+  const canConfirm = computed(() => !!requestId.value && !!token.value && !!userId.value && !blocked.value && !loading.value && !submitting.value && !!selected.value &&
     (!selected.value.requiresCustomText || (customReason.value.trim().length >= 10 && customReason.value.trim().length <= 200)));
 
   async function show(): Promise<void> {
-    if (!requestId.value || !token.value || submitting.value || cancelled.value || blocked.value) return;
+    if (!requestId.value || !token.value || !userId.value || submitting.value || cancelled.value || blocked.value) return;
+    const owner = userId.value;
     const current = ++generation;
     open.value = true;
     reasonId.value = "";
@@ -30,10 +32,10 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     loading.value = true;
     try {
       const result = await listSosCancellationReasons(token.value);
-      if (current !== generation || !open.value) return;
+      if (current !== generation || userId.value !== owner || !open.value) return;
       reasons.value = result;
     } catch (cause) {
-      if (current === generation && open.value) error.value = sosApiErrorMessage(cause, "دریافت دلایل لغو انجام نشد. دوباره تلاش کنید.");
+      if (current === generation && userId.value === owner && open.value) error.value = sosApiErrorMessage(cause, "دریافت دلایل لغو انجام نشد. دوباره تلاش کنید.");
     } finally {
       if (current === generation) loading.value = false;
     }
@@ -51,18 +53,20 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     if (!canConfirm.value) return;
     const id = requestId.value!;
     const currentToken = token.value!;
+    const owner = userId.value!;
+    const current = generation;
     const selectedReason = selected.value!;
     submitting.value = true;
     error.value = null;
     try {
       await cancelSosRequest(id, currentToken, selectedReason.id,
         selectedReason.requiresCustomText ? customReason.value.trim() : undefined);
-      if (requestId.value === id && token.value === currentToken) {
+      if (current === generation && requestId.value === id && userId.value === owner && token.value) {
         cancelled.value = true;
         open.value = false;
       }
     } catch (cause) {
-      if (requestId.value === id && token.value === currentToken) {
+      if (current === generation && requestId.value === id && userId.value === owner && token.value) {
         blocked.value = cause instanceof ApiError && cause.code === "SOS_ALREADY_IN_PROGRESS";
         error.value = blocked.value
           ? "وضعیت درخواست تغییر کرده است؛ لغوی ثبت نشد. درخواست را دوباره بررسی کنید."

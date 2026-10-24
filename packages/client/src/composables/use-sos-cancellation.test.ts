@@ -47,7 +47,7 @@ describe("requester SOS cancellation confirmation", () => {
   it("requires an explicit reason, validates Other, and never sends twice while saving", async () => {
     const token = ref<string | null>("token");
     const id = ref<string | null>(requesterId);
-    const cancel = useSosCancellation(token, id);
+    const cancel = useSosCancellation(token, id, ref("owner"));
     await cancel.show();
     expect(cancel.canConfirm.value).toBe(false);
     await cancel.confirm();
@@ -72,8 +72,39 @@ describe("requester SOS cancellation confirmation", () => {
     expect(cancel.open.value).toBe(false);
   });
 
+  it("acknowledges a committed cancellation even if the bearer token refreshed during retry", async () => {
+    const token = ref<string | null>("old-token");
+    const cancel = useSosCancellation(token, ref(requesterId), ref("owner"));
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelSosRequest).mockReturnValueOnce(pending.promise);
+    const saving = cancel.confirm();
+    token.value = "new-token"; // requestJson retried a 401 and committed with this token
+    pending.resolve();
+    await saving;
+    expect(cancel.cancelled.value).toBe(true);
+    expect(cancel.open.value).toBe(false);
+  });
+
+  it("does not show a previous account's pending cancellation result after switching users", async () => {
+    const token = ref<string | null>("old-token");
+    const owner = ref<string | null>("owner");
+    const cancel = useSosCancellation(token, ref(requesterId), owner);
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelSosRequest).mockReturnValueOnce(pending.promise);
+    const saving = cancel.confirm();
+    owner.value = "different-owner";
+    token.value = "new-owner-token";
+    pending.resolve();
+    await saving;
+    expect(cancel.cancelled.value).toBe(false);
+  });
+
   it("surfaces a conflict without claiming cancellation and supports a fresh retry", async () => {
-    const cancel = useSosCancellation(ref("token"), ref(requesterId));
+    const cancel = useSosCancellation(ref("token"), ref(requesterId), ref("owner"));
     await cancel.show();
     cancel.reasonId.value = reasons[0]!.id;
     vi.mocked(cancelSosRequest).mockRejectedValueOnce(new Error("Already in progress"));
@@ -86,7 +117,7 @@ describe("requester SOS cancellation confirmation", () => {
   });
 
   it("shows an accepted-mission conflict without suggesting another unsafe cancellation", async () => {
-    const cancel = useSosCancellation(ref("token"), ref(requesterId));
+    const cancel = useSosCancellation(ref("token"), ref(requesterId), ref("owner"));
     await cancel.show();
     cancel.reasonId.value = reasons[0]!.id;
     vi.mocked(cancelSosRequest).mockRejectedValueOnce(new ApiError(409, "SOS_ALREADY_IN_PROGRESS", "In progress"));
@@ -100,7 +131,7 @@ describe("requester SOS cancellation confirmation", () => {
 
   it("drops a late catalog response when the dialog has closed and requires a fresh token", async () => {
     const token = ref<string | null>("token");
-    const cancel = useSosCancellation(token, ref(requesterId));
+    const cancel = useSosCancellation(token, ref(requesterId), ref("owner"));
     const pending = deferred<CancellationReason[]>();
     vi.mocked(listSosCancellationReasons).mockReturnValueOnce(pending.promise);
     const loading = cancel.show();

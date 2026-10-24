@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — Cancellation acknowledgment survives bearer refresh
+
+- Fixed a confirmed SOS cancellation being shown as unconfirmed when `requestJson` refreshed an expired bearer on 401 and retried successfully. The composable now recognizes success by stable requester/request identity and request generation, rather than requiring the original token string to remain unchanged. It still discards a result after logout or an account switch. Regressions cover both token rotation and a different owner arriving before the request settles; no server cancellation behavior changed.
+
 ### 2026-10-24 — Rating submission survives same-account token rotation
 
 - Fixed a requester rating form race: `ensureSession()` can rotate the bearer token during a submit, but the composable watched the raw token value and treated the rotation as a new account/mission. That reset the form and discarded the intended POST. Rating state now reloads only when token *presence*, mission, or account changes; the submit uses the refreshed token while logout still invalidates the old response. A regression reproduces the lost write before the fix and verifies the refreshed-token submission afterward.
