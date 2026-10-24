@@ -121,6 +121,7 @@ export async function registerMissionProgressRoutes(
     if (!found) return reply.code(404).send({ error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: [] });
     const cancellationReason = await store.getCancellationReason?.(
       found.cancellationReasonId, found.cancellationCustomText) ?? null;
-    return reply.code(200).send({ ...found, cancellationReason });
+    const rating = await store.getRating?.(found.id) ?? null;
+    return reply.code(200).send({ ...found, cancellationReason, rating });
   });
 }

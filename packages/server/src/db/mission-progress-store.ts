@@ -31,6 +31,7 @@ export interface MissionProgressStore {
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
   /** Atomic insert; only the requester may rate a completed mission once. */
   rateMission?(missionId: string, requesterId: string, input: MissionRatingInput): Promise<MissionRatingResult>;
+  getRating?(missionId: string): Promise<number | null>;
   /** Only active-mission participants or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
   /** Active, participant-scoped sender role; admins observe but never publish GPS to a mission. */
@@ -54,6 +55,12 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     const [row] = await this.db.select().from(missions).where(and(eq(missions.id, id),
       role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
     return row ? toMission(row) : null;
+  }
+
+  async getRating(missionId: string): Promise<number | null> {
+    const [row] = await this.db.select({ rating: missionRatings.rating }).from(missionRatings)
+      .where(eq(missionRatings.missionId, missionId)).limit(1);
+    return row?.rating ?? null;
   }
 
   async rateMission(missionId: string, requesterId: string, input: MissionRatingInput): Promise<MissionRatingResult> {

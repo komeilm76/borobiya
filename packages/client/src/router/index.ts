@@ -81,6 +81,11 @@ export const routeRecords: RouteRecordRaw[] = [
     component: () => import("@client/views/_user/UserSosHistoryView.vue")
   },
   {
+    path: "/_user/mission-history",
+    name: "user-mission-history",
+    component: () => import("@client/views/_user/UserRescuerHistoryView.vue")
+  },
+  {
     path: "/_user/settings",
     name: "user-settings",
     component: () => import("@client/views/_user/PlaceholderView.vue"),

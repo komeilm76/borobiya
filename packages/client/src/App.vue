@@ -228,6 +228,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     { to: "/_user/proposals", label: proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
     { to: "/_user/mission", label: "مأموریت من", icon: "mdi-lifebuoy" },
     { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
+    { to: "/_user/mission-history", label: "سوابق امدادگری", icon: "mdi-timeline-clock-outline" },
     { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
     { to: "/_user/devices", label: "دستگاه‌ها", icon: "mdi-devices" }
   ];

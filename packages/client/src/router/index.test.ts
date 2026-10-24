@@ -75,9 +75,9 @@ describe("client route records", () => {
       const heading = lines.find((line) => line.startsWith(`## ${plannedSection}. `));
       expect(heading, `section ${plannedSection}`).toMatch(/— Planned$/);
     }
-    for (const partialSection of [10, 18, 19])
+    for (const partialSection of [10, 18])
       expect(lines.find((line) => line.startsWith(`## ${partialSection}. `))).toMatch(/— Partially available$/);
-    for (const liveSection of [11, 12, 13, 14, 16, 20, 21]) {
+    for (const liveSection of [11, 12, 13, 14, 16, 19, 20, 21]) {
       const heading = lines.find((line) => line.startsWith(`## ${liveSection}. `));
       expect(heading, `section ${liveSection}`).not.toMatch(/— Planned$/);
     }

@@ -88,6 +88,7 @@
             </div>
             <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
               :mission="selectedTimelineMission" audience="user" />
+            <MissionRatingPanel v-if="selectedTimelineMission" :mission="selectedTimelineMission" />
             <MissionLivePanel v-if="selectedMission" :mission="selectedMission"
               :center="[history.selected.value.location.lon, history.selected.value.location.lat]" />
             <div class="history__actions">
@@ -114,6 +115,7 @@ import { useRoute } from "vue-router";
 import type { Mission, SosRequest, SosRequestStatus } from "@shared/index";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
+import MissionRatingPanel from "@/components/mission/MissionRatingPanel.vue";
 import { statusLabel } from "@/mission/timeline-presentation";
 import { listRequesterMissions } from "@/api/mission";
 import SosCancellationDialog from "@/components/sos/SosCancellationDialog.vue";

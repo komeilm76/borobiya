@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiRoutes } from "@shared/api";
-import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, paginatedResponseSchema,
-  type CancellationReason, type Mission, type MissionTimeline } from "@shared/index";
+import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, paginatedResponseSchema, missionRatingSchema,
+  type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline } from "@shared/index";
 import { requestJson } from "./http";
 
 export async function listRescuerMissions(token: string, page = 1): Promise<{ items: Mission[]; total: number; totalPages: number }> {
@@ -37,7 +37,7 @@ export async function getMissionTimeline(token: string, missionId: string,
     { accessToken: token, signal }));
 }
 
-export async function getMission(token: string, id: string): Promise<Mission> {
+export async function getMission(token: string, id: string): Promise<MissionDetail> {
   return missionDetailSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token }));
 }
@@ -52,5 +52,14 @@ export async function cancelRescuerMission(token: string, missionId: string, rea
   await requestJson<unknown>(apiRoutes.sos.cancelMission.url.replace(":id", encodeURIComponent(missionSchema.shape.id.parse(missionId))), {
     method: "POST", accessToken: token,
     body: cancellationSchema.parse({ cancellationReasonId: reasonId, ...(customReason ? { customReason } : {}) })
+  });
+}
+
+/** Submit a single requester rating; duplicates are a server-side 409, never an overwrite. */
+export async function rateMission(token: string, id: string, input: MissionRatingInput): Promise<void> {
+  const route = apiRoutes.sos.rateMission;
+  const missionId = route.schema.params.parse({ id }).id;
+  await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(missionId)), {
+    method: "POST", accessToken: token, body: missionRatingSchema.parse(input)
   });
 }

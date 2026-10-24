@@ -159,9 +159,9 @@ gantt
 ## Phase 4 — Polish, Ship & Scale (Weeks 8-9)
 
 ### M4.1 Rating & History
-- [ ] `POST /_user/missions/:id/rate` {1-5} after completed + `mission_ratings` + `avgRating` cached
-- [ ] `GET /_user/sos/requests` + `GET /_user/sos/missions` (history for all users)
-- [ ] Timeline UI with timestamps
+- [x] `POST /_user/missions/:id/rate` {1-5} after completed + `mission_ratings` + `avgRating` cached — T3.7.2/T3.7.3, 2026-10-24
+- [x] `GET /_user/sos/requests` + `GET /_user/sos/missions` (owner/participant-scoped history) — T3.7.1, 2026-10-24
+- [x] Timeline UI with server timestamps — T3.5.8/T3.7.4, 2026-10-24
 
 ### M4.2 Search & Geocoding
 - [ ] `GET /_user/users/search` (advanced: q, category, incidentType, rating, online, distance)

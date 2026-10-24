@@ -169,7 +169,10 @@ export const cancellationReasonDetailSchema = z.strictObject({
   customText: z.string().nullable()
 });
 export type CancellationReasonDetail = z.infer<typeof cancellationReasonDetailSchema>;
-export const missionDetailSchema = missionSchema.extend({ cancellationReason: cancellationReasonDetailSchema.nullable() });
+export const missionDetailSchema = missionSchema.extend({
+  cancellationReason: cancellationReasonDetailSchema.nullable(),
+  rating: z.number().int().min(1).max(5).nullable()
+});
 export type MissionDetail = z.infer<typeof missionDetailSchema>;
 
 

@@ -1010,6 +1010,9 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect((await pg.query<{ rating: number }>(
       `SELECT rating FROM mission_ratings WHERE mission_id=$1`, [ratedMissionId]
     )).rows).toEqual([{ rating: 4 }]);
+    expect((await callContract<{ rating: number | null }>(apiRoutes.sos.getMission, 200, {
+      url: apiRoutes.sos.getMission.url.replace(":id", ratedMissionId), headers: requesterHeaders
+    })).rating).toBe(4);
     const inboxAfterAccept = await callContract<{ total: number }>(apiRoutes.sos.listProposals, 200, {
       url: apiRoutes.sos.listProposals.url, headers: responderHeaders
     });

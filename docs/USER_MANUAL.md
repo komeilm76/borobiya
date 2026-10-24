@@ -24,7 +24,7 @@
 16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
 18. [Cancellation — Partially available](#18-cancellation--partially-available)
-19. [History & Rating — Partially available](#19-history--rating--partially-available)
+19. [History & Rating](#19-history--rating)
 20. [Admin — User Management](#20-admin--user-management)
 21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
 22. [Troubleshooting](#22-troubleshooting)
@@ -343,18 +343,17 @@ Each update appears as **timeline** to requester + admin.
 
 ---
 
-## 19. History & Rating — Partially available
+## 19. History & Rating
 
-> **Current status:** `/_user/sos-history` now shows only your SOS requests with their status, evidence and cancellation options; `GET /_user/sos/requests?role=requester` and participant-scoped `GET /_user/sos/missions?role=rescuer` are live. Rescuer mission history UI, status timelines and `POST /_user/missions/:id/rate` remain planned.
+> **Current status:** Both history pages and the rating API are live. The requester's rating is saved once per completed mission; the rescuer's cached average is used when distance ties are broken in nearest-responder dispatch.
 
-- **Request History** (`/_user/sos-history`, live): your SOS requests, status, saved incident location, secure evidence image and reason-gated cancellation. Reopen a request after closing the SOS sheet; foreign request links cannot display other people’s data.
-- **Mission History** (read API live, full UI planned): mission records are requester/rescuer-scoped. The rescuer can revisit an active mission at `/_user/mission`; a past-mission timeline and ratings are still planned.
+- **Request History** (`/_user/sos-history`): your SOS requests, status, saved incident location, secure evidence image, reason-gated cancellation, and a selectable timeline for each mission. Reopen a request after closing the SOS sheet; foreign request links cannot display other people’s data.
+- **Mission History** (`/_user/mission-history`): paginated missions you served, recorded status and cancellation reason, requester stars (if given) and the server-timestamped timeline. The current active mission remains at `/_user/mission`. Links to another person's mission are refused without showing their details.
 
 ### Rating
 
-- After **Completed**, requester can **Rate** rescuer 1–5 stars + comment → appears on rescuer profile and influences future dispatches (distance tie-break).
-
-[Screenshot: Rating stars dialog]
+- Open **Request History** and choose a request, then select a **completed** mission. Choose 1–5 stars, optionally add up to 500 characters, and select **ثبت امتیاز**. The saved score appears on your request and the rescuer's mission history. Each mission accepts only one rating; if another tab submits it first, refresh to see the score already stored. Ineligible missions do not show the rating form.
+- The rescuer's cached average (`users.avg_rating`) affects future dispatch distance ties; individual comments are not displayed to other users.
 
 ---
 
@@ -411,6 +410,7 @@ Each update appears as **timeline** to requester + admin.
 | Rescue proposal inbox | `/_user/proposals` |
 | Active rescuer mission | `/_user/mission` |
 | SOS request history & cancellation | `/_user/sos-history` |
+| Rescuer mission history | `/_user/mission-history` |
 | Settings *(planned)* | `/_user/settings` |
 | Admin Dashboard *(planned)* | `/_admin/dashboard` |
 | Admin Users | `/_admin/users` |
