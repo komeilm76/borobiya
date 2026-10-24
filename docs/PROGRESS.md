@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — Deterministic mission timeline ties
+
+- Rapid committed status transitions can share a timestamp (writes use JavaScript `Date` millisecond precision). The timeline previously broke ties by random history UUID, so it could display completion before acceptance. The scoped history read now orders by stored timestamp, then by the mission's legal progress order, and only then by ID. A migrated PGlite test deliberately inserts the five steps with identical timestamps and UUIDs in reverse order to pin the corrected behavior; no schema change or fabricated timestamp is needed.
+
 ### 2026-10-24 — Replacement nearest-ten regression fix
 
 - A one-click replacement previously filtered previous rescuers **after** fetching the nearest ten, hiding eligible responders ranked 11th and later (or incorrectly reporting no candidates). The admin nearest read now accepts `?excludeAssigned=true` and excludes all prior SOS assignees in SQL before its ordered `LIMIT 10`; the normal picker remains unchanged. The client explicitly asks for this mode. A migrated PGlite regression with ten cancelled assignees and a valid eleventh rescuer proves the difference; malformed filters return 400. No browser/VM acceptance is claimed.

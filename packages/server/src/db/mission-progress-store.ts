@@ -96,7 +96,11 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
       fromStatus: missionStatusHistory.fromStatus, toStatus: missionStatusHistory.toStatus,
       changedBy: missionStatusHistory.changedBy, createdAt: missionStatusHistory.createdAt
     }).from(missionStatusHistory).where(eq(missionStatusHistory.missionId, missionId))
-      .orderBy(asc(missionStatusHistory.createdAt), asc(missionStatusHistory.id));
+      // JS Date timestamps have millisecond precision: two legitimate transitions can
+      // share a timestamp. UUIDs are random and must never determine their causal order.
+      .orderBy(asc(missionStatusHistory.createdAt), sql<number>`CASE ${missionStatusHistory.toStatus}
+        WHEN 'pending' THEN 0 WHEN 'on_the_way' THEN 1 WHEN 'arrived' THEN 2
+        WHEN 'in_progress' THEN 3 ELSE 4 END`, asc(missionStatusHistory.id));
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
   }
 

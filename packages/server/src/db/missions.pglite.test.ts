@@ -135,6 +135,27 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     });
   });
 
+  it("keeps progression order when distinct transitions share the same stored timestamp", async () => {
+    const id = "50000000-0000-4000-8000-000000000006";
+    const at = "2026-10-24T10:00:00.000Z";
+    await pg.query(`INSERT INTO missions (id,sos_request_id,rescuer_id,requester_id,status)
+      VALUES ($1,$2,$3,$4,'completed')`, [id, SOS, RESCUER, REQUESTER]);
+    // Lexicographic UUID order is deliberately the reverse of the legal transition order.
+    for (const [rowId, from, to] of [
+      ["60000000-0000-4000-8000-000000000004", null, "pending"],
+      ["60000000-0000-4000-8000-000000000003", "pending", "on_the_way"],
+      ["60000000-0000-4000-8000-000000000002", "on_the_way", "arrived"],
+      ["60000000-0000-4000-8000-000000000001", "arrived", "in_progress"],
+      ["60000000-0000-4000-8000-000000000000", "in_progress", "completed"]
+    ]) await pg.query(`INSERT INTO mission_status_history (id,mission_id,from_status,to_status,changed_by,created_at)
+      VALUES ($1,$2,$3,$4,$5,$6)`, [rowId, id, from, to, RESCUER, at]);
+    const store = new DrizzleMissionProgressStore(drizzle(pg, { schema }) as unknown as Database);
+    const steps = await store.findTimeline(id, REQUESTER, "user");
+    expect(missionTimelineSchema.parse(steps).map((step) => step.toStatus))
+      .toEqual(["pending", "on_the_way", "arrived", "in_progress", "completed"]);
+    expect(new Set(steps?.map((step) => step.createdAt)).size).toBe(1);
+  });
+
   it("rolls back the status and busy flag when history cannot be inserted", async () => {
     const store = new DrizzleMissionProgressStore(drizzle(pg, { schema }) as unknown as Database);
     await pg.query(`UPDATE "missions" SET "status" = 'in_progress' WHERE "id" = $1`, [MISSION]);
