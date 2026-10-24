@@ -12,6 +12,7 @@ import {
   missionProposalSchema,
   missionRatingSchema,
   missionSchema,
+  missionDetailSchema,
   missionTimelineSchema,
   missionNavigationTargetSchema,
   missionStatusUpdateSchema,
@@ -23,6 +24,7 @@ import {
   sosRequestCreatedSchema,
   sosRequestParamsSchema,
   sosRequestRecordSchema,
+  sosRequestDetailSchema,
   createSosRequestSchema
 } from "../schemas/sos";
 import { cancellationReasonSchema } from "../schemas/admin";
@@ -97,7 +99,7 @@ export const sosRoutes = {
     url: "/_user/sos/requests/:id",
     schema: {
       params: sosRequestParamsSchema,
-      responses: { 200: sosRequestRecordSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 503: errorSchema }
+      responses: { 200: sosRequestDetailSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 503: errorSchema }
     },
     meta: {
       operationId: "sosGetRequest",
@@ -227,7 +229,7 @@ export const sosRoutes = {
     url: "/_user/sos/missions/:id",
     schema: {
       params: missionParamsSchema,
-      responses: { 200: missionSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: missionDetailSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "sosGetMission",

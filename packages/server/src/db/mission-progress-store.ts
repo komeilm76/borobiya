@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline } from "@borobiya/shared";
+import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail } from "@borobiya/shared";
+import { readCancellationReason } from "./cancellation-detail";
 import type { Database } from "./client";
 import { missions, missionStatusHistory, sosRequests, users } from "./schema";
 
@@ -24,6 +25,7 @@ export interface MissionProgressStore {
   }>;
   listActiveRequestMissions?(sosRequestId: string, includeTerminal?: boolean): Promise<Mission[]>;
   findTimeline?(missionId: string, userId: string, role: "admin" | "user"): Promise<MissionTimeline | null>;
+  getCancellationReason?(id: string | null, customText: string | null): Promise<CancellationReasonDetail | null>;
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
   /** Only active-mission participants or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
@@ -39,6 +41,10 @@ export function missionTransition(current: MissionStatus, requested: MissionProg
 
 export class DrizzleMissionProgressStore implements MissionProgressStore {
   constructor(private readonly db: Database) {}
+
+  getCancellationReason(id: string | null, customText: string | null) {
+    return readCancellationReason(this.db, id, customText);
+  }
 
   async findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null> {
     const [row] = await this.db.select().from(missions).where(and(eq(missions.id, id),

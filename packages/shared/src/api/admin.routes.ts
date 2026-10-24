@@ -24,7 +24,8 @@ import {
   dispatchSosRequestSchema,
   missionSchema,
   missionTimelineSchema,
-  sosRequestRecordSchema
+  sosRequestRecordSchema,
+  sosRequestDetailSchema
 } from "../schemas/sos";
 import { sosRequestStatusSchema } from "../types/enums";
 import {
@@ -259,7 +260,7 @@ export const adminRoutes = {
     url: "/_admin/sos/requests/:id",
     schema: {
       params: uuidPathParamsSchema,
-      responses: { 200: sosRequestRecordSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: sosRequestDetailSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {
       operationId: "adminGetSosRequest",

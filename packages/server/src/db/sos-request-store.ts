@@ -1,7 +1,8 @@
 import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import type { AdminSosListQuery } from "@borobiya/shared/api";
-import type { Severity, SosRequestStatus } from "@borobiya/shared";
+import type { Severity, SosRequestStatus, CancellationReasonDetail } from "@borobiya/shared";
 import type { Database } from "./client";
+import { readCancellationReason } from "./cancellation-detail";
 import { geographyPointSql } from "./location-history-store";
 import { incidentTypes, sosRequests } from "./schema";
 
@@ -106,6 +107,7 @@ export interface SosRequestStore {
   getRequestById?(id: string): Promise<SosRequestRecord | null>;
   listRequests?(query: AdminSosListQuery): Promise<SosRequestListResult>;
   getOwnedRequest?(id: string, requesterId: string): Promise<SosRequestRecord | null>;
+  getCancellationReason?(id: string | null, customText: string | null): Promise<CancellationReasonDetail | null>;
   listOwnedRequests?(requesterId: string, page: number, limit: number): Promise<SosRequestListResult>;
 }
 
@@ -218,6 +220,10 @@ export class DrizzleSosRequestStore implements SosRequestStore {
       }
       return created;
     });
+  }
+
+  getCancellationReason(id: string | null, customText: string | null) {
+    return readCancellationReason(this.db, id, customText);
   }
 
   async getRequestById(id: string): Promise<SosRequestRecord | null> {

@@ -93,6 +93,8 @@ export async function registerMissionProgressRoutes(
     if (!params.success) return reply.code(404).send({ error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: [] });
     const found = await store.findMission(params.data.id, user.userId, user.role === "admin" ? "admin" : "user");
     if (!found) return reply.code(404).send({ error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: [] });
-    return reply.code(200).send(found);
+    const cancellationReason = await store.getCancellationReason?.(
+      found.cancellationReasonId, found.cancellationCustomText) ?? null;
+    return reply.code(200).send({ ...found, cancellationReason });
   });
 }

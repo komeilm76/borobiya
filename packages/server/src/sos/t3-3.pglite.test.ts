@@ -854,6 +854,18 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       expect(rescuerEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId)).toEqual([missionId]);
       expect(adminEvents.map((event) => requesterCancellationEventSchema.parse(event).missionId).sort())
         .toEqual([missionId, secondMissionId]);
+      const requestDetail = await app.inject({ method: "GET", url: `/_user/sos/requests/${sosId}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(requestDetail.json()).toMatchObject({ cancelledBy: "requester", cancellationReasonId: reasonId,
+        cancellationReason: { id: reasonId, key: "resolved", label: "Resolved", customText: null } });
+      expect(requestDetail.json().cancelledAt).toBeTruthy();
+      const adminDetail = await app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}`,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect(adminDetail.json().cancellationReason).toEqual(requestDetail.json().cancellationReason);
+      const missionDetail = await app.inject({ method: "GET", url: `/_user/sos/missions/${missionId}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(missionDetail.json()).toMatchObject({ cancelledBy: "requester", cancelledAt: expect.any(String),
+        cancellationReason: { id: reasonId, key: "resolved", customText: null } });
       const history = await app.inject({ method: "GET", url: `/_user/sos/missions/${missionId}/timeline`,
         headers: { authorization: `Bearer ${requesterToken}` } });
       expect(history.statusCode).toBe(200);
@@ -961,6 +973,14 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       expect(rescuerCancellationEventSchema.parse(requesterEvents[0])).not.toHaveProperty("rescuerLocation");
       const second = await missionFor(2);
       expect((await cancel(second.missionId, otherId, "My situation makes rescue unsafe.")).statusCode).toBe(200);
+      const rescuerDetail = await app.inject({ method: "GET", url: `/_user/sos/missions/${second.missionId}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(rescuerDetail.json()).toMatchObject({ cancelledBy: "rescuer", cancelledAt: expect.any(String),
+        cancellationReason: { id: otherId, key: "other", customText: "My situation makes rescue unsafe." } });
+      const sosAfterRescuer = await app.inject({ method: "GET", url: `/_user/sos/requests/${second.sosId}`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(sosAfterRescuer.json()).toMatchObject({ cancelledBy: "rescuer", cancellationReason: null,
+        cancelledAt: null }); // A replacement-needed SOS does not own the rescuer's mission reason.
       const third = await missionFor(3);
       expect((await cancel(third.missionId, reasonId)).statusCode).toBe(200);
       const flags = await pg.query<{ type: string; mission_id: string }>(`SELECT type,mission_id FROM admin_alerts ORDER BY type`);

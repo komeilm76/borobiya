@@ -108,7 +108,11 @@ export async function registerAdminSosRoutes(
     return reply
       .code(200)
       .header("cache-control", "no-store")
-      .send(sosRequestRecordPayload(record));
+      .send({ ...sosRequestRecordPayload(record),
+        cancelledBy: record.status === "cancelled_by_requester" ? "requester" :
+          record.status === "cancelled_by_rescuer" ? "rescuer" : null,
+        cancellationReason: await dependencies.store.getCancellationReason?.(
+          record.cancellationReasonId, record.cancellationCustomText) ?? null });
   });
 
   const missionsRoute = apiRoutes.admin.listSosMissions;

@@ -1,5 +1,5 @@
 import { apiRoutes } from "@shared/api";
-import { paginatedResponseSchema, sosRequestRecordSchema, type SosRequest } from "@shared/index";
+import { paginatedResponseSchema, sosRequestRecordSchema, sosRequestDetailSchema, type SosRequest } from "@shared/index";
 import { requestJson } from "./http";
 
 export interface SosHistoryPage {
@@ -20,7 +20,7 @@ export async function listRequesterSosHistory(token: string, page = 1): Promise<
 
 export async function getRequesterSosRequest(token: string, id: string): Promise<SosRequest> {
   const valid = sosRequestRecordSchema.shape.id.parse(id);
-  return sosRequestRecordSchema.parse(await requestJson<unknown>(
+  return sosRequestDetailSchema.parse(await requestJson<unknown>(
     apiRoutes.sos.getRequest.url.replace(":id", encodeURIComponent(valid)), { accessToken: token }
   ));
 }

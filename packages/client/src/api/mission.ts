@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiRoutes } from "@shared/api";
-import { cancellationReasonSchema, cancellationSchema, missionSchema, missionTimelineSchema, paginatedResponseSchema,
+import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, paginatedResponseSchema,
   type CancellationReason, type Mission, type MissionTimeline } from "@shared/index";
 import { requestJson } from "./http";
 
@@ -38,7 +38,7 @@ export async function getMissionTimeline(token: string, missionId: string,
 }
 
 export async function getMission(token: string, id: string): Promise<Mission> {
-  return missionSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
+  return missionDetailSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token }));
 }
 

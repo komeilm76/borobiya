@@ -4,6 +4,7 @@ import {
   nearestRespondersResponseSchema,
   paginatedResponseSchema,
   sosRequestRecordSchema,
+  sosRequestDetailSchema,
   type DispatchResponse,
   type NearestRespondersResponse,
   type SosRequestRecord,
@@ -64,7 +65,7 @@ export async function getAdminSosRequest(
     accessToken,
     signal
   });
-  return sosRequestRecordSchema.parse(response);
+  return sosRequestDetailSchema.parse(response);
 }
 
 /** Fetches the top 10 nearest qualified, active, non-busy responders (`GET /_admin/sos/requests/:id/nearest`). */

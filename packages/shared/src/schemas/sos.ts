@@ -163,6 +163,15 @@ export const missionSchema = z.strictObject({
   updatedAt: timestampSchema
 });
 export type Mission = z.infer<typeof missionSchema>;
+/** A persisted reason snapshot resolved by its FK, including deactivated catalog entries. */
+export const cancellationReasonDetailSchema = z.strictObject({
+  id: idSchema, key: z.string(), label: z.string(), labelFa: z.string().nullable(),
+  customText: z.string().nullable()
+});
+export type CancellationReasonDetail = z.infer<typeof cancellationReasonDetailSchema>;
+export const missionDetailSchema = missionSchema.extend({ cancellationReason: cancellationReasonDetailSchema.nullable() });
+export type MissionDetail = z.infer<typeof missionDetailSchema>;
+
 
 export const sosRequestRecordSchema = z.strictObject({
   id: idSchema,
@@ -180,6 +189,13 @@ export const sosRequestRecordSchema = z.strictObject({
 });
 export type SosRequest = z.infer<typeof sosRequestRecordSchema>;
 export type SosRequestRecord = SosRequest;
+/** The SOS row itself stores a requester cancellation; responder cancellations belong to individual missions. */
+export const sosRequestDetailSchema = sosRequestRecordSchema.extend({
+  cancelledBy: z.enum(["requester", "rescuer"]).nullable(),
+  cancellationReason: cancellationReasonDetailSchema.nullable()
+});
+export type SosRequestDetail = z.infer<typeof sosRequestDetailSchema>;
+
 
 export const nearestResponderSchema = z.strictObject({
   userId: idSchema,

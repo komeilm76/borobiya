@@ -242,6 +242,11 @@ export async function registerSosRequestRoutes(
     if (!dependencies.store.getOwnedRequest) return sendError(reply, 503, "SERVICE_UNAVAILABLE", "SOS history is unavailable.");
     const found = await dependencies.store.getOwnedRequest(params.data.id, user.userId);
     if (!found) return sendError(reply, 404, "SOS_REQUEST_NOT_FOUND", "SOS request not found.");
-    return reply.code(200).send(sosRequestRecordPayload(found));
+    const cancellationReason = await dependencies.store.getCancellationReason?.(
+      found.cancellationReasonId, found.cancellationCustomText) ?? null;
+    return reply.code(200).send({ ...sosRequestRecordPayload(found),
+      cancelledBy: found.status === "cancelled_by_requester" ? "requester" :
+        found.status === "cancelled_by_rescuer" ? "rescuer" : null,
+      cancellationReason });
   });
 }
