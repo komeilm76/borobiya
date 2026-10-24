@@ -171,6 +171,26 @@ describe("useTargetSearch", () => {
     scope.stop();
   });
 
+  it("never shows a prior term's recipients while the new valid term is still debouncing", async () => {
+    const older = deferred<Response>();
+    const fetchMock = vi.fn(async () => older.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const { search, scope } = mountComposable();
+    try {
+      search.term.value = "ha";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      search.term.value = "ham";
+      await nextTick();
+      older.resolve(jsonResponse(page([row("hades", "3")])));
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(search.results.value).toEqual([]);
+      expect(search.total.value).toBe(0);
+    } finally { scope.stop(); }
+  });
+
   it("reports a failure instead of leaving the previous list on screen", async () => {
     vi.stubGlobal(
       "fetch",
@@ -190,6 +210,30 @@ describe("useTargetSearch", () => {
     expect(search.loading.value).toBe(false);
 
     scope.stop();
+  });
+
+  it("hides previous recipients as soon as a filter changes, before the new request settles", async () => {
+    const filtered = deferred<Response>();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(page([row("hamrah_one", "1")], 1)))
+      .mockImplementationOnce(async () => filtered.promise);
+    vi.stubGlobal("fetch", fetchMock);
+    const minRating = ref<number | undefined>(undefined);
+    const { search, scope } = mountComposable({ minRating });
+    try {
+      search.term.value = "ham";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(search.results.value).toHaveLength(1);
+      minRating.value = 4;
+      await nextTick();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(search.results.value).toEqual([]);
+      expect(search.total.value).toBe(0);
+      filtered.resolve(jsonResponse(page([])));
+      await vi.advanceTimersByTimeAsync(0);
+    } finally { scope.stop(); }
   });
 
   it("refetches immediately when a narrowing control changes", async () => {

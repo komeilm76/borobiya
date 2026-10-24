@@ -63,6 +63,10 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     controller = new AbortController();
     const signal = controller.signal;
     loading.value = true;
+    // Results from a different filter or term must not remain selectable while
+    // the new request waits for a token, network, or server response.
+    results.value = [];
+    total.value = 0;
     // The previous term's failure is not this term's failure: leaving `failed` set until the new
     // response arrives shows "search failed" above a list that is still loading, and offers a retry
     // button for a request that has not been made yet.
@@ -128,18 +132,15 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
   }
 
   watch(term, () => {
-    if (timer !== null) clearTimeout(timer);
-    if (!shouldSearch(term.value)) {
-      // Clear without a round trip, and cancel whatever is still in flight so the list the user
-      // sees always corresponds to the box they are looking at.
-      cancelPending();
-      requestId += 1;
-      results.value = [];
-      total.value = 0;
-      failed.value = false;
-      loading.value = false;
-      return;
-    }
+    // Invalidate at the keystroke, not after the 300 ms debounce. Otherwise an
+    // older response can resolve during that window and offer the wrong recipient.
+    cancelPending();
+    requestId += 1;
+    results.value = [];
+    total.value = 0;
+    failed.value = false;
+    loading.value = false;
+    if (!shouldSearch(term.value)) return;
     timer = setTimeout(() => {
       timer = null;
       void run();

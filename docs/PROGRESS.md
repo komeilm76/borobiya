@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — Recipient search never shows results for superseded input
+
+- Fixed a recipient-picker race: when a valid username fragment changed, an older request could still resolve in the 300 ms debounce window and show selectable results for the previous fragment. Changing a term now aborts/invalidate the old request immediately, and starting a new search clears results from earlier filters before awaiting the new response. Tests reproduce both the in-flight keystroke race and stale results under a newly applied rating filter. The server search contract is unchanged.
+
 ### 2026-10-24 — Cancellation acknowledgment survives bearer refresh
 
 - Fixed a confirmed SOS cancellation being shown as unconfirmed when `requestJson` refreshed an expired bearer on 401 and retried successfully. The composable now recognizes success by stable requester/request identity and request generation, rather than requiring the original token string to remain unchanged. It still discards a result after logout or an account switch. Regressions cover both token rotation and a different owner arriving before the request settles; no server cancellation behavior changed.
