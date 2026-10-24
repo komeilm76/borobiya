@@ -27,9 +27,17 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("avgRating");
     expect(viewSource).toContain("lastActiveAt");
 
+    // T3.6.5: persistent accessible replacement signposting survives sound autoplay denial.
+    expect(viewSource).toContain("NEEDS REPLACEMENT");
+    expect(viewSource).toContain('aria-live="assertive"');
+    expect(viewSource).toContain("rescuerLocation");
+    expect(viewSource).toContain("prefers-reduced-motion");
+
     const appSource = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
     expect(appSource).toContain("/_admin/dispatch");
     expect(appSource).toContain("useAdminSosStore");
     expect(appSource).toContain("openAlertOnMap");
+    expect(appSource).toContain("openReplacementOnMap");
+    expect(appSource).toContain("dismissUrgentReplacement");
   });
 });

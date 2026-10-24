@@ -4,7 +4,7 @@ import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SosRequestRecord } from "@shared/index";
 import { ApiError } from "@/api/http";
-import { SOS_NEW_REQUEST_EVENT } from "@/services/socket-events";
+import { MISSION_CANCELLED_BY_RESCUER_EVENT, SOS_NEW_REQUEST_EVENT } from "@/services/socket-events";
 import { useAuthStore } from "./auth";
 import { configureAdminSosRuntimeForTests, useAdminSosStore } from "./admin-sos";
 
@@ -58,6 +58,122 @@ describe("useAdminSosStore (T3.2.5)", () => {
       }
     });
   }
+
+  const cancelledEvent = (sosRequestId: string) => ({
+    missionId: "11111111-1111-4111-8111-111111111111",
+    sosRequestId,
+    rescuerId: "22222222-2222-4222-8222-222222222222",
+    reason: "ناتوانی در ادامه",
+    at: "2026-10-24T12:00:00.000Z",
+    rescuerLocation: { lat: 35.7, lon: 51.4 },
+    reviewRequired: true
+  });
+
+  it("deduplicates urgent cancellations, resolves exact SOSs beyond the queue, and clears private data on logout", async () => {
+    const row = makeSosRecord({ status: "cancelled_by_rescuer" });
+    const getRequest = vi.fn(async () => row);
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [], total: 0 }), getRequest,
+      getNearestResponders: async () => ({ responders: [] }),
+      createAudioContext: () => ({
+        currentTime: 0, destination: {},
+        createOscillator: () => ({ type: "sine", frequency: { setValueAtTime: () => { playedCount++; } },
+          connect: vi.fn(), start: vi.fn(), stop: vi.fn() }),
+        createGain: () => ({ gain: { setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(),
+          exponentialRampToValueAtTime: vi.fn() }, connect: vi.fn() })
+      })
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(1));
+    const event = cancelledEvent(row.id);
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, { ...event, reviewRequired: undefined });
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, { ...event, rescuerLocation: { lat: 200, lon: 51 } });
+    expect(store.urgentReplacement).toBeNull();
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, event);
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, event);
+    await vi.waitFor(() => expect(store.requests.find((item) => item.id === row.id)).toEqual(row));
+    expect(store.pendingCount).toBe(1);
+    expect(store.urgentReplacement?.reviewRequired).toBe(true);
+    expect(store.replacementByRequest[row.id]?.rescuerLocation).toEqual(event.rescuerLocation);
+    expect(getRequest).toHaveBeenCalledTimes(1);
+    expect(playedCount).toBe(3);
+    store.dismissUrgentReplacement();
+    expect(store.urgentReplacement).toBeNull();
+    expect(store.replacementByRequest[row.id]).toBeDefined();
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    expect(store.requests).toEqual([]);
+    expect(store.replacementByRequest).toEqual({});
+    expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(0);
+  });
+
+  it("ignores a pre-event list reply and clears replacement after a successful dispatch", async () => {
+    const accepted = makeSosRecord({ status: "accepted" });
+    const cancelled = makeSosRecord({ status: "cancelled_by_rescuer" });
+    let finishOldList!: (value: { items: SosRequestRecord[]; total: number }) => void;
+    const oldList = new Promise<{ items: SosRequestRecord[]; total: number }>((resolve) => { finishOldList = resolve; });
+    const listRequests = vi.fn().mockImplementationOnce(() => oldList)
+      .mockResolvedValue({ items: [cancelled], total: 1 });
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(), listRequests,
+      getRequest: async () => cancelled,
+      getNearestResponders: async () => ({ responders: [] }),
+      dispatchResponders: async () => ({ proposals: [] })
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(1));
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, cancelledEvent(cancelled.id));
+    await vi.waitFor(() => expect(store.selectedRequest?.status).toBe("cancelled_by_rescuer"));
+    finishOldList({ items: [accepted], total: 1 });
+    await oldList;
+    await nextTick();
+    expect(store.selectedRequest?.status).toBe("cancelled_by_rescuer");
+    store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
+    expect(await store.dispatchSelectedResponders()).toBe(true);
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.urgentReplacement).toBeNull();
+    expect(store.replacementByRequest[cancelled.id]).toBeUndefined();
+  });
+
+  it("does not expose dispatch while another mission remains active, or rehydrate after logout", async () => {
+    const row = makeSosRecord({ status: "accepted" });
+    let finish!: (value: SosRequestRecord) => void;
+    const pending = new Promise<SosRequestRecord>((resolve) => { finish = resolve; });
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [row], total: 1 }),
+      getRequest: () => pending,
+      getNearestResponders: async () => ({ responders: [] })
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
+    await vi.waitFor(() => expect(socketEmitter.listenerCount(MISSION_CANCELLED_BY_RESCUER_EVENT)).toBe(1));
+    socketEmitter.emit(MISSION_CANCELLED_BY_RESCUER_EVENT, cancelledEvent(row.id));
+    expect(store.selectedRequest?.status).toBe("accepted");
+    expect(store.canDispatchSelected).toBe(false);
+    await vi.waitFor(() => expect(store.urgentReplacement).toBeNull());
+    expect(store.replacementByRequest[row.id]).toBeUndefined();
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    finish(makeSosRecord({ status: "cancelled_by_rescuer" }));
+    await pending;
+    await nextTick();
+    expect(store.requests).toEqual([]);
+    expect(store.urgentReplacement).toBeNull();
+  });
 
   it("hydrates pending requests for admins, chimes once per unique SOS, updates photoUrl in place, and clears on logout", async () => {
     const initialRow = makeSosRecord({

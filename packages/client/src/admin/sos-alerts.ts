@@ -1,5 +1,7 @@
 import {
+  rescuerCancellationEventSchema,
   sosNewRequestEventSchema,
+  type RescuerCancellationEvent,
   type Severity,
   type SosRequestRecord
 } from "@shared/index";
@@ -112,6 +114,19 @@ export function parseSosNewRequestPayload(payload: unknown): SosRequestRecord | 
   return parsed.success ? parsed.data.sosRequest : null;
 }
 
+/** Reject participant-scoped or malformed cancellation events before displaying admin-only fields. */
+export type AdminRescuerCancellationAlert = RescuerCancellationEvent & {
+  rescuerLocation: { lat: number; lon: number } | null;
+  reviewRequired: boolean;
+};
+
+export function parseAdminRescuerCancellationPayload(payload: unknown): AdminRescuerCancellationAlert | null {
+  const parsed = rescuerCancellationEventSchema.safeParse(payload);
+  if (!parsed.success || parsed.data.rescuerLocation === undefined ||
+      typeof parsed.data.reviewRequired !== "boolean") return null;
+  return parsed.data as AdminRescuerCancellationAlert;
+}
+
 /** Deterministic newest-first ordering (`createdAt DESC`, `id ASC` tie-breaker). */
 export function sortSosRequests(items: readonly SosRequestRecord[]): SosRequestRecord[] {
   return [...items].sort((left, right) => {
@@ -197,7 +212,9 @@ export function buildSosAlertsGeoJson(
       properties: {
         id: req.id,
         severity: req.severity,
-        color: SOS_SEVERITY_PRESENTATION[req.severity].color,
+        color: req.status === "cancelled_by_rescuer"
+          ? SOS_SEVERITY_PRESENTATION.high.color
+          : SOS_SEVERITY_PRESENTATION[req.severity].color,
         isSelected: req.id === selectedId,
         isManual: req.location.isManual,
         status: req.status

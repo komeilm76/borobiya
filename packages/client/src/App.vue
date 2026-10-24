@@ -123,7 +123,7 @@ class="nav-button d-none d-xxl-flex"
     <SosRequestSheet v-if="showSosButton" v-model="sosSheet.open" />
 
     <v-snackbar
-      :model-value="Boolean(adminSos.latestAlert)"
+      :model-value="Boolean(adminSos.latestAlert) && !adminSos.urgentReplacement"
       color="error"
       location="top"
       multi-line
@@ -136,6 +136,26 @@ class="nav-button d-none d-xxl-flex"
       <template #actions>
         <v-btn variant="text" @click="openAlertOnMap">مشاهده روی نقشه</v-btn>
         <v-btn variant="text" @click="adminSos.dismissLatestAlert()">بستن</v-btn>
+      </template>
+    </v-snackbar>
+
+    <v-snackbar
+      :model-value="Boolean(adminSos.urgentReplacement)"
+      color="error"
+      location="top"
+      multi-line
+      :timeout="-1"
+    >
+      <div v-if="adminSos.urgentReplacement" class="replacement-signal" role="alert" aria-live="assertive">
+        <strong>NEEDS REPLACEMENT · اعزام جایگزین فوری</strong>
+        <span class="ms-1">امدادگر مأموریت را لغو کرده است. درخواست را بررسی و امدادگر دیگری اعزام کنید.</span>
+        <span v-if="adminSos.urgentReplacement.reviewRequired" class="d-block mt-1">
+          این لغو به بررسی مدیریتی نیاز دارد.
+        </span>
+      </div>
+      <template #actions>
+        <v-btn variant="text" @click="openReplacementOnMap">مشاهده و اعزام</v-btn>
+        <v-btn variant="text" @click="adminSos.dismissUrgentReplacement()">بستن</v-btn>
       </template>
     </v-snackbar>
 
@@ -223,6 +243,14 @@ async function openAlertOnMap(): Promise<void> {
   }
 }
 
+async function openReplacementOnMap(): Promise<void> {
+  const requestId = adminSos.urgentReplacement?.sosRequestId;
+  if (!requestId) return;
+  adminSos.setFilterStatus("pending");
+  adminSos.selectRequest(requestId);
+  await router.push({ path: "/_admin/dispatch", query: { request: requestId } });
+}
+
 async function logout(): Promise<void> {
   try {
     await auth.logout();
@@ -240,3 +268,9 @@ onMounted(async () => {
   }
 });
 </script>
+
+<style scoped>
+.replacement-signal { animation: urgent-outline 1.1s ease-in-out 2; }
+@keyframes urgent-outline { 50% { outline: 3px solid currentColor; outline-offset: 4px; } }
+@media (prefers-reduced-motion: reduce) { .replacement-signal { animation: none; } }
+</style>

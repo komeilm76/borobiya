@@ -8,6 +8,7 @@ import type {
 } from "@shared/index";
 import {
   dispatchSosResponders,
+  getAdminSosRequest,
   getNearestSosResponders,
   listAdminSosRequests,
   type ListAdminSosRequestsParams
@@ -16,13 +17,15 @@ import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
 import {
   isDispatchableSosStatus,
+  parseAdminRescuerCancellationPayload,
+  type AdminRescuerCancellationAlert,
   mergeSosAlertSnapshot,
   parseSosNewRequestPayload,
   playSosAlertSound,
   upsertSosAlert,
   type AlertAudioContextLike
 } from "@/admin/sos-alerts";
-import { SOS_NEW_REQUEST_EVENT } from "@/services/socket-events";
+import { MISSION_CANCELLED_BY_RESCUER_EVENT, SOS_NEW_REQUEST_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { useAuthStore } from "./auth";
 
@@ -39,6 +42,7 @@ export interface AdminSosRuntime {
     accessToken: string,
     params: ListAdminSosRequestsParams
   ) => Promise<{ items: SosRequestRecord[]; total: number }>;
+  getRequest?: (requestId: string, accessToken: string) => Promise<SosRequestRecord>;
   getNearestResponders?: (
     requestId: string,
     accessToken: string
@@ -70,6 +74,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const selectedId = ref<string | null>(null);
   const filterStatus = ref<AdminSosFilterStatus>("pending");
   const latestAlert = ref<SosRequestRecord | null>(null);
+  const urgentReplacement = ref<AdminRescuerCancellationAlert | null>(null);
+  const replacementByRequest = ref<Record<string, AdminRescuerCancellationAlert>>({});
+  const seenCancellationMissions = new Set<string>();
   const soundMuted = ref(false);
   const connected = ref(false);
   const loading = ref(false);
@@ -90,6 +97,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   let nearestGeneration = 0;
   let dispatchGeneration = 0;
   let refreshingSocketAuth = false;
+  let sessionGeneration = 0;
 
   const isAdminSession = computed(
     () => auth.isAuthenticated && auth.user?.role === "admin"
@@ -170,6 +178,13 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
           : undefined
       );
       if (gen !== refreshGeneration || !response) return;
+      // A response begun before an urgent socket event is invalidated by its generation.
+      // A new server snapshot also resolves alerts already re-dispatched by another admin.
+      for (const item of response.items) {
+        if (replacementByRequest.value[item.id] && item.status !== "cancelled_by_rescuer") {
+          resolveReplacement(item.id);
+        }
+      }
       requests.value = mergeSosAlertSnapshot(requests.value, response.items);
       if (!selectedId.value && requests.value.length > 0) {
         selectedId.value = (visibleRequests.value[0] ?? requests.value[0])!.id;
@@ -271,6 +286,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       };
       const { items } = upsertSosAlert(requests.value, updatedRecord);
       requests.value = items;
+      refreshGeneration++; // Ignore an older list response that could undo the committed dispatch.
+      resolveReplacement(activeRequest.id);
       // The dispatcher may have selected another SOS while this request was in flight. The
       // first SOS still needs its updated status, but the new selection and banner are its own.
       if (selectedId.value === activeRequest.id) {
@@ -314,6 +331,54 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     } else if (latestAlert.value?.id === record.id) {
       latestAlert.value = record;
     }
+  }
+
+  function resolveReplacement(requestId: string): void {
+    if (!replacementByRequest.value[requestId]) return;
+    const next = { ...replacementByRequest.value };
+    delete next[requestId];
+    replacementByRequest.value = next;
+    if (urgentReplacement.value?.sosRequestId === requestId) urgentReplacement.value = null;
+  }
+
+  function handleRescuerCancellation(payload: unknown): void {
+    if (!isAdminSession.value) return;
+    const alert = parseAdminRescuerCancellationPayload(payload);
+    if (!alert || seenCancellationMissions.has(alert.missionId)) return;
+    seenCancellationMissions.add(alert.missionId);
+    // Drop any list read started before the committed cancellation broadcast.
+    refreshGeneration++;
+    replacementByRequest.value = { ...replacementByRequest.value, [alert.sosRequestId]: alert };
+    urgentReplacement.value = alert;
+    // A second rescuer may still be active on this SOS. Do not fabricate a
+    // dispatchable status until the authoritative admin read confirms it.
+    void playSosAlertSound("high", {
+      muted: soundMuted.value,
+      createContext: activeOverrides.createAudioContext
+    });
+    const session = sessionGeneration;
+    // The list is capped at 100 and may be filtered; fetch the exact affected SOS so
+    // the alert can always deep-link to a real, server-validated record.
+    const getRequest = activeOverrides.getRequest ?? getAdminSosRequest;
+    void withAdminAuthRetry((token) => getRequest(alert.sosRequestId, token))
+      .then((record) => {
+        if (session !== sessionGeneration || !isAdminSession.value || !record ||
+            replacementByRequest.value[record.id]?.missionId !== alert.missionId) return;
+        if (record.status !== "cancelled_by_rescuer") {
+          resolveReplacement(record.id);
+        }
+        requests.value = upsertSosAlert(requests.value, record).items;
+      })
+      .catch(() => {
+        if (session === sessionGeneration && isAdminSession.value) {
+          errorMessage.value = "جزئیات درخواست لغوشده دریافت نشد؛ فهرست را دوباره بارگذاری کنید.";
+        }
+      });
+    void refreshRequests();
+  }
+
+  function dismissUrgentReplacement(): void {
+    urgentReplacement.value = null;
   }
 
   async function attachRealtime(): Promise<void> {
@@ -393,12 +458,14 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     client.socket.on("disconnect", onDisconnect);
     client.socket.on("connect_error", onConnectError);
     client.socket.on(SOS_NEW_REQUEST_EVENT, onNewRequest);
+    client.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, handleRescuerCancellation);
 
     detachSocketListeners = () => {
       client.socket.off("connect", onConnect);
       client.socket.off("disconnect", onDisconnect);
       client.socket.off("connect_error", onConnectError);
       client.socket.off(SOS_NEW_REQUEST_EVENT, onNewRequest);
+      client.socket.off(MISSION_CANCELLED_BY_RESCUER_EVENT, handleRescuerCancellation);
       client.close();
     };
 
@@ -421,7 +488,11 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   }
 
   function resetState(): void {
+    sessionGeneration++;
     refreshGeneration++;
+    seenCancellationMissions.clear();
+    replacementByRequest.value = {};
+    urgentReplacement.value = null;
     nearestGeneration++;
     dispatchGeneration++;
     detachRealtime();
@@ -516,6 +587,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     selectedRequest,
     filterStatus,
     latestAlert,
+    urgentReplacement,
+    replacementByRequest,
     soundMuted,
     connected,
     loading,
@@ -543,6 +616,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     selectRequest,
     setFilterStatus,
     dismissLatestAlert,
+    dismissUrgentReplacement,
     toggleSoundMuted,
     testAlertSound
   };

@@ -302,7 +302,7 @@ Each update appears as **timeline** to requester + admin.
 
 ## 18. Cancellation — Partially available
 
-> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation also works after an accepted mission (T3.6.4). Requester SOS History is now live at `/_user/sos-history` (T3.7.1). The admin red-flash/sound replacement UI (T3.6.5) remains planned.
+> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation also works after an accepted mission (T3.6.4). Requester SOS History is now live at `/_user/sos-history` (T3.7.1). The admin replacement alert is live (T3.6.5); the dedicated re-dispatch workflow polish (T3.6.6) remains open.
 
 ### If you are the requester (need to cancel SOS)
 
@@ -325,14 +325,16 @@ Each update appears as **timeline** to requester + admin.
    - Insufficient expertise
    - Unsafe conditions
    - Other → (requires custom text, **needs admin approval** if “other”)
-3. Read the warning and **confirm** → your mission stops, you become eligible for another offer, and the server sends an urgent event to the admin room. The dispatcher’s red-flash/sound replacement interface is not yet built; do not assume re-dispatch has happened.
+3. Read the warning and **confirm** → your mission stops, you become eligible for another offer, and the server sends an urgent event to the admin room. The dispatcher sees an urgent admin-only alert; this does **not** re-dispatch by itself.
    - Do this rarely: max 3 requests/hour; the third cancellation in a UTC day is flagged for review. “Other” additionally needs admin approval of the reason.
 
 [Screenshot: Cancel with reason picker — requester vs rescuer]
 
 ### Admin view on rescuer cancel
 
-- Red flash + sound → “NEEDS REPLACEMENT” badge on SOS request → **Re-dispatch** button.
+- An authenticated admin receives a red flashing **NEEDS REPLACEMENT** alert with a **مشاهده و اعزام** (View and dispatch) link. The alert sounds three high-priority notes unless muted or blocked by browser autoplay. The visual warning is always present even without sound.
+- Open the linked SOS in `/_admin/dispatch`. A `cancelled_by_rescuer` request stays in the pending queue after reload, with a red badge and explanatory detail panel. If another rescuer is still active on the request, do not re-dispatch: the console first checks the server’s authoritative status and keeps dispatch disabled.
+- The cancellation banner may show the rescuer’s **last-known** location and a review-required flag (admin only; this is not a live location feed). Select eligible responders in the existing nearest-responder panel and dispatch; the live notice clears after success. Dismissing the banner does not remove the request’s replacement badge. Re-dispatch workflow polish remains T3.6.6.
 
 ### System cancels
 

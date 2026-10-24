@@ -5,6 +5,7 @@ import {
   formatResponderDistance,
   isDispatchableSosStatus,
   mergeSosAlertSnapshot,
+  parseAdminRescuerCancellationPayload,
   parseSosNewRequestPayload,
   playSosAlertSound,
   SOS_SEVERITY_PRESENTATION,
@@ -43,6 +44,24 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
     expect(parseSosNewRequestPayload(null)).toBeNull();
     expect(parseSosNewRequestPayload({ sosRequest: { id: "not-a-uuid" } })).toBeNull();
     expect(parseSosNewRequestPayload({ sosRequest: valid, extra: true })).toBeNull();
+  });
+
+  it("accepts only strict admin-scoped cancellation notices with validated location", () => {
+    const event = {
+      missionId: "11111111-1111-4111-8111-111111111111",
+      sosRequestId: sampleSos().id,
+      rescuerId: "22222222-2222-4222-8222-222222222222",
+      reason: "ناتوانی در ادامه",
+      at: "2026-10-24T12:00:00.000Z",
+      rescuerLocation: { lat: 35.7, lon: 51.4 },
+      reviewRequired: true
+    };
+    expect(parseAdminRescuerCancellationPayload(event)).toEqual(event);
+    expect(parseAdminRescuerCancellationPayload({ ...event, rescuerLocation: null })?.rescuerLocation).toBeNull();
+    expect(parseAdminRescuerCancellationPayload({ ...event, rescuerLocation: undefined })).toBeNull();
+    expect(parseAdminRescuerCancellationPayload({ ...event, reviewRequired: undefined })).toBeNull();
+    expect(parseAdminRescuerCancellationPayload({ ...event, rescuerLocation: { lat: 200, lon: 51 } })).toBeNull();
+    expect(parseAdminRescuerCancellationPayload({ ...event, extra: "leak" })).toBeNull();
   });
 
   it("marks first arrival as isNew=true and deduplicates follow-up photo updates without losing photoUrl", () => {
@@ -86,6 +105,8 @@ describe("admin SOS alert helpers (T3.2.5)", () => {
       SOS_SEVERITY_PRESENTATION.low.color
     ]);
     expect(geojson.features.map((f) => f.properties.isSelected)).toEqual([false, true, false]);
+    expect(buildSosAlertsGeoJson([sampleSos({ severity: "low", status: "cancelled_by_rescuer" })], null)
+      .features[0]?.properties.color).toBe(SOS_SEVERITY_PRESENTATION.high.color);
   });
 
   it("synthesizes severity-graded Web Audio chimes, respects mute, and closes AudioContext", async () => {

@@ -79,6 +79,35 @@
       {{ adminSos.errorMessage }}
     </v-alert>
 
+    <v-alert
+      v-if="adminSos.urgentReplacement"
+      class="replacement-flash mb-4"
+      color="error"
+      icon="mdi-alert-octagon"
+      variant="tonal"
+      role="alert"
+      aria-live="assertive"
+    >
+      <div class="d-flex flex-wrap align-center justify-space-between ga-3">
+        <div>
+          <strong>NEEDS REPLACEMENT · اعزام جایگزین فوری</strong>
+          <p class="mb-0">امدادگر مأموریت را لغو کرده است؛ درخواست را بررسی و امدادگر دیگری اعزام کنید.</p>
+          <p v-if="adminSos.urgentReplacement.reviewRequired" class="mb-0 font-weight-bold">
+            این لغو به بررسی مدیریتی نیاز دارد.
+          </p>
+          <p v-if="adminSos.urgentReplacement.rescuerLocation" class="mb-0 text-caption">
+            آخرین موقعیت امدادگر: <span dir="ltr">{{ adminSos.urgentReplacement.rescuerLocation.lat.toFixed(5) }}, {{ adminSos.urgentReplacement.rescuerLocation.lon.toFixed(5) }}</span>
+          </p>
+        </div>
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn color="error" variant="flat" @click="focusReplacement(adminSos.urgentReplacement.sosRequestId)">
+            مشاهدهٔ درخواست و اعزام
+          </v-btn>
+          <v-btn color="error" variant="text" @click="adminSos.dismissUrgentReplacement()">بستن هشدار</v-btn>
+        </div>
+      </div>
+    </v-alert>
+
     <v-row>
       <v-col cols="12" lg="7">
         <v-card class="overflow-hidden mb-4" rounded="xl" variant="outlined">
@@ -322,14 +351,17 @@
                 <template #prepend>
                   <span
                     class="pulse-indicator me-3"
-                    :style="{ '--alert-color': severityMeta(item.severity).color }"
+                    :style="{ '--alert-color': item.status === 'cancelled_by_rescuer' ? '#dc2626' : severityMeta(item.severity).color }"
                     aria-hidden="true"
                   />
                 </template>
 
-                <v-list-item-title class="d-flex align-center justify-space-between ga-2 font-weight-bold">
+                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
                   <span>{{ incidentLabel(item.incidentTypeId) }}</span>
-                  <div class="d-flex align-center ga-1">
+                  <div class="d-flex flex-wrap align-center ga-1">
+                    <v-chip v-if="item.status === 'cancelled_by_rescuer'" color="error" size="x-small" variant="flat">
+                      NEEDS REPLACEMENT
+                    </v-chip>
                     <v-chip
                       :color="statusMeta(item.status).badgeColor"
                       size="x-small"
@@ -378,6 +410,23 @@
             </v-chip>
           </v-card-title>
           <v-divider />
+          <v-alert
+            v-if="adminSos.selectedRequest.status === 'cancelled_by_rescuer'"
+            class="ma-4 mb-0 replacement-flash"
+            color="error"
+            icon="mdi-alert-octagon"
+            variant="tonal"
+            role="status"
+          >
+            <strong>NEEDS REPLACEMENT · اعزام جایگزین</strong>
+            <p class="mb-0">این مأموریت لغو شده است. امدادگران واجد شرایط را در ادامه انتخاب و پیشنهاد جدید ارسال کنید.</p>
+            <template v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]">
+              <p v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.reviewRequired" class="mb-0">این لغو به بررسی مدیریتی نیاز دارد.</p>
+              <p v-if="adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation" class="mb-0 text-caption">
+                آخرین موقعیت امدادگر: <span dir="ltr">{{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lat.toFixed(5) }}, {{ adminSos.replacementByRequest[adminSos.selectedRequest.id]?.rescuerLocation?.lon.toFixed(5) }}</span>
+              </p>
+            </template>
+          </v-alert>
           <v-card-text class="d-flex flex-column ga-2 text-body-2">
             <div>
               <strong>نوع حادثه:</strong>
@@ -616,6 +665,16 @@ function stopPulseLoop(): void {
   pulseAnimationFrame = null;
 }
 
+function focusReplacement(requestId: string): void {
+  adminSos.setFilterStatus("pending");
+  const item = adminSos.requests.find((request) => request.id === requestId);
+  if (item) focusRequest(item);
+  else {
+    pendingDeepLinkId = requestId;
+    adminSos.selectRequest(requestId);
+  }
+}
+
 function focusRequest(item: SosRequestRecord): void {
   adminSos.selectRequest(item.id);
   mapInstance?.flyTo({
@@ -795,6 +854,19 @@ onBeforeUnmount(() => {
   background: var(--alert-color, #dc2626);
   box-shadow: 0 0 0 0 var(--alert-color, #dc2626);
   animation: sos-pulse 1.6s infinite ease-out;
+}
+
+.replacement-flash {
+  border-inline-start: 5px solid rgb(var(--v-theme-error));
+  animation: replacement-arrival 1.1s ease-in-out 2;
+}
+
+@keyframes replacement-arrival {
+  50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, .3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .replacement-flash, .pulse-indicator { animation: none; }
 }
 
 @keyframes sos-pulse {
