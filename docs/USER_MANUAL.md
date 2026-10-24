@@ -152,7 +152,7 @@ User search and place/address search are not available in the current client. Se
 
 ## 10. Routing & Navigation — Partially available
 
-The accepted-offer page shows a simple incident/rescuer preview map. On an active mission, open **مأموریت من** (`/_user/mission`) and choose **رفتن به محل حادثه**. The map retrieves the incident for your assigned active mission, including after a reload. Choose **خودرو** (car), **دوچرخه** (bicycle), or **پیاده** (foot); then select **اجازهٔ موقعیت و دریافت مسیرها** to allow GPS and ask the local offline routing gateway for routes. Without location permission, the incident remains visible but no starting point or route can be calculated. You may refresh your location and retry, switch transport, and choose any offered route to preview it on the map. Distance and time are approximate estimates, not traffic-aware arrival promises. The local road graph may return only one option (or none); elevation is labeled unavailable because the installed offline graph has no elevation data. **Start Navigation**, turn-by-turn guidance, camera follow and background live location are not yet implemented (T3.5.6–T3.5.7).
+The accepted-offer page shows a simple incident/rescuer preview map. On an active mission, open **مأموریت من** (`/_user/mission`) and choose **رفتن به محل حادثه**. The map retrieves the incident for your assigned active mission, including after a reload. Choose **خودرو** (car), **دوچرخه** (bicycle), or **پیاده** (foot); then select **اجازهٔ موقعیت و دریافت مسیرها** to allow GPS and ask the local offline routing gateway for routes. Without location permission, the incident remains visible but no starting point or route can be calculated. You may refresh your location and retry, switch transport, and choose any offered route to preview it on the map. Distance and time are approximate estimates, not traffic-aware arrival promises. The local road graph may return only one option (or none); elevation is labeled unavailable because the installed offline graph has no elevation data. Choose a route and select **شروع راهبری** (Start Navigation) to follow your live GPS position with a transport-specific camera and route-direction bearing. **توقف راهبری** (Stop Navigation), closing the route panel, leaving the screen, or signing out stops the foreground location watch. You must stop before switching routes or transport. This is map-follow guidance, **not** spoken turn-by-turn instructions or a guaranteed ETA. Live participant markers and online/offline badges remain T3.5.7.
 
 ---
 
@@ -260,7 +260,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 16. SOS — Responding as Rescuer
 
-> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; follow-navigation, live location and mission status controls remain planned under T3.5.
+> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; foreground GPS-follow navigation is live, while live participant locations and client-side status controls remain planned under T3.5.
 
 ### Inbox
 

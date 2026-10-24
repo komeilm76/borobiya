@@ -83,7 +83,7 @@
           <div class="mission-route__controls">
             <div>
               <p class="text-body-2 font-weight-bold mb-2">وسیلهٔ حرکت</p>
-              <v-btn-toggle :model-value="routing.profile.value" mandatory rounded="lg" color="primary"
+              <v-btn-toggle :model-value="routing.profile.value" :disabled="navigation.active.value" mandatory rounded="lg" color="primary"
                 @update:model-value="onProfileChange">
                 <v-btn value="car" prepend-icon="mdi-car">خودرو</v-btn>
                 <v-btn value="bicycle" prepend-icon="mdi-bicycle">دوچرخه</v-btn>
@@ -91,10 +91,10 @@
               </v-btn-toggle>
             </div>
             <div class="d-flex flex-wrap ga-2">
-              <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value"
+              <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
                 @click="routing.findRoutes()">{{ routing.from.value ? 'دریافت مسیرها' : 'اجازهٔ موقعیت و دریافت مسیرها' }}</v-btn>
               <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
-                :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
+                :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
             </div>
           </div>
           <div class="mission-route__map">
@@ -108,12 +108,24 @@
           <div v-if="routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
             <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
               class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
-              :aria-pressed="routing.selectedIndex.value === index" @click="routing.selectRoute(index)">
+              :aria-pressed="routing.selectedIndex.value === index" :disabled="navigation.active.value" @click="routing.selectRoute(index)">
               <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
               <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
               <small>تغییر ارتفاع: دادهٔ ارتفاعی در مسیریاب فعلی موجود نیست.</small>
             </button>
           </div>
+          <div v-if="routing.selectedRoute.value" class="mission-route__navigation">
+            <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
+              prepend-icon="mdi-navigation" :disabled="!mapReady" @click="navigation.start()">شروع راهبری</v-btn>
+            <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
+              @click="navigation.stop()">توقف راهبری</v-btn>
+            <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
+              {{ navigation.fix.value ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'در انتظار موقعیت تازهٔ GPS…' }}
+            </p>
+          </div>
+          <v-alert v-if="navigation.error.value" type="warning" variant="tonal" role="alert" class="mt-3">
+            {{ navigation.error.value }}
+          </v-alert>
           <p v-if="routing.routes.value.length === 1" class="text-caption mt-2" role="status">
             برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
           </p>
@@ -156,7 +168,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { useRouteNavigation } from "@/composables/use-route-navigation";
 import { Marker, type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -175,6 +188,10 @@ const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), () => auth.ensureSession());
+const mapReady = ref(false);
+const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
+  computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
+  (camera) => routeMap?.easeTo(camera));
 function onProfileChange(value: unknown): void {
   if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
 }
@@ -236,13 +253,16 @@ function applyRouteLayer(): void {
 function onRouteMapReady(map: MapLibreMap): void {
   detachRouteMap?.();
   routeMap = map;
+  mapReady.value = true;
   const onStyleReady = () => applyRouteLayer();
   map.on("idle", onStyleReady);
   detachRouteMap = () => map.off("idle", onStyleReady);
   syncRouteMap();
 }
 function closeRoutes(): void {
+  navigation.stop();
   routing.reset();
+  mapReady.value = false;
   detachRouteMap?.();
   detachRouteMap = null;
   incidentMarker?.remove();
@@ -283,6 +303,8 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-route__choice { display: grid; text-align: start; gap: 7px; color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.35); border-radius: 15px; padding: 16px; cursor: pointer; font: inherit; }
 .mission-route__choice--selected { border: 2px solid rgb(var(--v-theme-primary)); background: rgba(22,130,108,.09); }
 .mission-route__choice:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-route__choice:disabled { opacity: .7; cursor: not-allowed; }
+.mission-route__navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 18px; }
 .mission-route__choice small { opacity: .75; }
 .mission-desk__shell { max-width: 1120px; margin-inline: auto; }
 .mission-hero { position: relative; overflow: hidden; border-radius: 28px; background: linear-gradient(115deg, #103b40, #206b67); color: white; padding: clamp(27px, 5vw, 56px); box-shadow: 0 22px 60px rgba(11,67,65,.18); }
