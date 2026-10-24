@@ -156,6 +156,45 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(new Set(steps?.map((step) => step.createdAt)).size).toBe(1);
   });
 
+  it("stores one completed-mission rating per requester and transactionally maintains the responder average", async () => {
+    const first = "50000000-0000-4000-8000-000000000007";
+    const second = "50000000-0000-4000-8000-000000000008";
+    const pending = "50000000-0000-4000-8000-000000000009";
+    for (const [id, status] of [[first, "completed"], [second, "completed"], [pending, "pending"]]) {
+      await pg.query(`INSERT INTO missions (id,sos_request_id,rescuer_id,requester_id,status)
+        VALUES ($1,$2,$3,$4,$5)`, [id, SOS, RESCUER, REQUESTER, status]);
+    }
+    const insert = (missionId: string, raterId: string, rateeId: string, rating: number, comment: string | null = null) =>
+      pg.query(`INSERT INTO mission_ratings (mission_id,rater_id,ratee_id,rating,comment)
+        VALUES ($1,$2,$3,$4,$5)`, [missionId, raterId, rateeId, rating, comment]);
+    const average = async () => (await pg.query<{ avg_rating: string | null }>(
+      `SELECT avg_rating FROM users WHERE id=$1`, [RESCUER])).rows[0]?.avg_rating;
+
+    expect(await average()).toBeNull();
+    await expect(insert(pending, REQUESTER, RESCUER, 5)).rejects.toThrow();
+    await expect(insert(first, RESCUER, REQUESTER, 5)).rejects.toThrow();
+    await expect(insert(first, REQUESTER, REQUESTER, 5)).rejects.toThrow();
+    await expect(insert(first, REQUESTER, RESCUER, 0)).rejects.toThrow();
+    await expect(insert(first, REQUESTER, RESCUER, 5, "x".repeat(501))).rejects.toThrow();
+    expect(await average()).toBeNull();
+
+    await insert(first, REQUESTER, RESCUER, 5, "Helpful responder");
+    expect(Number(await average())).toBe(5);
+    await expect(insert(first, REQUESTER, RESCUER, 1)).rejects.toThrow();
+    expect(Number(await average())).toBe(5);
+    await insert(second, REQUESTER, RESCUER, 4);
+    expect(Number(await average())).toBe(4.5);
+    await expect(pg.query(`UPDATE mission_ratings SET ratee_id=$1 WHERE mission_id=$2`,
+      [REQUESTER, first])).rejects.toThrow();
+    expect(Number(await average())).toBe(4.5);
+    await pg.query(`UPDATE mission_ratings SET rating=3 WHERE mission_id=$1`, [first]);
+    expect(Number(await average())).toBe(3.5);
+    await pg.query(`DELETE FROM mission_ratings WHERE mission_id=$1`, [second]);
+    expect(Number(await average())).toBe(3);
+    await pg.query(`DELETE FROM mission_ratings WHERE mission_id=$1`, [first]);
+    expect(await average()).toBeNull();
+  });
+
   it("rolls back the status and busy flag when history cannot be inserted", async () => {
     const store = new DrizzleMissionProgressStore(drizzle(pg, { schema }) as unknown as Database);
     await pg.query(`UPDATE "missions" SET "status" = 'in_progress' WHERE "id" = $1`, [MISSION]);

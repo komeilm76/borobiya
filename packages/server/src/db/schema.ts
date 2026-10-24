@@ -502,6 +502,26 @@ export const missionStatusHistory = pgTable(
   ]
 );
 
+/** One requester rating per completed mission; the cache is maintained by the 0018 DB triggers. */
+export const missionRatings = pgTable(
+  "mission_ratings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    missionId: uuid("mission_id").notNull().references(() => missions.id),
+    raterId: uuid("rater_id").notNull().references(() => users.id),
+    rateeId: uuid("ratee_id").notNull().references(() => users.id),
+    rating: integer("rating").notNull(),
+    comment: text("comment"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => [
+    unique("mission_ratings_mission_rater_unique").on(table.missionId, table.raterId),
+    check("mission_ratings_rating_check", sql`"rating" BETWEEN 1 AND 5`),
+    check("mission_ratings_comment_length_check", sql`"comment" IS NULL OR char_length("comment") <= 500`),
+    index("mission_ratings_ratee_id_idx").on(table.rateeId)
+  ]
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type NewUserRow = typeof users.$inferInsert;
 export type SecurityQuestionRow = typeof securityQuestions.$inferSelect;
@@ -531,3 +551,6 @@ export type MissionRow = typeof missions.$inferSelect;
 export type NewMissionRow = typeof missions.$inferInsert;
 export type MissionStatusHistoryRow = typeof missionStatusHistory.$inferSelect;
 export type NewMissionStatusHistoryRow = typeof missionStatusHistory.$inferInsert;
+
+export type MissionRatingRow = typeof missionRatings.$inferSelect;
+export type NewMissionRatingRow = typeof missionRatings.$inferInsert;

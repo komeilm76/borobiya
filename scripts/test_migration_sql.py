@@ -40,6 +40,16 @@ def journal_entries() -> list[dict]:
     return json.loads(JOURNAL.read_text(encoding="utf-8"))["entries"]
 
 
+def statement_terminators(sql_text: str) -> int:
+    """Count top-level semicolons, not PL/pgSQL body or quoted-string punctuation."""
+    # PostgreSQL dollar quotes can use $$ or $tag$ and contain semicolons without
+    # ending the enclosing CREATE FUNCTION statement.
+    without_dollar_bodies = re.sub(r"\$([A-Za-z_0-9]*)\$.*?\$\1\$", "''", sql_text, flags=re.DOTALL)
+    without_comments = re.sub(r"--[^\n]*", "", without_dollar_bodies)
+    without_strings = re.sub(r"'(?:''|[^'])*'", "''", without_comments)
+    return without_strings.count(";")
+
+
 def schema_geography_spelling() -> str:
     """The exact string `customType` returns in schema.ts, which is what DDL must contain."""
     text = SCHEMA.read_text(encoding="utf-8")
@@ -108,7 +118,7 @@ class JournalTests(unittest.TestCase):
         for entry in journal_entries():
             path = DRIZZLE / f"{entry['tag']}.sql"
             body = path.read_text(encoding="utf-8")
-            statements = body.count(";")
+            statements = statement_terminators(body)
             if statements <= 1:
                 continue
             self.assertTrue(entry.get("breakpoints"), f"{path.name}: {statements} statements and no "
@@ -118,6 +128,12 @@ class JournalTests(unittest.TestCase):
 
 
 class StatementShapeTests(unittest.TestCase):
+    def test_dollar_quoted_procedures_count_as_one_statement(self) -> None:
+        sample = "CREATE FUNCTION f() RETURNS void AS $$ BEGIN PERFORM 1; PERFORM 2; END; $$ LANGUAGE plpgsql;"
+        self.assertEqual(statement_terminators(sample), 1)
+        self.assertEqual(statement_terminators("SELECT ';'; SELECT 2;"), 2)
+        self.assertEqual(statement_terminators("SELECT 1; -- comment;"), 1)
+
     def test_each_chunk_holds_exactly_one_statement(self) -> None:
         # `bun src/db/migrate.ts` splits on the marker and sends each piece as its own query. Two
         # statements in one piece is accepted by some drivers and rejected by others, so the file should
@@ -129,9 +145,9 @@ class StatementShapeTests(unittest.TestCase):
                 if not stripped:
                     continue
                 self.assertLessEqual(
-                    stripped.count(";"),
+                    statement_terminators(stripped),
                     1,
-                    f"{path.name}: a chunk with {stripped.count(';')} semicolons: {stripped[:80]!r}",
+                    f"{path.name}: a chunk with {statement_terminators(stripped)} statements: {stripped[:80]!r}",
                 )
 
     def test_the_extension_that_the_types_need_comes_first(self) -> None:

@@ -127,6 +127,13 @@
       "when": 1792813130449,
       "tag": "0017_right_baron_zemo",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1792828333658,
+      "tag": "0018_mission-ratings",
+      "breakpoints": true
     }
   ]
 }

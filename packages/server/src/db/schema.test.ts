@@ -12,6 +12,7 @@ import {
   locationHistoryShares,
   locationShares,
   missionProposals,
+  missionRatings,
   passwordResetChallenges,
   passwordResetTokens,
   userSecurityAnswers,
@@ -183,6 +184,29 @@ describe("users database schema", () => {
     expect(extensionPosition).toBeGreaterThanOrEqual(0);
     expect(geographyPosition).toBeGreaterThan(extensionPosition);
     expect(migrationSql).not.toContain('"geography(Point,4326)"');
+  });
+});
+
+describe("mission ratings schema (T3.7.3)", () => {
+  it("ties one bounded rating to a mission and both participants, with an aggregate index", () => {
+    const config = getTableConfig(missionRatings);
+    const columns = new Map(config.columns.map((column) => [column.name, column]));
+    expect(config.foreignKeys).toHaveLength(3);
+    expect(columns.get("mission_id")?.notNull).toBe(true);
+    expect(columns.get("rater_id")?.notNull).toBe(true);
+    expect(columns.get("ratee_id")?.notNull).toBe(true);
+    expect(columns.get("rating")?.getSQLType()).toBe("integer");
+    expect(columns.get("created_at")?.hasDefault).toBe(true);
+    expect(config.uniqueConstraints.map(({ name }) => name)).toContain("mission_ratings_mission_rater_unique");
+    expect(config.checks.map(({ name }) => name)).toEqual([
+      "mission_ratings_rating_check", "mission_ratings_comment_length_check"
+    ]);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name))
+      .toContain("mission_ratings_ratee_id_idx");
+    const migration = readFileSync(new URL("../../drizzle/0018_mission-ratings.sql", import.meta.url), "utf8");
+    expect(migration).toContain("CREATE TRIGGER mission_ratings_guard_before_write");
+    expect(migration).toContain("CREATE TRIGGER mission_ratings_refresh_after_write");
+    expect(migration).toContain("FOR UPDATE");
   });
 });
 

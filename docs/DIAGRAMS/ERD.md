@@ -238,10 +238,13 @@ CREATE TABLE mission_ratings (
   rater_id UUID NOT NULL REFERENCES users(id),
   ratee_id UUID NOT NULL REFERENCES users(id),
   rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-  comment TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
+  comment TEXT CHECK (comment IS NULL OR char_length(comment) <= 500),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(mission_id, rater_id)
 );
+-- The live 0018 migration adds a ratee_id index and BEFORE/AFTER triggers:
+-- completed mission/requester/rescuer validation, per-rescuer row lock, and
+-- one-decimal users.avg_rating recomputation (NULL when no ratings remain).
 
 CREATE TABLE admin_audit_log (
   id UUID PRIMARY KEY,
@@ -256,7 +259,7 @@ CREATE TABLE admin_audit_log (
 
 ## Notes
 
-- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, the live `location_shares` table (T2.1.1), and `location_history`/`location_history_shares` (T2.2.1/T2.2.2, `0007_brief_hedge_knight.sql`). Socket `location:update` (T2.1.5) now writes one `location_history` row and the `users.last_location` geography per accepted fix; history reads/shares (T2.2.3-T2.2.4) are not implemented yet, while retention is: the share-expiry sweep and the batched history prune (T2.1.6/T2.2.5) run as in-process timers over these two tables. Category/incident, SOS, proposals, missions, and mission status history are migrated through `0014`; `mission_ratings` and remaining user columns (`suspended_until`, `suspension_reason`) remain future tasks.
+- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, the live `location_shares` table (T2.1.1), and `location_history`/`location_history_shares` (T2.2.1/T2.2.2, `0007_brief_hedge_knight.sql`). Socket `location:update` (T2.1.5) now writes one `location_history` row and the `users.last_location` geography per accepted fix; history reads/shares (T2.2.3-T2.2.4) are not implemented yet, while retention is: the share-expiry sweep and the batched history prune (T2.1.6/T2.2.5) run as in-process timers over these two tables. Category/incident, SOS, proposals, missions, and mission status history are migrated through `0014`; `mission_ratings` is migrated in `0018`, including database-side eligibility and average cache triggers; remaining user columns (`suspended_until`, `suspension_reason`) remain future tasks.
 - **History storage choice:** `location_history` keeps plain `lat`/`lon` columns with a composite `(user_id, timestamp)` index and no geography column or GiST index; every read is user- and time-scoped. Monthly partitioning stays the documented optional scale-up path (ARCHITECTURE §8.3).
 - **Geospatial:** `last_location` and `sos_requests.location` use `GEOGRAPHY(Point,4326)` for meter-accurate `ST_Distance`.
 - **No delete:** No `deleted_at` — deactivated users stay with `is_active=false` for audit.
