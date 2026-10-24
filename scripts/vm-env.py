@@ -82,7 +82,7 @@ def update_env(changes: dict[str, str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("development", "production"), help="application mode")
-    parser.add_argument("--origin", help="public HTTPS origin required in production; requires your own TLS reverse proxy")
+    parser.add_argument("--origin", help="public HTTPS DNS origin required in production; Caddy obtains TLS")
     parser.add_argument("--generate-admin", action="store_true", help="generate admin password instead of prompting")
     args = parser.parse_args()
     current = env_values()
@@ -103,7 +103,7 @@ def main() -> None:
             else:
                 public_origin = saved_origin
         if not public_origin:
-            fail("production requires --origin https://your-host and a configured external TLS proxy")
+            fail("production requires --origin https://your-public-dns-name for Caddy/ACME")
         public_origin = origin(public_origin)
     elif public_origin:
         fail("--origin is for production only")
@@ -112,6 +112,15 @@ def main() -> None:
     if public_origin:
         changes["CORS_ORIGINS"] = public_origin
         changes["PUBLIC_DOMAIN"] = urlsplit(public_origin).hostname or ""
+    elif saved_mode == "production":
+        # An unchanged HTTPS-only allowlist rejects the development browser's
+        # Origin (including SSH-tunneled HMR), even on the same VM.
+        dev_origins = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
+        port = current.get("NGINX_PORT", "8080")
+        if port.isdigit() and 1 <= int(port) <= 65535 and port != "8080":
+            dev_origins.append(f"http://localhost:{port}")
+        changes["CORS_ORIGINS"] = ",".join(dev_origins)
+        changes["PUBLIC_DOMAIN"] = ""
     credentials = {
         "POSTGRES_PASSWORD": "postgres-data",
         "NOMINATIM_PASSWORD": "nominatim-data",

@@ -117,6 +117,15 @@ class EnvTests(unittest.TestCase):
                 self.assertEqual(vm_common.env_values(), first)
                 self.assertEqual(first["CORS_ORIGINS"], "https://maps.example.org")
                 self.assertEqual(first["PUBLIC_DOMAIN"], "maps.example.org")
+                with patch.object(sys, "argv", ["vm-env.py", "--mode", "development", "--generate-admin"]), \
+                     redirect_stdout(io.StringIO()):
+                    vm_env.main()
+                development = vm_common.env_values()
+                self.assertEqual(development["PUBLIC_DOMAIN"], "")
+                self.assertEqual(development["CORS_ORIGINS"],
+                                 "http://localhost:5173,http://localhost:3000,http://localhost:8080")
+                for key in ("POSTGRES_PASSWORD", "NOMINATIM_PASSWORD", "JWT_SECRET", "JWT_REFRESH_SECRET"):
+                    self.assertEqual(development[key], first[key])
 
     def test_refuses_password_generation_for_existing_database_volume(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -159,6 +168,65 @@ class InstallerTests(unittest.TestCase):
 
 
 class OperationsTests(unittest.TestCase):
+    def test_down_stops_import_and_previous_production_profiles_without_starting_them(self):
+        with patch.object(vm, "env_values", return_value={"NODE_ENV": "development"}), \
+             patch.object(vm, "run") as run:
+            vm.vm_compose("down")
+            down = run.call_args.args[0]
+            self.assertIn("geocoding-import", down)
+            self.assertIn("production", down)
+            vm.vm_compose("up", "-d")
+            up = run.call_args.args[0]
+            self.assertNotIn("geocoding-import", up)
+            self.assertNotIn("production", up)
+
+    def test_dev_launch_stops_and_removes_previous_public_edge(self):
+        with patch.object(vm, "env_values", return_value={"NODE_ENV": "development"}), \
+             patch.object(vm, "run", side_effect=[SimpleNamespace(stdout="edge-container\n"), None, None]) as run:
+            vm.stop_inactive_edge()
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0][-4:], ["ps", "-a", "-q", "edge"])
+        self.assertEqual(commands[1][-2:], ["stop", "edge"])
+        self.assertEqual(commands[2][-3:], ["rm", "-f", "edge"])
+        self.assertTrue(all("production" in command for command in commands))
+        with patch.object(vm, "env_values", return_value={"NODE_ENV": "development"}), \
+             patch.object(vm, "run", return_value=SimpleNamespace(stdout="")) as run:
+            vm.stop_inactive_edge()
+        self.assertEqual(run.call_count, 1)
+
+    def test_doctor_flags_public_edge_left_running_in_development(self):
+        class Response:
+            status = 200
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self, _size):
+                return b"<html>ok</html>"
+
+        def command(args, **_kwargs):
+            if args[-3:] == ["ps", "-q", "edge"]:
+                return SimpleNamespace(stdout="public-edge\n")
+            if "psql" in str(args):
+                return SimpleNamespace(stdout="1\n")
+            return SimpleNamespace(stdout="")
+
+        env = {"NODE_ENV": "development", "NGINX_PORT": "8080", "MAP_REGION_IDS": "ir-tehran",
+               "JWT_SECRET": "a" * 32, "JWT_REFRESH_SECRET": "b" * 32,
+               "POSTGRES_PASSWORD": "secret", "NOMINATIM_PASSWORD": "secret"}
+        with patch.object(vm, "env_values", return_value=env), \
+             patch.object(vm, "configured_map", return_value={"regions": "ir-tehran", "policy": "cache-first"}), \
+             patch.object(vm, "static_ready", return_value=True), \
+             patch.object(vm, "run", side_effect=command), \
+             patch.object(vm, "compose", return_value=SimpleNamespace(stdout="db\n")), \
+             patch.object(vm, "build_opener", return_value=SimpleNamespace(open=lambda *_args, **_kw: Response())), \
+             redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(vm.doctor(), 1)
+        self.assertIn("old public TLS edge still running", output.getvalue())
+
     def test_stop_preserves_data_and_clear_db_requires_backup_and_confirmation(self):
         with patch.object(vm, "vm_compose") as compose, patch.object(vm, "volume", return_value="project_postgres-data"), \
              patch.object(vm, "remove_volumes") as remove, patch.object(vm, "confirm") as confirm, \
@@ -208,13 +276,20 @@ class OperationsTests(unittest.TestCase):
                  patch.object(vm, "configured_map", return_value=selection), \
                  patch.object(vm, "static_ready", return_value=True), \
                  patch.object(vm, "volume", return_value="scoped-volume"), \
+                 patch.object(vm, "stop_inactive_edge") as stop_edge, \
                  patch.object(vm, "vm_compose") as compose:
                 with self.assertRaises(SystemExit):
                     vm.launch(SimpleNamespace(serve_only=True, offline=False))
                 compose.assert_not_called()
                 selection["regions"] = values["MAP_REGION_IDS"]
                 vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                stop_edge.assert_called()
                 compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")
+                compose.reset_mock()
+                # Offline serving uses the Photon index, not Nominatim's import DB.
+                with patch.object(vm, "volume", side_effect=lambda name: None if name == "nominatim-data" else "present") as volume:
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                self.assertNotIn("nominatim-data", [call.args[0] for call in volume.call_args_list])
                 compose.reset_mock()
                 with patch.object(vm, "volume", return_value=None), self.assertRaises(SystemExit):
                     vm.launch(SimpleNamespace(serve_only=True, offline=False))
@@ -274,6 +349,27 @@ class OperationsTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     vm.backup(str(target))
 
+    def test_backup_never_overwrites_destination_created_during_dump(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "new.dump"
+
+            def dump(args, **kwargs):
+                kwargs["stdout"].write(b"PGDMPtest fixture")
+                return subprocess.CompletedProcess(args, 0)
+
+            def concurrent_create(_source, destination):
+                Path(destination).write_bytes(b"another operator's backup")
+                raise FileExistsError(destination)
+
+            with patch.object(vm, "volume", return_value="project_postgres-data"), \
+                 patch.object(vm, "compose", return_value=SimpleNamespace(stdout="container-id\n")), \
+                 patch.object(vm.subprocess, "run", side_effect=dump), \
+                 patch.object(vm.os, "link", side_effect=concurrent_create):
+                with self.assertRaises(FileExistsError):
+                    vm.backup(str(target))
+            self.assertEqual(target.read_bytes(), b"another operator's backup")
+            self.assertFalse(list(Path(directory).glob(".borobiya-pgdump-*")))
+
     def test_failed_backup_cleans_partial_archive_without_touching_database(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "failed.dump"
@@ -289,6 +385,29 @@ class OperationsTests(unittest.TestCase):
                     vm.backup(str(target))
                 self.assertFalse(target.exists())
                 self.assertFalse(list(Path(directory).glob(".borobiya-pgdump-*")))
+
+    def test_generated_admin_secret_remains_available_if_env_sync_fails(self):
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        with tempfile.TemporaryDirectory() as directory:
+            env = Path(directory) / ".env"
+            env.write_text("ADMIN_SEED_PASSWORD_B64=one\nADMIN_SEED_PASSWORD_B64=two\n")
+            output = Terminal()
+
+            def reset(args, **kwargs):
+                secret = kwargs["env"]["ADMIN_SEED_PASSWORD"]
+                self.assertIn(secret, output.getvalue())  # printed before the DB changes
+                self.assertNotIn(secret, str(args))
+                return subprocess.CompletedProcess(args, 0)
+
+            with patch.object(vm_common, "ENV", env), patch.object(vm, "compose", return_value=SimpleNamespace(stdout="db")), \
+                 patch.object(vm.subprocess, "run", side_effect=reset), \
+                 patch.object(sys.stdin, "isatty", return_value=True), redirect_stdout(output):
+                with self.assertRaisesRegex(SystemExit, "reset succeeded but .env sync failed"):
+                    vm.admin_reset(True)
+            self.assertIn("New admin password", output.getvalue())
 
     def test_volume_lookup_refuses_ambiguous_project_labels(self):
         with patch.object(vm_common, "project", return_value="borobiya"), \

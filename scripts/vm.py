@@ -34,15 +34,28 @@ OVERRIDE = ["-f", "docker-compose.yml", "-f", "docker-compose.vm.yml",
             "-f", "docker-compose.production.yml"]
 
 
-def vm_compose_args() -> list[str]:
+def vm_compose_args(*, all_profiles: bool = False) -> list[str]:
     profiles = [*PROFILES]
-    if env_values().get("NODE_ENV") == "production":
+    if all_profiles:
+        # The import service is intentionally excluded from `up`, but `down` must
+        # also stop an import interrupted halfway through an earlier build.
+        profiles.extend(["--profile", "geocoding-import"])
+    if all_profiles or env_values().get("NODE_ENV") == "production":
         profiles.extend(["--profile", "production"])
     return ["docker", "compose", *OVERRIDE, *profiles]
 
 
 def vm_compose(*args: str) -> None:
-    run([*vm_compose_args(), *args])
+    run([*vm_compose_args(all_profiles=args[:1] == ("down",)), *args])
+
+
+def stop_inactive_edge() -> None:
+    """Never leave the old public production listener running in development mode."""
+    command = vm_compose_args(all_profiles=True)
+    existing = run([*command, "ps", "-a", "-q", "edge"], capture=True, stderr=subprocess.PIPE).stdout.strip()
+    if existing:
+        run([*command, "stop", "edge"])
+        run([*command, "rm", "-f", "edge"])
 
 
 def require_env() -> dict[str, str]:
@@ -106,9 +119,13 @@ def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> Non
 def launch(args: argparse.Namespace) -> None:
     env = require_env()
     config = configured_map()
+    if env.get("NODE_ENV") != "production":
+        stop_inactive_edge()
     if args.serve_only:
         verify_serving_artifacts(env, config)
-        required_volumes = ["postgres-data", "borobiya-uploads", "nominatim-data"]
+        # Nominatim is import-only (geocoding-import profile is NOT enabled here).
+        # Photon serves its already-built index without the rebuildable import DB.
+        required_volumes = ["postgres-data", "borobiya-uploads"]
         if env.get("NODE_ENV") == "production":
             required_volumes += ["caddy-data", "caddy-config"]
         for name in required_volumes:
@@ -169,7 +186,9 @@ def backup(output: str) -> Path:
             valid_archive = archive.read(5) == b"PGDMP" and Path(temp).stat().st_size > 5
         if process.returncode or not valid_archive:
             fail("pg_dump failed or produced no valid custom-format archive; existing data untouched")
-        os.replace(temp, target)
+        # The destination must remain NEW even if another process creates it
+        # during the dump. A rename/replace would silently overwrite that file.
+        os.link(temp, target)
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
@@ -288,6 +307,10 @@ def admin_reset(generate: bool) -> None:
     if not (8 <= len(password.encode("utf-16-le")) // 2 <= 1024 and
             any(unicodedata.category(c).startswith("L") for c in password) and any(c.isdecimal() for c in password)):
         fail("password must contain a letter and digit and be 8–1024 characters")
+    if generate:
+        # Show it BEFORE changing the database: if the subsequent .env write
+        # fails, the operator still has the only copy of the new credential.
+        print(f"New admin password (store securely before reset): {password}", flush=True)
     environ = os.environ.copy()
     environ["ADMIN_SEED_PASSWORD"] = password
     subprocess.run(["docker", "compose", *PROFILES, "run", "--rm", "--no-deps", "-T",
@@ -300,9 +323,11 @@ def admin_reset(generate: bool) -> None:
         fail("password reset succeeded but .env sync failed: vm-env.py missing")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    module.update_env({"ADMIN_SEED_PASSWORD_B64": base64.b64encode(password.encode()).decode("ascii")})
-    if generate and sys.stdout.isatty():
-        print(f"New admin password (store securely): {password}")
+    try:
+        module.update_env({"ADMIN_SEED_PASSWORD_B64": base64.b64encode(password.encode()).decode("ascii")})
+    except (OSError, SystemExit) as error:
+        fail(f"admin reset succeeded but .env sync failed ({error}); retain the new password, "
+             "repair .env before the next seed/launch")
     print("Admin sessions revoked; .env bootstrap secret updated. No other accounts were changed.")
 
 
@@ -360,7 +385,15 @@ def doctor() -> int:
         print("FAIL application database authentication; inspect Postgres health and runbook §9.3 (never down -v)")
         errors += 1
     opener = build_opener(ProxyHandler({}))
-    if values.get("NODE_ENV") == "production":
+    if values.get("NODE_ENV") != "production":
+        try:
+            if run([*vm_compose_args(all_profiles=True), "ps", "-q", "edge"], capture=True,
+                   stderr=subprocess.PIPE).stdout.strip():
+                print("FAIL old public TLS edge still running in development; run scripts/vm.py launch")
+                errors += 1
+        except (OSError, subprocess.CalledProcessError):
+            pass  # Docker failure already reported above.
+    else:
         try:
             if not run([*vm_compose_args(), "ps", "-q", "edge"], capture=True,
                        stderr=subprocess.PIPE).stdout.strip():
