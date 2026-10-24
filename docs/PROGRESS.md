@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — GPS refresh no longer reuses a stale route origin
+
+- A rescuer who tapped **به‌روزرسانی موقعیت** after viewing routes could lose GPS permission, yet the route picker retained the previous starting coordinates. A later ordinary retry then routed from that old fix, and the failure was mislabelled as a routing-gateway error. An explicit position refresh now clears the old origin before requesting GPS; denial leaves no route and the next retry must obtain a new fix. A regression reproduces denial after a successful route and verifies the next route uses the new position. The routing server and offline elevation gap are unchanged.
+
 ### 2026-10-24 — Recipient search never shows results for superseded input
 
 - Fixed a recipient-picker race: when a valid username fragment changed, an older request could still resolve in the 300 ms debounce window and show selectable results for the previous fragment. Changing a term now aborts/invalidate the old request immediately, and starting a new search clears results from earlier filters before awaiting the new response. Tests reproduce both the in-flight keystroke race and stale results under a newly applied rating filter. The server search contract is unchanged.

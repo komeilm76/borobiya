@@ -74,6 +74,27 @@ describe("active rescuer mission route picker", () => {
     expect(active.target.value).toBeNull();
   });
 
+  it("does not route from an old fix after an explicit GPS refresh is denied", async () => {
+    const updated = { lat: 35.69, lon: 51.39 };
+    const getPosition = vi.fn().mockResolvedValueOnce(from)
+      .mockRejectedValueOnce(new Error("permission denied"))
+      .mockResolvedValueOnce(updated);
+    const getRoutes = vi.fn(async () => [route]);
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined,
+      { getTarget: async () => target, getPosition, getRoutes });
+    await picker.open();
+    await picker.findRoutes();
+    expect(picker.from.value).toEqual(from);
+    await picker.findRoutes(true);
+    expect(picker.from.value).toBeNull();
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.error.value).toContain("مکان‌یابی");
+    await picker.findRoutes();
+    expect(getPosition).toHaveBeenCalledTimes(3);
+    expect(getRoutes).toHaveBeenCalledTimes(2);
+    expect(getRoutes).toHaveBeenLastCalledWith(updated, incident, "car", expect.any(AbortSignal));
+  });
+
   it("handles denied location, gateway failure, no route and invalid polyline without showing misleading choices", async () => {
     const getPosition = vi.fn().mockRejectedValueOnce(new Error("denied")).mockResolvedValue(from);
     const getRoutes = vi.fn().mockRejectedValueOnce(new Error("NO_ROUTE"))

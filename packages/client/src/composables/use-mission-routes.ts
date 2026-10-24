@@ -102,6 +102,10 @@ export function useMissionRoutes(
     if (!incident || !mission || !owner || !token.value || loading.value) return;
     const current = invalidate();
     const signal = (controller = new AbortController()).signal;
+    // An explicit GPS refresh supersedes the old starting point immediately. If
+    // permission is denied or the fix fails, a later retry must request GPS again,
+    // never route from coordinates that the rescuer asked to replace.
+    if (refreshPosition) from.value = null;
     loading.value = true;
     error.value = null;
     routes.value = [];
