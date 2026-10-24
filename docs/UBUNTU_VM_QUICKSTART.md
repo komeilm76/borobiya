@@ -2,6 +2,12 @@
 
 **Ubuntu 24.04; run from the repository root as a normal login user (not `sudo`).** This is the short path. [Full runbook](./UBUNTU_VM_RUNBOOK.md) explains the long map import, disk sizing, network/proxy and recovery details. First map build can take **hours**, needs Internet and ample disk/RAM; it is not a one-minute installation. Keep an SSH session alive with `tmux`.
 
+## Before you launch: what you must provide
+
+`vm-env.py` asks for **development or production**, an initial admin password (or generates one), and, in production, your **public HTTPS DNS origin**. It generates and saves the PostgreSQL and Nominatim passwords and separate JWT secrets if unset, and preserves existing credentials; it does **not** ask you to send secrets to anyone. `vm-map.py` separately asks for area IDs, snapshot, source policy (`cache-first` downloads and saves verified sources; `offline` uses existing files only), and an external map-library directory. Review `.env.example` for defaults such as ports and memory limits; override them in `.env` if your VM differs. These two prompts do **not** collect every optional `.env` setting or confirm your VM's DNS, firewall, storage, or Internet access.
+
+Before a first build, verify Ubuntu 24.04, Docker access, enough **free disk and inodes on both the checkout and Docker storage**, and access to the map/image download hosts; whole countries need substantially more than a city. For production, you must own the DNS name and make TCP 80/443 publicly reachable for Caddy's certificate challenges. The [runbook §3.4](./UBUNTU_VM_RUNBOOK.md#34-water-polygons-the-current-outage-and-what-the-pipeline-does-about-it) documents a water-polygons source outage: if the real archive is not already cached and the canonical host is still unavailable, the first tile build **will fail** until you stage the real archive in the selected map library or configure a trusted `MAP_WATER_POLYGONS_URL` in `.env`. Do not substitute Planetiler's small test fixtures for production maps. Verify this source on **your** VM; this workspace cannot verify its availability for you.
+
 ## First launch
 
 ```bash
@@ -33,7 +39,7 @@ python3 scripts/vm.py stop
 python3 scripts/vm.py launch --serve-only                     # strict offline relaunch; prebuilt images/UI/data only
 ```
 
-The `--serve-only` path refuses missing artifacts and uses Compose `--no-build --pull never`; it does not fetch anything or silently create a new application database or uploads volume (Nominatim's import-only profile is not started). **Prepare and test it while online first** (images, application DB/uploads volumes, browser build, map sources/reference layers, routes and Photon index must already exist; production also needs cached Caddy image and valid certificate/ACME volumes). Area selection is a local ignored `.vm-map.json`; live data changes only after a successful launch. `cache-first` reuses verified source bytes; `refresh` asks for a new snapshot; `offline` refuses missing source bytes. Whole countries can be multi-GB. A changed selection may rebuild Photon and reset its **rebuildable Nominatim** import volume; the application database and uploaded photos are not map caches.
+The `--serve-only` path refuses missing artifacts and uses Compose `--no-build --pull never`; it does not fetch anything or silently create a new application database or uploads volume (Nominatim's import-only profile is not started). **Prepare and test it while online first** (images, application DB/uploads volumes, browser build, map sources/reference layers, routes and Photon index must already exist; production also needs a cached Caddy image and existing certificate/ACME volumes; the script checks volume existence, **not** certificate validity). Area selection is a local ignored `.vm-map.json`; live data changes only after a successful launch. `cache-first` reuses verified source bytes; `refresh` asks for a new snapshot; `offline` refuses missing source bytes. Whole countries can be multi-GB. A changed selection may rebuild Photon and reset its **rebuildable Nominatim** import volume; the application database and uploaded photos are not map caches.
 
 ## Day-two commands (safe defaults)
 
