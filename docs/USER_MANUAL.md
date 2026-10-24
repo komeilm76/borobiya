@@ -283,7 +283,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 17. Mission Statuses During Rescue — Planned
 
-> **Current status:** Mission tables, `PATCH /_user/missions/:id/status`, and the rescuer status bar remain planned under T3.5.
+> **Current status:** Mission tables, the ordered `PATCH /_user/missions/:id/status` API, and private realtime status delivery are live. The rescuer status bar, navigation integration, and requester/admin timeline UI remain planned under T3.5.
 
 Rescuer updates step-by-step (button in mission bar):
 

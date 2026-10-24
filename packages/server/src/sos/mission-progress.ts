@@ -1,9 +1,14 @@
 import { apiRoutes } from "@borobiya/shared/api";
 import type { FastifyInstance } from "fastify";
 import type { MissionProgressStore } from "../db/mission-progress-store";
+import { emitMissionStatusUpdated, type RoomEmitter } from "../realtime/socket";
 
 /** Rescuer-only, ordered mission progress. Never advances a state outside the DB transaction. */
-export async function registerMissionProgressRoutes(app: FastifyInstance, store: MissionProgressStore): Promise<void> {
+export async function registerMissionProgressRoutes(
+  app: FastifyInstance,
+  store: MissionProgressStore,
+  io?: RoomEmitter
+): Promise<void> {
   const route = apiRoutes.sos.updateMissionStatus;
   app.patch(route.url, async (request, reply) => {
     const response = reply.header("cache-control", "no-store");
@@ -29,6 +34,14 @@ export async function registerMissionProgressRoutes(app: FastifyInstance, store:
       message: `This mission is ${result.currentStatus}; the requested step is not next. Refresh its status.`,
       issues: []
     });
+    if (result.status === "updated") {
+      const mission = result.mission;
+      emitMissionStatusUpdated(io, {
+        missionId: mission.id, status: mission.status, by: user.userId, at: mission.updatedAt
+      }, mission.requesterId, mission.rescuerId, (error) => {
+        request.log.warn({ err: error, missionId: mission.id }, "Mission status notification failed");
+      });
+    }
     return response.code(200).send(result.mission);
   });
 }

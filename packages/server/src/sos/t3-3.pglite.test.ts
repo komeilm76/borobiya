@@ -11,6 +11,7 @@ import {
   nearestRespondersResponseSchema,
   sosNewRequestEventSchema,
   sosProposalReceivedEventSchema,
+  missionStatusUpdatedEventSchema,
   type SosNewRequestEvent,
   type SosProposalReceivedEvent
 } from "@borobiya/shared";
@@ -28,11 +29,12 @@ import { DrizzleUserRecoveryStore } from "../db/recovery-store";
 import { DrizzleUserRegistrationStore } from "../db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "../db/security-questions-store";
 import { DrizzleSosDispatchStore } from "../db/sos-dispatch-store";
+import { DrizzleMissionProgressStore } from "../db/mission-progress-store";
 import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
 import { DrizzleUserSearchStore } from "../db/user-search-store";
-import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT } from "../realtime/socket";
+import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT } from "../realtime/socket";
 import { signAccessToken } from "../security/tokens";
 import { createPhotoStorage } from "./photo-storage";
 
@@ -190,6 +192,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       categoryStore: new DrizzleCategoryStore(db),
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
+      missionProgressStore: new DrizzleMissionProgressStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir)
     });
@@ -622,4 +625,62 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       bystanderSocket.close();
     }
   });
+  it("scopes live mission-room subscriptions and delivers committed status once to each participant and admin", async () => {
+    const rescuerId = "80000000-0000-4000-8000-000000000008";
+    const rescuerSession = "81000000-0000-4000-8000-000000000008";
+    const outsiderId = "80000000-0000-4000-8000-000000000009";
+    const outsiderSession = "81000000-0000-4000-8000-000000000009";
+    const sosId = "90000000-0000-4000-8000-000000000008";
+    const missionId = "91000000-0000-4000-8000-000000000008";
+    await seedUser({ id: rescuerId, username: "mission_rescuer", sessionId: rescuerSession, isOnMission: true });
+    await seedUser({ id: outsiderId, username: "mission_outsider", sessionId: outsiderSession });
+    await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
+      VALUES ($1, $2, 'high', 'A rescuer is responding to an incident.', $3, 'POINT(51.4 35.7)', 'accepted')`,
+      [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    await pg.query(`INSERT INTO "missions" ("id", "sos_request_id", "rescuer_id", "requester_id")
+      VALUES ($1, $2, $3, $4)`, [missionId, sosId, rescuerId, REQUESTER_ID]);
+    await pg.query(`INSERT INTO "mission_status_history" ("mission_id", "to_status", "changed_by")
+      VALUES ($1, 'pending', $2)`, [missionId, rescuerId]);
+    const tokenFor = (id: string, session: string) => signAccessToken({
+      userId: id, role: "user", sessionId: session, deviceId: `dev-${id.slice(-6)}`
+    }, JWT_SECRET);
+    const connect = (token: string) => new Promise<ClientSocket>((resolve, reject) => {
+      const sock = createClientSocket(serverUrl, { auth: { token }, transports: ["websocket"], reconnection: false });
+      sock.once("connect", () => resolve(sock));
+      sock.once("connect_error", reject);
+    });
+    const admin = await connect(adminToken);
+    const requester = await connect(requesterToken);
+    const rescuer = await connect(await tokenFor(rescuerId, rescuerSession));
+    const outsider = await connect(await tokenFor(outsiderId, outsiderSession));
+    const subscribe = (socket: ClientSocket, id: string) => new Promise<{ ok: boolean; code?: string }>((resolve, reject) => {
+      socket.timeout(2000).emit(MISSION_SUBSCRIBE_EVENT, { missionId: id }, (error: Error | null, result: { ok: boolean; code?: string }) => {
+        if (error) reject(error); else resolve(result);
+      });
+    });
+    try {
+      expect(await subscribe(outsider, missionId)).toEqual({ ok: false, code: "MISSION_UNAVAILABLE" });
+      expect(await subscribe(requester, missionId)).toEqual({ ok: true });
+      expect(await subscribe(rescuer, missionId)).toEqual({ ok: true });
+      expect(await subscribe(admin, missionId)).toEqual({ ok: true });
+      const received = { admin: [] as unknown[], requester: [] as unknown[], rescuer: [] as unknown[], outsider: [] as unknown[] };
+      admin.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.admin.push(event));
+      requester.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.requester.push(event));
+      rescuer.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.rescuer.push(event));
+      outsider.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.outsider.push(event));
+      const response = await app.inject({ method: "PATCH", url: `/_user/missions/${missionId}/status`,
+        headers: { authorization: `Bearer ${await tokenFor(rescuerId, rescuerSession)}` }, payload: { status: "on_the_way" }
+      });
+      expect(response.statusCode).toBe(200);
+      const payload = { missionId, status: "on_the_way", by: rescuerId, at: response.json().updatedAt };
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      for (const recipient of [received.admin, received.requester, received.rescuer]) {
+        expect(recipient.map((event) => missionStatusUpdatedEventSchema.parse(event))).toEqual([payload]);
+      }
+      expect(received.outsider).toEqual([]);
+    } finally {
+      admin.close(); requester.close(); rescuer.close(); outsider.close();
+    }
+  });
+
 });

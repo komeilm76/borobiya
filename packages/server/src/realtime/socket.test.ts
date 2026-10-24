@@ -15,6 +15,8 @@ import {
   emitShareEnded,
   emitSosProposalAccepted,
   SOS_PROPOSAL_ACCEPTED_EVENT,
+  joinMissionRoom,
+  missionRoom,
   handleLocationUpdate,
   LOCATION_UPDATES_PER_MINUTE,
   PEER_UPDATE_EVENT,
@@ -35,6 +37,31 @@ it("notifies only the requester and admin room about an accepted proposal", () =
   ]);
 });
 
+it("authorizes private mission subscriptions against both the live session and mission membership", async () => {
+  const missionId = randomUUID();
+  const base = { userId, role: "user", sessionId, deviceId };
+  const socket = makeSocket({ data: base });
+  const canJoinMissionRoom = vi.fn(async () => true);
+  const dependencies = { jwtSecret, live: {} as LiveLocationService,
+    users: makeStore(userRecord()), missions: { canJoinMissionRoom } };
+  expect(await joinMissionRoom(socket as never, { missionId: "forged" }, dependencies)).toEqual({ ok: false, code: "INVALID_MISSION" });
+  expect(socket.joins).toEqual([]);
+  expect(await joinMissionRoom(socket as never, { missionId }, dependencies)).toEqual({ ok: true });
+  expect(canJoinMissionRoom).toHaveBeenCalledWith(missionId, userId, "user");
+  expect(socket.joins).toEqual([missionRoom(missionId)]);
+  const foreign = makeSocket({ data: base });
+  expect(await joinMissionRoom(foreign as never, { missionId }, {
+    ...dependencies, missions: { canJoinMissionRoom: async () => false }
+  })).toEqual({ ok: false, code: "MISSION_UNAVAILABLE" });
+  expect(foreign.joins).toEqual([]);
+  expect(await joinMissionRoom(foreign as never, { missionId }, {
+    ...dependencies, users: makeStore(userRecord(), false)
+  })).toEqual({ ok: false, code: "UNAUTHORIZED" });
+  expect(foreign.joins).toEqual([]);
+  foreign.connected = false;
+  expect(await joinMissionRoom(foreign as never, { missionId }, dependencies)).toEqual({ ok: false, code: "UNAUTHORIZED" });
+});
+
 const jwtSecret = "a".repeat(48);
 const userId = randomUUID();
 const sessionId = randomUUID();
@@ -49,6 +76,7 @@ interface FakeSocket {
   joins: string[];
   emitted: { room?: string; event: string; payload: unknown }[];
   disconnects: number;
+  connected: boolean;
   join(room: string): void;
   emit(event: string, payload: unknown): void;
   to(room: string): { emit(event: string, payload: unknown): void };
@@ -62,6 +90,7 @@ function makeSocket(options: { auth?: Record<string, unknown>; data?: SocketData
     joins: [],
     emitted: [],
     disconnects: 0,
+    connected: true,
     join(room: string) {
       socket.joins.push(room);
     },

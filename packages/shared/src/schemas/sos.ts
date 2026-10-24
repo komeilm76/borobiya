@@ -197,3 +197,11 @@ export const sosProposalAcceptedEventSchema = z.strictObject({
   missionId: idSchema
 });
 export type SosProposalAcceptedEvent = z.infer<typeof sosProposalAcceptedEventSchema>;
+
+export const missionStatusUpdatedEventSchema = z.strictObject({
+  missionId: idSchema,
+  status: missionStatusSchema,
+  by: idSchema,
+  at: timestampSchema
+});
+export type MissionStatusUpdatedEvent = z.infer<typeof missionStatusUpdatedEventSchema>;

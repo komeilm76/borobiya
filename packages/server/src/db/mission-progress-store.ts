@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { Mission, MissionProgressStatus, MissionStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import { missions, missionStatusHistory, sosRequests, users } from "./schema";
@@ -18,6 +18,8 @@ export type MissionProgressResult =
 
 export interface MissionProgressStore {
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
+  /** Only a participant or a currently authenticated admin may subscribe to the private mission room. */
+  canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
 }
 
 /** A retry of the same step is a no-op, but skipping, reversing or reviving terminal states is never legal. */
@@ -28,6 +30,14 @@ export function missionTransition(current: MissionStatus, requested: MissionProg
 
 export class DrizzleMissionProgressStore implements MissionProgressStore {
   constructor(private readonly db: Database) {}
+
+  async canJoinMissionRoom(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean> {
+    const [row] = await this.db.select({ id: missions.id }).from(missions)
+      .where(and(eq(missions.id, missionId), role === "admin" ? undefined :
+        or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId))))
+      .limit(1);
+    return Boolean(row);
+  }
 
   async advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult> {
     return this.db.transaction(async (tx): Promise<MissionProgressResult> => {
@@ -49,11 +59,12 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
       if (decision === "invalid_transition") return { status: decision, currentStatus: row.status };
       if (decision === "unchanged") return { status: decision, mission: toMission(row) };
 
-      const [updated] = await tx.update(missions).set({ status: nextStatus, updatedAt: new Date() })
+      const changedAt = new Date();
+      const [updated] = await tx.update(missions).set({ status: nextStatus, updatedAt: changedAt })
         .where(eq(missions.id, missionId)).returning();
       if (!updated) throw new Error("Mission disappeared during locked status update.");
       await tx.insert(missionStatusHistory).values({
-        missionId, fromStatus: row.status, toStatus: nextStatus, changedBy: rescuerId
+        missionId, fromStatus: row.status, toStatus: nextStatus, changedBy: rescuerId, createdAt: changedAt
       });
       if (nextStatus === "completed") {
         const [otherRescuerMission] = await tx.select({ id: missions.id }).from(missions)

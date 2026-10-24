@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import type { SosProposalAcceptedEvent, SosProposalReceivedEvent, SosRequest } from "@borobiya/shared";
+import { idSchema, type MissionStatusUpdatedEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
+import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
@@ -21,6 +22,8 @@ export const SHARE_ENDED_EVENT = "location:share-ended";
 export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
 export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
 export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted";
+export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated";
+export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe";
 export const ADMIN_ROOM = "admin";
 
 export type ShareEndedReason = "revoked" | "expired";
@@ -56,6 +59,7 @@ export interface RealtimeDependencies {
   jwtSecret: string;
   users: UserSecurityQuestionsStore;
   live: LiveLocationService;
+  missions?: Pick<MissionProgressStore, "canJoinMissionRoom">;
   /** Allowed browser origins for the WebSocket handshake; omitted means same-origin only. */
   corsOrigins?: string[];
   /** Where a swallowed dependency failure is reported; socket handlers have no HTTP reply to fail. */
@@ -74,6 +78,10 @@ function socketError(code: string, message: string): Error & { data: { code: str
 
 export function userRoom(userId: string): string {
   return `user:${userId}`;
+}
+
+export function missionRoom(missionId: string): string {
+  return `mission:${missionId}`;
 }
 
 export function sessionRoom(sessionId: string): string {
@@ -132,6 +140,32 @@ export function emitSosNewRequest(
 ): void {
   if (!io) return;
   io.to(ADMIN_ROOM).emit(SOS_NEW_REQUEST_EVENT, { sosRequest });
+}
+
+/**
+ * After a committed mission step, notify both participant rooms and admins. The mission
+ * room is joined only after the subscription rechecks the live session and membership;
+ * participant and admin rooms still receive updates without an explicit subscription.
+ * Socket.IO unions the rooms into one broadcast, so a socket in two rooms gets one event.
+ * A failed broadcast is logged but never turns a committed PATCH into a retryable 500.
+ */
+export function emitMissionStatusUpdated(
+  io: RoomEmitter | undefined,
+  payload: MissionStatusUpdatedEvent,
+  requesterId: string,
+  rescuerId: string,
+  onError: (error: unknown) => void
+): void {
+  if (!io) return;
+  const rooms = [missionRoom(payload.missionId), userRoom(requesterId), userRoom(rescuerId), ADMIN_ROOM];
+  try {
+    // Socket.IO accepts an array of rooms (union with deduplication). RoomEmitter's
+    // single-room shape serves other events and test doubles, so widen just this call.
+    (io.to as unknown as (targets: string[]) => { emit(event: string, value: unknown): unknown })(rooms)
+      .emit(MISSION_STATUS_UPDATED_EVENT, payload);
+  } catch (error) {
+    onError(error);
+  }
 }
 
 /**
@@ -360,6 +394,41 @@ async function locationUpdateAck(
   return { ok: true, status: "accepted", peers: result.peers };
 }
 
+export type MissionJoinAck = { ok: true } | { ok: false; code: "INVALID_MISSION" | "MISSION_UNAVAILABLE" | "UNAUTHORIZED" | "SERVICE_UNAVAILABLE" };
+
+/** The socket may be long-lived: recheck account and session before joining any private room. */
+export async function joinMissionRoom(
+  socket: Pick<Socket, "data" | "connected" | "join">,
+  payload: unknown,
+  dependencies: RealtimeDependencies
+): Promise<MissionJoinAck> {
+  const supplied = payload && typeof payload === "object" ? (payload as { missionId?: unknown }).missionId : undefined;
+  const parsed = idSchema.safeParse(supplied);
+  if (!parsed.success) return { ok: false, code: "INVALID_MISSION" };
+  const identity = socket.data as Partial<RealtimeSocketData>;
+  if (!identity.userId || !identity.sessionId || !identity.deviceId ||
+    (identity.role !== "admin" && identity.role !== "user")) return { ok: false, code: "UNAUTHORIZED" };
+  try {
+    const user = await dependencies.users.findUserById(identity.userId);
+    if (!user || !user.isActive || user.isSuspended || user.role !== identity.role ||
+      (user.role !== "admin" && user.mustCompleteSecurityQuestions) ||
+      !(await dependencies.users.hasActiveSession({ userId: identity.userId, sessionId: identity.sessionId, deviceId: identity.deviceId }))) {
+      return { ok: false, code: "UNAUTHORIZED" };
+    }
+    if (!dependencies.missions?.canJoinMissionRoom ||
+      !(await dependencies.missions.canJoinMissionRoom(parsed.data, identity.userId, identity.role))) {
+      // No information about whether a foreign mission exists.
+      return { ok: false, code: "MISSION_UNAVAILABLE" };
+    }
+    if (!socket.connected) return { ok: false, code: "UNAUTHORIZED" };
+    await socket.join(missionRoom(parsed.data));
+    return { ok: true };
+  } catch (error) {
+    dependencies.logger?.warn({ err: error }, "mission room subscription failed");
+    return { ok: false, code: "SERVICE_UNAVAILABLE" };
+  }
+}
+
 /** Wires the socket namespace onto an existing HTTP server (Fastify's `app.server`). */
 export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDependencies): RealtimeServer {
   const io = new Server(httpServer, {
@@ -421,6 +490,15 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
         .catch((error) => {
           dependencies.logger?.warn({ err: error }, "realtime session offline update failed");
         });
+    });
+
+    socket.on(MISSION_SUBSCRIBE_EVENT, async (payload: unknown, ack?: (response: MissionJoinAck) => void) => {
+      const result = await joinMissionRoom(socket, payload, dependencies);
+      if (typeof ack === "function") {
+        try { ack(result); } catch (error) {
+          dependencies.logger?.warn({ err: error }, "mission subscription ack failed");
+        }
+      }
     });
 
     socket.on(LOCATION_UPDATE_EVENT, async (payload: unknown, ack?: (response: LocationUpdateAck) => void) => {

@@ -164,6 +164,8 @@ fastify.register(async (f) => {
 
 **Frontend (implemented router guard):** `/_auth/*` pages redirect signed-in users away; protected user/admin pages redirect guests to login with a safe internal return path; non-admin users are sent back to the user dashboard; and a signed-in account with `mustCompleteSecurityQuestions=true` is redirected to onboarding from every route except the completion form. The server hook remains authoritative if client-side state is stale or tampered with.
 
+**Mission room authorization (T3.5.3):** `mission:subscribe` accepts only a UUID after a live account/session check. The database confirms requester/rescuer participation or the authenticated admin role before joining `mission:{id}`; foreign and unknown mission IDs return the same unavailable ack. Reconnects require reauthorization, and account/session revocation disconnects the socket. Status events fan out to participant and admin user rooms as well, so delivery does not rely on a client subscribing early. Never let a client choose an arbitrary Socket.IO room.
+
 **Photo evidence authorization (T3.2.6):** Bearer authentication on `/_user/sos/requests/:id/photo-access` verifies the current account and live session, then restricts issuance to the requester, an admin, or the rescuer on a pending/accepted proposal. The image-only `/uploads/:id` endpoint accepts only the resulting 60-second HMAC URL (not an access/refresh cookie or a bare filename); see §9. The URL remains usable for its brief lifetime if the session is revoked after issuance, so it must not be copied into logs or external links.
 
 ### 5.1 `_auth` Guest-Only

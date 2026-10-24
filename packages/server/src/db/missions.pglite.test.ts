@@ -81,6 +81,11 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     const store = new DrizzleMissionProgressStore(drizzle(pg, { schema }) as unknown as Database);
     await pg.query(`INSERT INTO "missions" ("id", "sos_request_id", "rescuer_id", "requester_id")
       VALUES ($1, $2, $3, $4)`, [MISSION, SOS, RESCUER, REQUESTER]);
+    expect(await store.canJoinMissionRoom(MISSION, RESCUER, "user")).toBe(true);
+    expect(await store.canJoinMissionRoom(MISSION, REQUESTER, "user")).toBe(true);
+    expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "user")).toBe(false);
+    expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "admin")).toBe(true);
+    expect(await store.canJoinMissionRoom("90000000-0000-4000-8000-000000000009", REQUESTER, "admin")).toBe(false);
     await pg.query(`UPDATE "users" SET "is_on_mission" = true WHERE "id" = $1`, [RESCUER]);
     await pg.query(`UPDATE "sos_requests" SET "status" = 'accepted' WHERE "id" = $1`, [SOS]);
     await pg.query(`INSERT INTO "mission_status_history" ("mission_id", "to_status", "changed_by")
