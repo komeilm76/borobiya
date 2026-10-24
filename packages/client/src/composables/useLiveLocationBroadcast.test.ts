@@ -128,6 +128,101 @@ describe("useLiveLocationBroadcast", () => {
     vi.useRealTimers();
   });
 
+  it("ignores late location acknowledgements after stop, restart, and sign-out", async () => {
+    let now = Date.now();
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const coords = ref<{ latitude: number | null; longitude: number | null; accuracy: number | null } | null>(null);
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token,
+      geolocation: { coords, isSupported: ref(true), pause },
+      openSocket: () => transport.client,
+      now: () => now,
+      intervalMs: 4_000
+    }))!;
+    try {
+      await api.start();
+      coords.value = { latitude: 35.7, longitude: 51.4, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(1);
+      const oldAck = transport.emitted[0]!.ack;
+
+      api.stop();
+      oldAck(new Error("timeout"), undefined);
+      await flush();
+      expect(api.status.value).toBe("stopped");
+      expect(api.lastErrorCode.value).toBeNull();
+
+      await api.start();
+      await flush();
+      expect(transport.emitted).toHaveLength(2);
+      oldAck(null, { ok: true, peers: ["stale-peer"] });
+      await flush();
+      expect(api.peerCount.value).toBe(0);
+      transport.emitted[1]!.ack(null, { ok: true, peers: ["current-peer"] });
+      await flush();
+      expect(api.status.value).toBe("broadcasting");
+      expect(api.peerCount.value).toBe(1);
+
+      now += 4_000;
+      coords.value = { latitude: 35.71, longitude: 51.4, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(3);
+      token.value = null;
+      await flush();
+      transport.emitted[2]!.ack(null, { ok: true, peers: ["signed-out-peer"] });
+      await flush();
+      expect(api.status.value).toBe("idle");
+      expect(api.peerCount.value).toBe(0);
+      expect(transport.closeCalls).toBe(1);
+    } finally {
+      scope.stop();
+    }
+  });
+
+  it("does not let an obsolete auth refresh reconnect a newly restarted broadcaster", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const coords = ref<{ latitude: number | null; longitude: number | null; accuracy: number | null } | null>(null);
+    const transport = makeFakeSocket();
+    let releaseRefresh!: () => void;
+    const gate = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+    const ensureSession = vi.fn(async () => {
+      await gate;
+      token.value = makeJwt("device-alpha", 9999999998);
+    });
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token,
+      ensureSession,
+      geolocation: { coords, isSupported: ref(true) },
+      openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      coords.value = { latitude: 35.7, longitude: 51.4, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(1);
+      transport.emitted[0]!.ack(null, { ok: false, code: "INVALID_ACCESS_TOKEN" });
+      await flush();
+      expect(ensureSession).toHaveBeenCalledTimes(1);
+
+      api.stop();
+      await api.start();
+      await flush();
+      expect(transport.connectCalls).toBe(1);
+      releaseRefresh();
+      await flush();
+      expect(transport.connectCalls).toBe(1);
+      expect(api.status.value).toBe("broadcasting");
+      expect(api.lastErrorCode.value).toBeNull();
+    } finally {
+      releaseRefresh();
+      scope.stop();
+    }
+  });
+
   it("refreshes an expired 15m access token via ensureSession and reconnects instead of sticking rejected", async () => {
     const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
     const token = ref<string | null>(makeJwt("device-alpha", 1));

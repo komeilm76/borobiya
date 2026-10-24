@@ -76,6 +76,8 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   let client: RealtimeClient | null = null;
   let ticker: ReturnType<typeof setInterval> | null = null;
   let generation = 0;
+  // An ack may arrive after Stop, logout or a new broadcast attempt with the same socket.
+  let broadcastAttempt = 0;
   let refreshingAuth = false;
 
   function requireToken(): string | null {
@@ -90,11 +92,18 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   }
 
   async function tryRecoverAuth(): Promise<boolean> {
-    if (!ensureSession || refreshingAuth) return false;
+    if (!ensureSession || refreshingAuth || !client) return false;
+    const recoveringClient = client;
+    const recoveringGeneration = generation;
+    const recoveringAttempt = broadcastAttempt;
     const previousToken = requireToken();
     refreshingAuth = true;
     try {
       await ensureSession();
+      // A slow refresh must not reconnect a socket after Stop, logout, or a new Start.
+      if (client !== recoveringClient || generation !== recoveringGeneration ||
+        broadcastAttempt !== recoveringAttempt ||
+        (status.value !== "connecting" && status.value !== "broadcasting")) return false;
       const nextToken = requireToken();
       if (!nextToken || nextToken === previousToken) return false;
       if (client) {
@@ -127,7 +136,10 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   async function onConnectError(error?: { data?: { code?: unknown } }): Promise<void> {
     const code = typeof error?.data?.code === "string" ? error.data.code : null;
+    const attempt = broadcastAttempt;
+    const failingClient = client;
     if (await tryRecoverAuth()) return;
+    if (attempt !== broadcastAttempt || client !== failingClient) return;
     if (status.value === "connecting" || status.value === "broadcasting") {
       clearTicker();
       geolocation.pause?.();
@@ -194,10 +206,16 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     if (!payload) return;
     if (!shouldSendUpdate({ lastSentAt: lastSentAt.value, now: currentNow, intervalMs })) return;
 
+    const attempt = broadcastAttempt;
+    const sentToken = requireToken();
+    const stillCurrent = () => attempt === broadcastAttempt && client === activeClient &&
+      status.value === "broadcasting" && !!sentToken && requireToken() === sentToken;
     activeClient.socket.timeout(5_000).emit(LOCATION_UPDATE_EVENT, payload, async (error: Error | null, ack: unknown) => {
+      if (!stillCurrent()) return;
       const outcome = error ? { ok: false, code: "SOCKET_TIMEOUT" } : describeAck(ack);
       if (!outcome.ok && (outcome.code === "UNAUTHORIZED" || outcome.code === "INVALID_ACCESS_TOKEN")) {
         if (await tryRecoverAuth()) return;
+        if (!stillCurrent()) return;
       }
       lastErrorCode.value = outcome.code;
       status.value = outcome.ok ? "broadcasting" : "rejected";
@@ -234,6 +252,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       return;
     }
 
+    broadcastAttempt++;
     lastErrorCode.value = null;
     hasLiveFix = geolocation.coords.value !== null && Number.isFinite(geolocation.coords.value.latitude);
     if (hasLiveFix && sampledAt.value === null) sampledAt.value = clock();
@@ -261,6 +280,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   }
 
   function stop(): void {
+    broadcastAttempt++;
     clearTicker();
     hasLiveFix = false;
     geolocation.pause?.();
