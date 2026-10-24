@@ -505,6 +505,27 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
 
   io.use(createAuthMiddleware(dependencies));
 
+  // A disconnect can still be writing "offline" when the same session reconnects. Serialize
+  // presence writes per session so the newer "online" cannot be overwritten by the old write.
+  // Also recheck the room immediately before an offline write: another tab may still be connected.
+  const presenceWrites = new Map<string, Promise<void>>();
+  function queuePresenceUpdate(identity: Partial<RealtimeSocketData>, isOnline: boolean): void {
+    const { userId, sessionId, deviceId } = identity;
+    const touch = dependencies.users.touchSessionPresence?.bind(dependencies.users);
+    if (!userId || !sessionId || !deviceId || !touch) return;
+    const previous = presenceWrites.get(sessionId) ?? Promise.resolve();
+    const pending = previous.then(async () => {
+      if (!isOnline && (await io.in(sessionRoom(sessionId)).fetchSockets()).length > 0) return;
+      await touch({ userId, sessionId, deviceId, isOnline });
+    }).catch((error: unknown) => {
+      dependencies.logger?.warn({ err: error }, `realtime session ${isOnline ? "online" : "offline"} update failed`);
+    });
+    presenceWrites.set(sessionId, pending);
+    void pending.then(() => {
+      if (presenceWrites.get(sessionId) === pending) presenceWrites.delete(sessionId);
+    });
+  }
+
   io.on("connection", (socket: Socket<ClientToServerEvents, ServerToClientEvents> & { data: Partial<RealtimeSocketData> }) => {
     const identity = socket.data;
     if (!identity.userId) {
@@ -515,41 +536,10 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
     if (identity.sessionId) void socket.join(sessionRoom(identity.sessionId));
     if (identity.role === "admin") void socket.join(ADMIN_ROOM);
 
-    if (identity.sessionId && identity.deviceId && dependencies.users.touchSessionPresence) {
-      void dependencies.users
-        .touchSessionPresence({
-          userId: identity.userId,
-          sessionId: identity.sessionId,
-          deviceId: identity.deviceId,
-          isOnline: true
-        })
-        .catch((error) => {
-          dependencies.logger?.warn({ err: error }, "realtime session online update failed");
-        });
-    }
+    queuePresenceUpdate(identity, true);
 
     socket.on("disconnect", () => {
-      if (!identity.userId || !identity.sessionId || !identity.deviceId || !dependencies.users.touchSessionPresence) {
-        return;
-      }
-      const userId = identity.userId;
-      const sessionId = identity.sessionId;
-      const deviceId = identity.deviceId;
-      void io
-        .in(sessionRoom(sessionId))
-        .fetchSockets()
-        .then((remaining) => {
-          if (remaining.length > 0) return;
-          return dependencies.users.touchSessionPresence?.({
-            userId,
-            sessionId,
-            deviceId,
-            isOnline: false
-          });
-        })
-        .catch((error) => {
-          dependencies.logger?.warn({ err: error }, "realtime session offline update failed");
-        });
+      queuePresenceUpdate(identity, false);
     });
 
     socket.on(MISSION_SUBSCRIBE_EVENT, async (payload: unknown, ack?: (response: MissionJoinAck) => void) => {
