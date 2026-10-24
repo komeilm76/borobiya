@@ -152,7 +152,7 @@ User search and place/address search are not available in the current client. Se
 
 ## 10. Routing & Navigation — Planned
 
-Route selection, transport profiles, alternatives, and turn-by-turn navigation are not available in the current client. This section will be updated when the client and offline routing service are implemented.
+The accepted-offer page now shows a simple incident/rescuer preview map with consent-based location and automatic camera framing. Route selection, transport profiles, alternatives, and turn-by-turn navigation are not available in the current client. This section will be updated when the client and offline routing service are implemented.
 
 ---
 
@@ -260,7 +260,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 16. SOS — Responding as Rescuer
 
-> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. Post-accept navigation and mission status controls remain planned under T3.5.
+> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route guidance, live navigation and mission status controls remain planned under T3.5.
 
 ### Inbox
 

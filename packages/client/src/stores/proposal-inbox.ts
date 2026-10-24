@@ -29,6 +29,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   const decidingId = ref<string | null>(null);
   const decisionError = ref<string | null>(null);
   const acceptedMissionId = ref<string | null>(null);
+  const acceptedOffer = ref<ProposalInboxItem | null>(null);
   const total = ref(0);
   const loading = ref(false);
   const failed = ref(false);
@@ -82,6 +83,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
           generation++; // invalidate any pre-accept inbox read
           loading.value = false;
           acceptedMissionId.value = missionId;
+          acceptedOffer.value = proposals.value.find((offer) => offer.id === id) ?? null;
           proposals.value = [];
           total.value = 0;
           totalPages.value = 0;
@@ -122,6 +124,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     decidingId.value = null;
     decisionError.value = null;
     acceptedMissionId.value = null;
+    acceptedOffer.value = null;
     loading.value = false;
     failed.value = false;
   }
@@ -166,5 +169,5 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     }
   });
 
-  return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, refresh, setPage, decide, stop };
+  return { proposals, total, page, totalPages, loading, failed, decidingId, decisionError, acceptedMissionId, acceptedOffer, refresh, setPage, decide, stop };
 });

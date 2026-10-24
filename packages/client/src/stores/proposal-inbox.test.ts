@@ -87,6 +87,33 @@ describe("proposal inbox", () => {
     expect(inbox.proposals).toEqual([]);
   });
 
+  it("keeps only the accepted incident in private memory for the post-accept map", async () => {
+    const offered = { ...proposal, details: {
+      incidentTypeName: "امداد شهری", requesterName: "requester",
+      sosRequest: { severity: "high" as const, description: "کمک اضطراری مورد نیاز است",
+        location: { lat: 35.71, lon: 51.43, isManual: false }, photoUrl: null,
+        createdAt: "2026-10-24T12:00:00.000Z" }
+    } };
+    configureProposalInboxForTests({
+      list: async () => ({ ...page([]), items: [offered], total: 1, totalPages: 1 }),
+      accept: async () => "77777777-7777-4777-8777-777777777777",
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() })
+    });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.proposals).toHaveLength(1));
+    expect(await inbox.decide(offered.id, "accept")).toBe(true);
+    expect(inbox.acceptedOffer?.details?.sosRequest.location).toEqual(offered.details.sosRequest.location);
+    expect(inbox.proposals).toEqual([]);
+    auth.accessToken = null;
+    auth.user = null;
+    await nextTick();
+    expect(inbox.acceptedOffer).toBeNull();
+  });
+
   it("passes an optional decline reason and loads further pages instead of hiding offers beyond twenty", async () => {
     const decline = vi.fn(async () => undefined);
     const list = vi.fn(async (_token: string, currentPage = 1) => ({

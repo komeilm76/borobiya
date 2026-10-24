@@ -20,6 +20,15 @@ describe("rescuer inbox markup and route", () => {
     expect(view).not.toContain(':src="selected.details.sosRequest.photoUrl"');
   });
 
+  it("shows the accepted incident map, explicit location consent, and a two-point fitBounds camera", () => {
+    expect(view).toContain('v-if="inbox.acceptedOffer?.details"');
+    expect(view).toContain('aria-label="نمای مأموریت پذیرفته‌شده"');
+    expect(view).toContain("missionMapCamera(incident, myPosition.value)");
+    expect(view).toContain("map.fitBounds(camera.bounds");
+    expect(view).toContain('v-if="!myPosition"');
+    expect(view).toContain("موقعیت شما فقط با اجازهٔ دستگاه");
+  });
+
   it("requires confirmation and discloses other offers will close when one is accepted", () => {
     expect(view).toContain('confirmAction = \'accept\'');
     expect(view).toContain("پیشنهادهای دیگر شما خودکار بسته می‌شوند");
