@@ -16,8 +16,8 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    // 64 = the previous 63 operations plus the requester/rescuer cancellation-reason catalog (T3.6.2).
-    expect(allApiRoutes).toHaveLength(64);
+    // 65 = the previous 64 operations plus the active-rescuer navigation-target read (T3.5.5).
+    expect(allApiRoutes).toHaveLength(65);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 

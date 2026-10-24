@@ -45,6 +45,8 @@
           </div>
         </div>
         <div class="mission-desk__foot">
+          <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
+            @click="routing.open()">رفتن به محل حادثه</v-btn>
           <p><v-icon icon="mdi-shield-check-outline" size="20" /> لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.</p>
           <v-menu location="bottom end">
             <template #activator="{ props }">
@@ -63,6 +65,59 @@
         <h3>در حال حاضر مأموریت فعالی ندارید</h3>
         <p>برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.</p>
         <v-btn color="primary" variant="flat" rounded="lg" to="/_user/proposals">مشاهدهٔ پیشنهادها</v-btn>
+      </section>
+      <section v-if="routing.visible.value && desk.activeMission.value" class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت">
+        <header class="mission-route__header">
+          <div>
+            <h2>مسیر تا محل حادثه</h2>
+            <p>مسیریابی با سرور نقشهٔ محلی انجام می‌شود؛ مسیرها پیشنهادند و زمان رسیدن قطعی نیست.</p>
+          </div>
+          <v-btn variant="text" aria-label="بستن مسیرها" @click="closeRoutes">بستن</v-btn>
+        </header>
+        <v-progress-linear v-if="routing.targetLoading.value" indeterminate color="primary" aria-label="دریافت محل حادثه" />
+        <v-alert v-if="routing.error.value" class="my-3" type="warning" variant="tonal" role="alert">
+          {{ routing.error.value }}
+          <v-btn v-if="!routing.target.value" size="small" variant="text" @click="routing.open()">تلاش دوباره</v-btn>
+        </v-alert>
+        <template v-if="routing.target.value">
+          <div class="mission-route__controls">
+            <div>
+              <p class="text-body-2 font-weight-bold mb-2">وسیلهٔ حرکت</p>
+              <v-btn-toggle :model-value="routing.profile.value" mandatory rounded="lg" color="primary"
+                @update:model-value="onProfileChange">
+                <v-btn value="car" prepend-icon="mdi-car">خودرو</v-btn>
+                <v-btn value="bicycle" prepend-icon="mdi-bicycle">دوچرخه</v-btn>
+                <v-btn value="foot" prepend-icon="mdi-walk">پیاده</v-btn>
+              </v-btn-toggle>
+            </div>
+            <div class="d-flex flex-wrap ga-2">
+              <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value"
+                @click="routing.findRoutes()">{{ routing.from.value ? 'دریافت مسیرها' : 'اجازهٔ موقعیت و دریافت مسیرها' }}</v-btn>
+              <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
+                :disabled="routing.loading.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
+            </div>
+          </div>
+          <div class="mission-route__map">
+            <MapCanvas :center="[routing.target.value.incident.lon, routing.target.value.incident.lat]" :zoom="14"
+              :constrain-bounds="false" :style-url="mapStyleUrl" aria-label="نقشهٔ مسیر تا محل حادثه"
+              @ready="onRouteMapReady" />
+          </div>
+          <p class="text-caption mt-2">قرمز: محل حادثه؛ سبز: موقعیت شما. مختصات حادثه:
+            <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
+          </p>
+          <div v-if="routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
+            <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
+              class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
+              :aria-pressed="routing.selectedIndex.value === index" @click="routing.selectRoute(index)">
+              <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
+              <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
+              <small>تغییر ارتفاع: دادهٔ ارتفاعی در مسیریاب فعلی موجود نیست.</small>
+            </button>
+          </div>
+          <p v-if="routing.routes.value.length === 1" class="text-caption mt-2" role="status">
+            برای این وسیله فقط یک مسیر در شبکهٔ راه‌های محلی پیدا شد؛ وجود چند مسیر تضمین نمی‌شود.
+          </p>
+        </template>
       </section>
     </div>
 
@@ -102,12 +157,106 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, watch } from "vue";
+import { Marker, type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
+import MapCanvas from "@/components/map/MapCanvas.vue";
+import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
+import { useThemeStore } from "@/stores/theme";
+import { useMissionRoutes } from "@/composables/use-mission-routes";
+import { missionMapCamera } from "@/sos/mission-map";
+import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
+import type { TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
 import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
 const desk = useMissionDesk(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   () => auth.ensureSession());
+const theme = useThemeStore();
+const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
+const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
+  computed(() => desk.activeMission.value?.id ?? null), () => auth.ensureSession());
+function onProfileChange(value: unknown): void {
+  if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
+}
+const ROUTE_SOURCE = "rescuer-route-preview";
+const ROUTE_LAYER = "rescuer-route-preview-line";
+let routeMap: MapLibreMap | null = null;
+let incidentMarker: Marker | null = null;
+let rescuerMarker: Marker | null = null;
+let detachRouteMap: (() => void) | null = null;
+type RouteLineData = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: Record<string, never>;
+    geometry: { type: "LineString"; coordinates: [number, number][] };
+  }>;
+};
+function routeGeometry(): RouteLineData {
+  const line = routing.selectedRoute.value;
+  return { type: "FeatureCollection", features: line ? [{ type: "Feature", properties: {},
+    geometry: { type: "LineString", coordinates: decodeRoutePolyline(line.polyline) } }] : [] };
+}
+function syncRouteMap(): void {
+  const map = routeMap;
+  const incident = routing.target.value?.incident;
+  if (!map || !incident) return;
+  incidentMarker?.remove();
+  rescuerMarker?.remove();
+  incidentMarker = new Marker({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
+  incidentMarker.getElement().setAttribute("aria-label", "محل حادثه");
+  rescuerMarker = routing.from.value ? new Marker({ color: "#16826c" })
+    .setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
+  rescuerMarker?.getElement().setAttribute("aria-label", "موقعیت من");
+  const line = routing.selectedRoute.value;
+  if (line) {
+    const points = decodeRoutePolyline(line.polyline);
+    const lon = points.map(([x]) => x);
+    const lat = points.map(([, y]) => y);
+    map.fitBounds([[Math.min(...lon), Math.min(...lat)], [Math.max(...lon), Math.max(...lat)]],
+      { padding: 60, maxZoom: 15, duration: 450 });
+  } else {
+    const camera = missionMapCamera(incident, routing.from.value);
+    if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
+    else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
+  }
+  applyRouteLayer();
+}
+function applyRouteLayer(): void {
+  const map = routeMap;
+  if (!map || !map.isStyleLoaded()) return;
+  try {
+    const source = map.getSource(ROUTE_SOURCE) as GeoJSONSource | undefined;
+    if (source) source.setData(routeGeometry());
+    else map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeGeometry() });
+    if (!map.getLayer(ROUTE_LAYER)) map.addLayer({ id: ROUTE_LAYER, type: "line", source: ROUTE_SOURCE,
+      paint: { "line-color": "#176e62", "line-width": 6, "line-opacity": 0.9 } });
+  } catch { /* Style swaps re-apply at idle. */ }
+}
+function onRouteMapReady(map: MapLibreMap): void {
+  detachRouteMap?.();
+  routeMap = map;
+  const onStyleReady = () => applyRouteLayer();
+  map.on("idle", onStyleReady);
+  detachRouteMap = () => map.off("idle", onStyleReady);
+  syncRouteMap();
+}
+function closeRoutes(): void {
+  routing.reset();
+  detachRouteMap?.();
+  detachRouteMap = null;
+  incidentMarker?.remove();
+  rescuerMarker?.remove();
+  incidentMarker = null;
+  rescuerMarker = null;
+  routeMap = null;
+}
+watch(() => [routing.target.value, routing.from.value, routing.selectedRoute.value] as const, () => syncRouteMap());
+watch(() => desk.activeMission.value?.id, (next, previous) => {
+  if (previous && next !== previous) {
+    closeRoutes();
+  }
+});
 const steps = [
   { status: "pending", label: "پذیرفته شده" },
   { status: "on_the_way", label: "در راه" },
@@ -118,12 +267,23 @@ const steps = [
 const activeStep = computed(() => steps.findIndex((step) => step.status === desk.activeMission.value?.status));
 const currentStatusLabel = computed(() => steps[activeStep.value]?.label ?? "در حال بررسی");
 onMounted(() => { void desk.load(); });
-watch(() => auth.user?.id, () => { desk.reset(); if (auth.user?.id) void desk.load(); });
-onBeforeUnmount(() => desk.reset());
+watch(() => auth.user?.id, () => { closeRoutes(); desk.reset(); if (auth.user?.id) void desk.load(); });
+onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 </script>
 
 <style scoped>
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
+.mission-route { margin-top: 24px; padding: clamp(18px, 4vw, 34px); border: 1px solid rgba(35,135,108,.25); border-radius: 24px; background: rgb(var(--v-theme-surface)); box-shadow: 0 12px 40px rgba(20,62,58,.07); }
+.mission-route__header, .mission-route__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
+.mission-route__header h2 { font-size: 1.3rem; font-weight: 800; }
+.mission-route__header p { font-size: .86rem; opacity: .78; }
+.mission-route__map { height: min(50vh, 430px); min-height: 310px; border-radius: 18px; overflow: hidden; }
+.mission-route__map :deep(.map-canvas), .mission-route__map :deep(.map-canvas__viewport) { min-height: 0; }
+.mission-route__choices { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }
+.mission-route__choice { display: grid; text-align: start; gap: 7px; color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.35); border-radius: 15px; padding: 16px; cursor: pointer; font: inherit; }
+.mission-route__choice--selected { border: 2px solid rgb(var(--v-theme-primary)); background: rgba(22,130,108,.09); }
+.mission-route__choice:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+.mission-route__choice small { opacity: .75; }
 .mission-desk__shell { max-width: 1120px; margin-inline: auto; }
 .mission-hero { position: relative; overflow: hidden; border-radius: 28px; background: linear-gradient(115deg, #103b40, #206b67); color: white; padding: clamp(27px, 5vw, 56px); box-shadow: 0 22px 60px rgba(11,67,65,.18); }
 .mission-hero__eyebrow { display: inline-flex; align-items: center; gap: 9px; color: #a4e7d5; font-weight: 700; font-size: .84rem; }

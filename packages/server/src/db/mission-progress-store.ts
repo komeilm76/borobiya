@@ -1,5 +1,5 @@
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Mission, MissionProgressStatus, MissionStatus } from "@borobiya/shared";
+import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus } from "@borobiya/shared";
 import type { Database } from "./client";
 import { missions, missionStatusHistory, sosRequests, users } from "./schema";
 
@@ -18,6 +18,7 @@ export type MissionProgressResult =
 
 export interface MissionProgressStore {
   findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
+  findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null>;
   listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number): Promise<{
     items: Mission[]; total: number; page: number; limit: number; totalPages: number
   }>;
@@ -39,6 +40,19 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     const [row] = await this.db.select().from(missions).where(and(eq(missions.id, id),
       role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
     return row ? toMission(row) : null;
+  }
+
+  async findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null> {
+    // Scope in SQL, not by filtering a globally readable request after the fact.
+    // A terminal/foreign/unknown mission returns the same null; neither grants navigation.
+    const [row] = await this.db.select({
+      missionId: missions.id,
+      lat: sql<number>`ST_Y(${sosRequests.location}::geometry)::float8`,
+      lon: sql<number>`ST_X(${sosRequests.location}::geometry)::float8`
+    }).from(missions).innerJoin(sosRequests, eq(sosRequests.id, missions.sosRequestId))
+      .where(and(eq(missions.id, id), eq(missions.rescuerId, rescuerId),
+        inArray(missions.status, ACTIVE_STATUSES))).limit(1);
+    return row ? { missionId: row.missionId, incident: { lat: row.lat, lon: row.lon } } : null;
   }
 
   async listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number) {

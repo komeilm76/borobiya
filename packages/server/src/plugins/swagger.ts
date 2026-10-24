@@ -64,6 +64,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "sosCancelRequest",
   "sosListMissions",
   "sosGetMission",
+  "sosGetMissionNavigationTarget",
   "sosCancelMission"
 ]);
 

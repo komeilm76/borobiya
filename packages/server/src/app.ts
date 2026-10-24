@@ -172,6 +172,7 @@ export async function createFastifyApp(
     (database ? new DrizzleMissionProgressStore(database.db) : {
       advanceStatus: async () => ({ status: "not_found" as const }),
       findMission: async () => null,
+      findNavigationTarget: async () => null,
       listMissions: async (_userId: string, _role: "requester" | "rescuer", page: number, limit: number) =>
         ({ items: [], total: 0, page, limit, totalPages: 0 })
     });

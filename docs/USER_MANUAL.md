@@ -15,7 +15,7 @@
 7. [Theme](#7-theme)
 8. [Map Basics](#8-map-basics)
 9. [Search — Planned](#9-search--planned)
-10. [Routing & Navigation — Planned](#10-routing--navigation--planned)
+10. [Routing & Navigation — Partially available](#10-routing--navigation--partially-available)
 11. [Live Location Sharing](#11-live-location-sharing)
 12. [History Sharing](#12-history-sharing)
 13. [Active Devices & Priority Device](#13-active-devices--priority-device)
@@ -150,9 +150,9 @@ User search and place/address search are not available in the current client. Se
 
 ---
 
-## 10. Routing & Navigation — Planned
+## 10. Routing & Navigation — Partially available
 
-The accepted-offer page now shows a simple incident/rescuer preview map with consent-based location and automatic camera framing. Route selection, transport profiles, alternatives, and turn-by-turn navigation are not available in the current client. This section will be updated when the client and offline routing service are implemented.
+The accepted-offer page shows a simple incident/rescuer preview map. On an active mission, open **مأموریت من** (`/_user/mission`) and choose **رفتن به محل حادثه**. The map retrieves the incident for your assigned active mission, including after a reload. Choose **خودرو** (car), **دوچرخه** (bicycle), or **پیاده** (foot); then select **اجازهٔ موقعیت و دریافت مسیرها** to allow GPS and ask the local offline routing gateway for routes. Without location permission, the incident remains visible but no starting point or route can be calculated. You may refresh your location and retry, switch transport, and choose any offered route to preview it on the map. Distance and time are approximate estimates, not traffic-aware arrival promises. The local road graph may return only one option (or none); elevation is labeled unavailable because the installed offline graph has no elevation data. **Start Navigation**, turn-by-turn guidance, camera follow and background live location are not yet implemented (T3.5.6–T3.5.7).
 
 ---
 
@@ -260,7 +260,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 16. SOS — Responding as Rescuer
 
-> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route guidance, live navigation and mission status controls remain planned under T3.5.
+> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; follow-navigation, live location and mission status controls remain planned under T3.5.
 
 ### Inbox
 
@@ -275,7 +275,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 1. Tap **Accept** on a proposal.
 2. Confirm the decision; other proposals auto-decline after acceptance.
-3. The accepted mission ID is shown. Navigation, mission status controls, and routing are not yet available (T3.5).
+3. The accepted mission ID and optional two-point preview map are shown. Open **مأموریت من** for a route preview that remains available after a reload; live navigation and client-side status controls are still pending.
 
 [Screenshot: Proposal inbox + Accept]
 

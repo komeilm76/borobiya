@@ -12,6 +12,7 @@ import {
   missionProposalSchema,
   missionRatingSchema,
   missionSchema,
+  missionNavigationTargetSchema,
   missionStatusUpdateSchema,
   nearestResponderSchema,
   nearestRespondersResponseSchema,
@@ -228,6 +229,20 @@ export const sosRoutes = {
     meta: {
       operationId: "sosGetMission",
       summary: "Get a mission",
+      tags: ["sos", "user"],
+      access: "authenticated"
+    }
+  }),
+  getMissionNavigationTarget: defineRoute({
+    method: "GET",
+    url: "/_user/sos/missions/:id/navigation",
+    schema: {
+      params: missionParamsSchema,
+      responses: { 200: missionNavigationTargetSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "sosGetMissionNavigationTarget",
+      summary: "Get incident coordinates for the assigned active rescuer",
       tags: ["sos", "user"],
       access: "authenticated"
     }

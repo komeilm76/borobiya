@@ -18,7 +18,11 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
   let pg: PGlite;
   beforeAll(async () => {
     pg = new PGlite();
-    await pg.exec("CREATE DOMAIN geography AS text; CREATE DOMAIN geometry AS text;");
+    await pg.exec(`CREATE DOMAIN geography AS text; CREATE DOMAIN geometry AS text;
+      CREATE FUNCTION ST_X(point geometry) RETURNS double precision LANGUAGE SQL IMMUTABLE AS $$
+        SELECT split_part(split_part(point::text, '(', 2), ' ', 1)::double precision $$;
+      CREATE FUNCTION ST_Y(point geometry) RETURNS double precision LANGUAGE SQL IMMUTABLE AS $$
+        SELECT split_part(split_part(point::text, ' ', 2), ')', 1)::double precision $$;`);
     const journal = JSON.parse(readFileSync(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8")) as {
       entries: { tag: string }[];
     };
@@ -86,6 +90,11 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "user")).toBe(false);
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "admin")).toBe(true);
     expect(await store.canJoinMissionRoom("90000000-0000-4000-8000-000000000009", REQUESTER, "admin")).toBe(false);
+    expect(await store.findNavigationTarget(MISSION, RESCUER)).toEqual({
+      missionId: MISSION, incident: { lat: 35.7, lon: 51.4 }
+    });
+    expect(await store.findNavigationTarget(MISSION, REQUESTER)).toBeNull();
+    expect(await store.findNavigationTarget("90000000-0000-4000-8000-000000000009", RESCUER)).toBeNull();
     await pg.query(`UPDATE "users" SET "is_on_mission" = true WHERE "id" = $1`, [RESCUER]);
     await pg.query(`UPDATE "sos_requests" SET "status" = 'accepted' WHERE "id" = $1`, [SOS]);
     await pg.query(`INSERT INTO "mission_status_history" ("mission_id", "to_status", "changed_by")
@@ -104,6 +113,7 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
       .toHaveLength(5);
     expect((await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [RESCUER])).rows[0]?.is_on_mission).toBe(false);
     expect((await pg.query<{ status: string }>(`SELECT "status" FROM "sos_requests" WHERE "id" = $1`, [SOS])).rows[0]?.status).toBe("completed");
+    expect(await store.findNavigationTarget(MISSION, RESCUER)).toBeNull();
     expect(await store.advanceStatus(MISSION, RESCUER, "on_the_way")).toEqual({
       status: "invalid_transition", currentStatus: "completed"
     });

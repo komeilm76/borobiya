@@ -129,6 +129,13 @@ export const missionRatingSchema = z.strictObject({
 });
 export type MissionRatingInput = z.infer<typeof missionRatingSchema>;
 
+/** Coordinates are only readable for an active mission's assigned rescuer. */
+export const missionNavigationTargetSchema = z.strictObject({
+  missionId: idSchema,
+  incident: coordinatesSchema
+});
+export type MissionNavigationTarget = z.infer<typeof missionNavigationTargetSchema>;
+
 export const missionSchema = z.strictObject({
   id: idSchema,
   sosRequestId: idSchema,

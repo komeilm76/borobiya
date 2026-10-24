@@ -94,7 +94,7 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | 3.2 SOS request | 100% (6/6) | ✅ `T3.2.1`–`T3.2.6` complete: `0012` `sos_requests` table, `POST /_user/sos/requests` + `sos:new-request` admin broadcast, `POST /_user/sos/requests/:id/photo` magic-byte-verified evidence storage + admin photo-update broadcast, floating SOS button & interactive map pin sheet (`SosRequestSheet.vue`), and live `/_admin/dispatch` alert markers & Web Audio siren chimes. ✅ `T3.2.6` secures photo read-back with short-lived signed URLs for participants and admins. Audit fix: the SOS form rejects duplicate submits during session refresh and after successful creation; photo retry is single-flight |
 | 3.3 Dispatch + nearest | 100% (4/4) | ✅ `T3.3.1`–`T3.3.4` complete: geodetic `ST_Distance` nearest qualified responder query (`0013`), `GET /_admin/sos/requests/:id/nearest`, row-locked `POST /_admin/sos/requests/:id/dispatch` emitting `sos:proposal-received` to `user:<id>`, and full `/_admin/dispatch` multi-select dispatch console |
 | 3.4 Proposals | 100% (6/6) | ✅ `T3.4.1`–`T3.4.6` (DDL, inbox, accept/decline, both busy guards, detailed rescuer UI); incident details are rescuer-scoped and photo access uses signed URLs. Next: mission status and cancellation. |
-| 3.5 Live mission + navigation | 50% (4/8) | ✅ `T3.5.1`–`T3.5.3` mission persistence, ordered progress and private updates; `T3.5.4` consent-based two-point post-accept map framing. Route alternatives, follow camera, live markers and mission timeline remain pending |
+| 3.5 Live mission + navigation | 50% (4/8) | ✅ `T3.5.1`–`T3.5.3` mission persistence, ordered progress and private updates; `T3.5.4` consent-based two-point post-accept map framing. Partial `T3.5.5` supplies an active-rescuer-scoped destination and car/bicycle/foot route preview; offline elevation is unavailable and OSRM cannot guarantee multiple alternatives, so T3.5.5 remains open. Follow camera, live markers and mission timeline remain pending |
 | 3.6 Cancellation + re-dispatch | 71% (5/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Re-dispatch polish and cancellation reads remain open |
 | 3.7 History + rating | 25% (1/4) | ✅ `T3.7.1` scoped mission and SOS histories, indexed requester reads, deep-linked requester list/detail with signed-photo access and guarded cancellation; rating and full rescuer history/timeline remain pending |
 
@@ -127,6 +127,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 ---
 
 ## Changelog
+
+### 2026-10-24 — Mission route preview and owner-scoped destination (T3.5.5 partial)
+
+- Added active-rescuer-only `GET /_user/sos/missions/:id/navigation` returning `{missionId,incident:{lat,lon}}` under a SQL status/owner predicate. Foreign/requester/admin/terminal IDs share the same 404; no-store and strict client response parsing apply. PGlite and route tests cover the owner/terminal boundary. This enables incident routing after page reload without making an SOS publicly readable.
+- `/_user/mission` offers an explicit location-permission step, transport selection (car/bicycle/foot), same-origin offline `POST /route`, validated/limited OSRM polyline decoding, selectable routes on MapLibre, approximate distance/time and robust errors for denial, no route or unavailable local service. Requests and private coordinates are aborted/cleared on account, mission or profile change. **Still open:** no elevation source exists in the current offline OSRM adapter, and it may return fewer than two alternatives. Elevation is explicitly labeled unavailable; no ETA guarantee or turn-by-turn claim is made. T3.5.5 remains unchecked pending offline elevation integration.
 
 ### 2026-10-24 — Post-accept incident and rescuer map framing (T3.5.4)
 

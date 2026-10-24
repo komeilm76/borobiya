@@ -27,7 +27,7 @@ async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceSt
     } : null;
   });
   await registerMissionProgressRoutes(app, {
-    advanceStatus, findMission: async () => null,
+    advanceStatus, findMission: async () => null, findNavigationTarget: async () => null,
     listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 })
   }, io);
   await app.ready();
@@ -35,6 +35,41 @@ async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceSt
 }
 
 describe("PATCH /_user/missions/:id/status", () => {
+  it("authorizes navigation coordinates only for the assigned active rescuer", async () => {
+    const app = Fastify({ logger: false });
+    let currentUser = rescuerId;
+    let role: "user" | "admin" = "user";
+    const findNavigationTarget = vi.fn(async (_id: string, userId: string) => userId === rescuerId
+      ? { missionId, incident: { lat: 35.7, lon: 51.4 } } : null);
+    app.addHook("onRequest", async (request) => {
+      request.authenticatedUser = {
+        userId: currentUser, role, sessionId: randomUUID(), deviceId: randomUUID(),
+        username: "rescuer", isActive: true, isSuspended: false,
+        mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date()
+      };
+    });
+    await registerMissionProgressRoutes(app, {
+      advanceStatus: async () => ({ status: "not_found" }), findMission: async () => null,
+      listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 }),
+      findNavigationTarget
+    });
+    try {
+      const url = `/_user/sos/missions/${missionId}/navigation`;
+      const own = await app.inject({ method: "GET", url });
+      expect(own.statusCode).toBe(200);
+      expect(own.headers["cache-control"]).toBe("no-store");
+      expect(own.json()).toEqual({ missionId, incident: { lat: 35.7, lon: 51.4 } });
+      currentUser = requesterId;
+      const foreign = await app.inject({ method: "GET", url });
+      expect(foreign.statusCode).toBe(404);
+      expect(foreign.json().code).toBe("MISSION_NOT_FOUND");
+      expect((await app.inject({ method: "GET", url: "/_user/sos/missions/not-a-uuid/navigation" })).statusCode).toBe(404);
+      role = "admin";
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      expect(findNavigationTarget).toHaveBeenCalledTimes(2);
+    } finally { await app.close(); }
+  });
+
   it("advances a rescuer-owned mission with a no-store response", async () => {
     const { app, advanceStatus } = await appFor({ status: "updated", mission });
     try {

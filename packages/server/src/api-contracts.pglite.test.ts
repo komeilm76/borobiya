@@ -923,6 +923,15 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     })).id).toBe(accepted.missionId);
     expect((await app.inject({ method: "GET", url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId),
       headers: responderHeaders })).statusCode).toBe(200);
+    const navUrl = apiRoutes.sos.getMissionNavigationTarget.url.replace(":id", accepted.missionId);
+    const nav = await callContract<{ missionId: string; incident: { lat: number; lon: number } }>(
+      apiRoutes.sos.getMissionNavigationTarget, 200, { url: navUrl, headers: responderHeaders }
+    );
+    expect(nav.missionId).toBe(accepted.missionId);
+    expect(nav.incident.lat).toBeGreaterThan(-90);
+    expect(nav.incident.lon).toBeGreaterThan(-180);
+    expect((await app.inject({ method: "GET", url: navUrl, headers: requesterHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: navUrl, headers: adminHeaders })).statusCode).toBe(404);
     const statusUrl = apiRoutes.sos.updateMissionStatus.url.replace(":id", accepted.missionId);
     expect((await callContract<{ code: string }>(apiRoutes.sos.updateMissionStatus, 409, {
       url: statusUrl, headers: responderHeaders, payload: { status: "arrived" }
@@ -947,6 +956,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       url: apiRoutes.sos.cancelMission.url.replace(":id", accepted.missionId),
       headers: responderHeaders, payload: { cancellationReasonId: rescuerCancelReasonId }
     });
+    expect((await app.inject({ method: "GET", url: navUrl, headers: responderHeaders })).statusCode).toBe(404);
     expect((await pg.query<{ status: string }>(`SELECT status FROM missions WHERE id=$1`, [accepted.missionId]))
       .rows[0]?.status).toBe("cancelled_by_rescuer");
     // A later re-dispatch reopens the declined proposal, never its old decision id.
