@@ -72,9 +72,11 @@ export async function getAdminSosRequest(
 export async function getNearestSosResponders(
   id: string,
   accessToken: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  excludeAssigned = false
 ): Promise<NearestRespondersResponse> {
-  const path = apiRoutes.admin.getNearestResponders.url.replace(":id", encodeURIComponent(id));
+  const base = apiRoutes.admin.getNearestResponders.url.replace(":id", encodeURIComponent(id));
+  const path = excludeAssigned ? `${base}?excludeAssigned=true` : base;
   const response = await requestJson<unknown>(path, {
     method: "GET",
     accessToken,

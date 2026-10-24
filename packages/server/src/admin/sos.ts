@@ -162,8 +162,13 @@ export async function registerAdminSosRoutes(
         );
     }
 
+    const filters = nearestRoute.schema.query.safeParse(request.query);
+    if (!filters.success) return reply.code(400).header("cache-control", "no-store")
+      .send(errorResponse("VALIDATION_ERROR", "Invalid nearest-responder filters.", validationIssues(filters.error)));
+
     const result = dependencies.dispatchStore
-      ? await dependencies.dispatchStore.findNearestResponders(parsed.data.id)
+      ? await dependencies.dispatchStore.findNearestResponders(parsed.data.id, undefined,
+        filters.data.excludeAssigned === "true")
       : { status: "not_found" as const };
     if (result.status === "not_found") {
       return reply

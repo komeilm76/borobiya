@@ -170,7 +170,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     await vi.waitFor(() => expect(store.selectedRequest?.id).toBe(row.id));
     expect(await store.redispatchNearest(row.id)).toBe(true); // works after reload without a socket alert
     expect(listRequestMissions).toHaveBeenCalledWith("admin-jwt", row.id, true);
-    expect(getNearestResponders).toHaveBeenCalledWith(row.id, "admin-jwt");
+    expect(getNearestResponders).toHaveBeenCalledWith(row.id, "admin-jwt", undefined, true);
     expect(dispatchResponders).toHaveBeenCalledWith(row.id, [newId, another], "admin-jwt");
     expect(store.selectedRequest?.status).toBe("dispatched");
     expect(store.quickDispatchFeedback?.type).toBe("success");

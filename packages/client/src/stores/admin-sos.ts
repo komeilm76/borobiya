@@ -47,7 +47,9 @@ export interface AdminSosRuntime {
   getRequest?: (requestId: string, accessToken: string) => Promise<SosRequestRecord>;
   getNearestResponders?: (
     requestId: string,
-    accessToken: string
+    accessToken: string,
+    signal?: AbortSignal,
+    excludeAssigned?: boolean
   ) => Promise<{ responders: NearestResponder[] }>;
   listRequestMissions?: (accessToken: string, requestId: string, includeTerminal: boolean) => Promise<Mission[]>;
   dispatchResponders?: (
@@ -373,7 +375,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       const latestCancelledRescuer = replacementByRequest.value[requestId]?.rescuerId;
       if (latestCancelledRescuer) excluded.add(latestCancelledRescuer);
       const nearest = activeOverrides.getNearestResponders ?? getNearestSosResponders;
-      const result = await withAdminAuthRetry((token) => nearest(requestId, token));
+      const result = await withAdminAuthRetry((token) => nearest(requestId, token, undefined, true));
       if (!result || !current()) return false;
       const candidates = [...new Set(result.responders.map((responder) => responder.userId))]
         .filter((id) => !excluded.has(id)).slice(0, 10);

@@ -128,6 +128,10 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — Replacement nearest-ten regression fix
+
+- A one-click replacement previously filtered previous rescuers **after** fetching the nearest ten, hiding eligible responders ranked 11th and later (or incorrectly reporting no candidates). The admin nearest read now accepts `?excludeAssigned=true` and excludes all prior SOS assignees in SQL before its ordered `LIMIT 10`; the normal picker remains unchanged. The client explicitly asks for this mode. A migrated PGlite regression with ten cancelled assignees and a valid eleventh rescuer proves the difference; malformed filters return 400. No browser/VM acceptance is claimed.
+
 ### 2026-10-24 — Immediate admin replacement dispatch (T3.6.6)
 
 - The urgent replacement alert and a persisted cancelled-rescuer SOS now offer a deliberate one-click dispatch. The admin store rechecks the exact SOS (`cancelled_by_rescuer` required), reads all of its prior mission assignments, refreshes the nearest qualified responders, excludes all previously assigned rescuers, then immediately calls the existing row-locked dispatch endpoint with up to 10 new IDs. No socket event dispatches by itself. A newer alert/session invalidates stale replies, simultaneous submissions are suppressed, and a status conflict, zero new candidates or HTTP failure displays an actionable error while leaving the manual picker available. Success updates proposals and the queue and clears the replacement state. Pure store tests cover reload, previous rescuer exclusion, changed SOS status, no candidates and logout; no browser/VM acceptance run is claimed.

@@ -274,6 +274,34 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     );
   });
 
+  it("does not truncate replacement candidates before excluding previously assigned rescuers", async () => {
+    const sosId = "76000000-0000-4000-8000-000000000001";
+    const assigned: string[] = [];
+    const nextId = "77000000-0000-4000-8000-000000000011";
+    await pg.query(`INSERT INTO sos_requests (id,requester_id,severity,description,incident_type_id,location,status)
+      VALUES ($1,$2,'high','A responder replacement is urgently needed.', $3,'POINT(51.4 35.7)','cancelled_by_rescuer')`,
+      [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    for (let n = 1; n <= 11; n++) {
+      const id = `77000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+      await seedUser({ id, username: `replacement_${n}`, lat: 35.7, lon: 51.4 + n * 0.001 });
+      await pg.query(`INSERT INTO category_users (category_id,user_id) VALUES ($1,$2)`, [CAT_MEDICAL_ALPHA_ID, id]);
+      if (n <= 10) {
+        assigned.push(id);
+        await pg.query(`INSERT INTO missions (sos_request_id,rescuer_id,requester_id,status)
+          VALUES ($1,$2,$3,'cancelled_by_rescuer')`, [sosId, id, REQUESTER_ID]);
+      }
+    }
+    const url = `/_admin/sos/requests/${sosId}/nearest`;
+    const headers = { authorization: `Bearer ${adminToken}` };
+    const ordinary = await app.inject({ method: "GET", url, headers });
+    expect(ordinary.json().responders.map((row: { userId: string }) => row.userId)).toEqual(assigned);
+    const replacement = await app.inject({ method: "GET", url: `${url}?excludeAssigned=true`, headers });
+    expect(replacement.statusCode).toBe(200);
+    expect(nearestRespondersResponseSchema.parse(replacement.json()).responders.map((row) => row.userId))
+      .toEqual([nextId]);
+    expect((await app.inject({ method: "GET", url: `${url}?excludeAssigned=garbage`, headers })).statusCode).toBe(400);
+  });
+
   it("enforces admin auth, UUID validation, and 404 on unknown SOS request IDs", async () => {
     const unauth = await app.inject({
       method: "GET",

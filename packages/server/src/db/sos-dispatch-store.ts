@@ -103,7 +103,7 @@ export type AcceptProposalResult =
 export interface SosDispatchStore {
   acceptProposal?(proposalId: string, rescuerId: string): Promise<AcceptProposalResult>;
   declineProposal?(proposalId: string, rescuerId: string, reason?: string): Promise<"declined" | "not_found" | "not_pending">;
-  findNearestResponders(sosRequestId: string, limit?: number): Promise<FindNearestRespondersResult>;
+  findNearestResponders(sosRequestId: string, limit?: number, excludeAssigned?: boolean): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
   listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }>;
@@ -129,7 +129,8 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
 
   public async findNearestResponders(
     sosRequestId: string,
-    limit: number = NEAREST_RESPONDERS_DEFAULT_LIMIT
+    limit: number = NEAREST_RESPONDERS_DEFAULT_LIMIT,
+    excludeAssigned = false
   ): Promise<FindNearestRespondersResult> {
     const requestRows = await this.db
       .select({
@@ -187,6 +188,13 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           )`,
           isNotNull(users.lastLocation),
           ne(users.id, targetRequest.requesterId),
+          // Filter before LIMIT. Removing previously assigned rescuers from a top-ten
+          // response would hide the eleventh (and every later) eligible replacement.
+          excludeAssigned ? sql`NOT EXISTS (
+            SELECT 1 FROM "missions" AS prior
+            WHERE prior."sos_request_id" = ${sosRequestId}
+              AND prior."rescuer_id" = ${users.id}
+          )` : undefined,
           sql`EXISTS (
             SELECT 1
             FROM "category_users"
