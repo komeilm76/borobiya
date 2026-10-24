@@ -250,7 +250,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 3.6 Cancellation & Re-dispatch (Critical)
 
 - [x] **T3.6.1** Seed `cancellation_reasons` (requester 5 + rescuer 6 keys, see spec §11.7C) — completed with T1.1.3 on 2026-10-18
-- [ ] **T3.6.2** Requester: `POST /_user/sos/requests/:id/cancel` {cancellationReasonId, customReason?} — must pick reason before accept
+- [x] **T3.6.2** Requester: `POST /_user/sos/requests/:id/cancel` {cancellationReasonId, customReason?} — must pick reason before accept ✅ 2026-10-24
+  - **Delivered:** Requester-only, row-locked cancellation for pending/dispatched SOSes. The active requester-reason catalog is available at `GET /_user/sos/cancellation-reasons?type=requester` (also `type=rescuer` for T3.6.3). The server rejects wrong-scope/inactive reasons and requires 10–200 characters for Other, atomically records reason/time/status and expires pending offers. Replays succeed without a second change; foreign IDs stay 404; accepted missions return 409 until T3.6.4 can cancel them and free responders safely. After submission, the SOS sheet offers a deliberately separate reason-picker and confirmation dialog with loading/retry, custom-text validation, cancellation success/error states. SOS history access remains T3.7.1.
 - [ ] **T3.6.3** Rescuer: `POST /_user/missions/:id/cancel` {cancellationReasonId, customReason?} — hidden behind “More→Unable to continue”, confirm, rate-limit 3/h, flag >2/day
 - [ ] **T3.6.4** Server: set `missions.status=cancelled_by_*`, `rescuer.isOnMission=false`, emit `mission:cancelled-by-requester/rescuer`
 - [ ] **T3.6.5** Rescuer cancel → urgent socket to `admin` room: red flash + sound + “NEEDS REPLACEMENT” badge with `rescuerLocation`

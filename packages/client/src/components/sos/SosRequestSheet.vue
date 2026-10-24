@@ -4,7 +4,7 @@
     inset
     scrollable
     max-width="740"
-    :persistent="sos.submitting.value"
+    :persistent="sos.submitting.value || cancellation.submitting.value"
     @update:model-value="onVisibility"
   >
     <v-card rounded="t-xl" class="sos-sheet">
@@ -23,7 +23,7 @@
           variant="text"
           size="small"
           aria-label="بستن فرم امداد"
-          :disabled="sos.submitting.value"
+          :disabled="sos.submitting.value || cancellation.submitting.value"
           @click="close"
         >
           <v-icon icon="mdi-close" />
@@ -33,19 +33,33 @@
       <v-divider />
 
       <v-card-text class="sos-sheet__body">
-        <div v-if="sos.isCompleted.value" class="sos-sheet__result" role="status" aria-live="polite">
+        <div v-if="cancellation.cancelled.value" class="sos-sheet__result" role="status" aria-live="polite">
+          <v-alert type="info" variant="tonal" rounded="lg" class="mb-4">
+            <strong>درخواست امداد شما لغو شد.</strong>
+            <div class="mt-1 text-sm">پیشنهادهای در انتظار اعزام نیز بسته شدند.</div>
+          </v-alert>
+          <div class="flex flex-wrap justify-end gap-2">
+            <v-btn variant="tonal" color="primary" rounded="lg" @click="startFresh">ثبت درخواست جدید</v-btn>
+            <v-btn color="primary" variant="flat" rounded="lg" @click="close">بستن</v-btn>
+          </div>
+        </div>
+
+        <div v-else-if="sos.isCompleted.value" class="sos-sheet__result" role="status" aria-live="polite">
           <v-alert type="success" variant="tonal" rounded="lg" class="mb-4">
             <strong>درخواست امداد شما با موفقیت ثبت شد.</strong>
             <div class="mt-1 text-sm">
               شناسهٔ پیگیری:
               <code dir="ltr">{{ sos.createdRequestId.value }}</code>
-              — وضعیت: <strong>در انتظار بررسی و اعزام امدادگر</strong>
+              — وضعیت: <strong>{{ cancellation.blocked.value ? "وضعیت درخواست تغییر کرده است؛ دوباره بررسی کنید" : "در انتظار بررسی و اعزام امدادگر" }}</strong>
             </div>
             <div v-if="sos.photoUploadedUrl.value" class="mt-1 text-xs opacity-80">
               تصویر مستندات حادثه نیز ضمیمه شد.
             </div>
           </v-alert>
           <div class="flex flex-wrap justify-end gap-2">
+            <v-btn v-if="!cancellation.blocked.value" variant="text" color="error" rounded="lg" prepend-icon="mdi-close-circle-outline" @click="cancellation.show()">
+              لغو این درخواست
+            </v-btn>
             <v-btn variant="tonal" color="primary" rounded="lg" @click="startFresh">
               ثبت درخواست جدید
             </v-btn>
@@ -60,6 +74,9 @@
             <div v-if="sos.submitError.value" class="mt-1 text-sm">{{ sos.submitError.value }}</div>
           </v-alert>
           <div class="flex flex-wrap justify-end gap-2">
+            <v-btn variant="text" color="error" rounded="lg" :disabled="sos.submitting.value" @click="cancellation.show()">
+              لغو این درخواست
+            </v-btn>
             <v-btn variant="text" rounded="lg" :disabled="sos.submitting.value" @click="startFresh">
               ثبت درخواست جدید
             </v-btn>
@@ -309,10 +326,10 @@
         </form>
       </v-card-text>
 
-      <v-divider v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value" />
+      <v-divider v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value" />
 
       <v-card-actions
-        v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value"
+        v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value"
         class="sos-sheet__actions"
       >
         <v-btn variant="text" rounded="lg" :disabled="sos.submitting.value" @click="close">
@@ -334,6 +351,35 @@
         </v-btn>
       </v-card-actions>
     </v-card>
+    <v-dialog :model-value="cancellation.open.value" max-width="500" :persistent="cancellation.submitting.value"
+      @update:model-value="(visible: boolean) => { if (!visible) cancellation.dismiss(); }">
+      <v-card rounded="xl" class="pa-2">
+        <v-card-title class="text-wrap">لغو درخواست امداد</v-card-title>
+        <v-card-text>
+          <p class="mb-4 text-body-2">اگر هنوز به کمک نیاز دارید، درخواست را لغو نکنید. پس از لغو، پیشنهادهای در انتظار بسته می‌شوند.</p>
+          <v-progress-linear v-if="cancellation.loading.value" indeterminate color="primary" aria-label="در حال دریافت دلایل لغو" class="mb-4" />
+          <v-alert v-if="cancellation.error.value" type="error" variant="tonal" role="alert" class="mb-4">
+            {{ cancellation.error.value }}
+          </v-alert>
+          <v-btn v-if="cancellation.error.value && !cancellation.reasons.value.length" variant="tonal" color="primary"
+            :disabled="cancellation.loading.value" @click="cancellation.show()">تلاش دوباره</v-btn>
+          <v-radio-group v-if="cancellation.reasons.value.length" v-model="cancellation.reasonId.value"
+            label="دلیل لغو را انتخاب کنید" :disabled="cancellation.submitting.value" hide-details>
+            <v-radio v-for="reason in cancellation.reasons.value" :key="reason.id"
+              :label="reason.labelFa || reason.label" :value="reason.id" />
+          </v-radio-group>
+          <v-textarea v-if="cancellation.selected.value?.requiresCustomText" v-model="cancellation.customReason.value"
+            label="توضیح دلیل (۱۰ تا ۲۰۰ نویسه)" counter="200" maxlength="200" variant="outlined" rows="2"
+            :disabled="cancellation.submitting.value" hint="برای «سایر» توضیح حداقل ۱۰ نویسه لازم است." persistent-hint />
+        </v-card-text>
+        <v-card-actions class="flex-wrap">
+          <v-spacer />
+          <v-btn variant="text" :disabled="cancellation.submitting.value" @click="cancellation.dismiss()">بازگشت</v-btn>
+          <v-btn color="error" variant="flat" rounded="lg" :loading="cancellation.submitting.value"
+            :disabled="!cancellation.canConfirm.value" @click="cancellation.confirm()">تأیید لغو درخواست</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-bottom-sheet>
 </template>
 
@@ -343,6 +389,7 @@ import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useSosRequest } from "@/composables/use-sos-request";
+import { useSosCancellation } from "@/composables/use-sos-cancellation";
 import { SOS_DESCRIPTION_MAX_LENGTH, SOS_SEVERITY_OPTIONS } from "@/sos/sos-form";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -359,6 +406,8 @@ const sos = useSosRequest({
   accessToken: computed(() => auth.accessToken),
   ensureSession: () => auth.ensureSession()
 });
+
+const cancellation = useSosCancellation(computed(() => auth.accessToken), sos.createdRequestId);
 
 const severityOptions = SOS_SEVERITY_OPTIONS;
 const maxDescriptionLength = SOS_DESCRIPTION_MAX_LENGTH;
@@ -436,6 +485,8 @@ function onFilePicked(event: Event): void {
 }
 
 function startFresh(): void {
+  if (cancellation.submitting.value) return;
+  cancellation.reset();
   sos.reset();
   sos.prepareForOpen();
 }
@@ -445,6 +496,8 @@ function onVisibility(next: boolean): void {
 }
 
 function close(): void {
+  if (cancellation.submitting.value) return;
+  cancellation.dismiss();
   emit("update:modelValue", false);
 }
 
@@ -462,11 +515,14 @@ watch(
       sos.prepareForOpen();
       return;
     }
+    if (cancellation.submitting.value) return;
+    cancellation.dismiss();
     pinMarker.value?.remove();
     pinMarker.value = null;
     mapInstance.value = null;
-    if (sos.isCompleted.value) {
+    if (sos.isCompleted.value || cancellation.cancelled.value) {
       sos.reset();
+      cancellation.reset();
     }
   },
   { immediate: true }

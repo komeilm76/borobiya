@@ -71,10 +71,11 @@ describe("client route records", () => {
       expect(headingSlugs, `TOC anchor #${anchor}`).toContain(anchor);
     }
 
-    for (const plannedSection of [9, 10, 15, 17, 18, 19]) {
+    for (const plannedSection of [9, 10, 15, 17, 19]) {
       const heading = lines.find((line) => line.startsWith(`## ${plannedSection}. `));
       expect(heading, `section ${plannedSection}`).toMatch(/— Planned$/);
     }
+    expect(lines.find((line) => line.startsWith("## 18. "))).toMatch(/— Partially available$/);
     for (const liveSection of [11, 12, 13, 14, 16, 20, 21]) {
       const heading = lines.find((line) => line.startsWith(`## ${liveSection}. `));
       expect(heading, `section ${liveSection}`).not.toMatch(/— Planned$/);

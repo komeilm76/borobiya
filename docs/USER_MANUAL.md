@@ -23,7 +23,7 @@
 15. [SOS — Admin Dispatch — Planned](#15-sos--admin-dispatch--planned)
 16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
-18. [Cancellation — Planned](#18-cancellation--planned)
+18. [Cancellation — Partially available](#18-cancellation--partially-available)
 19. [History & Rating — Planned](#19-history--rating--planned)
 20. [Admin — User Management](#20-admin--user-management)
 21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
@@ -300,20 +300,20 @@ Each update appears as **timeline** to requester + admin.
 
 ---
 
-## 18. Cancellation — Planned
+## 18. Cancellation — Partially available
 
-> **Current status:** Cancellation reasons are seeded in the database (T1.1.3), while requester/rescuer cancellation routes and UI remain planned under T3.6.
+> **Current status:** A requester can now cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. Cancellation after acceptance, the persistent SOS History entry point, rescuer cancellation and admin replacement alert remain planned (T3.6.3–T3.6.5, T3.7.1).
 
 ### If you are the requester (need to cancel SOS)
 
-1. Go to **SOS History** → your pending SOS → **Cancel**.
+1. Immediately after submitting, choose **لغو این درخواست** (Cancel this request) on the SOS confirmation sheet. If you already closed the sheet, the persistent history entry point is not available yet.
 2. **Must select reason:**
    - Need no longer exists
    - I resolved myself
    - Someone else helped
    - Sent by mistake
    - Other (→ type custom 10–200 chars)
-3. **Confirm** → SOS `cancelled_by_requester`, rescuer freed.
+3. Read the warning and select **تأیید لغو درخواست** (Confirm cancellation). The pending SOS is marked `cancelled_by_requester`, and any pending rescuer offers are withdrawn. If a rescuer has already accepted, the server refuses cancellation with a conflict rather than leaving them on an orphaned mission.
 
 ### If you are the rescuer (cannot continue)
 

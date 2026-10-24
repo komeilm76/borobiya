@@ -23,6 +23,7 @@ import {
   sosRequestRecordSchema,
   createSosRequestSchema
 } from "../schemas/sos";
+import { cancellationReasonSchema } from "../schemas/admin";
 import { noContentResponseSchema } from "./common";
 import { defineRoute } from "./define-route";
 
@@ -100,13 +101,26 @@ export const sosRoutes = {
       access: "authenticated"
     }
   }),
+  listCancellationReasons: defineRoute({
+    method: "GET",
+    url: "/_user/sos/cancellation-reasons",
+    schema: {
+      querystring: z.strictObject({ type: z.enum(["requester", "rescuer"]) }),
+      responses: { 200: z.array(cancellationReasonSchema), 400: errorSchema, 401: errorSchema, 403: errorSchema }
+    },
+    meta: {
+      operationId: "sosListCancellationReasons",
+      summary: "List active cancellation reasons for a requester or rescuer",
+      tags: ["sos", "user"], access: "authenticated"
+    }
+  }),
   cancelRequest: defineRoute({
     method: "POST",
     url: "/_user/sos/requests/:id/cancel",
     schema: {
       params: sosRequestParamsSchema,
       body: cancellationSchema,
-      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: noContentResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 409: errorSchema }
     },
     meta: {
       operationId: "sosCancelRequest",

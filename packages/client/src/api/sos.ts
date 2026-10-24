@@ -1,6 +1,9 @@
 import { z } from "zod";
 import {
   createSosRequestSchema,
+  cancellationReasonSchema,
+  cancellationSchema,
+  type CancellationReason,
   incidentTypeSchema,
   SOS_PHOTO_FIELD_NAME,
   sosRequestCreatedSchema,
@@ -53,6 +56,18 @@ export async function createSosRequest(
     accessToken
   });
   return sosRequestCreatedSchema.parse(response);
+}
+
+export async function listSosCancellationReasons(token: string): Promise<CancellationReason[]> {
+  const response = await requestJson<unknown>(`${apiRoutes.sos.listCancellationReasons.url}?type=requester`, { accessToken: token });
+  return z.array(cancellationReasonSchema).parse(response);
+}
+
+export async function cancelSosRequest(id: string, token: string, cancellationReasonId: string, customReason?: string): Promise<void> {
+  const body = cancellationSchema.parse({ cancellationReasonId, ...(customReason ? { customReason } : {}) });
+  await requestJson<unknown>(apiRoutes.sos.cancelRequest.url.replace(":id", encodeURIComponent(sosRequestParamsSchema.parse({ id }).id)), {
+    method: "POST", accessToken: token, body
+  });
 }
 
 /**

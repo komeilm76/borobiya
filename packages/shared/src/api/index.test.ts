@@ -16,8 +16,8 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    // 63 = 61 routes through Phase 3 dispatch plus photo access issuance and signed binary read (T3.2.6).
-    expect(allApiRoutes).toHaveLength(63);
+    // 64 = the previous 63 operations plus the requester/rescuer cancellation-reason catalog (T3.6.2).
+    expect(allApiRoutes).toHaveLength(64);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 

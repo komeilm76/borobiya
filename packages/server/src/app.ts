@@ -34,6 +34,8 @@ import {
 import { registerSosRequestRoutes } from "./sos/requests";
 import { registerSosProposalRoutes } from "./sos/proposals";
 import { registerMissionProgressRoutes } from "./sos/mission-progress";
+import { registerSosCancellationRoutes } from "./sos/cancellation";
+import { DrizzleSosCancellationStore, type SosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleMissionProgressStore, type MissionProgressStore } from "./db/mission-progress-store";
 import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
@@ -95,6 +97,8 @@ export interface FastifyAppDependencies {
   sosDispatchStore?: SosDispatchStore;
   /** Override the mission progress write in tests. */
   missionProgressStore?: MissionProgressStore;
+  /** Cancellation catalog and atomic requester cancellation. */
+  sosCancellationStore?: SosCancellationStore;
   /** Override the photo attach write in tests. */
   photoStore?: SosPhotoStore;
   /** Override where uploaded photos are written in tests. */
@@ -167,6 +171,11 @@ export async function createFastifyApp(
   const missionProgressStore = dependencies.missionProgressStore ??
     (database ? new DrizzleMissionProgressStore(database.db) : {
       advanceStatus: async () => ({ status: "not_found" as const })
+    });
+  const sosCancellationStore = dependencies.sosCancellationStore ??
+    (database ? new DrizzleSosCancellationStore(database.db) : {
+      listReasons: async () => [],
+      cancelUnaccepted: async () => ({ status: "not_found" as const })
     });
   const photoStore = dependencies.photoStore ?? new DrizzleSosPhotoStore(database!.db);
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
@@ -254,6 +263,7 @@ export async function createFastifyApp(
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerMissionProgressRoutes(app, missionProgressStore, realtime.io);
+  await registerSosCancellationRoutes(app, sosCancellationStore);
   await registerSosPhotoRoutes(app, {
     store: photoStore,
     storage: photoStorage,

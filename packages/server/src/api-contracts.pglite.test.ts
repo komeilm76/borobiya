@@ -28,6 +28,7 @@ import { DrizzleUserRegistrationStore } from "./db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "./db/security-questions-store";
 import { DrizzleSosDispatchStore } from "./db/sos-dispatch-store";
 import { DrizzleMissionProgressStore } from "./db/mission-progress-store";
+import { DrizzleSosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleSosPhotoStore } from "./db/sos-photo-store";
 import { DrizzleSosRequestStore } from "./db/sos-request-store";
 import { DrizzleUserSearchStore } from "./db/user-search-store";
@@ -173,6 +174,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
       missionProgressStore: new DrizzleMissionProgressStore(db),
+      sosCancellationStore: new DrizzleSosCancellationStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir),
       hashPassword: fastTestHash,
@@ -938,6 +940,22 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     // A replacement must invalidate even still-signed old URLs (the database pointer is authoritative).
     await pg.query(`UPDATE "sos_requests" SET "photo_url" = NULL WHERE "id" = $1`, [createdSos.requestId]);
     expect((await app.inject({ method: "GET", url: requesterPhotoAccess.url })).statusCode).toBe(404);
+
+    // Cancellation catalog and requester cancellation must be exercised against the same
+    // shared runtime schemas, not merely appear in Swagger's status map.
+    const cancelReasonId = "99000000-0000-4000-8000-000000000001";
+    await pg.query(`INSERT INTO "cancellation_reasons" ("id", "type", "key", "label", "label_fa")
+      VALUES ($1, 'requester', 'need_resolved', 'Resolved', 'رفع شد')`, [cancelReasonId]);
+    const cancellationReasons = await callContract<Array<{ id: string }>>(apiRoutes.sos.listCancellationReasons, 200, {
+      url: `${apiRoutes.sos.listCancellationReasons.url}?type=requester`, headers: requesterHeaders
+    });
+    expect(cancellationReasons.map(({ id }) => id)).toContain(cancelReasonId);
+    await callContract(apiRoutes.sos.cancelRequest, 200, {
+      url: apiRoutes.sos.cancelRequest.url.replace(":id", competing[1]!.sosId),
+      headers: requesterHeaders, payload: { cancellationReasonId: cancelReasonId }
+    });
+    expect((await pg.query<{ status: string }>(`SELECT status FROM "sos_requests" WHERE id=$1`, [competing[1]!.sosId])).rows[0]?.status)
+      .toBe("cancelled_by_requester");
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);

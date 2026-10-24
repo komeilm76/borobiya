@@ -30,6 +30,7 @@ import { DrizzleUserRegistrationStore } from "../db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "../db/security-questions-store";
 import { DrizzleSosDispatchStore } from "../db/sos-dispatch-store";
 import { DrizzleMissionProgressStore } from "../db/mission-progress-store";
+import { DrizzleSosCancellationStore } from "../db/sos-cancellation-store";
 import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
@@ -193,6 +194,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
       missionProgressStore: new DrizzleMissionProgressStore(db),
+      sosCancellationStore: new DrizzleSosCancellationStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir)
     });
@@ -681,6 +683,67 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     } finally {
       admin.close(); requester.close(); rescuer.close(); outsider.close();
     }
+  });
+
+  it("validates requester reasons, atomically cancels an unaccepted SOS and withdraws its offers", async () => {
+    const sosId = "92000000-0000-4000-8000-000000000001";
+    const rescuerId = "92000000-0000-4000-8000-000000000002";
+    const reasonId = "92000000-0000-4000-8000-000000000003";
+    const wrongReason = "92000000-0000-4000-8000-000000000004";
+    const otherReason = "92000000-0000-4000-8000-000000000005";
+    await seedUser({ id: rescuerId, username: "offer_rescuer" });
+    await pg.query(`INSERT INTO "cancellation_reasons" ("id", "type", "key", "label", "label_fa", "requires_custom_text")
+      VALUES ($1, 'requester', 'need_resolved', 'Resolved', 'رفع شد', false),
+             ($2, 'rescuer', 'physical_inability', 'Unable', 'عدم توانایی', false),
+             ($3, 'requester', 'other', 'Other', 'سایر', true)`, [reasonId, wrongReason, otherReason]);
+    await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
+      VALUES ($1, $2, 'high', 'A rescuer is needed at this location.', $3, 'POINT(51.4 35.7)', 'dispatched')`,
+      [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    await pg.query(`INSERT INTO "mission_proposals" ("sos_request_id", "rescuer_id") VALUES ($1, $2)`, [sosId, rescuerId]);
+    const url = `/_user/sos/requests/${sosId}/cancel`;
+    const send = (token: string, reason: string, customReason?: string) => app.inject({ method: "POST", url,
+      headers: { authorization: `Bearer ${token}` }, payload: { cancellationReasonId: reason, ...(customReason ? { customReason } : {}) }
+    });
+    const [reasons] = await Promise.all([app.inject({ method: "GET", url: "/_user/sos/cancellation-reasons?type=requester",
+      headers: { authorization: `Bearer ${requesterToken}` } }), app.ready()]);
+    expect(reasons.statusCode).toBe(200);
+    expect(reasons.json().map((reason: { id: string }) => reason.id)).toEqual([reasonId, otherReason]);
+    expect((await send(adminToken, reasonId)).statusCode).toBe(404);
+    expect((await send(requesterToken, wrongReason)).statusCode).toBe(400);
+    expect((await send(requesterToken, otherReason)).statusCode).toBe(400);
+    expect((await send(requesterToken, reasonId, "An unwanted explanation")).statusCode).toBe(400);
+    const pending = await pg.query<{ status: string }>(`SELECT status FROM "mission_proposals" WHERE "sos_request_id" = $1`, [sosId]);
+    expect(pending.rows[0]?.status).toBe("pending");
+    const cancelled = await send(requesterToken, reasonId);
+    expect(cancelled.statusCode).toBe(200);
+    expect(cancelled.body).toBe("");
+    const stored = await pg.query<{ status: string; cancellation_reason_id: string; cancelled_at: Date | null }>(
+      `SELECT status, cancellation_reason_id, cancelled_at FROM "sos_requests" WHERE "id" = $1`, [sosId]);
+    expect(stored.rows[0]?.status).toBe("cancelled_by_requester");
+    expect(stored.rows[0]?.cancellation_reason_id).toBe(reasonId);
+    expect(stored.rows[0]?.cancelled_at).not.toBeNull();
+    const expired = await pg.query<{ status: string }>(`SELECT status FROM "mission_proposals" WHERE "sos_request_id" = $1`, [sosId]);
+    expect(expired.rows[0]?.status).toBe("expired");
+    expect((await send(requesterToken, reasonId)).statusCode).toBe(200);
+  });
+
+  it("rejects requester cancellation of an accepted SOS without orphaning its active mission", async () => {
+    const sosId = "93000000-0000-4000-8000-000000000001";
+    const rescuerId = "93000000-0000-4000-8000-000000000002";
+    const reasonId = "93000000-0000-4000-8000-000000000003";
+    await seedUser({ id: rescuerId, username: "active_rescuer", isOnMission: true });
+    await pg.query(`INSERT INTO "cancellation_reasons" ("id", "type", "key", "label") VALUES ($1, 'requester', 'resolved', 'Resolved')`, [reasonId]);
+    await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
+      VALUES ($1, $2, 'high', 'An active rescue mission is underway.', $3, 'POINT(51.4 35.7)', 'accepted')`, [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    await pg.query(`INSERT INTO "missions" ("sos_request_id", "rescuer_id", "requester_id") VALUES ($1,$2,$3)`, [sosId, rescuerId, REQUESTER_ID]);
+    const reply = await app.inject({ method: "POST", url: `/_user/sos/requests/${sosId}/cancel`,
+      headers: { authorization: `Bearer ${requesterToken}` }, payload: { cancellationReasonId: reasonId } });
+    expect(reply.statusCode).toBe(409);
+    expect(reply.json().code).toBe("SOS_ALREADY_IN_PROGRESS");
+    const stored = await pg.query<{ status: string }>(`SELECT status FROM "sos_requests" WHERE "id"=$1`, [sosId]);
+    expect(stored.rows[0]?.status).toBe("accepted");
+    const mission = await pg.query<{ status: string }>(`SELECT status FROM "missions" WHERE "sos_request_id"=$1`, [sosId]);
+    expect(mission.rows[0]?.status).toBe("pending");
   });
 
 });
