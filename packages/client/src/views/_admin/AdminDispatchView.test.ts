@@ -10,6 +10,11 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("cancelAnimationFrame");
     expect(viewSource).toContain("styledata");
     expect(viewSource).toContain('"idle"');
+    // setData from an idle handler schedules another idle; event callbacks must only restore missing
+    // layers, while the request/selection watcher remains responsible for new GeoJSON data.
+    expect(viewSource).toContain("function restoreMapLayers()");
+    expect(viewSource).toMatch(/const onIdle = \(\) => \{\s*restoreMapLayers\(\)/);
+    expect(viewSource).toMatch(/const onStyleData = \(\) => \{\s*restoreMapLayers\(\)/);
     expect(viewSource).toContain(':constrain-bounds="false"');
     expect(viewSource).toContain("toggleSoundMuted");
     expect(viewSource).toContain("testAlertSound");

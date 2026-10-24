@@ -67,6 +67,7 @@ import { historyPlaybackStyle } from "@/history/playback";
 import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
 import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
 import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overlay-sync";
+import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
@@ -212,6 +213,14 @@ function showTrack(): void {
 }
 
 function repaintOverlays(): void {
+  const instance = map.value;
+  if (!instance) return;
+  const state = mapState(instance);
+  const styles = [liveStyle.value, playbackStyle.value];
+  // `setData`/`setPaintProperty` from paintLive/paintPlayback can themselves trigger styledata
+  // and then idle. Event-driven writes must be restore-only, or an unchanged map repaints forever.
+  if (!needsOverlayRestore(state, styles.flatMap((style) => style.sources.map((source) => source.id)),
+    styles.flatMap((style) => style.layers.map((layer) => layer.id)))) return;
   paintLive();
   paintPlayback();
 }

@@ -539,6 +539,7 @@ import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue"
 import { statusLabel } from "@/mission/timeline-presentation";
 import { listActiveSosMissions } from "@/api/mission";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
+import { needsOverlayRestore } from "@/map/overlay-restore";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
 import { useAuthStore } from "@/stores/auth";
@@ -693,6 +694,18 @@ function syncMapData(): void {
   }
 }
 
+function restoreMapLayers(): void {
+  const map = mapInstance;
+  if (!map || !needsOverlayRestore({
+    styleLoaded: Boolean(map.isStyleLoaded()),
+    hasSource: (id) => Boolean(map.getSource(id)),
+    hasLayer: (id) => Boolean(map.getLayer(id))
+  }, [SOS_SOURCE_ID], [SOS_PULSE_LAYER_ID, SOS_CORE_LAYER_ID])) return;
+  // Requests and selection changes call syncMapData directly. An idle/styledata callback only
+  // repairs style swaps; unconditionally setting GeoJSON here would schedule another idle.
+  syncMapData();
+}
+
 function startPulseLoop(): void {
   if (
     pulseAnimationFrame !== null ||
@@ -767,10 +780,10 @@ function onMapReady(map: MapLibreMap): void {
   }
 
   const onStyleData = () => {
-    syncMapData();
+    restoreMapLayers();
   };
   const onIdle = () => {
-    syncMapData();
+    restoreMapLayers();
   };
   const onMarkerClick = (event: MapMouseEvent) => {
     if (!map.getLayer(SOS_CORE_LAYER_ID) && !map.getLayer(SOS_PULSE_LAYER_ID)) return;

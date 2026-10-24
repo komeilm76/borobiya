@@ -179,6 +179,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { missionMapCamera } from "@/sos/mission-map";
 import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
+import { needsOverlayRestore } from "@/map/overlay-restore";
 import type { TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
 import { useAuthStore } from "@/stores/auth";
@@ -253,11 +254,20 @@ function applyRouteLayer(): void {
       paint: { "line-color": "#176e62", "line-width": 6, "line-opacity": 0.9 } });
   } catch { /* Style swaps re-apply at idle. */ }
 }
+function restoreRouteLayer(): void {
+  const map = routeMap;
+  if (!map || !needsOverlayRestore({
+    styleLoaded: Boolean(map.isStyleLoaded()),
+    hasSource: (id) => Boolean(map.getSource(id)),
+    hasLayer: (id) => Boolean(map.getLayer(id))
+  }, [ROUTE_SOURCE], [ROUTE_LAYER])) return;
+  applyRouteLayer();
+}
 function onRouteMapReady(map: MapLibreMap): void {
   detachRouteMap?.();
   routeMap = map;
   mapReady.value = true;
-  const onStyleReady = () => applyRouteLayer();
+  const onStyleReady = () => restoreRouteLayer();
   map.on("idle", onStyleReady);
   detachRouteMap = () => map.off("idle", onStyleReady);
   syncRouteMap();

@@ -21,6 +21,13 @@ function body(name: string): string {
 }
 
 describe("UserMapView live overlay", () => {
+  it("restores missing layers on idle without rewriting every existing source on each idle event", () => {
+    const restore = body("repaintOverlays");
+    expect(restore).toContain("needsOverlayRestore(");
+    expect(restore.indexOf("needsOverlayRestore(")).toBeLessThan(restore.indexOf("paintLive()"));
+    expect(body("onMapReady")).toContain('instance.on("idle", repaintOverlays)');
+  });
+
   it("paints the live markers before playback, so the layer playback sits under exists", () => {
     const ready = body("onMapReady");
     expect(ready.indexOf("paintLive()")).toBeLessThan(ready.indexOf("paintPlayback()"));
