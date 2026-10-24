@@ -6,6 +6,7 @@ import {
   sosRequestRecordPayload,
   type CreatedSosRequest,
   type NewSosRequest,
+  type SosRequestRecord,
   type SosRequestStore
 } from "../db/sos-request-store";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
@@ -179,26 +180,37 @@ export async function registerSosRequestRoutes(
       throw error;
     }
 
-    const persisted = await dependencies.store.getRequestById?.(created.requestId);
-    emitSosNewRequest(
-      dependencies.io,
-      persisted
-        ? sosRequestRecordPayload(persisted)
-        : {
-            id: created.requestId,
-            requesterId: user.userId,
-            severity: parsed.data.severity,
-            description: parsed.data.description,
-            incidentTypeId: parsed.data.incidentTypeId,
-            location: parsed.data.location,
-            photoUrl: null,
-            status: created.status,
-            cancellationReasonId: null,
-            cancellationCustomText: null,
-            cancelledAt: null,
-            createdAt: new Date().toISOString()
-          }
-    );
+    // The insert committed. A failed notification read or socket broadcast must not turn the
+    // response into a 500: a caller retrying that response would file a second emergency.
+    let persisted: SosRequestRecord | null | undefined;
+    try {
+      persisted = await dependencies.store.getRequestById?.(created.requestId);
+    } catch (error) {
+      request.log.warn({ err: error, requestId: created.requestId }, "SOS notification read failed");
+    }
+    try {
+      emitSosNewRequest(
+        dependencies.io,
+        persisted
+          ? sosRequestRecordPayload(persisted)
+          : {
+              id: created.requestId,
+              requesterId: user.userId,
+              severity: parsed.data.severity,
+              description: parsed.data.description,
+              incidentTypeId: parsed.data.incidentTypeId,
+              location: parsed.data.location,
+              photoUrl: null,
+              status: created.status,
+              cancellationReasonId: null,
+              cancellationCustomText: null,
+              cancelledAt: null,
+              createdAt: new Date().toISOString()
+            }
+      );
+    } catch (error) {
+      request.log.warn({ err: error, requestId: created.requestId }, "SOS notification broadcast failed");
+    }
 
     return reply
       .code(201)

@@ -9,6 +9,7 @@ import { registerUserSecurityQuestionsRoute } from "../auth/user-security-questi
 import { parseServerEnv } from "../config/env";
 import { registerHttpSecurityPlugins } from "../plugins/security";
 import { registerSosRequestRoutes, sosCreateRateLimit, sosRateLimitKey, sosRequestInput } from "./requests";
+import { SOS_NEW_REQUEST_EVENT, type RoomEmitter } from "../realtime/socket";
 
 const jwtSecret = "a".repeat(48);
 const requesterId = randomUUID();
@@ -64,7 +65,12 @@ const serverConfig = parseServerEnv({
   CORS_ORIGINS: "http://localhost:5173"
 });
 
-async function makeApp(options: { user?: SecurityQuestionsUserRecord; store?: Partial<SosRequestStore>; withSecurityPlugins?: boolean } = {}) {
+async function makeApp(options: {
+  user?: SecurityQuestionsUserRecord;
+  store?: Partial<SosRequestStore>;
+  io?: RoomEmitter;
+  withSecurityPlugins?: boolean;
+} = {}) {
   const securityStore: UserSecurityQuestionsStore = {
     async findUserById(userId) {
       // Keyed off the token's subject so a test can hand two accounts their own budgets.
@@ -85,14 +91,17 @@ async function makeApp(options: { user?: SecurityQuestionsUserRecord; store?: Pa
     requestId: randomUUID(),
     status: "pending"
   }));
-  const store: SosRequestStore = { createRequest: options.store?.createRequest ?? createRequest };
+  const store: SosRequestStore = {
+    createRequest: options.store?.createRequest ?? createRequest,
+    getRequestById: options.store?.getRequestById
+  };
 
   const app = Fastify({ logger: false });
   if (options.withSecurityPlugins) {
     await registerHttpSecurityPlugins(app, serverConfig);
   }
   await registerUserSecurityQuestionsRoute(app, { store: securityStore, jwtSecret });
-  await registerSosRequestRoutes(app, { store });
+  await registerSosRequestRoutes(app, { store, io: options.io });
   await app.ready();
   apps.push(app);
   return { app, createRequest };
@@ -134,6 +143,31 @@ describe("POST /_user/sos/requests", () => {
       incidentTypeId,
       location: { lat: 35.7, lon: 51.4, accuracy: 12, isManual: true }
     });
+  });
+
+  it("acknowledges a committed request when the notification read fails, using the created input for the event", async () => {
+    const emitted = vi.fn();
+    const { app, createRequest } = await makeApp({
+      store: { getRequestById: async () => { throw new Error("read replica unavailable"); } },
+      io: { to: () => ({ emit: emitted }) }
+    });
+    const response = await post(app, body(), await accessToken());
+
+    expect(response.statusCode).toBe(201);
+    expect(createRequest).toHaveBeenCalledTimes(1);
+    expect(emitted).toHaveBeenCalledWith(SOS_NEW_REQUEST_EVENT, {
+      sosRequest: expect.objectContaining({ id: response.json().requestId, description: body().description })
+    });
+  });
+
+  it("acknowledges a committed request even when broadcasting to admins fails", async () => {
+    const { app, createRequest } = await makeApp({
+      io: { to: () => ({ emit: () => { throw new Error("socket unavailable"); } }) }
+    });
+    const response = await post(app, body(), await accessToken());
+
+    expect(response.statusCode).toBe(201);
+    expect(createRequest).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the 10–500 character rule at both ends and refuses one character outside each", async () => {

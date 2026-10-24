@@ -10,6 +10,7 @@ import type { AttachSosPhotoInput, SosPhotoStore } from "../db/sos-photo-store";
 import type { SecurityQuestionsUserRecord, UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { registerUserSecurityQuestionsRoute } from "../auth/user-security-questions";
 import type { SosRequestStore } from "../db/sos-request-store";
+import type { RoomEmitter } from "../realtime/socket";
 import { parseServerEnv } from "../config/env";
 import { registerHttpSecurityPlugins } from "../plugins/security";
 import { registerMultipartParser } from "../plugins/multipart";
@@ -106,6 +107,8 @@ async function makeApp(
     attach?: (input: AttachSosPhotoInput) => Promise<{ status: "attached"; photoUrl: string } | { status: "not_found" }>;
     maxBytes?: number;
     withLimits?: boolean;
+    sosRequests?: Pick<SosRequestStore, "getRequestById">;
+    io?: RoomEmitter;
   } = {}
 ) {
   const directory = join(await mkdtemp(join(tmpdir(), "borobiya-photo-route-")), "uploads");
@@ -145,7 +148,9 @@ async function makeApp(
   }
   await registerUserSecurityQuestionsRoute(app, { store: securityStore, jwtSecret });
   await registerMultipartParser(app, { maxBytes: options.maxBytes });
-  await registerSosPhotoRoutes(app, { store: { attachPhoto }, storage, maxBytes: options.maxBytes });
+  await registerSosPhotoRoutes(app, {
+    store: { attachPhoto }, storage, maxBytes: options.maxBytes, sosRequests: options.sosRequests, io: options.io
+  });
   await app.ready();
   apps.push(app);
   return { app, attachPhoto, directory, createRequest };
@@ -181,6 +186,42 @@ describe("POST /_user/sos/requests/:id/photo", () => {
     const fileName = photoUrl.replace("/uploads/", "");
     expect(new Uint8Array(await readFile(join(directory, fileName)))).toEqual(PNG);
     expect(attachPhoto).toHaveBeenCalledWith({ requesterId, requestId, photoUrl });
+  });
+
+  it("removes the newly saved file when the database attachment fails", async () => {
+    const { app, directory, attachPhoto } = await makeApp({
+      attach: async () => { throw new Error("database unavailable"); }
+    });
+    const response = await upload(app, [{ name: SOS_PHOTO_FIELD_NAME, filename: "evidence.png", bytes: PNG }], requestId, await accessToken(requesterId));
+
+    expect(response.statusCode).toBe(500);
+    expect(attachPhoto).toHaveBeenCalledTimes(1);
+    expect(await storedFiles(directory)).toEqual([]);
+  });
+
+  it("acknowledges the attached photo when its post-write notification read fails", async () => {
+    const { app, directory } = await makeApp({
+      sosRequests: { getRequestById: async () => { throw new Error("read replica unavailable"); } }
+    });
+    const response = await upload(app, [{ name: SOS_PHOTO_FIELD_NAME, filename: "evidence.png", bytes: PNG }], requestId, await accessToken(requesterId));
+
+    expect(response.statusCode).toBe(200);
+    expect(await storedFiles(directory)).toHaveLength(1);
+  });
+
+  it("acknowledges the attached photo when broadcasting to admins fails", async () => {
+    const { app, directory } = await makeApp({
+      sosRequests: { getRequestById: async () => ({
+        id: requestId, requesterId, severity: "high", description: "A flooded street", incidentTypeId: randomUUID(),
+        location: { lat: 35.7, lon: 51.4, accuracy: null, isManual: false }, photoUrl: "/uploads/photo.png",
+        status: "pending", cancellationReasonId: null, cancellationCustomText: null, cancelledAt: null, createdAt
+      }) },
+      io: { to: () => ({ emit: () => { throw new Error("socket unavailable"); } }) }
+    });
+    const response = await upload(app, [{ name: SOS_PHOTO_FIELD_NAME, filename: "evidence.png", bytes: PNG }], requestId, await accessToken(requesterId));
+
+    expect(response.statusCode).toBe(200);
+    expect(await storedFiles(directory)).toHaveLength(1);
   });
 
   it("derives the extension from the bytes, never from the name or the declared type", async () => {

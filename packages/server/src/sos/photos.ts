@@ -238,11 +238,23 @@ export async function registerSosPhotoRoutes(
     }
 
     const stored = await dependencies.storage.save(photo.bytes, sniffed.extension);
-    const attached = await dependencies.store.attachPhoto({
-      requesterId: user.userId,
-      requestId: parsedParams.data.id,
-      photoUrl: stored.photoUrl
-    });
+    let attached: Awaited<ReturnType<SosPhotoStore["attachPhoto"]>>;
+    try {
+      attached = await dependencies.store.attachPhoto({
+        requesterId: user.userId,
+        requestId: parsedParams.data.id,
+        photoUrl: stored.photoUrl
+      });
+    } catch (error) {
+      // The file was written before the DB call. Discard only while the attachment has not
+      // returned success; notification failures below must never delete an attached photo.
+      try {
+        await dependencies.storage.discard(stored.fileName);
+      } catch (cleanupError) {
+        request.log.warn({ err: cleanupError, requestId: parsedParams.data.id }, "SOS photo cleanup failed");
+      }
+      throw error;
+    }
     if (attached.status === "not_found") {
       await dependencies.storage.discard(stored.fileName);
       return sendError(
@@ -253,9 +265,15 @@ export async function registerSosPhotoRoutes(
       );
     }
 
-    const refreshed = await dependencies.sosRequests?.getRequestById?.(parsedParams.data.id);
-    if (refreshed) {
-      emitSosNewRequest(dependencies.io, sosRequestRecordPayload(refreshed));
+    // The row now references this file. The admin refresh is best-effort; failing it must not
+    // make the requester retry a successful attachment or lose its URL.
+    try {
+      const refreshed = await dependencies.sosRequests?.getRequestById?.(parsedParams.data.id);
+      if (refreshed) {
+        emitSosNewRequest(dependencies.io, sosRequestRecordPayload(refreshed));
+      }
+    } catch (error) {
+      request.log.warn({ err: error, requestId: parsedParams.data.id }, "SOS photo notification failed");
     }
 
     // The URL the row now holds, answered from the store rather than recomputed here, so a client
