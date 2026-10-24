@@ -319,7 +319,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 4.5 Testing
 
-- [ ] **T4.5.1** Vitest: Zod schema tests (register 5 unique Q, password 8+letter+number, etc.)
+- [x] **T4.5.1** Vitest: Zod schema tests (register 5 unique Q, password 8+letter+number, etc.) — completed 2026-10-24
+  - Existing shared schema suites cover auth/recovery, devices, SOS/dispatch, location/history, search/geocoding, catalogs and map config. A Phase 4 route-contract matrix adds exact 4/5/6-question and duplicate-ID/path checks, blank answers, the 8-character Unicode-letter/decimal-digit password boundary at register/reset, strict unknown-field rejection, and SOS coordinate validation against the actual published route bodies. These are pure Vitest schema tests; they do not prove the HTTP guards (T4.5.2) or E2E flow (T4.5.3).
 - [ ] **T4.5.2** Route tests: prefix guards (already-authed 403, admin-only 403, no DELETE)
 - [ ] **T4.5.3** SSE/Playwright E2E: login → share → SOS → dispatch → accept → status → rate
 

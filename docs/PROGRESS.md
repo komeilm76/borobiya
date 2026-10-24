@@ -98,12 +98,13 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | 3.6 Cancellation + re-dispatch | 100% (7/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Cancellation detail reads expose actor/time/resolved reason; T3.6.6 adds explicit one-click replacement re-dispatch to previously unassigned nearest responders |
 | 3.7 History + rating | 100% (4/4) | ✅ `T3.7.1` requester SOS history, `T3.7.2` requester-only completed-mission rating API, `T3.7.3` storage/average triggers and `T3.7.4` requester star-rating form plus rescuer paginated history with ratings and timelines. VM/browser acceptance remains a separate gate |
 
-### Phase 4 — Polish — 15% (4 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
+### Phase 4 — Polish — 19% (5 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Routing polish | 33% (1/3) | ✅ `T4.2.3` resets the GPS-follow camera to north-up and level on exit; elevation and multi-stop routing remain open |
 | Search + geocode | 75% (3/4) | ✅ T4.1.2 local Photon gateway + client adapter; T4.1.3 reverse adapter + click/long-press address sheet; T4.1.4 debounced map search, list and fly-to. T4.1.1 username search is still term-bounded. No new VM/browser Photon run |
+| Testing | 33% (1/3) | ✅ T4.5.1 shared Zod schema suites + Phase 4 route-contract boundary matrix. HTTP prefix guards and E2E are separate open tasks |
 | UI/UX + perf | 0% | — |
 | Deploy + Android | 0% | — |
 
