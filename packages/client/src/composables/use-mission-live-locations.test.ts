@@ -14,7 +14,7 @@ function fakeSocket() {
   const socket = { connected: true,
     on: vi.fn((event: string, listener: (...args: unknown[]) => void) => { listeners.set(event, listener); }),
     timeout: vi.fn(() => ({ emit: (event: string, payload: unknown,
-      ack: (error: null, result: { ok: boolean }) => void) => {
+      ack: (error: Error | null, result?: { ok: boolean }) => void) => {
       emitted.push({ event, payload }); ack(null, { ok: true });
     } }))
   };
@@ -56,6 +56,135 @@ describe("mission live positions (T3.5.7)", () => {
     expect(live.locations.value).toEqual({});
     scope.stop();
     vi.useRealTimers();
+  });
+
+  it("does not let an old GPS watch or late publish acknowledgement affect a restarted share", async () => {
+    const session = fakeSocket();
+    const pending: Array<(error: Error | null, result?: { ok: boolean }) => void> = [];
+    session.socket.timeout.mockImplementation(() => ({ emit: (event: string, payload: unknown,
+      ack: (error: Error | null, result?: { ok: boolean }) => void) => {
+      session.emitted.push({ event, payload });
+      if (event === MISSION_SUBSCRIBE_EVENT) ack(null, { ok: true });
+      else pending.push(ack);
+    } }));
+    const watches: Array<(point: { lat: number; lon: number }) => void> = [];
+    const clears: Array<ReturnType<typeof vi.fn>> = [];
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, watchPosition: (onFix) => {
+        watches.push(onFix); const clear = vi.fn(); clears.push(clear); return clear;
+      } }))!;
+    await settle();
+    live.startSharing();
+    watches[0]?.({ lat: 35.7, lon: 51.4 });
+    expect(pending).toHaveLength(1);
+    live.stopSharing();
+    expect(clears[0]).toHaveBeenCalledOnce();
+    live.startSharing();
+    watches[0]?.({ lat: 40, lon: 40 }); // a queued callback from the stopped watch
+    watches[1]?.({ lat: 35.8, lon: 51.5 });
+    const publishes = session.emitted.filter(({ event }) => event === MISSION_LOCATION_PUBLISH_EVENT);
+    expect(publishes).toHaveLength(2);
+    expect(publishes[1]?.payload).toMatchObject({ location: { lat: 35.8, lon: 51.5 } });
+    pending[0]?.(new Error("timed out")); // the previous share times out after the restart
+    expect(live.sharing.value).toBe(true);
+    expect(live.error.value).toBeNull();
+    pending[1]?.(null, { ok: true });
+    scope.stop();
+    expect(clears[1]).toHaveBeenCalledOnce();
+  });
+
+  it("ignores a disconnect or terminal event queued by a socket replaced for the same mission", async () => {
+    const first = fakeSocket();
+    const second = fakeSocket();
+    let opens = 0;
+    const clears: Array<ReturnType<typeof vi.fn>> = [];
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => ++opens === 1 ? first.client : second.client,
+        watchPosition: () => { const clear = vi.fn(); clears.push(clear); return clear; } }))!;
+    await settle();
+    await live.start();
+    expect(first.close).toHaveBeenCalledOnce();
+    live.startSharing();
+    first.listeners.get("disconnect")?.();
+    first.listeners.get("mission:status-updated")?.({ missionId: mission.id, status: "completed",
+      by: mission.rescuerId, at: new Date().toISOString() });
+    expect(live.connected.value).toBe(true);
+    expect(live.sharing.value).toBe(true);
+    expect(second.close).not.toHaveBeenCalled();
+    scope.stop();
+    expect(clears[0]).toHaveBeenCalledOnce();
+  });
+
+  it("does not carry GPS consent into a new login on the same account and device", async () => {
+    const first = fakeSocket();
+    const second = fakeSocket();
+    let opens = 0;
+    const firstToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-1" }))}.x`;
+    const secondToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-2" }))}.x`;
+    const bearer = ref(firstToken);
+    let oldFix!: (fix: { lat: number; lon: number }) => void;
+    const clear = vi.fn();
+    const watchPosition = vi.fn((onFix: (fix: { lat: number; lon: number }) => void) => {
+      oldFix = onFix; return clear;
+    });
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => ++opens === 1 ? first.client : second.client,
+        watchPosition }))!;
+    await settle();
+    live.startSharing();
+    bearer.value = secondToken;
+    oldFix({ lat: 35.7, lon: 51.4 }); // before the Vue watcher flush
+    live.stopSharing();
+    live.startSharing(); // do not start another watch on the old socket with a new token
+    expect(watchPosition).toHaveBeenCalledOnce();
+    expect(live.sharing.value).toBe(false);
+    await settle();
+    expect(first.emitted.filter(({ event }) => event === MISSION_LOCATION_PUBLISH_EVENT)).toEqual([]);
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(live.sharing.value).toBe(false);
+    expect(second.emitted).toContainEqual({ event: MISSION_SUBSCRIBE_EVENT, payload: { missionId: mission.id } });
+    scope.stop();
+  });
+
+  it("keeps consent through an access-token refresh of the same session", async () => {
+    const session = fakeSocket();
+    const firstToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-1", exp: 100 }))}.x`;
+    const renewedToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-1", exp: 200 }))}.x`;
+    const bearer = ref(firstToken);
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, watchPosition: () => vi.fn() }))!;
+    await settle();
+    live.startSharing();
+    bearer.value = renewedToken;
+    await nextTick();
+    expect(live.sharing.value).toBe(true);
+    expect(session.close).not.toHaveBeenCalled();
+    expect(session.client.updateToken).toHaveBeenCalledWith(renewedToken);
+    scope.stop();
+  });
+
+  it("clears a watch that reports permission denial before returning its disposer", async () => {
+    const session = fakeSocket();
+    const clear = vi.fn();
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client,
+        watchPosition: (_onFix, onError) => { onError(true); return clear; } }))!;
+    await settle();
+    live.startSharing();
+    expect(live.sharing.value).toBe(false);
+    expect(live.error.value).toContain("متوقف");
+    expect(clear).toHaveBeenCalledOnce();
+    scope.stop();
   });
 
   it("stops a consented GPS watch immediately on a terminal mission event", async () => {

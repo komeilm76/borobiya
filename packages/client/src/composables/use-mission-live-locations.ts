@@ -8,6 +8,12 @@ import { ownDeviceId, decodeAccessTokenClaims } from "./device-identity";
 
 function isAdmin(token: string | null): boolean { return decodeAccessTokenClaims(token)?.role === "admin"; }
 
+/** Ignore access-token rotations, but never inherit GPS consent across login sessions. */
+function sessionIdentity(token: string | null): string | null {
+  const claims = decodeAccessTokenClaims(token);
+  return claims ? JSON.stringify([claims.sub, claims.role, claims.deviceId, claims.sessionId]) : null;
+}
+
 export interface LiveMissionIdentity {
   id: string;
   requesterId: string;
@@ -42,10 +48,12 @@ export function useMissionLiveLocations(
   const now = ref((runtime.now ?? Date.now)());
   const currentTime = runtime.now ?? Date.now;
   let client: RealtimeClient | null = null;
+  let socketIdentity: string | null = null;
   let stopWatch: (() => void) | null = null;
   let clockTicker: ReturnType<typeof setInterval> | null = null;
   let lastPublished = Number.NEGATIVE_INFINITY;
   let generation = 0;
+  let shareGeneration = 0;
 
   const participantStatus = computed(() => (["requester", "rescuer", "admin"] as const).map((role) => {
     const entry = locations.value[role];
@@ -54,8 +62,14 @@ export function useMissionLiveLocations(
   }));
 
   function stopSharing(): void {
-    stopWatch?.(); stopWatch = null;
+    // Invalidate callbacks first: watchPosition/clearWatch and Socket.IO acks can arrive late,
+    // including after a new opt-in has already started for this very same mission.
+    shareGeneration++;
     sharing.value = false;
+    lastPublished = Number.NEGATIVE_INFINITY;
+    const cleanup = stopWatch;
+    stopWatch = null;
+    cleanup?.();
   }
   function stop(): void {
     generation++;
@@ -64,6 +78,7 @@ export function useMissionLiveLocations(
     clockTicker = null;
     client?.close();
     client = null;
+    socketIdentity = null;
     connected.value = false;
     locations.value = {};
     error.value = null;
@@ -99,10 +114,13 @@ export function useMissionLiveLocations(
   function subscribe(): void {
     const current = mission.value;
     const socket = client?.socket;
-    if (!current || !socket?.connected) return;
+    if (!current || !socket?.connected || socketIdentity !== sessionIdentity(token.value)) return;
+    const gen = generation;
+    const owner = userId.value;
     socket.timeout(5000).emit(MISSION_SUBSCRIBE_EVENT, { missionId: current.id },
       (timeout: Error | null, response: { ok?: boolean } | undefined) => {
-        if (client?.socket !== socket || mission.value?.id !== current.id) return;
+        if (gen !== generation || client?.socket !== socket ||
+          mission.value?.id !== current.id || userId.value !== owner) return;
         if (timeout || !response?.ok) {
           connected.value = false;
           stopSharing();
@@ -125,38 +143,59 @@ export function useMissionLiveLocations(
         const { createRealtimeClient } = await import("@/services/socket");
         return createRealtimeClient(bearer);
       });
-      const opened = await opener(token.value);
-      if (gen !== generation || mission.value?.id !== current.id || userId.value !== owner) {
+      const openingToken = token.value;
+      const openingIdentity = sessionIdentity(openingToken);
+      const opened = await opener(openingToken);
+      if (gen !== generation || mission.value?.id !== current.id || userId.value !== owner ||
+        !openingIdentity || openingIdentity !== sessionIdentity(token.value)) {
         opened.close(); return;
       }
       client = opened;
-      opened.socket.on("connect", subscribe);
-      opened.socket.on("disconnect", () => { connected.value = false; stopSharing(); });
-      opened.socket.on(MISSION_LOCATION_EVENT, handleEvent);
-      opened.socket.on(MISSION_STATUS_UPDATED_EVENT, onMissionStatus);
-      opened.socket.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (payload: unknown) => onCancellation(payload, "requester"));
-      opened.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, (payload: unknown) => onCancellation(payload, "rescuer"));
+      socketIdentity = openingIdentity;
+      const active = () => gen === generation && client === opened &&
+        socketIdentity === sessionIdentity(token.value) &&
+        mission.value?.id === current.id && userId.value === owner;
+      opened.socket.on("connect", () => { if (active()) subscribe(); });
+      opened.socket.on("disconnect", () => {
+        if (!active()) return;
+        connected.value = false;
+        stopSharing();
+      });
+      opened.socket.on(MISSION_LOCATION_EVENT, (payload: unknown) => { if (active()) handleEvent(payload); });
+      opened.socket.on(MISSION_STATUS_UPDATED_EVENT, (payload: unknown) => { if (active()) onMissionStatus(payload); });
+      opened.socket.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (payload: unknown) => {
+        if (active()) onCancellation(payload, "requester");
+      });
+      opened.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, (payload: unknown) => {
+        if (active()) onCancellation(payload, "rescuer");
+      });
       opened.updateToken(token.value);
       opened.connect();
       if (opened.socket.connected) subscribe();
     } catch {
-      if (gen === generation) error.value = "اتصال زندهٔ مأموریت برقرار نشد؛ دوباره تلاش کنید.";
+      if (gen === generation) {
+        stop();
+        error.value = "اتصال زندهٔ مأموریت برقرار نشد؛ دوباره تلاش کنید.";
+      }
     }
   }
-  function publish(fix: { lat: number; lon: number; accuracy?: number }): void {
+  function publish(fix: { lat: number; lon: number; accuracy?: number }, share: number,
+    owner: string, device: string, identity: string | null): void {
     const current = mission.value;
     const socket = client?.socket;
-    const device = ownDeviceId(token.value);
-    if (!sharing.value || !connected.value || !current || !socket?.connected || !device) return;
-    if (current.requesterId !== userId.value && current.rescuerId !== userId.value &&
-      !isAdmin(token.value)) return;
+    if (share !== shareGeneration || !sharing.value || !connected.value || !current ||
+      !socket?.connected || owner !== userId.value || device !== ownDeviceId(token.value) ||
+      identity !== sessionIdentity(token.value) || identity !== socketIdentity) return;
+    if (current.requesterId !== owner && current.rescuerId !== owner && !isAdmin(token.value)) return;
     const timestamp = currentTime();
     if (timestamp - lastPublished < 5000) return;
     lastPublished = timestamp;
     socket.timeout(5000).emit(MISSION_LOCATION_PUBLISH_EVENT, { missionId: current.id,
       location: { ...fix, timestamp: new Date(timestamp).toISOString(), priorityDeviceId: device } },
     (timeout: Error | null, response: { ok?: boolean; code?: string } | undefined) => {
-      if (!sharing.value || mission.value?.id !== current.id) return;
+      if (share !== shareGeneration || !sharing.value || client?.socket !== socket ||
+        mission.value?.id !== current.id || userId.value !== owner || device !== ownDeviceId(token.value) ||
+        identity !== sessionIdentity(token.value)) return;
       if (timeout || !response?.ok) {
         error.value = response?.code === "MISSION_UNAVAILABLE" ? "مأموریت دیگر فعال نیست؛ اشتراک متوقف شد." :
           "ارسال موقعیت ممکن نشد؛ وضعیت اتصال و دستگاه اولویت‌دار را بررسی کنید.";
@@ -168,23 +207,46 @@ export function useMissionLiveLocations(
     if (sharing.value || !connected.value || !mission.value || !userId.value ||
       (mission.value.requesterId !== userId.value && mission.value.rescuerId !== userId.value &&
         !isAdmin(token.value))) return;
+    const owner = userId.value;
+    const device = ownDeviceId(token.value);
+    const identity = sessionIdentity(token.value);
+    if (!device || !identity || identity !== socketIdentity) {
+      error.value = "نشست این دستگاه معتبر نیست یا در حال تغییر است؛ دوباره وارد شوید.";
+      return;
+    }
+    const share = ++shareGeneration;
     sharing.value = true;
+    lastPublished = Number.NEGATIVE_INFINITY;
     error.value = null;
     try {
-      stopWatch = (runtime.watchPosition ?? browserWatch)((fix) => {
-        if (!sharing.value) return;
-        publish(fix);
+      const cleanup = (runtime.watchPosition ?? browserWatch)((fix) => {
+        if (share !== shareGeneration || !sharing.value || userId.value !== owner ||
+          identity !== sessionIdentity(token.value)) return;
+        publish(fix, share, owner, device, identity);
       }, (denied) => {
+        if (share !== shareGeneration || !sharing.value || userId.value !== owner) return;
         error.value = denied ? "اجازهٔ موقعیت قطع شد؛ اشتراک متوقف شد." : "موقعیت تازه دریافت نشد.";
         if (denied) stopSharing();
       });
+      // A synchronous watch error may have stopped sharing before its disposer was returned.
+      if (share === shareGeneration && sharing.value) stopWatch = cleanup;
+      else cleanup();
     } catch {
       stopSharing();
       error.value = "مکان‌یابی در این دستگاه در دسترس نیست.";
     }
   }
   watch(() => [mission.value?.id, userId.value] as const, () => { void start(); }, { immediate: true });
-  watch(token, (next) => { if (next && client) client.updateToken(next); if (!next) stop(); });
+  watch(token, (next, previous) => {
+    if (!next) { stop(); return; }
+    if (!sessionIdentity(next) || sessionIdentity(next) !== sessionIdentity(previous)) {
+      // A different login may use the same account and device. It needs a fresh
+      // authenticated room and a new, explicit consent gesture.
+      void start();
+      return;
+    }
+    client?.updateToken(next);
+  });
   onScopeDispose(stop);
   return { locations, participantStatus, connected, sharing, error, now, start, stop,
     startSharing, stopSharing, handleEvent };

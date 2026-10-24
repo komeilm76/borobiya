@@ -65,6 +65,37 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(clear).toHaveBeenCalledTimes(3);
   });
 
+  it("ignores queued callbacks from a stopped watch after a fresh navigation start", () => {
+    const fixes: Array<(fix: { lat: number; lon: number }) => void> = [];
+    const failures: Array<(denied: boolean) => void> = [];
+    const clear = vi.fn();
+    const camera = vi.fn();
+    const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), camera, {
+      subscribe: (onFix, onError) => { fixes.push(onFix); failures.push(onError); return clear; }, now: () => 1000
+    });
+    expect(nav.start()).toBe(true);
+    nav.stop();
+    expect(nav.start()).toBe(true);
+    fixes[0]?.({ lat: 38.5, lon: -120.2 });
+    failures[0]?.(true);
+    expect(nav.active.value).toBe(true);
+    expect(nav.error.value).toBeNull();
+    fixes[1]?.({ lat: 38.51, lon: -120.19 });
+    expect(camera).toHaveBeenCalledOnce();
+    nav.stop();
+    expect(clear).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears the GPS watch when subscription reports denial synchronously", () => {
+    const clear = vi.fn();
+    const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
+      subscribe: (_onFix, onError) => { onError(true); return clear; }, now: () => 1000
+    });
+    expect(nav.start()).toBe(false);
+    expect(nav.active.value).toBe(false);
+    expect(clear).toHaveBeenCalledOnce();
+  });
+
   it("reports missing GPS support without claiming navigation started", () => {
     const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
       subscribe: () => { throw new Error("unavailable"); }, now: () => 0

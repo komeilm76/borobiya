@@ -128,6 +128,11 @@ See [TASKS.md § Checklist](./TASKS.md#checklist-against-spec-23-39-mandatory) f
 
 ## Changelog
 
+### 2026-10-24 — GPS lifecycle race fixes (T3.5.6 / T3.5.7 audit)
+
+- A stopped mission GPS watch could deliver a queued fix or delayed Socket.IO acknowledgement into a newly started share, unexpectedly stopping it or publishing an old coordinate under the new consent. Sharing epochs now isolate callbacks, restart immediately resets throttling, and queued disconnect/terminal events from a replaced socket cannot tear down a newer connection. A new login on the same account/device replaces the private socket and **does not inherit** GPS consent; ordinary access-token refresh within the same session still works. Synchronous geolocation denial now clears a returned watch disposer.
+- Route-follow navigation likewise no longer lets a queued callback from an earlier watch stop the active camera, and a synchronous denial disposes the GPS watcher rather than reporting a successful start. Regression tests cover quick stop/restart, stale acknowledgements and events, same-device login replacement and synchronous errors. T3.5.5's elevation/alternative-count gap is unchanged.
+
 ### 2026-10-24 — Consented three-role live mission positions (T3.5.7)
 
 - Requester, rescuer and admin now join only active private mission rooms, can explicitly share their own fresh GPS (separately from route-follow and general location shares), and see all three role markers with Online/Offline + last-seen badges. Requester history selects the matching active mission; admin dispatch gets active missions through a separately authorized, no-store SOS-scoped read; rescuer desk uses its active mission. Maps work after reload and show no fabricated coordinate before consent.

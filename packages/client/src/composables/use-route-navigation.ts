@@ -37,9 +37,10 @@ export function useRouteNavigation(
 
   function stop(): void {
     generation++;
-    unsubscribe?.();
+    const cleanup = unsubscribe;
     unsubscribe = null;
     active.value = false;
+    cleanup?.();
     fix.value = null;
     lastCameraAt = Number.NEGATIVE_INFINITY;
   }
@@ -57,8 +58,11 @@ export function useRouteNavigation(
     const transport = profile.value;
     active.value = true;
     try {
-      unsubscribe = runtime.subscribe((candidate) => {
-        if (current !== generation || owner.value !== account || missionId.value !== mission ||
+      const cleanup = runtime.subscribe((candidate) => {
+        // A browser callback can remain queued after clearWatch. It must never stop a
+        // *newer* navigation watch started for the same route or a different mission.
+        if (current !== generation) return;
+        if (owner.value !== account || missionId.value !== mission ||
             selectedRoute.value !== route || profile.value !== transport) { stop(); return; }
         const result = coordinatesSchema.safeParse(candidate);
         if (!result.success) return;
@@ -78,6 +82,10 @@ export function useRouteNavigation(
           "موقعیت تازه دریافت نشد؛ اتصال GPS را بررسی کنید.";
         if (denied) stop();
       });
+      // A test/native bridge can report a fix or denial before returning the disposer.
+      // Do not retain an already-stopped GPS watch in that case.
+      if (current !== generation || !active.value) { cleanup(); return false; }
+      unsubscribe = cleanup;
       return true;
     } catch {
       stop();

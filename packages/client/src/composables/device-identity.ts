@@ -1,6 +1,7 @@
 export interface AccessTokenClaims {
   sub?: unknown;
   deviceId?: unknown;
+  sessionId?: unknown;
   role?: unknown;
   exp?: unknown;
 }
