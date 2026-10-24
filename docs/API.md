@@ -484,7 +484,7 @@ The deprecated `POST /_user/location/update` fallback runs the identical service
 
 **`location:share-ended` (T2.1.5 follow-up, live)** — server-to-client notification `{ shareId, userId, reason: "revoked" | "expired" }` emitted only to `user:{targetUserId}` whenever `DELETE /_user/location/share/:shareId` retires an active share or the minute sweep in `location/jobs.ts` marks an overdue timed share inactive. Receivers drop the companion's marker and decrement open share state immediately without polling `GET /_user/location/shares`.
 
-**Rooms:** `user:{userId}`, `admin`, `mission:{missionId}`.
+**Rooms:** `user:{userId}`, `admin`, `mission:{missionId}`. The implemented application events and acknowledgements have a shared type-only map (`packages/shared/src/types/realtime.ts`) used by both Socket.IO endpoints (T4.3.1). It does not replace schema parsing or session/membership checks for untrusted wire data. Planned event names below are not part of that live map.
 
 Full event catalog:
 
@@ -493,25 +493,23 @@ Full event catalog:
 | C→S | `location:update` | `{lat,lon,accuracy,timestamp,priorityDeviceId}` | authenticated owner; ordinary live-share fan-out only |
 | S→C | `location:peer-update` | `{userId, lat, lon, accuracy, timestamp}` | active share recipients + sender |
 | S→C | `location:share-ended` | `{shareId, userId, reason: "revoked"\|"expired"}` | `user:{targetUserId}` when a live share ends |
-| C→S | `sos:create` | same as REST body | requester (alt to REST) |
+| C→S | `sos:create` *(planned; use REST)* | same as REST body | requester |
 | S→C | `sos:new-request` | `{sosRequest}` | `admin` room |
-| S→C | `admin:nearest-responders` | `{sosRequestId, responders[]}` | admin who requested |
-| S→C | `sos:proposal-received` | `{proposal}` | `user:{rescuerId}` |
+| S→C | `admin:nearest-responders` *(planned; use REST)* | `{sosRequestId, responders[]}` | admin who requested |
+| S→C | `sos:proposal-received` | `{proposal, sosRequest}` | `user:{rescuerId}` |
 | S→C | `sos:proposal-accepted` | `{proposal, missionId}` | `admin` + `user:{requesterId}` |
 | C→S | `mission:subscribe` | `{missionId}` → ack `{ok:true}` or `{ok:false,code}` | authenticated active-mission participant/admin; live + DB recheck |
 | C→S | `mission:location-publish` | `{missionId,location:{lat,lon,accuracy?,timestamp,priorityDeviceId}}` → accepted/rejected ack | explicitly consented requester/rescuer/admin on active mission; live session, priority device, 60/min and fresh-fix checks |
 | S→C | `mission:location` | `{missionId,userId,role,lat,lon,accuracy,timestamp}` | sender + `mission:{id}` only after active-mission recheck; role is requester/rescuer/admin; timestamp is server receipt time |
 | C→S | `mission:update-status` *(planned; use PATCH REST now)* | `{missionId, status}` | rescuer |
 | S→C | `mission:status-updated` | `{missionId, status, by, at}` | union of `mission:{id}`, requester, rescuer and admin rooms |
-| S→C | `mission:cancelled-by-requester` | `{missionId,sosRequestId,requesterId,rescuerId,reason,at}` | union of mission, requester, rescuer and admin rooms |
 | S→C | `mission:cancelled-by-rescuer` | `{missionId,sosRequestId,rescuerId,reason,at}`; admin also gets `{rescuerLocation,reviewRequired}` | participant rooms (redacted); admin room (full) |
-| C→S | `mission:cancel` | `{missionId, reason}` | both |
-| S→C | `mission:cancelled-by-requester` | `{missionId, reason}` | `mission:{id}` |
+| C→S | `mission:cancel` *(planned; use REST)* | `{missionId, reason}` | both |
 | S→C | `mission:cancelled-by-requester` | `{missionId,sosRequestId,requesterId,rescuerId,reason,at}` | union of mission, requester, rescuer and admin rooms |
-| S→C | `system:suspended` | `{reason, until}` | suspended user |
-| C→S | `ping` / S→C `pong` | heartbeat | all |
+| S→C | `system:suspended` *(planned; Privacy-v2, not Phase 2)* | `{reason, until}` | suspended user |
+| Transport | Socket.IO ping/pong (25s/10s) | internal transport heartbeat; app-level offline/grace UI remains T4.3.2–3 | all |
 
-Polling fallback: `GET /_user/sync?since=` if WebSocket blocked.
+Planned polling/sync fallback: `GET /_user/sync?since=` (T4.3.4; not yet registered).
 
 ---
 

@@ -1,4 +1,5 @@
 import { io, type Socket } from "socket.io-client";
+import type { ClientToServerEvents, ServerToClientEvents } from "@shared/index";
 import {
   LOCATION_UPDATE_EVENT,
   PEER_UPDATE_EVENT,
@@ -17,7 +18,8 @@ export {
 };
 
 export interface RealtimeClient {
-  readonly socket: Socket;
+  /** Typed live event names and payloads; consumers still validate untrusted wire messages at runtime. */
+  readonly socket: Socket<ServerToClientEvents, ClientToServerEvents>;
   /** Applies a rotated access token; Socket.IO re-reads `auth` on every (re)connect. */
   updateToken(accessToken: string): void;
   connect(): void;
@@ -32,7 +34,7 @@ export interface RealtimeClient {
  * a broadcast channel open.
  */
 export function createRealtimeClient(accessToken: string | null): RealtimeClient {
-  const socket = io(realtimeConnectionOptions(accessToken ?? ""));
+  const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io(realtimeConnectionOptions(accessToken ?? ""));
 
   return {
     socket,

@@ -1,6 +1,8 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import { idSchema, missionLocationPublishSchema, type MissionLocationEvent, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
+import { idSchema, missionLocationPublishSchema, type LocationUpdateAck, type MissionJoinAck, type MissionLocationAck, type MissionLocationEvent, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type ShareEndedEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
+import type { ClientToServerEvents, ServerToClientEvents } from "@borobiya/shared";
+export type { LocationUpdateAck, MissionJoinAck, MissionLocationAck } from "@borobiya/shared";
 import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
@@ -16,27 +18,23 @@ export const LOCATION_UPDATE_WINDOW_MS = 60_000;
 
 /** Ack/handshake code for a dependency failure, so a client retries instead of losing the socket. */
 export const SERVICE_UNAVAILABLE_CODE = "SERVICE_UNAVAILABLE";
-export const LOCATION_UPDATE_EVENT = "location:update";
-export const PEER_UPDATE_EVENT = "location:peer-update";
-export const SHARE_ENDED_EVENT = "location:share-ended";
-export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
-export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
-export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted";
-export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated";
-export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe";
-export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish";
-export const MISSION_LOCATION_EVENT = "mission:location";
-export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer";
-export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester";
+export const LOCATION_UPDATE_EVENT = "location:update" satisfies keyof ClientToServerEvents;
+export const PEER_UPDATE_EVENT = "location:peer-update" satisfies keyof ServerToClientEvents;
+export const SHARE_ENDED_EVENT = "location:share-ended" satisfies keyof ServerToClientEvents;
+export const SOS_NEW_REQUEST_EVENT = "sos:new-request" satisfies keyof ServerToClientEvents;
+export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received" satisfies keyof ServerToClientEvents;
+export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted" satisfies keyof ServerToClientEvents;
+export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated" satisfies keyof ServerToClientEvents;
+export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe" satisfies keyof ClientToServerEvents;
+export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish" satisfies keyof ClientToServerEvents;
+export const MISSION_LOCATION_EVENT = "mission:location" satisfies keyof ServerToClientEvents;
+export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer" satisfies keyof ServerToClientEvents;
+export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester" satisfies keyof ServerToClientEvents;
 export const ADMIN_ROOM = "admin";
 
-export type ShareEndedReason = "revoked" | "expired";
+export type ShareEndedReason = ShareEndedPayload["reason"];
 
-export interface ShareEndedPayload {
-  shareId: string;
-  userId: string;
-  reason: ShareEndedReason;
-}
+export type ShareEndedPayload = ShareEndedEvent;
 
 /** Structurally satisfied by Socket.IO's `Server` and test doubles. */
 export interface RoomEmitter {
@@ -72,7 +70,7 @@ export interface RealtimeDependencies {
 }
 
 export interface RealtimeServer {
-  io: Server;
+  io: Server<ClientToServerEvents, ServerToClientEvents>;
   close(): Promise<void>;
 }
 
@@ -294,15 +292,6 @@ interface UpdateSender {
   borobiyaUpdateWindowStart?: number;
 }
 
-export interface LocationUpdateAck {
-  ok: boolean;
-  status: "accepted" | "rejected";
-  code?: string;
-  message?: string;
-  peers?: string[];
-  retryAfterMs?: number;
-}
-
 /**
  * Handles one `location:update` from an authenticated socket: per-connection throttle,
  * priority-device verification, persistence, and fan-out to every accepting peer.
@@ -429,8 +418,6 @@ async function locationUpdateAck(
   return { ok: true, status: "accepted", peers: result.peers };
 }
 
-export type MissionLocationAck = LocationUpdateAck | { ok: false; status: "rejected"; code: "MISSION_UNAVAILABLE"; message: string };
-
 /** An explicit mission-location publish reuses all existing live GPS/session/device/rate checks. */
 export async function publishMissionLocation(sender: UpdateSender, payload: unknown,
   dependencies: RealtimeDependencies): Promise<MissionLocationAck> {
@@ -469,8 +456,6 @@ export async function publishMissionLocation(sender: UpdateSender, payload: unkn
   }
 }
 
-export type MissionJoinAck = { ok: true } | { ok: false; code: "INVALID_MISSION" | "MISSION_UNAVAILABLE" | "UNAUTHORIZED" | "SERVICE_UNAVAILABLE" };
-
 /** The socket may be long-lived: recheck account and session before joining any private room. */
 export async function joinMissionRoom(
   socket: Pick<Socket, "data" | "connected" | "join">,
@@ -506,7 +491,7 @@ export async function joinMissionRoom(
 
 /** Wires the socket namespace onto an existing HTTP server (Fastify's `app.server`). */
 export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDependencies): RealtimeServer {
-  const io = new Server(httpServer, {
+  const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     path: dependencies.path ?? "/socket.io",
     serveClient: false,
     pingInterval: PING_INTERVAL_MS,
@@ -520,7 +505,7 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
 
   io.use(createAuthMiddleware(dependencies));
 
-  io.on("connection", (socket: Socket & { data: Partial<RealtimeSocketData> }) => {
+  io.on("connection", (socket: Socket<ClientToServerEvents, ServerToClientEvents> & { data: Partial<RealtimeSocketData> }) => {
     const identity = socket.data;
     if (!identity.userId) {
       socket.disconnect(true);
@@ -528,7 +513,7 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
     }
     void socket.join(userRoom(identity.userId));
     if (identity.sessionId) void socket.join(sessionRoom(identity.sessionId));
-    if (identity.role === "admin") void socket.join("admin");
+    if (identity.role === "admin") void socket.join(ADMIN_ROOM);
 
     if (identity.sessionId && identity.deviceId && dependencies.users.touchSessionPresence) {
       void dependencies.users

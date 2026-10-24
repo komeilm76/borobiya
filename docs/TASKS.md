@@ -303,7 +303,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 4.3 Realtime & Disconnection
 
-- [ ] **T4.3.1** Socket rooms: `user:{id}`, `admin`, `mission:{id}` + typed event map
+- [x] **T4.3.1** Socket rooms: `user:{id}`, `admin`, `mission:{id}` + typed event map — completed 2026-10-24
+  - Room creation, live-session verification and mission participant/admin subscription checks were already running. Added a shared type-only catalog for every **implemented** Socket.IO C→S/S→C event and its ack, wired the typed map to the browser socket and server Socket.IO instance, and checked event-name constants at compile time. Incoming wire payloads remain `unknown` at runtime and are still schema/authorization validated; types alone do not authenticate a socket. An actual Socket.IO test now verifies user/session auto-join, admin-only room access and a mission room that remains empty until the database membership check grants a subscription. Planned SSE/sync, suspension and heartbeat work remain separate T4.3.2–T4.3.5 tasks.
 - [ ] **T4.3.2** Heartbeat ping 25s / pong 10s timeout → `isOnline=false`, `lastSeenAt`, badge “Offline · 2 min ago”
 - [ ] **T4.3.3** 5min grace before mission consideration (no auto-cancel v1)
 - [ ] **T4.3.4** Reconnect: refreshToken, rejoin rooms, `GET /_user/sync?since=lastDisconnectAt`

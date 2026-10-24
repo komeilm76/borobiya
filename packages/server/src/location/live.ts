@@ -1,5 +1,5 @@
 import { apiRoutes } from "@borobiya/shared/api";
-import { locationUpdateSchema } from "@borobiya/shared";
+import { locationUpdateSchema, type PeerLocationEvent } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { LocationShareStore } from "../db/location-share-store";
 import type { LocationHistoryStore } from "../db/location-history-store";
@@ -16,13 +16,7 @@ export const MAX_FUTURE_TIMESTAMP_SKEW_MS = 5 * 60_000;
  */
 export const MAX_LIVE_UPDATE_AGE_MS = 24 * 60 * 60_000;
 
-export interface PeerLocationUpdate {
-  userId: string;
-  lat: number;
-  lon: number;
-  accuracy: number | null;
-  timestamp: string;
-}
+export type PeerLocationUpdate = PeerLocationEvent;
 
 export type LiveUpdateResult =
   | {
