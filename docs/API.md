@@ -608,6 +608,10 @@ curl -X PATCH http://localhost:3000/_user/missions/MISSION_ID/status -H "Authori
 
 ---
 
+Place search (T4.1.2): the **Map Server** gateway `GET /geocode?q=&limit=5&bbox=` validates and bounds the query, forwards it to local Photon, and returns GeoJSON (`FeatureCollection`). The client `searchPlaces` adapter calls this same-origin path and converts valid point features to the shared `{ placeId, name, address, lat, lon, type, importance? }[]` contract; invalid hits are skipped, errors are not treated as empty success, and cancellation is supported. This is not the contract-only `/_user` Swagger geocode descriptor. The map search bar/result selection and reverse-on-click UI are still T4.1.4/T4.1.3.
+
+---
+
 ## 12. Frontend Router Mirrors
 
 | Client page | API call |
