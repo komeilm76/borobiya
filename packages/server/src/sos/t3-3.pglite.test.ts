@@ -11,7 +11,7 @@ import {
   nearestRespondersResponseSchema,
   sosNewRequestEventSchema,
   sosProposalReceivedEventSchema,
-  missionStatusUpdatedEventSchema, rescuerCancellationEventSchema, requesterCancellationEventSchema,
+  missionStatusUpdatedEventSchema, missionLocationEventSchema, rescuerCancellationEventSchema, requesterCancellationEventSchema,
   type SosNewRequestEvent,
   type SosProposalReceivedEvent
 } from "@borobiya/shared";
@@ -35,7 +35,7 @@ import { DrizzleSosPhotoStore } from "../db/sos-photo-store";
 import { DrizzleSosRequestStore } from "../db/sos-request-store";
 import { DrizzleUserDeviceStore } from "../db/device-store";
 import { DrizzleUserSearchStore } from "../db/user-search-store";
-import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT } from "../realtime/socket";
+import { SOS_NEW_REQUEST_EVENT, SOS_PROPOSAL_RECEIVED_EVENT, MISSION_SUBSCRIBE_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_LOCATION_EVENT, MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT } from "../realtime/socket";
 import { signAccessToken } from "../security/tokens";
 import { createPhotoStorage } from "./photo-storage";
 
@@ -666,6 +666,53 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       expect(await subscribe(requester, missionId)).toEqual({ ok: true });
       expect(await subscribe(rescuer, missionId)).toEqual({ ok: true });
       expect(await subscribe(admin, missionId)).toEqual({ ok: true });
+      const positions = { admin: [] as unknown[], requester: [] as unknown[], rescuer: [] as unknown[], outsider: [] as unknown[] };
+      admin.on(MISSION_LOCATION_EVENT, (event) => positions.admin.push(event));
+      requester.on(MISSION_LOCATION_EVENT, (event) => positions.requester.push(event));
+      rescuer.on(MISSION_LOCATION_EVENT, (event) => positions.rescuer.push(event));
+      outsider.on(MISSION_LOCATION_EVENT, (event) => positions.outsider.push(event));
+      const publish = (socket: ClientSocket, id: string, device: string) => new Promise<{ ok: boolean; code?: string }>((resolve, reject) => {
+        socket.timeout(3000).emit(MISSION_LOCATION_PUBLISH_EVENT, { missionId: id,
+          location: { lat: 35.73, lon: 51.43, accuracy: 14, timestamp: new Date().toISOString(), priorityDeviceId: device }
+        }, (error: Error | null, result: { ok: boolean; code?: string }) => {
+          if (error) reject(error); else resolve(result);
+        });
+      });
+      expect(await publish(outsider, missionId, "dev-000009")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+      expect(await publish(admin, missionId, "dev-000001")).toMatchObject({ ok: true });
+      expect(await publish(requester, missionId, "dev-000001")).toMatchObject({ ok: true });
+      expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: true });
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      for (const recipient of [positions.admin, positions.requester, positions.rescuer]) {
+        expect(recipient.map((event) => missionLocationEventSchema.parse(event))
+          .sort((a, b) => a.role.localeCompare(b.role))).toMatchObject([
+          { missionId, userId: ADMIN_ID, role: "admin" },
+          { missionId, userId: REQUESTER_ID, role: "requester" },
+          { missionId, userId: rescuerId, role: "rescuer" }
+        ]);
+      }
+      expect(positions.outsider).toEqual([]);
+      // The ordinary live-share event is not an implicit mission-sharing opt-in.
+      await new Promise<void>((resolve, reject) => {
+        rescuer.timeout(3000).emit("location:update", { lat: 35.74, lon: 51.44,
+          timestamp: new Date().toISOString(), priorityDeviceId: "dev-000008" },
+        (error: Error | null, ack: { ok: boolean }) => {
+          if (error) reject(error);
+          else if (!ack.ok) reject(new Error("Generic location update rejected"));
+          else resolve();
+        });
+      });
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(positions.admin).toHaveLength(3);
+      expect(positions.requester).toHaveLength(3);
+      expect(positions.rescuer).toHaveLength(3);
+
+      const listMissions = async () => app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions`,
+        headers: { authorization: `Bearer ${adminToken}` } });
+      expect((await listMissions()).json().map((mission: { id: string }) => mission.id)).toEqual([missionId]);
+      const deniedList = await app.inject({ method: "GET", url: `/_admin/sos/requests/${sosId}/missions`,
+        headers: { authorization: `Bearer ${requesterToken}` } });
+      expect(deniedList.statusCode).not.toBe(200);
       const received = { admin: [] as unknown[], requester: [] as unknown[], rescuer: [] as unknown[], outsider: [] as unknown[] };
       admin.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.admin.push(event));
       requester.on(MISSION_STATUS_UPDATED_EVENT, (event) => received.requester.push(event));
@@ -681,6 +728,11 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
         expect(recipient.map((event) => missionStatusUpdatedEventSchema.parse(event))).toEqual([payload]);
       }
       expect(received.outsider).toEqual([]);
+      await pg.query(`UPDATE "missions" SET "status" = 'completed' WHERE "id" = $1`, [missionId]);
+      expect(await publish(rescuer, missionId, "dev-000008")).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+      expect((await listMissions()).json()).toEqual([]);
+      expect(positions.admin).toHaveLength(3);
+
     } finally {
       admin.close(); requester.close(); rescuer.close(); outsider.close();
     }

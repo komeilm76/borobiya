@@ -75,6 +75,11 @@
             <v-alert v-else-if="history.selected.value.status === 'cancelled_by_rescuer'" type="warning" variant="tonal" rounded="lg" class="mt-5">
               امدادگر قادر به ادامه نبوده است؛ مرکز امداد باید جایگزین معرفی کند.
             </v-alert>
+            <v-alert v-if="missionError" type="warning" variant="tonal" class="mt-5" role="alert">
+              {{ missionError }} <v-btn size="small" variant="text" @click="loadSelectedMission()">تلاش دوباره</v-btn>
+            </v-alert>
+            <MissionLivePanel v-if="selectedMission" :mission="selectedMission"
+              :center="[history.selected.value.location.lon, history.selected.value.location.lat]" />
             <div class="history__actions">
               <p v-if="history.canCancelSelected.value">اگر هنوز به کمک نیاز دارید، درخواست را باز بگذارید.</p>
               <v-btn v-if="history.canCancelSelected.value" variant="outlined" color="error" rounded="lg"
@@ -96,7 +101,9 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import type { SosRequest, SosRequestStatus } from "@shared/index";
+import type { Mission, SosRequest, SosRequestStatus } from "@shared/index";
+import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import { listRequesterMissions } from "@/api/mission";
 import SosCancellationDialog from "@/components/sos/SosCancellationDialog.vue";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { useSosHistory } from "@/composables/use-sos-history";
@@ -106,6 +113,33 @@ const auth = useAuthStore();
 const route = useRoute();
 const history = useSosHistory(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   () => auth.ensureSession());
+const selectedMission = ref<Mission | null>(null);
+const missionError = ref<string | null>(null);
+let missionGeneration = 0;
+async function loadSelectedMission() {
+  const id = history.selected.value?.id;
+  const token = auth.accessToken;
+  const owner = auth.user?.id;
+  const generation = ++missionGeneration;
+  selectedMission.value = null;
+  missionError.value = null;
+  if (!id || !token || !owner || history.selected.value?.status !== "accepted") return;
+  try {
+    for (let page = 1; ; page++) {
+      const result = await listRequesterMissions(token, page);
+      if (generation !== missionGeneration || auth.user?.id !== owner || history.selected.value?.id !== id) return;
+      const found = result.items.find((item) => item.sosRequestId === id &&
+        ["pending", "on_the_way", "arrived", "in_progress"].includes(item.status));
+      if (found) { selectedMission.value = found; return; }
+      // The backend sorts all active missions first. Once a page has no active row,
+      // further (older terminal) pages cannot contain the selected active mission.
+      if (page >= result.totalPages || !result.items.some((item) =>
+        ["pending", "on_the_way", "arrived", "in_progress"].includes(item.status))) return;
+    }
+  } catch {
+    if (generation === missionGeneration) missionError.value = "مأموریت زنده بارگذاری نشد.";
+  }
+}
 const photoSrc = ref<string | null>(null);
 const photoLoading = ref(false);
 const photoError = ref<string | null>(null);
@@ -139,10 +173,11 @@ async function loadPhoto() {
   }
 }
 onMounted(() => { void history.load(1, typeof route.query.request === "string" ? route.query.request : undefined); });
-watch(() => auth.user?.id, () => { clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); });
-watch(() => history.selected.value?.id, clearPhoto);
+watch(() => auth.user?.id, () => { ++missionGeneration; selectedMission.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); });
+watch(() => history.selected.value?.id, () => { clearPhoto(); void loadSelectedMission(); });
+watch(() => [history.selected.value?.status, auth.accessToken] as const, () => { void loadSelectedMission(); });
 watch(() => history.cancellation.cancelled.value, (value) => { if (value) history.markCancelled(); });
-onBeforeUnmount(() => { clearPhoto(); history.reset(); });
+onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 </script>
 
 <style scoped>

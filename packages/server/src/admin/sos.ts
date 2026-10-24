@@ -8,6 +8,7 @@ import {
   emitSosProposalReceived,
   type RoomEmitter
 } from "../realtime/socket";
+import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { AdminAuthorizerDependencies } from "./authorize";
 import { authorizeAdmin, errorResponse } from "./authorize";
 import { validationIssues } from "./normalize";
@@ -15,6 +16,7 @@ import { validationIssues } from "./normalize";
 export interface AdminSosRouteDependencies {
   store: SosRequestStore;
   dispatchStore?: SosDispatchStore;
+  missionStore?: MissionProgressStore;
   adminStore: AdminAuthorizerDependencies["store"];
   jwtSecret: string;
   io?: RoomEmitter;
@@ -107,6 +109,19 @@ export async function registerAdminSosRoutes(
       .code(200)
       .header("cache-control", "no-store")
       .send(sosRequestRecordPayload(record));
+  });
+
+  const missionsRoute = apiRoutes.admin.listSosMissions;
+  app.get(missionsRoute.url, async (request, reply) => {
+    if (!(await authorize(request, reply))) return;
+    const parsed = missionsRoute.schema.params.safeParse(request.params);
+    if (!parsed.success) return reply.code(404).header("cache-control", "no-store")
+      .send(errorResponse("SOS_REQUEST_NOT_FOUND", "SOS request not found."));
+    const record = await dependencies.store.getRequestById?.(parsed.data.id);
+    if (!record) return reply.code(404).header("cache-control", "no-store")
+      .send(errorResponse("SOS_REQUEST_NOT_FOUND", "SOS request not found."));
+    return reply.code(200).header("cache-control", "no-store")
+      .send(await dependencies.missionStore?.listActiveRequestMissions?.(parsed.data.id) ?? []);
   });
 
   app.get(nearestRoute.url, async (request, reply) => {

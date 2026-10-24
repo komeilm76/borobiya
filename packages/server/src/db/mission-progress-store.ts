@@ -22,9 +22,12 @@ export interface MissionProgressStore {
   listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number): Promise<{
     items: Mission[]; total: number; page: number; limit: number; totalPages: number
   }>;
+  listActiveRequestMissions?(sosRequestId: string): Promise<Mission[]>;
   advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult>;
-  /** Only a participant or a currently authenticated admin may subscribe to the private mission room. */
+  /** Only active-mission participants or a currently authenticated admin may subscribe to the private mission room. */
   canJoinMissionRoom?(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean>;
+  /** Active, participant-scoped sender role; admins observe but never publish GPS to a mission. */
+  missionLocationRole?(missionId: string, userId: string, role?: "admin" | "user"): Promise<"requester" | "rescuer" | "admin" | null>;
 }
 
 /** A retry of the same step is a no-op, but skipping, reversing or reviving terminal states is never legal. */
@@ -68,12 +71,25 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     return { items: rows.map(toMission), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
+  async listActiveRequestMissions(sosRequestId: string): Promise<Mission[]> {
+    const rows = await this.db.select().from(missions).where(and(eq(missions.sosRequestId, sosRequestId),
+      inArray(missions.status, ACTIVE_STATUSES))).orderBy(desc(missions.createdAt));
+    return rows.map(toMission);
+  }
+
   async canJoinMissionRoom(missionId: string, userId: string, role: "admin" | "user"): Promise<boolean> {
     const [row] = await this.db.select({ id: missions.id }).from(missions)
-      .where(and(eq(missions.id, missionId), role === "admin" ? undefined :
+      .where(and(eq(missions.id, missionId), inArray(missions.status, ACTIVE_STATUSES), role === "admin" ? undefined :
         or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId))))
       .limit(1);
     return Boolean(row);
+  }
+
+  async missionLocationRole(missionId: string, userId: string, role: "admin" | "user" = "user"): Promise<"requester" | "rescuer" | "admin" | null> {
+    const [row] = await this.db.select({ requesterId: missions.requesterId, rescuerId: missions.rescuerId })
+      .from(missions).where(and(eq(missions.id, missionId), inArray(missions.status, ACTIVE_STATUSES),
+        role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId)))).limit(1);
+    return !row ? null : role === "admin" ? "admin" : row.rescuerId === userId ? "rescuer" : "requester";
   }
 
   async advanceStatus(missionId: string, rescuerId: string, nextStatus: MissionProgressStatus): Promise<MissionProgressResult> {

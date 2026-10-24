@@ -36,6 +36,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "adminRemoveCategoryUser",
   "adminListSosRequests",
   "adminGetSosRequest",
+  "adminListSosMissions",
   "adminGetNearestResponders",
   "adminDispatchSosRequest",
   "userCompleteSecurityQuestions",
@@ -294,9 +295,10 @@ export function describeOpenApiRuntimeStatus(paths: OpenApiPaths = buildOpenApiP
 
   const totalCount = implementedCount + contractOnlyCount;
   const sosImplemented = implementedByTag.get("sos") ?? [];
+  const contractOnly = [...new Set([...contractOnlyByTag.values()].flat())].sort();
   const sosClause = sosImplemented.length > 0
-    ? `SOS creation, evidence upload, admin queue/detail reads, nearest-responder ranking, and multi-responder dispatch (${sosImplemented.join(", ")}) are live, while the remaining SOS history/cancellation, rescuer proposal, mission, and place-search operations carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`
-    : "SOS and mission operations carry `x-borobiya-runtime-status: contract-only` and currently return 404.";
+    ? `Live SOS and mission operations: ${sosImplemented.join(", ")}. Remaining operations (${contractOnly.join(", ")}) carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`
+    : `Remaining operations (${contractOnly.join(", ")}) carry \`x-borobiya-runtime-status: contract-only\` and currently return 404.`;
 
   return (
     `OpenAPI is generated from the shared Zod route contracts (${implementedCount} of ${totalCount} operations implemented at runtime, ` +

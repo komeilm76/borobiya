@@ -918,6 +918,17 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     });
     expect(ownMissions.items[0]?.id).toBe(accepted.missionId);
     expect(ownMissions.total).toBe(1);
+    const adminMissions = await callContract<Array<{ id: string; sosRequestId: string }>>(
+      apiRoutes.admin.listSosMissions, 200, {
+        url: apiRoutes.admin.listSosMissions.url.replace(":id", competing[0]!.sosId),
+        headers: adminHeaders
+      }
+    );
+    expect(adminMissions).toMatchObject([{ id: accepted.missionId, sosRequestId: competing[0]!.sosId }]);
+    expect((await app.inject({ method: "GET",
+      url: apiRoutes.admin.listSosMissions.url.replace(":id", competing[0]!.sosId),
+      headers: requesterHeaders })).statusCode).not.toBe(200);
+
     expect((await callContract<{ id: string }>(apiRoutes.sos.getMission, 200, {
       url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId), headers: requesterHeaders
     })).id).toBe(accepted.missionId);

@@ -184,6 +184,11 @@
           </div>
         </v-card>
 
+        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
+          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
+        </v-alert>
+        <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+          :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
         <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
@@ -494,7 +499,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
-import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
+import type { IncidentType, Severity, SosRequestRecord, Mission } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import {
@@ -504,6 +509,8 @@ import {
   SOS_STATUS_PRESENTATION
 } from "@/admin/sos-alerts";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import { listActiveSosMissions } from "@/api/mission";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { pinia } from "@/stores";
 import { useAdminSosStore } from "@/stores/admin-sos";
@@ -517,6 +524,27 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
 const auth = useAuthStore(pinia);
+const activeMissions = ref<Mission[]>([]);
+const missionError = ref<string | null>(null);
+let missionGeneration = 0;
+async function loadActiveMissions() {
+  const id = adminSos.selectedRequest?.id;
+  const token = auth.accessToken;
+  const generation = ++missionGeneration;
+  activeMissions.value = [];
+  missionError.value = null;
+  if (!id || !token || adminSos.selectedRequest?.status !== "accepted") return;
+  try {
+    const missions = await listActiveSosMissions(token, id);
+    if (generation === missionGeneration && adminSos.selectedRequest?.id === id && auth.accessToken === token)
+      activeMissions.value = missions;
+  } catch {
+    if (generation === missionGeneration) missionError.value = "مأموریت‌های زنده بارگذاری نشدند.";
+  }
+}
+watch(() => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.status, auth.accessToken] as const,
+  () => { void loadActiveMissions(); }, { immediate: true });
+
 const themeStore = useThemeStore(pinia);
 const photoSrc = ref<string | null>(null);
 const photoLoading = ref(false);
@@ -774,6 +802,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  ++missionGeneration;
   stopPulseLoop();
   detachMapEvents?.();
   detachMapEvents = null;

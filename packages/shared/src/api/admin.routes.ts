@@ -267,6 +267,20 @@ export const adminRoutes = {
       access: "admin"
     }
   }),
+  listSosMissions: defineRoute({
+    method: "GET",
+    url: "/_admin/sos/requests/:id/missions",
+    schema: {
+      params: uuidPathParamsSchema,
+      responses: { 200: z.array(missionSchema), 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "adminListSosMissions",
+      summary: "List active missions for private dispatch monitoring",
+      tags: ["admin", "sos"],
+      access: "admin"
+    }
+  }),
   getNearestResponders: defineRoute({
     method: "GET",
     url: "/_admin/sos/requests/:id/nearest",

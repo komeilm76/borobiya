@@ -90,6 +90,10 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "user")).toBe(false);
     expect(await store.canJoinMissionRoom(MISSION, "90000000-0000-4000-8000-000000000009", "admin")).toBe(true);
     expect(await store.canJoinMissionRoom("90000000-0000-4000-8000-000000000009", REQUESTER, "admin")).toBe(false);
+    expect(await store.missionLocationRole(MISSION, RESCUER)).toBe("rescuer");
+    expect(await store.missionLocationRole(MISSION, REQUESTER, "admin")).toBe("admin");
+    expect(await store.missionLocationRole(MISSION, REQUESTER)).toBe("requester");
+    expect(await store.missionLocationRole(MISSION, "90000000-0000-4000-8000-000000000009")).toBeNull();
     expect(await store.findNavigationTarget(MISSION, RESCUER)).toEqual({
       missionId: MISSION, incident: { lat: 35.7, lon: 51.4 }
     });
@@ -114,6 +118,10 @@ describe("mission tables (migrated PostgreSQL/PGlite)", () => {
     expect((await pg.query<{ is_on_mission: boolean }>(`SELECT "is_on_mission" FROM "users" WHERE "id" = $1`, [RESCUER])).rows[0]?.is_on_mission).toBe(false);
     expect((await pg.query<{ status: string }>(`SELECT "status" FROM "sos_requests" WHERE "id" = $1`, [SOS])).rows[0]?.status).toBe("completed");
     expect(await store.findNavigationTarget(MISSION, RESCUER)).toBeNull();
+    expect(await store.canJoinMissionRoom(MISSION, RESCUER, "user")).toBe(false);
+    expect(await store.canJoinMissionRoom(MISSION, REQUESTER, "admin")).toBe(false);
+    expect(await store.missionLocationRole(MISSION, RESCUER)).toBeNull();
+    expect(await store.missionLocationRole(MISSION, REQUESTER, "admin")).toBeNull();
     expect(await store.advanceStatus(MISSION, RESCUER, "on_the_way")).toEqual({
       status: "invalid_transition", currentStatus: "completed"
     });

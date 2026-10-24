@@ -12,6 +12,22 @@ export async function listRescuerMissions(token: string, page = 1): Promise<{ it
   ));
 }
 
+export async function listRequesterMissions(token: string, page = 1): Promise<{ items: Mission[]; totalPages: number }> {
+  const query = apiRoutes.sos.listMissions.schema.query.parse({ role: "requester", page, limit: 50 });
+  const params = new URLSearchParams({ role: "requester", page: String(query.page), limit: String(query.limit) });
+  return paginatedResponseSchema(missionSchema).parse(await requestJson<unknown>(
+    `${apiRoutes.sos.listMissions.url}?${params}`, { accessToken: token }
+  ));
+}
+
+export async function listActiveSosMissions(token: string, sosRequestId: string): Promise<Mission[]> {
+  const route = apiRoutes.admin.listSosMissions;
+  const id = route.schema.params.parse({ id: sosRequestId }).id;
+  return z.array(missionSchema).parse(await requestJson<unknown>(
+    route.url.replace(":id", encodeURIComponent(id)), { accessToken: token }
+  ));
+}
+
 export async function getMission(token: string, id: string): Promise<Mission> {
   return missionSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token }));

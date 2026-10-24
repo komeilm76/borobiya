@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { SignJWT } from "jose";
+import { missionLocationEventSchema } from "@borobiya/shared";
 import type { LocationShareStore } from "../db/location-share-store";
 import type { LocationHistoryStore } from "../db/location-history-store";
 import type {
@@ -16,6 +17,8 @@ import {
   emitSosProposalAccepted,
   SOS_PROPOSAL_ACCEPTED_EVENT,
   joinMissionRoom,
+  publishMissionLocation,
+  MISSION_LOCATION_EVENT,
   missionRoom,
   handleLocationUpdate,
   LOCATION_UPDATES_PER_MINUTE,
@@ -60,6 +63,60 @@ it("authorizes private mission subscriptions against both the live session and m
   expect(foreign.joins).toEqual([]);
   foreign.connected = false;
   expect(await joinMissionRoom(foreign as never, { missionId }, dependencies)).toEqual({ ok: false, code: "UNAUTHORIZED" });
+});
+
+it("publishes only fresh, explicit, authorized mission fixes to the private room", async () => {
+  const missionId = randomUUID();
+  const sender = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
+  const applyUpdate = vi.fn(async () => ({ status: "accepted" as const, peers: [],
+    fix: { lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() } }));
+  const missionLocationRole = vi.fn(async () => "rescuer" as const);
+  const dependencies = { jwtSecret, users: makeStore(userRecord()),
+    live: { applyUpdate }, missions: { missionLocationRole, canJoinMissionRoom: async () => true } };
+  const payload = { missionId, location: { lat: 35.7, lon: 51.4, timestamp: new Date().toISOString(), priorityDeviceId: deviceId } };
+  expect(await publishMissionLocation(sender as never, payload, dependencies)).toMatchObject({ ok: true });
+  expect(missionLocationRole).toHaveBeenCalledTimes(2);
+  expect(applyUpdate).toHaveBeenCalledOnce();
+  const emitted = sender.emitted.filter((entry) => entry.event === MISSION_LOCATION_EVENT);
+  expect(emitted).toHaveLength(2);
+  expect(emitted[0]?.room).toBe(missionRoom(missionId));
+  expect(missionLocationEventSchema.parse(emitted[0]?.payload)).toMatchObject({
+    userId, missionId, role: "rescuer", lat: 35.7, lon: 51.4
+  });
+
+  const outsider = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
+  expect(await publishMissionLocation(outsider as never, payload, {
+    ...dependencies, missions: { ...dependencies.missions, missionLocationRole: async () => null }
+  })).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+  expect(outsider.emitted).toEqual([]);
+  expect(applyUpdate).toHaveBeenCalledOnce();
+
+  const admin = makeSocket({ data: { userId, role: "admin", sessionId, deviceId } });
+  expect(await publishMissionLocation(admin as never, payload, {
+    ...dependencies, users: makeStore(userRecord({ role: "admin" })),
+    missions: { ...dependencies.missions, missionLocationRole: async (_missionId, _userId, role) =>
+      role === "admin" ? "admin" as const : null }
+  })).toMatchObject({ ok: true });
+  expect(admin.emitted.filter((event) => event.event === MISSION_LOCATION_EVENT)[0]?.payload)
+    .toMatchObject({ role: "admin", userId });
+  expect(await publishMissionLocation(outsider as never, { ...payload,
+    location: { ...payload.location, timestamp: new Date(Date.now() - 61_000).toISOString() }
+  }, dependencies)).toMatchObject({ ok: false, code: "INVALID_TIMESTAMP" });
+});
+
+it("never broadcasts across cancellation committed during a location write", async () => {
+  const sender = makeSocket({ data: { userId, role: "user", sessionId, deviceId } });
+  const missionId = randomUUID();
+  const missionLocationRole = vi.fn().mockResolvedValueOnce("requester").mockResolvedValueOnce(null);
+  const dependencies = { jwtSecret, users: makeStore(userRecord()),
+    live: { applyUpdate: async () => ({ status: "accepted" as const, peers: [],
+      fix: { lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() } }) },
+    missions: { missionLocationRole, canJoinMissionRoom: async () => true } };
+  const ack = await publishMissionLocation(sender as never, { missionId,
+    location: { lat: 35.7, lon: 51.4, timestamp: new Date().toISOString(), priorityDeviceId: deviceId }
+  }, dependencies);
+  expect(ack).toMatchObject({ ok: false, code: "MISSION_UNAVAILABLE" });
+  expect(sender.emitted.filter((item) => item.event === MISSION_LOCATION_EVENT)).toEqual([]);
 });
 
 const jwtSecret = "a".repeat(48);

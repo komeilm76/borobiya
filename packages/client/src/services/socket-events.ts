@@ -13,5 +13,7 @@ export const SOS_NEW_REQUEST_EVENT = "sos:new-request";
 export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
 export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated";
 export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe";
+export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish";
+export const MISSION_LOCATION_EVENT = "mission:location";
 export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer";
 export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester";

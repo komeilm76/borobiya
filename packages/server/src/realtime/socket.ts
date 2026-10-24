@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from "node:http";
 import { Server, type Socket } from "socket.io";
-import { idSchema, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
+import { idSchema, missionLocationPublishSchema, type MissionLocationEvent, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
 import type { MissionProgressStore } from "../db/mission-progress-store";
 import type { RetiredLocationShare } from "../db/location-share-store";
 import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
@@ -24,6 +24,8 @@ export const SOS_PROPOSAL_RECEIVED_EVENT = "sos:proposal-received";
 export const SOS_PROPOSAL_ACCEPTED_EVENT = "sos:proposal-accepted";
 export const MISSION_STATUS_UPDATED_EVENT = "mission:status-updated";
 export const MISSION_SUBSCRIBE_EVENT = "mission:subscribe";
+export const MISSION_LOCATION_PUBLISH_EVENT = "mission:location-publish";
+export const MISSION_LOCATION_EVENT = "mission:location";
 export const MISSION_CANCELLED_BY_RESCUER_EVENT = "mission:cancelled-by-rescuer";
 export const MISSION_CANCELLED_BY_REQUESTER_EVENT = "mission:cancelled-by-requester";
 export const ADMIN_ROOM = "admin";
@@ -61,7 +63,7 @@ export interface RealtimeDependencies {
   jwtSecret: string;
   users: UserSecurityQuestionsStore;
   live: LiveLocationService;
-  missions?: Pick<MissionProgressStore, "canJoinMissionRoom">;
+  missions?: Pick<MissionProgressStore, "canJoinMissionRoom" | "missionLocationRole">;
   /** Allowed browser origins for the WebSocket handshake; omitted means same-origin only. */
   corsOrigins?: string[];
   /** Where a swallowed dependency failure is reported; socket handlers have no HTTP reply to fail. */
@@ -287,6 +289,7 @@ interface UpdateSender {
   to(room: string): { emit(event: string, payload: unknown): unknown };
   emit(event: string, payload: unknown): unknown;
   disconnect(close?: boolean): void;
+  connected?: boolean;
   borobiyaUpdateCount?: number;
   borobiyaUpdateWindowStart?: number;
 }
@@ -426,6 +429,46 @@ async function locationUpdateAck(
   return { ok: true, status: "accepted", peers: result.peers };
 }
 
+export type MissionLocationAck = LocationUpdateAck | { ok: false; status: "rejected"; code: "MISSION_UNAVAILABLE"; message: string };
+
+/** An explicit mission-location publish reuses all existing live GPS/session/device/rate checks. */
+export async function publishMissionLocation(sender: UpdateSender, payload: unknown,
+  dependencies: RealtimeDependencies): Promise<MissionLocationAck> {
+  const parsed = missionLocationPublishSchema.safeParse(payload);
+  if (!parsed.success) return { ok: false, status: "rejected", code: "VALIDATION_ERROR", message: "Invalid mission location." };
+  const { missionId, location } = parsed.data;
+  const age = Date.now() - Date.parse(location.timestamp);
+  if (age > 60_000 || age < -10_000) return {
+    ok: false, status: "rejected", code: "INVALID_TIMESTAMP", message: "A live mission fix must be recent."
+  };
+  const identity = sender.data;
+  if ((identity.role !== "user" && identity.role !== "admin") || !identity.userId || !dependencies.missions?.missionLocationRole) {
+    return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
+  }
+  try {
+    const role = await dependencies.missions.missionLocationRole(missionId, identity.userId, identity.role);
+    if (!role) return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
+    const accepted = await handleLocationUpdate(sender, location, dependencies);
+    if (!accepted.ok) return accepted;
+    // A cancellation may commit while the fix persists. Recheck immediately before fan-out
+    // so an already-terminal mission cannot publish through a previously joined room.
+    if (sender.connected === false || !sender.data.userId || sender.data.userId !== identity.userId ||
+      !(await dependencies.missions.missionLocationRole(missionId, identity.userId, identity.role))) {
+      return { ok: false, status: "rejected", code: "MISSION_UNAVAILABLE", message: "Mission unavailable." };
+    }
+    const event: MissionLocationEvent = { missionId, userId: identity.userId, role,
+      lat: location.lat, lon: location.lon, accuracy: location.accuracy ?? null,
+      timestamp: new Date().toISOString() };
+    sender.to(missionRoom(missionId)).emit(MISSION_LOCATION_EVENT, event);
+    sender.emit(MISSION_LOCATION_EVENT, event);
+    return { ok: true, status: "accepted" };
+  } catch (error) {
+    dependencies.logger?.warn({ err: error }, "mission location publish failed");
+    return { ok: false, status: "rejected", code: SERVICE_UNAVAILABLE_CODE,
+      message: "Mission location is unavailable. Try again shortly." };
+  }
+}
+
 export type MissionJoinAck = { ok: true } | { ok: false; code: "INVALID_MISSION" | "MISSION_UNAVAILABLE" | "UNAUTHORIZED" | "SERVICE_UNAVAILABLE" };
 
 /** The socket may be long-lived: recheck account and session before joining any private room. */
@@ -529,6 +572,15 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
       if (typeof ack === "function") {
         try { ack(result); } catch (error) {
           dependencies.logger?.warn({ err: error }, "mission subscription ack failed");
+        }
+      }
+    });
+
+    socket.on(MISSION_LOCATION_PUBLISH_EVENT, async (payload: unknown, ack?: (response: MissionLocationAck) => void) => {
+      const response = await publishMissionLocation(socket as unknown as UpdateSender, payload, dependencies);
+      if (typeof ack === "function") {
+        try { ack(response); } catch (error) {
+          dependencies.logger?.warn({ err: error }, "mission location ack failed");
         }
       }
     });

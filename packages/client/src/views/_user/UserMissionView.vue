@@ -66,6 +66,7 @@
         <p>برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.</p>
         <v-btn color="primary" variant="flat" rounded="lg" to="/_user/proposals">مشاهدهٔ پیشنهادها</v-btn>
       </section>
+      <MissionLivePanel v-if="desk.activeMission.value" :mission="desk.activeMission.value" />
       <section v-if="routing.visible.value && desk.activeMission.value" class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت">
         <header class="mission-route__header">
           <div>
@@ -172,6 +173,7 @@ import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
 import { Marker, type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
+import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { useThemeStore } from "@/stores/theme";
 import { useMissionRoutes } from "@/composables/use-mission-routes";

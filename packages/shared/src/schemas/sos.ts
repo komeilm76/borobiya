@@ -225,6 +225,28 @@ export const rescuerCancellationEventSchema = z.strictObject({
 });
 export type RescuerCancellationEvent = z.infer<typeof rescuerCancellationEventSchema>;
 
+/** An explicit participant opt-in; never reuse an unrelated location share as consent. */
+export const missionLocationPublishSchema = z.strictObject({
+  missionId: idSchema,
+  location: coordinatesSchema.extend({
+    accuracy: z.number().finite().nonnegative().optional(),
+    timestamp: timestampSchema,
+    priorityDeviceId: z.string().trim().min(1).max(128)
+  })
+});
+export type MissionLocationPublish = z.infer<typeof missionLocationPublishSchema>;
+
+export const missionLocationEventSchema = z.strictObject({
+  missionId: idSchema,
+  userId: idSchema,
+  role: z.enum(["requester", "rescuer", "admin"]),
+  lat: coordinatesSchema.shape.lat,
+  lon: coordinatesSchema.shape.lon,
+  accuracy: z.number().finite().nonnegative().nullable(),
+  timestamp: timestampSchema
+});
+export type MissionLocationEvent = z.infer<typeof missionLocationEventSchema>;
+
 export const requesterCancellationEventSchema = z.strictObject({
   missionId: idSchema,
   sosRequestId: idSchema,

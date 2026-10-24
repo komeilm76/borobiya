@@ -244,6 +244,7 @@ export async function createFastifyApp(
   await registerAdminSosRoutes(app, {
     store: sosRequestStore,
     dispatchStore: sosDispatchStore,
+    missionStore: missionProgressStore,
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret,
     io: realtime.io
