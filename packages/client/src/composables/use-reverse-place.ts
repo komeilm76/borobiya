@@ -13,10 +13,12 @@ export function useReversePlace(options: { reverse?: typeof reversePlace; copy?:
   const copyFailed = ref(false);
   let controller: AbortController | null = null;
   let generation = 0;
+  let copyGeneration = 0;
   let disposed = false;
 
   function cancel(): void {
     generation++;
+    copyGeneration++;
     controller?.abort();
     controller = null;
     loading.value = false;
@@ -69,13 +71,14 @@ export function useReversePlace(options: { reverse?: typeof reversePlace; copy?:
     const text = address.value?.formattedAddress;
     if (!open.value || !text || disposed) return;
     const current = generation;
+    const attempt = ++copyGeneration;
     copied.value = false;
     copyFailed.value = false;
     try {
       await (options.copy ?? ((value: string) => navigator.clipboard.writeText(value)))(text);
-      if (!disposed && current === generation) copied.value = true;
+      if (!disposed && current === generation && attempt === copyGeneration) copied.value = true;
     } catch {
-      if (!disposed && current === generation) copyFailed.value = true;
+      if (!disposed && current === generation && attempt === copyGeneration) copyFailed.value = true;
     }
   }
 

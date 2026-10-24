@@ -5,8 +5,9 @@ import { useReversePlace } from "./use-reverse-place";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => { resolve = res; });
-  return { promise, resolve };
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 }
 const address = (formattedAddress: string): ReverseGeocodeResult => ({ formattedAddress });
 
@@ -58,6 +59,36 @@ describe("reverse map-point lookup", () => {
     await api.copy();
     expect(api.copied.value).toBe(true);
     expect(api.copyFailed.value).toBe(false);
+    scope.stop();
+  });
+
+  it("lets only the latest clipboard attempt set feedback on the same address", async () => {
+    const first = deferred<void>();
+    const second = deferred<void>();
+    const copy = vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
+    const { api, scope } = mount({ reverse: async () => address("Azadi"), copy });
+    api.select(35, 51);
+    await Promise.resolve();
+    const older = api.copy();
+    const newer = api.copy();
+    second.resolve();
+    await newer;
+    expect(api.copied.value).toBe(true);
+    first.reject(new Error("old clipboard request was denied"));
+    await older;
+    expect(api.copied.value).toBe(true);
+    expect(api.copyFailed.value).toBe(false);
+    const third = deferred<void>();
+    const fourth = deferred<void>();
+    copy.mockImplementationOnce(() => third.promise).mockImplementationOnce(() => fourth.promise);
+    const olderSuccess = api.copy();
+    const newerFailure = api.copy();
+    fourth.reject(new Error("latest copy denied"));
+    await newerFailure;
+    third.resolve();
+    await olderSuccess;
+    expect(api.copyFailed.value).toBe(true);
+    expect(api.copied.value).toBe(false);
     scope.stop();
   });
 
