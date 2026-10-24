@@ -409,12 +409,12 @@ export const sosRequests = pgTable(
     check(
       "sos_requests_status_check",
       sql`"status" IN ('pending', 'dispatched', 'accepted', 'cancelled_by_requester', 'cancelled_by_rescuer', 'expired', 'completed')`
-    )
-    // No index here, including no GiST on `location`, matching the ERD: the shape that will actually pay is
-    // T3.3.1's nearest query over *open* requests, which wants a partial index on the live statuses and
-    // should be written when that predicate exists — the active-pinned share index above is that precedent.
-    // Nor a cancellation cross-check: which of reason/custom text are required is §11.7C's rule, and the
-    // cancellation task (T3.6) is where that becomes a constraint instead of a guess.
+    ),
+    // History reads are owner-scoped and newest-first. This covers that predicate/sort without
+    // exposing another user's records or forcing a full table scan for every requester page.
+    index("sos_requests_requester_created_at_idx").on(table.requesterId, table.createdAt.desc(), table.id),
+    // No GiST location index yet: nearest-responder lookup indexes responder positions, not SOS pins.
+    // The cancellation reason/custom-text cross-check is enforced by the scoped write transaction.
   ]
 );
 

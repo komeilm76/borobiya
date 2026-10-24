@@ -262,11 +262,12 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 3.7 History & Rating
 
-- [ ] **T3.7.1** `GET /_user/sos/requests?role=requester` + `GET /_user/sos/missions?role=rescuer` — histories
-  - **Partial prerequisite for T3.6.3:** scoped `GET /_user/sos/missions?role=requester|rescuer` (active-first paging) and `GET /_user/sos/missions/:id` (participant/admin only) are live so a responder can return to an active mission after reload. SOS request history and a full history UI remain pending.
+- [x] **T3.7.1** `GET /_user/sos/requests?role=requester` + `GET /_user/sos/missions?role=rescuer` — histories ✅ 2026-10-24
+  - **Delivered:** Both paginated mission history (requester/rescuer scoped, active first) and requester-owned SOS history with stable newest-first paging and indexed owner lookup (`0017`). `GET /_user/sos/missions/:id` is participant/admin scoped; `GET /_user/sos/requests/:id` is requester-only and returns the same 404 for foreign/unknown IDs. The SOS route explicitly rejects `role=rescuer` rather than silently exposing another requester’s data. `/_user/sos-history` replaces its placeholder with a responsive owner-only list/detail, deep-link handling, secure signed-photo viewing and reusable, reason-gated cancellation (including after acceptance). Rescuer mission history display, rating and full timeline remain T3.7.4/T3.5.8.
 - [ ] **T3.7.2** `POST /_user/missions/:id/rate` {rating 1-5, comment?} — only if completed, only by requester
 - [ ] **T3.7.3** Table `mission_ratings` + compute `users.avgRating` cache trigger
 - [ ] **T3.7.4** UI: Request History + Mission History pages, star rating display, used for future dispatch tie-break
+  - **Partial:** Requester history list/detail/cancellation UI shipped with T3.7.1; the rescuer mission history and rating screens remain open.
 
 ---
 

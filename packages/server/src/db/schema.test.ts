@@ -413,7 +413,8 @@ describe("sos request table (T3.2.1)", () => {
     for (const fk of config.foreignKeys) {
       expect(fk.onDelete).toBe("no action");
     }
-    expect(config.indexes).toHaveLength(0);
+    expect(config.indexes.map(({ config: indexConfig }) => indexConfig.name))
+      .toEqual(["sos_requests_requester_created_at_idx"]);
     expect(config.uniqueConstraints).toHaveLength(0);
   });
 

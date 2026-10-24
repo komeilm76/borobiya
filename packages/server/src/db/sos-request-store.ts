@@ -1,4 +1,4 @@
-import { asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import type { AdminSosListQuery } from "@borobiya/shared/api";
 import type { Severity, SosRequestStatus } from "@borobiya/shared";
 import type { Database } from "./client";
@@ -105,6 +105,8 @@ export interface SosRequestStore {
   createRequest(input: NewSosRequest): Promise<CreatedSosRequest>;
   getRequestById?(id: string): Promise<SosRequestRecord | null>;
   listRequests?(query: AdminSosListQuery): Promise<SosRequestListResult>;
+  getOwnedRequest?(id: string, requesterId: string): Promise<SosRequestRecord | null>;
+  listOwnedRequests?(requesterId: string, page: number, limit: number): Promise<SosRequestListResult>;
 }
 
 /** The catalog probe, exported so its predicate is assertable without a live database. */
@@ -225,6 +227,23 @@ export class DrizzleSosRequestStore implements SosRequestStore {
       .where(eq(sosRequests.id, id))
       .limit(1);
     return row ? mapSosRequestRow(row) : null;
+  }
+
+  async getOwnedRequest(id: string, requesterId: string): Promise<SosRequestRecord | null> {
+    const [row] = await this.db.select(sosRequestReadSelection).from(sosRequests)
+      .where(and(eq(sosRequests.id, id), eq(sosRequests.requesterId, requesterId))).limit(1);
+    return row ? mapSosRequestRow(row) : null;
+  }
+
+  async listOwnedRequests(requesterId: string, page: number, limit: number): Promise<SosRequestListResult> {
+    const filter = eq(sosRequests.requesterId, requesterId);
+    const [rows, totals] = await Promise.all([
+      this.db.select(sosRequestReadSelection).from(sosRequests).where(filter)
+        .orderBy(desc(sosRequests.createdAt), asc(sosRequests.id)).limit(limit).offset((page - 1) * limit),
+      this.db.select({ total: count() }).from(sosRequests).where(filter)
+    ]);
+    const total = totals[0]?.total ?? 0;
+    return { items: rows.map(mapSosRequestRow), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async listRequests(query: AdminSosListQuery): Promise<SosRequestListResult> {

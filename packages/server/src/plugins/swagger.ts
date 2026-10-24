@@ -51,6 +51,8 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "locationListShares",
   "locationUpdateRestFallback",
   "sosCreateRequest",
+  "sosListRequests",
+  "sosGetRequest",
   "sosUploadRequestPhoto",
   "sosGetPhotoAccess",
   "publicReadSosPhoto",

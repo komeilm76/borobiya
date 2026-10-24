@@ -695,6 +695,19 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       }
     );
     expect(createdSos.status).toBe("pending");
+    const requesterHistory = await callContract<{ items: Array<{ id: string }> }>(apiRoutes.sos.listRequests, 200, {
+      url: `${apiRoutes.sos.listRequests.url}?role=requester`, headers: requesterHeaders
+    });
+    expect(requesterHistory.items.map(({ id }) => id)).toContain(createdSos.requestId);
+    expect((await callContract<{ id: string }>(apiRoutes.sos.getRequest, 200, {
+      url: apiRoutes.sos.getRequest.url.replace(":id", createdSos.requestId), headers: requesterHeaders
+    })).id).toBe(createdSos.requestId);
+    expect((await app.inject({ method: "GET", url: apiRoutes.sos.getRequest.url.replace(":id", createdSos.requestId),
+      headers: responderHeaders })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `${apiRoutes.sos.listRequests.url}?role=rescuer`,
+      headers: responderHeaders })).statusCode).toBe(400);
+
+
     const multipart = buildMultipartPhotoBody(SOS_PHOTO_FIELD_NAME, PNG_FIXTURE);
     const uploadedPhoto = await callContract<{ photoUrl: string }>(
       apiRoutes.sos.uploadRequestPhoto,

@@ -70,7 +70,7 @@
         <v-btn
           v-for="item in navItems"
           :key="item.to"
-class="nav-button d-none d-lg-flex"
+class="nav-button d-none d-xxl-flex"
           :to="item.to"
           variant="text"
           rounded="lg"
@@ -81,7 +81,7 @@ class="nav-button d-none d-lg-flex"
           <template #activator="{ props: menuProps }">
             <v-btn
               v-bind="menuProps"
-              class="d-lg-none"
+              class="d-xxl-none"
               icon
               variant="text"
               aria-label="باز کردن فهرست بخش‌ها"
@@ -207,6 +207,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
     { to: "/_user/proposals", label: proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
     { to: "/_user/mission", label: "مأموریت من", icon: "mdi-lifebuoy" },
+    { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
     { to: "/_user/location-shares", label: "اشتراک موقعیت", icon: "mdi-crosshairs-gps" },
     { to: "/_user/devices", label: "دستگاه‌ها", icon: "mdi-devices" }
   ];

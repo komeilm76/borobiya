@@ -77,7 +77,8 @@ export const sosRoutes = {
         200: paginatedResponseSchema(sosRequestRecordSchema),
         400: errorSchema,
         401: errorSchema,
-        403: errorSchema
+        403: errorSchema,
+        503: errorSchema
       }
     },
     meta: {
@@ -92,7 +93,7 @@ export const sosRoutes = {
     url: "/_user/sos/requests/:id",
     schema: {
       params: sosRequestParamsSchema,
-      responses: { 200: sosRequestRecordSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+      responses: { 200: sosRequestRecordSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema, 503: errorSchema }
     },
     meta: {
       operationId: "sosGetRequest",

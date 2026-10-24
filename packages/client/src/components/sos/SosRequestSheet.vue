@@ -60,6 +60,9 @@
             <v-btn v-if="!cancellation.blocked.value" variant="text" color="error" rounded="lg" prepend-icon="mdi-close-circle-outline" @click="cancellation.show()">
               لغو این درخواست
             </v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" :to="{ path: '/_user/sos-history', query: { request: sos.createdRequestId.value } }" @click="close">
+              پیگیری در سوابق
+            </v-btn>
             <v-btn variant="tonal" color="primary" rounded="lg" @click="startFresh">
               ثبت درخواست جدید
             </v-btn>

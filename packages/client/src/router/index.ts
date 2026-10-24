@@ -78,12 +78,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_user/sos-history",
     name: "user-sos-history",
-    component: () => import("@client/views/_user/PlaceholderView.vue"),
-    props: {
-      title: "سوابق امداد",
-      description: "درخواست‌ها و مأموریت‌های امدادی گذشته در این بخش مرور می‌شوند.",
-      icon: "mdi-history"
-    }
+    component: () => import("@client/views/_user/UserSosHistoryView.vue")
   },
   {
     path: "/_user/settings",

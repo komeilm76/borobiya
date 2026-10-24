@@ -791,6 +791,32 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     } finally { rescuer.close(); admin.close(); }
   });
 
+  it("keeps requester SOS history owner-scoped with stable pagination and indistinguishable foreign IDs", async () => {
+    const first = "97000000-0000-4000-8000-000000000001";
+    const second = "97000000-0000-4000-8000-000000000002";
+    const foreign = "97000000-0000-4000-8000-000000000003";
+    for (const [id, owner, date] of [
+      [first, REQUESTER_ID, "2026-10-21T08:00:00Z"],
+      [second, REQUESTER_ID, "2026-10-22T08:00:00Z"],
+      [foreign, ADMIN_ID, "2026-10-23T08:00:00Z"]
+    ]) await pg.query(`INSERT INTO sos_requests (id,requester_id,severity,description,incident_type_id,location,created_at)
+      VALUES ($1,$2,'medium','A person needs help at the ridge.', $3,'POINT(51.4 35.7)',$4)`,
+      [id, owner, INCIDENT_MEDICAL_ID, date]);
+    const headers = { authorization: `Bearer ${requesterToken}` };
+    const list = await app.inject({ method: "GET", url: "/_user/sos/requests?role=requester&limit=1", headers });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toMatchObject({ total: 2, totalPages: 2, items: [{ id: second }] });
+    const page2 = await app.inject({ method: "GET", url: "/_user/sos/requests?role=requester&limit=1&page=2", headers });
+    expect(page2.json()).toMatchObject({ total: 2, items: [{ id: first }] });
+    expect((await app.inject({ method: "GET", url: `/_user/sos/requests/${first}`, headers })).statusCode).toBe(200);
+    expect((await app.inject({ method: "GET", url: `/_user/sos/requests/${foreign}`, headers })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: "/_user/sos/requests?role=rescuer", headers })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: "/_user/sos/requests?limit=999", headers })).statusCode).toBe(400);
+    const indexes = await pg.query<{ indexname: string }>(`SELECT indexname FROM pg_indexes
+      WHERE tablename='sos_requests' AND indexname='sos_requests_requester_created_at_idx'`);
+    expect(indexes.rows).toHaveLength(1);
+  });
+
   it("atomically cancels rescuer missions, releases the responder, keeps location admin-only, flags repeated/Other reasons and limits bursts", async () => {
     const rescuerId = "94000000-0000-4000-8000-000000000001";
     const sessionId = "94000000-0000-4000-8000-000000000002";

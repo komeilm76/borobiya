@@ -24,7 +24,7 @@
 16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
 18. [Cancellation — Partially available](#18-cancellation--partially-available)
-19. [History & Rating — Planned](#19-history--rating--planned)
+19. [History & Rating — Partially available](#19-history--rating--partially-available)
 20. [Admin — User Management](#20-admin--user-management)
 21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
 22. [Troubleshooting](#22-troubleshooting)
@@ -302,11 +302,11 @@ Each update appears as **timeline** to requester + admin.
 
 ## 18. Cancellation — Partially available
 
-> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation also works after an accepted mission (T3.6.4). Persistent SOS History (T3.7.1) and the admin red-flash/sound replacement UI (T3.6.5) remain planned.
+> **Current status:** A requester can cancel a newly submitted request *before a rescuer accepts* from the SOS confirmation sheet. A rescuer can cancel an active mission from `/_user/mission` (also accessible after reload). Requester cancellation also works after an accepted mission (T3.6.4). Requester SOS History is now live at `/_user/sos-history` (T3.7.1). The admin red-flash/sound replacement UI (T3.6.5) remains planned.
 
 ### If you are the requester (need to cancel SOS)
 
-1. Immediately after submitting, choose **لغو این درخواست** (Cancel this request) on the SOS confirmation sheet. If you already closed the sheet, the persistent history entry point is not available yet.
+1. Immediately after submitting, choose **لغو این درخواست** (Cancel this request) on the SOS confirmation sheet. If you already closed the sheet, open **درخواست‌های من** (`/_user/sos-history`) and select the request; the same reason/confirmation dialog is available for pending, dispatched and accepted requests.
 2. **Must select reason:**
    - Need no longer exists
    - I resolved myself
@@ -341,12 +341,12 @@ Each update appears as **timeline** to requester + admin.
 
 ---
 
-## 19. History & Rating — Planned
+## 19. History & Rating — Partially available
 
-> **Current status:** `/_user/sos-history` currently renders a placeholder screen in the client, and `GET /_user/sos/requests`, `GET /_user/sos/missions`, and `POST /_user/missions/:id/rate` remain contract-only (tracked under T4.1).
+> **Current status:** `/_user/sos-history` now shows only your SOS requests with their status, evidence and cancellation options; `GET /_user/sos/requests?role=requester` and participant-scoped `GET /_user/sos/missions?role=rescuer` are live. Rescuer mission history UI, status timelines and `POST /_user/missions/:id/rate` remain planned.
 
-- **Request History** (`/_user/sos-history`, planned): SOS I created, status, rescuer, timeline.
-- **Mission History** (`/_user/sos-history`, planned): Missions I handled, rating received.
+- **Request History** (`/_user/sos-history`, live): your SOS requests, status, saved incident location, secure evidence image and reason-gated cancellation. Reopen a request after closing the SOS sheet; foreign request links cannot display other people’s data.
+- **Mission History** (read API live, full UI planned): mission records are requester/rescuer-scoped. The rescuer can revisit an active mission at `/_user/mission`; a past-mission timeline and ratings are still planned.
 
 ### Rating
 
@@ -407,7 +407,8 @@ Each update appears as **timeline** to requester + admin.
 | Full map (live companions + playback) | `/_user/map` |
 | Active Devices & Priority Device | `/_user/devices` |
 | Rescue proposal inbox | `/_user/proposals` |
-| SOS History *(planned)* | `/_user/sos-history` |
+| Active rescuer mission | `/_user/mission` |
+| SOS request history & cancellation | `/_user/sos-history` |
 | Settings *(planned)* | `/_user/settings` |
 | Admin Dashboard *(planned)* | `/_admin/dashboard` |
 | Admin Users | `/_admin/users` |

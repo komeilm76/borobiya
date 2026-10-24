@@ -217,4 +217,31 @@ export async function registerSosRequestRoutes(
       .header("cache-control", "no-store")
       .send({ requestId: created.requestId, status: created.status });
   });
+
+
+  const listRoute = apiRoutes.sos.listRequests;
+  app.get(listRoute.url, async (request, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return sendError(reply, 401, "UNAUTHORIZED", "Authentication required.");
+    const query = listRoute.schema.query.safeParse(request.query);
+    if (!query.success) return sendError(reply, 400, "VALIDATION_ERROR", "Invalid SOS list filters.",
+      query.error.issues.map(({ code, message, path }) => ({ code, message, path })));
+    if (query.data.role === "rescuer") return sendError(reply, 400, "SOS_ROLE_UNSUPPORTED",
+      "SOS request history is requester-only; rescuers should use their mission history.");
+    if (!dependencies.store.listOwnedRequests) return sendError(reply, 503, "SERVICE_UNAVAILABLE", "SOS history is unavailable.");
+    const page = await dependencies.store.listOwnedRequests(user.userId, query.data.page, query.data.limit);
+    return reply.code(200).send({ ...page, items: page.items.map(sosRequestRecordPayload) });
+  });
+
+  const detailRoute = apiRoutes.sos.getRequest;
+  app.get(detailRoute.url, async (request, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return sendError(reply, 401, "UNAUTHORIZED", "Authentication required.");
+    const params = detailRoute.schema.params.safeParse(request.params);
+    if (!params.success) return sendError(reply, 404, "SOS_REQUEST_NOT_FOUND", "SOS request not found.");
+    if (!dependencies.store.getOwnedRequest) return sendError(reply, 503, "SERVICE_UNAVAILABLE", "SOS history is unavailable.");
+    const found = await dependencies.store.getOwnedRequest(params.data.id, user.userId);
+    if (!found) return sendError(reply, 404, "SOS_REQUEST_NOT_FOUND", "SOS request not found.");
+    return reply.code(200).send(sosRequestRecordPayload(found));
+  });
 }

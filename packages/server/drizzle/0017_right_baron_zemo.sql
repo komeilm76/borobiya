@@ -1,0 +1,1 @@
+CREATE INDEX "sos_requests_requester_created_at_idx" ON "sos_requests" USING btree ("requester_id","created_at" DESC NULLS LAST,"id");
