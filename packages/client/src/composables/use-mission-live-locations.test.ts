@@ -26,7 +26,7 @@ function fakeSocket() {
 async function settle() { await Promise.resolve(); await Promise.resolve(); await nextTick(); }
 
 describe("mission live positions (T3.5.7)", () => {
-  it("subscribes privately, validates participant identity, marks stale updates offline, and cleans on mission switch", async () => {
+  it("subscribes privately, validates participant identity, marks stale location updates as old without conflating them with presence, and cleans on mission switch", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-24T10:00:00.000Z"));
     const missionRef = ref<typeof mission | null>(mission);
@@ -44,12 +44,12 @@ describe("mission live positions (T3.5.7)", () => {
     expect(live.locations.value.requester).toBeUndefined();
     session.listeners.get(MISSION_LOCATION_EVENT)?.(payload);
     session.listeners.get(MISSION_LOCATION_EVENT)?.({ ...payload, role: "admin", userId: "70000000-0000-4000-8000-000000000004" });
-    expect(live.participantStatus.value[0]?.online).toBe(true);
+    expect(live.participantStatus.value[0]?.fresh).toBe(true);
     expect(live.locations.value.admin?.userId).toBe("70000000-0000-4000-8000-000000000004");
     session.listeners.get(MISSION_LOCATION_EVENT)?.({ ...payload, lat: 1 }); // out of order
     expect(live.locations.value.requester?.lat).toBe(35.7);
     vi.advanceTimersByTime(31_000);
-    expect(live.participantStatus.value[0]?.online).toBe(false);
+    expect(live.participantStatus.value[0]?.fresh).toBe(false);
     missionRef.value = null;
     await nextTick();
     expect(session.close).toHaveBeenCalledOnce();

@@ -59,6 +59,38 @@ describe("useAdminSosStore (T3.2.5)", () => {
     });
   }
 
+  it("retries failed SOS socket setup and handshake, then stops retrying on logout", async () => {
+    vi.useFakeTimers();
+    try {
+      const connect = vi.fn(() => { socketEmitter.connected = true; });
+      const close = vi.fn();
+      const openSocket = vi.fn().mockRejectedValueOnce(new Error("temporary setup failure"))
+        .mockResolvedValue({ socket: socketEmitter, updateToken: vi.fn(), connect, close });
+      configureAdminSosRuntimeForTests({ openSocket,
+        listRequests: async () => ({ items: [], total: 0 }) });
+      const auth = useAuthStore();
+      auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+      auth.accessToken = "admin-token";
+      useAdminSosStore();
+      await nextTick();
+      await Promise.resolve();
+      expect(openSocket).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      expect(connect).toHaveBeenCalledOnce();
+      socketEmitter.connected = false;
+      socketEmitter.emit("connect_error", new Error("temporary handshake failure"));
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(connect).toHaveBeenCalledTimes(2);
+      auth.accessToken = null;
+      auth.user = null;
+      await nextTick();
+      expect(close).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+
   const cancelledEvent = (sosRequestId: string) => ({
     missionId: "11111111-1111-4111-8111-111111111111",
     sosRequestId,

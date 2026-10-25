@@ -40,6 +40,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
   let sessionGeneration = 0;
   let interval: ReturnType<typeof setInterval> | null = null;
   let client: RealtimeClient | null = null;
+  let opening: object | null = null;
 
   async function refresh(): Promise<void> {
     const userId = identity.value;
@@ -117,6 +118,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     interval = null;
     client?.close();
     client = null;
+    opening = null;
     proposals.value = [];
     total.value = 0;
     page.value = 1;
@@ -129,18 +131,18 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     failed.value = false;
   }
 
-  async function start(userId: string): Promise<void> {
-    void refresh();
-    interval = setInterval(() => { void refresh(); }, POLL_INTERVAL_MS);
-    interval.unref?.();
+  async function attachRealtime(userId: string): Promise<void> {
+    if (client || opening || identity.value !== userId || !auth.accessToken) return;
+    const attempt = {};
+    opening = attempt;
     const gen = sessionGeneration;
     try {
       const opener = runtime.openSocket ?? (async (token: string) => {
         const { createRealtimeClient } = await import("@/services/socket");
         return createRealtimeClient(token);
       });
-      const connected = await opener(auth.accessToken ?? "");
-      if (identity.value !== userId || gen !== sessionGeneration) {
+      const connected = await opener(auth.accessToken);
+      if (identity.value !== userId || gen !== sessionGeneration || !auth.accessToken) {
         connected.close();
         return;
       }
@@ -150,10 +152,25 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         const parsed = sosProposalReceivedEventSchema.safeParse(payload);
         if (parsed.success && parsed.data.proposal.rescuerId === identity.value) void refresh();
       });
+      connected.updateToken(auth.accessToken);
       connected.connect();
     } catch {
-      // Polling remains the fallback if the socket cannot connect.
+      // A failed import/handshake setup must not leave this user permanently offline.
+      // The existing 30-second inbox poll will try opening a socket again.
+    } finally {
+      if (opening === attempt) opening = null;
     }
+  }
+
+  function start(userId: string): void {
+    void refresh();
+    void attachRealtime(userId);
+    interval = setInterval(() => {
+      void refresh();
+      if (!client) void attachRealtime(userId);
+      else if (!client.socket.connected) client.connect();
+    }, POLL_INTERVAL_MS);
+    interval.unref?.();
   }
 
   watch(identity, (next) => {

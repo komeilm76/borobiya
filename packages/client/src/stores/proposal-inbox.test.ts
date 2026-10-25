@@ -62,6 +62,60 @@ describe("proposal inbox", () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it("reopens a failed SOS socket on the next inbox poll without retrying after logout", async () => {
+    vi.useFakeTimers();
+    try {
+      const socket = Object.assign(new EventEmitter(), { connected: false });
+      const close = vi.fn();
+      const connect = vi.fn(() => { socket.connected = true; });
+      const openSocket = vi.fn().mockRejectedValueOnce(new Error("temporary setup failure"))
+        .mockResolvedValue({ socket, updateToken: vi.fn(), connect, close });
+      configureProposalInboxForTests({ list: async () => page([]), openSocket });
+      const auth = useAuthStore();
+      auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+      auth.accessToken = "first-token";
+      useProposalInboxStore();
+      await nextTick();
+      await Promise.resolve();
+      expect(openSocket).toHaveBeenCalledTimes(1);
+      auth.accessToken = "rotated-token";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      expect(connect).toHaveBeenCalledOnce();
+      auth.accessToken = null;
+      auth.user = null;
+      await nextTick();
+      expect(close).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(openSocket).toHaveBeenCalledTimes(2);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("closes a delayed socket opened for the previous account rather than restoring its presence", async () => {
+    let finishOld!: (value: unknown) => void;
+    const oldSocket = Object.assign(new EventEmitter(), { connected: false });
+    const oldClose = vi.fn();
+    const newConnect = vi.fn();
+    const openSocket = vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finishOld = resolve; }))
+      .mockResolvedValue({ socket: Object.assign(new EventEmitter(), { connected: false }),
+        updateToken: vi.fn(), connect: newConnect, close: vi.fn() });
+    configureProposalInboxForTests({ list: async () => page([]), openSocket });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "first-token";
+    useProposalInboxStore();
+    await nextTick();
+    auth.user = { id: "44444444-4444-4444-8444-444444444444", username: "second", role: "user",
+      mustCompleteSecurityQuestions: false };
+    auth.accessToken = "second-token";
+    await nextTick();
+    finishOld({ socket: oldSocket, updateToken: vi.fn(), connect: vi.fn(), close: oldClose });
+    await vi.waitFor(() => expect(oldClose).toHaveBeenCalledOnce());
+    expect(newConnect).toHaveBeenCalledOnce();
+    expect(openSocket).toHaveBeenCalledTimes(2);
+  });
+
   it("serializes accept clicks, remembers a committed mission and clears other pending offers", async () => {
     let resolve!: (id: string) => void;
     const waiting = new Promise<string>((done) => { resolve = done; });

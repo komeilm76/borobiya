@@ -107,6 +107,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   let dispatchGeneration = 0;
   let refreshingSocketAuth = false;
   let sessionGeneration = 0;
+  let realtimeRetry: ReturnType<typeof setTimeout> | null = null;
 
   const isAdminSession = computed(
     () => auth.isAuthenticated && auth.user?.role === "admin"
@@ -469,6 +470,16 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     urgentReplacement.value = null;
   }
 
+  function scheduleRealtimeRetry(): void {
+    if (realtimeRetry || !isAdminSession.value) return;
+    const gen = socketGeneration;
+    realtimeRetry = setTimeout(() => {
+      realtimeRetry = null;
+      if (gen === socketGeneration && isAdminSession.value) void attachRealtime();
+    }, 30_000);
+    realtimeRetry.unref?.();
+  }
+
   async function attachRealtime(): Promise<void> {
     if (!isAdminSession.value || !auth.accessToken) return;
     if (attachedClient) {
@@ -483,6 +494,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     try {
       client = await opener(auth.accessToken);
     } catch {
+      // API polling cannot provide socket presence/alerts. Retry a failed socket setup.
+      if (gen === socketGeneration) scheduleRealtimeRetry();
       return;
     }
 
@@ -494,12 +507,15 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     attachedClient = client;
 
     const onConnect = () => {
+      if (realtimeRetry) clearTimeout(realtimeRetry);
+      realtimeRetry = null;
       connected.value = true;
       void refreshRequests();
     };
     const onDisconnect = (reason?: string) => {
       connected.value = false;
       if (reason === "io server disconnect" && !refreshingSocketAuth && isAdminSession.value) {
+        scheduleRealtimeRetry();
         refreshingSocketAuth = true;
         void auth
           .refreshSession()
@@ -517,6 +533,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     };
     const onConnectError = (err: Error & { data?: { code?: unknown } }) => {
       connected.value = false;
+      // A rejected Socket.IO handshake does not automatically reconnect. Transient server
+      // failures therefore need a bounded retry even if the bearer has not rotated.
+      scheduleRealtimeRetry();
       const errorCode = typeof err.data?.code === "string" ? err.data.code : "";
       const isAuthFailure =
         errorCode === "UNAUTHORIZED" ||
@@ -558,11 +577,15 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     };
 
     connected.value = client.socket.connected;
+    // A refresh may have rotated the bearer while the asynchronous opener was loading.
+    if (auth.accessToken) client.updateToken(auth.accessToken);
     client.connect();
   }
 
   function detachRealtime(): void {
     socketGeneration++;
+    if (realtimeRetry) clearTimeout(realtimeRetry);
+    realtimeRetry = null;
     detachSocketListeners?.();
     detachSocketListeners = null;
     attachedClient = null;

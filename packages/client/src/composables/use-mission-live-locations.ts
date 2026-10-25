@@ -63,9 +63,10 @@ export function useMissionLiveLocations(
   let syncAbort: AbortController | null = null;
   let refreshingAuth = false;
 
+  // GPS freshness is not transport/session presence: someone may be connected without opting in.
   const participantStatus = computed(() => (["requester", "rescuer", "admin"] as const).map((role) => {
     const entry = locations.value[role];
-    return { role, entry, online: Boolean(entry && connected.value &&
+    return { role, entry, fresh: Boolean(entry && connected.value &&
       now.value - Date.parse(entry.timestamp) <= STALE_MS) };
   }));
 

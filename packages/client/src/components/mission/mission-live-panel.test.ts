@@ -25,7 +25,7 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain("useMissionPresence");
     expect(panel).toContain("missionPresenceLabel[presence.rescuer.value]");
     expect(panel).toContain("مأموریت خودکار لغو نمی‌شود");
-    expect(panel).toContain("member.online ? 'آنلاین' : 'آفلاین'");
+    expect(panel).toContain("!member.entry ? 'اشتراک آغاز نشده' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی'");
     expect(panel).toContain("@click=\"live.startSharing()\"");
     expect(panel).toContain("@click=\"live.stopSharing()\"");
     expect(panel).toContain('aria-live="polite"');

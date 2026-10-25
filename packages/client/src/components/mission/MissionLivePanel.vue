@@ -39,11 +39,11 @@
             <small v-if="member.entry">آخرین مشاهده: {{ new Date(member.entry.timestamp).toLocaleString('fa-IR') }}</small>
             <small v-else>هنوز موقعیتی به اشتراک گذاشته نشده است.</small>
           </div>
-          <v-chip :color="member.online ? 'success' : 'grey'" variant="tonal" size="small">
-            {{ member.online ? 'آنلاین' : 'آفلاین' }}
+          <v-chip :color="member.fresh ? 'success' : 'grey'" variant="tonal" size="small">
+            {{ !member.entry ? 'اشتراک آغاز نشده' : member.fresh ? 'موقعیت تازه' : 'موقعیت قدیمی' }}
           </v-chip>
         </div>
-        <p class="live-panel__note">آفلاین یعنی در ۳۰ ثانیهٔ گذشته موقعیت تازه‌ای دریافت نشده؛ وضعیت حضور قطعی فرد نیست.</p>
+        <p class="live-panel__note">این نشانگر فقط تازگی موقعیت داوطلبانه را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
         <template v-if="canPublish">
           <v-btn v-if="!live.sharing.value" color="primary" variant="flat" rounded="lg" block
             :disabled="!live.connected.value" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
@@ -91,10 +91,10 @@ function syncMarkers() {
     markers[member.role]?.remove();
     delete markers[member.role];
     if (!map.value || !member.entry) continue;
-    const marker = new Marker({ color: member.role === "rescuer" ? "#16826c" : member.role === "admin" ? "#5555ae" : "#dc593b", scale: member.online ? 1 : 0.8 })
+    const marker = new Marker({ color: member.role === "rescuer" ? "#16826c" : member.role === "admin" ? "#5555ae" : "#dc593b", scale: member.fresh ? 1 : 0.8 })
       .setLngLat([member.entry.lon, member.entry.lat]).addTo(map.value);
-    marker.getElement().setAttribute("aria-label", `${member.role === "rescuer" ? "امدادگر" : member.role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${member.online ? "آنلاین" : "آفلاین"}`);
-    marker.getElement().style.opacity = member.online ? "1" : "0.55";
+    marker.getElement().setAttribute("aria-label", `${member.role === "rescuer" ? "امدادگر" : member.role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${member.fresh ? "موقعیت تازه" : "موقعیت قدیمی"}`);
+    marker.getElement().style.opacity = member.fresh ? "1" : "0.55";
     markers[member.role] = marker;
   }
 }
@@ -107,7 +107,7 @@ function focusMembers() {
 }
 function onMapReady(instance: MapLibreMap) { map.value = instance; syncMarkers(); focusMembers(); }
 watch(presentRoles, (next, previous) => { if (next !== previous) focusMembers(); });
-watch(() => [live.locations.value, ...live.participantStatus.value.map((member) => member.online)], syncMarkers);
+watch(() => [live.locations.value, ...live.participantStatus.value.map((member) => member.fresh)], syncMarkers);
 onBeforeUnmount(() => { for (const marker of Object.values(markers)) marker?.remove(); map.value = null; });
 </script>
 
