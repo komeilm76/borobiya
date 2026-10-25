@@ -75,6 +75,18 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.run()");
   });
 
+  it("moves phone-width map controls into a scrollable, non-occluding flow", () => {
+    const phone = view.slice(view.indexOf("@media (max-width: 750px)"));
+    expect(phone).toContain("height: auto;");
+    expect(phone).toContain("overflow: visible;");
+    expect(phone).toContain("height: clamp(20rem, 45dvh, 32rem);");
+    expect(phone).toContain(".user-map-view__search { order: 1; }");
+    expect(phone).toContain(".user-map-view__playback { order: 3; }");
+    expect(phone).toContain(".user-map-view__live { order: 5; }");
+    expect(phone).not.toContain("inset-block-");
+    expect(phone).not.toContain("position: absolute;");
+  });
+
   it("offers private own-position watching independently of peer sharing and clears its marker", () => {
     expect(view).toContain('useOwnMapPosition(computed(() => auth.user?.id ?? null))');
     expect(view).toContain('ownPositionLabel(own.position.value, own.active.value, own.error.value)');

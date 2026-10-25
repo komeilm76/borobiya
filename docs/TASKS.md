@@ -317,6 +317,7 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 4.4 UI/UX & a11y
 
 - [ ] **T4.4.1** Responsive breakpoints `sm,md,lg,xl`, bottom-sheets on mobile, no map occlusion
+  - **Partial 2026-10-25:** The companion map's phone layout now puts search, history, own-position and live panels in document flow around a definite-height map instead of absolutely stacking over map gestures or one another. Source-pinned regression covers the CSS structure. Other screens/breakpoints and real device/browser visual acceptance remain open; this is not a site-wide responsive sign-off.
 - [ ] **T4.4.2** Loading skeletons, toasts, optimistic updates everywhere
 - [ ] **T4.4.3** a11y: aria-*, keyboard nav, contrast 4.5:1, WCAG AA audit pass
 - [ ] **T4.4.4** Perf: lazy routes, virtual scroll (user lists), map load <2s, location <500ms

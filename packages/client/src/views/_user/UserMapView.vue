@@ -486,54 +486,53 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   color: #edf5f2;
 }
 
+/* At phone widths, stacked panels scroll with the page rather than covering map gestures,
+ * results, or one another. The canvas retains a definite height for MapLibre's resize logic. */
 @media (max-width: 750px) {
   .user-map-view {
-    height: calc(100dvh - 132px);
-    min-height: 24rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    height: auto;
+    min-height: calc(100dvh - 132px);
+    padding: 0.65rem;
+    overflow: visible;
   }
 
-  .user-map-view__toolbar {
-    inset-block-start: 0.65rem;
-    inset-inline-end: 0.65rem;
-    width: min(24rem, calc(100% - 1.3rem));
+  .user-map-view > .user-map-view__canvas {
+    position: relative;
+    order: 2;
+    flex: 0 0 auto;
+    height: clamp(20rem, 45dvh, 32rem);
+    min-height: 20rem;
+    border-radius: 0.85rem;
   }
 
-  .user-map-view__search {
-    inset-block-start: 5.7rem;
-    inset-inline-end: 0.65rem;
-    width: min(24rem, calc(100% - 1.3rem));
+  .user-map-view__toolbar,
+  .user-map-view__search,
+  .user-map-view__playback,
+  .user-map-view__own,
+  .user-map-view__live {
+    position: static;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    pointer-events: auto;
   }
 
-  .user-map-view__playback {
-    inset-block-start: 11rem;
-    inset-inline-start: 0.65rem;
-    width: min(20rem, calc(100% - 1.3rem));
-    max-height: calc(100% - 12rem);
-  }
+  .user-map-view__toolbar { order: 0; }
+  .user-map-view__search { order: 1; }
+  .user-map-view__playback { order: 3; }
+  .user-map-view__own { order: 4; }
+  .user-map-view__live { order: 5; }
 
   .user-map-view__toolbar-card {
     gap: 0.5rem;
     padding: 0.55rem 0.65rem;
   }
 
-  .user-map-view__title-block h1 {
-    font-size: 0.92rem;
-  }
-
-  .user-map-view__live {
-    inset-block-end: 0.65rem;
-    inset-inline-start: 0.65rem;
-    width: calc(100% - 1.3rem);
-    max-height: 32%;
-    overflow-y: auto;
-  }
-
-  .user-map-view__own {
-    inset-block-end: calc(32% + 1rem);
-    inset-inline-end: 0.65rem;
-    width: calc(100% - 1.3rem);
-    max-height: 8rem;
-    overflow-y: auto;
-  }
+  .user-map-view__title-block h1 { font-size: 0.92rem; }
 }
+
+:global(:root.dark) .user-map-view { background: var(--bb-color-background); }
 </style>
