@@ -83,6 +83,10 @@ export const useAuthStore = defineStore("auth", () => {
   const userRole = computed(() => user.value?.role ?? null);
   let initializationPromise: Promise<void> | null = null;
   let refreshPromise: Promise<void> | null = null;
+  let refreshPromiseGeneration = -1;
+  // Async refreshes/profile reads must not write into a session that has since signed out or
+  // switched accounts. Token equality alone cannot detect a late refresh response.
+  let sessionGeneration = 0;
   let expiresAt: number | null = null;
   let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -120,6 +124,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function clearSession(): void {
+    ++sessionGeneration;
     clearProactiveRefresh();
     accessToken.value = null;
     expiresAt = null;
@@ -128,16 +133,18 @@ export const useAuthStore = defineStore("auth", () => {
     initialized.value = true;
   }
 
-  async function loadCurrentUser(token: string): Promise<void> {
+  async function loadCurrentUser(token: string, generation = sessionGeneration): Promise<void> {
     try {
       const profile = userProfileSchema.parse(await requestJson<UserProfile>(userApiRoutes.me.url, {
         method: "GET",
         accessToken: token,
         skipAuthRefresh: true
       }));
+      if (generation !== sessionGeneration || accessToken.value !== token) return;
       userCategories.value = profile.categories;
       setUser(userFromProfile(profile));
     } catch (error) {
+      if (generation !== sessionGeneration || accessToken.value !== token) return;
       if (error instanceof ApiError && error.code === "SECURITY_QUESTIONS_REQUIRED") {
         onboardingRequired.value = true;
         if (user.value) setUser({ ...user.value, mustCompleteSecurityQuestions: true });
@@ -148,17 +155,23 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function refreshFromCookie(): Promise<void> {
-    if (refreshPromise) return refreshPromise;
+    if (refreshPromise && refreshPromiseGeneration === sessionGeneration) return refreshPromise;
+    const generation = sessionGeneration;
     const pending = (async () => {
       const response = refreshResponseSchema.parse(await requestJson<unknown>(authApiRoutes.refresh.url, {
         method: "POST"
       }));
+      if (generation !== sessionGeneration) return;
       setAccessToken(response.accessToken);
-      await loadCurrentUser(response.accessToken);
+      await loadCurrentUser(response.accessToken, generation);
     })();
     refreshPromise = pending;
+    refreshPromiseGeneration = generation;
     return pending.finally(() => {
-      if (refreshPromise === pending) refreshPromise = null;
+      if (refreshPromise === pending) {
+        refreshPromise = null;
+        refreshPromiseGeneration = -1;
+      }
     });
   }
 
@@ -166,6 +179,7 @@ export const useAuthStore = defineStore("auth", () => {
     if (initializationPromise) return initializationPromise;
     if (!initialized.value) {
       initializationPromise = (async () => {
+        const generation = sessionGeneration;
         const storedUser = readStoredUser();
         if (storedUser) {
           user.value = storedUser;
@@ -174,7 +188,7 @@ export const useAuthStore = defineStore("auth", () => {
         try {
           await refreshFromCookie();
         } catch {
-          clearSession();
+          if (generation === sessionGeneration) clearSession();
         } finally {
           initialized.value = true;
         }
@@ -188,20 +202,22 @@ export const useAuthStore = defineStore("auth", () => {
     }
 
     if (accessToken.value && expiresAt !== null && expiresAt <= Date.now() + ACCESS_TOKEN_REFRESH_MARGIN_MS) {
+      const generation = sessionGeneration;
       try {
         await refreshFromCookie();
       } catch {
-        clearSession();
+        if (generation === sessionGeneration) clearSession();
       }
     }
   }
 
   async function refreshSession(): Promise<boolean> {
+    const generation = sessionGeneration;
     try {
       await refreshFromCookie();
-      return true;
+      return generation === sessionGeneration && accessToken.value !== null;
     } catch {
-      clearSession();
+      if (generation === sessionGeneration) clearSession();
       return false;
     }
   }
@@ -216,6 +232,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   function acceptLogin(response: unknown): void {
     const parsed = loginResponseSchema.parse(response);
+    ++sessionGeneration;
     userCategories.value = [];
     setAccessToken(parsed.accessToken);
     setUser(parsed.user);
@@ -224,10 +241,12 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function login(input: LoginInput): Promise<void> {
     const parsedInput = loginSchema.parse(input);
+    const generation = sessionGeneration;
     const response = await requestJson<unknown>(authApiRoutes.login.url, {
       method: "POST",
       body: parsedInput
     });
+    if (generation !== sessionGeneration) throw new Error("Sign-in cancelled: session changed.");
     acceptLogin(response);
     if (accessToken.value && !mustCompleteSecurityQuestions.value) {
       await loadCurrentUser(accessToken.value);
@@ -236,6 +255,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   async function completeSecurityQuestions(input: CompleteSecurityQuestionsInput): Promise<void> {
     const parsedInput = completeSecurityQuestionsSchema.parse(input);
+    const generation = sessionGeneration;
     try {
       const response = await requestJson<unknown>(userApiRoutes.completeSecurityQuestions.url, {
         method: "POST",
@@ -247,6 +267,7 @@ export const useAuthStore = defineStore("auth", () => {
       if (!(error instanceof ApiError && error.code === "SECURITY_QUESTIONS_ALREADY_COMPLETED")) throw error;
     }
 
+    if (generation !== sessionGeneration) return;
     onboardingRequired.value = false;
     if (user.value) setUser({ ...user.value, mustCompleteSecurityQuestions: false });
     if (accessToken.value) await loadCurrentUser(accessToken.value);

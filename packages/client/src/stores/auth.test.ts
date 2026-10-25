@@ -169,6 +169,117 @@ describe("client auth store", () => {
     expect(auth.user).toBeNull();
   });
 
+  it("does not restore a logged-out session when an earlier refresh finishes late", async () => {
+    let finishRefresh!: (response: Response) => void;
+    const refreshReply = new Promise<Response>((resolve) => { finishRefresh = resolve; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => refreshReply,
+      jsonResponse({ ok: true })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+
+    const refreshing = auth.refreshSession();
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`/api${apiRoutes.auth.refresh.url}`);
+    await auth.logout();
+    finishRefresh(jsonResponse({ accessToken: "old-session-token" }));
+    await refreshing;
+
+    expect(auth.accessToken).toBeNull();
+    expect(auth.user).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3); // No profile read for a discarded refresh.
+  });
+
+  it("does not restore a logged-out profile when an earlier profile read finishes late", async () => {
+    let finishProfile!: (response: Response) => void;
+    const profileReply = new Promise<Response>((resolve) => { finishProfile = resolve; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => profileReply,
+      jsonResponse({ ok: true })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+
+    const refreshing = auth.refreshProfile();
+    await nextTick(); // refreshProfile awaits ensureSession before starting the profile GET.
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(`/api${apiRoutes.user.me.url}`);
+    await auth.logout();
+    finishProfile(jsonResponse({ ...profile, categories: [{ id: "20000000-0000-4000-8000-000000000001", name: "امداد کوهستان" }] }));
+    await refreshing;
+
+    expect(auth.user).toBeNull();
+    expect(auth.userCategories).toEqual([]);
+  });
+
+  it("does not clear a newer login when an old session refresh fails late", async () => {
+    let failRefresh!: (error: Error) => void;
+    const refreshReply = new Promise<Response>((_resolve, reject) => { failRefresh = reject; });
+    const newerUser = { ...user, id: "00000000-0000-4000-8000-000000000088", username: "rescue_user2" };
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => refreshReply,
+      jsonResponse({ ok: true }),
+      jsonResponse({ accessToken: "new-session-token", user: newerUser })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    const oldRefresh = auth.refreshSession();
+    await auth.logout();
+    await auth.login({ username: "rescue_user2", password: "safePass123" });
+    failRefresh(new Error("network unavailable"));
+
+    await expect(oldRefresh).resolves.toBe(false);
+    expect(auth.accessToken).toBe("new-session-token");
+    expect(auth.user).toEqual(newerUser);
+  });
+
+  it("does not sign back in from a login response that finishes after logout", async () => {
+    let finishLogin!: (response: Response) => void;
+    const loginReply = new Promise<Response>((resolve) => { finishLogin = resolve; });
+    const fetchMock = fakeFetch(() => loginReply, jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    const signingIn = auth.login({ username: "rescue_user1", password: "safePass123" });
+    await auth.logout();
+    finishLogin(jsonResponse({ accessToken, user }));
+
+    await expect(signingIn).rejects.toThrow("session changed");
+    expect(auth.accessToken).toBeNull();
+    expect(auth.user).toBeNull();
+  });
+
+  it("does not unlock a new account with an old account's late onboarding response", async () => {
+    const questionIds = Array.from({ length: 5 }, (_, index) =>
+      `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`
+    );
+    let finishCompletion!: (response: Response) => void;
+    const completionReply = new Promise<Response>((resolve) => { finishCompletion = resolve; });
+    const newerUser = { ...user, id: "00000000-0000-4000-8000-000000000088", username: "rescue_user2" };
+    vi.stubGlobal("fetch", fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => completionReply,
+      jsonResponse({ ok: true }),
+      jsonResponse({ accessToken: "new-session-token", user: newerUser })
+    ));
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    const completing = auth.completeSecurityQuestions({
+      securityQuestions: questionIds.map((questionId, index) => ({ questionId, answer: `Answer ${index + 1}` }))
+    });
+    await auth.logout();
+    await auth.login({ username: "rescue_user2", password: "safePass123" });
+    finishCompletion(jsonResponse({ ok: true }));
+    await completing;
+
+    expect(auth.user).toEqual(newerUser);
+    expect(auth.mustCompleteSecurityQuestions).toBe(true);
+  });
+
   it("proactively rotates an access token 60s before expiry on long-lived tabs", async () => {
     vi.useFakeTimers();
     try {
