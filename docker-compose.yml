@@ -212,6 +212,11 @@ services:
       OSRM_FOOT_URL: http://osrm-foot:5000/route/v1/foot
       PHOTON_GEOCODE_URL: http://photon:2322/api
       PHOTON_REVERSE_URL: http://photon:2322/reverse
+      ELEVATION_DIR: /elevation
+    volumes:
+      # Staged Skadi HGT tiles, external to the checkout. Until staging, use an isolated empty
+      # fallback so Compose cannot create an apparent "ready" elevation dataset directory.
+      - "${MAP_ELEVATION_DIR:-${MAP_LIBRARY_DIR:-${XDG_DATA_HOME:-${HOME:-/tmp}/.local/share}/borobiya/map-library}/.compose-unconfigured/elevation}:/elevation:ro"
     ports:
       - "127.0.0.1:${MAP_ROUTING_PORT:-8001}:3000"
     healthcheck:

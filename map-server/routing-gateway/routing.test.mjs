@@ -54,7 +54,8 @@ test("maps a POST /route request to the OSRM profile API and normalizes route fi
       distance_m: 5230.5,
       duration_s: 754.2,
       polyline: "encoded-polyline",
-      legs: osrmFixture.routes[0].legs
+      legs: osrmFixture.routes[0].legs,
+      elevation: null
     }],
     waypoints: osrmFixture.waypoints
   });

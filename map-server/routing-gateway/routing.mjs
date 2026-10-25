@@ -1,4 +1,5 @@
 import { parseMapConfig } from "./map-config.mjs";
+import { elevationForRoute } from "./elevation.mjs";
 import { DEFAULT_PHOTON_UPSTREAMS, handleGeocodeRequest } from "./geocoding.mjs";
 import { describeUpstream, formatUpstreamLog, readUpstreamBody } from "./upstream.mjs";
 
@@ -40,7 +41,7 @@ function validAlternatives(value) {
     (Number.isInteger(value) && value >= 0 && value <= 3);
 }
 
-function routeResult(osrmResponse, profile, diagnosis = {}) {
+function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null) {
   if (!Array.isArray(osrmResponse.routes)) {
     return json({
       error: "invalid_upstream_response",
@@ -69,7 +70,8 @@ function routeResult(osrmResponse, profile, diagnosis = {}) {
       distance_m: route.distance,
       duration_s: route.duration,
       polyline: route.geometry,
-      legs: route.legs
+      legs: route.legs,
+      elevation: elevationForRoute(route.geometry, elevation)
     });
   }
 
@@ -80,6 +82,7 @@ export async function handleRoutingRequest(request, {
   upstreams = configuredUpstreams(),
   geocodingUpstreams = configuredGeocodingUpstreams(),
   mapConfig = parseMapConfig(process.env),
+  elevation = null,
   fetchImpl = globalThis.fetch,
   timeoutMs = 15_000,
   log = console.error
@@ -169,7 +172,7 @@ export async function handleRoutingRequest(request, {
     return report("routing_failed", "The OSRM profile answered with an error and no message.");
   }
 
-  return routeResult(parsed, input.profile, upstream.fields);
+  return routeResult(parsed, input.profile, upstream.fields, elevation);
 }
 
 export { DEFAULT_UPSTREAMS, configuredGeocodingUpstreams, DEFAULT_PHOTON_UPSTREAMS };

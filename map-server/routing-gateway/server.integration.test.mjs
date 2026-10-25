@@ -1,20 +1,33 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { once } from "node:events";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = fileURLToPath(new URL("../..", import.meta.url));
 const serverPath = resolve(repositoryRoot, "map-server/routing-gateway/server.mjs");
+// Synthetic route in N35E051 (not a downloaded DEM).
+function encodePoint(lat, lon) {
+  const part = (number) => {
+    let value = number < 0 ? -number * 2 - 1 : number * 2;
+    let text = "";
+    while (value >= 32) { text += String.fromCharCode((32 | (value & 31)) + 63); value >>>= 5; }
+    return text + String.fromCharCode(value + 63);
+  };
+  return part(Math.round(lat * 1e5)) + part(Math.round(lon * 1e5));
+}
 const routeFixture = {
   code: "Ok",
   waypoints: [{ name: "Start" }, { name: "Finish" }],
   routes: [{
     distance: 5230.5,
     duration: 754.2,
-    geometry: "encoded-polyline",
+    geometry: encodePoint(35.68, 51.38) + encodePoint(0.02, 0.03),
     legs: [{ distance: 5230.5, duration: 754.2, steps: [] }]
   }]
 };
@@ -55,7 +68,15 @@ async function waitForStartup(child) {
   });
 }
 
-test("serves route, geocode, and reverse requests offline through local services", async () => {
+test("serves route with local DEM, geocode, and reverse requests offline through local services", async () => {
+  const elevationDir = mkdtempSync(join(tmpdir(), "borobiya-server-dem-"));
+  const samples = 1201;
+  const tile = Buffer.alloc(samples * samples * 2);
+  for (let i = 0; i < samples * samples; i++) tile.writeInt16BE(500, i * 2);
+  writeFileSync(join(elevationDir, "N35E051.hgt"), tile);
+  writeFileSync(join(elevationDir, "manifest.json"), JSON.stringify({ format: "skadi-hgt-v1", source: "mapzen-skadi",
+    tiles: { N35E051: { samples, sha256: createHash("sha256").update(tile).digest("hex"),
+      url: "https://s3.amazonaws.com/elevation-tiles-prod/skadi/N35/N35E051.hgt.gz" } } }));
   const upstreamRequests = [];
   const photonRequests = [];
   const photonFixture = {
@@ -103,7 +124,8 @@ test("serves route, geocode, and reverse requests offline through local services
       MAP_BBOX: "51.0,35.5,51.7,35.9",
       MAP_DATA_VERSION: "development",
       MAP_MIN_ZOOM: "0",
-      MAP_MAX_ZOOM: "14"
+      MAP_MAX_ZOOM: "14",
+      ELEVATION_DIR: elevationDir
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
@@ -140,6 +162,9 @@ test("serves route, geocode, and reverse requests offline through local services
       assert.equal(body.routes[0].duration_s, routeFixture.routes[0].duration);
       assert.equal(body.routes[0].polyline, routeFixture.routes[0].geometry);
       assert.ok(Array.isArray(body.routes[0].legs));
+      assert.deepEqual(body.routes[0].elevation, {
+        gain_m: 0, loss_m: 0, start_m: 500, end_m: 500, source: "mapzen-skadi"
+      });
     }
 
     assert.deepEqual(upstreamRequests.map(({ path }) => path), [
@@ -173,5 +198,6 @@ test("serves route, geocode, and reverse requests offline through local services
     }
     await close(osrm);
     await close(photon);
+    rmSync(elevationDir, { recursive: true, force: true });
   }
 });

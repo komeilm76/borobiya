@@ -29,6 +29,18 @@ describe("mission navigation APIs", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply, profile: "car" }))));
     await expect(getMissionRouteChoices(from, to, "bicycle")).rejects.toThrow();
   });
+  it("validates the optional offline gain/loss summary without inventing values", async () => {
+    const elevation = { gain_m: 120, loss_m: 31, start_m: 1140, end_m: 1229, source: "mapzen-skadi" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply,
+      routes: [{ ...reply.routes[0], elevation }] }), { status: 200 })));
+    expect((await getMissionRouteChoices(from, to, "bicycle"))[0]?.elevation).toEqual(elevation);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply,
+      routes: [{ ...reply.routes[0], elevation: null }] }), { status: 200 })));
+    expect((await getMissionRouteChoices(from, to, "bicycle"))[0]?.elevation).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply,
+      routes: [{ ...reply.routes[0], elevation: { ...elevation, gain_m: -10 } }] }), { status: 200 })));
+    await expect(getMissionRouteChoices(from, to, "bicycle")).rejects.toThrow();
+  });
   it("reports no route separately from an unavailable gateway", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 422 })));
     await expect(getMissionRouteChoices(from, to, "car")).rejects.toThrow("NO_ROUTE");

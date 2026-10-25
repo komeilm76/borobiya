@@ -8,7 +8,13 @@ export type TransportProfile = z.infer<typeof profileSchema>;
 const routeSchema = z.object({
   distance_m: z.number().finite().nonnegative(),
   duration_s: z.number().finite().nonnegative(),
-  polyline: z.string().min(1).max(200_000)
+  polyline: z.string().min(1).max(200_000),
+  // Null/absent means the route crossed missing or void DEM coverage (or a gateway without DEM).
+  elevation: z.object({
+    gain_m: z.number().finite().nonnegative(), loss_m: z.number().finite().nonnegative(),
+    start_m: z.number().finite(), end_m: z.number().finite(),
+    source: z.literal("mapzen-skadi")
+  }).nullable().optional()
 });
 const routesResponseSchema = z.object({
   profile: profileSchema,

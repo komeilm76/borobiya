@@ -112,9 +112,14 @@
               :aria-pressed="routing.selectedIndex.value === index" :disabled="navigation.active.value" @click="routing.selectRoute(index)">
               <strong>مسیر {{ (index + 1).toLocaleString('fa-IR') }}</strong>
               <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
-              <small>تغییر ارتفاع: دادهٔ ارتفاعی در مسیریاب فعلی موجود نیست.</small>
+              <small v-if="choice.elevation">صعود تخمینی: {{ Math.round(choice.elevation.gain_m).toLocaleString('fa-IR') }} متر · نزول تخمینی: {{ Math.round(choice.elevation.loss_m).toLocaleString('fa-IR') }} متر</small>
+              <small v-else>ارتفاع: دادهٔ آفلاین برای تمام این مسیر موجود نیست.</small>
             </button>
           </div>
+          <p v-if="routing.routes.value.some(choice => choice.elevation)" class="text-caption mt-2">
+            ارتفاع تقریبی از داده‌های محلی Mapzen/Tilezen محاسبه شده است؛ برای تصمیم ایمنی در مسیر به تنهایی کافی نیست.
+            <a href="/terrain-attribution.html" target="_blank" rel="noopener noreferrer">منابع و حق انتساب داده‌های ارتفاع (آفلاین)</a>
+          </p>
           <div v-if="routing.selectedRoute.value" class="mission-route__navigation">
             <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
               prepend-icon="mdi-navigation" :disabled="!mapReady" @click="navigation.start()">شروع راهبری</v-btn>

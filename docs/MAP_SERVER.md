@@ -237,6 +237,46 @@ docker compose --profile routing up -d
 
 `routing-gateway` runs in the default profile and can answer `/health` without graph data; the three OSRM services are in Compose's `routing` profile. Each `osrm-routed` service starts with one worker thread and `--max-table-size 100`. The table-size flag caps `/table` query locations (the default), not the graph's RAM use; the thread setting limits runtime concurrency. Once the profiles are enabled, the gateway forwards only to the local `osrm-car`, `osrm-bicycle`, or `osrm-foot` service. No public routing service or external network is used.
 
+### Optional offline route elevation (T3.5.5: VM evidence pending)
+
+OSRM's OSM PBF is not a DEM. To stage separate elevation tiles for the active WGS84
+`MAP_BBOX`, use the public [Mapzen/Tilezen Terrain Tiles Skadi data](https://registry.opendata.aws/terrain-tiles/)
+(`.hgt.gz`, signed 16-bit elevations in metres, 1° tiles). The
+[Tilezen source credits](https://github.com/tilezen/joerd/blob/master/docs/attribution.md)
+apply to the local data; the mission UI links to a bundled offline copy of the required
+source credits at `/terrain-attribution.html` (which also links to the original). Mapzen aggregates SRTM and
+other regional sources; **do not claim every tile is SRTM**. Downloads are operator-only,
+never performed by the runtime gateway or the browser. The script records the source URL,
+raw-file SHA-256 and raster size in `manifest.json` and rejects malformed raster sizes;
+the gateway checks SHA-256 again when it first reads each tile. The script's
+`--source-dir` test mode labels its manifest `fixture`, which the gateway rejects
+as a real DEM.
+
+```bash
+# On the VM, after setup has resolved MAP_BBOX and MAP_LIBRARY_DIR in .env;
+# use the VM's already-configured outbound proxy if downloads require it.
+set -a; source .env; set +a
+export MAP_ELEVATION_DIR="$MAP_LIBRARY_DIR/elevation/$MAP_REGION"
+python3 map-server/scripts/stage-elevation.py --bbox "$MAP_BBOX" --dir "$MAP_ELEVATION_DIR"
+# Persist MAP_ELEVATION_DIR=<the absolute path above> in .env for Compose.
+# Recreate to apply the read-only mount; do not remove map/OSRM data volumes.
+docker compose up -d --build --force-recreate routing-gateway
+MAP_REQUIRE_ELEVATION=1 ./map-server/scripts/verify-routing.sh
+# Re-run the command for each selected area: ...verify-routing.sh <area-id>
+```
+
+Stage the **actual OSRM route corridor**, not only the bbox, if profile paths
+leave the selected area. A returned route crossing a missing tile or HGT void has
+`elevation: null` while distance/duration and other routes still work. Positive
+`gain_m`/`loss_m` are approximate totals sampled along the *full OSRM polyline*
+at most every 90 m (max 12,000 samples); they are not net altitude change and
+are not a safety-grade slope survey. Empty/malformed/stale/missing DEM data never
+produces a guessed elevation. The gateway keeps at most three checked tiles in
+memory (~78 MB for 1-arcsecond rasters). Check each returned alternative on each
+profile and the mission view in an offline browser session before marking T3.5.5
+complete. OSRM can still return one route where alternatives are infeasible.
+**This VM staging and browser acceptance have not been run for this change.**
+
 ### Project API and OSRM adapter
 
 The project contract remains a simple `POST /route`; its body is translated to OSRM's native `POST /route/v1/{profile}` JSON API (coordinates are converted from `{lat,lon}` objects to `[longitude,latitude]` arrays):
@@ -250,7 +290,7 @@ The project contract remains a simple `POST /route`; its body is translated to O
 }
 ```
 
-`profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, and OSRM `legs`, plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
+`profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, OSRM `legs`, and `elevation` (`null` without full verified DEM coverage; otherwise `gain_m`, `loss_m`, `start_m`, `end_m`, `source`), plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
 
 A failure that reaches the client says what the upstream said. `map-server/routing-gateway/upstream.mjs`
 reads the profile's body once as text and parses it, so every 502 carries `upstream` (the container and path

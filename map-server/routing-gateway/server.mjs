@@ -1,9 +1,11 @@
 import { createServer } from "node:http";
 import { parseMapConfig } from "./map-config.mjs";
+import { createElevationProvider } from "./elevation.mjs";
 import { handleRoutingRequest } from "./routing.mjs";
 
 const maxRequestBytes = 16 * 1024;
 const mapConfig = parseMapConfig(process.env);
+const elevation = createElevationProvider(process.env.ELEVATION_DIR);
 
 function toHeaders(rawHeaders) {
   const headers = new Headers();
@@ -53,7 +55,7 @@ async function toWebRequest(incoming) {
 const server = createServer(async (incoming, outgoing) => {
   try {
     const request = await toWebRequest(incoming);
-    const response = await handleRoutingRequest(request, { mapConfig });
+    const response = await handleRoutingRequest(request, { mapConfig, elevation });
     outgoing.writeHead(response.status, Object.fromEntries(response.headers));
     if (incoming.method === "HEAD") {
       outgoing.end();

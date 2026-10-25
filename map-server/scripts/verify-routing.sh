@@ -48,7 +48,7 @@ for profile in car bicycle foot; do
     fail "${profile} route returned HTTP $status: $(cat "$response_file")"
   fi
 
-  python3 - "$response_file" "$profile" <<'PY' || fail "${profile} response is not a valid route"
+  python3 - "$response_file" "$profile" "${MAP_REQUIRE_ELEVATION:-0}" <<'PY' || fail "${profile} response is not a valid route"
 import json, sys
 body = json.load(open(sys.argv[1], encoding='utf-8'))
 profile = sys.argv[2]
@@ -64,7 +64,20 @@ if not isinstance(route.get('polyline'), str) or not route['polyline']:
     raise SystemExit('missing encoded polyline')
 if not isinstance(route.get('legs'), list):
     raise SystemExit('missing route legs')
-print(f"OK: {profile} returned {len(routes)} route(s), {route['distance_m']:.0f} m, {route['duration_s']:.0f} s")
+for i, option in enumerate(routes):
+    elevation = option.get('elevation')
+    if elevation is None:
+        if sys.argv[3] == '1':
+            raise SystemExit(f'route {i + 1} has no complete offline DEM coverage')
+        continue
+    if (elevation.get('source') != 'mapzen-skadi' or
+            not all(isinstance(elevation.get(key), (int, float)) and elevation[key] >= 0
+                    for key in ('gain_m', 'loss_m')) or
+            not all(isinstance(elevation.get(key), (int, float))
+                    for key in ('start_m', 'end_m'))):
+        raise SystemExit(f'route {i + 1} has invalid elevation')
+print(f"OK: {profile} returned {len(routes)} route(s), {route['distance_m']:.0f} m, {route['duration_s']:.0f} s; "
+      f"elevation on {sum(option.get('elevation') is not None for option in routes)}/{len(routes)}")
 PY
   rm -f "$response_file"
   trap - EXIT
