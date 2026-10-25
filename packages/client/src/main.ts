@@ -4,11 +4,13 @@ import { createAppRouter } from "./router";
 import { pinia } from "./stores";
 import { useThemeStore } from "./stores/theme";
 import { vuetify } from "./plugins/vuetify";
+import { installDesignTokenStyles } from "./styles/tokens";
 import { registerMapCacheWorker } from "./services/map-cache";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles/tailwind.css";
 import "./styles/auth.css";
 
+installDesignTokenStyles(document);
 const theme = useThemeStore(pinia);
 watch(
   () => theme.vuetifyThemeName,

@@ -258,6 +258,17 @@ Start the API first, then run `bun --filter @borobiya/client generate:api`. By d
 
 ---
 
+### Client design tokens
+
+Change shared UI spacing, theme colors and typography in `packages/client/src/styles/tokens.ts`.
+The 8px grid includes one 4px half-step for small details. Vuetify reads the same
+palette used for the generated `--bb-*` CSS variables; use those variables in new
+component CSS instead of copying hex values. The pre-paint `public/theme-init.js`
+must remain a small static script to prevent a theme flash: when changing its
+background or foreground, update it alongside the tokens (the token tests pin
+both values). Existing one-off component colors have not all been migrated;
+this foundation does not replace a responsive or WCAG visual audit.
+
 ## 8. Testing
 
 ```bash

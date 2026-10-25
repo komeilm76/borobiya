@@ -319,7 +319,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 - [ ] **T4.4.2** Loading skeletons, toasts, optimistic updates everywhere
 - [ ] **T4.4.3** a11y: aria-*, keyboard nav, contrast 4.5:1, WCAG AA audit pass
 - [ ] **T4.4.4** Perf: lazy routes, virtual scroll (user lists), map load <2s, location <500ms
-- [ ] **T4.4.5** Design tokens (8px grid, colors, typography) in `styles/tokens.ts`
+- [x] **T4.4.5** Design tokens (8px grid, colors, typography) in `styles/tokens.ts` ✅ 2026-10-25
+  - **Delivered:** Typed spacing on an 8px grid (4px half-step for small controls), light/dark semantic UI palettes and Persian-first typography in `packages/client/src/styles/tokens.ts`. The same palette now feeds Vuetify, the document theme/meta color and generated CSS custom properties; core layout, header and app-shell selectors consume the properties with pre-bundle fallbacks. The tiny static pre-paint theme initializer keeps its required literal colors, pinned to the tokens by tests so it cannot drift. Contrast checks cover base text/background, not a site-wide WCAG audit; remaining component-local styling and the responsive/a11y audit are T4.4.1/T4.4.3. No browser visual acceptance claimed.
 
 ### 4.5 Testing
 

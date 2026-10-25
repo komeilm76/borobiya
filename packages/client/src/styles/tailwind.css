@@ -3,15 +3,15 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  font-family: "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
-  color: #193536;
-  background: #f4f7f6;
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+  color: var(--bb-color-text, #193536);
+  background: var(--bb-color-background, #f4f7f6);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
-  font-weight: 400;
+  font-weight: var(--bb-weight-regular, 400);
 }
 
 * {
@@ -28,7 +28,7 @@ body,
 
 body {
   min-height: 100vh;
-  background: #f4f7f6;
+  background: var(--bb-color-background, #f4f7f6);
 }
 
 a {
@@ -43,14 +43,14 @@ a {
 }
 
 .v-toolbar__content {
-  padding-inline: clamp(1rem, 4vw, 3rem) !important;
+  padding-inline: clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem)) !important;
 }
 
 .brand-link {
   display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  color: #193536;
+  gap: var(--bb-space-one, 8px);
+  color: var(--bb-color-text, #193536);
 }
 
 .brand-mark {
@@ -60,7 +60,7 @@ a {
   place-items: center;
   border-radius: 15px;
   color: #fff;
-  background: #0e6666;
+  background: var(--bb-color-brand, #0e6666);
   box-shadow: 0 7px 18px rgba(14, 102, 102, 0.2);
 }
 
@@ -103,7 +103,7 @@ a {
   background:
     radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.12), transparent 30%),
     radial-gradient(ellipse at 92% 72%, rgba(14, 102, 102, 0.08), transparent 34%),
-    #f4f7f6;
+    var(--bb-color-background, #f4f7f6);
 }
 
 .page-shell {
@@ -318,8 +318,8 @@ a {
   min-height: 56px;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem clamp(1rem, 4vw, 3rem);
+  gap: var(--bb-space-two, 16px);
+  padding: 0.75rem clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem));
   border-top: 1px solid rgba(26, 67, 68, 0.07);
   color: #819292;
   background: rgba(255, 255, 255, 0.76);
@@ -410,8 +410,8 @@ a {
 }
 
 :root.dark body {
-  color: #edf5f2;
-  background: #111c1d;
+  color: var(--bb-color-text, #edf5f2);
+  background: var(--bb-color-background, #111c1d);
 }
 
 :root.dark .app-topbar {
@@ -420,7 +420,7 @@ a {
 }
 
 :root.dark .brand-link {
-  color: #edf5f2;
+  color: var(--bb-color-text, #edf5f2);
 }
 
 :root.dark .brand-tagline {
@@ -436,7 +436,7 @@ a {
   background:
     radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.07), transparent 30%),
     radial-gradient(ellipse at 92% 72%, rgba(113, 199, 190, 0.08), transparent 34%),
-    #111c1d;
+    var(--bb-color-background, #111c1d);
 }
 
 :root.dark .eyebrow {

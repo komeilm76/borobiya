@@ -1,4 +1,5 @@
 import { tryOnScopeDispose } from "@vueuse/core";
+import { palettes } from "@/styles/tokens";
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
 import { useSystemTheme } from "../composables/useSystemTheme";
@@ -12,11 +13,6 @@ import {
   type ThemePreference
 } from "../theme/theme-preference";
 
-const THEME_COLORS: Record<ResolvedTheme, { background: string; foreground: string }> = {
-  light: { background: "#f4f7f6", foreground: "#193536" },
-  dark: { background: "#111c1d", foreground: "#edf5f2" }
-};
-
 function applyDocumentTheme(theme: ResolvedTheme): void {
   if (typeof document === "undefined") return;
 
@@ -24,11 +20,11 @@ function applyDocumentTheme(theme: ResolvedTheme): void {
   root.classList.toggle("dark", theme === "dark");
   root.dataset.theme = theme;
   root.style.colorScheme = theme;
-  root.style.backgroundColor = THEME_COLORS[theme].background;
-  root.style.color = THEME_COLORS[theme].foreground;
+  root.style.backgroundColor = palettes[theme].background;
+  root.style.color = palettes[theme].text;
 
   const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-  if (themeColor) themeColor.content = THEME_COLORS[theme].background;
+  if (themeColor) themeColor.content = palettes[theme].background;
 }
 
 export const useThemeStore = defineStore("app-theme", () => {

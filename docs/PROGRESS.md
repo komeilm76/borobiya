@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-25 — T4.4.5 design-token foundation
+
+- Centralized the client’s 8px spacing grid, light/dark semantic UI colors and Persian-first typography in `styles/tokens.ts`. Vuetify, the theme store/meta color and generated CSS custom properties share one palette; app-shell selectors consume it. A source-pinned test prevents the static pre-paint initializer from drifting and checks base text contrast. Component-wide style migration, responsive/browser acceptance and the WCAG audit remain separate tasks.
+
 ### 2026-10-25 — T3.5.5 offline elevation integration (not yet accepted)
 
 - Added operator-only Mapzen/Tilezen Skadi HGT staging for an explicit WGS84 bbox, with source URL, SHA-256 and raster-size manifest; the gateway mounts that external directory read-only and never downloads tiles at request time. Optional sampled ascent/descent for each returned OSRM alternative requires complete checksum-valid DEM coverage; absent, void, corrupt and out-of-bounds samples return `null`, not invented altitude. Mission UI shows estimates with source credits only when present.
