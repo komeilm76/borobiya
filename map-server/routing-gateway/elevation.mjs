@@ -8,6 +8,29 @@ const TILE_NAME = /^[NS](?:0\d\d|[0-8]\d|90)[EW](?:0\d\d|1[0-7]\d|180)$/;
 const SOURCE = "mapzen-skadi";
 const MAX_SAMPLES = 12_000;
 const SAMPLE_SPACING_M = 90;
+const MAX_PROFILE_POINTS = 96;
+
+// Keep first/last plus each distance bucket's extrema in traversal order. Uniform
+// subsampling can erase a short steep climb; the chart still stays bounded on long routes.
+function compactProfile(samples) {
+  const buckets = Array.from({ length: (MAX_PROFILE_POINTS - 2) / 2 }, () => ({ min: null, max: null }));
+  const total = samples.at(-1).distance_m;
+  for (let i = 1; i < samples.length - 1; i++) {
+    const bucket = buckets[Math.min(buckets.length - 1, Math.floor(samples[i].distance_m / (total || 1) * buckets.length))];
+    if (bucket.min === null || samples[i].elevation_m < samples[bucket.min].elevation_m) bucket.min = i;
+    if (bucket.max === null || samples[i].elevation_m > samples[bucket.max].elevation_m) bucket.max = i;
+  }
+  const retained = [samples[0]];
+  for (const bucket of buckets) {
+    for (const i of [bucket.min, bucket.max].filter((index) => index !== null).sort((a, b) => a - b)) {
+      if (retained.at(-1) !== samples[i]) retained.push(samples[i]);
+    }
+  }
+  retained.push(samples.at(-1));
+  return retained.map(({ distance_m, elevation_m }) => ({
+    distance_m: Math.round(distance_m), elevation_m: Math.round(elevation_m)
+  }));
+}
 
 export function tileName(lat, lon) {
   const y = Math.floor(lat);
@@ -63,10 +86,13 @@ export function elevationForRoute(polyline, provider) {
   let loss = 0;
   let start = null;
   let count = 0;
+  let travelled = 0;
+  const samples = [];
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i];
     const b = points[i + 1];
-    const steps = Math.max(1, Math.ceil(distance(a, b) / SAMPLE_SPACING_M));
+    const segmentLength = distance(a, b);
+    const steps = Math.max(1, Math.ceil(segmentLength / SAMPLE_SPACING_M));
     if (count + steps + 1 > MAX_SAMPLES) return null;
     for (let j = 0; j < steps; j++) {
       const t = j / steps;
@@ -77,15 +103,19 @@ export function elevationForRoute(polyline, provider) {
         gain += Math.max(0, height - previous);
         loss += Math.max(0, previous - height);
       }
+      samples.push({ distance_m: travelled + segmentLength * t, elevation_m: height });
       previous = height;
       count++;
     }
+    travelled += segmentLength;
   }
   const end = provider.sample(points.at(-1).lat, points.at(-1).lon);
   if (end === null || !Number.isFinite(end)) return null;
   gain += Math.max(0, end - previous);
   loss += Math.max(0, previous - end);
-  return { gain_m: Math.round(gain), loss_m: Math.round(loss), start_m: Math.round(start), end_m: Math.round(end), source: SOURCE };
+  samples.push({ distance_m: travelled, elevation_m: end });
+  return { gain_m: Math.round(gain), loss_m: Math.round(loss), start_m: Math.round(start), end_m: Math.round(end),
+    source: SOURCE, profile: compactProfile(samples) };
 }
 
 export function createElevationProvider(directory, log = console.error) {

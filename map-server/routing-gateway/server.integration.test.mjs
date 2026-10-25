@@ -162,9 +162,14 @@ test("serves route with local DEM, geocode, and reverse requests offline through
       assert.equal(body.routes[0].duration_s, routeFixture.routes[0].duration);
       assert.equal(body.routes[0].polyline, routeFixture.routes[0].geometry);
       assert.ok(Array.isArray(body.routes[0].legs));
-      assert.deepEqual(body.routes[0].elevation, {
-        gain_m: 0, loss_m: 0, start_m: 500, end_m: 500, source: "mapzen-skadi"
-      });
+      assert.equal(body.routes[0].elevation.source, "mapzen-skadi");
+      assert.equal(body.routes[0].elevation.gain_m, 0);
+      assert.equal(body.routes[0].elevation.loss_m, 0);
+      assert.equal(body.routes[0].elevation.start_m, 500);
+      assert.equal(body.routes[0].elevation.end_m, 500);
+      assert.ok(body.routes[0].elevation.profile.length >= 2);
+      assert.ok(body.routes[0].elevation.profile.length <= 96);
+      assert.equal(body.routes[0].elevation.profile[0].distance_m, 0);
     }
 
     assert.deepEqual(upstreamRequests.map(({ path }) => path), [

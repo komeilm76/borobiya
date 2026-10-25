@@ -68,6 +68,23 @@ test("HGT bilinear interpolation, route ascent/descent and no-data cases", () =>
   assert.equal(logs.length, 0);
 });
 
+test("bounded distance profile retains a short elevation peak and never invents void samples", () => {
+  const path = encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.1, lon: 51.9 }]);
+  const elevation = elevationForRoute(path, { sample: (_lat, lon) => lon >= 51.499 && lon <= 51.502 ? 1000 : 100 });
+  assert.ok(elevation.profile.length >= 3 && elevation.profile.length <= 96);
+  assert.equal(elevation.profile[0].distance_m, 0);
+  assert.ok(elevation.profile.at(-1).distance_m > 70_000);
+  assert.ok(elevation.profile.some((point) => point.elevation_m === 1000));
+  assert.ok(elevation.profile.every((point, index) => index === 0 ||
+    point.distance_m >= elevation.profile[index - 1].distance_m));
+  assert.equal(elevation.gain_m, 900);
+  assert.equal(elevation.loss_m, 900);
+  assert.equal(elevationForRoute(path, { sample: (_lat, lon) => lon > 51.5 ? null : 100 }), null);
+  const still = elevationForRoute(encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.1, lon: 51.1 }]),
+    { sample: () => 100 });
+  assert.deepEqual(still.profile, [{ distance_m: 0, elevation_m: 100 }, { distance_m: 0, elevation_m: 100 }]);
+});
+
 test("void, corrupt, missing and invalid manifest data cannot imply an altitude", () => {
   const temp = mkdtempSync(join(tmpdir(), "borobiya-dem-void-"));
   try {

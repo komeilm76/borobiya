@@ -270,7 +270,10 @@ leave the selected area. A returned route crossing a missing tile or HGT void ha
 `elevation: null` while distance/duration and other routes still work. Positive
 `gain_m`/`loss_m` are approximate totals sampled along the *full OSRM polyline*
 at most every 90 m (max 12,000 samples); they are not net altitude change and
-are not a safety-grade slope survey. Empty/malformed/stale/missing DEM data never
+are not a safety-grade slope survey. A bounded `profile` (at most 96 ordered
+`{distance_m,elevation_m}` samples) retains each distance bucket's low/high points
+for a bike/foot preview chart. It is a visualization of the same verified DEM,
+not a separate grade/road-slope measurement. Empty/malformed/stale/missing DEM data never
 produces a guessed elevation. The gateway keeps at most three checked tiles in
 memory (~78 MB for 1-arcsecond rasters). Check each returned alternative on each
 profile and the mission view in an offline browser session before marking T3.5.5
@@ -290,7 +293,7 @@ The project contract remains a simple `POST /route`; its body is translated to O
 }
 ```
 
-`profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, OSRM `legs`, and `elevation` (`null` without full verified DEM coverage; otherwise `gain_m`, `loss_m`, `start_m`, `end_m`, `source`), plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
+`profile` must be `car`, `bicycle`, or `foot`; `alternatives` may be a boolean or an integer from 0 to 3. The response contains `routes`, each with `distance_m`, `duration_s`, encoded `polyline`, OSRM `legs`, and `elevation` (`null` without full verified DEM coverage; otherwise `gain_m`, `loss_m`, `start_m`, `end_m`, `source`, and a bounded ordered `profile`), plus the selected `profile` and snapped `waypoints`. The route adapter listens on `http://localhost:8001/route`; the Compose Nginx gateway also forwards same-origin `/route` on port 8080. The Vite dev proxy forwards `/route` to `MAP_ROUTING_URL`.
 
 A failure that reaches the client says what the upstream said. `map-server/routing-gateway/upstream.mjs`
 reads the profile's body once as text and parses it, so every 502 carries `upstream` (the container and path

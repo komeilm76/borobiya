@@ -5,6 +5,16 @@ import { requestJson } from "./http";
 
 const profileSchema = z.enum(["car", "bicycle", "foot"]);
 export type TransportProfile = z.infer<typeof profileSchema>;
+const elevationPointSchema = z.object({
+  distance_m: z.number().finite().nonnegative(),
+  elevation_m: z.number().finite()
+});
+export type ElevationProfilePoint = z.infer<typeof elevationPointSchema>;
+const elevationProfileSchema = z.array(elevationPointSchema).min(2).max(96).superRefine((points, context) => {
+  if (points[0]?.distance_m !== 0 || points.some((point, index) => index > 0 && point.distance_m < points[index - 1]!.distance_m)) {
+    context.addIssue({ code: "custom", message: "Elevation distances must start at zero and follow route order." });
+  }
+});
 const routeSchema = z.object({
   distance_m: z.number().finite().nonnegative(),
   duration_s: z.number().finite().nonnegative(),
@@ -13,7 +23,8 @@ const routeSchema = z.object({
   elevation: z.object({
     gain_m: z.number().finite().nonnegative(), loss_m: z.number().finite().nonnegative(),
     start_m: z.number().finite(), end_m: z.number().finite(),
-    source: z.literal("mapzen-skadi")
+    source: z.literal("mapzen-skadi"),
+    profile: elevationProfileSchema.optional() // Older gateways may return only gain/loss.
   }).nullable().optional()
 });
 const routesResponseSchema = z.object({

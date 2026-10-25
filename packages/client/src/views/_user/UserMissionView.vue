@@ -114,6 +114,14 @@
               <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
               <small v-if="choice.elevation">صعود تخمینی: {{ Math.round(choice.elevation.gain_m).toLocaleString('fa-IR') }} متر · نزول تخمینی: {{ Math.round(choice.elevation.loss_m).toLocaleString('fa-IR') }} متر</small>
               <small v-else>ارتفاع: دادهٔ آفلاین برای تمام این مسیر موجود نیست.</small>
+              <span v-if="chartForRoute(choice)" class="mission-route__elevation-chart">
+                <svg viewBox="0 0 240 80" preserveAspectRatio="none" aria-hidden="true">
+                  <path :d="chartForRoute(choice)?.area" class="mission-route__elevation-area" />
+                  <path :d="chartForRoute(choice)?.line" class="mission-route__elevation-line" />
+                </svg>
+                <small>{{ chartForRoute(choice)?.range }} · چپ: شروع، راست: مقصد</small>
+                <span class="sr-only">{{ chartForRoute(choice)?.description }}</span>
+              </span>
             </button>
           </div>
           <p v-if="routing.routes.value.some(choice => choice.elevation)" class="text-caption mt-2">
@@ -184,8 +192,9 @@ import { useThemeStore } from "@/stores/theme";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { missionMapCamera } from "@/sos/mission-map";
 import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
+import { buildElevationChart } from "@/sos/elevation-chart";
 import { needsOverlayRestore } from "@/map/overlay-restore";
-import type { TransportProfile } from "@/api/mission-routing";
+import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
 import { useAuthStore } from "@/stores/auth";
 
@@ -203,6 +212,9 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   () => routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
 function onProfileChange(value: unknown): void {
   if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
+}
+function chartForRoute(choice: RouteChoice) {
+  return routing.profile.value === "car" ? null : buildElevationChart(choice.elevation?.profile);
 }
 const ROUTE_SOURCE = "rescuer-route-preview";
 const ROUTE_LAYER = "rescuer-route-preview-line";
@@ -324,6 +336,10 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-route__choice:disabled { opacity: .7; cursor: not-allowed; }
 .mission-route__navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 18px; }
 .mission-route__choice small { opacity: .75; }
+.mission-route__elevation-chart { display: grid; gap: 4px; min-width: 0; }
+.mission-route__elevation-chart svg { display: block; width: 100%; height: 72px; direction: ltr; overflow: visible; }
+.mission-route__elevation-area { fill: rgb(var(--v-theme-primary)); opacity: .13; }
+.mission-route__elevation-line { fill: none; stroke: rgb(var(--v-theme-primary)); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .mission-desk__shell { max-width: 1120px; margin-inline: auto; }
 .mission-hero { position: relative; overflow: hidden; border-radius: 28px; background: linear-gradient(115deg, #103b40, #206b67); color: white; padding: clamp(27px, 5vw, 56px); box-shadow: 0 22px 60px rgba(11,67,65,.18); }
 .mission-hero__eyebrow { display: inline-flex; align-items: center; gap: 9px; color: #a4e7d5; font-weight: 700; font-size: .84rem; }

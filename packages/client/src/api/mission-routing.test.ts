@@ -22,6 +22,9 @@ describe("mission navigation APIs", () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(reply), { status: 200 }));
     vi.stubGlobal("fetch", fetcher);
     expect(await getMissionRouteChoices(from, to, "bicycle")).toHaveLength(1);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply,
+      routes: Array.from({ length: 4 }, (_, index) => ({ ...reply.routes[0], distance_m: 1000 + index })) }))));
+    expect((await getMissionRouteChoices(from, to, "bicycle")).map((route) => route.distance_m)).toEqual([1000, 1001, 1002]);
     expect(fetcher).toHaveBeenCalledWith("/route", expect.objectContaining({
       method: "POST", credentials: "same-origin",
       body: JSON.stringify({ from, to, profile: "bicycle", alternatives: 2 })
@@ -40,6 +43,22 @@ describe("mission navigation APIs", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply,
       routes: [{ ...reply.routes[0], elevation: { ...elevation, gain_m: -10 } }] }), { status: 200 })));
     await expect(getMissionRouteChoices(from, to, "bicycle")).rejects.toThrow();
+  });
+  it("accepts a bounded ordered elevation profile but refuses misleading chart coordinates", async () => {
+    const elevation = { gain_m: 20, loss_m: 2, start_m: 100, end_m: 118, source: "mapzen-skadi",
+      profile: [{ distance_m: 0, elevation_m: 100 }, { distance_m: 500, elevation_m: 120 }, { distance_m: 900, elevation_m: 118 }] };
+    const answer = (value: unknown) => new Response(JSON.stringify({ ...reply,
+      routes: [{ ...reply.routes[0], elevation: value }] }), { status: 200 });
+    vi.stubGlobal("fetch", vi.fn(async () => answer(elevation)));
+    expect((await getMissionRouteChoices(from, to, "bicycle"))[0]?.elevation?.profile).toEqual(elevation.profile);
+    for (const invalid of [
+      [{ distance_m: 1, elevation_m: 100 }, { distance_m: 500, elevation_m: 120 }],
+      [{ distance_m: 0, elevation_m: 100 }, { distance_m: 500, elevation_m: 120 }, { distance_m: 400, elevation_m: 118 }],
+      Array.from({ length: 97 }, (_, i) => ({ distance_m: i, elevation_m: 100 }))
+    ]) {
+      vi.stubGlobal("fetch", vi.fn(async () => answer({ ...elevation, profile: invalid })));
+      await expect(getMissionRouteChoices(from, to, "bicycle")).rejects.toThrow();
+    }
   });
   it("reports no route separately from an unavailable gateway", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 422 })));

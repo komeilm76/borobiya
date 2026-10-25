@@ -49,7 +49,7 @@ for profile in car bicycle foot; do
   fi
 
   python3 - "$response_file" "$profile" "${MAP_REQUIRE_ELEVATION:-0}" <<'PY' || fail "${profile} response is not a valid route"
-import json, sys
+import json, math, sys
 body = json.load(open(sys.argv[1], encoding='utf-8'))
 profile = sys.argv[2]
 routes = body.get('routes')
@@ -71,11 +71,23 @@ for i, option in enumerate(routes):
             raise SystemExit(f'route {i + 1} has no complete offline DEM coverage')
         continue
     if (elevation.get('source') != 'mapzen-skadi' or
-            not all(isinstance(elevation.get(key), (int, float)) and elevation[key] >= 0
+            not all(isinstance(elevation.get(key), (int, float)) and math.isfinite(elevation[key]) and elevation[key] >= 0
                     for key in ('gain_m', 'loss_m')) or
-            not all(isinstance(elevation.get(key), (int, float))
+            not all(isinstance(elevation.get(key), (int, float)) and math.isfinite(elevation[key])
                     for key in ('start_m', 'end_m'))):
         raise SystemExit(f'route {i + 1} has invalid elevation')
+    samples = elevation.get('profile')
+    if not isinstance(samples, list) or not 2 <= len(samples) <= 96:
+        raise SystemExit(f'route {i + 1} lacks a bounded elevation profile')
+    previous_distance = 0
+    for j, point in enumerate(samples):
+        if (not isinstance(point, dict) or
+                not all(isinstance(point.get(key), (int, float)) and math.isfinite(point[key])
+                        for key in ('distance_m', 'elevation_m')) or
+                point['distance_m'] < (0 if j == 0 else previous_distance) or
+                (j == 0 and point['distance_m'] != 0)):
+            raise SystemExit(f'route {i + 1} has an invalid elevation profile at point {j}')
+        previous_distance = point['distance_m']
 print(f"OK: {profile} returned {len(routes)} route(s), {route['distance_m']:.0f} m, {route['duration_s']:.0f} s; "
       f"elevation on {sum(option.get('elevation') is not None for option in routes)}/{len(routes)}")
 PY

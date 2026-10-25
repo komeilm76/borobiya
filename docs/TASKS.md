@@ -297,9 +297,10 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 4.2 Routing Polish
 
 - [ ] **T4.2.1** Multi-destination (waypoint) routing: A→B→C slider, drag reorder, `optimize=true` TSP toggle
-- [ ] **T4.2.2** Alternative routes UI (2-3 cards with distance/duration/elevation chart for bike/foot)
+- [x] **T4.2.2** Alternative routes UI (2-3 cards with distance/duration/elevation chart for bike/foot) ✅ 2026-10-25
+  - **Delivered in code:** The existing selectable, keyboard-focusable rescuer route cards show distance/duration and up to three **actual** OSRM alternatives (with honest one-route wording). The gateway now supplies a ≤96-point distance/elevation profile alongside gain/loss only after every sampled point has verified local HGT coverage; distance buckets retain short peaks/troughs rather than erasing them by uniform thinning. Bicycle/foot cards show an accessible SVG chart and visible low/high range; car retains the summary without a chart. A flat-route display floor avoids exaggerating a one-metre bump into a mountain. Malformed/oversized/nonmonotonic profiles are rejected at the client boundary and pure chart helper. Gateway, HTTP integration, client adapter, chart and source-pinned view tests pass. **No browser or real DEM run is claimed**; T3.5.5 remains open for VM coverage, and OSRM cannot guarantee 2–3 alternatives on every route.
 - [x] **T4.2.3** Exit navigation → reset `pitch 0, bearing 0` ✅ 2026-10-24
-  - **Delivered:** Stopping GPS-follow returns the active route map to a north-up, level camera (450 ms). It applies to the Stop button, closed panel, permission denial and mission/account change, but never on an initial start or redundant stop. The location watch is disposed before the camera reset; old watch callbacks remain ignored. Pure composable regressions and a source-pinned mission-view test cover the behavior. Offline elevation (T3.5.5/T4.2.2) remains open; VM/browser acceptance is pending.
+  - **Delivered:** Stopping GPS-follow returns the active route map to a north-up, level camera (450 ms). It applies to the Stop button, closed panel, permission denial and mission/account change, but never on an initial start or redundant stop. The location watch is disposed before the camera reset; old watch callbacks remain ignored. Pure composable regressions and a source-pinned mission-view test cover the behavior. Real offline elevation coverage (T3.5.5) remains open; T4.2.2 chart code shipped later, without VM/browser acceptance.
 
 ### 4.3 Realtime & Disconnection
 

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-25 — T4.2.2 conditional offline elevation charts (code complete)
+
+- Existing mission cards now add a bike/foot-only accessible SVG profile when a route has complete local DEM coverage; missing/void tiles still produce no chart. The gateway compacts full-geometry samples to at most 96 points while retaining distance-bucket extrema, and the client validates order/size and avoids exaggerating flat profiles. Source-pinned view, pure chart, gateway and HTTP tests cover the code. OSRM can return only one route, and no browser or real VM DEM acceptance is claimed; T3.5.5 stays open.
+
 ### 2026-10-25 — T4.6.4 environment reference and platform guide
 
 - Documented all active `.env.example` entries by consumer/meaning in `docs/ENVIRONMENT.md`, linked from the docs index and development guide. Added a static lint guard against undocumented/duplicate env keys, unused SOS/mission timeout promises, and remote browser-facing Vite URLs; removed the unused placeholders and added the actual Nominatim import default. Replaced the stale duplicate env snippet and corrected the no-Docker Windows PowerShell/PostGIS/migration sequence alongside the Ubuntu VM helper path. **Windows instructions are source-reviewed, not live-tested on Windows.**

@@ -14,6 +14,17 @@ describe("mission map style restoration", () => {
     expect(credits).toContain("SRTM terrain data courtesy of the U.S. Geological Survey");
     expect(credits).toContain("Europe terrain data produced using Copernicus");
   });
+  it("offers up to three route cards and restricts offline elevation charts to bike/foot", () => {
+    expect(view).toContain('v-for="(choice, index) in routing.routes.value"');
+    expect(view).toContain("formatRouteDistance(choice.distance_m)");
+    expect(view).toContain("formatRouteDuration(choice.duration_s)");
+    expect(view).toContain('routing.profile.value === "car" ? null');
+    expect(view).toContain('v-if="chartForRoute(choice)"');
+    expect(view).toContain('aria-hidden="true"');
+    expect(view).toContain('<span class="sr-only">{{ chartForRoute(choice)?.description }}</span>');
+    expect(view).toContain("buildElevationChart(choice.elevation?.profile)");
+    expect(view).toContain("routing.routes.value.length === 1");
+  });
   it("does not call GeoJSON setData on every map idle when the route layer is already present", () => {
     expect(view).toContain('map.on("idle", onStyleReady)');
     expect(view).toContain("function restoreRouteLayer()");
