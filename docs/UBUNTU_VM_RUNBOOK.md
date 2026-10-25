@@ -495,10 +495,32 @@ else
 fi
 ```
 
-Do not disable APT signature checks, remove the working Engine, or run `down -v` to
-fix a repository URL. If APT still fails with suite `noble`, inspect the proxy/connection
-error separately. Apt source lines may contain credentials in other installations; inspect
-locally before sharing them.
+**Another older-install mismatch: `NO_PUBKEY` with `docker.gpg` missing and `docker.asc`
+present.** Inspect the active Docker APT source first. If its exact `signed-by` path is
+`/etc/apt/keyrings/docker.gpg`, that file is missing, and a nonempty armored key is
+already at `/etc/apt/keyrings/docker.asc`, point *only this source* at the existing key.
+The strict APT update below will reject it unless it verifies Docker's signed metadata:
+
+```bash
+SRC=/etc/apt/sources.list.d/docker.list
+KEY=/etc/apt/keyrings/docker.asc
+if sudo grep -qF 'signed-by=/etc/apt/keyrings/docker.gpg' "$SRC" && sudo test -s "$KEY"; then
+  sudo cp -a "$SRC" /root/docker.list.before-key-fix
+  sudo sed -i 's|signed-by=/etc/apt/keyrings/docker.gpg|signed-by=/etc/apt/keyrings/docker.asc|' "$SRC"
+  sudo apt-get -o APT::Update::Error-Mode=any update
+else
+  echo 'Expected source/key mismatch not found; inspect the active signed-by path before changing it.' >&2
+fi
+```
+
+The final update must succeed **without** `NO_PUBKEY` before installing the Compose plugin.
+If it still rejects the key, stop and verify or refresh the official Docker key (the fresh
+install block above uses Docker's HTTPS key URL). Do not use `trusted=yes`, `apt-key`,
+`--allow-unauthenticated`, remove the working Engine, or run `down -v`. A backup file
+named `docker.list.before-suite-fix` inside the APT source directory is ignored; its
+filename warning is cosmetic. If APT still fails with suite `noble`, inspect the
+proxy/connection error separately. Source lines may contain credentials on other systems;
+inspect locally before sharing them.
 
 Two traps, both of which look like "the script is broken":
 

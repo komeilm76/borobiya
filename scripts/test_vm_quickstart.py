@@ -153,6 +153,9 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('sudo install -m 0644 "$DOCKER_KEY" /etc/apt/keyrings/docker.asc', runbook)
         self.assertIn("signed-by=/etc/apt/keyrings/docker.asc", runbook)
         self.assertNotIn("sudo gpg --dearmor < /tmp/docker.gpg >", runbook)
+        self.assertIn("sudo test -s \"$KEY\"", runbook)
+        self.assertIn("signed-by=/etc/apt/keyrings/docker.gpg|signed-by=/etc/apt/keyrings/docker.asc", runbook)
+        self.assertIn("APT::Update::Error-Mode=any update", runbook)
 
     def test_reports_incompatible_versions_without_installing_anything(self):
         with tempfile.TemporaryDirectory() as directory:
