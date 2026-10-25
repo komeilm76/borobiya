@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
     "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts",
     "db:migrate:runtime": "bun src/db/migrate.ts",
+    "db:check:runtime": "bun src/db/check-schema.ts",
     "db:seed": "bun src/db/seed.ts",
     "db:reset-admin-password": "bun src/db/reset-admin-password.ts"
   },

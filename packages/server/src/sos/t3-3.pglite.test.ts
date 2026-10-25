@@ -669,6 +669,42 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       bystanderSocket.close();
     }
   });
+  it("serves the proposal inbox and filtered requester missions before and after acceptance", async () => {
+    const rescuerId = "80000000-0000-4000-8000-000000000006";
+    const sessionId = "81000000-0000-4000-8000-000000000006";
+    const sosId = "82000000-0000-4000-8000-000000000006";
+    const proposalId = "83000000-0000-4000-8000-000000000006";
+    await seedUser({ id: rescuerId, username: "inbox_rescuer", sessionId });
+    await pg.query(`INSERT INTO "sos_requests" ("id", "requester_id", "severity", "description", "incident_type_id", "location", "status")
+      VALUES ($1, $2, 'high', 'A person needs an emergency response.', $3, 'POINT(51.4 35.7)', 'dispatched')`,
+    [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    await pg.query(`INSERT INTO "mission_proposals" ("id", "sos_request_id", "rescuer_id") VALUES ($1, $2, $3)`,
+      [proposalId, sosId, rescuerId]);
+    const rescuerToken = await signAccessToken({ userId: rescuerId, role: "user", sessionId,
+      deviceId: `dev-${rescuerId.slice(-6)}` }, JWT_SECRET);
+    const inbox = () => app.inject({ method: "GET", url: "/_user/sos/proposals?page=1&limit=20",
+      headers: { authorization: `Bearer ${rescuerToken}` } });
+    const missions = () => app.inject({ method: "GET",
+      url: `/_user/sos/missions?role=requester&page=1&limit=50&sosRequestId=${sosId}`,
+      headers: { authorization: `Bearer ${requesterToken}` } });
+    const before = await Promise.all([inbox(), missions()]);
+    expect(before[0]!.statusCode, before[0]!.body).toBe(200);
+    expect(before[0]!.json()).toMatchObject({ total: 1, items: [{ id: proposalId,
+      details: { incidentTypeName: "امداد پزشکی", requesterName: "trapped_requester" } }] });
+    expect(before[1]!.statusCode, before[1]!.body).toBe(200);
+    expect(before[1]!.json()).toMatchObject({ total: 0, items: [] });
+
+    const accepted = await app.inject({ method: "POST", url: `/_user/sos/proposals/${proposalId}/accept`,
+      headers: { authorization: `Bearer ${rescuerToken}` } });
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(accepted.json().missionId).toEqual(expect.any(String));
+    const after = await Promise.all([inbox(), missions()]);
+    expect(after[0]!.statusCode, after[0]!.body).toBe(200);
+    expect(after[0]!.json()).toMatchObject({ total: 0, items: [] });
+    expect(after[1]!.statusCode, after[1]!.body).toBe(200);
+    expect(after[1]!.json()).toMatchObject({ total: 1, items: [{ id: accepted.json().missionId, sosRequestId: sosId }] });
+  });
+
   it("scopes live mission-room subscriptions and delivers committed status once to each participant and admin", async () => {
     const rescuerId = "80000000-0000-4000-8000-000000000008";
     const rescuerSession = "81000000-0000-4000-8000-000000000008";

@@ -206,7 +206,7 @@ external assets, not bundled in `.env` or Git.
 | Command | Where | What |
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
-| `bun run dev` | root | Runs the API and Vite client concurrently with Bun's workspace runner; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
+| `bun run dev` | root | Read-only database schema check, then API and Vite concurrently; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
 | `bun run lint` | root | Runs `./scripts/check-repo.sh`: `bash -n` and `shellcheck` across `scripts/*.sh` and `map-server/scripts/*.sh`, `ruff` across both Python script trees, `scripts/check_runbook_markdown.py` across `docs/*.md` and `README.md`, and env-reference parity |
 | `bun run typecheck` | root | Typechecks `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
 | `bun run test` | root | Runs the Vitest suites in `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
@@ -222,6 +222,7 @@ external assets, not bundled in `.env` or Git.
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
 | `bun --filter @borobiya/server db:generate` | root | Generates a Drizzle migration from `packages/server/src/db/schema.ts`; does not apply it |
 | `bun --filter @borobiya/server db:migrate` | root | Applies pending Drizzle migrations to the configured `DATABASE_URL`; not run by API startup |
+| `bun --filter @borobiya/server db:check:runtime` | root | Read-only check that the configured API database has the latest journal migration and proposal/mission tables; prints an actionable error without credentials if outdated |
 | `docker compose run --rm api bun src/db/migrate.ts` | root | Same migrations via the runtime migrator inside the API image (no drizzle-kit there); run before `db:seed` on a fresh database |
 | `bun run db:setup` | server | Not wired yet |
 | `bun --filter @borobiya/server db:seed` | root | Idempotently seeds reference data and the bootstrap admin; run after `db:migrate` |
@@ -299,6 +300,7 @@ bun --filter @borobiya/client build
 |---------|-----|
 | API startup rejects `DATABASE_URL` | Use a valid `postgres://` or `postgresql://` URL; registration/login database queries run only when a route is used |
 | `relation "users" does not exist` | The migration is checked in but is not applied automatically; start PostgreSQL and run `bun --filter @borobiya/server db:migrate` against the intended `DATABASE_URL` |
+| `GET /_user/sos/proposals` and `GET /_user/sos/missions` return generic 500s | Both routes read tables added by migrations `0013` and `0014`. Before starting host dev, `bun --filter @borobiya/server db:check:runtime` checks the **same** database as the API without writing to it; `bun run dev` and `bun run dev:lan-https` also run this check and refuse to start with an outdated schema. To apply the reviewed migrations explicitly, run `bun --filter @borobiya/server db:migrate:runtime`, then check again. For a Compose API, run `docker compose run --rm --build api bun src/db/migrate.ts` (inside the API image) before retrying. Neither command deletes data. If the check passes yet a route still returns 500, use the API process's sanitized SQLSTATE/error log for that request to diagnose a different cause; do not share tokens, connection strings or full logs. |
 | Map blank, 404 tiles | Check `docker compose logs map-server` and confirm a generated `borobiya.pmtiles` exists under the active `MAP_DATASET_DIR`; styles/sprites/fonts are committed, but map data is built separately into the external library |
 | `ALREADY_AUTHENTICATED` on `_auth` | You are logged in — guard redirects; clear storage or hit logout |
 | `SECURITY_QUESTIONS_REQUIRED` | User was created by admin — complete 5Q at `/_user/complete-security-questions` |
