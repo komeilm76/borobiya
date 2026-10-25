@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --watch src/server.ts",
+    "dev:lan-https": "bun --watch src/server.ts",
     "start": "bun src/server.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.json",

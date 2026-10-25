@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:lan-https": "node ./node_modules/vite/bin/vite.js --host 0.0.0.0",
     "build": "vue-tsc --noEmit --project tsconfig.json && vite build",
     "generate:api": "bun scripts/generate-api.ts",
     "preview": "vite preview --host 0.0.0.0",

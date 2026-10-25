@@ -4,7 +4,7 @@ A phone opening `http://172.16.20.70:5173` cannot normally use `navigator.geoloc
 
 ## 1. Start the chosen mode
 
-From the checkout on the machine owning the LAN IP (Linux/macOS/WSL with OpenSSL 3, Python 3 and Bun):
+From the checkout on the machine owning the LAN IP (Linux/macOS/WSL with OpenSSL 3, Python 3, Bun, and **Node.js 20.19+ or 22.12+ for HTTPS Vite**):
 
 ```bash
 # First, generate the private development CA and IP-specific server certificate:
@@ -19,6 +19,8 @@ From the checkout on the machine owning the LAN IP (Linux/macOS/WSL with OpenSSL
 The script prints the public `ca.crt` path and SHA-256 fingerprint. By default certificates are under `${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/dev-tls/` on the development machine; `BOROBIYA_DEV_TLS_DIR` can override the directory. `ca.key` and `172.16.20.70.key` are **private**: never put them on a phone, in an APK, in Git, in a message, or on a public server. Share **only `ca.crt`** (the public CA) with the phone, using a private transfer method such as USB. The script reuses the same CA and valid IP-specific leaf certificate on subsequent runs; keep the CA private key safe. If the machine IP changes, run `cert` or `https` again with the new IP, then visit that new IP on the phone. A publicly trusted CA normally will not issue a certificate for a private LAN IP.
 
 The phone and computer must be on the same reachable LAN/VPN, with TCP 5173 allowed through the firewall and without Wi-Fi client isolation. Vite already binds `0.0.0.0`; the backends stay on their existing server-side HTTP proxy targets. Browser requests for `/api`, `/map`, `/route`, `/socket.io` (via `/api/socket.io`) and HMR remain on the **HTTPS origin**; the browser must not call a backend's `http://localhost`. Vite forwards the browser-facing scheme to the proxies for services that honor forwarded headers. Restart the server after changing the transport.
+
+**Runtime note:** `bun run dev` and the `http` switch retain the usual Bun dev runner. With Bun 1.4.3, Vite's **HTTPS HMR WebSocket** upgrade can crash inside Bun's `ws` implementation (`TypeError: undefined is not an object (evaluating 'socket')`). The `https` switch now keeps the API watcher on Bun but explicitly runs **Vite on Node.js**, including its `wss://` HMR server. It checks Node's version before starting. This does not affect the certificate or require an APK. The regression test `python3 -m unittest scripts/test_dev_lan.py` includes a real trusted HTTPS + WSS handshake when Node and dependencies are installed.
 
 If using the project's API/Socket.IO from that origin, add `https://172.16.20.70:5173` to the comma-separated `CORS_ORIGINS` in the **local `.env`** (retain the existing entries), then restart the API. Do not use `*`. Vite's proxy itself does not eliminate the Socket.IO server's origin allowlist. If you need the backend to mark refresh cookies `Secure` behind the HTTPS Vite proxy, configure `TRUSTED_PROXY_IPS` for **only the actual local Vite proxy IP**, not a world-wide range; the API trusts `X-Forwarded-Proto` only from listed proxies. This is not required just to get GPS working.
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Regression checks for local mobile GPS TLS and debug-only Android trust."""
+import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -67,8 +69,34 @@ class LanTlsTest(unittest.TestCase):
         self.assertIn("run dev|unset|unset|", recorder.read_text())
         https = self.run_script("https", env=env)
         self.assertEqual(https.returncode, 0, https.stderr)
-        self.assertIn(f"run dev|{self.certs / f'{IP}.pem'}|{self.certs / f'{IP}.key'}|",
+        self.assertIn(f"run dev:lan-https|{self.certs / f'{IP}.pem'}|{self.certs / f'{IP}.key'}|",
                       recorder.read_text())
+
+    def test_https_launcher_uses_node_for_vite_and_wss_really_upgrades(self):
+        repo = SCRIPT.parent.parent
+        root = json.loads((repo / "package.json").read_text())
+        server = json.loads((repo / "packages/server/package.json").read_text())
+        client = json.loads((repo / "packages/client/package.json").read_text())
+        self.assertIn("--parallel", root["scripts"]["dev:lan-https"])
+        self.assertIn("bun --watch", server["scripts"]["dev:lan-https"])
+        self.assertTrue(client["scripts"]["dev:lan-https"].startswith("node "))
+        if not shutil.which("node") or not (repo / "packages/client/node_modules/vite").exists():
+            self.skipTest("Node and installed Vite are required for the live WSS test")
+        cert = self.run_script("cert")
+        self.assertEqual(cert.returncode, 0, cert.stderr)
+        env = dict(self.env, NODE_EXTRA_CA_CERTS=str(self.certs / "ca.pem"),
+                   BOROBIYA_DEV_TLS_CERT=str(self.certs / f"{IP}.pem"),
+                   BOROBIYA_DEV_TLS_KEY=str(self.certs / f"{IP}.key"))
+        # Vite's esbuild child can inherit a capture_output pipe after Node exits;
+        # log to a regular file so communicate() does not wait for that pipe's EOF.
+        log_path = self.root / "hmr.log"
+        with log_path.open("w+") as log:
+            result = subprocess.run(["node", str(repo / "packages/client/scripts/test-dev-https-hmr.mjs")],
+                                    cwd=repo, env=env, stdout=log, stderr=subprocess.STDOUT,
+                                    check=False, timeout=25)
+        output = log_path.read_text()
+        self.assertEqual(result.returncode, 0, output)
+        self.assertIn("WSS HMR handshake passed", output)
 
     def test_android_overlay_contains_only_public_ca_and_is_debug_only(self):
         android = self.root / "android"

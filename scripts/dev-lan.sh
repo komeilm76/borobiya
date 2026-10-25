@@ -11,7 +11,8 @@ Usage: scripts/dev-lan.sh {http|https|cert|android-debug} <LAN IPv4 address>
   android-debug  Bundle the public CA into a generated Android debug APK overlay.
 
 Example: scripts/dev-lan.sh https 172.16.20.70
-Requires: openssl, python3; Bun for http/https. The CA is stored outside Git in
+Requires: openssl, python3, Bun; HTTPS also needs Node.js 20.19+ or 22.12+ for Vite HMR.
+The CA is stored outside Git in
 ${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/dev-tls (override BOROBIYA_DEV_TLS_DIR).
 HELP
   exit 2
@@ -107,8 +108,14 @@ case "$mode" in
   https)
     echo "Starting HTTPS at https://$address:5173 (trust ca.crt on your phone first)."
     export BOROBIYA_DEV_TLS_CERT="$leaf_cert" BOROBIYA_DEV_TLS_KEY="$leaf_key"
+    command -v node >/dev/null || { echo 'HTTPS HMR requires Node.js >=20.19 or >=22.12 (Vite must not run on Bun here).' >&2; exit 1; }
+    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || major === 22 && minor >= 12 || major === 20 && minor >= 19 ? 0 : 1)' || {
+      echo "Node.js $(node --version) is too old for Vite. Install Node.js >=20.19 or >=22.12." >&2; exit 1;
+    }
     cd -- "$repo_root"
-    exec bun run dev
+    # Bun 1.4.3 can crash inside its ws implementation on Vite's TLS HMR upgrade.
+    # Keep Bun for the API and use the supported Node runtime only for Vite.
+    exec bun run dev:lan-https
     ;;
   android-debug)
     debug_dir="$android_root/app/src/debug"
