@@ -113,6 +113,9 @@ describe("userSearchQueries", () => {
 
     expect(online.sql).toContain('exists (select 1 from "user_sessions"');
     expect(online.sql).toContain('"refresh_token_hash" is not null');
+    expect(online.sql).toContain('"last_active_at" >= now()');
+    expect(online.params).toContain(70_000);
+    expect(offline.sql).toContain('"last_active_at" >= now()');
     expect(offline.sql).toContain("not exists (");
     expect(offline.sql).toContain('exists (select 1 from "user_sessions"');
   });

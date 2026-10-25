@@ -1,6 +1,7 @@
 import { and, asc, eq, gte, ilike, ne, sql, type SQLWrapper } from "drizzle-orm";
 import type { Database } from "./client";
 import { users } from "./schema";
+import { PRESENCE_STALE_MS } from "../realtime/presence";
 
 /**
  * The read behind `GET /_user/users/search` (spec §5, T4.1.1's first slice). It answers the question
@@ -100,7 +101,7 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
 
   if (input.online !== null) {
     // Active session presence: a live refresh token plus an active online flag.
-    const liveSessions = sql`select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true`;
+    const liveSessions = sql`select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true and "user_sessions"."last_active_at" >= now() - (${PRESENCE_STALE_MS} * interval '1 millisecond')`;
     conditions.push(input.online ? sql`exists (${liveSessions})` : sql`not exists (${liveSessions})`);
   }
 
@@ -139,7 +140,7 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
         username: users.username,
         category: categorySummary.as("category"),
         avgRating: users.avgRating,
-        isOnline: sql<boolean>`exists (select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true)`
+        isOnline: sql<boolean>`exists (select 1 from "user_sessions" where "user_sessions"."user_id" = "users"."id" and "user_sessions"."refresh_token_hash" is not null and "user_sessions"."is_online" = true and "user_sessions"."last_active_at" >= now() - (${PRESENCE_STALE_MS} * interval '1 millisecond'))`
           .mapWith(Boolean)
           .as("isOnline"),
         distanceKm: distanceKm.mapWith(readDistanceKm).as("distanceKm")

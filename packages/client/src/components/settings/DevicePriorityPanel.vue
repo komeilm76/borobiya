@@ -36,7 +36,7 @@
             </td>
             <td>
               <v-chip size="x-small" :color="row.isOnline ? 'success' : 'grey'" variant="tonal">
-                {{ row.isOnline ? "آنلاین" : "آفلاین" }}
+                {{ row.isOnline ? "آنلاین" : `آفلاین · ${ageText(row.minutesSinceActive)}` }}
               </v-chip>
             </td>
             <td>{{ ageText(row.minutesSinceActive) }}</td>

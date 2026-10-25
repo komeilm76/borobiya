@@ -103,8 +103,7 @@ export class DrizzleUserLoginStore implements UserLoginStore {
       .update(userSessions)
       .set({
         refreshTokenHash: input.nextTokenHash,
-        lastActiveAt: input.lastActiveAt,
-        isOnline: true
+        lastActiveAt: input.lastActiveAt
       })
       .where(and(
         eq(userSessions.id, input.sessionId),

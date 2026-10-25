@@ -98,13 +98,13 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | 3.6 Cancellation + re-dispatch | 100% (7/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Cancellation detail reads expose actor/time/resolved reason; T3.6.6 adds explicit one-click replacement re-dispatch to previously unassigned nearest responders |
 | 3.7 History + rating | 100% (4/4) | ✅ `T3.7.1` requester SOS history, `T3.7.2` requester-only completed-mission rating API, `T3.7.3` storage/average triggers and `T3.7.4` requester star-rating form plus rescuer paginated history with ratings and timelines. VM/browser acceptance remains a separate gate |
 
-### Phase 4 — Polish — 26% (7 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
+### Phase 4 — Polish — 30% (8 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
 
 | Milestone | % | Notes |
 |-----------|---|-------|
 | Routing polish | 33% (1/3) | ✅ `T4.2.3` resets the GPS-follow camera to north-up and level on exit; elevation and multi-stop routing remain open |
 | Search + geocode | 75% (3/4) | ✅ T4.1.2 local Photon gateway + client adapter; T4.1.3 reverse adapter + click/long-press address sheet; T4.1.4 debounced map search, list and fly-to. T4.1.1 username search is still term-bounded. No new VM/browser Photon run |
-| Realtime + disconnection | 20% (1/5) | ✅ T4.3.1 existing private rooms now share a typed live event/ack catalog across client and server, with actual Socket.IO room-isolation coverage. Heartbeat, grace, sync and optional SSE remain open |
+| Realtime + disconnection | 40% (2/5) | ✅ T4.3.1 typed private rooms; T4.3.2 25s/10s heartbeat, session-scoped online/offline timestamps, stale-presence TTL, offline age badge. Mission grace, reconnect sync and optional SSE remain open; VM/browser acceptance pending |
 | Testing | 67% (2/3) | ✅ T4.5.1 shared Zod schema suites + Phase 4 route-contract boundary matrix; T4.5.2 mounted-Fastify guest/admin/user prefix guard and absent DELETE coverage. E2E remains open |
 | UI/UX + perf | 0% | — |
 | Deploy + Android | 0% | — |

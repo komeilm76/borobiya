@@ -103,7 +103,7 @@ export async function registerLoginRoute(
       refreshTokenHash: hashRefreshToken(refreshToken),
       ip: request.ip,
       lastActiveAt: new Date(),
-      isOnline: true
+      isOnline: false
     });
 
     const responseBody = {

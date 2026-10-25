@@ -1,4 +1,6 @@
 import type { Server as HttpServer } from "node:http";
+import { PING_INTERVAL_MS, PING_TIMEOUT_MS } from "./presence";
+export { PING_INTERVAL_MS, PING_TIMEOUT_MS } from "./presence";
 import { Server, type Socket } from "socket.io";
 import { idSchema, missionLocationPublishSchema, type LocationUpdateAck, type MissionJoinAck, type MissionLocationAck, type MissionLocationEvent, type MissionStatusUpdatedEvent, type RequesterCancellationEvent, type RescuerCancellationEvent, type ShareEndedEvent, type SosProposalAcceptedEvent, type SosProposalReceivedEvent, type SosRequest } from "@borobiya/shared";
 import type { ClientToServerEvents, ServerToClientEvents } from "@borobiya/shared";
@@ -9,9 +11,6 @@ import type { LiveLocationService, PeerLocationUpdate } from "../location/live";
 import type { UserSecurityQuestionsStore } from "../db/security-questions-store";
 import { verifyAccessToken, type SessionTokenIdentity } from "../security/tokens";
 
-/** Socket.IO heartbeats follow spec §12.3: a client ping every 25s must be answered within 10s. */
-export const PING_INTERVAL_MS = 25_000;
-export const PING_TIMEOUT_MS = 10_000;
 /** Spec §10.1: 60 location updates per minute per device. */
 export const LOCATION_UPDATES_PER_MINUTE = 60;
 export const LOCATION_UPDATE_WINDOW_MS = 60_000;
@@ -67,6 +66,8 @@ export interface RealtimeDependencies {
   /** Where a swallowed dependency failure is reported; socket handlers have no HTTP reply to fail. */
   logger?: RealtimeLogger;
   path?: string;
+  /** Override only for deterministic heartbeat integration tests; production uses 25s. */
+  presenceRefreshIntervalMs?: number;
 }
 
 export interface RealtimeServer {
@@ -537,8 +538,16 @@ export function attachRealtime(httpServer: HttpServer, dependencies: RealtimeDep
     if (identity.role === "admin") void socket.join(ADMIN_ROOM);
 
     queuePresenceUpdate(identity, true);
+    // Engine.IO owns the actual ping/pong timeout. Refresh the persisted timestamp only
+    // while that transport is connected; a process crash leaves a row that read-side TTLs
+    // can mark offline. Never emit a synthetic ping or require GPS publication.
+    const presenceTimer = setInterval(() => {
+      if (socket.connected) queuePresenceUpdate(identity, true);
+    }, dependencies.presenceRefreshIntervalMs ?? PING_INTERVAL_MS);
+    presenceTimer.unref?.();
 
     socket.on("disconnect", () => {
+      clearInterval(presenceTimer);
       queuePresenceUpdate(identity, false);
     });
 

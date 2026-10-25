@@ -72,6 +72,60 @@ describe("live socket room isolation and session presence", () => {
     }
   });
 
+  it("refreshes connected session presence and records an offline timestamp after the final tab closes", async () => {
+    const userId = randomUUID();
+    const deviceId = randomUUID();
+    const sessionId = randomUUID();
+    const writes: Array<{ isOnline: boolean; at: number }> = [];
+    const users = {
+      async findUserById(id: string) {
+        return id === userId ? { id, role: "user" as const, username: "field_user",
+          isActive: true, isSuspended: false, mustCompleteSecurityQuestions: false,
+          avgRating: null, createdAt: new Date() } : null;
+      },
+      async hasActiveSession() { return true; },
+      async securityQuestionsExist() { return true; },
+      async completeSecurityQuestions() { return true; },
+      async touchSessionPresence({ isOnline }: { isOnline: boolean }) {
+        writes.push({ isOnline, at: Date.now() });
+      }
+    } satisfies UserSecurityQuestionsStore;
+    const http = createServer((_request, reply) => reply.end());
+    const realtime = attachRealtime(http, { jwtSecret: secret, users,
+      live: {} as LiveLocationService, presenceRefreshIntervalMs: 25 });
+    const clients: ClientSocket[] = [];
+    try {
+      await new Promise<void>((resolve) => http.listen(0, "127.0.0.1", resolve));
+      const address = http.address();
+      if (!address || typeof address === "string") throw new Error("missing test port");
+      const token = await signAccessToken({ userId, role: "user", deviceId, sessionId }, secret);
+      const connect = async () => {
+        const client = ioClient(`http://127.0.0.1:${address.port}`, { auth: { token },
+          transports: ["websocket"], reconnection: false, timeout: 3000 });
+        clients.push(client);
+        await new Promise<void>((resolve, reject) => {
+          client.once("connect", resolve);
+          client.once("connect_error", reject);
+        });
+        return client;
+      };
+      const first = await connect();
+      await vi.waitFor(() => expect(writes.filter((entry) => entry.isOnline).length).toBeGreaterThanOrEqual(2));
+      const second = await connect();
+      first.disconnect();
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(writes.some((entry) => !entry.isOnline)).toBe(false);
+      second.disconnect();
+      await vi.waitFor(() => expect(writes.at(-1)?.isOnline).toBe(false));
+      const count = writes.length;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(writes.length).toBe(count); // no leaked presence timers
+    } finally {
+      for (const client of clients) client.disconnect();
+      await realtime.close();
+    }
+  });
+
   it("does not let a delayed disconnect overwrite a reconnect's online presence", async () => {
     const userId = randomUUID();
     const deviceId = randomUUID();

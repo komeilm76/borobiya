@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { userSessions } from "./schema";
+import { PRESENCE_STALE_MS } from "../realtime/presence";
 
 /**
  * Reads for the Active Devices table (spec §7.3). Writing `user_sessions` belongs to
@@ -46,7 +47,7 @@ export function userDeviceListQuery(db: Database, input: { userId: string; limit
       deviceName: userSessions.deviceName,
       ip: userSessions.ip,
       lastActiveAt: userSessions.lastActiveAt,
-      isOnline: userSessions.isOnline
+      isOnline: sql<boolean>`${userSessions.isOnline} and ${userSessions.lastActiveAt} >= now() - (${PRESENCE_STALE_MS} * interval '1 millisecond')`.mapWith(Boolean).as("is_online")
     })
     .from(userSessions)
     .where(and(eq(userSessions.userId, input.userId), isNotNull(userSessions.refreshTokenHash)))

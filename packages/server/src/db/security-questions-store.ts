@@ -89,9 +89,7 @@ export class DrizzleUserSecurityQuestionsStore implements UserSecurityQuestionsS
     await this.db
       .update(userSessions)
       .set(
-        input.isOnline
-          ? { isOnline: true, lastActiveAt: at }
-          : { isOnline: false }
+        { isOnline: input.isOnline, lastActiveAt: at }
       )
       .where(
         and(

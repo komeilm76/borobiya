@@ -202,6 +202,7 @@ describe("deviceLabelFor", () => {
  */
 describe("the settings screen", () => {
   const panel = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
+  expect(panel).toContain("`آفلاین · ${ageText(row.minutesSinceActive)}`");
   const view = readFileSync(new URL("../views/_user/UserDevicesView.vue", import.meta.url), "utf8");
   const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
 

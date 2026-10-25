@@ -146,7 +146,7 @@ describe("POST /_auth/login", () => {
       // The stored label is a summary of the User-Agent, never the raw string (T2.3.1).
       deviceName: "Chrome on Windows",
       ip: expect.any(String),
-      isOnline: true
+      isOnline: false
     });
     expect(calls.sessions[0]?.refreshTokenHash).toBe(hashRefreshToken(refreshToken));
     expect(refresh.payload.sessionId).toBe(calls.sessions[0]?.id);

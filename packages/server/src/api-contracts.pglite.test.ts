@@ -413,7 +413,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     );
     expect(responderMe.avgRating).toBe(4.9);
 
-    const responderDevices = await callContract<Array<{ deviceId: string; isCurrentDevice: boolean }>>(
+    const responderDevices = await callContract<Array<{ id: string; deviceId: string; isCurrentDevice: boolean }>>(
       apiRoutes.user.devices,
       200,
       {
@@ -573,6 +573,13 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
         timestamp: fixTimestamp,
         priorityDeviceId: requesterDeviceId
       }
+    });
+
+    // Injection does not open a Socket.IO transport. Explicitly record the presence that
+    // a connected socket would write; login/refresh alone must no longer count as online.
+    await new DrizzleUserSecurityQuestionsStore(db).touchSessionPresence({
+      userId: createdResponder.id, sessionId: responderDevices[0]!.id,
+      deviceId: responderDeviceId, isOnline: true
     });
 
     const searchResponse = await callContract<{

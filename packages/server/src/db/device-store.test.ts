@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import type { Database } from "./client";
 import { userSessions, users } from "./schema";
+import { PRESENCE_STALE_MS } from "../realtime/presence";
 import { DrizzleUserDeviceStore, userDeviceListQuery, type UserDeviceRow } from "./device-store";
 
 const userId = randomUUID();
@@ -52,7 +53,9 @@ describe("userDeviceListQuery", () => {
     expect(sql).toContain("limit");
     // Only these six columns are read: the refresh-token hash must never reach a response.
     expect(sql).toContain('select "id", "device_id", "device_name", "ip", "last_active_at", "is_online"');
-    expect(built.params).toEqual([userId, 50]);
+    expect(sql).toContain("last_active_at");
+    expect(sql).toContain("interval '1 millisecond'");
+    expect(built.params).toEqual([PRESENCE_STALE_MS, userId, 50]);
   });
 });
 

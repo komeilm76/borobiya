@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import type { Database } from "./client";
 import { DrizzleUserSecurityQuestionsStore } from "./security-questions-store";
@@ -70,6 +71,23 @@ function makeSessionStore(result: unknown[]) {
 }
 
 describe("DrizzleUserSecurityQuestionsStore", () => {
+  it("writes the disconnect timestamp, not only the online timestamp, without reviving revoked sessions", async () => {
+    const set = vi.fn(() => ({ where: vi.fn(async () => []) }));
+    const db = { update: vi.fn(() => ({ set })) } as unknown as Database;
+    const at = new Date("2026-10-25T08:00:00Z");
+    await new DrizzleUserSecurityQuestionsStore(db).touchSessionPresence({
+      userId: "00000000-0000-4000-8000-000000000099",
+      sessionId: "00000000-0000-4000-8000-000000000077",
+      deviceId: "00000000-0000-4000-8000-000000000088",
+      isOnline: false, now: at
+    });
+    expect(db.update).toHaveBeenCalledWith(userSessions);
+    expect(set).toHaveBeenCalledWith({ isOnline: false, lastActiveAt: at });
+    // The write's WHERE clause still requires an unrevoked refresh token (and matching IDs).
+    const updateSql = readFileSync(new URL("./security-questions-store.ts", import.meta.url), "utf8");
+    expect(updateSql).toContain("isNotNull(userSessions.refreshTokenHash)");
+  });
+
   it("only authorizes a matching session with an unrevoked refresh credential", async () => {
     const identity = {
       userId: "00000000-0000-4000-8000-000000000099",
