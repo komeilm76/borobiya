@@ -19,6 +19,7 @@
           </div>
         </div>
         <v-btn
+          class="sos-sheet__close"
           icon
           variant="text"
           size="small"
@@ -513,17 +514,27 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .sos-sheet__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 0.75rem;
   padding: 1rem 1.25rem;
+  white-space: normal;
 }
 
 .sos-sheet__title-group {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 0.75rem;
+}
+
+.sos-sheet__title-group > div { min-width: 0; }
+
+.sos-sheet__close {
+  align-self: start;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .sos-sheet__badge {
@@ -541,11 +552,15 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 800;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .sos-sheet__subtitle {
   margin: 0.1rem 0 0;
   font-size: 0.8rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
   opacity: 0.74;
 }
 

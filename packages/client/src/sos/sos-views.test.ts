@@ -49,6 +49,16 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(appSource).toContain("if (!visible) sosSheet.closeSheet()");
   });
 
+  it("keeps the SOS close control in its own top-aligned mobile header column", () => {
+    expect(sheetSource).toContain('class="sos-sheet__close"');
+    expect(sheetSource).toContain('aria-label="بستن فرم امداد"');
+    expect(sheetSource).toContain('v-card-title class="sos-sheet__header"');
+    expect(sheetSource).toMatch(/\.sos-sheet__header\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto;[^}]*white-space: normal;/s);
+    expect(sheetSource).toMatch(/\.sos-sheet__title-group\s*\{[^}]*min-width: 0;/s);
+    expect(sheetSource).toMatch(/\.sos-sheet__close\s*\{[^}]*align-self: start;[^}]*min-width: 44px;[^}]*min-height: 44px;/s);
+    expect(sheetSource).toMatch(/\.sos-sheet__subtitle\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/s);
+  });
+
   it("replaces the dashboard 'coming soon' rescue card with an active SOS trigger", () => {
     expect(dashboardSource).toContain("sosSheet.openSheet()");
     expect(dashboardSource).not.toContain("درخواست و پیگیری امداد در گام بعدی اضافه می‌شود");
