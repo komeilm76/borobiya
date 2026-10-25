@@ -12,7 +12,7 @@ export const MAP_TILE_CACHE_ZOOM_LEVELS = 8;
 const FALLBACK_RUNTIME_CONFIG: MapCanvasRuntimeConfig = {
   bbox: DEFAULT_MAP_BOUNDS,
   minZoom: 0,
-  maxZoom: 14
+  maxZoom: 18 // camera overzoom is safe when /map-config is temporarily unavailable
 };
 
 /** Center of a [west, south, east, north] bbox as [lng, lat]. */

@@ -67,7 +67,8 @@
 | `MAP_PBF` | Absolute path to the active verified merged dataset PBF; setup writes it. Not a DEM. |
 | `MAP_DATA_VERSION` | Map-config public version slug; setup keeps it equal to installed snapshot date. |
 | `MAP_MIN_ZOOM` | Minimum style/tile zoom exposed in `/map-config`; checked against generated data. |
-| `MAP_MAX_ZOOM` | Maximum style/tile zoom (Planetiler supports 0–16); keep build/config/client aligned. |
+| `MAP_MAX_ZOOM` | Maximum generated tile zoom (Planetiler supports 0–16; checked-in styles currently request through z14). Existing VM tile archives need rebuilding before the style source maxzoom is raised. |
+| `MAP_VIEW_MAX_ZOOM` | Maximum map **camera** zoom in `/map-config` (default 18, range 0–20); overzooms existing tiles without requesting missing higher-zoom tiles. Does not create missing alleys or extra map data. |
 | `MAP_ROUTING_URL` | Vite **server-side** routing-gateway target and host-side verify script URL. Browser uses same-origin `/route`. |
 | `MAP_GEOCODE_URL` | Host-side geocoding verification script URL; browser uses same-origin `/geocode`. |
 | `MAP_REVERSE_URL` | Host-side reverse-geocoding verification script URL; browser uses same-origin `/reverse`. |

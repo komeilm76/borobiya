@@ -48,9 +48,9 @@ describe("MapCanvas initial options", () => {
     expect(createMapCanvasOptions(null, { zoom: 99 })).toMatchObject({
       style: DEFAULT_MAP_STYLE,
       center: bboxCenter(DEFAULT_MAP_BOUNDS),
-      zoom: 14,
+      zoom: 18,
       minZoom: 0,
-      maxZoom: 14,
+      maxZoom: 18,
       maxBounds: DEFAULT_MAP_BOUNDS
     });
   });
@@ -62,7 +62,7 @@ describe("MapCanvas initial options", () => {
       center: bboxCenter(DEFAULT_MAP_BOUNDS),
       zoom: DEFAULT_MAP_ZOOM,
       minZoom: 0,
-      maxZoom: 14,
+      maxZoom: 18,
       maxBounds: DEFAULT_MAP_BOUNDS,
       maxTileCacheZoomLevels: MAP_TILE_CACHE_ZOOM_LEVELS
     });

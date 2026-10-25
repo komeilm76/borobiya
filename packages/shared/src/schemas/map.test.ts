@@ -22,7 +22,8 @@ describe("public map configuration schema", () => {
   });
 
   it("rejects unsupported zoom levels and inverted ranges", () => {
-    expect(mapConfigSchema.safeParse({ ...validMapConfig, maxZoom: 17 }).success).toBe(false);
+    expect(mapConfigSchema.safeParse({ ...validMapConfig, maxZoom: 18 }).success).toBe(true);
+    expect(mapConfigSchema.safeParse({ ...validMapConfig, maxZoom: 21 }).success).toBe(false);
     expect(mapConfigSchema.safeParse({ ...validMapConfig, minZoom: 15, maxZoom: 14 }).success).toBe(false);
   });
 

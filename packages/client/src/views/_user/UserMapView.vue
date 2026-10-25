@@ -153,7 +153,7 @@ function selectPlace(place: GeocodeResult): void {
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
   userPickedPlace.value = true;
   placeSearch.clear();
-  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(15, instance.getMaxZoom()), duration: 700 });
+  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));

@@ -3,20 +3,21 @@ export const DEFAULT_MAP_CONFIG = Object.freeze({
   bbox: Object.freeze([51.0, 35.5, 51.7, 35.9]),
   dataVersion: "2026-10-18",
   minZoom: 0,
-  maxZoom: 14
+  maxZoom: 18 // map camera may overzoom z14 tiles; does not create new tile detail
 });
 
 const REGION_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-const MAX_SUPPORTED_ZOOM = 16;
+const MAX_TILE_ZOOM = 16;
+const MAX_VIEW_ZOOM = 20;
 
-function readZoom(source, name, fallback) {
+function readZoom(source, name, fallback, ceiling = MAX_TILE_ZOOM) {
   const raw = source[name]?.trim();
   if (!raw) return fallback;
-  if (!/^\d+$/.test(raw)) throw new Error(`${name} must be an integer from 0 to ${MAX_SUPPORTED_ZOOM}.`);
+  if (!/^\d+$/.test(raw)) throw new Error(`${name} must be an integer from 0 to ${ceiling}.`);
   const zoom = Number(raw);
-  if (zoom > MAX_SUPPORTED_ZOOM) throw new Error(`${name} must be an integer from 0 to ${MAX_SUPPORTED_ZOOM}.`);
+  if (zoom > ceiling) throw new Error(`${name} must be an integer from 0 to ${ceiling}.`);
   return zoom;
 }
 
@@ -46,8 +47,13 @@ export function parseMapConfig(source = {}) {
   if (!VERSION_PATTERN.test(dataVersion)) throw new Error("MAP_DATA_VERSION must be a 1–64 character version slug.");
 
   const minZoom = readZoom(source, "MAP_MIN_ZOOM", DEFAULT_MAP_CONFIG.minZoom);
-  const maxZoom = readZoom(source, "MAP_MAX_ZOOM", DEFAULT_MAP_CONFIG.maxZoom);
-  if (minZoom > maxZoom) throw new Error("MAP_MIN_ZOOM cannot exceed MAP_MAX_ZOOM.");
+  // MAP_MAX_ZOOM still controls the *generated* Planetiler pyramid (up to z16).
+  // The view ceiling is independent, so existing z14 archives can be overzoomed
+  // without asking Martin for non-existent z15+ tiles.
+  const tileMaxZoom = readZoom(source, "MAP_MAX_ZOOM", 14);
+  const maxZoom = readZoom(source, "MAP_VIEW_MAX_ZOOM", DEFAULT_MAP_CONFIG.maxZoom, MAX_VIEW_ZOOM);
+  if (minZoom > tileMaxZoom) throw new Error("MAP_MIN_ZOOM cannot exceed MAP_MAX_ZOOM.");
+  if (minZoom > maxZoom) throw new Error("MAP_MIN_ZOOM cannot exceed MAP_VIEW_MAX_ZOOM.");
 
   return Object.freeze({
     region,

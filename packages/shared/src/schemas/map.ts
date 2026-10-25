@@ -19,7 +19,7 @@ export const mapConfigSchema = z.strictObject({
   bbox: mapBboxSchema,
   dataVersion: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
   minZoom: z.number().int().min(0).max(16),
-  maxZoom: z.number().int().min(0).max(16)
+  maxZoom: z.number().int().min(0).max(20) // camera overzoom, independent of the z0–z16 generated tile pyramid
 }).superRefine((config, context) => {
   if (config.minZoom > config.maxZoom) {
     context.addIssue({ code: "custom", path: ["minZoom"], message: "minZoom cannot exceed maxZoom." });

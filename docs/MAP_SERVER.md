@@ -310,7 +310,7 @@ nothing with more detail there; the reason for a refused or timed-out connection
 log instead, along with the same upstream summary. Photon query text is deliberately never copied into a
 response or a log line — only the upstream host and path, never the query string.
 
-`GET /map-config` is the public, same-origin configuration endpoint (gateway path `/config`). It returns only `{ region, bbox, dataVersion, minZoom, maxZoom }`; invalid region, bounds, version, or zoom environment values prevent the gateway from starting. Both Nginx and Vite proxy this endpoint to the same routing gateway, and the client validates the response before using it.
+`GET /map-config` is the public, same-origin configuration endpoint (gateway path `/config`). It returns only `{ region, bbox, dataVersion, minZoom, maxZoom }`; invalid region, bounds, version, or zoom environment values prevent the gateway from starting. Both Nginx and Vite proxy this endpoint to the same routing gateway, and the client validates the response before using it. `MAP_MAX_ZOOM` remains the **tile build** limit (0–16); `MAP_VIEW_MAX_ZOOM` is the independent **camera** ceiling (default 18, up to 20). The styles continue requesting z14 tiles at higher camera zoom via MapLibre vector overzoom, so an installed z14 dataset needs no rebuild for closer viewing. Overzoom only magnifies geometry already in those tiles; streets omitted by tile generalization/OSM cannot be created by a camera change. To obtain true z15/16 detail, rebuild and verify tiles, then separately update and verify both style source `maxzoom` values before activating the new dataset. Do not point the existing styles at unbuilt tiles.
 
 Run the deterministic, network-free gateway tests with Node.js; they exercise all three OSRM profile mappings and Photon geocode/reverse forwarding against local fixtures:
 
@@ -398,7 +398,8 @@ MAP_REGION=borobiya          # fixed dataset slug (archive/graph names, map conf
 MAP_BBOX=51.0,35.5,51.7,35.9  # union of selected areas, west,south,east,north WGS84
 MAP_DATA_VERSION=2026-10-18  # equals MAP_SNAPSHOT_DATE
 MAP_MIN_ZOOM=0
-MAP_MAX_ZOOM=14              # Planetiler 0.10.2 supports up to 16
+MAP_MAX_ZOOM=14              # generated tile pyramid / style source (Planetiler ceiling 16)
+MAP_VIEW_MAX_ZOOM=18         # camera ceiling; MapLibre overzooms the existing z14 tiles
 MAP_OSMIUM_VERSION=1.16.0  # must match `osmium --version`; Ubuntu 24.04 apt version
 MAP_PLANETILER_SOURCES_DIR=      # blank = <map-library>/planetiler-sources (shared by all datasets)
 MAP_WATER_POLYGONS_URL=          # optional mirror; replaces the public URL for that source

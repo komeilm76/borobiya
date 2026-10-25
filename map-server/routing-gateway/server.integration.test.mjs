@@ -141,7 +141,7 @@ test("serves route with local DEM, geocode, and reverse requests offline through
       bbox: [51, 35.5, 51.7, 35.9],
       dataVersion: "development",
       minZoom: 0,
-      maxZoom: 14
+      maxZoom: 18 // camera overzooms existing z14 tiles
     });
 
     for (const profile of ["car", "bicycle", "foot"]) {

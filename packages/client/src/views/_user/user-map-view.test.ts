@@ -59,6 +59,7 @@ describe("UserMapView live overlay", () => {
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
     expect(body("selectPlace")).toContain("placeSearch.clear()");
     expect(body("selectPlace")).toContain("instance.flyTo(");
+    expect(body("selectPlace")).toContain("zoom: Math.min(16, instance.getMaxZoom())");
   });
 
   it("renders search results and an explicit return-to-track action without mounting the map", () => {
