@@ -335,7 +335,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 - [ ] **T4.6.1** Lefthook/Husky: `pre-commit` lint+typecheck, `pre-push` test+build dry-run
 - [ ] **T4.6.2** `deploy.yml` GitHub Action: on `main` → build images → push → SSH `docker compose pull && up -d`
 - [ ] **T4.6.3** `android.yml`: on tag `v*` → `cap sync` → `./gradlew assembleRelease` → APK artifact
-- [ ] **T4.6.4** `.env.example` fully documented + `DEVELOPMENT.md` Windows vs Ubuntu
+- [x] **T4.6.4** `.env.example` fully documented + `DEVELOPMENT.md` Windows vs Ubuntu ✅ 2026-10-25
+  - **Delivered:** Every active template key is described by consumer and purpose in `docs/ENVIRONMENT.md`; a new static check in `bun run lint` rejects missing/duplicate documentation rows, inactive SOS timeout placeholders and browser-facing external Vite URLs. `.env.example` now exposes the actual Nominatim import-style default, drops two never-consumed SOS/mission timeout promises, and identifies intentionally separate host/Compose OpenAPI defaults. `DEVELOPMENT.md` now has PowerShell/local PostGIS migration and seed steps, distinguishes Windows without Docker from the Ubuntu VM helper, removes a stale duplicate env template and avoids a broken `psql` reconnect command. Docs/guard tests pass; these instructions have **not** been executed on a Windows host in this checkout.
 
 ### 4.7 Docs & Cleanup
 

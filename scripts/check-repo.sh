@@ -16,3 +16,4 @@ bash -n "${shell_scripts[@]}"
 shellcheck -S warning "${shell_scripts[@]}"
 ruff check --select E4,E7,E9,F,W,I,B,EXE,PLW1510 scripts map-server/scripts
 python3 scripts/check_runbook_markdown.py "${markdown_files[@]}"
+python3 scripts/check_env_documentation.py

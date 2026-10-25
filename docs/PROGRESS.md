@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-25 — T4.6.4 environment reference and platform guide
+
+- Documented all active `.env.example` entries by consumer/meaning in `docs/ENVIRONMENT.md`, linked from the docs index and development guide. Added a static lint guard against undocumented/duplicate env keys, unused SOS/mission timeout promises, and remote browser-facing Vite URLs; removed the unused placeholders and added the actual Nominatim import default. Replaced the stale duplicate env snippet and corrected the no-Docker Windows PowerShell/PostGIS/migration sequence alongside the Ubuntu VM helper path. **Windows instructions are source-reviewed, not live-tested on Windows.**
+
 ### 2026-10-25 — T4.4.5 design-token foundation
 
 - Centralized the client’s 8px spacing grid, light/dark semantic UI colors and Persian-first typography in `styles/tokens.ts`. Vuetify, the theme store/meta color and generated CSS custom properties share one palette; app-shell selectors consume it. A source-pinned test prevents the static pre-paint initializer from drifting and checks base text contrast. Component-wide style migration, responsive/browser acceptance and the WCAG audit remain separate tasks.

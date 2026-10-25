@@ -452,7 +452,7 @@ class OperationsTests(unittest.TestCase):
                 (root / ".env.example").write_text((vm_common.ROOT / ".env.example").read_text())
                 env = root / ".env"
 
-                def command(args, **_kwargs):
+                def command(args, *, failed=failed, **_kwargs):
                     kind = ("version" if "version" in args else "info" if "info" in args
                             else "quiet" if "--quiet" in args else "json")
                     if kind == "json" or kind in failed:

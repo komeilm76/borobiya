@@ -99,104 +99,103 @@ docker compose down -v                      # destructive: also removes persiste
 
 ---
 
-## 3. Windows Without Docker
+## 3. Windows Without Docker (PowerShell + local PostgreSQL)
 
-> Required per spec §20.2 — many contributors have no Docker on Windows.
+This is an **API/client development path**, not a native-Windows map-data build.
+It has not been exercised on a Windows machine in this checkout; the Ubuntu
+VM procedure in §2 and the VM quickstart are the tested deployment targets.
 
-### 3.1 Install
+### 3.1 Install and prepare the database
 
-1. **Bun:** `powershell -c "irm bun.sh/install.ps1|iex"` → reopen terminal.
-2. **PostgreSQL:** Install from `postgresql.org/download/windows/` (installer includes PostGIS checkbox).
-   - Create DB:
-     ```sql
-     CREATE USER borobiya WITH PASSWORD 'secret' CREATEDB;
-     CREATE DATABASE borobiya OWNER borobiya;
-     \c borobiya; CREATE EXTENSION postgis;
-     ```
-3. **Node:** fallback if Bun tools missing.
-4. **Git:** standard.
+1. Install Bun 1.4.3, Git, PostgreSQL 16, and **a compatible PostGIS 3.4 extension**.
+   PostgreSQL's Windows installer does not by itself guarantee PostGIS; use the
+   PostgreSQL installer/Stack Builder extension package and verify that
+   `CREATE EXTENSION postgis` succeeds. Use the official Windows installers and
+   reopen PowerShell after updating PATH. Node.js is optional for this Bun path.
+2. In a PostgreSQL superuser `psql -U postgres -h localhost -d postgres` session,
+   run these as **separate** SQL/psql statements, replacing the example password
+   with a URL-safe value (no real credentials in source control):
 
-### 3.2 Install & Run
+   ```sql
+   CREATE ROLE borobiya LOGIN PASSWORD 'replace-with-url-safe-password' CREATEDB;
+   CREATE DATABASE borobiya OWNER borobiya;
+   ```
 
-```bash
-cd borobiya
-bun install
-# Copy .env.example to .env and replace the two JWT placeholders first.
-bun run dev   # API and Vite client concurrently
+   Then reconnect **as the superuser** to the new database and install PostGIS:
+
+   ```text
+   \connect borobiya
+   ```
+
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS postgis;
+   ```
+
+   Check `SELECT PostGIS_Version();` before migrating. If the extension is
+   unavailable, install the matching PostGIS package; a bare database is not
+   sufficient for the checked-in geography migrations. Do not remove an existing
+   database or change a populated application's credentials as a setup shortcut.
+
+### 3.2 Install and run (PowerShell)
+
+```powershell
+Set-Location path\to\borobiya
+Copy-Item .env.example .env
+# Edit .env: replace the two different JWT placeholders and set DATABASE_URL to
+# postgresql://borobiya:<your-url-safe-password>@localhost:5432/borobiya.
+# This password is illustrative; do not paste a real value into chat or Git.
+bun install --frozen-lockfile
+bun --filter @borobiya/server db:migrate
+bun --filter @borobiya/server db:seed
+bun run dev
 ```
 
-The API requires a syntactically valid `DATABASE_URL` in its environment. The auth/reference migrations and `db:seed` command are available for manual use against a running database; registration/login, refresh/logout, recovery, onboarding, and account-management routes use PostgreSQL after those steps. Map data is generated locally (never committed) with the `map-server/scripts/` pipeline for the areas/snapshot selected from `map-server/regions.json` (`MAP_REGION_IDS`, default `ir-tehran`; whole countries and/or cities; `MAP_SNAPSHOT=pinned|latest|YYYY-MM-DD`). All sources, crops, and generated dataset artifacts live in the standardized external map library (`MAP_LIBRARY_DIR`, default `~/.local/share/borobiya/map-library`; see `docs/MAP_LIBRARY.md`). `scripts/setup-ubuntu-vm.sh` automates the full Ubuntu VM launch in `docs/UBUNTU_VM_RUNBOOK.md`, including the library/snapshot/policy/area form (`--list-regions`, `--regions`, `--update-map`, `--offline`, `--reselect`, `--dry-run`). Docker is optional for API/client work with a local PostgreSQL/PostGIS database, but the documented tile/routing/geocoding stack and OSM build pipeline target Ubuntu with Docker.
+Open `http://localhost:5173` and `http://localhost:3000/docs`. The development
+seed defaults to `admin`/`admin123`; change it before exposure. Host API runs
+against `DATABASE_URL`, not the Compose-only `POSTGRES_PASSWORD` setting.
+The Vite proxy can reach map services **only if** Martin, OSRM and Photon run
+separately; without them, the map/routing/geocoding requests report unavailable,
+while API/client work can continue. No native-Windows PBF preparation or Photon
+import is claimed. For a complete map stack, use Docker Desktop with §2 or
+Ubuntu/WSL2 with the [VM quickstart](./UBUNTU_VM_QUICKSTART.md).
 
-### 3.3 Windows Caveats
+### 3.3 Windows vs Ubuntu at a glance
 
-- PostgreSQL/PostGIS is required for the implemented database-backed auth/account routes, migrations, and `db:seed` (use Compose on WSL2/Docker Desktop or install PostgreSQL/PostGIS locally). The API can start without querying the database, but database-backed operations will not work until setup is complete.
-- The Martin/OSRM/Photon services run via Docker (see `docs/MAP_SERVER.md`); styles, sprites, and fonts are committed, while tiles/graphs/indexes are generated locally and ignored by Git. Native Windows runs of the OSM toolchain (Osmium, Planetiler) are not supported — use the Ubuntu VM runbook.
+| Concern | Windows, no Docker | Ubuntu 24.04 VM |
+|---------|--------------------|-----------------|
+| Shell | PowerShell; `Copy-Item`, not `cp`/`source` | Bash; `cp`/`source` and Python VM tools |
+| Database | Local PG16 + compatible PostGIS3.4 installed separately; host `DATABASE_URL` | Managed PostGIS container; VM helper creates secrets, migrations and seed |
+| Map services | Unavailable until a separate stack is provisioned; no native pipeline supported | External map library + Docker-based Martin, OSRM, Photon; stage data before offline use |
+| Browser origin | `http://localhost:5173` is a secure-context exception for geolocation | Use localhost forwarding or HTTPS for GPS/service worker; plain LAN HTTP is insufficient |
+| Configuration | Manually edit `.env`; no Linux absolute paths in bind mounts | Prefer `vm-env.py`, `vm-map.py`, `vm.py launch` and external absolute library paths |
+
+Never put proxy credentials or a Docker-only URL such as `postgres:5432` in
+Windows `DATABASE_URL`. The target VM steps live in
+[`UBUNTU_VM_QUICKSTART.md`](./UBUNTU_VM_QUICKSTART.md); do not substitute
+`docker compose down -v` for a database repair.
 
 ---
 
 ## 4. Env File (`.env.example` → `.env`)
 
-```env
-# API
-NODE_ENV=development
-HOST=0.0.0.0
-PORT=3000
-DATABASE_URL=postgresql://borobiya:change-me@localhost:5432/borobiya
-# Optional: admin123 fallback is accepted only when NODE_ENV=development or test.
-# ADMIN_SEED_PASSWORD=
-JWT_SECRET=replace-this-with-a-random-secret-of-at-least-32-characters
-JWT_REFRESH_SECRET=replace-this-with-a-different-random-secret-of-at-least-32-characters
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:8080
-# Explicit reverse-proxy IPs/CIDRs only; leave empty for direct access.
-TRUSTED_PROXY_IPS=
-# Compose-only values: use a URL-safe password; host ports are localhost-bound.
-POSTGRES_USER=borobiya
-POSTGRES_PASSWORD=change-me
-POSTGRES_DB=borobiya
-POSTGRES_PORT=5432
-API_PORT=3000
-MAP_SERVER_PORT=8000
-NGINX_PORT=8080
-API_PROXY_TARGET=http://127.0.0.1:3000
+The full, annotated template is [`.env.example`](../.env.example). Copy it
+and replace **both** JWT placeholders with different 32+ character secrets;
+never commit `.env`, proxy credentials or real passwords. Each active key's
+consumer, scope and failure mode is in the [environment reference](./ENVIRONMENT.md),
+kept in sync with the template by `scripts/check_env_documentation.py`.
+`OPENAPI_SERVER_PATH` is intentionally not in the template: host default `/`,
+Compose default `/api`. The `ADMIN_SEED_PASSWORD_B64` field is read by the VM
+helper, not directly by the seed command (which reads `ADMIN_SEED_PASSWORD`).
 
-# Global rate limit: 100 requests per minute; auth/SOS routes apply stricter limits.
-RATE_LIMIT_WINDOW_MS=60000
-RATE_LIMIT_MAX=100
-LOCATION_HISTORY_RETENTION_DAYS=90
-LOCATION_HISTORY_MAX_SHARE_DAYS=30
-LOCATION_HISTORY_READ_POINTS=1000
-SOS_PHOTO_MAX_SIZE_MB=5
-# Where SOS photos are stored (the volume `docker-compose.yml` mounts for the API service).
-UPLOAD_DIR=data/uploads
-SOS_REQUEST_AUTO_EXPIRE_HOURS=24
-MISSION_STATUS_TIMEOUT_HOURS=6
-
-# Independent Map Server (server-to-server URLs for local development)
-MAP_SERVER_URL=http://localhost:8000
-MAP_LIBRARY_DIR=
-MAP_DATASET_DIR=
-MAP_SNAPSHOT=pinned
-MAP_SNAPSHOT_DATE=2026-10-18
-MAP_SOURCE_POLICY=cache-first
-MAP_REGION_IDS=ir-tehran
-MAP_REGION=borobiya
-MAP_BBOX=51.0,35.5,51.7,35.9
-MAP_DATA_VERSION=2026-10-18
-MAP_MAX_ZOOM=14
-MAP_MIN_ZOOM=0
-# (no MAP_STYLE_* — the client uses same-origin /map/style/{light,dark}; nothing reads an override)
-MAP_ROUTING_URL=http://localhost:8001/route
-MAP_ROUTING_PORT=8001
-MAP_OSRM_DATA_DIR=
-MAP_GEOCODE_URL=http://localhost:8001/geocode
-MAP_REVERSE_URL=http://localhost:8001/reverse
-
-# Browser-facing paths stay same-origin; Vite and the production proxy forward them.
-VITE_API_URL=/api
-VITE_MAP_URL=/map
-```
-
-The repository's [`.env.example`](../.env.example) is the source of truth for the full template. Copy it to `.env`, replace the JWT placeholders with different secrets (for example, `openssl rand -base64 32` twice), and never commit `.env`. Compose uses `POSTGRES_*` values to build its container-internal database URL; use a URL-safe password, and keep the local `DATABASE_URL` credentials in sync if you also run the API directly on the host. A clean checkout intentionally has no PMTiles, OSRM graphs, or Photon index: generate these with the pipeline/runbook into `MAP_LIBRARY_DIR` before enabling the corresponding map services. The routing gateway and offline geocoding adapter are implemented; live dataset acceptance for the external-library refactor remains a target-VM gate.
+For Ubuntu, prefer the VM helpers rather than guessing bind paths and DB secrets:
+`python3 scripts/vm-env.py`, `python3 scripts/vm-map.py`, and
+`python3 scripts/vm.py launch` (see the [short guide](./UBUNTU_VM_QUICKSTART.md)).
+For a local Compose development stack, `POSTGRES_PASSWORD` must be URL-safe
+because Compose interpolates it into `DATABASE_URL`. If a host API also runs,
+keep the host `DATABASE_URL` credentials aligned. Existing Postgres volumes
+are **not** reinitialized when `.env` changes; diagnose before altering a role.
+Map PBFs, graph data, Photon indexes and optional elevation tiles are separate
+external assets, not bundled in `.env` or Git.
 
 ---
 
@@ -206,7 +205,7 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 |---------|-------|------|
 | `bun install` | root | Install all workspaces |
 | `bun run dev` | root | Runs the API and Vite client concurrently with Bun's workspace runner; requires a `.env` with a valid DB URL, distinct JWT secrets, and explicit CORS origins |
-| `bun run lint` | root | Runs `./scripts/check-repo.sh`: `bash -n` and `shellcheck` across `scripts/*.sh` and `map-server/scripts/*.sh`, `ruff` across both Python script trees, and `scripts/check_runbook_markdown.py` across `docs/*.md` and `README.md` |
+| `bun run lint` | root | Runs `./scripts/check-repo.sh`: `bash -n` and `shellcheck` across `scripts/*.sh` and `map-server/scripts/*.sh`, `ruff` across both Python script trees, `scripts/check_runbook_markdown.py` across `docs/*.md` and `README.md`, and env-reference parity |
 | `bun run typecheck` | root | Typechecks `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
 | `bun run test` | root | Runs the Vitest suites in `@borobiya/shared`, `@borobiya/server`, and `@borobiya/client` |
 | `bun run build` | root | Builds the `@borobiya/client` production bundle |
@@ -218,8 +217,6 @@ The repository's [`.env.example`](../.env.example) is the source of truth for th
 | `bun --filter @borobiya/client typecheck` | root | Vue SFC and TypeScript check |
 | `bun --filter @borobiya/client build` | root | Typecheck and production Vite build |
 | `bun --filter @borobiya/client preview` | root | Preview the production build |
-| `bun run build` | root | Not wired yet |
-| `bun run lint` | root | Not wired yet |
 | `bun --filter @borobiya/shared test` | root | Shared schema and route-contract tests |
 | `bun --filter @borobiya/server db:generate` | root | Generates a Drizzle migration from `packages/server/src/db/schema.ts`; does not apply it |
 | `bun --filter @borobiya/server db:migrate` | root | Applies pending Drizzle migrations to the configured `DATABASE_URL`; not run by API startup |
