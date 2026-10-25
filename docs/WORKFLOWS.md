@@ -259,6 +259,15 @@ jobs:
 
 ### 6.2 Local Android
 
+For GPS testing in **mobile Chrome** on a LAN IP, no APK is involved; follow
+[`MOBILE_LAN_HTTPS.md`](./MOBILE_LAN_HTTPS.md) to trust a development CA and
+run Vite at `https://<LAN-IP>:5173`. The Android steps below describe a future
+Capacitor project; `android/` is generated/ignored, not committed. For a
+WebView debug APK, the same guide's `android-debug` command bundles **only the
+public CA**, adds a debug-only trust overlay, and explains the required debug
+server URL and native location permissions. Never bundle the CA private key
+or ship that trust overlay in a release build.
+
 ```bash
 bun run build
 npx cap add android                  # once

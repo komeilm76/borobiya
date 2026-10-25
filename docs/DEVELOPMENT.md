@@ -86,6 +86,8 @@ docker compose up --build -d
 bun --filter @borobiya/client dev
 ```
 
+For **phone GPS on a fixed LAN IP** (for example `172.16.20.70`), plain `http://IP:5173` is not a browser secure context. Use `./scripts/dev-lan.sh https 172.16.20.70` to issue a local IP-SAN certificate and run the same API + Vite stack over HTTPS; `./scripts/dev-lan.sh http 172.16.20.70` switches back. Install only the printed public CA certificate on Android Chrome. See [Mobile LAN HTTPS and debug APK trust](./MOBILE_LAN_HTTPS.md) for the exact CA path, `.env`/Socket.IO origin setting, and the **separate** Android WebView debug-APK trust steps. This is not a public deployment certificate.
+
 The Vite dev proxy reads `API_PROXY_TARGET` and `MAP_SERVER_URL` from the root `.env` and defaults to the Compose-published host ports. Martin-bound proxy entries preserve the browser-facing `Host` header (`changeOrigin: false`) because Martin expands style asset URLs to absolute URLs built from that Host; rewriting it breaks map loading from any non-localhost origin. It proxies `/map` for Martin styles/catalog endpoints and the root-relative `/borobiya/` (dataset slug from the validated map config), `/sprite/`, and `/font/` requests used by the styles. `bun run dev` and a Compose API cannot both bind host port `3000` at the same time.
 
 Useful commands:

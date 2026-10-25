@@ -54,6 +54,14 @@ export default defineConfig(({ mode }) => {
   const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
   const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
   const routingTarget = new URL(env.MAP_ROUTING_URL || "http://127.0.0.1:8001/route").origin;
+  // Opt-in dev HTTPS, selected by scripts/dev-lan.sh. Keys live outside Git;
+  // API/map proxy targets remain local HTTP and browser URLs stay same-origin.
+  const certPath = process.env.BOROBIYA_DEV_TLS_CERT;
+  const keyPath = process.env.BOROBIYA_DEV_TLS_KEY;
+  if (Boolean(certPath) !== Boolean(keyPath)) {
+    throw new Error("BOROBIYA_DEV_TLS_CERT and BOROBIYA_DEV_TLS_KEY must be set together.");
+  }
+  const https = certPath && keyPath ? { cert: readFileSync(certPath), key: readFileSync(keyPath) } : undefined;
   // Martin expands the relative sprite/glyph/tile URLs in served styles to
   // absolute URLs built from the request Host. changeOrigin must therefore
   // stay false for every Martin-bound proxy: rewriting Host to the target
@@ -65,7 +73,7 @@ export default defineConfig(({ mode }) => {
     // (MAP_REGION); styles reference it root-relative as /<slug>/<z>/<x>/<y>.
     [`/${mapConfig.region}/`, "/sprite/", "/font/"].map((prefix) => [
       prefix,
-      { target: mapServerTarget, changeOrigin: false }
+      { target: mapServerTarget, changeOrigin: false, xfwd: true }
     ])
   );
 
@@ -82,6 +90,7 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       host: "0.0.0.0",
+      https,
       allowedHosts: ["localhost", "127.0.0.1", ".e2b.app"],
       proxy: {
         "/map-config": {
@@ -106,17 +115,20 @@ export default defineConfig(({ mode }) => {
         [`${apiPrefix}/socket.io`]: {
           target: env.API_PROXY_TARGET || "http://127.0.0.1:3000",
           changeOrigin: true,
+          xfwd: true,
           ws: true,
           rewrite: stripPrefix(apiPrefix)
         },
         [apiPrefix]: {
           target: env.API_PROXY_TARGET || "http://127.0.0.1:3000",
           changeOrigin: true,
+          xfwd: true,
           rewrite: stripPrefix(apiPrefix)
         },
         [mapPrefix]: {
           target: mapServerTarget,
           changeOrigin: false,
+          xfwd: true,
           rewrite: stripPrefix(mapPrefix)
         },
         ...mapResourceProxy
