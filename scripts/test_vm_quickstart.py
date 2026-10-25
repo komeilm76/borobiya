@@ -150,6 +150,9 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn("$(grep VERSION_CODENAME /etc/os-release", runbook)
         self.assertIn('"$(dpkg --print-architecture)" "$VERSION_CODENAME" | sudo tee', runbook)
         self.assertIn("/etc/apt/sources.list.d/docker.list", runbook)
+        self.assertIn('sudo install -m 0644 "$DOCKER_KEY" /etc/apt/keyrings/docker.asc', runbook)
+        self.assertIn("signed-by=/etc/apt/keyrings/docker.asc", runbook)
+        self.assertNotIn("sudo gpg --dearmor < /tmp/docker.gpg >", runbook)
 
     def test_reports_incompatible_versions_without_installing_anything(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -188,6 +191,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("pkg=docker-compose-v2", installer)
         self.assertIn("pkg=docker-compose-plugin", installer)
         self.assertIn("--no-remove --no-upgrade", installer)
+        self.assertIn("APT::Update::Error-Mode=any", installer)
 
 
 class OperationsTests(unittest.TestCase):

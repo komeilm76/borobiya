@@ -462,12 +462,14 @@ To do the same by hand (identical result, and it is what the script does):
 ```bash
 sudo apt remove -y docker docker-compose docker-compose-plugin docker.io 2>/dev/null || true
 sudo install -m 0755 -d /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg   # fetch, don't pipe a key into apt
-sudo gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg && rm -f /tmp/docker.gpg   # gpg needs stdin
+DOCKER_KEY=$(mktemp)
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$DOCKER_KEY"  # official ASCII-armored key
+sudo install -m 0644 "$DOCKER_KEY" /etc/apt/keyrings/docker.asc   # sudo must own the write
+rm -f "$DOCKER_KEY"
 . /etc/os-release     # VERSION_CODENAME=noble is an assignment; use its VALUE, not the whole line
-printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
+printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
   "$(dpkg --print-architecture)" "$VERSION_CODENAME" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt update
+sudo apt-get -o APT::Update::Error-Mode=any update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker "$USER"
 newgrp docker        # or: log out and back in
@@ -500,8 +502,9 @@ locally before sharing them.
 
 Two traps, both of which look like "the script is broken":
 
-- **Never `curl … | sudo apt-key add -`.** `apt-key` is removed in recent Ubuntu; the `tee` of the
-  key file is what the runbook does instead. `gpg` reads from stdin — it has no `--dearmor` flag.
+- **Never `curl … | sudo apt-key add -` or disable APT signature checks.** Keep the official
+  key in the source's explicit `signed-by` path, readable by APT. `sudo command > /root/file`
+  redirects as your unprivileged shell, not as root; use `sudo install` for the key.
 - **Docker's groups don't apply to an existing shell.** If you skipped `newgrp docker` and re-run
   `setup-ubuntu-vm.sh`, it reports `Docker daemon unreachable (is your user in the docker group?)`
   even though `groups` prints `docker`. The group change applies to a *new* login — a new SSH

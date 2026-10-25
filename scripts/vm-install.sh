@@ -95,7 +95,12 @@ install_compose_plugin() {
   printf 'Install %s ONLY, without removing/upgrading the existing Docker Engine? [y/N] ' "$pkg"
   read -r candidate
   [[ "$candidate" == [yY] ]] || return 1
-  as_root apt-get update
+  # Plain apt-get update can return 0 while printing W: signature errors and
+  # reusing stale indexes. Refuse to install from an unverified repository.
+  if ! as_root apt-get -o APT::Update::Error-Mode=any update; then
+    echo 'APT update failed (check the Docker source signed-by key, repository suite, and proxy); no plugin installed. Never disable signature verification.' >&2
+    return 1
+  fi
   # Simulate first; apt may upgrade dependencies even with --no-upgrade on
   # the requested package. Refuse any plan that touches the running engine.
   plan="$(as_root apt-get -s install --no-remove --no-upgrade --no-install-recommends "$pkg")"
@@ -130,7 +135,7 @@ fi
 printf 'Installing Ubuntu packages (no dist-upgrade, no automatic uninstall). Continue? [y/N] '
 read -r answer
 [[ "$answer" == [yY] ]] || exit 0
-as_root apt-get update
+as_root apt-get -o APT::Update::Error-Mode=any update
 as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y openjdk-21-jdk-headless osmium-tool git curl wget unzip ca-certificates openssl python3 openssh-server gnupg
 bun_pin="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')"
 docker_major="$(docker --version 2>/dev/null | sed -nE 's/.*version ([0-9]+).*/\1/p' || true)"
@@ -150,7 +155,7 @@ else
   as_root install -m 0644 "$temp/docker.asc" /etc/apt/keyrings/borobiya-docker.asc
   printf 'deb [arch=%s signed-by=/etc/apt/keyrings/borobiya-docker.asc] https://download.docker.com/linux/ubuntu %s stable\n' \
     "$(dpkg --print-architecture)" "$VERSION_CODENAME" | as_root tee /etc/apt/sources.list.d/borobiya-docker.list >/dev/null
-  as_root apt-get update
+  as_root apt-get -o APT::Update::Error-Mode=any update
   as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   as_root systemctl enable --now docker
 fi
