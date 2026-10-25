@@ -245,13 +245,15 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     trap 'rm -rf -- "${source_tmp_dir:-}"' EXIT
     if [[ "$MAP_SNAPSHOT_MODE" != "pinned" ]]; then
       sidecar_tmp="$source_tmp_dir/$source_file_name.md5"
-      curl -fL --retry 3 --retry-delay 2 "${source_url}.md5" -o "$sidecar_tmp"
+      curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 "${source_url}.md5" -o "$sidecar_tmp" ||
+        fail "Geofabrik checksum fetch failed for $source_id; check this shell's HTTPS proxy/no_proxy and test the source URL before retrying"
       sidecar_md5="$(awk '{print tolower($1); exit}' "$sidecar_tmp")"
       [[ "$sidecar_md5" == "$source_md5" ]] || \
         fail "official sidecar MD5 for $source_id changed while resolving the snapshot: expected $source_md5, received $sidecar_md5"
     fi
     printf 'Downloading Geofabrik snapshot extract %s...\n' "$source_file_name"
-    curl -fL --retry 3 --retry-delay 2 "$source_url" -o "$source_tmp"
+    curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 "$source_url" -o "$source_tmp" ||
+      fail "Geofabrik download failed for $source_id; check this shell's HTTPS proxy/no_proxy and test the source URL before retrying"
     [[ -n "$source_md5" ]] || fail "no trusted MD5 available for source $source_id; refusing to install the download"
     download_md5="$(md5_file "$source_tmp")"
     [[ "$download_md5" == "$source_md5" ]] || \

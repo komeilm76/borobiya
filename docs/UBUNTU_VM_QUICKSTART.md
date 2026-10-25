@@ -66,6 +66,7 @@ Nothing here runs `docker system prune` or `docker compose down -v`: project-sco
 ./scripts/enable-proxy.sh --status
 ./scripts/enable-proxy.sh --dry-run             # preview changes to shell, apt and Docker
 ./scripts/enable-proxy.sh                       # prompts for host and port, verifies reachability
+# Open a NEW terminal (or source ~/.bashrc) before vm.py launch; existing shells keep old env.
 ./scripts/disable-proxy.sh --status
 ./scripts/disable-proxy.sh --dry-run
 ./scripts/disable-proxy.sh                      # confirm; then open a fresh terminal

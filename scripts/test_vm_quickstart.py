@@ -502,6 +502,12 @@ class OperationsTests(unittest.TestCase):
         self.assertIn("caddy-data", (vm.ROOT / "docker-compose.production.yml").read_text())
         self.assertIn("header_up X-Forwarded-Proto {scheme}", (vm.ROOT / "Caddyfile.vm").read_text())
 
+    def test_geofabrik_fetch_fails_fast_on_unreachable_host_without_limiting_transfer_time(self):
+        script = (vm.ROOT / "map-server/scripts/prepare-regions-pbf.sh").read_text()
+        self.assertEqual(script.count("curl -fL --connect-timeout 20 --retry 3"), 2)
+        self.assertIn("check this shell's HTTPS proxy/no_proxy", script)
+        self.assertNotIn("--max-time", script)  # large source transfers can take hours
+
     def test_vm_nginx_preserves_proxy_locations_but_serves_spa(self):
         base = (vm.ROOT / "nginx.conf").read_text()
         quick = (vm.ROOT / "nginx.vm.conf").read_text()
