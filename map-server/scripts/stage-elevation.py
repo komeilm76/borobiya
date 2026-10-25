@@ -34,19 +34,20 @@ def tiles_for(bbox):
 
 
 def stage(bbox, destination, source_dir=None):
+    names = tiles_for(bbox)
     destination.mkdir(parents=True, exist_ok=True)
     entries = {}
-    for name in tiles_for(bbox):
-        url = f"{SOURCE}/{name[:3]}/{name}.hgt.gz"
-        print(f"Staging {name} from {'local test fixture' if source_dir else url}", flush=True)
-        # Only the explicitly supplied local test source overrides the public data source.
-        compressed = open(source_dir / f"{name}.hgt.gz", "rb") if source_dir else urlopen(url, timeout=90)
-        temp_path = None
-        try:
-            with compressed, gzip.GzipFile(fileobj=compressed) as stream, tempfile.NamedTemporaryFile(
-                dir=destination, prefix=f".{name}-", delete=False
-            ) as out:
-                temp_path = Path(out.name)
+    # Do not replace live tiles as they arrive: a later missing/corrupt download
+    # would leave the old manifest pointing at overwritten bytes. Keep a scratch
+    # directory on the same filesystem and publish only after every tile verifies.
+    with tempfile.TemporaryDirectory(dir=destination, prefix=".staging-") as scratch:
+        staging = Path(scratch)
+        for name in names:
+            url = f"{SOURCE}/{name[:3]}/{name}.hgt.gz"
+            print(f"Staging {name} from {'local test fixture' if source_dir else url}", flush=True)
+            # Only the explicitly supplied local test source overrides the public data source.
+            compressed = open(source_dir / f"{name}.hgt.gz", "rb") if source_dir else urlopen(url, timeout=90)
+            with compressed, gzip.GzipFile(fileobj=compressed) as stream, open(staging / f"{name}.hgt", "wb") as out:
                 digest = hashlib.sha256()
                 size = 0
                 while chunk := stream.read(1024 * 1024):
@@ -57,24 +58,20 @@ def stage(bbox, destination, source_dir=None):
                     out.write(chunk)
             if size not in (1201 * 1201 * 2, MAX_BYTES):
                 raise ValueError(f"{name} has unexpected raster size {size}")
-            os.replace(temp_path, destination / f"{name}.hgt")
-            temp_path = None
             entries[name] = {"samples": math.isqrt(size // 2), "sha256": digest.hexdigest(),
                              "url": url if source_dir is None else f"fixture:{name}.hgt.gz"}
-        finally:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
-    manifest = {
-        "format": "skadi-hgt-v1", "source": "fixture" if source_dir else "mapzen-skadi", "bbox": bbox,
-        "attribution": ("Synthetic test fixture; not terrain data" if source_dir else
-                        "Terrain Tiles by Mapzen/Tilezen; underlying data sources and required credits: https://github.com/tilezen/joerd/blob/master/docs/attribution.md"),
-        "tiles": entries
-    }
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=destination, prefix=".manifest-", delete=False) as out:
-        temp_path = Path(out.name)
-        json.dump(manifest, out, ensure_ascii=False, indent=2, sort_keys=True)
-        out.write("\n")
-    os.replace(temp_path, destination / "manifest.json")
+        manifest = {
+            "format": "skadi-hgt-v1", "source": "fixture" if source_dir else "mapzen-skadi", "bbox": bbox,
+            "attribution": ("Synthetic test fixture; not terrain data" if source_dir else
+                            "Terrain Tiles by Mapzen/Tilezen; underlying data sources and required credits: https://github.com/tilezen/joerd/blob/master/docs/attribution.md"),
+            "tiles": entries
+        }
+        with open(staging / "manifest.json", "w", encoding="utf-8") as out:
+            json.dump(manifest, out, ensure_ascii=False, indent=2, sort_keys=True)
+            out.write("\n")
+        for name in names:
+            os.replace(staging / f"{name}.hgt", destination / f"{name}.hgt")
+        os.replace(staging / "manifest.json", destination / "manifest.json")
     print(f"Staged {len(entries)} tiles; manifest: {destination / 'manifest.json'}")
 
 

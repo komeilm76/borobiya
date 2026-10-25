@@ -128,6 +128,29 @@ test("staging verifies offline compressed fixtures and writes a reproducible man
   } finally { rmSync(temp, { recursive: true, force: true }); }
 });
 
+test("a failed multi-tile refresh preserves the previous staged tile and manifest", () => {
+  const temp = mkdtempSync(join(tmpdir(), "borobiya-dem-refresh-"));
+  const script = resolve("map-server/scripts/stage-elevation.py");
+  const source = join(temp, "source");
+  const output = join(temp, "output");
+  const run = (bbox) => spawnSync("python3", [script,
+    "--bbox", bbox, "--dir", output, "--source-dir", source], { encoding: "utf8" });
+  try {
+    mkdirSync(source);
+    writeFileSync(join(source, `${name}.hgt.gz`), gzipSync(data));
+    assert.equal(run("51.1,35.1,51.8,35.8").status, 0);
+    const beforeManifest = readFileSync(join(output, "manifest.json"));
+    const beforeTile = readFileSync(join(output, `${name}.hgt`));
+    // First tile changed, but the next tile is missing. No part of the old
+    // published dataset should change when the refresh cannot complete.
+    writeFileSync(join(source, `${name}.hgt.gz`), gzipSync(Buffer.alloc(data.length)));
+    assert.notEqual(run("51.1,35.1,52.1,35.8").status, 0);
+    assert.deepEqual(readFileSync(join(output, "manifest.json")), beforeManifest);
+    assert.equal(createHash("sha256").update(readFileSync(join(output, `${name}.hgt`))).digest("hex"),
+      createHash("sha256").update(beforeTile).digest("hex"));
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+});
+
 test("each returned OSRM alternative gets its own optional DEM summary", async () => {
   const first = encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.2, lon: 51.2 }]);
   const second = encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.2, lon: 52.2 }]);

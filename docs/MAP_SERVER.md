@@ -248,9 +248,14 @@ source credits at `/terrain-attribution.html` (which also links to the original)
 other regional sources; **do not claim every tile is SRTM**. Downloads are operator-only,
 never performed by the runtime gateway or the browser. The script records the source URL,
 raw-file SHA-256 and raster size in `manifest.json` and rejects malformed raster sizes;
-the gateway checks SHA-256 again when it first reads each tile. The script's
-`--source-dir` test mode labels its manifest `fixture`, which the gateway rejects
-as a real DEM.
+the gateway checks SHA-256 again when it first reads each tile. A refresh first
+verifies **all** tiles in a temporary directory on the same filesystem before
+replacing live files; a failed download leaves the previous manifest and tiles
+untouched. Allow disk space for an additional copy of the staged area during a
+refresh. Publishing the tiles and manifest is not a single atomic directory swap:
+if interruption-free replacement is required, stop the routing gateway while
+publishing and restart it after staging succeeds. The script's `--source-dir`
+test mode labels its manifest `fixture`, which the gateway rejects as a real DEM.
 
 ```bash
 # On the VM, after setup has resolved MAP_BBOX and MAP_LIBRARY_DIR in .env;
