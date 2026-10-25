@@ -42,6 +42,21 @@
       <HistoryPlaybackPanel :api="playback" />
     </aside>
 
+    <aside class="user-map-view__own" aria-label="موقعیت من">
+      <v-card class="user-map-view__own-card" elevation="2" rounded="lg">
+        <strong>موقعیت من</strong>
+        <p role="status" aria-live="polite">
+          {{ ownPositionLabel(own.position.value, own.active.value, own.error.value) }}
+        </p>
+        <div class="user-map-view__own-actions">
+          <v-btn v-if="!own.active.value" size="small" color="primary" :disabled="!map" @click="startOwnLocation">نمایش زندهٔ موقعیت من</v-btn>
+          <v-btn v-else size="small" color="primary" variant="tonal" @click="own.stop()">توقف نمایش</v-btn>
+          <v-btn v-if="own.position.value" size="small" variant="text" color="primary" @click="centerOnOwnLocation">مرکز روی من</v-btn>
+        </div>
+        <small>فقط روی این دستگاه؛ نمایش موقعیت، اشتراک‌گذاری را فعال نمی‌کند.</small>
+      </v-card>
+    </aside>
+
     <aside class="user-map-view__live">
       <LiveBroadcastBar compact />
       <LiveCompanionPanel :api="live" />
@@ -51,7 +66,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import type { Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
+import { Marker, type Map as MapLibreMap, type MapMouseEvent } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
@@ -69,6 +84,8 @@ import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-loca
 import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overlay-sync";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
+import { useOwnMapPosition } from "@/composables/use-own-map-position";
+import { ownPositionLabel } from "@/map/own-position";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -88,6 +105,36 @@ const playback = useHistoryPlayback({
   refreshSession: () => auth.refreshSession()
 });
 const map = shallowRef<MapLibreMap | null>(null);
+const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
+let ownMarker: Marker | null = null;
+let focusOnNextFix = false;
+
+function syncOwnMarker(): void {
+  const instance = map.value;
+  const fix = own.position.value;
+  if (!instance || !fix) { ownMarker?.remove(); ownMarker = null; return; }
+  if (!ownMarker) {
+    ownMarker = new Marker({ color: "#2563eb" }).setLngLat([fix.lon, fix.lat]).addTo(instance);
+    ownMarker.getElement().setAttribute("aria-label", "موقعیت زندهٔ من");
+  } else ownMarker.setLngLat([fix.lon, fix.lat]);
+}
+function centerOnOwnLocation(): void {
+  const instance = map.value;
+  const fix = own.position.value;
+  if (!instance || !fix) return;
+  userPickedPlace.value = true; // A late history fetch must not pan away from the GPS fix.
+  instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
+}
+function startOwnLocation(): void {
+  focusOnNextFix = own.start();
+}
+function focusOwnIfRequested(): void {
+  if (!focusOnNextFix || !own.position.value || !map.value) return;
+  focusOnNextFix = false;
+  centerOnOwnLocation(); // Recenter only on the first fix or an explicit press, not on every update.
+}
+watch(() => own.position.value, () => { syncOwnMarker(); focusOwnIfRequested(); });
+watch(() => own.active.value, (active) => { if (!active) focusOnNextFix = false; });
 const reverse = useReversePlace();
 const placeSearch = usePlaceSearch({
   // Search the loaded library's coverage, not just the currently visible few streets. MapCanvas
@@ -248,7 +295,9 @@ function onMapReady(instance: MapLibreMap): void {
   instance.on("contextmenu", onMapLongPress);
   paintLive();
   paintPlayback();
+  syncOwnMarker();
   frameCamera();
+  focusOwnIfRequested();
 }
 
 watch(() => playback.frame.value, paintPlayback);
@@ -283,6 +332,9 @@ onBeforeUnmount(() => {
   // still alive here and nothing else can paint after this point.
   const instance = map.value;
   map.value = null;
+  own.stop();
+  ownMarker?.remove();
+  ownMarker = null;
   if (instance) {
     instance.off("styledata", repaintOverlays);
     instance.off("idle", repaintOverlays);
@@ -391,6 +443,26 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
  * button) so unlike the playback column it does not set `pointer-events: none` — a card that swallows
  * drags is the price of a button that works, and the panel is small enough to live at the edge.
  */
+.user-map-view__own {
+  position: absolute;
+  z-index: 2;
+  inset-block-end: 1rem;
+  inset-inline-end: 1rem;
+  width: min(22rem, calc(100% - 2rem));
+}
+
+.user-map-view__own-card {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.7rem 0.85rem;
+  background: rgba(var(--v-theme-surface), 0.94);
+  color: rgb(var(--v-theme-on-surface));
+}
+
+.user-map-view__own-card p { margin: 0; font-size: 0.8rem; direction: rtl; }
+.user-map-view__own-card small { opacity: 0.8; }
+.user-map-view__own-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
 .user-map-view__live {
   position: absolute;
   z-index: 2;
@@ -414,7 +486,7 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   color: #edf5f2;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 750px) {
   .user-map-view {
     height: calc(100dvh - 132px);
     min-height: 24rem;
@@ -452,6 +524,16 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
     inset-block-end: 0.65rem;
     inset-inline-start: 0.65rem;
     width: calc(100% - 1.3rem);
+    max-height: 32%;
+    overflow-y: auto;
+  }
+
+  .user-map-view__own {
+    inset-block-end: calc(32% + 1rem);
+    inset-inline-end: 0.65rem;
+    width: calc(100% - 1.3rem);
+    max-height: 8rem;
+    overflow-y: auto;
   }
 }
 </style>

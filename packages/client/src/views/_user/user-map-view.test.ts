@@ -51,7 +51,7 @@ describe("UserMapView live overlay", () => {
   });
 
   it("never moves the camera for a peer; only track framing and explicit place selection move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(3);
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(4);
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userPickedPlace.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
@@ -72,6 +72,19 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.failed.value");
     expect(search).toContain("api.searched.value");
     expect(search).toContain("api.run()");
+  });
+
+  it("offers private own-position watching independently of peer sharing and clears its marker", () => {
+    expect(view).toContain('useOwnMapPosition(computed(() => auth.user?.id ?? null))');
+    expect(view).toContain('ownPositionLabel(own.position.value, own.active.value, own.error.value)');
+    expect(view).toContain('نمایش زندهٔ موقعیت من');
+    expect(view).toContain('نمایش موقعیت، اشتراک‌گذاری را فعال نمی‌کند');
+    expect(body("syncOwnMarker")).toContain('new Marker(');
+    expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
+    expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation()');
+    expect(body("centerOnOwnLocation")).toContain('userPickedPlace.value = true');
+    expect(view).toContain('ownMarker?.remove();');
+    expect(view).toContain('own.stop();');
   });
 
   it("renders the live panel and no longer claims that live positions are missing", () => {

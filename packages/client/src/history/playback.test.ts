@@ -366,7 +366,7 @@ describe("the panel and the view", () => {
     // A theme change now repaints both overlays, live first because playback asks to sit under it.
     expect(view).toContain("watch(() => playbackStyle.value, () => {");
     expect(view).toContain("paintLive();\n  paintPlayback();");
-    expect(view).toContain("paintPlayback();\n  frameCamera();");
+    expect(view).toContain("paintPlayback();\n  syncOwnMarker();\n  frameCamera();");
   });
 
   it("frames the camera once per track, and does not zoom into a single fix", () => {
