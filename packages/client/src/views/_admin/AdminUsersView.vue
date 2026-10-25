@@ -546,9 +546,9 @@ onUnmounted(() => {
 
 .admin-users-card {
   overflow: hidden;
-  border: 1px solid rgba(34, 75, 75, 0.09);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   background: rgb(var(--v-theme-surface)) !important;
-  box-shadow: 0 18px 50px rgba(31, 67, 66, 0.07) !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08) !important;
 }
 
 .admin-users-toolbar {
@@ -623,7 +623,7 @@ onUnmounted(() => {
 
 .admin-users-table-wrap {
   overflow-x: auto;
-  border: 1px solid rgba(26, 67, 68, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
   border-radius: 17px;
 }
 
@@ -643,7 +643,7 @@ onUnmounted(() => {
 .admin-users-table :deep(td),
 .admin-users-table :deep(tbody th) {
   height: 74px !important;
-  border-top: 1px solid rgba(26, 67, 68, 0.06) !important;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.10) !important;
   color: var(--bb-color-text);
   font-size: 0.82rem;
 }
@@ -709,21 +709,25 @@ onUnmounted(() => {
 }
 
 .admin-role-pill.is-admin {
-  border-color: rgba(162, 113, 37, 0.15);
+  border-color: rgba(var(--v-theme-secondary), 0.25);
   color: #8b641f;
-  background: #fff7e6;
+  background: rgba(var(--v-theme-secondary), 0.15);
 }
 
 .admin-account-status.is-active {
-  border-color: rgba(53, 161, 118, 0.15);
-  color: #39765f;
-  background: #eff8f3;
+  border-color: rgba(var(--v-theme-success), 0.25);
+  color: var(--bb-color-success);
+  background: rgba(var(--v-theme-success), 0.12);
 }
 
 .admin-account-status.is-inactive {
-  border-color: rgba(184, 63, 66, 0.13);
-  color: #a4484b;
-  background: #fff2f1;
+  border-color: rgba(var(--v-theme-error), 0.25);
+  color: var(--bb-color-error);
+  background: rgba(var(--v-theme-error), 0.12);
+}
+
+:global(:root.dark) .admin-role-pill.is-admin {
+  color: #f3ca7f;
 }
 
 .admin-status-dot {
@@ -791,13 +795,13 @@ onUnmounted(() => {
 }
 
 .admin-dialog-icon.is-activate {
-  color: #347c61;
-  background: #eff8f3;
+  color: var(--bb-color-success);
+  background: rgba(var(--v-theme-success), 0.12);
 }
 
 .admin-dialog-icon.is-deactivate {
-  color: #b83f42;
-  background: #fff2f1;
+  color: var(--bb-color-error);
+  background: rgba(var(--v-theme-error), 0.12);
 }
 
 .admin-status-dialog :deep(.v-card-text) {
@@ -818,11 +822,15 @@ onUnmounted(() => {
 
 .admin-deactivation-note {
   padding: 0.65rem 0.8rem;
-  border-inline-start: 3px solid #e9b35a;
+  border-inline-start: 3px solid var(--bb-color-secondary);
   border-radius: 8px;
   color: #816a42;
-  background: #fff9ed;
+  background: rgba(var(--v-theme-secondary), 0.12);
   font-size: 0.78rem;
+}
+
+:global(:root.dark) .admin-deactivation-note {
+  color: #f3ca7f;
 }
 
 .admin-dialog-error {
