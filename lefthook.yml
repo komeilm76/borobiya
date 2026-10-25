@@ -1,0 +1,18 @@
+# Lefthook is installed on a fresh dev-dependency install (or `bunx lefthook install`).
+# Full-repository gates, not staged-file-only: shared schemas, Vue SFCs, migration
+# and docs checks can depend on files outside the current commit.
+pre-commit:
+  parallel: false
+  jobs:
+    - name: lint
+      run: bun run lint
+    - name: typecheck
+      run: bun run typecheck
+
+pre-push:
+  parallel: false
+  jobs:
+    - name: test
+      run: bun run test
+    - name: build-dry-run
+      run: bun run build

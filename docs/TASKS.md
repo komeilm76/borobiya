@@ -333,7 +333,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 4.6 Workflows & Deploy
 
-- [ ] **T4.6.1** Lefthook/Husky: `pre-commit` lint+typecheck, `pre-push` test+build dry-run
+- [x] **T4.6.1** Lefthook/Husky: `pre-commit` lint+typecheck, `pre-push` test+build dry-run ✅ 2026-10-25
+  - **Delivered:** Pinned Lefthook 2.2.2, committed full-repository gates in `lefthook.yml`, and documented explicit `bunx lefthook install` for fresh checkouts in `WORKFLOWS.md`. Pre-commit runs the existing Bash/ShellCheck/Ruff/Markdown/env-reference lint plus all TypeScript/Vue typechecks; pre-push runs all workspace Vitest suites and a production client build, with no publishing. The hooks are local (not committed `.git` files) and CI remains a separate task. Removed two unused variable declarations flagged by ShellCheck 0.8 so the new lint gate is actually green. Gateway Node tests remain a separate explicit command. Hook execution and output were verified locally; no browser acceptance is implied.
 - [ ] **T4.6.2** `deploy.yml` GitHub Action: on `main` → build images → push → SSH `docker compose pull && up -d`
 - [ ] **T4.6.3** `android.yml`: on tag `v*` → `cap sync` → `./gradlew assembleRelease` → APK artifact
 - [x] **T4.6.4** `.env.example` fully documented + `DEVELOPMENT.md` Windows vs Ubuntu ✅ 2026-10-25

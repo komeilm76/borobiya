@@ -1,6 +1,6 @@
 # Borobiya — Workflows & CI/CD
 
-> TL;DR: This document records the **planned** Git/CI/deployment workflows. Lefthook/Husky, GitHub Actions workflows, Android packaging, and production TLS are not configured in the current scaffold. A local Compose stack and root `bun run dev` command are available.
+> TL;DR: Lefthook local commit/push gates are configured. GitHub Actions CI/deployment and Android packaging are still planned; the separate Ubuntu VM runbook documents the existing production TLS edge. A local Compose stack and root `bun run dev` command are available.
 
 ---
 
@@ -33,56 +33,41 @@ Prefix `feat/fix/docs/chore/refactor/test`. Keep scope narrow.
 2. Implement + tests + docs (`PROGRESS.md`).
 3. Ensure local gates pass (see §2).
 4. Push → open PR via `gh pr create --base main`.
-5. Auto CI runs → review → merge (squash or merge).
-6. On merge to `main`, deploy workflow triggers.
+5. Review → merge (squash or merge); GitHub CI is planned, not running yet.
+6. A `main` deploy workflow is planned; merge does not automatically deploy today.
 
 ---
 
 ## 2. Git Hooks — Gates (Local)
 
-Use **Lefthook** (single binary, fast) or **Husky** — pick one, document in `lefthook.yml` or `.husky/`.
-
-Neither hook manager is installed yet, while root `package.json` defines `dev`, `lint` (`./scripts/check-repo.sh` — shell syntax, ShellCheck across both `scripts/*.sh` and `map-server/scripts/*.sh`, Ruff on both Python script directories, and `scripts/check_runbook_markdown.py`), `typecheck`, `test` (run via `bun run test` so Vitest executes rather than Bun's built-in test runner), and `build`.
-
-### Lefthook (`lefthook.yml`)
-
-```yaml
-pre-commit:
-  commands:
-    lint:
-      run: bun run lint
-    typecheck:
-      run: bun run typecheck
-
-pre-push:
-  commands:
-    test:
-      run: bun run test
-    build-dry:
-      run: bun run build
-```
-
-### Husky (alternative)
+The project uses **Lefthook 2.2.2** (devDependency) with the committed
+[`lefthook.yml`](../lefthook.yml). From a developer checkout with Git, Bun,
+ShellCheck and Ruff on PATH:
 
 ```bash
-bun add -D husky
-npx husky init
-# .husky/pre-commit: bun run lint && bun run typecheck
-# .husky/pre-push: bun test && bun run build
-```
-
-Install hook:
-
-```bash
-bun add -D lefthook
+bun install --frozen-lockfile
 bunx lefthook install
 ```
 
-**Rules:**
+The explicit install works even if a package manager suppresses postinstall
+scripts. Hooks are generated locally inside `.git/hooks` and are **not** tracked;
+container builds without `.git` do not need them. Re-run the install when the
+config changes. Do not install both Husky and Lefthook. Both gates run against the
+**full repository**, because a shared schema, migration or CSS change can affect
+another workspace or a source-pinned view test. They do not publish artifacts:
 
-- `pre-commit`: Must pass lint + typecheck — blocks commit if fails.
-- `pre-push`: Must pass tests + build — blocks push if fails.
-- Bypass only with `git commit --no-verify` for docs-only WIP, but CI will still run.
+| Hook | Checks (both must succeed) |
+|------|----------------------------|
+| `pre-commit` | `bun run lint` (Bash, ShellCheck, Ruff, Markdown, env-reference parity) then `bun run typecheck` (shared/server/client) |
+| `pre-push` | `bun run test` (Vitest, all three workspaces) then `bun run build` (client Vue typecheck + Vite dry-run; output is gitignored) |
+
+Use `bun run lint`, `bun run typecheck`, `bun run test`, and `bun run build`
+to reproduce failures. The root Vitest command does **not** include the separate
+Node-based routing-gateway tests: run
+`node --test map-server/routing-gateway/*.test.mjs` when editing that gateway.
+A local hook is a contributor safeguard, not a substitute for reviewed CI or
+VM/browser acceptance. Never bypass a failing gate merely to push; if the
+platform lacks ShellCheck/Ruff, install them before claiming local lint passed.
 
 ### Branch Protection (GitHub)
 

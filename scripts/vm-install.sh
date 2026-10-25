@@ -19,7 +19,7 @@ expected_osmium="$(awk -F= '$1=="MAP_OSMIUM_VERSION" {print $2; exit}' .env 2>/d
 bun_pin="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])' 2>/dev/null || true)"
 
 check() {
-  local bad=0 tool installed label java_major docker_major compose_major osmium_version bun_version python_major python_minor
+  local bad=0 tool installed label java_major docker_major compose_major python_major python_minor
   printf 'Tool / requirement             Result\n'
   for tool in git curl wget unzip openssl python3 java osmium docker bun; do
     if ! command -v "$tool" >/dev/null 2>&1; then

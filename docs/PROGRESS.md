@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-25 — T4.6.1 local Git gates
+
+- Pinned Lefthook 2.2.2 and added `pre-commit` lint/typecheck plus `pre-push` Vitest/build dry-run for the full checkout. The contributing guide documents explicit installation and the difference between local gates and still-unconfigured GitHub CI. Removed two genuinely unused Bash declarations reported by the available ShellCheck version; hook execution requires installed ShellCheck and Ruff. No deploy action or Android workflow was added.
+
 ### 2026-10-25 — T4.2.2 conditional offline elevation charts (code complete)
 
 - Existing mission cards now add a bike/foot-only accessible SVG profile when a route has complete local DEM coverage; missing/void tiles still produce no chart. The gateway compacts full-geometry samples to at most 96 points while retaining distance-bucket extrema, and the client validates order/size and avoids exaggerating flat profiles. Source-pinned view, pure chart, gateway and HTTP tests cover the code. OSRM can return only one route, and no browser or real VM DEM acceptance is claimed; T3.5.5 stays open.
