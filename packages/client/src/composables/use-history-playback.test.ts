@@ -165,6 +165,96 @@ describe("range controls", () => {
     expect(HISTORY_WINDOW_ISSUE_COPY.order).toBeTruthy();
   });
 
+  it("does not restore an old track after the next manual window is invalid", async () => {
+    const { api } = mount();
+    const first = api.selectPreset(7);
+    await settle();
+    expect(calls).toHaveLength(1);
+
+    await api.setManualRange("2026-10-21T12:00", "2026-10-21T11:00");
+    expect(api.windowIssue.value).toBe("order");
+    expect(api.points.value).toEqual([]);
+
+    calls[0]!.resolve(historyBody([point(35.7, 51.4, new Date(NOW - HOUR).toISOString())]));
+    await first;
+    await settle();
+    expect(api.points.value).toEqual([]);
+    expect(api.windowIssue.value).toBe("order");
+    expect(api.loading.value).toBe(false);
+  });
+
+  it("does not start an obsolete read after a slower session check", async () => {
+    const waiting: Array<() => void> = [];
+    const scope = effectScope();
+    const token = ref<string | null>("access-token");
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({
+      accessToken: token,
+      ensureSession: () => new Promise<void>((resolve) => { waiting.push(resolve); })
+    }); });
+    const first = api.selectPreset(7);
+    const second = api.selectPreset(1);
+    expect(waiting).toHaveLength(2);
+    waiting[1]!();
+    await settle();
+    expect(calls).toHaveLength(1);
+    calls[0]!.resolve(historyBody([]));
+    await second;
+    waiting[0]!();
+    await first;
+    expect(calls).toHaveLength(1);
+    scope.stop();
+  });
+
+  it("does not restore another session's share list after sign-out", async () => {
+    const { token, api } = mount();
+    api.selectSource("grant");
+    await settle();
+    expect(calls).toHaveLength(1);
+    token.value = null;
+    calls[0]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
+    await settle();
+    expect(api.grants.value).toEqual([]);
+    expect(api.grantsLoaded.value).toBe(false);
+    expect(api.grantsLoading.value).toBe(false);
+  });
+
+  it("does not replay an in-flight private track after sign-out", async () => {
+    const { token, api } = mount();
+    const read = api.selectPreset(7);
+    await settle();
+    token.value = null;
+    calls[0]!.resolve(historyBody([point(35.7, 51.4, new Date(NOW - HOUR).toISOString())]));
+    await read;
+    await settle();
+    expect(api.points.value).toEqual([]);
+    expect(api.loading.value).toBe(false);
+  });
+
+  it("reports a failed session check rather than leaving an unhandled read", async () => {
+    const scope = effectScope();
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({
+      accessToken: ref("access-token"),
+      ensureSession: async () => { throw new Error("refresh unavailable"); }
+    }); });
+    await expect(api.selectPreset(7)).resolves.toBeUndefined();
+    expect(api.loadIssue.value).toBe("request_failed");
+    expect(api.loading.value).toBe(false);
+    expect(calls).toHaveLength(0);
+    scope.stop();
+  });
+
+  it("ignores a history reply after its view is disposed", async () => {
+    const { api, scope } = mount();
+    const read = api.selectPreset(7);
+    await settle();
+    scope.stop();
+    calls[0]!.resolve(historyBody([point(35.7, 51.4, new Date(NOW - HOUR).toISOString())]));
+    await read;
+    expect(api.points.value).toEqual([]);
+  });
+
   it("does not impose a span limit of its own", async () => {
     const { api } = mount();
     autoRespond = () => historyBody([]);

@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, shallowRef, type ComputedRef, type Ref } from "vue";
+import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationHistoryPoint, ReceivedLocationHistoryShare } from "@shared/index";
 import { ApiError } from "@/api/http";
 import { fetchMyLocationHistory, fetchSharedLocationHistory, listLocationHistoryShares } from "@/api/location";
@@ -102,6 +102,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   const boundsForMap = computed(() => trackBounds(frames.value));
 
   let requestId = 0;
+  let grantsRequestId = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastTickAt = 0;
 
@@ -143,11 +144,14 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   }
 
   async function loadShares(): Promise<void> {
-    if (options.ensureSession) await options.ensureSession();
-    const accessToken = options.accessToken.value;
-    if (!accessToken || grantsLoading.value) return;
+    if (grantsLoading.value) return;
+    const requestIdForThisLoad = ++grantsRequestId;
     grantsLoading.value = true;
     try {
+      if (options.ensureSession) await options.ensureSession();
+      if (requestIdForThisLoad !== grantsRequestId) return;
+      const accessToken = options.accessToken.value;
+      if (!accessToken) return;
       let response;
       try {
         response = await listLocationHistoryShares(accessToken);
@@ -163,6 +167,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
           throw error;
         }
       }
+      if (requestIdForThisLoad !== grantsRequestId) return;
       grants.value = response.sharedWithMe;
       grantsLoaded.value = true;
       grantsFailed.value = false;
@@ -179,23 +184,38 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       // A failed refresh keeps the list the user is already choosing from (and any track already on the
       // map playable): the panel reports `grantsFailed` next to a list that may be a moment stale,
       // rather than silently replacing it with nothing.
-      grantsFailed.value = true;
+      if (requestIdForThisLoad === grantsRequestId) grantsFailed.value = true;
     } finally {
-      grantsLoading.value = false;
+      if (requestIdForThisLoad === grantsRequestId) grantsLoading.value = false;
     }
   }
 
   async function load(): Promise<void> {
+    // Invalidate the previous read *before* session refresh or window validation: even an
+    // invalid next range must prevent an older response from repainting the map.
+    const requestIdForThisLoad = ++requestId;
     stopTimer();
-    if (options.ensureSession) await options.ensureSession();
-    const accessToken = options.accessToken.value;
+    loading.value = true;
     windowIssue.value = null;
     loadIssue.value = null;
     failed.value = false;
+    try {
+      if (options.ensureSession) await options.ensureSession();
+    } catch {
+      if (requestIdForThisLoad !== requestId) return;
+      clearTrack();
+      loadIssue.value = "request_failed";
+      failed.value = true;
+      loading.value = false;
+      return;
+    }
+    if (requestIdForThisLoad !== requestId) return;
+    const accessToken = options.accessToken.value;
     if (!accessToken) {
       loadIssue.value = "no_token";
       failed.value = true;
       clearTrack();
+      loading.value = false;
       return;
     }
 
@@ -215,6 +235,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
         windowIssue.value = issue;
         failed.value = true;
         clearTrack();
+        loading.value = false;
         return;
       }
       plan = { kind: "own", window };
@@ -223,13 +244,12 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
         loadIssue.value = "grant_required";
         failed.value = true;
         clearTrack();
+        loading.value = false;
         return;
       }
       plan = { kind: "grant", shareId: grantId.value };
     }
 
-    const requestIdForThisLoad = ++requestId;
-    loading.value = true;
     const runPlan = (token: string) =>
       plan.kind === "own"
         ? fetchMyLocationHistory(plan.window, token)
@@ -348,7 +368,28 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     void load();
   }
 
-  onScopeDispose(stopTimer);
+  // Sign-out must synchronously invalidate both reads: otherwise a response that was already in
+  // flight can repopulate a previous account's private track or share list after auth is cleared.
+  watch(options.accessToken, (token) => {
+    if (token) return;
+    ++requestId;
+    ++grantsRequestId;
+    stopTimer();
+    clearTrack();
+    loading.value = false;
+    grants.value = [];
+    grantsLoading.value = false;
+    grantsLoaded.value = false;
+    grantsFailed.value = false;
+    grantId.value = "";
+    sourceKind.value = "own";
+  }, { flush: "sync" });
+
+  onScopeDispose(() => {
+    ++requestId;
+    ++grantsRequestId;
+    stopTimer();
+  });
 
   return {
     sourceKind,
