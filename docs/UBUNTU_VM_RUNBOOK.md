@@ -464,12 +464,39 @@ sudo apt remove -y docker docker-compose docker-compose-plugin docker.io 2>/dev/
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg   # fetch, don't pipe a key into apt
 sudo gpg --dearmor < /tmp/docker.gpg > /etc/apt/keyrings/docker.gpg && rm -f /tmp/docker.gpg   # gpg needs stdin
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(grep VERSION_CODENAME /etc/os-release | cut -d'"' -f2) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+. /etc/os-release     # VERSION_CODENAME=noble is an assignment; use its VALUE, not the whole line
+printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu %s stable\n' \
+  "$(dpkg --print-architecture)" "$VERSION_CODENAME" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 sudo usermod -aG docker "$USER"
 newgrp docker        # or: log out and back in
 ```
+
+**Existing Engine, missing Compose only?** Do not run the `apt remove` block above or
+reinstall Docker. Use `./scripts/vm-install.sh --install-compose` instead; it installs only
+the plugin matching the already-installed Engine package family.
+
+**Repair for an older version of this runbook:** Its Docker repository command accidentally
+wrote the literal suite `VERSION_CODENAME=noble` instead of `noble` on Ubuntu 24.04,
+causing `apt update` to return 404. If the exact bad line is in
+`/etc/apt/sources.list.d/docker.list`, back it up and replace *only that suite*:
+
+```bash
+BAD=/etc/apt/sources.list.d/docker.list
+if sudo grep -qF 'https://download.docker.com/linux/ubuntu VERSION_CODENAME=noble stable' "$BAD"; then
+  sudo cp -a "$BAD" "${BAD}.before-suite-fix"
+  sudo sed -i 's|https://download.docker.com/linux/ubuntu VERSION_CODENAME=noble stable|https://download.docker.com/linux/ubuntu noble stable|' "$BAD"
+  sudo apt-get update
+else
+  echo 'The expected bad line is absent; inspect the Docker APT source locally before changing anything.' >&2
+fi
+```
+
+Do not disable APT signature checks, remove the working Engine, or run `down -v` to
+fix a repository URL. If APT still fails with suite `noble`, inspect the proxy/connection
+error separately. Apt source lines may contain credentials in other installations; inspect
+locally before sharing them.
 
 Two traps, both of which look like "the script is broken":
 

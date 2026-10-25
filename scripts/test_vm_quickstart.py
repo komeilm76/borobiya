@@ -145,6 +145,12 @@ class EnvTests(unittest.TestCase):
 
 
 class InstallerTests(unittest.TestCase):
+    def test_runbook_docker_source_uses_codename_value_not_assignment(self):
+        runbook = (vm.ROOT / "docs/UBUNTU_VM_RUNBOOK.md").read_text()
+        self.assertNotIn("$(grep VERSION_CODENAME /etc/os-release", runbook)
+        self.assertIn('"$(dpkg --print-architecture)" "$VERSION_CODENAME" | sudo tee', runbook)
+        self.assertIn("/etc/apt/sources.list.d/docker.list", runbook)
+
     def test_reports_incompatible_versions_without_installing_anything(self):
         with tempfile.TemporaryDirectory() as directory:
             bin_dir = Path(directory)
