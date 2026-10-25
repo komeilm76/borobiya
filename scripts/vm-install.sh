@@ -5,9 +5,10 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 ACTION=check
 case "${1:---check}" in
-  --check) [[ $# -le 1 ]] || { echo 'usage: vm-install.sh [--check|--install]' >&2; exit 2; } ;;
-  --install) ACTION=install; [[ $# -eq 1 ]] || { echo 'usage: vm-install.sh [--check|--install]' >&2; exit 2; } ;;
-  *) echo 'usage: vm-install.sh [--check|--install]' >&2; exit 2 ;;
+  --check) [[ $# -le 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
+  --install) ACTION=install; [[ $# -eq 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
+  --install-compose) ACTION=install-compose; [[ $# -eq 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
+  *) echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2 ;;
 esac
 
 as_root() { if (( EUID == 0 )); then "$@"; else sudo "$@"; fi; }
@@ -57,7 +58,8 @@ check() {
   if command -v docker >/dev/null 2>&1; then
     installed="$(docker compose version --short 2>/dev/null || true)"
     compose_major="${installed#v}"; compose_major="${compose_major%%.*}"
-    if [[ "$compose_major" != 2 ]]; then printf '%-30s INCOMPATIBLE (need Compose v2)  %s\n' 'docker compose' "${installed:-missing}"; bad=1
+    if ! [[ "$compose_major" =~ ^[0-9]+$ ]] || (( compose_major < 2 )); then
+      printf '%-30s INCOMPATIBLE (need Compose plugin v2+)  %s\n' 'docker compose' "${installed:-missing}"; bad=1
     else printf '%-30s OK                                 %s\n' 'docker compose' "$installed"; fi
     if docker info >/dev/null 2>&1; then printf '%-30s OK\n' 'Docker daemon access'
     else printf '%-30s UNAVAILABLE (daemon/group; re-login after group change)\n' 'Docker daemon access'; bad=1; fi
@@ -74,12 +76,57 @@ check() {
   echo 'Prerequisites OK.'
 }
 
+installed_pkg() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -qx 'install ok installed'
+}
+
+install_compose_plugin() {
+  local pkg candidate plan
+  # Match the existing engine's package family. Never migrate/replace a running
+  # Docker installation just because its optional CLI plugin is missing.
+  if installed_pkg docker.io && ! installed_pkg docker-ce-cli; then
+    pkg=docker-compose-v2  # Ubuntu 24.04 universe
+  elif installed_pkg docker-ce-cli && ! installed_pkg docker.io; then
+    pkg=docker-compose-plugin  # Docker's official apt repository
+  else
+    echo 'Cannot identify a single apt-managed Docker CLI (docker.io or docker-ce-cli). Refusing an automatic engine migration; inspect package provenance first.' >&2
+    return 1
+  fi
+  printf 'Install %s ONLY, without removing/upgrading the existing Docker Engine? [y/N] ' "$pkg"
+  read -r candidate
+  [[ "$candidate" == [yY] ]] || return 1
+  as_root apt-get update
+  # Simulate first; apt may upgrade dependencies even with --no-upgrade on
+  # the requested package. Refuse any plan that touches the running engine.
+  plan="$(as_root apt-get -s install --no-remove --no-upgrade --no-install-recommends "$pkg")"
+  printf '%s\n' "$plan"
+  if grep -Eq '^(Inst|Remv) (docker-ce|docker-ce-cli|docker.io|containerd.io|containerd|runc)([ :]|$)' <<< "$plan"; then
+    echo 'APT would change the running Docker Engine or container runtime. No packages installed; review the plan manually.' >&2
+    return 1
+  fi
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-remove --no-upgrade --no-install-recommends "$pkg"
+  docker compose version
+}
+
 if [[ "$ACTION" == check ]]; then check; exit $?; fi
 [[ -r /etc/os-release ]] || { echo 'Ubuntu 24.04 required' >&2; exit 1; }
 # shellcheck disable=SC1091 # Ubuntu's OS metadata is trusted by apt as well.
 source /etc/os-release
 [[ "${ID:-}" == ubuntu && "${VERSION_ID:-}" == 24.04 ]] || { echo 'Installation is supported only on Ubuntu 24.04.' >&2; exit 1; }
 command -v sudo >/dev/null 2>&1 || (( EUID == 0 )) || { echo 'sudo is required' >&2; exit 1; }
+if [[ "$ACTION" == install-compose ]]; then
+  docker_major="$(docker --version 2>/dev/null | sed -nE 's/.*version ([0-9]+).*/\1/p' || true)"
+  [[ "$docker_major" =~ ^[0-9]+$ ]] && (( docker_major >= 24 )) && docker info >/dev/null 2>&1 || {
+    echo 'A working Docker Engine >=24 is required for plugin-only installation; run --check.' >&2; exit 1;
+  }
+  if docker compose version --short >/dev/null 2>&1; then
+    echo 'Docker Compose is already installed; run --check to verify its version.'
+    exit 0
+  fi
+  install_compose_plugin
+  check
+  exit $?
+fi
 printf 'Installing Ubuntu packages (no dist-upgrade, no automatic uninstall). Continue? [y/N] '
 read -r answer
 [[ "$answer" == [yY] ]] || exit 0
@@ -87,8 +134,12 @@ as_root apt-get update
 as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y openjdk-21-jdk-headless osmium-tool git curl wget unzip ca-certificates openssl python3 openssh-server gnupg
 bun_pin="$(python3 -c 'import json; print(json.load(open("package.json"))["packageManager"].split("@")[1])')"
 docker_major="$(docker --version 2>/dev/null | sed -nE 's/.*version ([0-9]+).*/\1/p' || true)"
-if ! [[ "$docker_major" =~ ^[0-9]+$ ]] || (( docker_major < 24 )) || ! docker compose version >/dev/null 2>&1; then
-  if dpkg-query -W -f='${Status}' docker.io 2>/dev/null | grep -q 'install ok installed'; then
+if [[ "$docker_major" =~ ^[0-9]+$ ]] && (( docker_major >= 24 )); then
+  if ! docker compose version --short >/dev/null 2>&1; then
+    install_compose_plugin
+  fi
+else
+  if installed_pkg docker.io; then
     echo 'Existing docker.io detected. Migrate it deliberately using runbook A2; refusing automatic removal of a running engine.' >&2
     exit 1
   fi

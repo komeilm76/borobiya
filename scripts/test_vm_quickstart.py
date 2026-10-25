@@ -166,6 +166,23 @@ class InstallerTests(unittest.TestCase):
                 self.assertIn(expected, result.stdout)
             self.assertIn("Docker daemon access", result.stdout)
 
+    def test_compose_plugin_accepts_newer_major_and_has_plugin_only_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            docker = Path(directory) / "docker"
+            docker.write_text("#!/bin/sh\nif [ \"$1\" = compose ]; then echo 5.4.0; "
+                              "elif [ \"$1\" = info ]; then exit 0; else echo 'Docker version 29.1.3'; fi\n")
+            docker.chmod(0o755)
+            result = subprocess.run(["bash", str(SCRIPTS / "vm-install.sh"), "--check"], cwd=vm.ROOT,
+                                    env={**os.environ, "PATH": directory + ":" + os.environ["PATH"]},
+                                    capture_output=True, text=True, check=False)
+            self.assertRegex(result.stdout, r"docker compose\s+OK\s+5\.4\.0")
+            self.assertNotIn("INCOMPATIBLE (need Compose plugin", result.stdout)
+        installer = (SCRIPTS / "vm-install.sh").read_text()
+        self.assertIn("--install-compose", installer)
+        self.assertIn("pkg=docker-compose-v2", installer)
+        self.assertIn("pkg=docker-compose-plugin", installer)
+        self.assertIn("--no-remove --no-upgrade", installer)
+
 
 class OperationsTests(unittest.TestCase):
     def test_down_stops_import_and_previous_production_profiles_without_starting_them(self):
@@ -411,7 +428,7 @@ class OperationsTests(unittest.TestCase):
 
     def test_env_setup_diagnoses_compose_failure_without_leaking_secrets_or_writing_env(self):
         cases = (
-            ({"version"}, "Docker Compose v2 is missing"),
+            ({"version"}, "Docker Compose plugin v2+ is missing"),
             ({"info"}, "Docker daemon is inaccessible"),
             ({"quiet"}, "Docker Compose configuration is invalid or unsupported"),
             (set(), "cannot produce JSON"),

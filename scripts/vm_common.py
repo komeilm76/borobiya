@@ -56,7 +56,8 @@ def project() -> str:
                 return False
 
         if not works(["docker", "compose", "version", "--short"]):
-            fail("Docker Compose v2 is missing or not working; run ./scripts/vm-install.sh --check")
+            fail("Docker Compose plugin v2+ is missing or not working; run ./scripts/vm-install.sh --check "
+                 "and --install-compose if Docker Engine already works")
         if not works(["docker", "info"]):
             fail("Docker daemon is inaccessible; run ./scripts/vm-install.sh --check, "
                  "then verify docker info (re-login after docker group changes)")
