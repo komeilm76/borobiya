@@ -79,6 +79,7 @@ import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
+import { historyCameraPadding } from "@/history/camera-padding";
 import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
 import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
 import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overlay-sync";
@@ -239,14 +240,14 @@ function frameCamera(): void {
   const instance = map.value;
   const track = playback.frames.value;
   if (!instance || track.length === 0 || userPickedPlace.value) return;
-  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}`;
+  const compact = window.matchMedia("(max-width: 750px)").matches;
+  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}`;
   if (fittedFor === key) return;
   fittedFor = key;
   const bounds = playback.boundsForMap.value;
   if (bounds) {
-    // Padding leaves the toolbar and the panel off the track itself, which matters more on a phone
-    // where the panel covers half the viewport.
-    instance.fitBounds(bounds, { padding: { top: 96, bottom: 168, left: 72, right: 72 }, maxZoom: 15, duration: 700 });
+    // On phones the controls sit outside the map, so they need no reserved viewport space.
+    instance.fitBounds(bounds, { padding: historyCameraPadding(compact), maxZoom: 15, duration: 700 });
     return;
   }
   const only = track[0]!;
@@ -293,6 +294,7 @@ function onMapReady(instance: MapLibreMap): void {
   instance.on("idle", repaintOverlays);
   instance.on("click", onMapClick);
   instance.on("contextmenu", onMapLongPress);
+  instance.on("resize", frameCamera);
   paintLive();
   paintPlayback();
   syncOwnMarker();
@@ -340,6 +342,7 @@ onBeforeUnmount(() => {
     instance.off("idle", repaintOverlays);
     instance.off("click", onMapClick);
     instance.off("contextmenu", onMapLongPress);
+    instance.off("resize", frameCamera);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
   }

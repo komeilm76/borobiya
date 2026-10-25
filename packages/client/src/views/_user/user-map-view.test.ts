@@ -75,6 +75,15 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.run()");
   });
 
+  it("fits tracks without reserving overlay space for panels that sit outside the phone map", () => {
+    const camera = body("frameCamera");
+    expect(camera).toContain('window.matchMedia("(max-width: 750px)").matches');
+    expect(camera).toContain("historyCameraPadding(compact)");
+    expect(body("onMapReady")).toContain('instance.on("resize", frameCamera)');
+    const teardown = view.slice(view.indexOf("onBeforeUnmount("));
+    expect(teardown).toContain('instance.off("resize", frameCamera)');
+  });
+
   it("moves phone-width map controls into a scrollable, non-occluding flow", () => {
     const phone = view.slice(view.indexOf("@media (max-width: 750px)"));
     expect(phone).toContain("height: auto;");
