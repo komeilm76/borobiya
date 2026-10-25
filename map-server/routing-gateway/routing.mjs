@@ -56,8 +56,13 @@ function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null) {
 
   const routes = [];
   for (const route of osrmResponse.routes) {
-    if (!Number.isFinite(route.distance) || !Number.isFinite(route.duration) ||
-        typeof route.geometry !== "string" || !Array.isArray(route.legs)) {
+    // OSRM is local, but an Ok response can still be malformed. Do not throw on a null
+    // entry or return a 200 that the client must reject (or an unbounded polyline).
+    if (!route || typeof route !== "object" || Array.isArray(route) ||
+        !Number.isFinite(route.distance) || route.distance < 0 ||
+        !Number.isFinite(route.duration) || route.duration < 0 ||
+        typeof route.geometry !== "string" || route.geometry.length === 0 ||
+        route.geometry.length > 200_000 || !Array.isArray(route.legs)) {
       return json({
         error: "invalid_upstream_response",
         profile,

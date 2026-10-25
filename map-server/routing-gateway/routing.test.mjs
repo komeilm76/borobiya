@@ -185,6 +185,27 @@ test("flags an Ok reply that carries no routes array", async () => {
   assert.equal(body.upstream_status, 200);
 });
 
+test("rejects malformed Ok route entries as 502 instead of throwing or serving unusable routes", async () => {
+  for (const invalid of [
+    null,
+    42,
+    { ...osrmFixture.routes[0], distance: -1 },
+    { ...osrmFixture.routes[0], duration: -1 },
+    { ...osrmFixture.routes[0], geometry: "" },
+    { ...osrmFixture.routes[0], geometry: "x".repeat(200_001) }
+  ]) {
+    const response = await handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => Response.json({ ...osrmFixture, routes: [osrmFixture.routes[0], invalid] }),
+      log: () => {}
+    });
+    assert.equal(response.status, 502, JSON.stringify(invalid)?.slice(0, 60));
+    const body = await response.json();
+    assert.equal(body.error, "invalid_upstream_response");
+    assert.equal(body.route_index, 1);
+    assert.equal(body.upstream_status, 200);
+  }
+});
+
 test("truncates a huge non-JSON upstream body before echoing it", async () => {
   const response = await handleRoutingRequest(postRoute(validInput), {
     fetchImpl: async () => new Response("x".repeat(5000), { status: 500 }),
