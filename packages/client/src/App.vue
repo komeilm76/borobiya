@@ -105,11 +105,39 @@ class="nav-button d-none d-xxl-flex"
           <v-icon class="me-1" icon="mdi-account-outline" />
           ورود
         </v-btn>
-        <v-btn v-else class="login-button" color="primary" variant="tonal" rounded="lg" @click="logout">
+        <v-btn v-else class="login-button" color="primary" variant="tonal" rounded="lg" @click="logoutConfirmation.request()">
           خروج
         </v-btn>
       </nav>
     </v-app-bar>
+
+    <v-dialog
+      :model-value="logoutConfirmation.open.value"
+      :persistent="logoutConfirmation.submitting.value"
+      max-width="420"
+      aria-labelledby="logout-confirm-title"
+      aria-describedby="logout-confirm-description"
+      @update:model-value="(visible: boolean) => { if (!visible) logoutConfirmation.cancel(); }"
+    >
+      <v-card rounded="xl">
+        <v-card-title id="logout-confirm-title">خروج از حساب کاربری؟</v-card-title>
+        <v-card-text id="logout-confirm-description">
+          آیا مطمئن هستید که می‌خواهید از حساب خود خارج شوید؟
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" rounded="lg" :disabled="logoutConfirmation.submitting.value" @click="logoutConfirmation.cancel()">
+            انصراف
+          </v-btn>
+          <v-spacer />
+          <v-btn color="error" variant="flat" rounded="lg"
+            :loading="logoutConfirmation.submitting.value"
+            :disabled="logoutConfirmation.submitting.value"
+            @click="logoutConfirmation.confirm()">
+            بله، خروج از حساب
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-main class="app-main dark:text-slate-100">
       <RouterView v-slot="{ Component, route }">
@@ -181,6 +209,7 @@ import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRouter } from "vue-router";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
+import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
 import { pinia } from "./stores";
 import { useAdminSosStore } from "./stores/admin-sos";
 import { useProposalInboxStore } from "./stores/proposal-inbox";
@@ -234,6 +263,11 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   ];
 });
 const router = useRouter();
+const logoutConfirmation = useLogoutConfirmation({
+  isAuthenticated: computed(() => auth.isAuthenticated),
+  logout: () => auth.logout(),
+  onLoggedOut: () => router.replace("/_auth/login")
+});
 
 async function openAlertOnMap(): Promise<void> {
   const alertId = adminSos.latestAlert?.id;
@@ -250,16 +284,6 @@ async function openReplacementOnMap(): Promise<void> {
   adminSos.setFilterStatus("pending");
   adminSos.selectRequest(requestId);
   await router.push({ path: "/_admin/dispatch", query: { request: requestId } });
-}
-
-async function logout(): Promise<void> {
-  try {
-    await auth.logout();
-  } catch {
-    // Clear the local session and return to the guest flow even if the network is unavailable.
-  } finally {
-    await router.replace("/_auth/login");
-  }
 }
 
 onMounted(async () => {

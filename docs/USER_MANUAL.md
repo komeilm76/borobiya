@@ -75,6 +75,8 @@ Roles:
 2. Enter **Username** + **Password** → **Sign in**.
 3. If your account was created by an admin without security questions, you will be redirected to **Complete Security Questions** (see §6).
 
+To sign out, select **خروج** in the top bar and confirm **بله، خروج از حساب**. Choose **انصراف** (or dismiss the dialog) to stay signed in.
+
 [Screenshot: Login page]
 
 Errors:
