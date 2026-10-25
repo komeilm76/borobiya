@@ -19,6 +19,8 @@ Before a first build, verify Ubuntu 24.04, Docker access, enough **free disk and
 # Do not continue until --check reports Prerequisites OK (including Docker daemon + Compose plugin).
 python3 scripts/vm-env.py               # development or production; secrets + admin password, .env mode 0600
 python3 scripts/vm-map.py               # choose countries/cities, snapshot and cache policy; writes no map data
+# If you enabled the optional proxy in THIS terminal, first run: source ~/.bashrc
+# Or open a new SSH terminal; see the Proxy section below before any large download.
 python3 scripts/vm.py launch            # resume/build maps + images, migrate/seed DB, verify, build web UI, start Compose
 python3 scripts/vm.py doctor            # read-only status/HTTP checks
 ```
@@ -66,7 +68,19 @@ Nothing here runs `docker system prune` or `docker compose down -v`: project-sco
 ./scripts/enable-proxy.sh --status
 ./scripts/enable-proxy.sh --dry-run             # preview changes to shell, apt and Docker
 ./scripts/enable-proxy.sh                       # prompts for host and port, verifies reachability
-# Open a NEW terminal (or source ~/.bashrc) before vm.py launch; existing shells keep old env.
+```
+
+**After that command finishes**, open a new SSH terminal **or**, in the current interactive Bash shell, run the following *before* `vm.py launch` (a child script cannot reset its parent shell's environment):
+
+```bash
+source ~/.bashrc                                 # reload the proxy exports in THIS shell
+curl -sSI --connect-timeout 8 --max-time 20 -o /dev/null \
+  -w 'Geofabrik: HTTP=%{http_code} remote=%{remote_ip}\n' https://download.geofabrik.de/
+```
+
+If the check reports HTTP=000, do not start the long map download; see [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md). A successful site-root check does not prove that the selected extract exists; if the download fails, test its exact URL from `map-server/regions.json` before retrying. To **disable** the proxy later, separately:
+
+```bash
 ./scripts/disable-proxy.sh --status
 ./scripts/disable-proxy.sh --dry-run
 ./scripts/disable-proxy.sh                      # confirm; then open a fresh terminal
