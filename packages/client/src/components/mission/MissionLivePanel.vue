@@ -17,6 +17,15 @@
     <v-alert v-if="live.error.value" type="warning" variant="tonal" role="alert" class="mb-3">
       {{ live.error.value }} <v-btn size="small" variant="text" @click="live.start()">تلاش دوباره</v-btn>
     </v-alert>
+    <div class="d-flex flex-wrap ga-2 mb-3" role="status" aria-live="polite">
+      <v-chip size="small" variant="tonal" :color="presence.requester.value === 'online' ? 'success' : 'warning'">
+        اتصال درخواست‌کننده: {{ missionPresenceLabel[presence.requester.value] }}
+      </v-chip>
+      <v-chip size="small" variant="tonal" :color="presence.rescuer.value === 'online' ? 'success' : 'warning'">
+        اتصال امدادگر: {{ missionPresenceLabel[presence.rescuer.value] }}
+      </v-chip>
+      <small>وضعیت اتصال، مستقل از اشتراک داوطلبانهٔ موقعیت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
+    </div>
     <div class="live-panel__grid">
       <div class="live-panel__map">
         <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
@@ -56,6 +65,8 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
+import { useMissionPresence } from "@/composables/use-mission-presence";
+import { missionPresenceLabel } from "@/mission/presence";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -67,6 +78,8 @@ const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const live = useMissionLiveLocations(computed(() => props.mission), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null), () => auth.ensureSession());
+const presence = useMissionPresence(computed(() => props.mission.id), computed(() => auth.accessToken),
+  computed(() => auth.user?.id ?? null));
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
 const map = shallowRef<MapLibreMap | null>(null);

@@ -941,6 +941,25 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     })).id).toBe(accepted.missionId);
     expect((await app.inject({ method: "GET", url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId),
       headers: responderHeaders })).statusCode).toBe(200);
+    const presenceUrl = apiRoutes.sos.getMissionPresence.url.replace(":id", accepted.missionId);
+    const presence = await callContract<{ missionId: string; requester: { online: boolean }; rescuer: { online: boolean } }>(
+      apiRoutes.sos.getMissionPresence, 200, { url: presenceUrl, headers: requesterHeaders });
+    expect(presence).toMatchObject({ missionId: accepted.missionId,
+      requester: { online: false }, rescuer: { online: true } });
+    expect((await app.inject({ method: "GET", url: presenceUrl, headers: adminHeaders })).statusCode).toBe(200);
+    expect((await callContract<{ code: string }>(apiRoutes.sos.getMissionPresence, 404, {
+      url: apiRoutes.sos.getMissionPresence.url.replace(":id", "00000000-0000-4000-8000-000000000099"),
+      headers: requesterHeaders })).code).toBe("MISSION_NOT_FOUND");
+    // A crashed server can leave is_online=true; the TTL still refuses a stale socket.
+    await pg.query(`UPDATE user_sessions SET last_active_at = now() - interval '6 minutes'
+      WHERE id = $1`, [responderDevices[0]!.id]);
+    const stale = await app.inject({ method: "GET", url: presenceUrl, headers: requesterHeaders });
+    expect(stale.statusCode).toBe(200);
+    expect(stale.json().rescuer.online).toBe(false);
+    await new DrizzleUserSecurityQuestionsStore(db).touchSessionPresence({
+      userId: createdResponder.id, sessionId: responderDevices[0]!.id,
+      deviceId: responderDeviceId, isOnline: true
+    });
     const userTimelineUrl = apiRoutes.sos.getMissionTimeline.url.replace(":id", accepted.missionId);
     const adminTimelineUrl = apiRoutes.admin.getMissionTimeline.url.replace(":id", accepted.missionId);
     const requesterTimeline = await callContract<Array<{ toStatus: string }>>(apiRoutes.sos.getMissionTimeline, 200,

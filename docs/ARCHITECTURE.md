@@ -263,8 +263,8 @@ Events (full list in API.md § Realtime):
 ```
 
 **Disconnection:**
-- Heartbeat `ping` 25s → server `pong` timeout 10s → mark `user_sessions.isOnline=false`. Runtime status: the heartbeat pair is live since T2.1.5/T2.3.4 (the server drops a silent connection), but the drop is **not** yet written to `user_sessions`; until it is, `GET /_user/devices` reports `isOnline` from refresh-token liveness (login/refresh set it, logout/revocation clear it).
-- Grace period 5 min before auto-cancel consideration (no auto-cancel in v1, just badge).
+- Heartbeat `ping` 25s → server `pong` timeout 10s → write `user_sessions.is_online=false` and last activity when the final socket disconnects; an online socket refreshes its timestamp every 25s. Reads treat rows older than 70s as offline even after a process crash; login/HTTP token rotation do not assert socket presence.
+- Active-mission participant/admin snapshot `GET /_user/sos/missions/:id/presence` supplies transport presence for the 5-minute disconnection grace badge; after 5 minutes it asks for manual review. No auto-cancel in v1, and GPS consent/fix freshness is a separate signal.
 - Reconnect: refresh JWT if needed, rejoin rooms, `GET /_user/sync?since=lastDisconnectAt` for missed events.
 
 **Scaling:** Single instance → in-memory adapter fine. Multi-instance → `socket.io-redis` adapter + `sticky sessions` via nginx `ip_hash`.

@@ -22,6 +22,9 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain('aria-label="نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر"');
     expect(panel).toContain("member.role === 'rescuer' ? 'امدادگر' : 'مدیر مرکز'");
     expect(panel).toContain("آخرین مشاهده:");
+    expect(panel).toContain("useMissionPresence");
+    expect(panel).toContain("missionPresenceLabel[presence.rescuer.value]");
+    expect(panel).toContain("مأموریت خودکار لغو نمی‌شود");
     expect(panel).toContain("member.online ? 'آنلاین' : 'آفلاین'");
     expect(panel).toContain("@click=\"live.startSharing()\"");
     expect(panel).toContain("@click=\"live.stopSharing()\"");

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiRoutes } from "@shared/api";
-import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, paginatedResponseSchema, missionRatingSchema,
-  type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline } from "@shared/index";
+import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, missionPresenceSchema, paginatedResponseSchema, missionRatingSchema,
+  type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline, type MissionPresence } from "@shared/index";
 import { requestJson } from "./http";
 
 export async function listRescuerMissions(token: string, page = 1): Promise<{ items: Mission[]; total: number; totalPages: number }> {
@@ -34,6 +34,14 @@ export async function getMissionTimeline(token: string, missionId: string,
   const route = audience === "admin" ? apiRoutes.admin.getMissionTimeline : apiRoutes.sos.getMissionTimeline;
   const id = route.schema.params.parse({ id: missionId }).id;
   return missionTimelineSchema.parse(await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(id)),
+    { accessToken: token, signal }));
+}
+
+/** An active-mission, participant/admin-scoped transport snapshot (never GPS coordinates). */
+export async function getMissionPresence(token: string, missionId: string, signal?: AbortSignal): Promise<MissionPresence> {
+  const route = apiRoutes.sos.getMissionPresence;
+  const id = route.schema.params.parse({ id: missionId }).id;
+  return missionPresenceSchema.parse(await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token, signal }));
 }
 

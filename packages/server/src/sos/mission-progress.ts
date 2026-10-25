@@ -97,6 +97,20 @@ export async function registerMissionProgressRoutes(
     return response.code(200).send(timeline);
   });
 
+  const presenceRoute = apiRoutes.sos.getMissionPresence;
+  app.get(presenceRoute.url, async (request, reply) => {
+    const response = reply.header("cache-control", "no-store");
+    const user = request.authenticatedUser;
+    if (!user) return response.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
+    const params = presenceRoute.schema.params.safeParse(request.params);
+    const presence = params.success ? await store.findActiveMissionPresence?.(params.data.id, user.userId,
+      user.role === "admin" ? "admin" : "user") : null;
+    if (!presence) return response.code(404).send({
+      error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
+    });
+    return response.code(200).send(presence);
+  });
+
   const navigationRoute = apiRoutes.sos.getMissionNavigationTarget;
   app.get(navigationRoute.url, async (request, reply) => {
     const response = reply.header("cache-control", "no-store");

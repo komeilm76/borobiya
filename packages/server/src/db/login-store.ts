@@ -42,7 +42,6 @@ export interface UserLoginStore {
     sessionId: string;
     currentTokenHash: string;
     nextTokenHash: string;
-    lastActiveAt: Date;
   }): Promise<boolean>;
   revokeSession(sessionId: string, userId: string): Promise<boolean>;
   revokeSessionByRefreshTokenHash(tokenHash: string): Promise<boolean>;
@@ -97,13 +96,11 @@ export class DrizzleUserLoginStore implements UserLoginStore {
     sessionId: string;
     currentTokenHash: string;
     nextTokenHash: string;
-    lastActiveAt: Date;
   }): Promise<boolean> {
     const updated = await this.db
       .update(userSessions)
       .set({
-        refreshTokenHash: input.nextTokenHash,
-        lastActiveAt: input.lastActiveAt
+        refreshTokenHash: input.nextTokenHash
       })
       .where(and(
         eq(userSessions.id, input.sessionId),

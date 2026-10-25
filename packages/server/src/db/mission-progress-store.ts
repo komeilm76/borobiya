@@ -1,8 +1,9 @@
-import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
-import type { Mission, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail, MissionRatingInput } from "@borobiya/shared";
+import { and, asc, count, desc, eq, inArray, isNotNull, or, sql } from "drizzle-orm";
+import type { Mission, MissionPresence, MissionNavigationTarget, MissionProgressStatus, MissionStatus, MissionTimeline, CancellationReasonDetail, MissionRatingInput } from "@borobiya/shared";
 import { readCancellationReason } from "./cancellation-detail";
 import type { Database } from "./client";
-import { missions, missionRatings, missionStatusHistory, sosRequests, users } from "./schema";
+import { PRESENCE_STALE_MS } from "../realtime/presence";
+import { missions, missionRatings, missionStatusHistory, sosRequests, userSessions, users } from "./schema";
 
 const NEXT_STATUS: Partial<Record<MissionStatus, MissionProgressStatus>> = {
   pending: "on_the_way",
@@ -22,6 +23,7 @@ export type MissionRatingResult = "rated" | "not_found" | "not_completed" | "alr
 export interface MissionProgressStore {
   findMission(id: string, userId: string, role: "admin" | "user"): Promise<Mission | null>;
   findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null>;
+  findActiveMissionPresence?(id: string, userId: string, role: "admin" | "user"): Promise<MissionPresence | null>;
   listMissions(userId: string, role: "requester" | "rescuer", page: number, limit: number, sosRequestId?: string): Promise<{
     items: Mission[]; total: number; page: number; limit: number; totalPages: number
   }>;
@@ -78,6 +80,29 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
     }).onConflictDoNothing({ target: [missionRatings.missionId, missionRatings.raterId] })
       .returning({ id: missionRatings.id });
     return inserted.length ? "rated" : "already_rated";
+  }
+
+  async findActiveMissionPresence(id: string, userId: string, role: "admin" | "user"): Promise<MissionPresence | null> {
+    // Authorization is inside this query. Never read a foreign mission and filter it in JS.
+    const [row] = await this.db.select({ requesterId: missions.requesterId, rescuerId: missions.rescuerId })
+      .from(missions).where(and(eq(missions.id, id), inArray(missions.status, ACTIVE_STATUSES),
+        role === "admin" ? undefined : or(eq(missions.requesterId, userId), eq(missions.rescuerId, userId))))
+      .limit(1);
+    if (!row) return null;
+    const sessions = await this.db.select({ userId: userSessions.userId,
+      isOnline: userSessions.isOnline, lastActiveAt: userSessions.lastActiveAt })
+      .from(userSessions).where(and(inArray(userSessions.userId, [row.requesterId, row.rescuerId]),
+        isNotNull(userSessions.refreshTokenHash)));
+    const now = Date.now();
+    const describe = (id: string) => {
+      const entries = sessions.filter((entry) => entry.userId === id);
+      const last = entries.reduce<Date | null>((latest, entry) =>
+        !latest || entry.lastActiveAt > latest ? entry.lastActiveAt : latest, null);
+      return { online: entries.some((entry) => entry.isOnline &&
+        now - entry.lastActiveAt.getTime() <= PRESENCE_STALE_MS && entry.lastActiveAt.getTime() <= now + 10_000),
+        lastSeenAt: last?.toISOString() ?? null };
+    };
+    return { missionId: id, requester: describe(row.requesterId), rescuer: describe(row.rescuerId) };
   }
 
   async findNavigationTarget(id: string, rescuerId: string): Promise<MissionNavigationTarget | null> {

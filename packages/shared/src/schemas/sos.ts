@@ -136,6 +136,14 @@ export const missionNavigationTargetSchema = z.strictObject({
 });
 export type MissionNavigationTarget = z.infer<typeof missionNavigationTargetSchema>;
 
+/** Transport presence only. Neither value implies the person is sharing GPS or physically safe. */
+export const missionPresenceSchema = z.strictObject({
+  missionId: idSchema,
+  requester: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable() }),
+  rescuer: z.strictObject({ online: z.boolean(), lastSeenAt: timestampSchema.nullable() })
+});
+export type MissionPresence = z.infer<typeof missionPresenceSchema>;
+
 /** The immutable committed status steps, including terminal cancellation rows. */
 export const missionTimelineEntrySchema = z.strictObject({
   id: idSchema,

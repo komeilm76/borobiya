@@ -110,8 +110,7 @@ export async function registerSessionRoutes(
     const rotated = await dependencies.store.rotateRefreshToken({
       sessionId: session.id,
       currentTokenHash,
-      nextTokenHash: hashRefreshToken(nextRefreshToken),
-      lastActiveAt: new Date()
+      nextTokenHash: hashRefreshToken(nextRefreshToken)
     });
     if (!rotated) return invalidRefreshReply(reply, request, "rotation_conflict");
 

@@ -14,6 +14,7 @@ import {
   missionSchema,
   missionDetailSchema,
   missionTimelineSchema,
+  missionPresenceSchema,
   missionNavigationTargetSchema,
   missionStatusUpdateSchema,
   nearestResponderSchema,
@@ -248,6 +249,19 @@ export const sosRoutes = {
     meta: {
       operationId: "sosGetMissionTimeline",
       summary: "Read committed mission steps as a participant",
+      tags: ["sos", "user"], access: "authenticated"
+    }
+  }),
+  getMissionPresence: defineRoute({
+    method: "GET",
+    url: "/_user/sos/missions/:id/presence",
+    schema: {
+      params: missionParamsSchema,
+      responses: { 200: missionPresenceSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "sosGetMissionPresence",
+      summary: "Read active mission participant transport presence and last activity",
       tags: ["sos", "user"], access: "authenticated"
     }
   }),

@@ -36,6 +36,36 @@ async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceSt
 }
 
 describe("PATCH /_user/missions/:id/status", () => {
+  it("fails closed for foreign and terminal mission presence, and never returns locations", async () => {
+    const app = Fastify({ logger: false });
+    let caller = requesterId;
+    const findActiveMissionPresence = vi.fn(async (_id: string, user: string) =>
+      user === requesterId ? { missionId, requester: { online: false, lastSeenAt: now },
+        rescuer: { online: true, lastSeenAt: now } } : null);
+    app.addHook("onRequest", async (request) => {
+      request.authenticatedUser = { userId: caller, role: "user", sessionId: randomUUID(), deviceId: randomUUID(),
+        username: "participant", isActive: true, isSuspended: false,
+        mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date() };
+    });
+    await registerMissionProgressRoutes(app, {
+      advanceStatus: async () => ({ status: "not_found" }), findMission: async () => null,
+      listMissions: async (_id, _role, page, limit) => ({ items: [], total: 0, page, limit, totalPages: 0 }),
+      findNavigationTarget: async () => null, findActiveMissionPresence
+    });
+    try {
+      const url = `/_user/sos/missions/${missionId}/presence`;
+      const own = await app.inject({ method: "GET", url });
+      expect(own.statusCode).toBe(200);
+      expect(own.headers["cache-control"]).toBe("no-store");
+      expect(own.json()).toEqual({ missionId, requester: { online: false, lastSeenAt: now },
+        rescuer: { online: true, lastSeenAt: now } });
+      caller = randomUUID();
+      expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
+      expect((await app.inject({ method: "GET", url: "/_user/sos/missions/invalid/presence" })).statusCode).toBe(404);
+      expect(findActiveMissionPresence).toHaveBeenCalledTimes(2);
+    } finally { await app.close(); }
+  });
+
   it("authorizes navigation coordinates only for the assigned active rescuer", async () => {
     const app = Fastify({ logger: false });
     let currentUser = rescuerId;

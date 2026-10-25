@@ -66,7 +66,7 @@ function makeSessionStore(options: {
 } = {}) {
   const calls = {
     findHashes: [] as string[],
-    rotations: [] as Array<{ sessionId: string; currentTokenHash: string; nextTokenHash: string; lastActiveAt: Date }>,
+    rotations: [] as Array<{ sessionId: string; currentTokenHash: string; nextTokenHash: string }>,
     revocations: [] as Array<{ sessionId: string; userId: string }>,
     hashRevocations: [] as string[]
   };
@@ -167,8 +167,7 @@ describe("POST /_auth/refresh", () => {
     expect(state.calls.rotations[0]).toMatchObject({
       sessionId: identity.sessionId,
       currentTokenHash: hashRefreshToken(currentToken),
-      nextTokenHash: hashRefreshToken(nextToken),
-      lastActiveAt: expect.any(Date)
+      nextTokenHash: hashRefreshToken(nextToken)
     });
     expect(state.currentTokenHash).toBe(hashRefreshToken(nextToken));
     expect(response.headers["set-cookie"]).toContain("HttpOnly");
