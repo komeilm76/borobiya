@@ -68,15 +68,20 @@ export async function getAdminSosRequest(
   return sosRequestDetailSchema.parse(response);
 }
 
-/** Fetches the top 10 nearest qualified, active, non-busy responders (`GET /_admin/sos/requests/:id/nearest`). */
+/** Fetches the nearest ten eligible responders, optionally matching a username before the cap. */
 export async function getNearestSosResponders(
   id: string,
   accessToken: string,
   signal?: AbortSignal,
-  excludeAssigned = false
+  excludeAssigned = false,
+  search?: string
 ): Promise<NearestRespondersResponse> {
   const base = apiRoutes.admin.getNearestResponders.url.replace(":id", encodeURIComponent(id));
-  const path = excludeAssigned ? `${base}?excludeAssigned=true` : base;
+  const params = new URLSearchParams();
+  if (excludeAssigned) params.set("excludeAssigned", "true");
+  if (search) params.set("search", search);
+  const query = params.toString();
+  const path = query ? `${base}?${query}` : base;
   const response = await requestJson<unknown>(path, {
     method: "GET",
     accessToken,

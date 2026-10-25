@@ -31,6 +31,10 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(viewSource).toContain("categoryName");
     expect(viewSource).toContain("avgRating");
     expect(viewSource).toContain("lastActiveAt");
+    expect(viewSource).toContain('role="search" @submit.prevent="searchResponders"');
+    expect(viewSource).toContain("adminSos.setResponderSearch(term)");
+    expect(viewSource).toContain("adminSos.selectedResponderNames[id]");
+    expect(viewSource).toContain("فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده");
 
     // T3.6.5: persistent accessible replacement signposting survives sound autoplay denial.
     expect(viewSource).toContain("NEEDS REPLACEMENT");

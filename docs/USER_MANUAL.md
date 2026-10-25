@@ -20,7 +20,7 @@
 12. [History Sharing](#12-history-sharing)
 13. [Active Devices & Priority Device](#13-active-devices--priority-device)
 14. [SOS — Requesting Help](#14-sos--requesting-help)
-15. [SOS — Admin Dispatch — Planned](#15-sos--admin-dispatch--planned)
+15. [SOS — Admin Dispatch](#15-sos--admin-dispatch)
 16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
 17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
 18. [Cancellation — Partially available](#18-cancellation--partially-available)
@@ -240,17 +240,18 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ---
 
-## 15. SOS — Admin Dispatch — Planned
+## 15. SOS — Admin Dispatch
 
-> **Current status:** Admin dispatch routes (`/_admin/sos/requests*`, `POST .../dispatch`) remain contract-only on the API, and `/_admin/dispatch` and `/_admin/dashboard` currently render placeholder screens in the client (tracked under T3.3).
+> **Current status:** The admin SOS queue, candidate picker and dispatch endpoint are live. VM and physical-device acceptance still require verification.
 
 *Admin only (`/_admin/dispatch`).*
 
 1. New SOS appears: **pulsing red marker** + sidebar alert with severity color.
 2. Click alert → map zooms to SOS location, shows **Nearest Responders** (top 10 eligible by distance + category match).
-3. Each responder shows **distance, rating, category, last active**.
-4. Select **one or more** → **Dispatch**.
-5. Rescuers receive **proposal** (bell icon) instantly.
+3. If a known rescuer is farther away, enter at least two characters of their **username** in **جست‌وجوی امدادگر با نام کاربری** and press **جست‌وجو**. Matching happens before the ten-result limit; clearing the field and searching restores the nearest list. A missing match may be inactive, suspended, busy, outside the SOS specialty, lacking a stored location, or the SOS requester; the search does not override dispatch eligibility. Refresh after their eligibility changes.
+4. Each responder shows **distance, rating, category, last active**. Select multiple responders across searches; chosen usernames remain listed as removable chips until you switch SOS requests or dispatch.
+5. Select **one or more** → **Dispatch**.
+6. Rescuers receive **proposal** (bell icon) instantly.
 
 [Screenshot: Admin alert + nearest responders list]
 

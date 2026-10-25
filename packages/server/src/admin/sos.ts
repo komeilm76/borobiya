@@ -168,7 +168,7 @@ export async function registerAdminSosRoutes(
 
     const result = dependencies.dispatchStore
       ? await dependencies.dispatchStore.findNearestResponders(parsed.data.id, undefined,
-        filters.data.excludeAssigned === "true")
+        filters.data.excludeAssigned === "true", filters.data.search)
       : { status: "not_found" as const };
     if (result.status === "not_found") {
       return reply

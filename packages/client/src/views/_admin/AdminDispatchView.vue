@@ -252,6 +252,24 @@
             </div>
           </v-card-title>
           <v-divider />
+          <form class="pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
+            <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
+              placeholder="حداقل ۲ حرف؛ جست‌وجو در همهٔ امدادگران واجد شرایط"
+              variant="outlined" density="compact" hide-details autocomplete="off" maxlength="64"
+              aria-label="جست‌وجوی امدادگر با نام کاربری" />
+            <v-btn type="submit" color="primary" variant="tonal" :disabled="responderSearchInput.trim().length === 1"
+              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
+          </form>
+          <p class="px-4 mt-2 text-caption text-medium-emphasis">
+            {{ adminSos.responderSearch ? 'نزدیک‌ترین ۱۰ نتیجهٔ منطبق با جست‌وجو' : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}
+            فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده قابل انتخاب‌اند.
+          </p>
+          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
+            <v-chip v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
+              variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
+              @{{ adminSos.selectedResponderNames[id] ?? id }}
+            </v-chip>
+          </div>
 
           <v-alert
             v-if="adminSos.dispatchFeedback"
@@ -283,7 +301,9 @@
             v-else-if="adminSos.nearestResponders.length === 0"
             class="py-6 text-center text-medium-emphasis"
           >
-            در حال حاضر امدادگر فعال، آزاد و دارای موقعیت مکانی ثبت‌شده برای این نوع حادثه یافت نشد.
+            {{ adminSos.responderSearch
+              ? 'برای این نام کاربری امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده یافت نشد.'
+              : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
           </v-card-text>
 
           <v-list v-else class="responder-list py-0" lines="two">
@@ -609,6 +629,14 @@ const incidentNameById = computed(
 const proposedRescuerIdSet = computed(
   () => new Set(adminSos.selectedRequestProposals.map((proposal) => proposal.rescuerId))
 );
+const responderSearchInput = ref("");
+watch(() => adminSos.selectedId, () => { responderSearchInput.value = ""; });
+function searchResponders(): void {
+  const term = responderSearchInput.value.trim();
+  if (term.length === 1) return;
+  adminSos.setResponderSearch(term);
+  void adminSos.loadNearestResponders();
+}
 
 let mapInstance: MapLibreMap | null = null;
 let pulseAnimationFrame: number | null = null;

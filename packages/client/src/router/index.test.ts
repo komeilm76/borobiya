@@ -71,7 +71,7 @@ describe("client route records", () => {
       expect(headingSlugs, `TOC anchor #${anchor}`).toContain(anchor);
     }
 
-    for (const plannedSection of [9, 15, 17]) {
+    for (const plannedSection of [9, 17]) {
       const heading = lines.find((line) => line.startsWith(`## ${plannedSection}. `));
       expect(heading, `section ${plannedSection}`).toMatch(/— Planned$/);
     }

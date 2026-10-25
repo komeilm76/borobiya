@@ -476,6 +476,66 @@ describe("useAdminSosStore (T3.2.5)", () => {
     await secondNearest;
   });
 
+  it("searches beyond the nearest ten without dropping previously selected rescuers", async () => {
+    const request = makeSosRecord();
+    const near = { userId: "44444444-4444-4444-8444-444444444441", username: "rescuer_near",
+      distance: 100, avgRating: null, categoryName: "امداد", lastActiveAt: "2026-10-23T12:10:00.000Z" };
+    const far = { ...near, userId: "44444444-4444-4444-8444-444444444442", username: "rescuer_far", distance: 12000 };
+    const getNearestResponders = vi.fn(async (_id: string, _token: string,
+      _signal?: AbortSignal, _excludeAssigned?: boolean, search?: string) => ({ responders: search ? [far] : [near] }));
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }),
+      getNearestResponders
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.nearestResponders).toEqual([near]));
+    store.selectAllNearestResponders();
+    store.setResponderSearch(" rescuer_far ");
+    await store.loadNearestResponders();
+    expect(getNearestResponders).toHaveBeenLastCalledWith(request.id, "admin-jwt", undefined, false, "rescuer_far");
+    expect(store.nearestResponders).toEqual([far]);
+    store.selectAllNearestResponders();
+    expect(store.selectedResponderIds).toEqual([near.userId, far.userId]);
+    expect(store.selectedResponderNames[near.userId]).toBe("rescuer_near");
+    store.setResponderSearch("");
+    await store.loadNearestResponders();
+    expect(store.selectedResponderIds).toEqual([near.userId, far.userId]);
+    store.toggleResponderSelection(far.userId);
+    expect(store.selectedResponderIds).toEqual([near.userId]);
+    store.selectRequest(null);
+    await nextTick();
+    expect(store.selectedResponderNames).toEqual({});
+    expect(store.responderSearch).toBe("");
+  });
+
+  it("ignores a late nearest-list response after a username search starts", async () => {
+    const request = makeSosRecord();
+    const near = { userId: "44444444-4444-4444-8444-444444444441", username: "rescuer_near",
+      distance: 100, avgRating: null, categoryName: null, lastActiveAt: "2026-10-23T12:10:00.000Z" };
+    const far = { ...near, userId: "44444444-4444-4444-8444-444444444442", username: "rescuer_far" };
+    let finishInitial!: (value: { responders: typeof near[] }) => void;
+    const pendingInitial = new Promise<{ responders: typeof near[] }>((resolve) => { finishInitial = resolve; });
+    const getNearestResponders = vi.fn((_id: string, _token: string, _signal?: AbortSignal,
+      _excludeAssigned?: boolean, search?: string) => search ? Promise.resolve({ responders: [far] }) : pendingInitial);
+    configureAdminSosRuntimeForTests({
+      openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }), getNearestResponders
+    });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
+    store.setResponderSearch("rescuer_far");
+    await store.loadNearestResponders();
+    finishInitial({ responders: [near] });
+    await vi.waitFor(() => expect(store.nearestResponders).toEqual([far]));
+  });
+
   it("does not clear another SOS's selection or show its dispatch feedback when a previous dispatch finishes", async () => {
     const first = makeSosRecord();
     const second = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });

@@ -302,7 +302,10 @@ export const adminRoutes = {
     url: "/_admin/sos/requests/:id/nearest",
     schema: {
       params: uuidPathParamsSchema,
-      query: z.strictObject({ excludeAssigned: z.enum(["true", "false"]).optional() }),
+      query: z.strictObject({
+        excludeAssigned: z.enum(["true", "false"]).optional(),
+        search: z.string().trim().min(2).max(64).optional()
+      }),
       responses: { 200: nearestRespondersResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },
     meta: {

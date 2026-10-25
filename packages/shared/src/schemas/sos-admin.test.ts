@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { apiRoutes } from "../api";
 import {
   cancellationReasonCreateSchema,
   categoryCreateSchema,
@@ -20,6 +21,13 @@ const id1 = "00000000-0000-4000-8000-000000000020";
 const id2 = "00000000-0000-4000-8000-000000000021";
 
 describe("SOS and admin schemas", () => {
+  it("validates a bounded username search on the admin-only nearest-responder route", () => {
+    const query = apiRoutes.admin.getNearestResponders.schema.query;
+    expect(query.parse({ search: "  rescue_far  " })).toEqual({ search: "rescue_far" });
+    expect(query.safeParse({ search: "r" }).success).toBe(false);
+    expect(query.safeParse({ search: "r".repeat(65) }).success).toBe(false);
+    expect(query.safeParse({ search: "rescue", extra: "yes" }).success).toBe(false);
+  });
   it("validates SOS description, location, and incident reference", () => {
     const valid = {
       severity: "high",

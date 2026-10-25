@@ -103,7 +103,7 @@ export type AcceptProposalResult =
 export interface SosDispatchStore {
   acceptProposal?(proposalId: string, rescuerId: string): Promise<AcceptProposalResult>;
   declineProposal?(proposalId: string, rescuerId: string, reason?: string): Promise<"declined" | "not_found" | "not_pending">;
-  findNearestResponders(sosRequestId: string, limit?: number, excludeAssigned?: boolean): Promise<FindNearestRespondersResult>;
+  findNearestResponders(sosRequestId: string, limit?: number, excludeAssigned?: boolean, search?: string): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
   listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }>;
@@ -130,7 +130,8 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
   public async findNearestResponders(
     sosRequestId: string,
     limit: number = NEAREST_RESPONDERS_DEFAULT_LIMIT,
-    excludeAssigned = false
+    excludeAssigned = false,
+    search?: string
   ): Promise<FindNearestRespondersResult> {
     const requestRows = await this.db
       .select({
@@ -188,6 +189,9 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
           )`,
           isNotNull(users.lastLocation),
           ne(users.id, targetRequest.requesterId),
+          // Match before the nearest-ten cap. POSITION treats % and _ literally and
+          // binds the search term; searching a known, more distant rescuer works.
+          search ? sql`POSITION(LOWER(${search}) IN LOWER(${users.username})) > 0` : undefined,
           // Filter before LIMIT. Removing previously assigned rescuers from a top-ten
           // response would hide the eleventh (and every later) eligible replacement.
           excludeAssigned ? sql`NOT EXISTS (

@@ -458,6 +458,18 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
       "medic_ring_07",
       "medic_ring_08"
     ]);
+
+    const search = async (term: string) => app.inject({ method: "GET",
+      url: `/_admin/sos/requests/${requestId}/nearest?search=${encodeURIComponent(term)}`,
+      headers: { authorization: `Bearer ${adminToken}` } });
+    expect(nearestRespondersResponseSchema.parse((await search("MEDIC_RING_10")).json()).responders
+      .map((item) => item.username)).toEqual(["medic_ring_10"]);
+    expect(nearestRespondersResponseSchema.parse((await search("medic_ring_%")).json()).responders).toEqual([]);
+    for (const excluded of ["fire_only_near", "unknown_gps_medic", "inactive_medic", "busy_medic"]) {
+      expect(nearestRespondersResponseSchema.parse((await search(excluded)).json()).responders).toEqual([]);
+    }
+    expect((await search("m")).statusCode).toBe(400);
+    expect((await search("x".repeat(65))).statusCode).toBe(400);
   });
 
   it("does not suggest or dispatch a rescuer with an active mission even when the busy flag is stale", async () => {

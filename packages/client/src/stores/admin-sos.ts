@@ -49,7 +49,8 @@ export interface AdminSosRuntime {
     requestId: string,
     accessToken: string,
     signal?: AbortSignal,
-    excludeAssigned?: boolean
+    excludeAssigned?: boolean,
+    search?: string
   ) => Promise<{ responders: NearestResponder[] }>;
   listRequestMissions?: (accessToken: string, requestId: string, includeTerminal: boolean) => Promise<Mission[]>;
   dispatchResponders?: (
@@ -90,7 +91,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const nearestResponders = ref<NearestResponder[]>([]);
   const nearestLoading = ref(false);
   const nearestError = ref<string | null>(null);
+  const responderSearch = ref("");
   const selectedResponderIds = ref<string[]>([]);
+  const selectedResponderNames = ref<Record<string, string>>({});
   const dispatchSubmitting = ref(false);
   const dispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
   const quickDispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
@@ -215,7 +218,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const targetId = requestId ?? selectedId.value;
     if (!isAdminSession.value || !targetId) {
       nearestResponders.value = [];
-      selectedResponderIds.value = [];
+      clearResponderSelection();
       nearestError.value = null;
       nearestLoading.value = false;
       return;
@@ -225,12 +228,15 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     nearestError.value = null;
 
     const nearestFn = activeOverrides.getNearestResponders ?? getNearestSosResponders;
+    const search = responderSearch.value;
     try {
-      const response = await withAdminAuthRetry((token) => nearestFn(targetId, token));
+      const response = await withAdminAuthRetry((token) => search
+        ? nearestFn(targetId, token, undefined, false, search)
+        : nearestFn(targetId, token));
       if (gen !== nearestGeneration || !response) return;
       nearestResponders.value = response.responders;
-      const validIds = new Set(response.responders.map((item) => item.userId));
-      selectedResponderIds.value = selectedResponderIds.value.filter((id) => validIds.has(id));
+      // Retain selections from earlier searches; the dispatch endpoint rechecks availability.
+      // Clearing these here would silently discard a chosen rescuer outside the nearest ten.
     } catch (err) {
       if (gen !== nearestGeneration) return;
       nearestResponders.value = [];
@@ -245,20 +251,38 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
   }
 
+  function setResponderSearch(value: string): void {
+    responderSearch.value = value.trim();
+    nearestGeneration++; // a previous query cannot overwrite results for the new term
+    nearestResponders.value = [];
+  }
+
   function toggleResponderSelection(userId: string): void {
     if (selectedResponderIds.value.includes(userId)) {
       selectedResponderIds.value = selectedResponderIds.value.filter((id) => id !== userId);
+      const remaining = { ...selectedResponderNames.value };
+      delete remaining[userId];
+      selectedResponderNames.value = remaining;
     } else {
+      const responder = nearestResponders.value.find((item) => item.userId === userId);
+      if (!responder) return; // only displayed eligible candidates can be selected
       selectedResponderIds.value = [...selectedResponderIds.value, userId];
+      selectedResponderNames.value = { ...selectedResponderNames.value, [userId]: responder.username };
     }
   }
 
   function selectAllNearestResponders(): void {
-    selectedResponderIds.value = nearestResponders.value.map((item) => item.userId);
+    for (const responder of nearestResponders.value) {
+      if (!selectedResponderIds.value.includes(responder.userId)) {
+        selectedResponderIds.value = [...selectedResponderIds.value, responder.userId];
+      }
+      selectedResponderNames.value = { ...selectedResponderNames.value, [responder.userId]: responder.username };
+    }
   }
 
   function clearResponderSelection(): void {
     selectedResponderIds.value = [];
+    selectedResponderNames.value = {};
   }
 
   async function dispatchSelectedResponders(): Promise<boolean> {
@@ -297,7 +321,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       // The dispatcher may have selected another SOS while this request was in flight. The
       // first SOS still needs its updated status, but the new selection and banner are its own.
       if (selectedId.value === activeRequest.id) {
-        selectedResponderIds.value = [];
+        clearResponderSelection();
         dispatchFeedback.value = {
           type: "success",
           message: `پیشنهاد مأموریت با موفقیت برای ${response.proposals.length} امدادگر ارسال شد.`
@@ -569,7 +593,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     nearestResponders.value = [];
     nearestLoading.value = false;
     nearestError.value = null;
-    selectedResponderIds.value = [];
+    responderSearch.value = "";
+    clearResponderSelection();
     dispatchSubmitting.value = false;
     dispatchFeedback.value = null;
     proposalsByRequestId.value = {};
@@ -604,7 +629,8 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     // A responder list is scoped to its SOS, not to the dispatch page as a whole. Do not
     // display or allow selecting the previous SOS's candidates while the next read is pending.
     nearestResponders.value = [];
-    selectedResponderIds.value = [];
+    responderSearch.value = "";
+    clearResponderSelection();
     dispatchFeedback.value = null;
     void loadNearestResponders(nextId);
   });
@@ -661,7 +687,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     nearestResponders,
     nearestLoading,
     nearestError,
+    responderSearch,
     selectedResponderIds,
+    selectedResponderNames,
     dispatchSubmitting,
     dispatchFeedback,
     quickDispatchFeedback,
@@ -674,6 +702,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     resetState,
     refreshRequests,
     loadNearestResponders,
+    setResponderSearch,
     toggleResponderSelection,
     selectAllNearestResponders,
     clearResponderSelection,
