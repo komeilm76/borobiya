@@ -79,7 +79,7 @@ describe("UserMapView live overlay", () => {
     const phone = view.slice(view.indexOf("@media (max-width: 750px)"));
     expect(phone).toContain("height: auto;");
     expect(phone).toContain("overflow: visible;");
-    expect(phone).toContain("height: clamp(20rem, 45dvh, 32rem);");
+    expect(phone).toContain("height: clamp(20rem, 55dvh, 32rem);");
     expect(phone).toContain(".user-map-view__search { order: 1; }");
     expect(phone).toContain(".user-map-view__playback { order: 3; }");
     expect(phone).toContain(".user-map-view__live { order: 5; }");

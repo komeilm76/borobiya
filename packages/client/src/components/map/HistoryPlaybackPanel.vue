@@ -7,8 +7,9 @@
   >
     <header class="history-playback__header">
       <div class="history-playback__title-block">
-        <p>تاریخچهٔ مسیر</p>
-        <h2>پخش حرکت</h2>
+        <h2>تاریخچهٔ مسیر</h2>
+        <p v-if="isOpen">پخش حرکت</p>
+        <p v-else class="history-playback__preview" role="status">{{ statusLine }}</p>
       </div>
       <v-chip
         v-if="api.hasTrack.value && !isOpen"
@@ -19,19 +20,29 @@
       >
         {{ pointCount }}
       </v-chip>
+      <v-btn v-if="!isOpen && api.canPlay.value" class="history-playback__quick-play"
+        variant="tonal" color="primary" icon size="small"
+        :aria-label="api.playing.value ? 'توقف پخش مسیر' : 'پخش مسیر'"
+        @click="api.toggle()">
+        <v-icon :icon="api.playing.value ? 'mdi-pause' : 'mdi-play'" />
+      </v-btn>
       <v-btn
-        variant="text"
-        icon
+        class="history-playback__toggle"
+        variant="tonal"
+        color="primary"
+        size="small"
+        :prepend-icon="isOpen ? 'mdi-chevron-up' : 'mdi-tune-variant'"
         :aria-label="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
         :aria-expanded="isOpen"
+        aria-controls="history-playback-controls"
         :title="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
         @click="isOpen = !isOpen"
       >
-        <v-icon :icon="isOpen ? 'mdi-chevron-up' : 'mdi-history'" />
+        {{ isOpen ? 'بستن' : 'جزئیات' }}
       </v-btn>
     </header>
 
-    <div v-show="isOpen" class="history-playback__body">
+    <div id="history-playback-controls" v-show="isOpen" class="history-playback__body">
       <div class="history-playback__source" role="group" aria-label="منبع مسیر">
         <v-btn-toggle
           :model-value="api.sourceKind.value"
@@ -204,6 +215,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { formatDuration } from "@/sharing/share-form";
+import { historyPanelInitiallyOpen } from "@/history/playback-panel";
 import {
   formatLocalTime,
   playbackIssueText,
@@ -224,7 +236,9 @@ import type { HistoryPlayback } from "@/composables/use-history-playback";
 const props = defineProps<{ api: HistoryPlayback }>();
 const route = useRoute();
 
-const isOpen = ref(true);
+const isNarrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
+  && window.matchMedia("(max-width: 750px)").matches;
+const isOpen = ref(historyPanelInitiallyOpen(isNarrow, route.query.historyShare));
 const fromField = ref("");
 const toField = ref("");
 
@@ -375,8 +389,16 @@ function scrub(value: number | readonly number[]): void {
   line-height: 1.4;
 }
 
-.history-playback__points-chip {
+.history-playback__points-chip,
+.history-playback__toggle,
+.history-playback__quick-play {
   flex: 0 0 auto;
+}
+
+.history-playback__preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-playback__body {
@@ -491,13 +513,29 @@ function scrub(value: number | readonly number[]): void {
   border-color: rgba(226, 240, 238, 0.22);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 750px) {
   .history-playback {
-    width: min(20rem, 100%);
+    width: 100%;
+    max-height: min(56dvh, 26rem);
+    padding: 0.5rem 0.75rem;
+    overscroll-behavior: contain;
   }
 
-  .history-playback__fields {
-    flex-wrap: wrap;
+  .history-playback:not(.history-playback--open) {
+    max-height: none;
+    overflow: hidden;
   }
+
+  .history-playback__header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 2.75rem;
+    background: rgb(var(--v-theme-surface));
+  }
+
+  .history-playback__title-block p { margin-top: 0.15rem; }
+  .history-playback__points-chip { display: none; }
+  .history-playback__fields { flex-wrap: wrap; }
 }
 </style>
