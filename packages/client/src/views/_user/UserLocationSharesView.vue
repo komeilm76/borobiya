@@ -73,7 +73,7 @@ function onSharesChanged(): void {
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.8rem;
   font-weight: 800;
 }

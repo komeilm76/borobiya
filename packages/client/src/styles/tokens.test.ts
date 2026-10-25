@@ -55,6 +55,30 @@ describe("T4.4.5 design primitives", () => {
     expect(css).toContain("gap: var(--bb-space-two");
   });
 
+  it("uses readable semantic text against dark surfaces in admin and incident views", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const palette = palettes[mode];
+      expect(contrast(palette.text, palette.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(palette.muted, palette.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(palette.primary, palette.surface)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(contrast(palettes.dark.secondary, palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
+
+    const views = (name: string) => readFileSync(new URL(`../views/${name}.vue`, import.meta.url), "utf8");
+    const users = views("_admin/AdminUsersView");
+    expect(users).toContain(".admin-users-header h1 {\n  margin: 0;\n  color: var(--bb-color-text);");
+    expect(users).toContain("background: rgb(var(--v-theme-surface)) !important;");
+    expect(users).toContain(".admin-users-table :deep(th) {\n  height: 52px !important;\n  color: var(--bb-color-muted) !important;");
+    expect(users).toContain(".admin-users-username {\n  color: var(--bb-color-text);");
+    expect(users).toContain("color: var(--bb-color-text);\n  font-size: 1.1rem;");
+    expect(users).toContain("background: rgba(var(--v-theme-on-surface), 0.04);");
+    expect(views("_user/UserLocationSharesView")).toContain("color: var(--bb-color-muted);");
+    for (const name of ["UserSosHistoryView", "UserRescuerHistoryView", "UserMissionView", "UserProposalsView"]) {
+      expect(views(`_user/${name}`)).toContain("color: rgb(var(--v-theme-primary));");
+    }
+    expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark) .history__stars { color: var(--bb-color-secondary); }");
+  });
+
   it("installs one style element and updates it idempotently", () => {
     const nodes = new Map<string, { id: string; textContent: string }>();
     const root = {

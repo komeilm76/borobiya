@@ -351,7 +351,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offer-card__stripe--urgent { background: #df554f; }.offer-card__stripe--important { background: #db9837; }.offer-card__stripe--standard { background: #3a9a8a; }
 .offer-card__body { min-width: 0; width: 100%; display: grid; padding: 20px 19px; gap: 12px; }
 .offer-card__top, .offer-card__foot { display: flex; align-items: center; gap: 10px; }
-.offer-card__icon { display: inline-flex; justify-content: center; align-items: center; background: rgba(49,149,129,.12); color: #16826c; border-radius: 11px; width: 36px; height: 36px; flex-shrink: 0; }
+.offer-card__icon { display: inline-flex; justify-content: center; align-items: center; background: rgba(49,149,129,.12); color: rgb(var(--v-theme-primary)); border-radius: 11px; width: 36px; height: 36px; flex-shrink: 0; }
 .offer-card__title { font-weight: 800; font-size: .95rem; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: .78rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
 .offer-card__severity--urgent { background: #ffe7e4; color: #a2241e; }.offer-card__severity--important { background: #fff0d4; color: #875000; }.offer-card__severity--standard { background: #d9f4ed; color: #066b57; }

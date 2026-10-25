@@ -516,14 +516,14 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.45rem;
   margin: 0 0 0.55rem;
-  color: #0e7772;
+  color: var(--bb-color-primary);
   font-size: 0.78rem;
   font-weight: 800;
 }
 
 .admin-users-header h1 {
   margin: 0;
-  color: #193d3d;
+  color: var(--bb-color-text);
   font-size: clamp(1.7rem, 3.5vw, 2.45rem);
   font-weight: 850;
   letter-spacing: -0.035em;
@@ -533,7 +533,7 @@ onUnmounted(() => {
 .admin-users-intro {
   max-width: 45rem;
   margin: 0.4rem 0 0;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.9rem;
   line-height: 1.9;
 }
@@ -547,7 +547,7 @@ onUnmounted(() => {
 .admin-users-card {
   overflow: hidden;
   border: 1px solid rgba(34, 75, 75, 0.09);
-  background: rgba(255, 255, 255, 0.96) !important;
+  background: rgb(var(--v-theme-surface)) !important;
   box-shadow: 0 18px 50px rgba(31, 67, 66, 0.07) !important;
 }
 
@@ -574,7 +574,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   font-weight: 650;
 }
@@ -583,8 +583,8 @@ onUnmounted(() => {
   padding: 0.28rem 0.65rem;
   border: 1px solid rgba(14, 102, 102, 0.12);
   border-radius: 999px;
-  color: #0e6666;
-  background: #edf7f3;
+  color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), 0.12);
   font-size: 0.7rem;
 }
 
@@ -594,13 +594,13 @@ onUnmounted(() => {
   justify-items: center;
   align-content: center;
   gap: 0.8rem;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.85rem;
   text-align: center;
 }
 
 .admin-users-state strong {
-  color: #365b5c;
+  color: var(--bb-color-text);
   font-size: 0.95rem;
   font-weight: 800;
 }
@@ -617,8 +617,8 @@ onUnmounted(() => {
   place-items: center;
   border: 1px solid rgba(14, 102, 102, 0.1);
   border-radius: 19px;
-  color: #0e7772;
-  background: #edf7f3;
+  color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), 0.12);
 }
 
 .admin-users-table-wrap {
@@ -633,8 +633,8 @@ onUnmounted(() => {
 
 .admin-users-table :deep(th) {
   height: 52px !important;
-  color: #688180 !important;
-  background: #f8fbfa;
+  color: var(--bb-color-muted) !important;
+  background: rgba(var(--v-theme-on-surface), 0.04);
   font-size: 0.74rem !important;
   font-weight: 800 !important;
   white-space: nowrap;
@@ -644,12 +644,12 @@ onUnmounted(() => {
 .admin-users-table :deep(tbody th) {
   height: 74px !important;
   border-top: 1px solid rgba(26, 67, 68, 0.06) !important;
-  color: #3b5e5f;
+  color: var(--bb-color-text);
   font-size: 0.82rem;
 }
 
 .admin-users-table :deep(tbody tr:hover) {
-  background: #fbfdfc;
+  background: rgba(var(--v-theme-primary), 0.06);
 }
 
 .admin-user-cell {
@@ -667,8 +667,8 @@ onUnmounted(() => {
   place-items: center;
   border: 1px solid rgba(14, 102, 102, 0.1);
   border-radius: 14px;
-  color: #0e6666;
-  background: #eaf5f1;
+  color: var(--bb-color-primary);
+  background: rgba(var(--v-theme-primary), 0.12);
   font-size: 0.9rem;
   font-weight: 850;
   text-transform: uppercase;
@@ -680,7 +680,7 @@ onUnmounted(() => {
 }
 
 .admin-users-username {
-  color: #254849;
+  color: var(--bb-color-text);
   font-size: 0.85rem;
   font-weight: 800;
   text-align: start;
@@ -688,7 +688,7 @@ onUnmounted(() => {
 
 .admin-user-copy small,
 .admin-self-note {
-  color: #8b9b99;
+  color: var(--bb-color-muted);
   font-size: 0.68rem;
   font-weight: 500;
 }
@@ -701,8 +701,8 @@ onUnmounted(() => {
   padding: 0.32rem 0.62rem;
   border: 1px solid rgba(91, 117, 116, 0.12);
   border-radius: 999px;
-  color: #607777;
-  background: #f4f7f6;
+  color: var(--bb-color-muted);
+  background: rgba(var(--v-theme-on-surface), 0.06);
   font-size: 0.72rem;
   font-weight: 750;
   white-space: nowrap;
@@ -764,7 +764,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 1rem;
   padding-top: 0.9rem;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.75rem;
 }
 
@@ -777,7 +777,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.75rem;
   padding: 1.35rem 1.5rem 0.5rem;
-  color: #254849;
+  color: var(--bb-color-text);
   font-size: 1.1rem;
   font-weight: 850;
 }
@@ -802,7 +802,7 @@ onUnmounted(() => {
 
 .admin-status-dialog :deep(.v-card-text) {
   padding: 0.6rem 1.5rem 0.9rem;
-  color: #647b7a;
+  color: var(--bb-color-muted);
   font-size: 0.86rem;
   line-height: 1.9;
 }
@@ -813,7 +813,7 @@ onUnmounted(() => {
 
 .admin-status-dialog :deep(.v-card-text strong) {
   margin-inline: 0.2rem;
-  color: #254849;
+  color: var(--bb-color-text);
 }
 
 .admin-deactivation-note {
