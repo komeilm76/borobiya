@@ -171,6 +171,17 @@ export const missionSchema = z.strictObject({
   updatedAt: timestampSchema
 });
 export type Mission = z.infer<typeof missionSchema>;
+
+/** Reconnect snapshot: durable mission steps, not a replay of private GPS or ephemeral offers.
+ * The cursor pages status events; a truncated mission list must be reloaded via paginated reads. */
+export const userSyncResponseSchema = z.strictObject({
+  events: z.array(missionTimelineEntrySchema),
+  location: z.null(),
+  missions: z.array(missionSchema),
+  missionsTruncated: z.boolean(),
+  nextCursor: idSchema.nullable()
+});
+export type UserSyncResponse = z.infer<typeof userSyncResponseSchema>;
 /** A persisted reason snapshot resolved by its FK, including deactivated catalog entries. */
 export const cancellationReasonDetailSchema = z.strictObject({
   id: idSchema, key: z.string(), label: z.string(), labelFa: z.string().nullable(),

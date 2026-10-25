@@ -16,6 +16,7 @@ import {
   missionTimelineSchema,
   missionPresenceSchema,
   missionNavigationTargetSchema,
+  userSyncResponseSchema,
   missionStatusUpdateSchema,
   nearestResponderSchema,
   nearestRespondersResponseSchema,
@@ -48,12 +49,7 @@ const missionListQuerySchema = z.strictObject({
 
 const proposalListQuerySchema = z.strictObject(paginationQuerySchema.shape);
 
-const syncQuerySchema = z.strictObject({ since: timestampSchema });
-const syncResponseSchema = z.strictObject({
-  events: z.array(z.unknown()),
-  location: z.unknown().nullable(),
-  missions: z.array(missionSchema)
-});
+const syncQuerySchema = z.strictObject({ since: timestampSchema, cursor: missionParamsSchema.shape.id.optional() });
 const photoUploadResponseSchema = z.strictObject({ photoUrl: z.string().trim().min(1) });
 export const photoAccessResponseSchema = z.strictObject({
   url: z.string().startsWith("/uploads/"),
@@ -343,7 +339,7 @@ export const sosRoutes = {
     url: "/_user/sync",
     schema: {
       query: syncQuerySchema,
-      responses: { 200: syncResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
+      responses: { 200: userSyncResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema }
     },
     meta: {
       operationId: "userSync",

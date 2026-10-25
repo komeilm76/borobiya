@@ -234,4 +234,115 @@ describe("mission live positions (T3.5.7)", () => {
     expect(clear).toHaveBeenCalledTimes(2);
     scope.stop();
   });
+  it("reauthorizes the room and reconciles missed terminal status without restarting GPS consent", async () => {
+    const session = fakeSocket();
+    const clear = vi.fn();
+    const readSync = vi.fn(async () => ({ events: [], missions: [{ ...mission, sosRequestId: mission.id,
+      status: "cancelled_by_rescuer" as const, cancelledBy: "rescuer" as const,
+      cancellationReasonId: null, cancellationCustomText: null, cancelledAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
+      missionsTruncated: false, nextCursor: null, location: null as null }));
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, watchPosition: () => clear, readSync }))!;
+    await settle();
+    live.startSharing();
+    session.socket.connected = false;
+    session.listeners.get("disconnect")?.("transport close");
+    expect(clear).toHaveBeenCalledOnce();
+    expect(live.sharing.value).toBe(false);
+    session.socket.connected = true;
+    session.listeners.get("connect")?.();
+    await settle();
+    expect(session.emitted.filter(({ event }) => event === MISSION_SUBSCRIBE_EVENT)).toHaveLength(2);
+    expect(readSync).toHaveBeenCalledWith(token, expect.any(String), expect.any(AbortSignal));
+    expect(live.error.value).toContain("پایان");
+    expect(session.close).toHaveBeenCalledOnce();
+    scope.stop();
+  });
+
+  it("discards a delayed sync response after changing missions and leaves GPS stopped on sync failure", async () => {
+    const session = fakeSocket();
+    const missionRef = ref<typeof mission | null>(mission);
+    let finish!: (value: { events: []; missions: []; missionsTruncated: false; nextCursor: null; location: null }) => void;
+    const readSync = vi.fn(() => new Promise<{
+      events: []; missions: []; missionsTruncated: false; nextCursor: null; location: null
+    }>((resolve) => { finish = resolve; }));
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(missionRef, ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, readSync,
+        readMission: vi.fn(async () => { throw new Error("should not run after switch"); }) }))!;
+    await settle();
+    session.socket.connected = false;
+    session.listeners.get("disconnect")?.("transport close");
+    session.socket.connected = true;
+    session.listeners.get("connect")?.();
+    await settle();
+    missionRef.value = null;
+    await settle();
+    finish({ events: [], missions: [], missionsTruncated: false, nextCursor: null, location: null });
+    await settle();
+    expect(live.locations.value).toEqual({});
+    expect(session.close).toHaveBeenCalledOnce();
+    scope.stop();
+
+    const second = fakeSocket();
+    const scope2 = effectScope();
+    const failed = scope2.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => second.client,
+        readSync: async () => { throw new Error("offline"); } }))!;
+    await settle();
+    second.socket.connected = false;
+    second.listeners.get("disconnect")?.("transport close");
+    second.socket.connected = true;
+    second.listeners.get("connect")?.();
+    await settle();
+    expect(failed.sharing.value).toBe(false);
+    expect(failed.error.value).toContain("همگام‌سازی");
+    scope2.stop();
+  });
+
+  it("uses the scoped mission detail, not the user sync stream, for admin reconnect", async () => {
+    const session = fakeSocket();
+    const adminToken = `x.${btoa(JSON.stringify({ role: "admin", sub: "admin", deviceId: "device-1" }))}.x`;
+    const readSync = vi.fn();
+    const readMission = vi.fn(async () => ({ ...mission, sosRequestId: mission.id, status: "completed" as const,
+      cancelledBy: null, cancellationReasonId: null, cancellationCustomText: null, cancelledAt: null,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      cancellationReason: null, rating: null }));
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(adminToken), ref("admin"),
+      async () => {}, { openSocket: async () => session.client, readSync, readMission }))!;
+    await settle();
+    session.socket.connected = false;
+    session.listeners.get("disconnect")?.("transport close");
+    session.socket.connected = true;
+    session.listeners.get("connect")?.();
+    await settle();
+    expect(readSync).not.toHaveBeenCalled();
+    expect(readMission).toHaveBeenCalledWith(adminToken, mission.id);
+    expect(live.error.value).toContain("پایان");
+    scope.stop();
+  });
+
+  it("refreshes an expired socket credential before reconnecting the same private session", async () => {
+    const session = fakeSocket();
+    const bearer = ref(token);
+    const rotated = `x.${btoa(JSON.stringify({ deviceId: "device-1", exp: 9999999999 }))}.x`;
+    const ensureSession = vi.fn(async () => { if (ensureSession.mock.calls.length > 1) bearer.value = rotated; });
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, ref(mission.rescuerId),
+      ensureSession, { openSocket: async () => session.client }))!;
+    await settle();
+    session.socket.connected = false;
+    session.listeners.get("disconnect")?.("io server disconnect");
+    await settle();
+    expect(ensureSession).toHaveBeenCalledTimes(2); // initial handshake and rejected reconnect
+    expect(session.client.updateToken).toHaveBeenCalledWith(rotated);
+    expect(session.client.connect).toHaveBeenCalledTimes(2);
+    expect(session.close).not.toHaveBeenCalled();
+    expect(live.sharing.value).toBe(false);
+    scope.stop();
+  });
+
 });

@@ -37,6 +37,8 @@ import { registerMissionProgressRoutes } from "./sos/mission-progress";
 import { registerSosCancellationRoutes } from "./sos/cancellation";
 import { DrizzleSosCancellationStore, type SosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleMissionProgressStore, type MissionProgressStore } from "./db/mission-progress-store";
+import { DrizzleSyncStore, type SyncStore } from "./db/sync-store";
+import { registerUserSyncRoute } from "./sos/sync";
 import { registerMultipartParser } from "./plugins/multipart";
 import { DrizzleSosPhotoStore, type SosPhotoStore } from "./db/sos-photo-store";
 import { createPhotoStorage, type PhotoStorage } from "./sos/photo-storage";
@@ -97,6 +99,7 @@ export interface FastifyAppDependencies {
   sosDispatchStore?: SosDispatchStore;
   /** Override the mission progress write in tests. */
   missionProgressStore?: MissionProgressStore;
+  syncStore?: SyncStore;
   /** Cancellation catalog and atomic requester cancellation. */
   sosCancellationStore?: SosCancellationStore;
   /** Override the photo attach write in tests. */
@@ -269,6 +272,9 @@ export async function createFastifyApp(
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerMissionProgressRoutes(app, missionProgressStore, realtime.io);
+  await registerUserSyncRoute(app, dependencies.syncStore ?? (database ? new DrizzleSyncStore(database.db) : {
+    readSync: async () => ({ events: [], missions: [], missionsTruncated: false, nextCursor: null, location: null })
+  }));
   await registerSosCancellationRoutes(app, sosCancellationStore, realtime.io);
   await registerSosPhotoRoutes(app, {
     store: photoStore,

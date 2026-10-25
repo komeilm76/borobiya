@@ -70,6 +70,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "sosGetMission",
   "sosGetMissionNavigationTarget",
   "sosGetMissionPresence",
+  "userSync",
   "sosCancelMission"
 ]);
 

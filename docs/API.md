@@ -346,7 +346,7 @@ Mission status order enforced: `pending → on_the_way → arrived → in_progre
 ### 5.6 Sync (reconnection)
 
 ```
-GET /_user/sync?since=ISO → { events: [...], location: ..., missions: ... }
+GET /_user/sync?since=ISO[&cursor=UUID] → { events: missionStatusSteps[≤100], location: null, missions: missionSnapshots[≤100], missionsTruncated, nextCursor }
 ```
 
 ---
@@ -511,7 +511,7 @@ Full event catalog:
 | S→C | `system:suspended` *(planned; Privacy-v2, not Phase 2)* | `{reason, until}` | suspended user |
 | Transport | Socket.IO ping/pong (25s/10s) | internal transport heartbeat; app-level offline/grace UI remains T4.3.2–3 | all |
 
-Planned polling/sync fallback: `GET /_user/sync?since=` (T4.3.4; not yet registered).
+`GET /_user/sync?since=<ISO>[&cursor=<UUID>]` is live (T4.3.4): authenticated ordinary users only, no-store, 30-day lookback, participant-scoped mission status steps ordered by timestamp/id with a 100-step cursor, and active/recently changed mission snapshots with a 100-item limit and an explicit `missionsTruncated` flag. Invalid/foreign cursors or stale/future windows return 400; use paginated mission reads for older gaps or a truncated list. `location` is always `null` because neither a socket reconnection nor this read confers GPS consent. Proposal inbox, shares and admin queue reconcile through their own guarded reads on reconnect; no SSE fallback is implied.
 
 ---
 

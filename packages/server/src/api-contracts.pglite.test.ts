@@ -28,6 +28,7 @@ import { DrizzleUserRegistrationStore } from "./db/registration-store";
 import { DrizzleUserSecurityQuestionsStore } from "./db/security-questions-store";
 import { DrizzleSosDispatchStore } from "./db/sos-dispatch-store";
 import { DrizzleMissionProgressStore } from "./db/mission-progress-store";
+import { DrizzleSyncStore } from "./db/sync-store";
 import { DrizzleSosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleSosPhotoStore } from "./db/sos-photo-store";
 import { DrizzleSosRequestStore } from "./db/sos-request-store";
@@ -174,6 +175,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       sosRequestStore: new DrizzleSosRequestStore(db),
       sosDispatchStore: new DrizzleSosDispatchStore(db),
       missionProgressStore: new DrizzleMissionProgressStore(db),
+      syncStore: new DrizzleSyncStore(db),
       sosCancellationStore: new DrizzleSosCancellationStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir),
@@ -941,6 +943,18 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     })).id).toBe(accepted.missionId);
     expect((await app.inject({ method: "GET", url: apiRoutes.sos.getMission.url.replace(":id", accepted.missionId),
       headers: responderHeaders })).statusCode).toBe(200);
+    const sync = await callContract<{ events: Array<{ missionId: string; toStatus: string }>; missions: Array<{ id: string }>;
+      nextCursor: string | null; location: null }>(apiRoutes.sos.sync, 200, {
+      url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString())}`,
+      headers: requesterHeaders
+    });
+    expect(sync.events).toContainEqual(expect.objectContaining({ missionId: accepted.missionId, toStatus: "pending" }));
+    expect(sync.missions.map((row) => row.id)).toContain(accepted.missionId);
+    expect(sync.location).toBeNull();
+    expect((await app.inject({ method: "GET", url: `${apiRoutes.sos.sync.url}?since=invalid`,
+      headers: requesterHeaders })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(new Date().toISOString())}`,
+      headers: adminHeaders })).statusCode).toBe(403);
     const presenceUrl = apiRoutes.sos.getMissionPresence.url.replace(":id", accepted.missionId);
     const presence = await callContract<{ missionId: string; requester: { online: boolean }; rescuer: { online: boolean } }>(
       apiRoutes.sos.getMissionPresence, 200, { url: presenceUrl, headers: requesterHeaders });
@@ -1114,6 +1128,29 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       .rows[0]?.status).toBe("cancelled_by_requester");
     expect((await pg.query<{ is_on_mission: boolean }>(`SELECT is_on_mission FROM users WHERE id=$1`,
       [createdResponder.id])).rows[0]?.is_on_mission).toBe(false);
+
+    // Cursor traversal remains complete when more than 100 durable steps share a timestamp.
+    // The cursor is scoped to this account, and paging never exposes GPS coordinates.
+    const pageSince = new Date(Date.now() - 1000).toISOString();
+    await pg.query(`INSERT INTO mission_status_history (mission_id, to_status, changed_by, created_at)
+      SELECT $1, 'pending', $2, now() FROM generate_series(1, 101)`, [accepted.missionId, createdResponder.id]);
+    const firstPage = await app.inject({ method: "GET", headers: requesterHeaders,
+      url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(pageSince)}` });
+    expect(firstPage.statusCode).toBe(200);
+    expect(firstPage.json().events).toHaveLength(100);
+    expect(firstPage.json().nextCursor).toBeTruthy();
+    const secondPage = await app.inject({ method: "GET", headers: requesterHeaders,
+      url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(pageSince)}&cursor=${firstPage.json().nextCursor}` });
+    expect(secondPage.statusCode).toBe(200);
+    expect(secondPage.json().events.length).toBeGreaterThan(0);
+    expect(secondPage.json().nextCursor).toBeNull();
+    const allIds = [...firstPage.json().events, ...secondPage.json().events].map((step: { id: string }) => step.id);
+    expect(new Set(allIds).size).toBe(allIds.length);
+    expect(secondPage.json().location).toBeNull();
+    expect((await app.inject({ method: "GET", headers: requesterHeaders,
+      url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(pageSince)}&cursor=00000000-0000-4000-8000-000000000099` })).statusCode).toBe(400);
+    expect((await app.inject({ method: "GET", headers: requesterHeaders,
+      url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(new Date(Date.now() - 31 * 86400_000).toISOString())}` })).statusCode).toBe(400);
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);

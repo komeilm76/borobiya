@@ -213,7 +213,7 @@ export class DrizzleMissionProgressStore implements MissionProgressStore {
   }
 }
 
-function toMission(row: typeof missions.$inferSelect): Mission {
+export function toMission(row: typeof missions.$inferSelect): Mission {
   return {
     id: row.id, sosRequestId: row.sosRequestId, rescuerId: row.rescuerId,
     requesterId: row.requesterId, status: row.status, cancelledBy: row.cancelledBy,

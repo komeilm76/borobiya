@@ -265,7 +265,7 @@ Events (full list in API.md § Realtime):
 **Disconnection:**
 - Heartbeat `ping` 25s → server `pong` timeout 10s → write `user_sessions.is_online=false` and last activity when the final socket disconnects; an online socket refreshes its timestamp every 25s. Reads treat rows older than 70s as offline even after a process crash; login/HTTP token rotation do not assert socket presence.
 - Active-mission participant/admin snapshot `GET /_user/sos/missions/:id/presence` supplies transport presence for the 5-minute disconnection grace badge; after 5 minutes it asks for manual review. No auto-cancel in v1, and GPS consent/fix freshness is a separate signal.
-- Reconnect: refresh JWT if needed, rejoin rooms, `GET /_user/sync?since=lastDisconnectAt` for missed events.
+- Reconnect: refresh JWT if needed, rejoin rooms after live membership checks, then `GET /_user/sync?since=lastDisconnectAt` for durable participant-scoped mission steps and current mission snapshots (bounded cursor paging, 30-day window). GPS is never replayed from sync; active sharing must be explicitly restarted. Admins use scoped mission detail; other views re-read their own authoritative lists on reconnect.
 
 **Scaling:** Single instance → in-memory adapter fine. Multi-instance → `socket.io-redis` adapter + `sticky sessions` via nginx `ip_hash`.
 

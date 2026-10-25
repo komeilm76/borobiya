@@ -16,7 +16,7 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    // 69 = the previous 68 operations plus the active-mission presence read (T4.3.3).
+    // 69 routes: T4.3.4 activates the existing sync descriptor without adding a new one.
     expect(allApiRoutes).toHaveLength(69);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);

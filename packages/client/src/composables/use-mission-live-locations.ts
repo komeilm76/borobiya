@@ -5,6 +5,9 @@ import { MISSION_LOCATION_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_SUBSCRI
   MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT, MISSION_CANCELLED_BY_RESCUER_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { ownDeviceId, decodeAccessTokenClaims } from "./device-identity";
+import { readAllUserSync } from "@/api/sync";
+import { getMission } from "@/api/mission";
+import type { MissionDetail, UserSyncResponse } from "@shared/index";
 
 function isAdmin(token: string | null): boolean { return decodeAccessTokenClaims(token)?.role === "admin"; }
 
@@ -24,6 +27,8 @@ export interface MissionLiveRuntime {
   watchPosition?: (onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
     onError: (denied: boolean) => void) => () => void;
   now?: () => number;
+  readSync?: (token: string, since: string, signal?: AbortSignal) => Promise<UserSyncResponse>;
+  readMission?: (token: string, id: string) => Promise<MissionDetail>;
 }
 const STALE_MS = 30_000;
 
@@ -54,6 +59,9 @@ export function useMissionLiveLocations(
   let lastPublished = Number.NEGATIVE_INFINITY;
   let generation = 0;
   let shareGeneration = 0;
+  let lastDisconnectAt: string | null = null;
+  let syncAbort: AbortController | null = null;
+  let refreshingAuth = false;
 
   const participantStatus = computed(() => (["requester", "rescuer", "admin"] as const).map((role) => {
     const entry = locations.value[role];
@@ -73,6 +81,9 @@ export function useMissionLiveLocations(
   }
   function stop(): void {
     generation++;
+    syncAbort?.abort();
+    syncAbort = null;
+    lastDisconnectAt = null;
     stopSharing();
     if (clockTicker) clearInterval(clockTicker);
     clockTicker = null;
@@ -125,9 +136,64 @@ export function useMissionLiveLocations(
           connected.value = false;
           stopSharing();
           error.value = "دسترسی به اتاق زندهٔ مأموریت ممکن نیست؛ دوباره تلاش کنید.";
-        } else { connected.value = true; error.value = null; }
+        } else { connected.value = true; if (!lastDisconnectAt) error.value = null; }
       });
   }
+  async function recoverAuth(opened: RealtimeClient, gen: number): Promise<void> {
+    if (!ensureSession || refreshingAuth) return;
+    refreshingAuth = true;
+    try {
+      const before = token.value;
+      await ensureSession();
+      if (gen !== generation || client !== opened || socketIdentity !== sessionIdentity(token.value)) return;
+      if (!token.value || token.value === before) return;
+      opened.updateToken(token.value);
+      if (opened.reconnect) opened.reconnect();
+      else opened.connect();
+    } catch {
+      if (gen === generation) error.value = "نشست زنده منقضی شده است؛ دوباره وارد شوید.";
+    } finally { refreshingAuth = false; }
+  }
+
+  async function reconcile(current: LiveMissionIdentity, owner: string,
+    opened: RealtimeClient, gen: number): Promise<void> {
+    const since = lastDisconnectAt;
+    const bearer = token.value;
+    if (!since || !bearer) return;
+    syncAbort?.abort();
+    const abort = new AbortController();
+    syncAbort = abort;
+    const valid = () => gen === generation && !abort.signal.aborted && client === opened &&
+      opened.socket.connected && mission.value?.id === current.id && userId.value === owner &&
+      socketIdentity === sessionIdentity(token.value);
+    try {
+      // Admins do not have a /_user sync stream: their authenticated detail read is the
+      // authoritative recovery path; participant sync must never leak a global event feed.
+      const result = isAdmin(bearer) ? null : await (runtime.readSync ?? readAllUserSync)(bearer, since, abort.signal);
+      if (!valid()) return;
+      // A full snapshot contains the current mission whenever it is active or changed since
+      // disconnect. A truncated list or an older terminal mission needs a scoped detail read.
+      const snapshot = result?.missions.find((item) => item.id === current.id);
+      const latest = snapshot ?? await (runtime.readMission ?? getMission)(token.value!, current.id);
+      if (!valid()) return;
+      if (latest.status === "completed" || latest.status.startsWith("cancelled_") || latest.status === "expired") {
+        endMission();
+        return;
+      }
+      // A socket event delivered while the HTTP snapshot was in flight can be newer than the
+      // snapshot. Neither this reconciliation nor reconnect starts GPS sharing by itself.
+      lastDisconnectAt = null;
+      if (connected.value) error.value = null;
+    } catch {
+      if (valid()) {
+        stopSharing();
+        error.value = "همگام‌سازی پس از اتصال دوباره ممکن نشد؛ وضعیت مأموریت را تازه‌سازی کنید.";
+      }
+    } finally {
+      if (syncAbort === abort) syncAbort = null;
+    }
+  }
+
   async function start(): Promise<void> {
     stop();
     const current = mission.value;
@@ -155,12 +221,20 @@ export function useMissionLiveLocations(
       const active = () => gen === generation && client === opened &&
         socketIdentity === sessionIdentity(token.value) &&
         mission.value?.id === current.id && userId.value === owner;
-      opened.socket.on("connect", () => { if (active()) subscribe(); });
-      opened.socket.on("disconnect", () => {
+      opened.socket.on("connect", () => {
+        if (!active()) return;
+        subscribe();
+        void reconcile(current, owner, opened, gen);
+      });
+      opened.socket.on("disconnect", (reason) => {
         if (!active()) return;
         connected.value = false;
+        syncAbort?.abort();
+        lastDisconnectAt ??= new Date(currentTime()).toISOString();
         stopSharing();
+        if (reason === "io server disconnect") void recoverAuth(opened, gen);
       });
+      opened.socket.on("connect_error", () => { if (active()) void recoverAuth(opened, gen); });
       opened.socket.on(MISSION_LOCATION_EVENT, (payload: unknown) => { if (active()) handleEvent(payload); });
       opened.socket.on(MISSION_STATUS_UPDATED_EVENT, (payload: unknown) => { if (active()) onMissionStatus(payload); });
       opened.socket.on(MISSION_CANCELLED_BY_REQUESTER_EVENT, (payload: unknown) => {
