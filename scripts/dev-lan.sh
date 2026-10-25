@@ -11,7 +11,8 @@ Usage: scripts/dev-lan.sh {http|https|cert|android-debug} <LAN IPv4 address>
   android-debug  Bundle the public CA into a generated Android debug APK overlay.
 
 Example: scripts/dev-lan.sh https 172.16.20.70
-Requires: openssl, python3, Bun; HTTPS also needs Node.js 20.19+ or 22.12+ for Vite HMR.
+Requires: openssl, python3, Bun. HTTPS uses Node.js 20.19+ or 22.12+ for Vite HMR;
+on Linux x64, Bun installs a private pinned Node 22 if none is available.
 The CA is stored outside Git in
 ${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/dev-tls (override BOROBIYA_DEV_TLS_DIR).
 HELP
@@ -39,6 +40,36 @@ ca_cert="$cert_dir/ca.pem"
 ca_key="$cert_dir/ca.key"
 leaf_cert="$cert_dir/$address.pem"
 leaf_key="$cert_dir/$address.key"
+
+node_is_supported() {
+  "$1" -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || major === 22 && minor >= 12 || major === 20 && minor >= 19 ? 0 : 1)' >/dev/null 2>&1
+}
+
+ensure_vite_node() {
+  if command -v node >/dev/null && node_is_supported node; then return; fi
+  if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
+    echo 'HTTPS HMR needs Node.js >=20.19 or >=22.12 on this platform; install it before retrying.' >&2
+    exit 1
+  fi
+  local node_dir="${BOROBIYA_DEV_NODE_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/borobiya/dev-node}"
+  local private_node="$node_dir/node_modules/node-linux-x64/bin/node"
+  if [[ ! -x "$private_node" ]] || ! node_is_supported "$private_node"; then
+    echo 'Node.js is missing/too old; Bun will install pinned Node 22.16.0 for Vite into:' >&2
+    echo "  $node_dir (outside the checkout; no sudo or system packages)" >&2
+    (umask 077; mkdir -p -- "$node_dir")
+    chmod 700 -- "$node_dir"
+    [[ -e "$node_dir/package.json" ]] || printf '{"private":true}\n' > "$node_dir/package.json"
+    bun add --cwd "$node_dir" --no-save node-linux-x64@22.16.0 || {
+      echo 'Could not download private Node from the npm registry. Check the Bun registry/proxy, or install supported Node manually.' >&2
+      exit 1
+    }
+    [[ -x "$private_node" ]] && node_is_supported "$private_node" || {
+      echo 'Private Node installation did not produce a supported binary.' >&2; exit 1;
+    }
+  fi
+  export PATH="$node_dir/node_modules/node-linux-x64/bin:$PATH"
+  echo "Using private Node.js $(node --version) for Vite HTTPS HMR (system Node unchanged)."
+}
 
 issue_certificate() {
   command -v openssl >/dev/null || { echo 'openssl is required for local HTTPS.' >&2; exit 1; }
@@ -108,10 +139,7 @@ case "$mode" in
   https)
     echo "Starting HTTPS at https://$address:5173 (trust ca.crt on your phone first)."
     export BOROBIYA_DEV_TLS_CERT="$leaf_cert" BOROBIYA_DEV_TLS_KEY="$leaf_key"
-    command -v node >/dev/null || { echo 'HTTPS HMR requires Node.js >=20.19 or >=22.12 (Vite must not run on Bun here).' >&2; exit 1; }
-    node -e 'const [major, minor] = process.versions.node.split(".").map(Number); process.exit(major > 22 || major === 22 && minor >= 12 || major === 20 && minor >= 19 ? 0 : 1)' || {
-      echo "Node.js $(node --version) is too old for Vite. Install Node.js >=20.19 or >=22.12." >&2; exit 1;
-    }
+    ensure_vite_node
     cd -- "$repo_root"
     # Bun 1.4.3 can crash inside its ws implementation on Vite's TLS HMR upgrade.
     # Keep Bun for the API and use the supported Node runtime only for Vite.

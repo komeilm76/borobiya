@@ -72,6 +72,34 @@ class LanTlsTest(unittest.TestCase):
         self.assertIn(f"run dev:lan-https|{self.certs / f'{IP}.pem'}|{self.certs / f'{IP}.key'}|",
                       recorder.read_text())
 
+    def test_missing_system_node_installs_private_pinned_node_only_once(self):
+        binary = self.root / "bin"
+        binary.mkdir()
+        (binary / "node").write_text("#!/bin/sh\nexit 1\n")  # Simulate absent/unsupported system Node.
+        (binary / "node").chmod(0o755)
+        fake_bun = binary / "bun"
+        fake_bun.write_text("#!/bin/sh\n"
+                            "echo \"$*\" >> \"$BUN_RECORDER\"\n"
+                            "if [ \"$1\" = add ]; then\n"
+                            "  mkdir -p \"$BOROBIYA_DEV_NODE_DIR/node_modules/node-linux-x64/bin\"\n"
+                            "  printf '#!/bin/sh\\nif [ \"$1\" = --version ]; then echo v22.16.0; fi\\nexit 0\\n' > "
+                            "\"$BOROBIYA_DEV_NODE_DIR/node_modules/node-linux-x64/bin/node\"\n"
+                            "  chmod +x \"$BOROBIYA_DEV_NODE_DIR/node_modules/node-linux-x64/bin/node\"\n"
+                            "fi\n")
+        fake_bun.chmod(0o755)
+        recorder = self.root / "bun-args"
+        private = self.root / "private-node"
+        env = dict(self.env, PATH=f"{binary}:{os.environ['PATH']}", BUN_RECORDER=str(recorder),
+                   BOROBIYA_DEV_NODE_DIR=str(private))
+        for _ in range(2):
+            launched = self.run_script("https", env=env)
+            self.assertEqual(launched.returncode, 0, launched.stderr)
+            self.assertIn("Using private Node.js v22.16.0", launched.stdout)
+        log = recorder.read_text().splitlines()
+        self.assertEqual(log.count(f"add --cwd {private} --no-save node-linux-x64@22.16.0"), 1)
+        self.assertEqual(log.count("run dev:lan-https"), 2)
+        self.assertEqual((private / "package.json").read_text(), '{"private":true}\n')
+
     def test_https_launcher_uses_node_for_vite_and_wss_really_upgrades(self):
         repo = SCRIPT.parent.parent
         root = json.loads((repo / "package.json").read_text())
