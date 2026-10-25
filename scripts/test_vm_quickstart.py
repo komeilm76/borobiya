@@ -409,6 +409,35 @@ class OperationsTests(unittest.TestCase):
                     vm.admin_reset(True)
             self.assertIn("New admin password", output.getvalue())
 
+    def test_env_setup_diagnoses_compose_failure_without_leaking_secrets_or_writing_env(self):
+        cases = (
+            ({"version"}, "Docker Compose v2 is missing"),
+            ({"info"}, "Docker daemon is inaccessible"),
+            ({"quiet"}, "Docker Compose configuration is invalid or unsupported"),
+            (set(), "cannot produce JSON"),
+        )
+        for failed, expected in cases:
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / ".env.example").write_text((vm_common.ROOT / ".env.example").read_text())
+                env = root / ".env"
+
+                def command(args, **_kwargs):
+                    kind = ("version" if "version" in args else "info" if "info" in args
+                            else "quiet" if "--quiet" in args else "json")
+                    if kind == "json" or kind in failed:
+                        raise subprocess.CalledProcessError(125, args, stderr="SENSITIVE_VALUE")
+                    return SimpleNamespace(stdout="ok")
+
+                with patch.object(vm_env, "ENV", env), patch.object(vm_env, "ROOT", root), \
+                     patch.object(vm_common, "ENV", env), patch.object(vm_common, "run", side_effect=command), \
+                     patch.object(sys, "argv", ["vm-env.py", "--mode", "development", "--generate-admin"]):
+                    with self.assertRaises(SystemExit) as raised:
+                        vm_env.main()
+                self.assertIn(expected, str(raised.exception))
+                self.assertNotIn("SENSITIVE_VALUE", str(raised.exception))
+                self.assertFalse(env.exists())
+
     def test_volume_lookup_refuses_ambiguous_project_labels(self):
         with patch.object(vm_common, "project", return_value="borobiya"), \
              patch.object(vm_common, "run", return_value=SimpleNamespace(stdout="one\ntwo\n")):

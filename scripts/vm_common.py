@@ -42,12 +42,33 @@ def compose(*args: str, capture: bool = False) -> subprocess.CompletedProcess[st
 
 
 def project() -> str:
+    """Identify the owning project without guessing when Docker/Compose is broken."""
     try:
-        data = json.loads(run(["docker", "compose", "config", "--format", "json"],
-                              capture=True, stderr=subprocess.PIPE).stdout)
-        name = data["name"]
-    except (OSError, subprocess.CalledProcessError, ValueError, KeyError) as error:
-        fail(f"could not identify Compose project; check .env and docker compose config ({error})")
+        output = run(["docker", "compose", "config", "--format", "json"],
+                     capture=True, stderr=subprocess.PIPE).stdout
+    except (OSError, subprocess.CalledProcessError):
+        # Do not print Compose stderr or a rendered config: they can contain .env secrets.
+        def works(args: list[str]) -> bool:
+            try:
+                run(args, capture=True, stderr=subprocess.PIPE)
+                return True
+            except (OSError, subprocess.CalledProcessError):
+                return False
+
+        if not works(["docker", "compose", "version", "--short"]):
+            fail("Docker Compose v2 is missing or not working; run ./scripts/vm-install.sh --check")
+        if not works(["docker", "info"]):
+            fail("Docker daemon is inaccessible; run ./scripts/vm-install.sh --check, "
+                 "then verify docker info (re-login after docker group changes)")
+        if works(["docker", "compose", "config", "--quiet"]):
+            fail("Docker Compose accepts the configuration but cannot produce JSON; "
+                 "upgrade the Compose v2 plugin and rerun --check")
+        fail("Docker Compose configuration is invalid or unsupported; inspect "
+             "docker compose config --quiet LOCALLY (never share rendered config or .env)")
+    try:
+        name = json.loads(output)["name"]
+    except (ValueError, KeyError, TypeError):
+        fail("Docker Compose returned no valid project name in JSON; update Compose v2")
     if not isinstance(name, str) or not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", name):
         fail("invalid Compose project name")
     return name

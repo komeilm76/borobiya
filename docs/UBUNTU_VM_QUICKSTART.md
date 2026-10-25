@@ -14,6 +14,7 @@ Before a first build, verify Ubuntu 24.04, Docker access, enough **free disk and
 ./scripts/vm-install.sh --check          # installed / missing / incompatible versions
 ./scripts/vm-install.sh --install        # explicit opt-in: Ubuntu packages, official Docker apt repo, pinned Bun
 # Re-login if you accepted membership in the root-equivalent docker group; then rerun --check.
+# Do not continue until --check reports Prerequisites OK (including Docker daemon + Compose v2).
 python3 scripts/vm-env.py               # development or production; secrets + admin password, .env mode 0600
 python3 scripts/vm-map.py               # choose countries/cities, snapshot and cache policy; writes no map data
 python3 scripts/vm.py launch            # resume/build maps + images, migrate/seed DB, verify, build web UI, start Compose
