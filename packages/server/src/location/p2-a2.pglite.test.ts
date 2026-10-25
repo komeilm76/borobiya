@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import type { Database } from "../db/client";
 import * as schema from "../db/schema";
@@ -40,7 +41,7 @@ let carolId: string;
 let daveId: string;
 
 beforeAll(async () => {
-  pg = new PGlite();
+  pg = new PGlite({ extensions: { pg_trgm } });
   const journal = JSON.parse(
     readFileSync(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8")
   ) as { entries: { tag: string }[] };

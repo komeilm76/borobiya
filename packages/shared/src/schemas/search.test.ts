@@ -9,7 +9,8 @@ import {
 describe("search and common query schemas", () => {
   it("coerces pagination values and enforces the published maximum", () => {
     expect(userSearchSchema.parse({ page: "2", limit: "50" })).toMatchObject({ page: 2, limit: 50 });
-    expect(userSearchSchema.parse({})).toMatchObject({ page: 1, limit: 20, sort: "distance" });
+    expect(userSearchSchema.parse({})).toMatchObject({ page: 1, limit: 20 });
+    expect(userSearchSchema.parse({})).not.toHaveProperty("sort");
     // A cleared picker control arrives as an empty string: that means "no filter", not "invalid id".
     expect(userSearchSchema.parse({ category: "", incidentType: "" })).toMatchObject({
       category: undefined,
@@ -17,6 +18,10 @@ describe("search and common query schemas", () => {
     });
     expect(userSearchSchema.safeParse({ category: "not-a-uuid" }).success).toBe(false);
     expect(userSearchSchema.safeParse({ limit: "101" }).success).toBe(false);
+    expect(userSearchSchema.parse({ radiusKm: "5", sort: "username" })).toMatchObject({ radiusKm: 5, sort: "username" });
+    for (const radiusKm of ["0", "-1", "500.1", "Infinity", "x"]) {
+      expect(userSearchSchema.safeParse({ radiusKm }).success).toBe(false);
+    }
   });
 
   it("parses boolean query strings without treating false as true", () => {

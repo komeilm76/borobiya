@@ -5,9 +5,8 @@ import { PRESENCE_STALE_MS } from "../realtime/presence";
 
 /**
  * The read behind `GET /_user/users/search` (spec §5, T4.1.1's first slice). It answers the question
- * the location-share picker asks — "which account is this?" — and nothing else: category membership
- * and incident specialty have no tables yet, so the route refuses those filters rather than ignoring
- * them.
+ * the location-share picker asks — "which account is this?" — plus bounded directory browsing
+ * and responder filters. Usernames are indexed for case-insensitive contains matching.
  */
 
 /** `LIKE`/`ILIKE` wildcards in user text would widen the match; backslash is the default escape character. */
@@ -43,8 +42,10 @@ export interface UserSearchRow {
 }
 
 export interface UserSearchInput {
-  /** Trimmed partial username match; at least 2 characters, enforced by the route. */
+  /** Trimmed partial username match or empty for authenticated directory browsing. */
   term: string;
+  sort: "distance" | "username";
+  radiusKm: number | null;
   category?: string | null;
   incidentType?: string | null;
   minRating: number | null;
@@ -87,10 +88,8 @@ function reachableUserConditions(callerId: string) {
  * between — an accurate-as-of-its-own-statement count is the honest trade for one less round trip.
  */
 export function userSearchQueries(db: Database, input: UserSearchInput) {
-  const conditions: SQLWrapper[] = [
-    ilike(users.username, `%${escapeLikePattern(input.term)}%`),
-    ...reachableUserConditions(input.callerId)
-  ];
+  const conditions: SQLWrapper[] = [...reachableUserConditions(input.callerId)];
+  if (input.term) conditions.push(ilike(users.username, `%${escapeLikePattern(input.term)}%`));
 
   if (input.minRating !== null) {
     // unrated accounts are `NULL`, and a rating floor is a quality filter: treating "no ratings yet" as
@@ -115,13 +114,18 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
     conditions.push(sql`exists (${matchingSpecialty})`);
   }
 
-  const where = and(...conditions);
-
   // PostGIS takes X = longitude and Y = latitude. Falling back to a scalar subquery keeps the whole
   // query one statement when the caller sent no coordinates and just uses their own last position.
   const reference = input.reference
     ? sql`ST_SetSRID(ST_MakePoint(${input.reference.lon}, ${input.reference.lat}), 4326)::geography`
     : sql`(select "users"."last_location" from "users" where "users"."id" = ${input.callerId})`;
+  // A radius is a hard geographical filter (not a display-only distance sort). GiST on
+  // last_location supports ST_DWithin; a caller with no fix matches nobody, never 0 km.
+  if (input.radiusKm !== null) {
+    conditions.push(sql`ST_DWithin("users"."last_location", ${reference}, ${input.radiusKm * 1000})`);
+  }
+  const where = and(...conditions);
+
   // Geography distance is metres; the contract's `distance` is what a list renders as "12.4 km away".
   // `::numeric` before the round is not style: `round(double precision, integer)` is an unresolved
   // function in PostgreSQL (42883), which turned every search into a 500 until a live instance said
@@ -149,7 +153,9 @@ export function userSearchQueries(db: Database, input: UserSearchInput) {
       .where(where)
       // Nearest first, but accounts without a position are not dropped: they sort last, then by name, so
       // a search never loses a reachable person just because their phone has not reported since install.
-      .orderBy(sql`"distanceKm" nulls last`, asc(users.username))
+      .orderBy(...(input.sort === "username"
+        ? [asc(users.username), asc(users.id)]
+        : [sql`"distanceKm" nulls last`, asc(users.username), asc(users.id)]))
       .limit(input.limit)
       .offset((input.page - 1) * input.limit),
     count: db

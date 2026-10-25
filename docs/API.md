@@ -219,19 +219,20 @@ POST   /_user/complete-security-questions Body { securityQuestions[5] } → 200
 ### 5.2 User Search
 
 ```
-GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=distance&lat=&lon=&page=&limit=
+GET /_user/users/search?q=&category=&incidentType=&minRating=&online=&sort=distance|username&radiusKm=&lat=&lon=&page=&limit=
 → { items: [{ id, username, category, avgRating, isOnline, distance }], total, page, limit, totalPages }
 ```
 
 `online` accepts `true` or `false`. `lat` and `lon` must be supplied together; if omitted, distance sorting uses the authenticated user's last known location when available.
 
-**Live for the share picker and responder filtering (T2.1.7 + T3.1.4).** This build answers a term-bounded search across all filters:
-- `q` is required and needs at least 2 characters (a case-insensitive partial username match, wildcards and backslashes escaped). A 1-character term would return most of the account table, and trigram/prefix indexing belongs to T4.1.1.
+**Live for the share picker, responder filtering and directory browsing (T2.1.7 + T3.1.4 + T4.1.1).** Authenticated accounts may browse reachable active accounts without `q`, paginated with a 20-row default and a 100-row ceiling; the one-term picker deliberately continues to wait for at least two characters.
+- `q` is optional. When present it needs at least 2 characters (case-insensitive substring match, wildcards and backslashes escaped). PostgreSQL `pg_trgm` indexes contains matches, while the existing unique username B-tree backs the default username order for term-free browsing. Do not interpret a query result as a currently consenting GPS recipient.
 - The caller's own account is never a candidate, in the page or in its `total`: `POST /_user/location/share` refuses it (`self_target`), so a list that offered it could only produce an error the user cannot act on.
 - `category` and `incidentType` are honored against `categories`, `category_users`, and `category_incident_types`, projecting the matching responder category name (or primary alphabetical category when unfiltered).
 - `minRating` and `online` are honored: unrated accounts count as 0, and `online` checks active unrevoked socket-connected sessions (`user_sessions.is_online = true` with non-null `refresh_token_hash`).
 - `distance` is **kilometres, one decimal**, from `lat`/`lon` if given, otherwise from the caller's last stored position, otherwise `null` for every row. Results sort nearest-first with accounts that have no position last, then by username, so nobody is dropped for having an old fix.
-- `sort` accepts `distance`; `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
+- `sort` accepts `distance|username`; named searches default to nearest-first, term-free browsing to username-first (ties by id). `page`/`limit` follow the shared pagination bounds (limit 1–100, default 20).
+- Optional `radiusKm` is 0.1–500 km. It filters with PostGIS `ST_DWithin` in the page **and** total query before pagination; it uses `lat`/`lon` when given, otherwise the caller’s stored position. A caller without a stored position and no explicit coordinates gets zero matches, not invented 0 km or an unbounded result. VM PostGIS spatial performance remains to be measured; PGlite only verifies a test-stand-in for the geography operations.
 
 `Cache-Control: no-store`, because the answer depends on who is asking and where they last were.
 

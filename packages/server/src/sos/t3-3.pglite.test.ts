@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import type { FastifyInstance } from "fastify";
 import { io as createClientSocket, type Socket as ClientSocket } from "socket.io-client";
@@ -115,7 +116,7 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
 
   beforeAll(async () => {
     uploadDir = mkdtempSync(join(tmpdir(), "borobiya-t33-"));
-    pg = new PGlite();
+    pg = new PGlite({ extensions: { pg_trgm } });
 
     // Replay all checked-in Drizzle migrations (0000..0013) plus exact spherical Haversine ST_Distance.
     const journal = JSON.parse(

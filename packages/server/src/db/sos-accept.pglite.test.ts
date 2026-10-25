@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Database } from "./client";
@@ -18,7 +19,7 @@ describe("atomic proposal acceptance (migrated PGlite)", () => {
   let pg: PGlite;
   let store: DrizzleSosDispatchStore;
   beforeAll(async () => {
-    pg = new PGlite();
+    pg = new PGlite({ extensions: { pg_trgm } });
     await pg.exec("CREATE DOMAIN geography AS text; CREATE DOMAIN geometry AS text;");
     const journal = JSON.parse(readFileSync(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8")) as {
       entries: { tag: string }[];

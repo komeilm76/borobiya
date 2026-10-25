@@ -84,17 +84,15 @@ describe("GET /_user/users/search", () => {
     expect(searchUsers).not.toHaveBeenCalled();
   });
 
-  it("requires a term instead of browsing every account", async () => {
+  it("supports bounded authenticated browsing without a term, but rejects a single character", async () => {
     const { app, searchUsers } = await makeApp();
-
-    const missing = await search(app, "page=1");
+    const browse = await search(app, "page=1&limit=20");
     const tooShort = await search(app, "q=f");
-
-    expect(missing.statusCode).toBe(400);
-    expect(missing.json().issues[0].code).toBe("q_required");
+    expect(browse.statusCode).toBe(200);
+    expect(searchUsers).toHaveBeenCalledTimes(1);
+    expect(searchUsers.mock.calls[0]![0]).toMatchObject({ term: "", sort: "username", radiusKm: null, page: 1, limit: 20 });
     expect(tooShort.statusCode).toBe(400);
     expect(tooShort.json().issues[0].code).toBe("q_too_short");
-    expect(searchUsers).not.toHaveBeenCalled();
   });
 
   it("answers a store failure with the documented envelope and no description of the failure", async () => {
@@ -165,6 +163,8 @@ describe("GET /_user/users/search", () => {
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(searchUsers).toHaveBeenCalledWith({
       term: "field_resp",
+      sort: "distance",
+      radiusKm: null,
       category: null,
       incidentType: null,
       minRating: null,
@@ -190,6 +190,17 @@ describe("GET /_user/users/search", () => {
       limit: 25,
       totalPages: 2
     });
+  });
+
+  it("forwards bounded radius and explicit username sorting without losing the distance reference", async () => {
+    const { app, searchUsers } = await makeApp();
+    const result = await search(app, "radiusKm=2.5&sort=username&lat=35.7&lon=51.4&category=");
+    expect(result.statusCode).toBe(200);
+    expect(searchUsers.mock.calls[0]![0]).toMatchObject({ term: "", sort: "username",
+      radiusKm: 2.5, reference: { lat: 35.7, lon: 51.4 } });
+    expect((await search(app, "q=a&radiusKm=2.5")).statusCode).toBe(400);
+    expect((await search(app, "radiusKm=500.1")).statusCode).toBe(400);
+    expect((await search(app, "sort=invalid")).statusCode).toBe(400);
   });
 
   it("prefers explicit coordinates and keeps them together", async () => {

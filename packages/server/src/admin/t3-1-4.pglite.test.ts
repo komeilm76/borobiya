@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import type { FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
@@ -77,7 +78,7 @@ async function signAccessToken(input: {
 }
 
 beforeAll(async () => {
-  pg = new PGlite();
+  pg = new PGlite({ extensions: { pg_trgm } });
   await pg.exec(`
     CREATE DOMAIN geography AS text;
     CREATE FUNCTION st_makepoint(lon double precision, lat double precision)

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import { missionSchema, missionTimelineSchema } from "@borobiya/shared";
 import type { Database } from "./client";
@@ -17,7 +18,7 @@ const MISSION = "50000000-0000-4000-8000-000000000005";
 describe("mission tables (migrated PostgreSQL/PGlite)", () => {
   let pg: PGlite;
   beforeAll(async () => {
-    pg = new PGlite();
+    pg = new PGlite({ extensions: { pg_trgm } });
     await pg.exec(`CREATE DOMAIN geography AS text; CREATE DOMAIN geometry AS text;
       CREATE FUNCTION ST_X(point geometry) RETURNS double precision LANGUAGE SQL IMMUTABLE AS $$
         SELECT split_part(split_part(point::text, '(', 2), ' ', 1)::double precision $$;

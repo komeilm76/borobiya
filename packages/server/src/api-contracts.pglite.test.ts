@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import type { FastifyInstance, InjectOptions } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -76,7 +77,7 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
 
   beforeAll(async () => {
     uploadDir = mkdtempSync(join(tmpdir(), "borobiya-api-contracts-"));
-    pg = new PGlite();
+    pg = new PGlite({ extensions: { pg_trgm } });
 
     const journal = JSON.parse(
       readFileSync(new URL("../drizzle/meta/_journal.json", import.meta.url), "utf8")
@@ -110,6 +111,10 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
               power(sin(radians((st_x(b) - st_x(a)) / 2.0)), 2)
             )
           );
+        $$;
+      CREATE FUNCTION st_dwithin(a text, b text, radius double precision)
+        RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+          SELECT st_distance(a, b) <= radius;
         $$;
     `);
 
@@ -595,6 +600,25 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect(searchResponse.items[0]?.id).toBe(createdResponder.id);
     expect(searchResponse.items[0]?.category).toBe("Alpine Rescue Team");
     expect(searchResponse.items[0]?.avgRating).toBe(4.9);
+
+    // Term-free directory browsing stays paginated, indexed, and caller-scoped. A bounded
+    // radius excludes positionless/far accounts *before* the count, not after pagination.
+    const browse = await callContract<{ items: Array<{ username: string }>; total: number }>(apiRoutes.user.search, 200, {
+      url: `${apiRoutes.user.search.url}?sort=username&category=${createdCategory.id}&page=1&limit=20`,
+      headers: requesterHeaders
+    });
+    expect(browse.items.map((item) => item.username)).toContain("mountain_rescuer");
+    expect(browse.items.every((item) => item.username !== requesterSession.user.id)).toBe(true);
+    const near = await callContract<{ total: number }>(apiRoutes.user.search, 200, {
+      url: `${apiRoutes.user.search.url}?q=mountain&radiusKm=1&lat=35.8&lon=51.425`, headers: requesterHeaders
+    });
+    const far = await callContract<{ total: number }>(apiRoutes.user.search, 200, {
+      url: `${apiRoutes.user.search.url}?q=mountain&radiusKm=0.1&lat=35.8&lon=51.425`, headers: requesterHeaders
+    });
+    expect(near.total).toBe(1);
+    expect(far.total).toBe(0);
+    expect((await pg.query<{ indexname: string }>(`SELECT indexname FROM pg_indexes WHERE indexname = 'idx_users_username_trgm'`)).rows)
+      .toEqual([{ indexname: "idx_users_username_trgm" }]);
 
     // Admin with mustCompleteSecurityQuestions = true can ALSO query /_user/users/search for category member picker!
     const adminSearch = await callContract<{ total: number }>(apiRoutes.user.search, 200, {

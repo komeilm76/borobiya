@@ -43,9 +43,10 @@ export interface UserSearchOptions {
   lon?: number;
   page?: number;
   limit?: number;
-  sort?: "distance";
+  sort?: "distance" | "username";
+  radiusKm?: number;
   /** Alias accepted for backwards compatibility; serialized on the wire as `sort`. */
-  sortBy?: "distance";
+  sortBy?: "distance" | "username";
 }
 
 /** Builds the query string matching `userSearchSchema` (`sort`, `category`, `incidentType`, `lat`, `lon`, etc.). */
@@ -58,6 +59,7 @@ export function userSearchQuery(options: UserSearchOptions): string {
   const incidentType = options.incidentType?.trim();
   if (incidentType) search.set("incidentType", incidentType);
   if (options.minRating !== undefined) search.set("minRating", String(options.minRating));
+  if (options.radiusKm !== undefined) search.set("radiusKm", String(options.radiusKm));
   // An untouched `online` control is not sent at all: `online=false` is a real filter ("show the
   // people who are currently *not* connected") and must never be the default of a clearable switch.
   if (options.online !== undefined) search.set("online", String(options.online));

@@ -64,7 +64,8 @@ export const users = pgTable(
     ),
     check("users_role_check", sql`"role" IN ('user', 'admin')`),
     check("users_avg_rating_range_check", sql`"avg_rating" IS NULL OR "avg_rating" BETWEEN 0 AND 5`),
-    index("idx_users_last_location_gist").using("gist", table.lastLocation)
+    index("idx_users_last_location_gist").using("gist", table.lastLocation),
+    index("idx_users_username_trgm").using("gin", sql`${table.username} gin_trgm_ops`)
   ]
 );
 

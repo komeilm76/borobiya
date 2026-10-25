@@ -24,6 +24,8 @@ const callerId = randomUUID();
 function searchInput(overrides: Partial<UserSearchInput> = {}): UserSearchInput {
   return {
     term: "field_resp",
+    sort: "distance",
+    radiusKm: null,
     minRating: null,
     online: null,
     callerId,
@@ -118,6 +120,19 @@ describe("userSearchQueries", () => {
     expect(offline.sql).toContain('"last_active_at" >= now()');
     expect(offline.sql).toContain("not exists (");
     expect(offline.sql).toContain('exists (select 1 from "user_sessions"');
+  });
+
+  it("browses without an unindexed empty ILIKE, and filters by a GiST-backed distance predicate", () => {
+    const browse = userSearchQueries(offlineDb, searchInput({ term: "", sort: "username" }));
+    const items = browse.items.toSQL();
+    expect(items.sql).not.toContain('"username" ilike');
+    expect(browse.count.toSQL().sql).not.toContain('"username" ilike');
+    expect(items.sql).toContain('order by "users"."username" asc');
+    const radius = userSearchQueries(offlineDb, searchInput({ term: "", radiusKm: 1.5,
+      reference: { lat: 35.7, lon: 51.4 } }));
+    expect(radius.items.toSQL().sql).toContain('ST_DWithin("users"."last_location"');
+    expect(radius.items.toSQL().params).toContain(1500);
+    expect(radius.count.toSQL().params).toContain(1500);
   });
 
   it("paginates with limit and offset", () => {

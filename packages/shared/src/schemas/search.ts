@@ -42,7 +42,9 @@ export const userSearchSchema = z.strictObject({
   incidentType: optionalIdQuerySchema,
   minRating: optionalRatingQuerySchema,
   online: optionalBooleanQuerySchema,
-  sort: z.enum(["distance"]).default("distance"),
+  sort: z.enum(["distance", "username"]).optional(),
+  radiusKm: z.preprocess(emptyQueryValueToUndefined,
+    z.coerce.number().finite().min(0.1).max(500).optional()),
   lat: optionalLatitudeQuerySchema,
   lon: optionalLongitudeQuerySchema,
   ...paginationQuerySchema.shape

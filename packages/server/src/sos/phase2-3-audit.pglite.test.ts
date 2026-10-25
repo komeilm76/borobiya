@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { drizzle } from "drizzle-orm/pglite";
 import type { FastifyInstance } from "fastify";
 import { io as createClientSocket, type Socket as ClientSocket } from "socket.io-client";
@@ -54,7 +55,7 @@ describe("Phase 2 & 3 cross-cutting server + realtime regression suite (PGlite)"
 
   beforeAll(async () => {
     uploadDir = mkdtempSync(join(tmpdir(), "borobiya-p23-audit-"));
-    pg = new PGlite();
+    pg = new PGlite({ extensions: { pg_trgm } });
 
     const journal = JSON.parse(
       readFileSync(new URL("../../drizzle/meta/_journal.json", import.meta.url), "utf8")

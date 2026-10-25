@@ -4,7 +4,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import type { AuthenticatedUserContext } from "../auth/user-security-questions";
 import type { UserSearchRow, UserSearchStore } from "../db/user-search-store";
 
-/** Below this length a partial username match on an unindexed column returns more noise than signal. */
+/** Short fragments are noisy and cannot use the trigram index effectively. */
 const MIN_SEARCH_TERM_LENGTH = 2;
 
 function errorResponse(code: string, message: string, issues: unknown[] = []) {
@@ -42,7 +42,7 @@ export function userSearchPayload(row: UserSearchRow) {
 }
 
 /**
- * User search (spec §5): partial username match over reachable accounts, with responder category and
+ * User search (spec §5): optional partial username match over reachable accounts, with responder category and
  * incident specialty filters (`category_users` / `category_incident_types`), rating floor, online state,
  * and distance from the caller or an explicit point.
  */
@@ -70,19 +70,21 @@ export async function registerUserSearchRoute(
     }
 
     const term = parsed.data.q?.trim() ?? "";
-    if (term.length < MIN_SEARCH_TERM_LENGTH) {
+    if (term.length > 0 && term.length < MIN_SEARCH_TERM_LENGTH) {
       return sendError(
         reply,
         400,
         "VALIDATION_ERROR",
-        `User search needs a username fragment of at least ${MIN_SEARCH_TERM_LENGTH} characters.`,
-        [{ code: term.length === 0 ? "q_required" : "q_too_short", path: ["q"], minLength: MIN_SEARCH_TERM_LENGTH }]
+        `A username fragment needs at least ${MIN_SEARCH_TERM_LENGTH} characters.`,
+        [{ code: "q_too_short", path: ["q"], minLength: MIN_SEARCH_TERM_LENGTH }]
       );
     }
 
-    const { page, limit, category, incidentType, minRating, online, lat, lon } = parsed.data;
+    const { page, limit, category, incidentType, minRating, online, lat, lon, radiusKm } = parsed.data;
     const { items, total } = await dependencies.store.searchUsers({
       term,
+      sort: parsed.data.sort ?? (term ? "distance" : "username"),
+      radiusKm: radiusKm ?? null,
       category: category ?? null,
       incidentType: incidentType ?? null,
       minRating: minRating ?? null,

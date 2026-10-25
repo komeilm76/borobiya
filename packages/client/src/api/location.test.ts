@@ -66,6 +66,8 @@ describe("user search query", () => {
     expect(userSearchQuery({ q: "ha", minRating: 4, page: 2, limit: 25, sortBy: "distance" })).toBe(
       "q=ha&minRating=4&page=2&limit=25&sort=distance"
     );
+    expect(userSearchQuery({ radiusKm: 2.5, sort: "username", lat: 35.7, lon: 51.4 }))
+      .toBe("radiusKm=2.5&lat=35.7&lon=51.4&sort=username");
   });
 });
 

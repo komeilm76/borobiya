@@ -164,7 +164,7 @@ gantt
 - [x] Timeline UI with server timestamps — T3.5.8/T3.7.4, 2026-10-24
 
 ### M4.2 Search & Geocoding
-- [ ] `GET /_user/users/search` (advanced: q, category, incidentType, rating, online, distance)
+- [x] `GET /_user/users/search` (advanced: q, category, incidentType, rating, online, distance) — T4.1.1 completed 2026-10-25; VM/browser checks remain
 - [ ] Map Server `GET /geocode?q=` + `GET /reverse?lat=&lon=` (Photon)
 - [ ] Reverse on map click/long-press → bottom sheet with copyable address
 - [ ] Frontend: debounced 300ms autocomplete
