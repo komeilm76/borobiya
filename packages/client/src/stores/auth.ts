@@ -87,6 +87,9 @@ export const useAuthStore = defineStore("auth", () => {
   // Async refreshes/profile reads must not write into a session that has since signed out or
   // switched accounts. Token equality alone cannot detect a late refresh response.
   let sessionGeneration = 0;
+  // Keep tokens issued in this session so staggered 401s can reuse a rotated bearer, but a
+  // request from a *previous* account cannot be retried as the account now signed in.
+  const sessionTokens = new Set<string>();
   let expiresAt: number | null = null;
   let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -113,6 +116,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   function setAccessToken(token: string): void {
     accessToken.value = token;
+    sessionTokens.add(token);
     expiresAt = accessTokenExpiry(token);
     scheduleProactiveRefresh(expiresAt);
   }
@@ -125,6 +129,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   function clearSession(): void {
     ++sessionGeneration;
+    sessionTokens.clear();
     clearProactiveRefresh();
     accessToken.value = null;
     expiresAt = null;
@@ -223,6 +228,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   registerAccessTokenRefresher(async (failedToken: string) => {
+    if (!sessionTokens.has(failedToken)) return null;
     if (accessToken.value && accessToken.value !== failedToken) {
       return accessToken.value;
     }
@@ -233,6 +239,7 @@ export const useAuthStore = defineStore("auth", () => {
   function acceptLogin(response: unknown): void {
     const parsed = loginResponseSchema.parse(response);
     ++sessionGeneration;
+    sessionTokens.clear();
     userCategories.value = [];
     setAccessToken(parsed.accessToken);
     setUser(parsed.user);

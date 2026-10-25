@@ -354,6 +354,30 @@ describe("client auth store", () => {
     expect(refreshCalls).toHaveLength(1);
   });
 
+  it("does not retry an old account's 401 request using a newer account's bearer", async () => {
+    let finishOldRead!: (response: Response) => void;
+    const oldReadReply = new Promise<Response>((resolve) => { finishOldRead = resolve; });
+    const newerUser = { ...user, id: "00000000-0000-4000-8000-000000000088", username: "rescue_user2" };
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: "token-account-a", user }),
+      () => oldReadReply,
+      jsonResponse({ ok: true }),
+      jsonResponse({ accessToken: "token-account-b", user: newerUser }),
+      jsonResponse({ items: ["account-b-data"] })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: "rescue_user1", password: "safePass123" });
+    const oldRead = requestJson<{ items: string[] }>("/_user/devices", { accessToken: auth.accessToken });
+    await auth.logout();
+    await auth.login({ username: "rescue_user2", password: "safePass123" });
+    finishOldRead(jsonResponse({ error: true, code: "INVALID_ACCESS_TOKEN", message: "Expired" }, 401));
+
+    await expect(oldRead).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(auth.accessToken).toBe("token-account-b");
+  });
+
   it("does not resurrect a logged-out session via broadcast priority watcher even if /_auth/logout fails offline", async () => {
     const fetchMock = fakeFetch(
       // Initial login + profile + broadcast priority watcher (/devices + /location/shares)
