@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 companion map tablet collision (partial)
+
+- The companion map switched absolute side panels to in-flow controls only at 750px. At 751–815px its 25rem toolbar/search and 24rem history playback card plus 1rem inset on each side need 816px even before leaving a lane for map gestures, so the panels can physically overlap. The in-flow, definite-height map layout now extends through 1023px; the history panel's compact/scrollable treatment and the map's camera-padding media query use the same cutoff, preserving deep-link expansion. Focused regressions failed before the change and pass afterward. This is a structural fix, not a real browser/tablet verification; T4.4.1 remains **open** for broader breakpoints, bottom-sheet audit and device acceptance.
+
 ### 2026-10-26 — T4.4.1 tablet dispatch map occlusion (partial)
 
 - Vuetify stacks the `lg` dispatch queue/map columns below 1280px, but the selected-SOS card and legend only left the map at widths below 600px. Across the 600–1279px stacked range, those overlays covered incident markers and map gestures despite ample room for normal-flow content. The in-flow, definite-height MapLibre layout now follows the actual column breakpoint; compact filter and responder-search rules remain phone-only. Source-pinned regression failed before the breakpoint change and passes afterward. This does not claim browser/device visual acceptance or a site-wide no-occlusion audit; T4.4.1 stays **open**.

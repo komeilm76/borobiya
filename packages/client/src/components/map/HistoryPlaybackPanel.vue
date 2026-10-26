@@ -237,7 +237,7 @@ const props = defineProps<{ api: HistoryPlayback }>();
 const route = useRoute();
 
 const isNarrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
-  && window.matchMedia("(max-width: 750px)").matches;
+  && window.matchMedia("(max-width: 1023px)").matches;
 const isOpen = ref(historyPanelInitiallyOpen(isNarrow, route.query.historyShare));
 const fromField = ref("");
 const toField = ref("");
@@ -513,7 +513,7 @@ function scrub(value: number | readonly number[]): void {
   border-color: rgba(226, 240, 238, 0.22);
 }
 
-@media (max-width: 750px) {
+@media (max-width: 1023px) {
   .history-playback {
     width: 100%;
     max-height: min(56dvh, 26rem);

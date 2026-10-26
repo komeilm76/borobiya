@@ -240,13 +240,13 @@ function frameCamera(): void {
   const instance = map.value;
   const track = playback.frames.value;
   if (!instance || track.length === 0 || userPickedPlace.value) return;
-  const compact = window.matchMedia("(max-width: 750px)").matches;
+  const compact = window.matchMedia("(max-width: 1023px)").matches;
   const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}`;
   if (fittedFor === key) return;
   fittedFor = key;
   const bounds = playback.boundsForMap.value;
   if (bounds) {
-    // On phones the controls sit outside the map, so they need no reserved viewport space.
+    // In the narrow layout controls sit outside the map, so they need no reserved viewport space.
     instance.fitBounds(bounds, { padding: historyCameraPadding(compact), maxZoom: 15, duration: 700 });
     return;
   }
@@ -489,9 +489,9 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   color: #edf5f2;
 }
 
-/* At phone widths, stacked panels scroll with the page rather than covering map gestures,
- * results, or one another. The canvas retains a definite height for MapLibre's resize logic. */
-@media (max-width: 750px) {
+/* At narrow/tablet widths, side panels would overlap each other and cover the map.
+ * Stack them in page flow instead; keep a definite canvas height for MapLibre. */
+@media (max-width: 1023px) {
   .user-map-view {
     display: flex;
     flex-direction: column;

@@ -75,17 +75,24 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.run()");
   });
 
-  it("fits tracks without reserving overlay space for panels that sit outside the phone map", () => {
+  it("fits tracks without reserving overlay space for panels outside the narrow map", () => {
     const camera = body("frameCamera");
-    expect(camera).toContain('window.matchMedia("(max-width: 750px)").matches');
+    expect(camera).toContain('window.matchMedia("(max-width: 1023px)").matches');
     expect(camera).toContain("historyCameraPadding(compact)");
     expect(body("onMapReady")).toContain('instance.on("resize", frameCamera)');
     const teardown = view.slice(view.indexOf("onBeforeUnmount("));
     expect(teardown).toContain('instance.off("resize", frameCamera)');
   });
 
-  it("moves phone-width map controls into a scrollable, non-occluding flow", () => {
-    const phone = view.slice(view.indexOf("@media (max-width: 750px)"));
+  it("moves narrow map controls into a scrollable, non-occluding flow", () => {
+    // 25rem toolbar + 24rem history + two 1rem edges = 816px at the default root size.
+    // The previous 750px cutoff left a real overlap from 751px through at least 815px.
+    expect(view).toContain('width: min(25rem, calc(100% - 2rem));');
+    expect(view).toContain('width: min(24rem, calc(100% - 2rem));');
+    expect(25 * 16 + 24 * 16 + 2 * 16).toBe(816);
+    const start = view.indexOf("@media (max-width: 1023px)");
+    expect(start).toBeGreaterThan(-1);
+    const phone = view.slice(start);
     expect(phone).toContain("height: auto;");
     expect(phone).toContain("overflow: visible;");
     expect(phone).toContain("height: clamp(20rem, 55dvh, 32rem);");
