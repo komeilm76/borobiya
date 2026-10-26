@@ -47,8 +47,11 @@ const faNumber = (value: number) => value.toLocaleString("fa-IR");
 export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const devices = ref<UserDevice[]>([]);
   const liveShares = ref<OwnedLocationShare[]>([]);
-  const loading = ref(false);
+  // Until both owner-scoped reads succeed, an empty array is not proof that there are no devices/shares.
+  const loading = ref(true);
+  const loaded = ref(false);
   const failed = ref(false);
+  let readVersion = 0;
   const busyShareId = ref<string | null>(null);
   const bulkRunning = ref(false);
   const status = ref<DeviceSettingsStatus | null>(null);
@@ -89,30 +92,43 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     return options.accessToken.value;
   }
 
+  const READ_FAILED_STALE = "خواندن فهرست دستگاه‌ها ناموفق بود؛ آخرین خوانده‌شده نمایش داده می‌شود.";
+  const READ_FAILED_FIRST = "خواندن فهرست دستگاه‌ها ناموفق بود؛ دوباره تلاش کنید.";
+  const SIGN_IN_REQUIRED = "برای دیدن دستگاه‌ها وارد حساب شوید.";
+
   async function refresh(): Promise<void> {
-    const accessToken = await currentAccessToken();
-    if (!accessToken) {
-      setStatus("warn", "برای دیدن دستگاه‌ها وارد حساب شوید.");
-      return;
-    }
+    const version = ++readVersion;
     loading.value = true;
     try {
+      const accessToken = await currentAccessToken();
+      if (version !== readVersion) return;
+      if (!accessToken) {
+        // An unavailable session cannot keep displaying the prior account's private rows.
+        devices.value = [];
+        liveShares.value = [];
+        loaded.value = false;
+        failed.value = true;
+        setStatus("warn", SIGN_IN_REQUIRED);
+        return;
+      }
       const [deviceList, shares] = await Promise.all([fetchUserDevices(accessToken), listLocationShares(accessToken)]);
+      if (version !== readVersion) return;
       devices.value = deviceList;
       // Owned rows only: the pin belongs to the sharer's sessions, so a received share is not this
       // screen's to edit — and `sharedWithMe` rows carry the *owner's* device ids, which would be both
       // meaningless and a leak of their session list to offer them here.
       liveShares.value = shares.owned;
+      loaded.value = true;
       failed.value = false;
+      if ([READ_FAILED_STALE, READ_FAILED_FIRST, SIGN_IN_REQUIRED].includes(status.value?.text ?? "")) status.value = null;
       nowMs.value = Date.now();
     } catch {
-      // A refresh that fails keeps the previous rows on screen (and says it failed): the user may be
-      // looking at a device they are about to change, and an empty table is a worse answer than a stale
-      // one with a warning.
+      if (version !== readVersion) return;
+      // A failed re-read retains known rows but cannot certify that a previously empty list remains empty.
       failed.value = true;
-      setStatus("error", "خواندن فهرست دستگاه‌ها ناموفق بود؛ آخرین خوانده‌شده نمایش داده می‌شود.");
+      setStatus("error", loaded.value ? READ_FAILED_STALE : READ_FAILED_FIRST);
     } finally {
-      loading.value = false;
+      if (version === readVersion) loading.value = false;
     }
   }
 
@@ -248,6 +264,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     shareRows,
     lastBulkSummary,
     loading,
+    loaded,
     failed,
     busyShareId,
     bulkRunning,

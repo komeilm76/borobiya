@@ -137,6 +137,57 @@ const posts = () => calls.filter((call) => call.method === "POST");
 const deviceReads = () => calls.filter((call) => call.url.endsWith("/_user/devices"));
 
 describe("reading the two lists", () => {
+  it("starts unresolved, reports an initial failed read rather than an empty account, and recovers on retry", async () => {
+    const { api } = mount();
+    expect(api.loading.value).toBe(true);
+    expect(api.loaded.value).toBe(false);
+    responder = () => ({ status: 500, body: { code: "INTERNAL", message: "boom", issues: [] } });
+    await api.refresh();
+    expect(api.loading.value).toBe(false);
+    expect(api.loaded.value).toBe(false);
+    expect(api.failed.value).toBe(true);
+    expect(api.status.value?.text).toContain("دوباره تلاش کنید");
+    responder = defaultResponder;
+    await api.refresh();
+    expect(api.loaded.value).toBe(true);
+    expect(api.failed.value).toBe(false);
+    expect(api.status.value).toBeNull();
+    expect(api.deviceRows.value).toHaveLength(2);
+  });
+
+  it("clears previously read private devices and shares if a refresh finds no session", async () => {
+    const { api, token } = mount();
+    await api.refresh();
+    token.value = null;
+    await api.refresh();
+    expect(api.deviceRows.value).toHaveLength(0);
+    expect(api.shareRows.value).toHaveLength(0);
+    expect(api.loaded.value).toBe(false);
+    expect(api.failed.value).toBe(true);
+  });
+
+  it("ignores an older pending read when a later refresh loses its session", async () => {
+    const { api, token } = mount();
+    let finishDeviceRead!: (response: Response) => void;
+    const delayedDeviceRead = new Promise<Response>((resolve) => { finishDeviceRead = resolve; });
+    globalThis.fetch = vi.fn((input: unknown) =>
+      String(input).endsWith("/_user/devices")
+        ? delayedDeviceRead
+        : Promise.resolve(jsonResponse({ owned: [], sharedWithMe: [] }, 200))
+    ) as unknown as typeof fetch;
+
+    const oldRead = api.refresh();
+    await settle();
+    token.value = null;
+    await api.refresh();
+    finishDeviceRead(jsonResponse([deviceRow(PHONE)], 200));
+    await oldRead;
+    expect(api.loading.value).toBe(false);
+    expect(api.loaded.value).toBe(false);
+    expect(api.deviceRows.value).toEqual([]);
+    expect(api.failed.value).toBe(true);
+  });
+
   it("joins the shares onto the sessions they pin", async () => {
     const { api } = mount();
     await api.refresh();

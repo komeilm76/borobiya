@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.2 active-device read feedback (partial)
+
+- The active-devices panel rendered empty-account/share copy on its first frame and after an initial failed read, although neither device sessions nor owned live shares had been confirmed. It now starts unresolved with two labeled skeletons, keeps known rows visible during re-reads with explicit freshness copy, and shows a failed-read/retry state rather than false empty or single-device claims. A missing session clears rows, older pending reads cannot restore them, a recovered read clears its read error, and device-priority edits are disabled until the snapshot is current. Runtime read/failure/race regressions and source-pinned markup checks pass; no browser/device acceptance or site-wide T4.4.2 completion is claimed.
+
 ### 2026-10-26 — T4.4.1 narrow admin user management (partial)
 
 - The six-column admin user table requires at least 760px inside its padded container, so narrow screens hid the status switch behind horizontal scrolling. At widths up to 850px, a single-column card view of the same paged rows surfaces username, role, setup, category, join date, status and the same guarded confirmation switch; desktop retains the semantic table. Phone-width confirmation actions stack as full-width 44px-minimum targets. Source-pinned tests verify handler parity and breakpoint rules. This is a structural fix without real browser/device visual or screen-reader verification; remaining T4.4.1 screens and bottom-sheet acceptance are still open.

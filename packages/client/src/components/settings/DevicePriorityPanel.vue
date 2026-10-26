@@ -17,8 +17,15 @@
           تازه‌سازی
         </v-btn>
       </header>
+      <p v-if="api.loading.value && api.loaded.value" class="device-priority__hint" role="status">
+        در حال به‌روزرسانی دستگاه‌ها و اشتراک‌ها؛ ردیف‌های پیشین هنوز تأیید نشده‌اند…
+      </p>
 
-      <v-table v-if="api.deviceRows.value.length" class="device-priority__table">
+      <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
+        <span>در حال خواندن دستگاه‌ها…</span>
+        <v-skeleton-loader type="list-item-two-line@3" aria-hidden="true" />
+      </div>
+      <v-table v-else-if="api.deviceRows.value.length" class="device-priority__table">
         <thead>
           <tr>
             <th scope="col">دستگاه</th>
@@ -49,15 +56,19 @@
         </tbody>
       </v-table>
 
-      <p v-else-if="api.loading.value" class="device-priority__muted" role="status">در حال خواندن دستگاه‌ها…</p>
+      <p v-else-if="api.loading.value" class="device-priority__hint" role="status">در حال بازبینی دستگاه‌ها…</p>
+      <p v-else-if="api.failed.value" class="device-priority__hint device-priority__hint--error" role="alert">
+        فهرست دستگاه‌ها تأیید نشد؛ برای بررسی نشست‌ها دوباره تلاش کنید.
+      </p>
       <p v-else class="device-priority__hint">
         این فهرست فقط نشست‌هایی را نشان می‌دهد که هنوز توکن تازه‌کردن دارند؛ دستگاهی که از آن خارج شده‌اید
         در اینجا نیامده است.
       </p>
-      <p v-if="!api.hasMultipleDevices.value && api.deviceRows.value.length === 1" class="device-priority__hint">
+      <p v-if="!api.failed.value && !api.loading.value && !api.hasMultipleDevices.value && api.deviceRows.value.length === 1"
+        class="device-priority__hint">
         با یک دستگاهِ فعال، انتخابی لازم نیست: هر اشتراک تازه به همین دستگاه وصل می‌شود.
       </p>
-      <p v-if="api.failed.value" class="device-priority__hint device-priority__hint--error">
+      <p v-if="api.failed.value && api.deviceRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
         آخرین خواندن ناموفق بود؛ مقادیر بالا ممکن است کهنه باشند.
       </p>
     </v-card>
@@ -74,13 +85,18 @@
           variant="flat"
           color="primary"
           :loading="api.bulkRunning.value"
+          :disabled="api.loading.value || api.failed.value"
           @click="applyToAll"
         >
           اعمال این دستگاه برای همه
         </v-btn>
       </header>
 
-      <div v-if="api.shareRows.value.length" class="device-priority__shares">
+      <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
+        <span>در حال خواندن اشتراک‌ها…</span>
+        <v-skeleton-loader type="list-item-two-line@2" aria-hidden="true" />
+      </div>
+      <div v-else-if="api.shareRows.value.length" class="device-priority__shares">
         <div v-for="entry in api.shareRows.value" :key="entry.share.id" class="device-priority__share">
           <div class="device-priority__share-head">
             <v-icon icon="mdi-crosshairs-gps" size="18" />
@@ -95,7 +111,7 @@
               :items="api.choicesFor(entry.share)"
               item-title="label"
               item-value="value"
-              :disabled="entry.row.kind === 'expired' || busy(entry.share.id)"
+              :disabled="entry.row.kind === 'expired' || busy(entry.share.id) || api.loading.value || api.failed.value"
               density="compact"
               variant="outlined"
               hide-details="auto"
@@ -117,9 +133,15 @@
           </p>
         </div>
       </div>
-      <p v-else-if="api.loading.value" class="device-priority__muted" role="status">در حال خواندن اشتراک‌ها…</p>
+      <p v-else-if="api.loading.value" class="device-priority__hint" role="status">در حال بازبینی اشتراک‌ها…</p>
+      <p v-else-if="api.failed.value" class="device-priority__hint device-priority__hint--error" role="alert">
+        فهرست اشتراک‌ها تأیید نشد؛ نمی‌توان گفت هیچ اشتراک زنده‌ای ندارید.
+      </p>
       <p v-else class="device-priority__hint">
         هنوز اشتراک زنده‌ای باز نکرده‌اید؛ دستگاه پخش‌کننده هنگام ساختن اولین اشتراک انتخاب می‌شود.
+      </p>
+      <p v-if="api.failed.value && api.shareRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
+        دستگاه‌های پخش‌کنندهٔ بالا ممکن است کهنه باشند؛ فهرست را تازه کنید.
       </p>
 
       <p class="device-priority__status" role="status" aria-live="polite" :class="statusClass">
@@ -190,7 +212,7 @@ function busy(shareId: string): boolean {
 
 function canApply(entry: { share: LocationShare; row: { kind: ShareRowKind } }): boolean {
   const chosen = drafts[entry.share.id];
-  if (!chosen || entry.row.kind === "expired" || busy(entry.share.id)) return false;
+  if (!chosen || entry.row.kind === "expired" || busy(entry.share.id) || props.api.loading.value || props.api.failed.value) return false;
   // The button is disabled when it would do nothing the server has not already done. The composable
   // refuses the same case; a control that is lit for a no-op is a bug the user finds by pressing it.
   return chosen !== entry.share.priorityDeviceId;
@@ -274,6 +296,13 @@ function applyToAll(): void {
 
 .device-priority__muted {
   color: #718584;
+}
+
+.device-priority__skeleton {
+  margin: 0 1.3rem 0.8rem;
+  max-width: calc(100% - 2.6rem);
+  color: #536d6c;
+  font-size: 0.76rem;
 }
 
 .device-priority__hint {
