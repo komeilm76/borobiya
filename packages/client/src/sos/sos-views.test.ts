@@ -49,6 +49,12 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(appSource).toContain("if (!visible) sosSheet.closeSheet()");
   });
 
+  it("keeps the sheet in a non-dismissable attaching state after SOS creation until photo upload settles", () => {
+    expect(sheetSource).toContain('v-else-if="sos.createdRequestId.value && sos.submitting.value"');
+    expect(sheetSource).toContain('!sos.createdRequestId.value && !sos.isCompleted.value && !sos.awaitingPhotoRetry.value');
+    expect(sheetSource).toContain('if (sos.submitting.value || cancellation.submitting.value) return;');
+  });
+
   it("keeps the SOS close control in its own top-aligned mobile header column", () => {
     expect(sheetSource).toContain('class="sos-sheet__close"');
     expect(sheetSource).toContain('aria-label="بستن فرم امداد"');

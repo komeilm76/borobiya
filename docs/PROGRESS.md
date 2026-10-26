@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Fix SOS create/photo-upload race
+
+- A successful SOS create previously set the sheet's completed state before its optional photo upload finished, exposing “new request” and close actions while an attachment was still in flight. The sheet now shows an explicit non-dismissable attachment progress state, reports completion only after the upload settles, and retains the existing photo-retry flow on failure. The submission snapshots the incident and file at tap time; GPS callbacks, map/coordinate edits and file-picker events cannot silently change them during session refresh. Deferred-upload and delayed-session regressions reproduce the previous behavior and cover the fix; no device-network test was run.
+
 ### 2026-10-26 — T4.4.1 responsive dispatch triage (partial)
 
 - Reordered the admin SOS console so its request queue precedes the map/dispatch form in both DOM and visual order (including stacked widths); on phones, the selected incident summary and severity legend follow a definite-height map in document flow instead of obscuring markers and gestures. A compact status select replaces the three wide filter buttons at phone width without introducing a second filter state, and responder search wraps. Source-pinned tests and client typechecks cover structural decisions; other screens/breakpoints, mobile bottom-sheet behavior and **real browser/device visual verification** remain open, so T4.4.1 is **not** checked complete.

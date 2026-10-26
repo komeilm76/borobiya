@@ -179,6 +179,64 @@ describe("useSosRequest composable", () => {
     expect(sos.awaitingPhotoRetry.value).toBe(false);
   });
 
+  it("does not report completion while a photo is still uploading", async () => {
+    let finishUpload!: (value: { photoUrl: string }) => void;
+    const pendingUpload = new Promise<{ photoUrl: string }>((resolve) => { finishUpload = resolve; });
+    vi.spyOn(sosApi, "createSosRequest").mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto").mockReturnValue(pendingUpload);
+    const sos = useSosRequest({ accessToken: ref("token-ok") });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "An urgent rescue is needed at the incident location.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+
+    const sending = sos.submit();
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledOnce());
+    expect(sos.createdRequestId.value).toBe(REQUEST_ID);
+    expect(sos.submitting.value).toBe(true);
+    expect(sos.isCompleted.value).toBe(false); // never enable "new request" before the attachment settles
+    finishUpload({ photoUrl: `/uploads/${REQUEST_ID}.png` });
+    expect(await sending).toBe(true);
+    expect(sos.isCompleted.value).toBe(true);
+  });
+
+  it("submits the location and photo picked at tap time, not edits made while refreshing the session", async () => {
+    let finishSession!: () => void;
+    const pendingSession = new Promise<void>((resolve) => { finishSession = resolve; });
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto")
+      .mockResolvedValue({ photoUrl: `/uploads/${REQUEST_ID}.png` });
+    let lateGps!: Parameters<GeolocationProvider["getCurrentPosition"]>[0];
+    const sos = useSosRequest({
+      accessToken: ref("token-ok"), ensureSession: () => pendingSession,
+      geolocation: () => ({ getCurrentPosition: (success) => { lateGps = success; } })
+    });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "Incident at the first selected location.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.requestGpsLocation();
+    const firstPhoto = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "first.png", { type: "image/png" });
+    sos.selectPhoto(firstPhoto);
+
+    const sending = sos.submit();
+    expect(sos.setManualLocation(35.8, 51.5)).toBe(false); // a map click during refresh
+    lateGps({ coords: { latitude: 35.9, longitude: 51.6, accuracy: 8 } });
+    expect(sos.location.value).toEqual({ lat: 35.7, lon: 51.4, isManual: true });
+    sos.description.value = "This later edit must not silently change the sent request.";
+    expect(sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "later.png", { type: "image/png" }))).toBe(false);
+    sos.clearPhoto();
+    expect(sos.photoFile.value).toBe(firstPhoto);
+    finishSession();
+    expect(await sending).toBe(true);
+    expect(create).toHaveBeenCalledWith({
+      severity: "high", incidentTypeId: INCIDENT_A,
+      description: "Incident at the first selected location.",
+      location: { lat: 35.7, lon: 51.4, isManual: true }
+    }, "token-ok");
+    expect(upload).toHaveBeenCalledWith(REQUEST_ID, firstPhoto, "token-ok");
+  });
+
   it("preserves trailing zeros while typing coordinates and clears stale GPS coordinates when invalidated", async () => {
     vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([
       {

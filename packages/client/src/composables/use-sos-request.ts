@@ -84,7 +84,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
   const issues = computed(() => sosDraftIssues(draft.value));
   const canSubmit = computed(() => !submitting.value && createdRequestId.value === null && canSubmitSosDraft(draft.value));
-  const isCompleted = computed(() => createdRequestId.value !== null && !awaitingPhotoRetry.value);
+  const isCompleted = computed(() => createdRequestId.value !== null && !submitting.value && !awaitingPhotoRetry.value);
 
   async function loadCatalog(): Promise<void> {
     loadingCatalog.value = true;
@@ -106,6 +106,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function requestGpsLocation(): void {
+    if (submitting.value) return;
     const currentGpsRequest = ++gpsRequestId;
     const provider = (options.geolocation ?? defaultGeolocation)();
     if (!provider) {
@@ -141,6 +142,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function setManualLocation(lat: number, lon: number): boolean {
+    if (submitting.value) return false;
     const next = manualLocationDraft(lat, lon);
     if (!next) {
       submitError.value = sosIssueMessage("location_invalid");
@@ -157,6 +159,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function setCoordinateInputs(nextLatInput: string, nextLonInput: string): boolean {
+    if (submitting.value) return false;
     gpsRequestId++;
     locating.value = false;
     latInput.value = nextLatInput;
@@ -177,6 +180,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function selectPhoto(file: (Blob & { name?: string }) | null): boolean {
+    if (submitting.value) return false;
     photoError.value = null;
     if (!file) {
       photoFile.value = null;
@@ -197,6 +201,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function clearPhoto(): void {
+    if (submitting.value) return;
     photoFile.value = null;
     photoError.value = null;
     if (awaitingPhotoRetry.value) {
@@ -225,6 +230,12 @@ export function useSosRequest(options: UseSosRequestOptions) {
       return false;
     }
 
+    // Snapshot what the user approved at tap time. A late GPS fix, map drag or file-picker
+    // event during session refresh must not silently change the submitted SOS or attachment.
+    const payload = buildSosCreatePayload(draft.value);
+    const selectedPhoto = photoFile.value;
+    gpsRequestId++; // discard a geolocation callback already in flight
+    locating.value = false;
     // Lock before an asynchronous session refresh. Two taps while a refresh is pending
     // must not each create a separate emergency (and consume the 3/minute quota).
     submitting.value = true;
@@ -234,13 +245,12 @@ export function useSosRequest(options: UseSosRequestOptions) {
         submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
         return false;
       }
-      const payload = buildSosCreatePayload(draft.value);
       const created = await createSosRequest(payload, token);
       createdRequestId.value = created.requestId;
 
-      if (photoFile.value) {
+      if (selectedPhoto) {
         try {
-          const uploaded = await uploadSosRequestPhoto(created.requestId, photoFile.value, token);
+          const uploaded = await uploadSosRequestPhoto(created.requestId, selectedPhoto, token);
           photoUploadedUrl.value = uploaded.photoUrl;
           awaitingPhotoRetry.value = false;
         } catch (uploadError) {
@@ -267,6 +277,8 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
   async function retryPhotoUpload(): Promise<boolean> {
     if (submitting.value || !createdRequestId.value || !photoFile.value) return false;
+    const requestId = createdRequestId.value;
+    const selectedPhoto = photoFile.value;
     submitError.value = null;
 
     // The photo retry is also single-flight across an asynchronous token refresh.
@@ -277,7 +289,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
         submitError.value = "برای ارسال تصویر دوباره وارد حساب کاربری شوید.";
         return false;
       }
-      const uploaded = await uploadSosRequestPhoto(createdRequestId.value, photoFile.value, token);
+      const uploaded = await uploadSosRequestPhoto(requestId, selectedPhoto, token);
       photoUploadedUrl.value = uploaded.photoUrl;
       awaitingPhotoRetry.value = false;
       return true;

@@ -45,6 +45,14 @@
           </div>
         </div>
 
+        <div v-else-if="sos.createdRequestId.value && sos.submitting.value" class="sos-sheet__result" role="status" aria-live="polite">
+          <v-alert type="info" variant="tonal" rounded="lg" class="mb-4">
+            درخواست امداد شما ثبت شد (<code dir="ltr">{{ sos.createdRequestId.value }}</code>).
+            تصویر در حال ارسال است؛ تا پایان ارسال صبر کنید.
+          </v-alert>
+          <v-progress-linear indeterminate color="primary" aria-label="در حال ارسال تصویر حادثه" />
+        </div>
+
         <div v-else-if="sos.isCompleted.value" class="sos-sheet__result" role="status" aria-live="polite">
           <v-alert type="success" variant="tonal" rounded="lg" class="mb-4">
             <strong>درخواست امداد شما با موفقیت ثبت شد.</strong>
@@ -122,6 +130,7 @@
                 class="sos-severity-card"
                 :class="{ 'is-selected': sos.severity.value === option.value }"
                 :aria-checked="sos.severity.value === option.value"
+                :disabled="sos.submitting.value"
                 :style="sos.severity.value === option.value ? { borderColor: option.hex } : undefined"
                 @click="sos.severity.value = option.value"
               >
@@ -236,7 +245,7 @@
               </template>
             </p>
 
-            <div class="sos-sheet__map-wrap">
+            <div class="sos-sheet__map-wrap" :class="{ 'pointer-events-none': sos.submitting.value }">
               <MapCanvas
                 :style-url="mapStyleUrl"
                 :constrain-bounds="false"
@@ -315,6 +324,7 @@
               <v-chip
                 v-if="sos.photoFile.value"
                 closable
+                :disabled="sos.submitting.value"
                 size="small"
                 color="primary"
                 variant="tonal"
@@ -330,10 +340,10 @@
         </form>
       </v-card-text>
 
-      <v-divider v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value" />
+      <v-divider v-if="!sos.createdRequestId.value && !sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value" />
 
       <v-card-actions
-        v-if="!sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value"
+        v-if="!sos.createdRequestId.value && !sos.isCompleted.value && !sos.awaitingPhotoRetry.value && !cancellation.cancelled.value"
         class="sos-sheet__actions"
       >
         <v-btn variant="text" rounded="lg" :disabled="sos.submitting.value" @click="close">
@@ -462,18 +472,19 @@ function onFilePicked(event: Event): void {
 }
 
 function startFresh(): void {
-  if (cancellation.submitting.value) return;
+  if (sos.submitting.value || cancellation.submitting.value) return;
   cancellation.reset();
   sos.reset();
   sos.prepareForOpen();
 }
 
 function onVisibility(next: boolean): void {
+  if (!next && (sos.submitting.value || cancellation.submitting.value)) return;
   emit("update:modelValue", next);
 }
 
 function close(): void {
-  if (cancellation.submitting.value) return;
+  if (sos.submitting.value || cancellation.submitting.value) return;
   cancellation.dismiss();
   emit("update:modelValue", false);
 }
