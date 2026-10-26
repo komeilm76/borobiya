@@ -973,14 +973,10 @@ onBeforeUnmount(() => {
   background: #0284c7;
 }
 
-@media (max-width: 599px) {
-  .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
-  .admin-dispatch__responder-search { flex-wrap: wrap; }
-  .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
-
-  /* Keep the map a definite size for MapLibre, but put its selected SOS card and
-   * severity key *after* the canvas in normal flow rather than covering markers,
-   * gestures and zoom controls on a phone. One map instance stays mounted. */
+/* Vuetify's lg columns start at 1280px. Below that width the queue and map
+ * stack; keep the selected SOS and legend *after* the definite-height canvas
+ * in normal flow so they cannot cover markers, gestures or zoom controls. */
+@media (max-width: 1279px) {
   .dispatch-map-wrapper { display: flex; flex-direction: column; height: auto; min-height: 0; gap: 0.75rem; }
   .dispatch-map-wrapper > :deep(.map-canvas) {
     flex: 0 0 auto;
@@ -1003,6 +999,12 @@ onBeforeUnmount(() => {
     margin: 0 0.75rem 0.75rem;
     border-radius: 0.75rem;
   }
+}
+
+@media (max-width: 599px) {
+  .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
+  .admin-dispatch__responder-search { flex-wrap: wrap; }
+  .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
 }
 
 .pulse-indicator {

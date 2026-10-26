@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 tablet dispatch map occlusion (partial)
+
+- Vuetify stacks the `lg` dispatch queue/map columns below 1280px, but the selected-SOS card and legend only left the map at widths below 600px. Across the 600–1279px stacked range, those overlays covered incident markers and map gestures despite ample room for normal-flow content. The in-flow, definite-height MapLibre layout now follows the actual column breakpoint; compact filter and responder-search rules remain phone-only. Source-pinned regression failed before the breakpoint change and passes afterward. This does not claim browser/device visual acceptance or a site-wide no-occlusion audit; T4.4.1 stays **open**.
+
 ### 2026-10-26 — T4.4.1 rescuer stacked-detail bug review (partial)
 
 - Rescuer mission history and pending-offer inbox each page up to 20 cards. When their layouts stacked, the selected timeline or incident map and accept/decline controls followed all 20 cards, even after tapping a card. Both now bound only the card list to a viewport-relative height at the stacking breakpoint, preserving keyboard scrolling and leaving pagination and detail panels outside the scroller. In the proposal inbox the first displayed fallback selection previously had no selected styling or `aria-pressed` card; both now track the computed displayed offer. Phone-width accepted-map and distance-consent buttons can wrap long labels while retaining 44px minimum height. Regressions failed on the old structure/selection and pass after the change; source/typechecks cannot prove pixel-level behavior. T4.4.1 stays **open** for other screens, mobile bottom-sheet audit and real browser/device acceptance.

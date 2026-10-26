@@ -12,23 +12,31 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toContain("adminSos.dispatchedCount");
   });
 
-  it("presents the SOS queue first when stacked and removes overlays only on phone widths", () => {
+  it("presents the SOS queue first and removes map overlays at every stacked width", () => {
     const mapColumn = '<v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">';
     const queueColumn = '<v-col cols="12" lg="5" class="admin-dispatch__queue">';
     expect(source).toContain(mapColumn);
     expect(source).toContain(queueColumn);
     expect(source.indexOf(queueColumn)).toBeLessThan(source.indexOf(mapColumn));
     expect(source).not.toMatch(/\.admin-dispatch__queue \{ order:/); // no visual/keyboard order mismatch
-    const desktop = source.split("<style scoped>")[1]!.split("@media (max-width: 599px)")[0]!;
+    const desktop = source.split("<style scoped>")[1]!.split("@media (max-width: 1279px)")[0]!;
     expect(desktop).toMatch(/\.map-selected-alert-card \{\s*position: absolute;/);
     expect(desktop).toMatch(/\.severity-legend \{\s*position: absolute;/);
-    const phone = source.split("@media (max-width: 599px) {")[1]!.split("\n}\n\n.pulse-indicator")[0]!;
-    expect(phone).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
-    expect(phone).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(20rem, 48dvh, 30rem\);[^}]*min-height: 20rem;/);
+    const stacked = source.split("@media (max-width: 1279px) {")[1]!.split("@media (max-width: 599px)")[0]!;
+    expect(stacked).toMatch(/\.dispatch-map-wrapper \{[^}]*display: flex;[^}]*height: auto;/);
+    expect(stacked).toMatch(/\.dispatch-map-wrapper > :deep\(\.map-canvas\) \{[^}]*height: clamp\(20rem, 48dvh, 30rem\);[^}]*min-height: 20rem;/);
     for (const element of ["map-selected-alert-card", "severity-legend"]) {
-      expect(phone).toMatch(new RegExp(`\\.${element} \\{[^}]*position: static;`));
+      expect(stacked).toMatch(new RegExp(`\\.${element} \\{[^}]*position: static;`));
     }
+    expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
     expect(source).toContain('@click="focusRequest(adminSos.selectedRequest)"');
     expect(source).toContain('@click="focusRequest(item)"');
+  });
+
+  it("still reserves the compact filter and responder search wrap for phones", () => {
+    const phone = source.split("@media (max-width: 599px) {")[1]!.split("\n}\n\n.pulse-indicator")[0]!;
+    expect(phone).toContain('.admin-dispatch__filter-select { flex: 1 1 12rem;');
+    expect(phone).toContain('.admin-dispatch__responder-search { flex-wrap: wrap; }');
+    expect(phone).not.toContain('.dispatch-map-wrapper {');
   });
 });
