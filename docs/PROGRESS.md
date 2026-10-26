@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Location-share session lifecycle bug review
+
+- Found two related privacy/feedback races: the share-ended Socket.IO listener survived access-token rotation with its original handshake, and an old HTTP read could repopulate private share rows after logout or an in-place account switch. The revocation subscription now closes the prior client and reconnects with the new bearer; generation guards close late dynamic imports after rotation/logout/unmount. Session transitions invalidate reads, clear all four share lists and confirmation state, and reload only the newly signed-in user's grants. Runtime socket-lifecycle tests cover token reuse, rotation, pending import, failure and disposal; source-pinned tests guard list invalidation and cleanup. This is a bounded bug fix, not device/browser verification or completion of T4.4.2.
+
 ### 2026-10-26 — T4.4.4 bounded map-cache startup (partial)
 
 - MapCanvas previously waited for cache-worker registration/ready before importing MapLibre; on a fresh install this could consume the worker's 1.5s readiness timeout even while the map service was online. The map now waits at most 200ms for worker startup, then initializes while registration continues in the background; worker errors cannot block rendering, and an already controlling worker retains its cache behavior. Focused tests cover immediate readiness, a never-settling registration, failures and the component wiring. Routes were already lazy and the admin user list already paged at 20 rows. This removes a startup gate; it **does not** prove <2s rendered map, <500ms location or site-wide performance targets without browser/VM measurements. T4.4.4 stays **open**.

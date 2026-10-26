@@ -199,6 +199,7 @@ import {
   type ShareRowKind
 } from "@/sharing/share-form";
 import { shareSectionPresentation } from "@/sharing/share-list-presentation";
+import { createShareEndedSubscription } from "@/sharing/share-list-session";
 
 /**
  * "My Shares" / "Shared With Me" (spec §7.2, tracker T2.1.7), plus the history grants that share
@@ -488,13 +489,20 @@ async function confirmRevoke(): Promise<void> {
   }
 }
 
-let detachShareEnded: (() => void) | null = null;
-let socketSeq = 0;
-
-function detachRealtimeShareSync(): void {
-  socketSeq += 1;
-  detachShareEnded?.();
-  detachShareEnded = null;
+function resetShareRows(): void {
+  // A logout/account switch must invalidate any pending read before its old bearer can write rows.
+  readVersion += 1;
+  owned.value = [];
+  received.value = [];
+  ownedHistory.value = [];
+  receivedHistory.value = [];
+  liveFresh.value = false;
+  historyFresh.value = false;
+  loaded.value = true;
+  loading.value = false;
+  loadError.value = auth.accessToken ? null : "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
+  confirmOpen.value = false;
+  pendingRow.value = null;
 }
 
 function handleShareEnded(payload: unknown): void {
@@ -509,39 +517,32 @@ function handleShareEnded(payload: unknown): void {
   emit("changed");
 }
 
-async function attachRealtimeShareSync(token: string): Promise<void> {
-  if (detachShareEnded) return;
-  const seq = ++socketSeq;
-  try {
-    const [{ createRealtimeClient }, { SHARE_ENDED_EVENT }] = await Promise.all([
-      import("@/services/socket"),
-      import("@/services/socket-events")
-    ]);
-    if (seq !== socketSeq || !auth.accessToken) return;
-    const client = createRealtimeClient(token);
-    client.socket.on(SHARE_ENDED_EVENT, handleShareEnded);
-    detachShareEnded = () => {
-      client.socket.off(SHARE_ENDED_EVENT, handleShareEnded);
-      client.close();
-    };
-    client.connect();
-  } catch {
-    // Manual refresh and 30s local countdown continue independently if socket creation fails.
-  }
-}
+const shareSync = createShareEndedSubscription(async (token) => {
+  // The Socket.IO transport is still downloaded only when this panel has a real bearer.
+  const { createRealtimeClient } = await import("@/services/socket");
+  return createRealtimeClient(token);
+}, handleShareEnded);
 
 watch(
   () => auth.accessToken,
-  (token) => {
-    if (token) void attachRealtimeShareSync(token);
-    else detachRealtimeShareSync();
+  (token, previousToken) => {
+    void shareSync.setToken(token);
+    if (!token && previousToken) resetShareRows();
   },
   { immediate: true }
 );
 
+watch(() => auth.user?.id, (nextId, previousId) => {
+  if (nextId === previousId) return;
+  if (previousId) resetShareRows();
+  // The initial onMounted read already handles a restored session. On an in-place account switch,
+  // reload only the new owner's grants; do not revive results from the old in-flight request.
+  if (nextId && auth.accessToken && (previousId || loaded.value)) void refresh();
+});
+
 onBeforeUnmount(() => {
   readVersion += 1;
-  detachRealtimeShareSync();
+  shareSync.close();
 });
 onMounted(refresh);
 
