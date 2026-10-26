@@ -179,7 +179,7 @@ gantt
 ### M4.4 Deploy & Android
 - [ ] Lefthook/Husky: pre-commit lint+typecheck, pre-push test+build
 - [ ] GitHub Actions `deploy.yml` → build images → push registry → SSH `docker compose pull && up -d`
-- [ ] GitHub Actions `android.yml` on tag `v*` → `./gradlew assembleRelease` → APK/AAB
+- [x] GitHub Actions `android.yml` on tag `v*` → `./gradlew assembleRelease` → signed APK artifact (code only; GitHub/Android device acceptance pending)
 - [ ] `DEVELOPMENT.md` verified on Windows + Ubuntu
 
 ### M4.5 Docs Lock

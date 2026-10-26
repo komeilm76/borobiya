@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.6.3 signed Android tag workflow (code only)
+
+- Added pinned Capacitor CLI/Android dependencies and a release-tag Action that checks main ancestry, generates/syncs the ignored native project, inserts location permissions, versions and signs the APK with ephemeral environment-only secrets, verifies the signature and uploads an artifact. The release shell requires a configured public HTTPS production origin for same-origin API/map/cookie requests; it does not claim standalone offline operation or trust the LAN debug CA. Python template/security checks and local `cap add`/`cap sync` succeed. **No GitHub Action, Android SDK/Gradle assemble, signed APK, production TLS, device GPS or share acceptance has been run.** See `WORKFLOWS.md` §6 for required operator settings and sign-off.
+
 ### 2026-10-26 — Bug fix: optimized trips use OSRM's supported HTTP method
 
 - The trip gateway was sending a JSON POST that OSRM v26.10 only supports for route/table/match; a real trip service would reject every optimized multi-stop request. Switched the bounded local trip call to GET with coordinates and options in its URL, and kept private GET paths and upstream echoes out of gateway errors/logs. Added a strict GET-only HTTP stub and a regression for unsupported POST, network failures, untrusted error bodies and disconnected stops. Local tests pass; real OSRM/VM/browser acceptance remains pending.

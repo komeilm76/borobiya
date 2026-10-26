@@ -911,36 +911,22 @@ Docs must be **clear for Human + AI**. Use Markdown + Diagrams (Mermaid) + OpenA
 
 ## 19. Workflows & CI/CD
 
-### 19.1. Git Hooks / Gates (planned)
-- Add **Husky** or **Lefthook**:
-  - `pre-commit`: `bun run lint` + `bun run typecheck` (vue-tsc + tsc)
-  - `pre-push`: `bun run test` (vitest) + `bun run build` dry-run
-- **Branch protection:** `main` requires PR + 1 review (if team >1) or at least passing CI.
-
-These hooks and gates are recommendations only; no hook config, CI workflow, or root lint/test/build scripts are wired yet.
+### 19.1. Git Hooks / Gates
+- [Lefthook](./lefthook.yml) runs `bun run lint` and `bun run typecheck` before commits, then `bun run test` and `bun run build` before pushes. Install the hooks locally after `bun install --frozen-lockfile`; see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md#2-git-hooks--gates-local). These do not replace CI or VM/device acceptance.
 
 ### 19.2. Launch / Deploy Workflow
-- **GitHub Actions `deploy.yml` (planned; not present yet):**
-  - On push to `main`: build Docker images, push to registry, SSH to Ubuntu server, `docker compose pull && docker compose up -d`
-  - Includes: `api`, `postgres`, `map-server`, `nginx` (reverse proxy)
-- **Local launch (scaffold):**
+- [Main-branch Action](./.github/workflows/deploy.yml): source checks, immutable API/routing/Photon GHCR images, and guarded SSH cutover to an **operator-prepared** VM. It does not migrate the database or ship map datasets; its first production execution remains unverified.
+- **Local launch:**
   ```bash
   cp .env.example .env          # replace the JWT placeholders and Postgres password
-  docker compose up --build -d  # default profile: API, PostGIS, Martin, routing gateway, and Nginx
+  docker compose up --build -d  # API, PostGIS, Martin, routing gateway, Nginx
   bun install
-  bun --filter @borobiya/client dev  # Vite client with HMR at :5173
+  bun --filter @borobiya/client dev
   ```
-  For Bun-only development, stop the Compose API and run `bun run dev` from the repository root. The Compose stack is not production-hardened (Nginx is HTTP-only). Auth, recovery, session, and user/admin account flows use PostgreSQL after the explicit migrations and seed; SOS/location mission workflows remain planned. Map PBFs, PMTiles, OSRM graphs, and the Photon index are generated outside Git under the external library by the map pipeline; a clean checkout does not contain those large data artifacts.
+  The dev stack uses HTTP by default; use [`docs/MOBILE_LAN_HTTPS.md`](docs/MOBILE_LAN_HTTPS.md) for mobile Chrome GPS at `172.16.20.70`. Dataset selection/staging is covered in the VM runbook.
 
-### 19.3. Android Build Workflow (planned)
-- **GitHub Actions `android.yml` (not present yet):**
-  - On tag `v*`: `bun run build:web`, `npx cap sync android`, `cd android && ./gradlew assembleRelease`, upload APK/AAB artifact
-- **Local:**
-  ```bash
-  bun run build
-  npx cap copy android
-  npx cap open android  # opens Android Studio
-  ```
+### 19.3. Android Build Workflow
+- [Release-tag Action](./.github/workflows/android.yml): protected environment, main-ancestor check, generated Capacitor 8 project, `cap sync android`, environment-only signing, `assembleRelease`, signature verification, private APK artifact. The release shell needs a configured **public HTTPS** production origin for same-origin API/map traffic; it is not an offline APK. The Action and device install have not yet run; see [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md#6-android-build-androidyml--signed-apk-on-a-release-tag).
 
 ---
 

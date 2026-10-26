@@ -127,6 +127,7 @@ class LanTlsTest(unittest.TestCase):
         self.assertIn("WSS HMR handshake passed", output)
 
     def test_android_overlay_contains_only_public_ca_and_is_debug_only(self):
+        self.assertIn('$repo_root/packages/client/android', SCRIPT.read_text())
         android = self.root / "android"
         main = android / "app/src/main"
         main.mkdir(parents=True)

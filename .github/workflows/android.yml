@@ -1,0 +1,99 @@
+name: Android release APK
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: borobiya-android-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: production
+    env:
+      BOROBIYA_ANDROID_ORIGIN: ${{ vars.ANDROID_PUBLIC_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require a release tag pointing to main
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch --quiet origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}^{commit}" origin/main
+          : "${BOROBIYA_ANDROID_ORIGIN:?Set production ANDROID_PUBLIC_ORIGIN repository variable}"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22' # Capacitor CLI 8 requires Node >=22
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install SDK for pinned Capacitor 8 platform
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check source and build the client
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+          python3 -m pip install ruff==0.15.3
+          bun install --frozen-lockfile
+          bun run lint
+          bun run typecheck
+          bun run test
+          node --test map-server/routing-gateway/*.test.mjs
+          bun run build
+      - name: Generate native project, sync plugins and configure release
+        run: |
+          set -euo pipefail
+          cd packages/client
+          bunx cap add android
+          bunx cap sync android
+          cd ../..
+          python3 scripts/prepare_android_release.py packages/client/android "$GITHUB_REF_NAME" "$GITHUB_RUN_NUMBER"
+      - name: Assemble signed, installable APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          BOROBIYA_ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          BOROBIYA_ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          BOROBIYA_ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${KEYSTORE_BASE64:?Configure ANDROID_KEYSTORE_BASE64}"
+          : "${BOROBIYA_ANDROID_STORE_PASSWORD:?Configure ANDROID_STORE_PASSWORD}"
+          : "${BOROBIYA_ANDROID_KEY_ALIAS:?Configure ANDROID_KEY_ALIAS}"
+          : "${BOROBIYA_ANDROID_KEY_PASSWORD:?Configure ANDROID_KEY_PASSWORD}"
+          umask 077
+          export BOROBIYA_ANDROID_KEYSTORE_FILE="$RUNNER_TEMP/borobiya-release.keystore"
+          trap 'rm -f "$BOROBIYA_ANDROID_KEYSTORE_FILE"' EXIT
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$BOROBIYA_ANDROID_KEYSTORE_FILE"
+          test -s "$BOROBIYA_ANDROID_KEYSTORE_FILE"
+          cd packages/client/android
+          ./gradlew --no-daemon assembleRelease
+          apk='app/build/outputs/apk/release/app-release.apk'
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: borobiya-${{ github.ref_name }}-release-apk
+          path: packages/client/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 14

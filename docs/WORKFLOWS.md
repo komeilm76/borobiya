@@ -1,6 +1,6 @@
 # Borobiya — Workflows & CI/CD
 
-> TL;DR: Lefthook local commit/push gates are configured. The main-branch deploy Action is implemented but requires an operator-prepared VM and protected GitHub secrets. CI and Android packaging are still planned; the separate Ubuntu VM runbook documents the production TLS edge. A local Compose stack and root `bun run dev` command are available.
+> TL;DR: Lefthook local gates, the main-branch deploy Action, and the release-tag Android Action are implemented in code. They require a prepared VM, protected GitHub settings and live acceptance; the separate Ubuntu VM runbook documents the production TLS edge. A local Compose stack and root `bun run dev` command are available.
 
 ---
 
@@ -212,82 +212,82 @@ rollout, HTTPS, real PostGIS and map smoke tests remain operator gates.
 
 ---
 
-## 6. Android Build (`android.yml` — on tag `v*`)
+## 6. Android Build (`android.yml` — signed APK on a release tag)
 
-### 6.1 Workflow
+### 6.1 Tag-triggered Action
 
-```yaml
-name: Android
-on:
-  push:
-    tags: ["v*"]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: oven-sh/setup-bun@v2
-      - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
-      - run: bun install
-      - run: bun run build
-      - run: bun --filter client build           # vite build → dist/
-      - run: npx cap copy android && npx cap sync android
-      - run: cd android && ./gradlew assembleRelease
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-      - uses: actions/upload-artifact@v4
-        with: { name: borobiya-apk, path: android/app/build/outputs/apk/release/app-release.apk }
-      - uses: softprops/action-gh-release@v2
-        with: { files: android/app/build/outputs/apk/release/app-release.apk }
-```
+[The workflow](../.github/workflows/android.yml) runs on a `vMAJOR.MINOR.PATCH`
+tag whose commit is on `main`. It uses the protected `production` environment,
+checks the same repository gates as deploy, pins Capacitor CLI/Android 8.5.3 in
+`bun.lock`, builds the web client, generates the ignored native Android project
+under `packages/client/android/`, runs `cap sync android` and then
+`./gradlew assembleRelease`. [The preparation script](../scripts/prepare_android_release.py)
+sets a monotonic `versionCode` from `GITHUB_RUN_NUMBER`, the tag's `versionName`,
+coarse/fine location permissions, disables Android backup/cleartext, and wires
+Gradle release signing to **environment variables**, not inline passwords.
+`apksigner verify` must succeed before the signed APK is uploaded as a private
+Actions artifact (14-day retention, no automatic public release). Missing
+variables/keystore, malformed tags or changes to the expected Capacitor 8
+Android template fail closed. There is no committed native project or keystore.
 
-### 6.2 Local Android
+**Important runtime boundary:** The browser code uses same-origin `/api`,
+`/map`, `/route`, `/socket.io`, tile and worker paths. The release config
+therefore loads the existing **public production HTTPS origin** in the WebView
+rather than pretending bundled `https://localhost` has a native API/map server.
+The APK requires the production site and network; it is **not** an offline
+Android app/map pack. Capacitor still copies web assets into the APK, but with
+`server.url` set they do **not** automatically rescue a production-site outage.
+Provide `ANDROID_PUBLIC_ORIGIN` as a GitHub **production environment variable**,
+e.g. `https://example.org` (exact public HTTPS origin, no path or port, not a
+private/LAN IP). The app does not trust private CAs or allow HTTP in release.
+The server must serve a valid publicly trusted cert and have the same-origin
+API/map proxy working first. No production domain is shipped as a default.
 
-For GPS testing in **mobile Chrome** on a LAN IP, no APK is involved; follow
-[`MOBILE_LAN_HTTPS.md`](./MOBILE_LAN_HTTPS.md) to trust a development CA and
-run Vite at `https://<LAN-IP>:5173`. The Android steps below describe a future
-Capacitor project; `android/` is generated/ignored, not committed. For a
-WebView debug APK, the same guide's `android-debug` command bundles **only the
-public CA**, adds a debug-only trust overlay, and explains the required debug
-server URL and native location permissions. Never bundle the CA private key
-or ship that trust overlay in a release build.
+**Before a release:** configure the protected `production` environment and its
+variable `ANDROID_PUBLIC_ORIGIN`; add the four environment secrets below; run
+or review the production site deployment; create and protect the tag on `main`.
+The Action is code-complete but has **not** run on GitHub or built an APK here:
+no Android SDK/Gradle, physical install, TLS, login, GPS or location-sharing
+acceptance is claimed. Install the resulting APK on a test device, check the
+certificate and origin, grant *while-using-app* location, confirm a real fix and
+share/revoke against the running production server before distributing it.
 
-```bash
-bun run build
-npx cap add android                  # once
-npx cap copy android                # after each build
-npx cap open android                # open in Android Studio → Run
-# Or CLI
-cd android && ./gradlew assembleDebug && adb install app/build/outputs/apk/debug/app-debug.apk
-```
+### 6.2 Signing and key custody
 
-### 6.3 Signing (release)
+Generate a release key on a secure operator machine using `keytool`; protect the
+keystore and both passwords outside GitHub with offline backups. Losing the key
+prevents updates to the same installed app. Set these **GitHub environment
+secrets** (never print, commit or send the values in chat):
 
-- Generate: `keytool -genkey -v -keystore release.keystore -alias borobiya -keyalg RSA -keysize 2048 -validity 10000`
-- Store `release.keystore` base64 as `KEYSTORE_BASE64` secret; set `android/gradle.properties` signingConfigs from env.
-- Document keystore backup — lost key = cannot update Play Store.
+| Secret | Purpose |
+|--------|---------|
+| `ANDROID_KEYSTORE_BASE64` | Base64 encoding of the release keystore file (decoded into `RUNNER_TEMP`, mode 0600, deleted at step exit) |
+| `ANDROID_STORE_PASSWORD` | Keystore password |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key inside that keystore |
+| `ANDROID_KEY_PASSWORD` | Signing key password |
 
-### 6.4 Capacitor Config
+The workflow uses `apksigner verify`, but only a device install and a signature
+comparison with the previous release can establish update compatibility. Keep
+an operator copy of the keystore fingerprint and verify it before distributing
+an artifact; GitHub Actions artifacts are private to accounts with repository
+access, not an app store.
 
-`capacitor.config.ts`:
+### 6.3 Local development and LAN certificates
 
-```ts
-export default {
-  appId: "com.borobiya.app",
-  appName: "Borobiya",
-  webDir: "dist",
-  server: { androidScheme: "https", allowNavigation: ["borobiya.local", "map.borobiya.local"] },
-  plugins: {
-    Geolocation: { },
-    Camera: { }
-  }
-} as CapacitorConfig;
-```
+**Chrome on a phone needs no APK:** use [`MOBILE_LAN_HTTPS.md`](./MOBILE_LAN_HTTPS.md)
+with `172.16.20.70`, the HTTP/HTTPS switch and Android's user CA installation
+instructions. Do not put this CA or its key in a release APK. For a *generated
+local debug Android project*, use the guide's `android-debug` step to place only
+the public CA under the **debug** source set, set a debug-only Capacitor server
+URL to `https://172.16.20.70:5173`, then rebuild/install a **debug** APK. The
+release Action never runs that step and fails if no real public HTTPS origin is
+configured. Android WebView CA trust is separate from Chrome's user-CA trust.
 
-Permissions in `AndroidManifest.xml`: `ACCESS_FINE_LOCATION`, `CAMERA`, `INTERNET`.
+The included `capacitor.config.ts` defaults to local `https://localhost` for
+non-CI debug builds; that origin cannot access the production API/map without
+additional native networking work. For mobile app tests, supply an explicitly
+trusted origin and request runtime location permission. Bundled offline maps,
+secure native refresh-token storage and background GPS remain separate tasks.
 
 ---
 
@@ -307,8 +307,8 @@ node --test map-server/routing-gateway/*.test.mjs
 # Bump version in package.json + docs/PROGRESS.md BEFORE merging the release PR so the cut record lands on main
 git add . && git commit -m "chore: v1.0.0 prep"
 git tag -a v1.0.0 -m "v1.0.0" && git push origin main --tags
-# → would trigger deploy.yml (to VPS) + android.yml (APK): neither workflow file exists in
-#   .github/workflows yet, so tagging publishes nothing on its own (see README §19)
+# → triggers deploy.yml on the main push and android.yml on the tag push;
+#   neither is an acceptance test: protect environment secrets and verify VM + APK first
 # Write concise curated release notes summarizing changes since the previous tag
 # (do NOT pass the multi-thousand-line docs/PROGRESS.md running log verbatim to --notes-file)
 gh release create v1.0.0 --title "v1.0.0" --notes-file release-notes.md
@@ -324,17 +324,14 @@ gh release create v1.0.0 --title "v1.0.0" --notes-file release-notes.md
 
 ---
 
-## 9. Secrets Inventory (GitHub Secrets needed)
+## 9. GitHub production settings
 
-| Secret | Used by | How to set |
-|--------|---------|------------|
-| `SSH_HOST` | deploy.yml | VPS IP/domain |
-| `SSH_USER` | deploy.yml | `ubuntu` / `deploy` |
-| `SSH_KEY` | deploy.yml | `cat ~/.ssh/id_rsa \| base64 -w0` |
-| `ENV_FILE` | deploy.yml | `cat .env \| base64 -w0` |
-| `KEYSTORE_BASE64` | android.yml | `cat release.keystore \| base64 -w0` |
-| `KEYSTORE_PASSWORD` | android.yml | keystore pass |
-| `GITHUB_TOKEN` | both | auto |
+| Setting | Used by | Notes |
+|---------|---------|-------|
+| `VM_HOST`, `VM_USER`, `VM_SSH_PRIVATE_KEY`, `VM_SSH_KNOWN_HOSTS` (secrets) | deploy.yml | See §5 for prepared VM and pinned host key |
+| `ANDROID_PUBLIC_ORIGIN` (variable, **not a secret**) | android.yml | Exact publicly trusted HTTPS origin, no LAN address or path |
+| `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (secrets) | android.yml | See §6.2; keep key backups off the runner |
+| `GITHUB_TOKEN` | deploy.yml | GitHub-provided, registry publishing from main only; Android needs read-only contents |
 
 ---
 
@@ -343,7 +340,7 @@ gh release create v1.0.0 --title "v1.0.0" --notes-file release-notes.md
 | Issue | Check |
 |-------|-------|
 | `ci` fails on PG connect | `services.postgres` health — wait `sleep 5` before tests |
-| Deploy SSH `permission denied` | `SSH_KEY` is private key, not pub; `SSH_USER` exists on VPS |
+| Deploy SSH `permission denied` | Verify the `VM_SSH_PRIVATE_KEY`, pinned known-host key and `VM_USER` are correct |
 | Map tiles 404 in prod | `map-data` volume missing — `docker volume ls`, copy `*.pmtiles` |
-| APK too large | Enable R8/proguard in `android/app/build.gradle` |
+| APK too large | Inspect the signed artifact and bundled assets; R8/proguard is not enabled by default in the generated project |
 

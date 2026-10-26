@@ -116,9 +116,9 @@ issue_certificate() {
 }
 
 if [[ "$mode" != http ]]; then
-  android_root="${BOROBIYA_DEV_ANDROID_DIR:-$repo_root/android}"
+  android_root="${BOROBIYA_DEV_ANDROID_DIR:-$repo_root/packages/client/android}"
   if [[ "$mode" == android-debug && ! -f "$android_root/app/src/main/AndroidManifest.xml" ]]; then
-    echo 'No generated Android project found. Run npx cap add android first (see docs/WORKFLOWS.md).' >&2
+    echo 'No generated Android project found. From packages/client, run bunx cap add android first (see docs/WORKFLOWS.md).' >&2
     exit 1
   fi
   issue_certificate

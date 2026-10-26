@@ -35,17 +35,17 @@ For a laptop browser, import/trust `ca.crt` in that OS/browser trust store as ne
 
 ## 3. Android APK / WebView is a different trust store
 
-**Mobile Chrome does not need any APK.** This repository does **not** have a committed/generated Android application today; the Capacitor steps in `WORKFLOWS.md` are a plan. If you create an Android app, a WebView targeting Android 7+ generally does not trust user-installed CAs by default. To test a **debug APK only**, after generating the Capacitor Android project:
+**Mobile Chrome does not need any APK.** The release workflow can generate a native Android project, but no native project is committed; `capacitor.config.ts` lives under `packages/client`. A WebView targeting Android 7+ generally does not trust user-installed CAs by default. To test a **debug APK only**, after generating the Capacitor Android project locally:
 
 ```bash
-npx cap add android                   # once, if Android is not generated yet
+cd packages/client && bunx cap add android && cd ../.. # once, after bun run build
 ./scripts/dev-lan.sh android-debug 172.16.20.70
 # Configure the *debug-only* Capacitor server URL to https://172.16.20.70:5173,
 # and allow navigation to that IP; request Android location permissions.
-# Then build/install a NEW debug APK, e.g. cd android && ./gradlew assembleDebug
+# Then build/install a NEW debug APK, e.g. cd packages/client/android && ./gradlew assembleDebug
 ```
 
-`android-debug` puts the **public CA only** into `android/app/src/debug/res/raw/` and creates a debug-only `network_security_config.xml` and merged `AndroidManifest.xml` overlay. Android's debug build merges these resources and trusts this CA in the WebView (alongside system roots); release builds do **not** contain this overlay. The generated `android/` directory is Git-ignored. The script does **not** create a Capacitor app, edit `capacitor.config.ts`, request location permissions, sign an APK, or verify that an APK was built. A debug APK with bundled static files at `https://localhost` is not automatically connected to the computer: point its **debug server URL** at the exact LAN HTTPS IP for live Vite testing, then rebuild/reinstall the debug APK. Do not bundle the CA private key or development CA in a release APK; for a release, use a proper production HTTPS trust strategy and separately review network security configuration.
+`android-debug` puts the **public CA only** into `packages/client/android/app/src/debug/res/raw/` and creates a debug-only `network_security_config.xml` and merged `AndroidManifest.xml` overlay. Android's debug build merges these resources and trusts this CA in the WebView (alongside system roots); release builds do **not** contain this overlay. The generated `packages/client/android/` directory is Git-ignored. The script does **not** create a Capacitor app, edit `capacitor.config.ts`, request location permissions, sign an APK, or verify that an APK was built. The release workflow prepares those permissions for its **generated release** project only; the local debug shell still needs its own permission configuration. A debug APK with bundled static files at `https://localhost` is not automatically connected to the computer: point its **debug server URL** at the exact LAN HTTPS IP for live Vite testing, then rebuild/reinstall the debug APK. Do not bundle the CA private key or development CA in a release APK; for a release, use a proper production HTTPS trust strategy and separately review network security configuration.
 
 ## Troubleshooting
 
