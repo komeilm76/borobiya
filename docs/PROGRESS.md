@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 rescuer stacked-detail bug review (partial)
+
+- Rescuer mission history and pending-offer inbox each page up to 20 cards. When their layouts stacked, the selected timeline or incident map and accept/decline controls followed all 20 cards, even after tapping a card. Both now bound only the card list to a viewport-relative height at the stacking breakpoint, preserving keyboard scrolling and leaving pagination and detail panels outside the scroller. In the proposal inbox the first displayed fallback selection previously had no selected styling or `aria-pressed` card; both now track the computed displayed offer. Phone-width accepted-map and distance-consent buttons can wrap long labels while retaining 44px minimum height. Regressions failed on the old structure/selection and pass after the change; source/typechecks cannot prove pixel-level behavior. T4.4.1 stays **open** for other screens, mobile bottom-sheet audit and real browser/device acceptance.
+
 ### 2026-10-26 — T4.4.1 requester history phone flow (partial)
 
 - A long SOS request page previously placed the selected case, cancellation action and live mission map after every card on narrow screens; two card columns stayed active to 530px. The cards now stack by 780px and only their keyboard-focusable, named list scrolls within a viewport-relative cap; pagination stays visible after the list and the selected case/map remain in normal flow below. Nested rating choices wrap without shrinking 48px targets, while live member badges and share-button text can wrap at phone widths. Source-pinned regressions, focused client tests and typechecks cover the change; no browser or device visual acceptance has been performed. Other screens, bottom-sheet review and site-wide breakpoints remain open; T4.4.1 is **not** checked complete.

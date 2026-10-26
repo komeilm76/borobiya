@@ -72,25 +72,28 @@
       </div>
       <div v-else class="offers__layout">
         <section class="offers__list" aria-label="فهرست پیشنهادهای مأموریت">
-          <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
-            :class="{ 'offer-card--selected': selectedId === offer.id }"
-            :aria-pressed="selectedId === offer.id" @click="selectedId = offer.id">
-            <span class="offer-card__stripe" :class="`offer-card__stripe--${severity(offer).tone}`" />
-            <span class="offer-card__body">
-              <span class="offer-card__top">
-                <span class="offer-card__icon"><v-icon icon="mdi-lifebuoy" size="21" /></span>
-                <span class="offer-card__title">{{ offer.details?.incidentTypeName ?? 'درخواست امداد' }}</span>
-                <span class="offer-card__severity" :class="`offer-card__severity--${severity(offer).tone}`">
-                  {{ severity(offer).label }}
+          <div class="offers__items" role="region" aria-label="پیشنهادها؛ برای موارد بیشتر پیمایش کنید"
+            :tabindex="inbox.proposals.length > 1 ? 0 : -1">
+            <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
+              :class="{ 'offer-card--selected': selected?.id === offer.id }"
+              :aria-pressed="selected?.id === offer.id" @click="selectedId = offer.id">
+              <span class="offer-card__stripe" :class="`offer-card__stripe--${severity(offer).tone}`" />
+              <span class="offer-card__body">
+                <span class="offer-card__top">
+                  <span class="offer-card__icon"><v-icon icon="mdi-lifebuoy" size="21" /></span>
+                  <span class="offer-card__title">{{ offer.details?.incidentTypeName ?? 'درخواست امداد' }}</span>
+                  <span class="offer-card__severity" :class="`offer-card__severity--${severity(offer).tone}`">
+                    {{ severity(offer).label }}
+                  </span>
+                </span>
+                <span class="offer-card__description">{{ offer.details?.sosRequest.description ?? 'جزئیات در حال دریافت است.' }}</span>
+                <span class="offer-card__foot">
+                  <span><v-icon icon="mdi-clock-outline" size="16" /> {{ proposalTime(offer.createdAt) }}</span>
+                  <span>مشاهدهٔ جزئیات <v-icon icon="mdi-chevron-left" size="17" /></span>
                 </span>
               </span>
-              <span class="offer-card__description">{{ offer.details?.sosRequest.description ?? 'جزئیات در حال دریافت است.' }}</span>
-              <span class="offer-card__foot">
-                <span><v-icon icon="mdi-clock-outline" size="16" /> {{ proposalTime(offer.createdAt) }}</span>
-                <span>مشاهدهٔ جزئیات <v-icon icon="mdi-chevron-left" size="17" /></span>
-              </span>
-            </span>
-          </button>
+            </button>
+          </div>
           <div v-if="inbox.totalPages > 1" class="offers__pages" aria-label="صفحه‌بندی پیشنهادها">
             <v-btn :disabled="inbox.page <= 1" icon="mdi-chevron-right" variant="text" aria-label="صفحهٔ قبل"
               @click="inbox.setPage(inbox.page - 1)" />
@@ -115,7 +118,7 @@
               <div><span>فاصلهٔ تقریبی</span><strong>{{ proposalDistance(myPosition, selected.details) }}</strong></div>
             </div>
             <v-btn v-if="!myPosition" size="small" variant="text" color="primary" prepend-icon="mdi-crosshairs-gps"
-              :loading="locating" class="mt-2" @click="locateMe">محاسبهٔ فاصله با اجازهٔ شما</v-btn>
+              :loading="locating" class="offer-detail__locate mt-2" @click="locateMe">محاسبهٔ فاصله با اجازهٔ شما</v-btn>
             <p v-if="locationError" class="offer-detail__hint" role="status">{{ locationError }}</p>
             <div class="offer-detail__section">
               <h3><v-icon icon="mdi-text-box-outline" size="19" /> شرح حادثه</h3>
@@ -342,7 +345,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offers__toolbar h2 { font-size: 1.28rem; font-weight: 800; margin: 0 0 4px; }
 .offers__toolbar p { font-size: .82rem; opacity: .66; margin: 0; }
 .offers__layout { display: grid; grid-template-columns: minmax(265px, 385px) minmax(0, 1fr); gap: 20px; align-items: start; }
-.offers__list { display: grid; gap: 11px; }
+.offers__list,.offers__items { display: grid; gap: 11px; min-width: 0; }
 .offer-card { width: 100%; text-align: start; color: inherit; font: inherit; border: 1px solid rgba(128, 155, 151, .25); border-radius: 19px; background: rgb(var(--v-theme-surface)); padding: 0; display: flex; overflow: hidden; cursor: pointer; box-shadow: 0 4px 17px rgba(20, 62, 58, .035); transition: border-color .2s, transform .2s, box-shadow .2s; }
 .offer-card:hover { transform: translateY(-2px); box-shadow: 0 12px 25px rgba(20, 62, 58, .1); }
 .offer-card:focus-visible, .offers__pages :focus-visible { outline: 3px solid #398c7d; outline-offset: 2px; }
@@ -370,7 +373,23 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offer-detail__hint { font-size: .79rem; line-height: 1.7; opacity: .7; margin: 6px 32px 0; }
 .offer-detail__actions { margin-top: 26px; padding: 22px clamp(22px, 3vw, 36px) 27px; border-top: 1px solid rgba(128,155,151,.18); }.offer-detail__actions p { margin: 0 0 16px; display: flex; gap: 8px; align-items: center; font-size: .8rem; opacity: .75; }.offer-detail__buttons { display: flex; flex-wrap: wrap; gap: 10px; }
 .offers__empty { border: 1px dashed rgba(89,145,133,.4); background: rgb(var(--v-theme-surface)); border-radius: 24px; text-align: center; padding: 65px 20px; margin-top: 18px; }.offers__empty-icon { display: inline-flex; padding: 15px; background: rgba(48,148,123,.12); border-radius: 50%; color: rgb(var(--v-theme-primary)); }.offers__empty h3 { font-size: 1.25rem; margin: 16px 0 8px; }.offers__empty p { opacity: .7; font-size: .9rem; line-height: 1.8; max-width: 440px; margin: 0 auto 20px; }.offers__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }.offers__skeleton { border-radius: 18px; }
-@media (max-width: 850px) { .offers__layout { grid-template-columns: 1fr; }.offer-detail { scroll-margin-top: 85px; } }
-@media (max-width: 580px) { .offers { padding-inline: 12px; }.offers__hero { flex-direction: column; align-items: stretch; padding: 26px 23px; }.offers__stat { flex-direction: row; min-height: 67px; gap: 12px; }.offers__stat-number { font-size: 1.6rem; }.offers__toolbar { align-items: start; }.offers__toolbar p { display: none; }.offers__grid { grid-template-columns: 1fr; }.offer-detail__buttons > * { flex: 1 1 100%; } }
+@media (max-width: 850px) {
+  .offers__layout { grid-template-columns: 1fr; }
+  .offers__items { max-height: min(45vh, 26rem); max-height: min(45dvh, 26rem); overflow-y: auto; padding: 4px 4px 6px; }
+  .offers__items:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; border-radius: 19px; }
+  .offer-detail { scroll-margin-top: 85px; }
+}
+@media (max-width: 580px) {
+  .offers { padding-inline: 12px; }
+  .offers__hero { flex-direction: column; align-items: stretch; padding: 26px 23px; }
+  .offers__stat { flex-direction: row; min-height: 67px; gap: 12px; }
+  .offers__stat-number { font-size: 1.6rem; }
+  .offers__toolbar { align-items: start; }
+  .offers__toolbar p { display: none; }
+  .offers__grid { grid-template-columns: 1fr; }
+  .offer-detail__buttons > * { flex: 1 1 100%; }
+  .accepted-map__intro :deep(.v-btn),.offer-detail .offer-detail__locate { max-width: 100%; min-width: 0; min-height: 44px; height: auto; }
+  .accepted-map__intro :deep(.v-btn__content),.offer-detail__locate :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
 @media (prefers-reduced-motion: reduce) { .offer-card { transition: none; } }
 </style>
