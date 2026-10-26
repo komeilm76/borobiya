@@ -103,6 +103,34 @@ describe("requester SOS cancellation confirmation", () => {
     expect(cancel.cancelled.value).toBe(false);
   });
 
+  it("drops a pending cancellation on reset even if the same account reopens the dialog", async () => {
+    const cancel = useSosCancellation(ref("token"), ref(requesterId), ref("owner"));
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    const oldRequest = deferred<void>();
+    const newRequest = deferred<void>();
+    vi.mocked(cancelSosRequest).mockReturnValueOnce(oldRequest.promise).mockReturnValueOnce(newRequest.promise);
+    const previous = cancel.confirm();
+
+    cancel.reset(); // account/panel lifecycle changed while the first request was pending
+    expect(cancel.open.value).toBe(false);
+    expect(cancel.submitting.value).toBe(false);
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    const current = cancel.confirm();
+    expect(cancel.submitting.value).toBe(true);
+    oldRequest.resolve();
+    await previous;
+    expect(cancel.cancelled.value).toBe(false);
+    expect(cancel.open.value).toBe(true);
+    expect(cancel.submitting.value).toBe(true); // older finally must not unlock the new request
+
+    newRequest.resolve();
+    await current;
+    expect(cancel.cancelled.value).toBe(true);
+    expect(cancel.submitting.value).toBe(false);
+  });
+
   it("surfaces a conflict without claiming cancellation and supports a fresh retry", async () => {
     const cancel = useSosCancellation(ref("token"), ref(requesterId), ref("owner"));
     await cancel.show();

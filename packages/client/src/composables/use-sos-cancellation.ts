@@ -73,12 +73,19 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
           : sosApiErrorMessage(cause, "لغو درخواست انجام نشد؛ وضعیت درخواست را بررسی کنید و دوباره تلاش کنید.");
       }
     } finally {
-      submitting.value = false;
+      if (current === generation) submitting.value = false;
     }
   }
 
   function reset(): void {
-    dismiss();
+    // Reset is a lifecycle boundary (including logout/unmount), not an ordinary
+    // dismiss. Invalidate even an in-flight confirmation, and do not let its
+    // finally block unlock a later confirmation in the reopened panel.
+    ++generation;
+    open.value = false;
+    loading.value = false;
+    submitting.value = false;
+    error.value = null;
     cancelled.value = false;
     blocked.value = false;
     reasons.value = [];

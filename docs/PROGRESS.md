@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Fix requester SOS cancellation lifecycle races
+
+- A history read started before confirmed SOS cancellation could finish later and restore the request’s former cancellable status; marking the committed cancellation now invalidates that older read and clears its loading state. Resetting a cancellation panel during an in-flight confirmation previously left it open/locked and let the old result update a reopened panel for the same account; reset now invalidates that confirmation and its late `finally` cannot unlock a newer one. Two deferred-response regressions failed before the fix and pass afterward. Browser/device and production-network acceptance remain open.
+
 ### 2026-10-26 — Fix rescuer mission-desk asynchronous cancellation races
 
 - A mission list refresh and the cancellation-reason dialog previously shared one generation counter: opening the dialog discarded a pending list reply but stranded its loading spinner. A list started while the dialog was open could also finish after a confirmed cancellation and restore the old active status; a cancelled request resolving after the panel reset for the same account could mutate the new panel. List, reason and panel-session lifetimes are now isolated; successful cancellation invalidates older list reads, and reset drops in-flight mutation results. Three deferred-response tests reproduced these interleavings before the fix; focused client typechecks pass. This does not claim live database or device acceptance.

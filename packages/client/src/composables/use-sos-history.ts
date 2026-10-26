@@ -76,6 +76,10 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   function markCancelled(): void {
     if (!selected.value || !cancellation.cancelled.value) return;
     const id = selected.value.id;
+    // A history read begun before the committed mutation must not restore the
+    // old cancellable status when it arrives after this local acknowledgement.
+    ++generation;
+    loading.value = false;
     selected.value = { ...selected.value, status: "cancelled_by_requester" };
     items.value = items.value.map((item) => item.id === id ? { ...item, status: "cancelled_by_requester" } : item);
   }

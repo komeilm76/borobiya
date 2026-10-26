@@ -62,6 +62,26 @@ describe("requester SOS history and cancellation", () => {
     expect(history.selected.value?.id).toBe(olderId);
   });
 
+  it("does not let an older history reply revive a request after confirmed cancellation", async () => {
+    const history = useSosHistory(ref("token"), ref(requesterId));
+    await history.load();
+    const waiting = pending<{ items: SosRequest[]; total: number; page: number; limit: number; totalPages: number }>();
+    vi.mocked(listRequesterSosHistory).mockReturnValueOnce(waiting.promise);
+    const refresh = history.load();
+    expect(history.loading.value).toBe(true);
+
+    // The cancellation endpoint committed while the older history read was on the wire.
+    history.cancellation.cancelled.value = true;
+    history.markCancelled();
+    expect(history.selected.value?.status).toBe("cancelled_by_requester");
+    waiting.resolve({ items: [record], total: 1, page: 1, limit: 12, totalPages: 1 });
+    await refresh;
+    expect(history.selected.value?.status).toBe("cancelled_by_requester");
+    expect(history.items.value[0]?.status).toBe("cancelled_by_requester");
+    expect(history.canCancelSelected.value).toBe(false);
+    expect(history.loading.value).toBe(false);
+  });
+
   it("handles a foreign deep link without showing another request and does not confuse a network error with 404", async () => {
     const history = useSosHistory(ref("token"), ref(requesterId));
     vi.mocked(getRequesterSosRequest).mockRejectedValueOnce(new ApiError(404, "SOS_REQUEST_NOT_FOUND", "Not found"));
