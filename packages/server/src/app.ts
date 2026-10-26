@@ -34,6 +34,7 @@ import {
 import { registerSosRequestRoutes } from "./sos/requests";
 import { registerSosProposalRoutes } from "./sos/proposals";
 import { registerMissionProgressRoutes } from "./sos/mission-progress";
+import { registerMissionTimelineEvents } from "./sos/timeline-events";
 import { registerSosCancellationRoutes } from "./sos/cancellation";
 import { DrizzleSosCancellationStore, type SosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleMissionProgressStore, type MissionProgressStore } from "./db/mission-progress-store";
@@ -272,6 +273,8 @@ export async function createFastifyApp(
   await registerSosRequestRoutes(app, { store: sosRequestStore, io: realtime.io });
   await registerSosProposalRoutes(app, sosDispatchStore, { sosRequests: sosRequestStore, io: realtime.io });
   await registerMissionProgressRoutes(app, missionProgressStore, realtime.io);
+  registerMissionTimelineEvents(app, { store: missionProgressStore, sessions: securityQuestionsStore,
+    jwtSecret: config.jwtSecret });
   await registerUserSyncRoute(app, dependencies.syncStore ?? (database ? new DrizzleSyncStore(database.db) : {
     readSync: async () => ({ events: [], missions: [], missionsTruncated: false, nextCursor: null, location: null })
   }));

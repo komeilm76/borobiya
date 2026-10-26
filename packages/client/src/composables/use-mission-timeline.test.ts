@@ -85,3 +85,80 @@ describe("mission timeline lifecycle", () => {
     scope.stop();
   });
 });
+
+describe("timeline transport fallback", () => {
+  it("opens the scoped SSE on socket failure, aborts it on recovery, and ignores stale mission notices", async () => {
+    const mission = ref<string | null>(ID);
+    const owner = ref<string | null>(OWNER);
+    const token = ref<string | null>("bearer");
+    const fake = fakeSocket();
+    const read = vi.fn(async () => [row]);
+    const callbacks: Array<() => void> = [];
+    const followEvents = vi.fn((_token: string, _id: string, signal: AbortSignal, callback: () => void) => {
+      callbacks.push(callback);
+      return new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true }));
+    });
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(mission, "user", token, owner, async () => {}, {
+      read, followEvents, openSocket: async () => fake.client
+    }))!;
+    await settle();
+    fake.listeners.get("connect_error")?.(new Error("Socket failed"));
+    await settle();
+    expect(followEvents).toHaveBeenCalledWith("bearer", ID, expect.any(AbortSignal), expect.any(Function));
+    fake.listeners.get("connect_error")?.(new Error("Socket still offline"));
+    await settle();
+    expect(followEvents).toHaveBeenCalledTimes(1); // one stream per timeline, even during repeated failures
+    callbacks[0]?.();
+    await settle();
+    expect(read).toHaveBeenCalledTimes(2);
+    fake.listeners.get("connect")?.(undefined);
+    await settle();
+    expect(followEvents.mock.calls[0]?.[2].aborted).toBe(true);
+    callbacks[0]?.();
+    await settle();
+    expect(read).toHaveBeenCalledTimes(3); // socket connect reload only, stale SSE ignored
+    fake.listeners.get("disconnect")?.(undefined);
+    await settle();
+    expect(followEvents).toHaveBeenCalledTimes(2);
+    mission.value = OTHER;
+    await settle();
+    expect(followEvents.mock.calls[1]?.[2].aborted).toBe(true);
+    callbacks[1]?.();
+    await settle();
+    expect(timeline.entries.value).toEqual([row]); // injected test read ignores the id
+    scope.stop();
+    expect(fake.close).toHaveBeenCalledTimes(2); // old mission and active mission
+  });
+
+  it("refreshes the bearer on SSE retry, stops streams on logout, and handles socket opener failure", async () => {
+    const token = ref<string | null>("first");
+    const fake = fakeSocket();
+    const followEvents = vi.fn((_token: string, _id: string, signal: AbortSignal) =>
+      new Promise<void>((resolve) => signal.addEventListener("abort", () => resolve(), { once: true })));
+    const scope = effectScope();
+    scope.run(() => useMissionTimeline(ref(ID), "user", token, ref(OWNER), async () => {}, {
+      read: async () => [row], followEvents, openSocket: async () => fake.client
+    }));
+    await settle();
+    fake.listeners.get("connect_error")?.(new Error("Socket failed"));
+    await settle();
+    token.value = "second";
+    await settle();
+    expect(followEvents.mock.calls.map((call) => call[0])).toEqual(["first", "second"]);
+    expect(followEvents.mock.calls[0]?.[2].aborted).toBe(true);
+    token.value = null;
+    await settle();
+    expect(followEvents.mock.calls[1]?.[2].aborted).toBe(true);
+    scope.stop();
+
+    const failed = vi.fn(async () => { throw new Error("Socket unavailable"); });
+    const controller = effectScope();
+    controller.run(() => useMissionTimeline(ref(ID), "admin", ref("admin"), ref(OWNER), undefined, {
+      read: async () => [row], openSocket: failed, followEvents
+    }));
+    await settle();
+    expect(followEvents).toHaveBeenCalledWith("admin", ID, expect.any(AbortSignal), expect.any(Function));
+    controller.stop();
+  });
+});

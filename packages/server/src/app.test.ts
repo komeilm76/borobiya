@@ -12,9 +12,11 @@ import { createFastifyApp, type FastifyAppDependencies } from "./app";
 import { JOB_TICK_INTERVAL_MS } from "./location/jobs";
 import type { LocationHistoryStore } from "./db/location-history-store";
 import type { LocationShareStore, RetiredLocationShare } from "./db/location-share-store";
+import type { MissionProgressStore } from "./db/mission-progress-store";
 import { describeOpenApiRuntimeStatus } from "./plugins/swagger";
 import { SHARE_ENDED_EVENT } from "./realtime/socket";
 import { parseServerEnv } from "./config/env";
+import { signAccessToken } from "./security/tokens";
 
 const serverConfig = parseServerEnv({
   NODE_ENV: "test",
@@ -52,6 +54,47 @@ function makeRecoveryStore(questions: SecurityQuestion[]): UserRecoveryStore {
 }
 
 describe("Fastify server skeleton", () => {
+  it("guards the transport-only mission timeline stream behind the live /_user session hook", async () => {
+    const app = await makeApp();
+    const path = `/_user/sos/missions/${randomUUID()}/timeline/events`;
+    expect(app.hasRoute({ method: "GET", url: "/_user/sos/missions/:id/timeline/events" })).toBe(true);
+    const response = await app.inject({ method: "GET", url: path });
+    expect(response.statusCode).toBe(401);
+    expect(response.headers["cache-control"]).toBe("no-store");
+  });
+
+  it("retains Helmet and allowlisted CORS headers on a live hijacked SSE response", async () => {
+    const userId = randomUUID();
+    const missionId = randomUUID();
+    const deviceId = randomUUID();
+    const sessionId = randomUUID();
+    const securityQuestionsStore: UserSecurityQuestionsStore = {
+      async findUserById(id) { return id === userId ? { id, username: "reader", role: "user",
+        isActive: true, isSuspended: false, mustCompleteSecurityQuestions: false,
+        avgRating: null, createdAt: new Date() } : null; },
+      async hasActiveSession() { return true; },
+      async securityQuestionsExist() { return true; },
+      async completeSecurityQuestions() { return true; }
+    };
+    const app = await makeApp({}, { securityQuestionsStore,
+      missionProgressStore: { findTimeline: async () => [] } as unknown as MissionProgressStore });
+    await app.listen({ host: "127.0.0.1", port: 0 });
+    const address = app.server.address();
+    if (!address || typeof address === "string") throw new Error("No listener");
+    const controller = new AbortController();
+    try {
+      const token = await signAccessToken({ userId, sessionId, deviceId, role: "user" }, serverConfig.jwtSecret);
+      const response = await fetch(`http://127.0.0.1:${address.port}/_user/sos/missions/${missionId}/timeline/events`, {
+        headers: { authorization: `Bearer ${token}`, origin: "http://localhost:5173" }, signal: controller.signal
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("cache-control")).toContain("no-store");
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
+      expect(await response.body?.getReader().read()).toMatchObject({ done: false });
+    } finally { controller.abort(); }
+  });
+
   it("registers the admin catalog routes, so they answer 401 rather than the contract-only 404", async () => {
     // The whole point of T3.1.2/T3.1.3 landing: these URLs used to fall through to the 404 that unregistered
     // descriptors return. A 401 here is proof the handler is mounted and its authorization runs.

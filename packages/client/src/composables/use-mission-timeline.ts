@@ -2,6 +2,7 @@ import { onScopeDispose, ref, watch, type Ref } from "vue";
 import { missionStatusUpdatedEventSchema, requesterCancellationEventSchema,
   rescuerCancellationEventSchema, type MissionTimeline } from "@shared/index";
 import { getMissionTimeline } from "@/api/mission";
+import { followMissionTimelineEvents } from "@/api/mission-timeline-events";
 import { MISSION_STATUS_UPDATED_EVENT, MISSION_CANCELLED_BY_REQUESTER_EVENT,
   MISSION_CANCELLED_BY_RESCUER_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
@@ -9,6 +10,7 @@ import type { RealtimeClient } from "@/services/socket";
 export interface MissionTimelineRuntime {
   read?: typeof getMissionTimeline;
   openSocket?: (token: string) => Promise<RealtimeClient>;
+  followEvents?: typeof followMissionTimelineEvents;
 }
 
 /** The server's committed rows are authoritative; socket notices only trigger scoped re-reads. */
@@ -22,11 +24,49 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
   let readId = 0;
   let controller: AbortController | null = null;
   let client: RealtimeClient | null = null;
+  let fallback: AbortController | null = null;
+  let fallbackRetry: ReturnType<typeof setTimeout> | null = null;
+
+  function stopFallback() {
+    fallback?.abort(); fallback = null;
+    if (fallbackRetry) clearTimeout(fallbackRetry);
+    fallbackRetry = null;
+  }
+  function startFallback() {
+    if (fallback || fallbackRetry || client?.socket.connected || !missionId.value || !owner.value || !token.value) return;
+    const gen = generation;
+    const id = missionId.value;
+    const account = owner.value;
+    const controller = new AbortController();
+    fallback = controller;
+    void (async () => {
+      try {
+        await ensureSession?.();
+        if (controller.signal.aborted || gen !== generation || missionId.value !== id || owner.value !== account ||
+            !token.value || client?.socket.connected) return;
+        await (runtime.followEvents ?? followMissionTimelineEvents)(token.value, id, controller.signal, () => {
+          if (!controller.signal.aborted && gen === generation && missionId.value === id && owner.value === account &&
+              !client?.socket.connected) void load();
+        });
+      } catch {
+        // The timeline stays readable through normal authenticated HTTP with an explicit retry.
+      } finally {
+        if (fallback === controller) {
+          fallback = null;
+          if (gen === generation && missionId.value === id && owner.value === account && token.value &&
+              !client?.socket.connected) {
+            fallbackRetry = setTimeout(() => { fallbackRetry = null; startFallback(); }, 5_000);
+          }
+        }
+      }
+    })();
+  }
 
   function stop() {
     generation++;
     readId++;
     controller?.abort(); controller = null;
+    stopFallback();
     client?.close(); client = null;
     entries.value = [];
     loading.value = false;
@@ -75,7 +115,9 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
       if (gen !== generation || missionId.value !== id || owner.value !== account) { opened.close(); return; }
       client = opened;
       const active = () => gen === generation && client === opened && missionId.value === id && owner.value === account;
-      opened.socket.on("connect", () => { if (active()) void load(); });
+      opened.socket.on("connect", () => { if (active()) { stopFallback(); void load(); } });
+      opened.socket.on("disconnect", () => { if (active()) startFallback(); });
+      opened.socket.on("connect_error", () => { if (active()) startFallback(); });
       opened.socket.on(MISSION_STATUS_UPDATED_EVENT, (value: unknown) => {
         if (active() && missionStatusUpdatedEventSchema.safeParse(value).data?.missionId === id) void load();
       });
@@ -88,14 +130,19 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
       opened.updateToken(token.value);
       opened.connect();
     } catch {
-      // HTTP history remains usable, including the explicit retry button, without a socket.
+      startFallback();
     }
   }
   watch([missionId, owner], () => { void start(); }, { immediate: true });
   watch(token, (next) => {
     if (!next) stop();
-    else if (!client) void start();
-    else client.updateToken(next);
+    else if (!client) {
+      if (fallback) { stopFallback(); startFallback(); }
+      else void start();
+    } else {
+      client.updateToken(next);
+      if (fallback || fallbackRetry) { stopFallback(); startFallback(); }
+    }
   });
   onScopeDispose(stop);
   return { entries, loading, error, load, stop };

@@ -22,7 +22,7 @@
 14. [SOS — Requesting Help](#14-sos--requesting-help)
 15. [SOS — Admin Dispatch](#15-sos--admin-dispatch)
 16. [SOS — Responding as Rescuer](#16-sos--responding-as-rescuer)
-17. [Mission Statuses During Rescue — Planned](#17-mission-statuses-during-rescue--planned)
+17. [Mission Statuses During Rescue](#17-mission-statuses-during-rescue)
 18. [Cancellation — Partially available](#18-cancellation--partially-available)
 19. [History & Rating](#19-history--rating)
 20. [Admin — User Management](#20-admin--user-management)
@@ -278,26 +278,26 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 1. Tap **Accept** on a proposal.
 2. Confirm the decision; other proposals auto-decline after acceptance.
-3. The accepted mission ID and optional two-point preview map are shown. Open **مأموریت من** for a route preview that remains available after a reload; live navigation and client-side status controls are still pending.
+3. The accepted mission ID and an incident/rescuer preview map are shown. Open **مأموریت من** for route preview, explicit GPS-follow navigation and mission status controls that remain available after a reload.
 
 [Screenshot: Proposal inbox + Accept]
 
 ---
 
-## 17. Mission Statuses During Rescue — Planned
+## 17. Mission Statuses During Rescue
 
-> **Current status:** Mission tables, the ordered `PATCH /_user/missions/:id/status` API, and private realtime status delivery are live. The rescuer status bar, navigation integration, and requester/admin timeline UI remain planned under T3.5.
+The authenticated rescuer advances an active mission through ordered status controls. A GPS fix does **not** automatically change the mission step. The requester and admin can view the server-timestamped status timeline; foreign mission histories are not visible.
 
 Rescuer updates step-by-step (button in mission bar):
 
 | Step | Status | When |
 |------|--------|------|
-| 1 | **On the way** — `در حال رفتن به محل حادثه` | After starting navigation |
-| 2 | **Arrived** — `به محل حادثه رسیدم` | Within 50m (auto-detected + confirm) |
+| 1 | **On the way** — `در حال رفتن به محل حادثه` | After beginning the journey (manual confirmation) |
+| 2 | **Arrived** — `به محل حادثه رسیدم` | On reaching the incident (manual confirmation, not GPS-triggered) |
 | 3 | **In Progress** — `در حال رسیدگی` | Assessing scene |
 | 4 | **Completed** | Done |
 
-Each update appears as **timeline** to requester + admin.
+Each committed update appears as a timeline to the requester and admin. If the mission timeline’s Socket.IO connection fails, an authenticated read-only event stream checks for changes roughly every 15 seconds and asks the page to reload its authorized timeline. It may be delayed; it does not share GPS or replace the mission-location socket. Reopen or retry the timeline if both transports are unavailable.
 
 [Screenshot: Mission timeline with 4 steps]
 
