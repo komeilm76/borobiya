@@ -19,7 +19,20 @@
       </div>
 
       <div class="d-flex flex-wrap align-center ga-2">
+        <v-select
+          :model-value="adminSos.filterStatus"
+          :items="dispatchFilters"
+          class="admin-dispatch__filter-select d-sm-none"
+          label="وضعیت درخواست‌های اضطراری"
+          item-title="title"
+          item-value="value"
+          density="compact"
+          variant="outlined"
+          hide-details
+          @update:model-value="onFilterChange"
+        />
         <v-btn-toggle
+          class="d-none d-sm-inline-flex"
           :model-value="adminSos.filterStatus"
           density="compact"
           mandatory
@@ -117,266 +130,9 @@
       </div>
     </v-alert>
 
+    <!-- Triage queue is first in DOM and visual order, including when the columns stack. -->
     <v-row>
-      <v-col cols="12" lg="7">
-        <v-card class="overflow-hidden mb-4" rounded="xl" variant="outlined">
-          <div class="dispatch-map-wrapper">
-            <MapCanvas
-              aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
-              :style-url="mapStyleUrl"
-              :constrain-bounds="false"
-              :zoom="12"
-              @ready="onMapReady"
-            />
-
-            <v-card
-              v-if="adminSos.selectedRequest"
-              class="map-selected-alert-card"
-              elevation="4"
-              rounded="lg"
-            >
-              <v-card-text class="pa-3">
-                <div class="d-flex align-center justify-space-between ga-2 mb-1">
-                  <div class="d-flex align-center ga-2">
-                    <v-chip
-                      :color="severityMeta(adminSos.selectedRequest.severity).badgeColor"
-                      size="x-small"
-                      variant="flat"
-                    >
-                      {{ severityMeta(adminSos.selectedRequest.severity).label }}
-                    </v-chip>
-                    <span class="text-subtitle-2 font-weight-bold">
-                      {{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}
-                    </span>
-                  </div>
-                  <v-chip
-                    :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
-                    size="x-small"
-                    variant="tonal"
-                  >
-                    {{ statusMeta(adminSos.selectedRequest.status).label }}
-                  </v-chip>
-                </div>
-                <p class="text-caption text-medium-emphasis text-truncate mb-2">
-                  {{ adminSos.selectedRequest.description }}
-                </p>
-                <div class="d-flex align-center justify-space-between text-caption">
-                  <span dir="ltr">
-                    {{ adminSos.selectedRequest.location.lat.toFixed(5) }},
-                    {{ adminSos.selectedRequest.location.lon.toFixed(5) }}
-                  </span>
-                  <v-btn
-                    color="primary"
-                    density="compact"
-                    prepend-icon="mdi-crosshairs-gps"
-                    size="small"
-                    variant="text"
-                    @click="focusRequest(adminSos.selectedRequest)"
-                  >
-                    تمرکز روی نقشه
-                  </v-btn>
-                </div>
-              </v-card-text>
-            </v-card>
-
-            <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--high" /> بحرانی
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--medium" /> متوسط
-              </span>
-              <span class="legend-item">
-                <span class="legend-dot legend-dot--low" /> کم‌خطر
-              </span>
-            </div>
-          </div>
-        </v-card>
-
-        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
-          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
-        </v-alert>
-        <div v-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
-          <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
-          <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
-            <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
-              {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
-            </option>
-          </select>
-          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
-            :mission="selectedTimelineMission" audience="admin" />
-        </div>
-        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
-          color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
-          :disabled="adminSos.dispatchSubmitting"
-          @click="quickRedispatch(adminSos.selectedRequest.id)">
-          اعزام فوری به امدادگران جدید
-        </v-btn>
-        <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
-          :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
-        <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
-          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
-            <div class="d-flex align-center ga-2">
-              <v-icon color="primary" icon="mdi-account-group-outline" />
-              <span>نزدیک‌ترین امدادگران واجد شرایط</span>
-              <v-chip color="primary" size="x-small" variant="tonal">
-                {{ adminSos.nearestResponders.length }} نفر
-              </v-chip>
-            </div>
-
-            <div class="d-flex align-center ga-1">
-              <v-btn
-                :disabled="adminSos.nearestResponders.length === 0"
-                size="small"
-                variant="text"
-                @click="adminSos.selectAllNearestResponders()"
-              >
-                انتخاب همه
-              </v-btn>
-              <v-btn
-                v-if="adminSos.selectedResponderIds.length > 0"
-                size="small"
-                variant="text"
-                @click="adminSos.clearResponderSelection()"
-              >
-                پاک‌سازی انتخاب
-              </v-btn>
-              <v-btn
-                :loading="adminSos.nearestLoading"
-                aria-label="بازخوانی امدادگران نزدیک"
-                icon="mdi-refresh"
-                size="small"
-                variant="text"
-                @click="adminSos.loadNearestResponders()"
-              />
-            </div>
-          </v-card-title>
-          <v-divider />
-          <form class="pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
-            <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
-              placeholder="حداقل ۲ حرف؛ جست‌وجو در همهٔ امدادگران واجد شرایط"
-              variant="outlined" density="compact" hide-details autocomplete="off" maxlength="64"
-              aria-label="جست‌وجوی امدادگر با نام کاربری" />
-            <v-btn type="submit" color="primary" variant="tonal" :disabled="responderSearchInput.trim().length === 1"
-              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
-          </form>
-          <p class="px-4 mt-2 text-caption text-medium-emphasis">
-            {{ adminSos.responderSearch ? 'نزدیک‌ترین ۱۰ نتیجهٔ منطبق با جست‌وجو' : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}
-            فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده قابل انتخاب‌اند.
-          </p>
-          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
-            <v-chip v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
-              variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
-              @{{ adminSos.selectedResponderNames[id] ?? id }}
-            </v-chip>
-          </div>
-
-          <v-alert
-            v-if="adminSos.dispatchFeedback"
-            :type="adminSos.dispatchFeedback.type"
-            class="ma-4 mb-0"
-            closable
-            density="comfortable"
-            variant="tonal"
-            @click:close="adminSos.dispatchFeedback = null"
-          >
-            {{ adminSos.dispatchFeedback.message }}
-          </v-alert>
-
-          <v-alert
-            v-if="adminSos.nearestError"
-            class="ma-4 mb-0"
-            type="error"
-            variant="tonal"
-          >
-            {{ adminSos.nearestError }}
-          </v-alert>
-
-          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis">
-            <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
-            در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
-          </v-card-text>
-
-          <v-card-text
-            v-else-if="adminSos.nearestResponders.length === 0"
-            class="py-6 text-center text-medium-emphasis"
-          >
-            {{ adminSos.responderSearch
-              ? 'برای این نام کاربری امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده یافت نشد.'
-              : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
-          </v-card-text>
-
-          <v-list v-else class="responder-list py-0" lines="two">
-            <template v-for="(responder, rIndex) in adminSos.nearestResponders" :key="responder.userId">
-              <v-divider v-if="rIndex > 0" />
-              <v-list-item
-                :active="adminSos.selectedResponderIds.includes(responder.userId)"
-                class="py-3"
-                @click="adminSos.toggleResponderSelection(responder.userId)"
-              >
-                <template #prepend>
-                  <v-checkbox-btn
-                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
-                    color="primary"
-                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
-                  />
-                </template>
-
-                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
-                  <div class="d-flex align-center ga-2">
-                    <span dir="ltr">@{{ responder.username }}</span>
-                    <v-chip
-                      v-if="proposedRescuerIdSet.has(responder.userId)"
-                      color="info"
-                      size="x-small"
-                      variant="tonal"
-                    >
-                      پیشنهاد ارسال‌شده
-                    </v-chip>
-                  </div>
-
-                  <div class="d-flex align-center ga-2">
-                    <v-chip color="primary" size="x-small" variant="flat">
-                      {{ formatDistance(responder.distance) }}
-                    </v-chip>
-                    <v-chip color="amber-darken-2" size="x-small" variant="tonal">
-                      {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
-                    </v-chip>
-                  </div>
-                </v-list-item-title>
-
-                <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
-                  <span v-if="responder.categoryName">
-                    تخصص: {{ responder.categoryName }}
-                  </span>
-                  <span>•</span>
-                  <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
-                </v-list-item-subtitle>
-              </v-list-item>
-            </template>
-          </v-list>
-
-          <v-divider />
-          <v-card-actions class="pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
-            <span class="text-caption text-medium-emphasis">
-              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
-            </span>
-            <v-btn
-              :disabled="!adminSos.canDispatchSelected"
-              :loading="adminSos.dispatchSubmitting"
-              color="error"
-              prepend-icon="mdi-send-check-outline"
-              rounded="lg"
-              variant="flat"
-              @click="adminSos.dispatchSelectedResponders()"
-            >
-              اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-col>
-
-      <v-col cols="12" lg="5">
+      <v-col cols="12" lg="5" class="admin-dispatch__queue">
         <v-card class="mb-4" rounded="xl" variant="outlined">
           <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
             <span>صف درخواست‌های اضطراری</span>
@@ -536,6 +292,264 @@
           </v-card-text>
         </v-card>
       </v-col>
+      <v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">
+        <v-card class="overflow-hidden mb-4" rounded="xl" variant="outlined">
+          <div class="dispatch-map-wrapper">
+            <MapCanvas
+              aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
+              :style-url="mapStyleUrl"
+              :constrain-bounds="false"
+              :zoom="12"
+              @ready="onMapReady"
+            />
+
+            <v-card
+              v-if="adminSos.selectedRequest"
+              class="map-selected-alert-card"
+              elevation="4"
+              rounded="lg"
+            >
+              <v-card-text class="pa-3">
+                <div class="d-flex flex-wrap align-center justify-space-between ga-2 mb-1">
+                  <div class="d-flex flex-wrap align-center ga-2">
+                    <v-chip
+                      :color="severityMeta(adminSos.selectedRequest.severity).badgeColor"
+                      size="x-small"
+                      variant="flat"
+                    >
+                      {{ severityMeta(adminSos.selectedRequest.severity).label }}
+                    </v-chip>
+                    <span class="text-subtitle-2 font-weight-bold">
+                      {{ incidentLabel(adminSos.selectedRequest.incidentTypeId) }}
+                    </span>
+                  </div>
+                  <v-chip
+                    :color="statusMeta(adminSos.selectedRequest.status).badgeColor"
+                    size="x-small"
+                    variant="tonal"
+                  >
+                    {{ statusMeta(adminSos.selectedRequest.status).label }}
+                  </v-chip>
+                </div>
+                <p class="text-caption text-medium-emphasis text-truncate mb-2">
+                  {{ adminSos.selectedRequest.description }}
+                </p>
+                <div class="d-flex flex-wrap align-center justify-space-between ga-1 text-caption">
+                  <span dir="ltr">
+                    {{ adminSos.selectedRequest.location.lat.toFixed(5) }},
+                    {{ adminSos.selectedRequest.location.lon.toFixed(5) }}
+                  </span>
+                  <v-btn
+                    color="primary"
+                    density="compact"
+                    prepend-icon="mdi-crosshairs-gps"
+                    size="small"
+                    variant="text"
+                    @click="focusRequest(adminSos.selectedRequest)"
+                  >
+                    تمرکز روی نقشه
+                  </v-btn>
+                </div>
+              </v-card-text>
+            </v-card>
+
+            <div class="severity-legend" role="note" aria-label="راهنمای رنگ شدت حادثه">
+              <span class="legend-item">
+                <span class="legend-dot legend-dot--high" /> بحرانی
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot legend-dot--medium" /> متوسط
+              </span>
+              <span class="legend-item">
+                <span class="legend-dot legend-dot--low" /> کم‌خطر
+              </span>
+            </div>
+          </div>
+        </v-card>
+
+        <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
+          {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
+        </v-alert>
+        <div v-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
+          <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
+          <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
+            <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
+              {{ new Date(mission.createdAt).toLocaleString('fa-IR') }} · {{ statusLabel(mission.status) }}
+            </option>
+          </select>
+          <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
+            :mission="selectedTimelineMission" audience="admin" />
+        </div>
+        <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
+          color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
+          :disabled="adminSos.dispatchSubmitting"
+          @click="quickRedispatch(adminSos.selectedRequest.id)">
+          اعزام فوری به امدادگران جدید
+        </v-btn>
+        <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
+          :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
+        <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
+          <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
+            <div class="d-flex align-center ga-2">
+              <v-icon color="primary" icon="mdi-account-group-outline" />
+              <span>نزدیک‌ترین امدادگران واجد شرایط</span>
+              <v-chip color="primary" size="x-small" variant="tonal">
+                {{ adminSos.nearestResponders.length }} نفر
+              </v-chip>
+            </div>
+
+            <div class="d-flex align-center ga-1">
+              <v-btn
+                :disabled="adminSos.nearestResponders.length === 0"
+                size="small"
+                variant="text"
+                @click="adminSos.selectAllNearestResponders()"
+              >
+                انتخاب همه
+              </v-btn>
+              <v-btn
+                v-if="adminSos.selectedResponderIds.length > 0"
+                size="small"
+                variant="text"
+                @click="adminSos.clearResponderSelection()"
+              >
+                پاک‌سازی انتخاب
+              </v-btn>
+              <v-btn
+                :loading="adminSos.nearestLoading"
+                aria-label="بازخوانی امدادگران نزدیک"
+                icon="mdi-refresh"
+                size="small"
+                variant="text"
+                @click="adminSos.loadNearestResponders()"
+              />
+            </div>
+          </v-card-title>
+          <v-divider />
+          <form class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
+            <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
+              placeholder="حداقل ۲ حرف؛ جست‌وجو در همهٔ امدادگران واجد شرایط"
+              variant="outlined" density="compact" hide-details autocomplete="off" maxlength="64"
+              aria-label="جست‌وجوی امدادگر با نام کاربری" />
+            <v-btn type="submit" color="primary" variant="tonal" :disabled="responderSearchInput.trim().length === 1"
+              :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
+          </form>
+          <p class="px-4 mt-2 text-caption text-medium-emphasis">
+            {{ adminSos.responderSearch ? 'نزدیک‌ترین ۱۰ نتیجهٔ منطبق با جست‌وجو' : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}
+            فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده قابل انتخاب‌اند.
+          </p>
+          <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
+            <v-chip v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
+              variant="tonal" @click:close="adminSos.toggleResponderSelection(id)">
+              @{{ adminSos.selectedResponderNames[id] ?? id }}
+            </v-chip>
+          </div>
+
+          <v-alert
+            v-if="adminSos.dispatchFeedback"
+            :type="adminSos.dispatchFeedback.type"
+            class="ma-4 mb-0"
+            closable
+            density="comfortable"
+            variant="tonal"
+            @click:close="adminSos.dispatchFeedback = null"
+          >
+            {{ adminSos.dispatchFeedback.message }}
+          </v-alert>
+
+          <v-alert
+            v-if="adminSos.nearestError"
+            class="ma-4 mb-0"
+            type="error"
+            variant="tonal"
+          >
+            {{ adminSos.nearestError }}
+          </v-alert>
+
+          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis">
+            <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
+            در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
+          </v-card-text>
+
+          <v-card-text
+            v-else-if="adminSos.nearestResponders.length === 0"
+            class="py-6 text-center text-medium-emphasis"
+          >
+            {{ adminSos.responderSearch
+              ? 'برای این نام کاربری امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده یافت نشد.'
+              : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
+          </v-card-text>
+
+          <v-list v-else class="responder-list py-0" lines="two">
+            <template v-for="(responder, rIndex) in adminSos.nearestResponders" :key="responder.userId">
+              <v-divider v-if="rIndex > 0" />
+              <v-list-item
+                :active="adminSos.selectedResponderIds.includes(responder.userId)"
+                class="py-3"
+                @click="adminSos.toggleResponderSelection(responder.userId)"
+              >
+                <template #prepend>
+                  <v-checkbox-btn
+                    :model-value="adminSos.selectedResponderIds.includes(responder.userId)"
+                    color="primary"
+                    @click.stop="adminSos.toggleResponderSelection(responder.userId)"
+                  />
+                </template>
+
+                <v-list-item-title class="d-flex flex-wrap align-center justify-space-between ga-2 font-weight-bold">
+                  <div class="d-flex align-center ga-2">
+                    <span dir="ltr">@{{ responder.username }}</span>
+                    <v-chip
+                      v-if="proposedRescuerIdSet.has(responder.userId)"
+                      color="info"
+                      size="x-small"
+                      variant="tonal"
+                    >
+                      پیشنهاد ارسال‌شده
+                    </v-chip>
+                  </div>
+
+                  <div class="d-flex align-center ga-2">
+                    <v-chip color="primary" size="x-small" variant="flat">
+                      {{ formatDistance(responder.distance) }}
+                    </v-chip>
+                    <v-chip color="amber-darken-2" size="x-small" variant="tonal">
+                      {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
+                    </v-chip>
+                  </div>
+                </v-list-item-title>
+
+                <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
+                  <span v-if="responder.categoryName">
+                    تخصص: {{ responder.categoryName }}
+                  </span>
+                  <span>•</span>
+                  <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
+                </v-list-item-subtitle>
+              </v-list-item>
+            </template>
+          </v-list>
+
+          <v-divider />
+          <v-card-actions class="pa-4 d-flex flex-wrap align-center justify-space-between ga-2">
+            <span class="text-caption text-medium-emphasis">
+              {{ adminSos.selectedResponderIds.length }} امدادگر برای ارسال پیشنهاد مأموریت انتخاب شده است.
+            </span>
+            <v-btn
+              :disabled="!adminSos.canDispatchSelected"
+              :loading="adminSos.dispatchSubmitting"
+              color="error"
+              prepend-icon="mdi-send-check-outline"
+              rounded="lg"
+              variant="flat"
+              @click="adminSos.dispatchSelectedResponders()"
+            >
+              اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-col>
+
     </v-row>
   </v-container>
 </template>
@@ -571,6 +585,11 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
+const dispatchFilters = computed(() => [
+  { title: `در انتظار رسیدگی (${adminSos.pendingCount})`, value: "pending" },
+  { title: `اعزام‌شده (${adminSos.dispatchedCount})`, value: "dispatched" },
+  { title: `همه (${adminSos.requests.length})`, value: "all" }
+]);
 const auth = useAuthStore(pinia);
 const requestMissions = ref<Mission[]>([]);
 const activeMissions = computed(() => requestMissions.value.filter((mission) =>
@@ -952,6 +971,38 @@ onBeforeUnmount(() => {
 
 .legend-dot--low {
   background: #0284c7;
+}
+
+@media (max-width: 599px) {
+  .admin-dispatch__filter-select { flex: 1 1 12rem; min-width: 0; max-width: 100%; }
+  .admin-dispatch__responder-search { flex-wrap: wrap; }
+  .admin-dispatch__responder-search :deep(.v-input) { flex: 1 1 100%; min-width: 0; }
+
+  /* Keep the map a definite size for MapLibre, but put its selected SOS card and
+   * severity key *after* the canvas in normal flow rather than covering markers,
+   * gestures and zoom controls on a phone. One map instance stays mounted. */
+  .dispatch-map-wrapper { display: flex; flex-direction: column; height: auto; min-height: 0; gap: 0.75rem; }
+  .dispatch-map-wrapper > :deep(.map-canvas) {
+    flex: 0 0 auto;
+    height: clamp(20rem, 48dvh, 30rem);
+    min-height: 20rem;
+  }
+  .map-selected-alert-card {
+    position: static;
+    z-index: auto;
+    width: auto;
+    margin-inline: 0.75rem;
+    backdrop-filter: none;
+    overflow-wrap: anywhere;
+  }
+  .severity-legend {
+    position: static;
+    z-index: auto;
+    align-self: flex-start;
+    flex-wrap: wrap;
+    margin: 0 0.75rem 0.75rem;
+    border-radius: 0.75rem;
+  }
 }
 
 .pulse-indicator {

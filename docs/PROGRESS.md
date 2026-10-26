@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 responsive dispatch triage (partial)
+
+- Reordered the admin SOS console so its request queue precedes the map/dispatch form in both DOM and visual order (including stacked widths); on phones, the selected incident summary and severity legend follow a definite-height map in document flow instead of obscuring markers and gestures. A compact status select replaces the three wide filter buttons at phone width without introducing a second filter state, and responder search wraps. Source-pinned tests and client typechecks cover structural decisions; other screens/breakpoints, mobile bottom-sheet behavior and **real browser/device visual verification** remain open, so T4.4.1 is **not** checked complete.
+
 ### 2026-10-26 — Fix HTTPS/WSS smoke teardown after Android generation
 
 - Generating `packages/client/android/` made the existing one-shot Vite HTTPS/WSS handshake test intermittently hang **after** reporting success: Vite watched the large native tree and left file watchers alive during teardown. The smoke harness now loads the real Vite config and uses it with watching disabled only for this one-shot transport test, then waits for the WebSocket close handshake before stopping Vite. The six LAN tests, including a trusted TLS/WSS handshake with the generated Android tree present, now finish normally. This does not claim a physical device, real Android build or production WSS check.
