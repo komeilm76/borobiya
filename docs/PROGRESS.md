@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 narrow admin user management (partial)
+
+- The six-column admin user table requires at least 760px inside its padded container, so narrow screens hid the status switch behind horizontal scrolling. At widths up to 850px, a single-column card view of the same paged rows surfaces username, role, setup, category, join date, status and the same guarded confirmation switch; desktop retains the semantic table. Phone-width confirmation actions stack as full-width 44px-minimum targets. Source-pinned tests verify handler parity and breakpoint rules. This is a structural fix without real browser/device visual or screen-reader verification; remaining T4.4.1 screens and bottom-sheet acceptance are still open.
+
 ### 2026-10-26 — Location-share session lifecycle bug review
 
 - Found two related privacy/feedback races: the share-ended Socket.IO listener survived access-token rotation with its original handshake, and an old HTTP read could repopulate private share rows after logout or an in-place account switch. The revocation subscription now closes the prior client and reconnects with the new bearer; generation guards close late dynamic imports after rotation/logout/unmount. Session transitions invalidate reads, clear all four share lists and confirmation state, and reload only the newly signed-in user's grants. Runtime socket-lifecycle tests cover token reuse, rotation, pending import, failure and disposal; source-pinned tests guard list invalidation and cleanup. This is a bounded bug fix, not device/browser verification or completion of T4.4.2.

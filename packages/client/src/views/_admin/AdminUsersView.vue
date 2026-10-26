@@ -106,58 +106,110 @@
           <span>عبارت جست‌وجو یا فیلترها را تغییر دهید.</span>
         </div>
 
-        <div v-else class="admin-users-table-wrap">
-          <v-table class="admin-users-table">
-            <thead>
-              <tr>
-                <th scope="col">کاربر</th>
-                <th scope="col">نقش</th>
-                <th scope="col">گروه‌های امدادگر</th>
-                <th scope="col">وضعیت</th>
-                <th scope="col">تاریخ عضویت</th>
-                <th scope="col" class="admin-actions-heading">فعال‌سازی</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="user in users" :key="user.id">
-                <th scope="row">
-                  <div class="admin-user-cell">
-                    <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
-                    <span class="admin-user-copy">
-                      <span class="admin-users-username" dir="ltr">{{ user.username }}</span>
-                      <small>
-                        {{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}
-                      </small>
+        <div v-else class="admin-users-results">
+          <div class="admin-users-table-wrap">
+            <v-table class="admin-users-table">
+              <thead>
+                <tr>
+                  <th scope="col">کاربر</th>
+                  <th scope="col">نقش</th>
+                  <th scope="col">گروه‌های امدادگر</th>
+                  <th scope="col">وضعیت</th>
+                  <th scope="col">تاریخ عضویت</th>
+                  <th scope="col" class="admin-actions-heading">فعال‌سازی</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="user in users" :key="user.id">
+                  <th scope="row">
+                    <div class="admin-user-cell">
+                      <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
+                      <span class="admin-user-copy">
+                        <span class="admin-users-username" dir="ltr">{{ user.username }}</span>
+                        <small>
+                          {{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}
+                        </small>
+                      </span>
+                    </div>
+                  </th>
+                  <td>
+                    <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
+                      {{ user.role === "admin" ? "مدیر" : "کاربر" }}
                     </span>
-                  </div>
-                </th>
-                <td>
-                  <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
-                    {{ user.role === "admin" ? "مدیر" : "کاربر" }}
-                  </span>
-                </td>
-                <td>
-                  <div class="flex flex-wrap gap-1">
-                    <v-chip
-                      v-for="cat in user.categories"
-                      :key="cat.id"
-                      size="x-small"
-                      variant="tonal"
+                  </td>
+                  <td>
+                    <div class="flex flex-wrap gap-1">
+                      <v-chip
+                        v-for="cat in user.categories"
+                        :key="cat.id"
+                        size="x-small"
+                        variant="tonal"
+                        color="primary"
+                      >
+                        {{ cat.name }}
+                      </v-chip>
+                      <span v-if="!user.categories || user.categories.length === 0" class="opacity-60">بدون گروه</span>
+                    </div>
+                  </td>
+                  <td>
+                    <span :class="['admin-account-status', user.isActive ? 'is-active' : 'is-inactive']">
+                      <span class="admin-status-dot" />
+                      {{ user.isActive ? "فعال" : "غیرفعال" }}
+                    </span>
+                  </td>
+                  <td class="admin-joined-date">{{ formatDate(user.createdAt) }}</td>
+                  <td class="admin-user-action-cell">
+                    <v-switch
+                      :model-value="user.isActive"
+                      :aria-label="statusSwitchLabel(user)"
+                      :disabled="loading || statusSavingUserId !== null || isCurrentAdmin(user)"
+                      :loading="statusSavingUserId === user.id"
                       color="primary"
-                    >
-                      {{ cat.name }}
-                    </v-chip>
-                    <span v-if="!user.categories || user.categories.length === 0" class="opacity-60">بدون گروه</span>
-                  </div>
-                </td>
-                <td>
-                  <span :class="['admin-account-status', user.isActive ? 'is-active' : 'is-inactive']">
-                    <span class="admin-status-dot" />
-                    {{ user.isActive ? "فعال" : "غیرفعال" }}
+                      density="compact"
+                      inset
+                      hide-details
+                      @update:model-value="requestStatusChange(user, $event)"
+                    />
+                    <small v-if="isCurrentAdmin(user)" class="admin-self-note">حساب جاری</small>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </div>
+
+          <ul class="admin-users-mobile" aria-label="کاربران">
+            <li v-for="user in users" :key="user.id" class="admin-mobile-card">
+              <div class="admin-mobile-header">
+                <div class="admin-user-cell">
+                  <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
+                  <span class="admin-user-copy">
+                    <span class="admin-mobile-username" dir="ltr">{{ user.username }}</span>
+                    <small>{{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}</small>
                   </span>
-                </td>
-                <td class="admin-joined-date">{{ formatDate(user.createdAt) }}</td>
-                <td class="admin-user-action-cell">
+                </div>
+                <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
+                  {{ user.role === "admin" ? "مدیر" : "کاربر" }}
+                </span>
+              </div>
+              <dl class="admin-mobile-meta">
+                <div>
+                  <dt>گروه‌های امدادگر</dt>
+                  <dd class="admin-mobile-categories">
+                    <v-chip v-for="cat in user.categories" :key="cat.id" size="x-small" variant="tonal" color="primary">{{ cat.name }}</v-chip>
+                    <span v-if="!user.categories || user.categories.length === 0">بدون گروه</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt>تاریخ عضویت</dt>
+                  <dd>{{ formatDate(user.createdAt) }}</dd>
+                </div>
+              </dl>
+              <div class="admin-mobile-footer">
+                <span :class="['admin-account-status', user.isActive ? 'is-active' : 'is-inactive']">
+                  <span class="admin-status-dot" />
+                  {{ user.isActive ? "فعال" : "غیرفعال" }}
+                </span>
+                <div class="admin-mobile-action">
                   <v-switch
                     :model-value="user.isActive"
                     :aria-label="statusSwitchLabel(user)"
@@ -170,10 +222,10 @@
                     @update:model-value="requestStatusChange(user, $event)"
                   />
                   <small v-if="isCurrentAdmin(user)" class="admin-self-note">حساب جاری</small>
-                </td>
-              </tr>
-            </tbody>
-          </v-table>
+                </div>
+              </div>
+            </li>
+          </ul>
         </div>
 
         <footer v-if="!loading && !listError && users.length > 0" class="admin-users-pagination">
@@ -621,6 +673,8 @@ onUnmounted(() => {
   background: rgba(var(--v-theme-primary), 0.12);
 }
 
+.admin-users-mobile { display: none; }
+
 .admin-users-table-wrap {
   overflow-x: auto;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
@@ -842,6 +896,26 @@ onUnmounted(() => {
   padding: 0.7rem 1.5rem 1.3rem;
 }
 
+/* The six-column, 760px table would hide the status switch behind horizontal scrolling.
+   Keep its semantics on desktop; use the same paged rows and action in phone/tablet cards. */
+@media (max-width: 850px) {
+  .admin-users-table-wrap { display: none; }
+  .admin-users-mobile { display: grid; gap: 0.75rem; margin: 0; padding: 0; list-style: none; min-width: 0; }
+  .admin-mobile-card { min-width: 0; padding: 1rem; border: 1px solid rgba(var(--v-theme-on-surface), 0.14); border-radius: 17px; background: rgb(var(--v-theme-surface)); }
+  .admin-mobile-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; }
+  .admin-mobile-header .admin-user-cell { min-width: 0; flex: 1 1 12rem; }
+  .admin-mobile-header .admin-user-copy { min-width: 0; }
+  .admin-mobile-username { overflow-wrap: anywhere; color: var(--bb-color-text); font-size: 0.88rem; font-weight: 800; }
+  .admin-mobile-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 0.6rem; margin: 0.85rem 0; }
+  .admin-mobile-meta > div { min-width: 0; }
+  .admin-mobile-meta dt { color: var(--bb-color-muted); font-size: 0.72rem; }
+  .admin-mobile-meta dd { margin: 0.25rem 0 0; color: var(--bb-color-text); font-size: 0.82rem; overflow-wrap: anywhere; }
+  .admin-mobile-categories { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  .admin-mobile-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.7rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.10); }
+  .admin-mobile-action { display: grid; justify-items: center; min-width: 48px; }
+  .admin-mobile-action :deep(.v-selection-control) { min-height: 44px; }
+}
+
 @media (max-width: 720px) {
   .admin-users-page {
     padding-block: 1.3rem;
@@ -885,5 +959,10 @@ onUnmounted(() => {
   .admin-users-pagination :deep(.v-pagination__list) {
     justify-content: center;
   }
+
+  .admin-status-dialog-actions { flex-direction: column; align-items: stretch; gap: 0.4rem; }
+  .admin-status-dialog-actions :deep(.v-spacer) { display: none; }
+  .admin-status-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; margin: 0; }
+  .admin-status-dialog-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 </style>
