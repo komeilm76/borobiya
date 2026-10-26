@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T3.5.5 route-geometry boundary review (partial; VM acceptance blocked)
+
+- Reproduced a malformed OSRM alternative receiving HTTP 200 when no DEM was configured: the browser then rejected the entire route selection. The gateway now validates every returned polyline before serving any alternative; out-of-range, truncated, single-point and oversized geometry produce a scoped 502. A valid long route still reaches the client even when its optional DEM summary exceeds the separate 12,000-sample altitude budget. Gateway tests use synthetic responses and a local server; no Docker, real OSRM graphs, downloaded Skadi tiles or offline browser are available in this workspace. T3.5.5 remains **open** until the VM corridor, per-profile alternatives/elevation and offline browser checks in `docs/MAP_SERVER.md` are recorded.
+
 ### 2026-10-26 — Fix requester SOS cancellation lifecycle races
 
 - A history read started before confirmed SOS cancellation could finish later and restore the request’s former cancellable status; marking the committed cancellation now invalidates that older read and clears its loading state. Resetting a cancellation panel during an in-flight confirmation previously left it open/locked and let the old result update a reopened panel for the same account; reset now invalidates that confirmation and its late `finally` cannot unlock a newer one. Two deferred-response regressions failed before the fix and pass afterward. Browser/device and production-network acceptance remain open.

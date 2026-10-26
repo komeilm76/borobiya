@@ -1,5 +1,5 @@
 import { parseMapConfig } from "./map-config.mjs";
-import { elevationForRoute } from "./elevation.mjs";
+import { decodePolyline, elevationForRoute } from "./elevation.mjs";
 import { DEFAULT_PHOTON_UPSTREAMS, handleGeocodeRequest } from "./geocoding.mjs";
 import { describeUpstream, formatUpstreamLog, readUpstreamBody } from "./upstream.mjs";
 
@@ -77,8 +77,8 @@ function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null, op
         !Number.isFinite(route.distance) || route.distance < 0 ||
         !Number.isFinite(route.duration) || route.duration < 0 ||
         typeof route.geometry !== "string" || route.geometry.length === 0 ||
-        route.geometry.length > 200_000 || !Array.isArray(route.legs) ||
-        (stopCount > 2 && route.legs.length !== stopCount - 1)) {
+        route.geometry.length > 200_000 || !decodePolyline(route.geometry) ||
+        !Array.isArray(route.legs) || (stopCount > 2 && route.legs.length !== stopCount - 1)) {
       return json({
         error: "invalid_upstream_response",
         profile,

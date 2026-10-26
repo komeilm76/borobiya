@@ -17,13 +17,24 @@ const validInput = {
   alternatives: 2
 };
 
+function encodePoint(lat, lon) {
+  const part = (number) => {
+    let value = number < 0 ? -number * 2 - 1 : number * 2;
+    let text = "";
+    while (value >= 32) { text += String.fromCharCode((32 | (value & 31)) + 63); value >>>= 5; }
+    return text + String.fromCharCode(value + 63);
+  };
+  return part(Math.round(lat * 1e5)) + part(Math.round(lon * 1e5));
+}
+const validGeometry = encodePoint(35.68, 51.38) + encodePoint(0.02, 0.03);
+
 const osrmFixture = {
   code: "Ok",
   waypoints: [{ name: "Start" }, { name: "Finish" }],
   routes: [{
     distance: 5230.5,
     duration: 754.2,
-    geometry: "encoded-polyline",
+    geometry: validGeometry,
     legs: [{ distance: 5230.5, duration: 754.2, steps: [] }]
   }]
 };
@@ -53,7 +64,7 @@ test("maps a POST /route request to the OSRM profile API and normalizes route fi
     routes: [{
       distance_m: 5230.5,
       duration_s: 754.2,
-      polyline: "encoded-polyline",
+      polyline: validGeometry,
       legs: osrmFixture.routes[0].legs,
       elevation: null
     }],
@@ -204,6 +215,36 @@ test("rejects malformed Ok route entries as 502 instead of throwing or serving u
     assert.equal(body.route_index, 1);
     assert.equal(body.upstream_status, 200);
   }
+});
+
+test("rejects malformed alternative geometry even when no DEM is configured", async () => {
+  const malformed = ["?", "??", "encoded-polyline",
+    encodePoint(95, 51.38) + encodePoint(0.02, 0.03),
+    validGeometry + "??".repeat(30_000)];
+  for (const [index, geometry] of malformed.entries()) {
+    const response = await handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => Response.json({ ...osrmFixture,
+        routes: [osrmFixture.routes[0], { ...osrmFixture.routes[0], geometry }] }),
+      log: () => {}
+    });
+    assert.equal(response.status, 502, `malformed case ${index}`);
+    const body = await response.json();
+    assert.equal(body.error, "invalid_upstream_response");
+    assert.equal(body.route_index, 1);
+  }
+});
+
+test("retains a long valid route when optional elevation exceeds its sampling budget", async () => {
+  const geometry = validGeometry + "??".repeat(12_050); // valid repeated points, under the browser's 30k-point limit
+  const response = await handleRoutingRequest(postRoute(validInput), {
+    fetchImpl: async () => Response.json({ ...osrmFixture,
+      routes: [{ ...osrmFixture.routes[0], geometry }] }),
+    elevation: { sample: () => 100 }
+  });
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.routes[0].polyline, geometry);
+  assert.equal(body.routes[0].elevation, null); // no invented partial DEM summary
 });
 
 test("truncates a huge non-JSON upstream body before echoing it", async () => {

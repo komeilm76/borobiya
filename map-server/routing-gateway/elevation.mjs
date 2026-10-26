@@ -7,6 +7,9 @@ import { join } from "node:path";
 const TILE_NAME = /^[NS](?:0\d\d|[0-8]\d|90)[EW](?:0\d\d|1[0-7]\d|180)$/;
 const SOURCE = "mapzen-skadi";
 const MAX_SAMPLES = 12_000;
+// Match the browser route decoder: a long valid route remains navigable even
+// when its optional DEM sampling exceeds the smaller altitude work budget.
+const MAX_POLYLINE_POINTS = 30_000;
 const SAMPLE_SPACING_M = 90;
 const MAX_PROFILE_POINTS = 96;
 
@@ -62,9 +65,9 @@ export function decodePolyline(encoded) {
     if (deltaLat === null || deltaLon === null) return null;
     lat += deltaLat;
     lon += deltaLon;
-    if (Math.abs(lat) > 9_000_000 || Math.abs(lon) > 18_000_000) return null;
+    if (Math.abs(lat) > 9_000_000 || Math.abs(lon) > 18_000_000 ||
+        points.length >= MAX_POLYLINE_POINTS) return null;
     points.push({ lat: lat / 1e5, lon: lon / 1e5 });
-    if (points.length > MAX_SAMPLES) return null;
   }
   return points.length >= 2 ? points : null;
 }
