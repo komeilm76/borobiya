@@ -82,16 +82,21 @@
         </v-alert>
         <template v-if="routing.target.value">
           <div class="mission-route__controls">
-            <div>
-              <p class="text-body-2 font-weight-bold mb-2">وسیلهٔ حرکت</p>
-              <v-btn-toggle :model-value="routing.profile.value" :disabled="navigation.active.value" mandatory rounded="lg" color="primary"
+            <div class="mission-route__profile">
+              <p class="d-none d-sm-block text-body-2 font-weight-bold mb-2">وسیلهٔ حرکت</p>
+              <v-select :model-value="routing.profile.value" :items="transportProfiles"
+                class="mission-route__profile-select d-sm-none" label="وسیلهٔ حرکت" item-title="title" item-value="value"
+                density="compact" variant="outlined" hide-details :disabled="navigation.active.value"
+                @update:model-value="onProfileChange" />
+              <v-btn-toggle class="d-none d-sm-inline-flex" :model-value="routing.profile.value"
+                :disabled="navigation.active.value" mandatory rounded="lg" color="primary"
                 @update:model-value="onProfileChange">
                 <v-btn value="car" prepend-icon="mdi-car">خودرو</v-btn>
                 <v-btn value="bicycle" prepend-icon="mdi-bicycle">دوچرخه</v-btn>
                 <v-btn value="foot" prepend-icon="mdi-walk">پیاده</v-btn>
               </v-btn-toggle>
             </div>
-            <div class="d-flex flex-wrap ga-2">
+            <div class="mission-route__route-actions d-flex flex-wrap ga-2">
               <v-btn color="primary" variant="flat" rounded="lg" :loading="routing.loading.value" :disabled="navigation.active.value"
                 @click="routing.findRoutes()">{{ routing.from.value ? 'دریافت مسیرها' : 'اجازهٔ موقعیت و دریافت مسیرها' }}</v-btn>
               <v-btn v-if="routing.from.value" color="primary" variant="tonal" rounded="lg"
@@ -244,6 +249,11 @@ const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), () => auth.ensureSession());
+const transportProfiles = [
+  { title: "خودرو", value: "car" },
+  { title: "دوچرخه", value: "bicycle" },
+  { title: "پیاده", value: "foot" }
+] satisfies { title: string; value: TransportProfile }[];
 const mapReady = ref(false);
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
@@ -466,5 +476,18 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-desk__empty h3 { font-size: 1.28rem; margin: 0 0 8px; }.mission-desk__empty p { opacity: .7; margin-bottom: 22px; }
 .mission-desk__limit { font-size: .8rem; opacity: .68; margin: 20px 0 0; }
 @media(max-width: 780px) { .mission-steps { grid-template-columns: repeat(2, 1fr); }.mission-desk__toolbar { align-items: flex-start; }.mission-desk__toolbar p { max-width: 230px; } }
+@media(max-width: 599px) {
+  .mission-desk { padding-inline: 12px; }
+  .mission-desk__toolbar { flex-wrap: wrap; }
+  .mission-desk__toolbar > div { flex: 1 1 100%; min-width: 0; }
+  .mission-desk__toolbar p { max-width: none; }
+  .mission-route { padding: 16px; border-radius: 18px; }
+  .mission-route__controls > div { width: 100%; min-width: 0; }
+  .mission-route__profile-select { width: 100%; }
+  .mission-route__route-actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%; min-height: 44px; height: auto; white-space: normal; }
+  .mission-route__route-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+  .mission-route__stops { padding: 12px; }
+  .mission-route__coordinate { flex: 1 1 100%; max-width: none; min-width: 0; }
+}
 @media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
 </style>

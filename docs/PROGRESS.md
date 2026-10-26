@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 rescuer route phone controls (partial)
+
+- The mission route editor uses one transport-profile state for a compact phone select and the desktop button group; both remain locked during active navigation. Under 600px the route actions, waypoint coordinate fields and mission refresh toolbar can stack within the available width, with the route map below the controls in document flow at a definite height. Source-pinned regressions and client build cover the structure. The broader responsive/bottom-sheet audit and browser/device visual acceptance remain open; T4.4.1 is **not** checked complete.
+
 ### 2026-10-26 — Fix SOS create/photo-upload race
 
 - A successful SOS create previously set the sheet's completed state before its optional photo upload finished, exposing “new request” and close actions while an attachment was still in flight. The sheet now shows an explicit non-dismissable attachment progress state, reports completion only after the upload settles, and retains the existing photo-retry flow on failure. The submission snapshots the incident and file at tap time; GPS callbacks, map/coordinate edits and file-picker events cannot silently change them during session refresh. Deferred-upload and delayed-session regressions reproduce the previous behavior and cover the fix; no device-network test was run.
