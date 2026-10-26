@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import { useMissionRoutes } from "./use-mission-routes";
@@ -111,4 +112,59 @@ describe("active rescuer mission route picker", () => {
     expect(picker.routes.value).toEqual([]);
     expect(picker.error.value).toContain("پاسخ معتبری");
   });
+});
+
+describe("waypoint editing", () => {
+  it("reorders by drag/button index, optimizes only via points, and invalidates displayed routes on every edit", async () => {
+    const first = { lat: 35.69, lon: 51.39 };
+    const second = { lat: 35.695, lon: 51.395 };
+    const getPlan = vi.fn(async () => ({ routes: [route], order: [0, 2, 1, 3] }));
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined, {
+      getTarget: async () => target, getPosition: async () => from, getPlan
+    });
+    await picker.open();
+    picker.addWaypoint(first);
+    picker.addWaypoint(second);
+    picker.moveWaypoint(0, 1);
+    expect(picker.via.value).toEqual([second, first]);
+    picker.setOptimize(true);
+    await picker.findRoutes();
+    expect(getPlan).toHaveBeenCalledWith(from, incident, "car", [second, first], true, expect.any(AbortSignal));
+    expect(picker.order.value).toEqual([0, 2, 1, 3]);
+    picker.selectStep(2);
+    expect(picker.step.value).toBe(2);
+    picker.removeWaypoint(0);
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.order.value).toEqual([]);
+    expect(picker.step.value).toBe(0);
+    picker.removeWaypoint(0);
+    expect(picker.optimize.value).toBe(false);
+    picker.reset();
+    expect(picker.via.value).toEqual([]);
+  });
+  it("drops a late optimized reply when waypoint ordering or mission identity changes", async () => {
+    const pending = deferred<{ routes: typeof route[]; order: number[] }>();
+    const getPlan = vi.fn(() => pending.promise);
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined, {
+      getTarget: async () => target, getPosition: async () => from, getPlan
+    });
+    await picker.open();
+    picker.addWaypoint({ lat: 35.69, lon: 51.39 });
+    const request = picker.findRoutes();
+    await vi.waitFor(() => expect(getPlan).toHaveBeenCalled());
+    picker.setOptimize(true);
+    pending.resolve({ routes: [route], order: [0, 1, 2] });
+    await request;
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.order.value).toEqual([]);
+  });
+});
+
+it("wires waypoint editing, keyboard reorder, map picking, slider, and picker cleanup without mounting Vue", () => {
+  const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+  for (const token of ["onRouteMapClick", 'map.on("click", onRouteMapClick)', 'map.off("click", onRouteMapClick)',
+    "routing.addWaypoint", "routing.removeWaypoint", "routing.moveWaypoint", "routing.setOptimize",
+    "routing.selectStep", "onWaypointDrop", "مختصات معتبر WGS84", "navigation.active.value"]) {
+    expect(view).toContain(token);
+  }
 });

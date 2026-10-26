@@ -245,3 +245,67 @@ test("serves a liveness endpoint without any external request", async () => {
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { status: "ok" });
 });
+
+const multiStopFixture = { ...osrmFixture, routes: [{ ...osrmFixture.routes[0],
+  legs: Array.from({ length: 3 }, () => osrmFixture.routes[0].legs[0]) }] };
+
+test("routes A via B via C to incident in entered order on the local graph", async () => {
+  const via = [{ lat: 35.69, lon: 51.39 }, { lat: 35.695, lon: 51.395 }];
+  let body;
+  let url;
+  const response = await handleRoutingRequest(postRoute({ ...validInput, via }), {
+    fetchImpl: async (endpoint, options) => {
+      url = endpoint;
+      body = JSON.parse(options.body);
+      return Response.json(multiStopFixture);
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(url, DEFAULT_UPSTREAMS.car);
+  assert.deepEqual(body.coordinates, [[51.38, 35.68], [51.39, 35.69], [51.395, 35.695], [51.41, 35.7]]);
+  assert.equal(body.alternatives, false);
+});
+
+test("optimizes intermediates while fixing A and the incident, rejecting an untrustworthy OSRM order", async () => {
+  const via = [{ lat: 35.69, lon: 51.39 }, { lat: 35.695, lon: 51.395 }];
+  const stops = [{ waypoint_index: 0, trips_index: 0 }, { waypoint_index: 2, trips_index: 0 },
+    { waypoint_index: 1, trips_index: 0 }, { waypoint_index: 3, trips_index: 0 }];
+  const fixture = { code: "Ok", trips: multiStopFixture.routes, waypoints: stops };
+  let body;
+  const response = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+    fetchImpl: async (url, options) => {
+      assert.equal(url, DEFAULT_UPSTREAMS.car.replace("/route/v1/", "/trip/v1/"));
+      body = JSON.parse(options.body);
+      return Response.json(fixture);
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual(body, {
+    coordinates: [[51.38, 35.68], [51.39, 35.69], [51.395, 35.695], [51.41, 35.7]],
+    roundtrip: false, source: "first", destination: "last", steps: true, geometries: "polyline", overview: "full"
+  });
+  assert.deepEqual((await response.json()).order, [0, 2, 1, 3]);
+  for (const waypoints of [stops.slice(1), [{ ...stops[0], waypoint_index: 1 }, ...stops.slice(1)],
+    [stops[0], stops[1], { ...stops[2], waypoint_index: 2 }, stops[3]],
+    [stops[0], stops[1], { ...stops[2], trips_index: 1 }, stops[3]]]) {
+    const rejected = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+      fetchImpl: async () => Response.json({ ...fixture, waypoints })
+    });
+    assert.equal(rejected.status, 502);
+  }
+});
+
+test("rejects unbounded, malformed or meaningless waypoint requests before OSRM", async () => {
+  let calls = 0;
+  for (const changes of [
+    { via: null }, { via: Array.from({ length: 7 }, () => validInput.from) },
+    { via: [{ lat: 92, lon: 51 }] }, { via: [null] },
+    { via: [], optimize: true }, { via: [validInput.to], optimize: "true" }
+  ]) {
+    const answer = await handleRoutingRequest(postRoute({ ...validInput, ...changes }), {
+      fetchImpl: async () => { calls++; return Response.json(osrmFixture); }
+    });
+    assert.equal(answer.status, 400);
+  }
+  assert.equal(calls, 0);
+});

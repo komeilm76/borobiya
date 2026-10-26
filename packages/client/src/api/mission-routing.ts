@@ -30,7 +30,8 @@ const routeSchema = z.object({
 const routesResponseSchema = z.object({
   profile: profileSchema,
   routes: z.array(routeSchema).min(1),
-  waypoints: z.array(z.unknown())
+  waypoints: z.array(z.unknown()),
+  order: z.array(z.number().int().nonnegative()).optional()
 });
 export type RouteChoice = z.infer<typeof routeSchema>;
 
@@ -40,13 +41,21 @@ export async function getMissionNavigationTarget(token: string, missionId: strin
   return missionNavigationTargetSchema.parse(await requestJson<unknown>(path, { accessToken: token, signal }));
 }
 
-/** Same-origin offline OSRM adapter; never send incident or rescuer coordinates to a third-party origin. */
-export async function getMissionRouteChoices(
-  from: { lat: number; lon: number }, to: { lat: number; lon: number }, profile: TransportProfile,
+export type RoutePoint = { lat: number; lon: number };
+
+/** Same-origin local routing only. Endpoints are fixed; optimization may reorder intermediate stops. */
+export async function getMissionRoutePlan(
+  from: RoutePoint, to: RoutePoint, profile: TransportProfile, via: RoutePoint[], optimize: boolean,
   signal?: AbortSignal
-): Promise<RouteChoice[]> {
-  const request = { from: coordinatesSchema.parse(from), to: coordinatesSchema.parse(to),
-    profile: profileSchema.parse(profile), alternatives: 2 };
+): Promise<{ routes: RouteChoice[]; order: number[] }> {
+  if (via.length > 6) throw new Error("TOO_MANY_WAYPOINTS");
+  if (optimize && via.length === 0) throw new Error("WAYPOINT_REQUIRED");
+  const request = {
+    from: coordinatesSchema.parse(from), to: coordinatesSchema.parse(to),
+    profile: profileSchema.parse(profile),
+    ...(via.length ? { via: via.map((point) => coordinatesSchema.parse(point)) } : {}),
+    ...(optimize ? { optimize: true } : { alternatives: 2 })
+  };
   const response = await fetch("/route", {
     method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
     credentials: "same-origin", body: JSON.stringify(request), signal
@@ -57,6 +66,20 @@ export async function getMissionRouteChoices(
   }
   const parsed = routesResponseSchema.parse(await response.json());
   if (parsed.profile !== profile) throw new Error("ROUTING_UNAVAILABLE");
-  // OSRM may return just one viable route, even when alternatives=2 was requested.
-  return parsed.routes.slice(0, 3);
+  const expected = Array.from({ length: via.length + 2 }, (_, index) => index);
+  const order = parsed.order ?? expected;
+  if ((optimize && !parsed.order) || (!optimize && parsed.order) ||
+      order.length !== expected.length || order[0] !== 0 || order.at(-1) !== expected.at(-1) ||
+      order.some((index) => index >= order.length) || new Set(order).size !== order.length) {
+    throw new Error("ROUTING_UNAVAILABLE");
+  }
+  // A trip returns one route; the route service may return fewer alternatives than requested.
+  return { routes: parsed.routes.slice(0, 3), order };
+}
+
+/** Backwards-compatible two-point adapter used by the existing mission route picker. */
+export async function getMissionRouteChoices(
+  from: RoutePoint, to: RoutePoint, profile: TransportProfile, signal?: AbortSignal
+): Promise<RouteChoice[]> {
+  return (await getMissionRoutePlan(from, to, profile, [], false, signal)).routes;
 }

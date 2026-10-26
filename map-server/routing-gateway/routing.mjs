@@ -41,7 +41,22 @@ function validAlternatives(value) {
     (Number.isInteger(value) && value >= 0 && value <= 3);
 }
 
-function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null) {
+function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null, optimized = false, stopCount = 2) {
+  // Trip waypoints are indexed in input order; waypoint_index is the position in the trip.
+  // Fail closed if OSRM ever changes either endpoint or returns an ambiguous/malformed order.
+  let order;
+  if (optimized) {
+    if (!Array.isArray(osrmResponse.waypoints) || osrmResponse.waypoints.length !== stopCount) {
+      return json({ error: "invalid_upstream_response", profile, message: "Incomplete optimized waypoint order." }, 502);
+    }
+    const indices = osrmResponse.waypoints.map((point) => point?.waypoint_index);
+    if (indices.some((index) => !Number.isInteger(index) || index < 0 || index >= stopCount) ||
+        new Set(indices).size !== stopCount || indices[0] !== 0 || indices[stopCount - 1] !== stopCount - 1 ||
+        osrmResponse.waypoints.some((point) => point?.trips_index !== 0)) {
+      return json({ error: "invalid_upstream_response", profile, message: "Optimized order changed a fixed endpoint." }, 502);
+    }
+    order = indices.map((_, index) => indices.indexOf(index));
+  }
   if (!Array.isArray(osrmResponse.routes)) {
     return json({
       error: "invalid_upstream_response",
@@ -62,7 +77,8 @@ function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null) {
         !Number.isFinite(route.distance) || route.distance < 0 ||
         !Number.isFinite(route.duration) || route.duration < 0 ||
         typeof route.geometry !== "string" || route.geometry.length === 0 ||
-        route.geometry.length > 200_000 || !Array.isArray(route.legs)) {
+        route.geometry.length > 200_000 || !Array.isArray(route.legs) ||
+        (stopCount > 2 && route.legs.length !== stopCount - 1)) {
       return json({
         error: "invalid_upstream_response",
         profile,
@@ -80,7 +96,7 @@ function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null) {
     });
   }
 
-  return json({ profile, routes, waypoints: osrmResponse.waypoints ?? [] });
+  return json({ profile, routes, waypoints: osrmResponse.waypoints ?? [], ...(optimized ? { order } : {}) });
 }
 
 export async function handleRoutingRequest(request, {
@@ -125,6 +141,16 @@ export async function handleRoutingRequest(request, {
   if (!["car", "bicycle", "foot"].includes(input.profile)) {
     return json({ error: "invalid_profile", message: "profile must be car, bicycle, or foot." }, 400);
   }
+  if ((input.via !== undefined && !Array.isArray(input.via)) || input.via?.length > 6 ||
+      (input.via ?? []).some((point) => !isPoint(point))) {
+    return json({ error: "invalid_waypoints", message: "via requires at most six WGS84 points." }, 400);
+  }
+  if (input.optimize !== undefined && typeof input.optimize !== "boolean") {
+    return json({ error: "invalid_optimization", message: "optimize must be boolean." }, 400);
+  }
+  if (input.optimize && !input.via?.length) {
+    return json({ error: "invalid_optimization", message: "Optimization requires a waypoint." }, 400);
+  }
   if (!validAlternatives(input.alternatives)) {
     return json({ error: "invalid_alternatives", message: "alternatives must be boolean or an integer from 0 to 3." }, 400);
   }
@@ -134,17 +160,23 @@ export async function handleRoutingRequest(request, {
     return json({ error: "routing_profile_unavailable", profile: input.profile }, 503);
   }
 
+  const optimized = input.optimize === true;
+  const stops = [input.from, ...(input.via ?? []), input.to];
   const osrmRequest = {
-    coordinates: [[input.from.lon, input.from.lat], [input.to.lon, input.to.lat]],
-    alternatives: input.alternatives ?? true,
+    coordinates: stops.map((point) => [point.lon, point.lat]),
+    ...(optimized ? { roundtrip: false, source: "first", destination: "last" } :
+      // OSRM alternatives are only supported for a two-stop route.
+      { alternatives: stops.length === 2 ? (input.alternatives ?? true) : false }),
     steps: true,
     geometries: "polyline",
     overview: "full"
   };
 
+  const upstreamEndpoint = optimized ? endpoint.replace("/route/v1/", "/trip/v1/") : endpoint;
+  if (optimized && upstreamEndpoint === endpoint) return json({ error: "routing_profile_unavailable", profile: input.profile }, 503);
   let response;
   try {
-    response = await fetchImpl(endpoint, {
+    response = await fetchImpl(upstreamEndpoint, {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify(osrmRequest),
@@ -154,14 +186,14 @@ export async function handleRoutingRequest(request, {
     // The 503 body stays a fixed shape for clients; the container log is where "connection refused" and
     // "timed out after 15s" have to be told apart, because that difference is the whole diagnosis.
     const reason = `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
-    log(`${input.profile} routing: no HTTP answer from ${endpoint} (${reason})`);
+    log(`${input.profile} routing: no HTTP answer from ${upstreamEndpoint} (${reason})`);
     return json({ error: "routing_unavailable", profile: input.profile }, 503);
   }
 
   const { text, parsed, readFailed } = await readUpstreamBody(response);
-  const upstream = describeUpstream({ endpoint, status: response.status, text, parsed, readFailed });
+  const upstream = describeUpstream({ endpoint: upstreamEndpoint, status: response.status, text, parsed, readFailed });
   const report = (error, fallback) => {
-    log(formatUpstreamLog(`${input.profile} routing`, { status: response.status, endpoint, ...upstream }));
+    log(formatUpstreamLog(`${input.profile} routing`, { status: response.status, endpoint: upstreamEndpoint, ...upstream }));
     return json({ error, profile: input.profile, message: upstream.message ?? fallback, ...upstream.fields }, 502);
   };
 
@@ -177,7 +209,13 @@ export async function handleRoutingRequest(request, {
     return report("routing_failed", "The OSRM profile answered with an error and no message.");
   }
 
-  return routeResult(parsed, input.profile, upstream.fields, elevation);
+  if (optimized) {
+    if (!Array.isArray(parsed.trips) || parsed.trips.length !== 1) {
+      return report("invalid_upstream_response", "OSRM did not return exactly one optimized trip.");
+    }
+    return routeResult({ ...parsed, routes: parsed.trips }, input.profile, upstream.fields, elevation, true, stops.length);
+  }
+  return routeResult(parsed, input.profile, upstream.fields, elevation, false, stops.length);
 }
 
 export { DEFAULT_UPSTREAMS, configuredGeocodingUpstreams, DEFAULT_PHOTON_UPSTREAMS };

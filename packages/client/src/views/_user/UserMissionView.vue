@@ -98,6 +98,45 @@
                 :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
             </div>
           </div>
+          <section class="mission-route__stops" aria-label="ایستگاه‌های میانی مسیر">
+            <h3>ایستگاه‌های میانی (حداکثر ۶)</h3>
+            <p class="text-caption">برای افزودن یک نقطه روی نقشه، حالت انتخاب را فعال کنید؛ یا مختصات را وارد کنید. محل حادثه همیشه مقصد نهایی است.</p>
+            <div class="d-flex flex-wrap ga-2 align-center">
+              <v-btn variant="tonal" :disabled="navigation.active.value || routing.via.value.length >= 6 || !mapReady"
+                :aria-pressed="pickingWaypoint" @click="pickingWaypoint = !pickingWaypoint">
+                {{ pickingWaypoint ? 'لغو انتخاب روی نقشه' : 'افزودن نقطه از نقشه' }}
+              </v-btn>
+              <v-text-field v-model="waypointLat" type="number" label="عرض جغرافیایی" aria-label="عرض جغرافیایی ایستگاه"
+                density="compact" variant="outlined" hide-details class="mission-route__coordinate" />
+              <v-text-field v-model="waypointLon" type="number" label="طول جغرافیایی" aria-label="طول جغرافیایی ایستگاه"
+                density="compact" variant="outlined" hide-details class="mission-route__coordinate" />
+              <v-btn variant="tonal" :disabled="navigation.active.value || routing.via.value.length >= 6" @click="addTypedWaypoint">افزودن مختصات</v-btn>
+            </div>
+            <p v-if="waypointError" role="alert" class="text-error">{{ waypointError }}</p>
+            <ol class="mission-route__stop-list">
+              <li v-for="(point, index) in routing.via.value" :key="`${point.lat},${point.lon},${index}`"
+                draggable="true" @dragstart="onWaypointDrag(index, $event)" @dragover.prevent
+                @drop.prevent="onWaypointDrop(index)" @dragend="draggingWaypoint = null">
+                <span>ایستگاه {{ (index + 1).toLocaleString('fa-IR') }}: <bdi dir="ltr">{{ point.lat.toFixed(5) }}, {{ point.lon.toFixed(5) }}</bdi></span>
+                <div class="d-flex ga-1">
+                  <v-btn icon="mdi-arrow-up" size="small" variant="text" :disabled="navigation.active.value || index === 0"
+                    :aria-label="`جابه‌جایی ایستگاه ${index + 1} به قبل`" @click="routing.moveWaypoint(index, index - 1)" />
+                  <v-btn icon="mdi-arrow-down" size="small" variant="text" :disabled="navigation.active.value || index === routing.via.value.length - 1"
+                    :aria-label="`جابه‌جایی ایستگاه ${index + 1} به بعد`" @click="routing.moveWaypoint(index, index + 1)" />
+                  <v-btn icon="mdi-close" size="small" variant="text" :disabled="navigation.active.value"
+                    :aria-label="`حذف ایستگاه ${index + 1}`" @click="routing.removeWaypoint(index)" />
+                </div>
+              </li>
+            </ol>
+            <v-switch :model-value="routing.optimize.value" label="بهینه‌سازی ترتیب ایستگاه‌ها (TSP)"
+              :disabled="navigation.active.value || !routing.via.value.length" hide-details color="primary"
+              @update:model-value="routing.setOptimize(Boolean($event))" />
+            <div v-if="routing.routes.value.length" role="group" aria-label="مراحل مسیر پیشنهادی">
+              <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
+                label="مرحلهٔ مسیر A تا مقصد" thumb-label="always" @update:model-value="routing.selectStep(Number($event))" />
+              <p role="status">{{ currentStopLabel }}</p>
+            </div>
+          </section>
           <div class="mission-route__map">
             <MapCanvas :center="[routing.target.value.incident.lon, routing.target.value.incident.lat]" :zoom="14"
               :constrain-bounds="false" :style-url="mapStyleUrl" aria-label="نقشهٔ مسیر تا محل حادثه"
@@ -184,7 +223,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
-import { Marker, type GeoJSONSource, type Map as MapLibreMap } from "maplibre-gl";
+import { Marker, type GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -206,6 +245,48 @@ const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAU
 const routing = useMissionRoutes(computed(() => auth.accessToken), computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), () => auth.ensureSession());
 const mapReady = ref(false);
+const pickingWaypoint = ref(false);
+const waypointLat = ref("");
+const waypointLon = ref("");
+const waypointError = ref("");
+let draggingWaypoint: number | null = null;
+const currentStopLabel = computed(() => {
+  const stops = routing.order.value.length ? routing.order.value :
+    Array.from({ length: routing.via.value.length + 2 }, (_, index) => index);
+  const inputIndex = stops[routing.step.value];
+  if (inputIndex === 0) return "A: موقعیت شروع";
+  if (inputIndex === routing.via.value.length + 1) return "مقصد نهایی: محل حادثه";
+  return `ایستگاه ${inputIndex}: ${routing.via.value[inputIndex! - 1]?.lat.toFixed(5)}, ${routing.via.value[inputIndex! - 1]?.lon.toFixed(5)}`;
+});
+function addTypedWaypoint(): void {
+  const lat = Number(waypointLat.value);
+  const lon = Number(waypointLon.value);
+  if (!waypointLat.value.trim() || !waypointLon.value.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) ||
+      lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    waypointError.value = "مختصات معتبر WGS84 وارد کنید.";
+    return;
+  }
+  routing.addWaypoint({ lat, lon });
+  waypointError.value = "";
+  waypointLat.value = "";
+  waypointLon.value = "";
+}
+function onWaypointDrag(index: number, event: DragEvent): void {
+  if (navigation.active.value) { event.preventDefault(); return; }
+  draggingWaypoint = index;
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+function onWaypointDrop(index: number): void {
+  if (draggingWaypoint !== null && !navigation.active.value) routing.moveWaypoint(draggingWaypoint, index);
+  draggingWaypoint = null;
+}
+function onRouteMapClick(event: MapMouseEvent): void {
+  if (!pickingWaypoint.value || navigation.active.value) return;
+  routing.addWaypoint({ lat: event.lngLat.lat, lon: event.lngLat.lng });
+  pickingWaypoint.value = false;
+  waypointError.value = "";
+}
+
 const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
   computed(() => desk.activeMission.value?.id ?? null), routing.selectedRoute, routing.profile,
   (camera) => routeMap?.easeTo(camera), undefined,
@@ -221,6 +302,7 @@ const ROUTE_LAYER = "rescuer-route-preview-line";
 let routeMap: MapLibreMap | null = null;
 let incidentMarker: Marker | null = null;
 let rescuerMarker: Marker | null = null;
+let waypointMarkers: Marker[] = [];
 let detachRouteMap: (() => void) | null = null;
 type RouteLineData = {
   type: "FeatureCollection";
@@ -241,6 +323,12 @@ function syncRouteMap(): void {
   if (!map || !incident) return;
   incidentMarker?.remove();
   rescuerMarker?.remove();
+  waypointMarkers.forEach((marker) => marker.remove());
+  waypointMarkers = routing.via.value.map((point, index) => {
+    const marker = new Marker({ color: "#c27c14" }).setLngLat([point.lon, point.lat]).addTo(map);
+    marker.getElement().setAttribute("aria-label", `ایستگاه ${index + 1}`);
+    return marker;
+  });
   incidentMarker = new Marker({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
   incidentMarker.getElement().setAttribute("aria-label", "محل حادثه");
   rescuerMarker = routing.from.value ? new Marker({ color: "#16826c" })
@@ -286,22 +374,29 @@ function onRouteMapReady(map: MapLibreMap): void {
   mapReady.value = true;
   const onStyleReady = () => restoreRouteLayer();
   map.on("idle", onStyleReady);
-  detachRouteMap = () => map.off("idle", onStyleReady);
+  map.on("click", onRouteMapClick);
+  detachRouteMap = () => { map.off("idle", onStyleReady); map.off("click", onRouteMapClick); };
   syncRouteMap();
 }
 function closeRoutes(): void {
   navigation.stop();
   routing.reset();
+  pickingWaypoint.value = false;
+  waypointError.value = "";
+  draggingWaypoint = null;
   mapReady.value = false;
   detachRouteMap?.();
   detachRouteMap = null;
   incidentMarker?.remove();
   rescuerMarker?.remove();
+  waypointMarkers.forEach((marker) => marker.remove());
+  waypointMarkers = [];
   incidentMarker = null;
   rescuerMarker = null;
   routeMap = null;
 }
-watch(() => [routing.target.value, routing.from.value, routing.selectedRoute.value] as const, () => syncRouteMap());
+watch(() => [routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const, () => syncRouteMap());
+watch(() => navigation.active.value, (active) => { if (active) pickingWaypoint.value = false; });
 watch(() => desk.activeMission.value?.id, (next, previous) => {
   if (previous && next !== previous) {
     closeRoutes();
@@ -327,6 +422,10 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-route__header, .mission-route__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
 .mission-route__header h2 { font-size: 1.3rem; font-weight: 800; }
 .mission-route__header p { font-size: .86rem; opacity: .78; }
+.mission-route__stops { margin-block: 16px; padding: 16px; border: 1px solid rgba(98,146,137,.3); border-radius: 16px; }
+.mission-route__coordinate { flex: 1 1 145px; max-width: 225px; }
+.mission-route__stop-list { padding-inline-start: 22px; }
+.mission-route__stop-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px; cursor: grab; }
 .mission-route__map { height: min(50vh, 430px); min-height: 310px; border-radius: 18px; overflow: hidden; }
 .mission-route__map :deep(.map-canvas), .mission-route__map :deep(.map-canvas__viewport) { min-height: 0; }
 .mission-route__choices { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 12px; }

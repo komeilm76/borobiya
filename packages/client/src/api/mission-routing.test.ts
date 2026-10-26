@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getMissionNavigationTarget, getMissionRouteChoices } from "./mission-routing";
+import { getMissionNavigationTarget, getMissionRouteChoices, getMissionRoutePlan } from "./mission-routing";
 
 const missionId = "50000000-0000-4000-8000-000000000005";
 const from = { lat: 35.68, lon: 51.38 };
@@ -65,5 +65,31 @@ describe("mission navigation APIs", () => {
     await expect(getMissionRouteChoices(from, to, "car")).rejects.toThrow("NO_ROUTE");
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 503 })));
     await expect(getMissionRouteChoices(from, to, "car")).rejects.toThrow("ROUTING_UNAVAILABLE");
+  });
+});
+
+describe("multi-destination route plan boundary", () => {
+  it("sends ordered intermediates only to the local gateway and accepts a fixed-endpoint trip permutation", async () => {
+    const via = [{ lat: 35.69, lon: 51.39 }, { lat: 35.695, lon: 51.395 }];
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ ...reply, order: [0, 2, 1, 3] })));
+    vi.stubGlobal("fetch", fetcher);
+    expect(await getMissionRoutePlan(from, to, "bicycle", via, true)).toEqual({
+      routes: [{ distance_m: 1420, duration_s: 300, polyline: reply.routes[0]!.polyline }],
+      order: [0, 2, 1, 3]
+    });
+    expect(fetcher).toHaveBeenCalledWith("/route", expect.objectContaining({
+      credentials: "same-origin", body: JSON.stringify({ from, to, profile: "bicycle", via, optimize: true })
+    }));
+  });
+  it("fails closed for missing/repeated/out-of-range or endpoint-changing optimized orders", async () => {
+    const via = [{ lat: 35.69, lon: 51.39 }, { lat: 35.695, lon: 51.395 }];
+    for (const order of [undefined, [0, 1, 1, 3], [0, 1, 2, 4], [1, 0, 2, 3], [0, 1, 3, 2]]) {
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ...reply, order }))));
+      await expect(getMissionRoutePlan(from, to, "bicycle", via, true)).rejects.toThrow();
+    }
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await expect(getMissionRoutePlan(from, to, "bicycle", Array.from({ length: 7 }, () => from), false)).rejects.toThrow();
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });

@@ -1,13 +1,14 @@
 import { computed, ref, type Ref } from "vue";
 import { coordinatesSchema, type MissionNavigationTarget } from "@shared/index";
 import {
-  getMissionNavigationTarget, getMissionRouteChoices, type RouteChoice, type TransportProfile
+  getMissionNavigationTarget, getMissionRouteChoices, getMissionRoutePlan, type RouteChoice, type RoutePoint, type TransportProfile
 } from "@/api/mission-routing";
 import { decodeRoutePolyline } from "@/sos/route-preview";
 
 export interface MissionRoutingRuntime {
   getTarget?: typeof getMissionNavigationTarget;
   getRoutes?: typeof getMissionRouteChoices;
+  getPlan?: typeof getMissionRoutePlan;
   getPosition?: () => Promise<{ lat: number; lon: number }>;
 }
 
@@ -34,6 +35,10 @@ export function useMissionRoutes(
   const profile = ref<TransportProfile>("car");
   const from = ref<{ lat: number; lon: number } | null>(null);
   const routes = ref<RouteChoice[]>([]);
+  const via = ref<RoutePoint[]>([]);
+  const optimize = ref(false);
+  const order = ref<number[]>([]);
+  const step = ref(0);
   const selectedIndex = ref(0);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -53,6 +58,10 @@ export function useMissionRoutes(
     targetLoading.value = false;
     from.value = null;
     routes.value = [];
+    via.value = [];
+    order.value = [];
+    optimize.value = false;
+    step.value = 0;
     selectedIndex.value = 0;
     loading.value = false;
     error.value = null;
@@ -68,6 +77,10 @@ export function useMissionRoutes(
     target.value = null;
     from.value = null;
     routes.value = [];
+    via.value = [];
+    order.value = [];
+    optimize.value = false;
+    step.value = 0;
     selectedIndex.value = 0;
     loading.value = false;
     targetLoading.value = true;
@@ -86,14 +99,47 @@ export function useMissionRoutes(
       if (current === generation) targetLoading.value = false;
     }
   }
-  function selectProfile(next: TransportProfile): void {
-    if (profile.value === next) return;
+  function invalidatePlan(): void {
     invalidate();
-    profile.value = next;
     routes.value = [];
+    order.value = [];
+    step.value = 0;
     selectedIndex.value = 0;
     loading.value = false;
     error.value = null;
+  }
+  function addWaypoint(point: RoutePoint): void {
+    if (!visible.value || !target.value || via.value.length >= 6) return;
+    via.value = [...via.value, coordinatesSchema.parse(point)];
+    invalidatePlan();
+  }
+  function removeWaypoint(index: number): void {
+    if (!Number.isInteger(index) || index < 0 || index >= via.value.length) return;
+    via.value = via.value.filter((_, position) => position !== index);
+    if (!via.value.length) optimize.value = false;
+    invalidatePlan();
+  }
+  function moveWaypoint(fromIndex: number, toIndex: number): void {
+    if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) ||
+        fromIndex < 0 || toIndex < 0 || fromIndex >= via.value.length || toIndex >= via.value.length ||
+        fromIndex === toIndex) return;
+    const next = [...via.value];
+    next.splice(toIndex, 0, next.splice(fromIndex, 1)[0]!);
+    via.value = next;
+    invalidatePlan();
+  }
+  function setOptimize(enabled: boolean): void {
+    if (optimize.value === enabled || (enabled && !via.value.length)) return;
+    optimize.value = enabled;
+    invalidatePlan();
+  }
+  function selectStep(index: number): void {
+    if (Number.isInteger(index) && index >= 0 && index < via.value.length + 2) step.value = index;
+  }
+  function selectProfile(next: TransportProfile): void {
+    if (profile.value === next) return;
+    invalidatePlan();
+    profile.value = next;
   }
   async function findRoutes(refreshPosition = false): Promise<void> {
     const incident = target.value?.incident;
@@ -109,6 +155,8 @@ export function useMissionRoutes(
     loading.value = true;
     error.value = null;
     routes.value = [];
+    order.value = [];
+    step.value = 0;
     selectedIndex.value = 0;
     try {
       if (!from.value || refreshPosition) {
@@ -116,10 +164,17 @@ export function useMissionRoutes(
         if (current !== generation || owner !== userId.value || mission !== missionId.value) return;
         from.value = coordinatesSchema.parse(candidate);
       }
-      const choices = await (runtime.getRoutes ?? getMissionRouteChoices)(from.value!, incident, profile.value, signal);
+      const waypoints = [...via.value];
+      const planned = waypoints.length
+        ? await (runtime.getPlan ?? getMissionRoutePlan)(from.value!, incident, profile.value, waypoints, optimize.value, signal)
+        : { routes: await (runtime.getRoutes ?? getMissionRouteChoices)(from.value!, incident, profile.value, signal), order: [0, 1] };
+      const choices = planned.routes;
       // Validate geometry before showing alternatives; never paint an arbitrary or malformed polyline.
       choices.forEach((choice) => decodeRoutePolyline(choice.polyline));
-      if (current === generation && owner === userId.value && mission === missionId.value) routes.value = choices;
+      if (current === generation && owner === userId.value && mission === missionId.value) {
+        routes.value = choices;
+        order.value = planned.order;
+      }
     } catch (cause) {
       if (current === generation && owner === userId.value && mission === missionId.value) {
         error.value = cause instanceof Error && cause.message === "NO_ROUTE"
@@ -134,6 +189,7 @@ export function useMissionRoutes(
   function selectRoute(index: number): void {
     if (Number.isInteger(index) && index >= 0 && index < routes.value.length) selectedIndex.value = index;
   }
-  return { visible, target, targetLoading, profile, from, routes, selectedIndex, selectedRoute,
-    loading, error, open, reset, selectProfile, findRoutes, selectRoute };
+  return { visible, target, targetLoading, profile, from, via, optimize, order, step, routes, selectedIndex, selectedRoute,
+    loading, error, open, reset, selectProfile, findRoutes, selectRoute, addWaypoint, removeWaypoint,
+    moveWaypoint, setOptimize, selectStep };
 }

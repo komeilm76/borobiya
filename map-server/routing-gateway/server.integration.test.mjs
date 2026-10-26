@@ -100,7 +100,11 @@ test("serves route with local DEM, geocode, and reverse requests offline through
     for await (const chunk of incoming) body += chunk;
     upstreamRequests.push({ path: incoming.url, body: JSON.parse(body) });
     outgoing.writeHead(200, { "content-type": "application/json" });
-    outgoing.end(JSON.stringify(routeFixture));
+    outgoing.end(JSON.stringify(incoming.url.startsWith("/trip/")
+      ? { ...routeFixture, trips: [{ ...routeFixture.routes[0], legs: Array.from({ length: 3 }, () => routeFixture.routes[0].legs[0]) }], waypoints: [
+        { waypoint_index: 0, trips_index: 0 }, { waypoint_index: 2, trips_index: 0 },
+        { waypoint_index: 1, trips_index: 0 }, { waypoint_index: 3, trips_index: 0 }
+      ] } : routeFixture));
   });
   const osrmPort = await listen(osrm);
   const upstreamBase = `http://127.0.0.1:${osrmPort}`;
@@ -178,6 +182,18 @@ test("serves route with local DEM, geocode, and reverse requests offline through
       "/route/v1/foot"
     ]);
     assert.deepEqual(upstreamRequests[0].body.coordinates, [[51.38, 35.68], [51.41, 35.70]]);
+
+    const tripResponse = await fetch(`http://127.0.0.1:${gatewayPort}/route`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ from: { lat: 35.68, lon: 51.38 }, to: { lat: 35.70, lon: 51.41 },
+        via: [{ lat: 35.69, lon: 51.39 }, { lat: 35.695, lon: 51.395 }], profile: "foot", optimize: true })
+    });
+    assert.equal(tripResponse.status, 200);
+    assert.deepEqual((await tripResponse.json()).order, [0, 2, 1, 3]);
+    assert.equal(upstreamRequests.at(-1).path, "/trip/v1/foot");
+    assert.deepEqual(upstreamRequests.at(-1).body.coordinates,
+      [[51.38, 35.68], [51.39, 35.69], [51.395, 35.695], [51.41, 35.70]]);
+    assert.equal(upstreamRequests.at(-1).body.destination, "last");
 
     const geocodeResponse = await fetch(`http://127.0.0.1:${gatewayPort}/geocode?q=Azadi%20Square`);
     assert.equal(geocodeResponse.status, 200);
