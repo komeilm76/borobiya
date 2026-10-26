@@ -98,7 +98,17 @@ test("serves route with local DEM, geocode, and reverse requests offline through
   const osrm = createServer(async (incoming, outgoing) => {
     let body = "";
     for await (const chunk of incoming) body += chunk;
-    upstreamRequests.push({ path: incoming.url, body: JSON.parse(body) });
+    // Mirror OSRM: trip accepts a GET URL, not a JSON POST. Fail the whole
+    // integration test if the gateway ever regresses to the unsupported method.
+    const isTrip = incoming.url.startsWith("/trip/");
+    if ((isTrip && (incoming.method !== "GET" || body !== "")) ||
+        (!isTrip && incoming.method !== "POST")) {
+      outgoing.writeHead(405, { "content-type": "application/json" });
+      outgoing.end(JSON.stringify({ code: "InvalidUrl" }));
+      return;
+    }
+    upstreamRequests.push({ method: incoming.method, path: incoming.url,
+      body: isTrip ? null : JSON.parse(body) });
     outgoing.writeHead(200, { "content-type": "application/json" });
     outgoing.end(JSON.stringify(incoming.url.startsWith("/trip/")
       ? { ...routeFixture, trips: [{ ...routeFixture.routes[0], legs: Array.from({ length: 3 }, () => routeFixture.routes[0].legs[0]) }], waypoints: [
@@ -190,10 +200,13 @@ test("serves route with local DEM, geocode, and reverse requests offline through
     });
     assert.equal(tripResponse.status, 200);
     assert.deepEqual((await tripResponse.json()).order, [0, 2, 1, 3]);
-    assert.equal(upstreamRequests.at(-1).path, "/trip/v1/foot");
-    assert.deepEqual(upstreamRequests.at(-1).body.coordinates,
-      [[51.38, 35.68], [51.39, 35.69], [51.395, 35.695], [51.41, 35.70]]);
-    assert.equal(upstreamRequests.at(-1).body.destination, "last");
+    assert.equal(upstreamRequests.at(-1).method, "GET");
+    const tripUrl = new URL(upstreamRequests.at(-1).path, upstreamBase);
+    assert.equal(tripUrl.pathname, "/trip/v1/foot/51.38,35.68;51.39,35.69;51.395,35.695;51.41,35.7");
+    assert.deepEqual(Object.fromEntries(tripUrl.searchParams), {
+      roundtrip: "false", source: "first", destination: "last", steps: "true",
+      geometries: "polyline", overview: "full"
+    });
 
     const geocodeResponse = await fetch(`http://127.0.0.1:${gatewayPort}/geocode?q=Azadi%20Square`);
     assert.equal(geocodeResponse.status, 200);

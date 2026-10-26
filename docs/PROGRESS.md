@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Bug fix: optimized trips use OSRM's supported HTTP method
+
+- The trip gateway was sending a JSON POST that OSRM v26.10 only supports for route/table/match; a real trip service would reject every optimized multi-stop request. Switched the bounded local trip call to GET with coordinates and options in its URL, and kept private GET paths and upstream echoes out of gateway errors/logs. Added a strict GET-only HTTP stub and a regression for unsupported POST, network failures, untrusted error bodies and disconnected stops. Local tests pass; real OSRM/VM/browser acceptance remains pending.
+
 ### 2026-10-26 — T4.6.2 guarded main-branch deploy workflow (code only)
 
 - Added a main-only GHCR build-and-push Action for API/routing/Photon, client static transfer over pinned-host-key SSH, immutable registry Compose overlay, and a VM cutover script with environment/map/schema preflight, no automatic migrations, bounded health wait and a best-effort static/image rollback. `docs/WORKFLOWS.md` now specifies one-time production/secret/registry preparation instead of the stale inline secret-echo workflow. ShellCheck, Ruff, YAML parse and static safety tests pass. **No CI run, Docker daemon, real GHCR push, SSH VM or production acceptance occurred here.**

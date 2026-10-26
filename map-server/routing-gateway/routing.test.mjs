@@ -271,18 +271,20 @@ test("optimizes intermediates while fixing A and the incident, rejecting an untr
   const stops = [{ waypoint_index: 0, trips_index: 0 }, { waypoint_index: 2, trips_index: 0 },
     { waypoint_index: 1, trips_index: 0 }, { waypoint_index: 3, trips_index: 0 }];
   const fixture = { code: "Ok", trips: multiStopFixture.routes, waypoints: stops };
-  let body;
+  let tripUrl;
   const response = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
     fetchImpl: async (url, options) => {
-      assert.equal(url, DEFAULT_UPSTREAMS.car.replace("/route/v1/", "/trip/v1/"));
-      body = JSON.parse(options.body);
+      tripUrl = new URL(url);
+      assert.equal(options.method, "GET");
+      assert.equal(options.body, undefined);
       return Response.json(fixture);
     }
   });
   assert.equal(response.status, 200);
-  assert.deepEqual(body, {
-    coordinates: [[51.38, 35.68], [51.39, 35.69], [51.395, 35.695], [51.41, 35.7]],
-    roundtrip: false, source: "first", destination: "last", steps: true, geometries: "polyline", overview: "full"
+  assert.equal(tripUrl.pathname, "/trip/v1/car/51.38,35.68;51.39,35.69;51.395,35.695;51.41,35.7");
+  assert.deepEqual(Object.fromEntries(tripUrl.searchParams), {
+    roundtrip: "false", source: "first", destination: "last", steps: "true",
+    geometries: "polyline", overview: "full"
   });
   assert.deepEqual((await response.json()).order, [0, 2, 1, 3]);
   for (const waypoints of [stops.slice(1), [{ ...stops[0], waypoint_index: 1 }, ...stops.slice(1)],
@@ -308,4 +310,57 @@ test("rejects unbounded, malformed or meaningless waypoint requests before OSRM"
     assert.equal(answer.status, 400);
   }
   assert.equal(calls, 0);
+});
+
+test("optimized trip uses OSRM v26.10 GET URL (POST JSON is route/table/match-only) without logging private coordinates", async () => {
+  const via = [{ lat: 35.69, lon: 51.39 }];
+  const lines = [];
+  const fixture = { code: "Ok", trips: [{ ...osrmFixture.routes[0],
+    legs: [osrmFixture.routes[0].legs[0], osrmFixture.routes[0].legs[0]] }],
+  waypoints: [{ waypoint_index: 0, trips_index: 0 }, { waypoint_index: 1, trips_index: 0 },
+    { waypoint_index: 2, trips_index: 0 }] };
+  const response = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+    log: (line) => lines.push(line),
+    fetchImpl: async (address, options) => {
+      const url = new URL(address);
+      if (options.method !== "GET" || options.body !== undefined || url.pathname !==
+        "/trip/v1/car/51.38,35.68;51.39,35.69;51.41,35.7") {
+        return Response.json({ code: "InvalidUrl", message: "GET trip URL required" }, { status: 405 });
+      }
+      assert.equal(url.searchParams.get("roundtrip"), "false");
+      assert.equal(url.searchParams.get("source"), "first");
+      assert.equal(url.searchParams.get("destination"), "last");
+      assert.equal(url.searchParams.get("steps"), "true");
+      assert.equal(url.searchParams.get("geometries"), "polyline");
+      assert.equal(url.searchParams.get("overview"), "full");
+      return Response.json(fixture);
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).order, [0, 1, 2]);
+  assert.deepEqual(lines, []);
+
+  // A failed upstream can have sensitive coordinates in the GET path; neither logs nor
+  // browser-facing diagnostics may contain them, including on a transport failure.
+  const failed = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+    log: (line) => lines.push(line),
+    fetchImpl: async () => Response.json({ code: "NotImplemented",
+      message: "GET /trip/v1/car/51.38,35.68;51.39,35.69;51.41,35.7 failed" }, { status: 400 })
+  });
+  assert.equal(failed.status, 502);
+  assert.doesNotMatch(JSON.stringify(await failed.json()) + lines.join("\n"), /51\.39,35\.69/);
+  const networkFailure = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+    log: (line) => lines.push(line),
+    fetchImpl: async () => { throw new TypeError("fetch GET /trip/v1/car/51.38,35.68;51.39,35.69 failed", {
+      cause: { code: "ECONNREFUSED" }
+    }); }
+  });
+  assert.equal(networkFailure.status, 503);
+  assert.match(lines.at(-1), /ECONNREFUSED/);
+  assert.doesNotMatch(lines.join("\n"), /51\.39,35\.69/);
+  const noTrip = await handleRoutingRequest(postRoute({ ...validInput, via, optimize: true }), {
+    fetchImpl: async () => Response.json({ code: "NoTrips", message: "51.39,35.69 is disconnected" }, { status: 400 })
+  });
+  assert.equal(noTrip.status, 422);
+  assert.doesNotMatch(JSON.stringify(await noTrip.json()), /51\.39,35\.69/);
 });

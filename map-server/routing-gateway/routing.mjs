@@ -162,11 +162,11 @@ export async function handleRoutingRequest(request, {
 
   const optimized = input.optimize === true;
   const stops = [input.from, ...(input.via ?? []), input.to];
+  const coordinates = stops.map((point) => [point.lon, point.lat]);
   const osrmRequest = {
-    coordinates: stops.map((point) => [point.lon, point.lat]),
-    ...(optimized ? { roundtrip: false, source: "first", destination: "last" } :
-      // OSRM alternatives are only supported for a two-stop route.
-      { alternatives: stops.length === 2 ? (input.alternatives ?? true) : false }),
+    coordinates,
+    // OSRM alternatives are only supported for a two-stop route.
+    alternatives: stops.length === 2 ? (input.alternatives ?? true) : false,
     steps: true,
     geometries: "polyline",
     overview: "full"
@@ -174,24 +174,52 @@ export async function handleRoutingRequest(request, {
 
   const upstreamEndpoint = optimized ? endpoint.replace("/route/v1/", "/trip/v1/") : endpoint;
   if (optimized && upstreamEndpoint === endpoint) return json({ error: "routing_profile_unavailable", profile: input.profile }, 503);
+  // OSRM accepts JSON POST for route/table/match, but its trip service only accepts GET.
+  // The bounded (<=8 stops) validated numbers keep the local URL short. Never put this URL
+  // into gateway logs/diagnostics: unlike the route POST it contains private GPS points.
+  let requestUrl = upstreamEndpoint;
+  if (optimized) {
+    try {
+      const tripUrl = new URL(upstreamEndpoint);
+      tripUrl.pathname += `/${coordinates.map(([lon, lat]) => `${lon},${lat}`).join(";")}`;
+      for (const [key, value] of Object.entries({ roundtrip: "false", source: "first", destination: "last",
+        steps: "true", geometries: "polyline", overview: "full" })) {
+        tripUrl.searchParams.set(key, value);
+      }
+      requestUrl = tripUrl.toString();
+    } catch {
+      return json({ error: "routing_profile_unavailable", profile: input.profile }, 503);
+    }
+  }
   let response;
   try {
-    response = await fetchImpl(upstreamEndpoint, {
+    response = await fetchImpl(requestUrl, optimized ? {
+      method: "GET", headers: { accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs)
+    } : {
       method: "POST",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify(osrmRequest),
       signal: AbortSignal.timeout(timeoutMs)
     });
   } catch (error) {
-    // The 503 body stays a fixed shape for clients; the container log is where "connection refused" and
-    // "timed out after 15s" have to be told apart, because that difference is the whole diagnosis.
-    const reason = `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
+    // Fetch errors can contain the full request URL. Keep transport error names and safe
+    // socket codes for trips, but not the exception message (which may contain GPS points).
+    const transportCode = error?.cause?.code;
+    const reason = optimized
+      ? `${error?.name === "TimeoutError" ? "TimeoutError" : "Error"}${
+        typeof transportCode === "string" && /^[A-Z_0-9]+$/.test(transportCode)
+          ? `: ${transportCode}` : ""}`
+      : `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
     log(`${input.profile} routing: no HTTP answer from ${upstreamEndpoint} (${reason})`);
     return json({ error: "routing_unavailable", profile: input.profile }, 503);
   }
 
   const { text, parsed, readFailed } = await readUpstreamBody(response);
-  const upstream = describeUpstream({ endpoint: upstreamEndpoint, status: response.status, text, parsed, readFailed });
+  // An OSRM error body can also echo the GET path. Only report status and code for trips.
+  const safeParsed = optimized ? (parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? { code: parsed.code } : undefined) : parsed;
+  const upstream = describeUpstream({ endpoint: upstreamEndpoint, status: response.status,
+    text: optimized ? "" : text, parsed: safeParsed, readFailed });
   const report = (error, fallback) => {
     log(formatUpstreamLog(`${input.profile} routing`, { status: response.status, endpoint: upstreamEndpoint, ...upstream }));
     return json({ error, profile: input.profile, message: upstream.message ?? fallback, ...upstream.fields }, 502);
@@ -202,8 +230,9 @@ export async function handleRoutingRequest(request, {
       ? "The OSRM response body could not be read."
       : "OSRM answered with something that is not a JSON object.");
   }
-  if (parsed.code === "NoRoute" || parsed.code === "NoSegment") {
-    return json({ error: "no_route", message: parsed.message ?? "No route was found." }, 422);
+  if (parsed.code === "NoRoute" || parsed.code === "NoSegment" || (optimized && parsed.code === "NoTrips")) {
+    return json({ error: "no_route", message: optimized ? "No connected trip was found." :
+      (parsed.message ?? "No route was found.") }, 422);
   }
   if (!response.ok || parsed.code !== "Ok") {
     return report("routing_failed", "The OSRM profile answered with an error and no message.");
