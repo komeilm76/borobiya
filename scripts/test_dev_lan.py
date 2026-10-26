@@ -108,6 +108,9 @@ class LanTlsTest(unittest.TestCase):
         self.assertIn("--parallel", root["scripts"]["dev:lan-https"])
         self.assertIn("bun --watch", server["scripts"]["dev:lan-https"])
         self.assertTrue(client["scripts"]["dev:lan-https"].startswith("node "))
+        smoke = (repo / "packages/client/scripts/test-dev-https-hmr.mjs").read_text()
+        self.assertIn("loadConfigFromFile", smoke)  # preserve actual project TLS/proxy config
+        self.assertIn("watch: null", smoke)  # generated Android tree must not hang this one-shot test
         if not shutil.which("node") or not (repo / "packages/client/node_modules/vite").exists():
             self.skipTest("Node and installed Vite are required for the live WSS test")
         cert = self.run_script("cert")

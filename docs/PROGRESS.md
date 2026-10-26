@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Fix HTTPS/WSS smoke teardown after Android generation
+
+- Generating `packages/client/android/` made the existing one-shot Vite HTTPS/WSS handshake test intermittently hang **after** reporting success: Vite watched the large native tree and left file watchers alive during teardown. The smoke harness now loads the real Vite config and uses it with watching disabled only for this one-shot transport test, then waits for the WebSocket close handshake before stopping Vite. The six LAN tests, including a trusted TLS/WSS handshake with the generated Android tree present, now finish normally. This does not claim a physical device, real Android build or production WSS check.
+
 ### 2026-10-26 — T4.6.3 signed Android tag workflow (code only)
 
 - Added pinned Capacitor CLI/Android dependencies and a release-tag Action that checks main ancestry, generates/syncs the ignored native project, inserts location permissions, versions and signs the APK with ephemeral environment-only secrets, verifies the signature and uploads an artifact. The release shell requires a configured public HTTPS production origin for same-origin API/map/cookie requests; it does not claim standalone offline operation or trust the LAN debug CA. Python template/security checks and local `cap add`/`cap sync` succeed. **No GitHub Action, Android SDK/Gradle assemble, signed APK, production TLS, device GPS or share acceptance has been run.** See `WORKFLOWS.md` §6 for required operator settings and sign-off.

@@ -3,16 +3,24 @@
 //   node packages/client/scripts/test-dev-https-hmr.mjs
 import assert from "node:assert/strict";
 import https from "node:https";
-import { createServer } from "vite";
+import { createServer, loadConfigFromFile } from "vite";
 
 assert.ok(!process.versions.bun, "Vite's HTTPS HMR smoke test must run on Node, not Bun");
 assert.ok(process.env.BOROBIYA_DEV_TLS_CERT && process.env.BOROBIYA_DEV_TLS_KEY && process.env.NODE_EXTRA_CA_CERTS);
 
+const configFile = new URL("../vite.config.ts", import.meta.url).pathname;
+const loaded = await loadConfigFromFile({ command: "serve", mode: "development" }, configFile);
+assert.ok(loaded, "Project Vite config must load");
+// Use the actual HTTPS/proxy/plugin configuration but explicitly disable the
+// watcher for this one-shot handshake. Passing watch:null alongside configFile
+// does not work: Vite merges the file afterward and loses the null override.
+// A generated Capacitor android/ tree otherwise leaves hundreds of native file
+// watchers alive after close(), making a successful WSS smoke time out.
 const vite = await createServer({
-  configFile: new URL("../vite.config.ts", import.meta.url).pathname,
-  // The test only needs the Vite HTTP and HMR services; no app dependency scan.
+  ...loaded.config,
+  configFile: false,
   optimizeDeps: { noDiscovery: true },
-  server: { host: "127.0.0.1", port: 0 }
+  server: { ...loaded.config.server, host: "127.0.0.1", port: 0, watch: null }
 });
 let socket;
 try {
@@ -37,6 +45,16 @@ try {
   assert.deepEqual(JSON.parse(message), { type: "connected" });
   console.log("Trusted HTTPS response and WSS HMR handshake passed under Node.");
 } finally {
-  socket?.close();
+  if (socket && socket.readyState !== WebSocket.CLOSED) {
+    // Node's WebSocket close is asynchronous. Closing Vite in the same tick can
+    // strand its HMR shutdown waiting for this client (the WSS handshake passed,
+    // but the smoke test timed out in teardown). Drain the close handshake first.
+    const closed = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timed out closing Vite WSS HMR client")), 5000);
+      socket.addEventListener("close", () => { clearTimeout(timer); resolve(); }, { once: true });
+    });
+    socket.close();
+    await closed;
+  }
   await vite.close();
 }
