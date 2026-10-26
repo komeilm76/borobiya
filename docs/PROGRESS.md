@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.6.2 guarded main-branch deploy workflow (code only)
+
+- Added a main-only GHCR build-and-push Action for API/routing/Photon, client static transfer over pinned-host-key SSH, immutable registry Compose overlay, and a VM cutover script with environment/map/schema preflight, no automatic migrations, bounded health wait and a best-effort static/image rollback. `docs/WORKFLOWS.md` now specifies one-time production/secret/registry preparation instead of the stale inline secret-echo workflow. ShellCheck, Ruff, YAML parse and static safety tests pass. **No CI run, Docker daemon, real GHCR push, SSH VM or production acceptance occurred here.**
+
 ### 2026-10-26 — T4.3.5 scoped mission-timeline SSE fallback
 
 - Added a bearer-header, owner-scoped mission-timeline invalidation stream for when the mission timeline’s Socket.IO connection fails; the client re-reads persisted timeline rows, never trusts the stream for GPS or mission changes. Periodic JWT/session/ownership rechecks, a two-stream/session cap, a 14-minute expiry, abort-on-recovery/identity-change and unbuffered local/VM nginx proxy paths are implemented. HTTP streaming and pure client lifecycle tests pass. This does **not** guarantee live VM/browser streaming or cover other Socket.IO consumers.
@@ -131,7 +135,7 @@ The implementation and 150 ms paint-transition configuration are tested, Tehran 
 | 3.6 Cancellation + re-dispatch | 100% (7/7) | ✅ `T3.6.1` reasons; `T3.6.2` requester pre-accept cancel; `T3.6.3` guarded rescuer cancellation and mission UI; `T3.6.4` requester accepted-mission teardown; `T3.6.5` urgent admin replacement alerts, red-flash badge, private location and deep link. Cancellation detail reads expose actor/time/resolved reason; T3.6.6 adds explicit one-click replacement re-dispatch to previously unassigned nearest responders |
 | 3.7 History + rating | 100% (4/4) | ✅ `T3.7.1` requester SOS history, `T3.7.2` requester-only completed-mission rating API, `T3.7.3` storage/average triggers and `T3.7.4` requester star-rating form plus rescuer paginated history with ratings and timelines. VM/browser acceptance remains a separate gate |
 
-### Phase 4 — Polish — 67% (18 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
+### Phase 4 — Polish — 70% (19 of 27 numbered T4 tasks checked in `docs/TASKS.md` §4.1–4.7)
 
 | Milestone | % | Notes |
 |-----------|---|-------|

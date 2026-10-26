@@ -1,0 +1,106 @@
+name: Production deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+# Never interrupt an in-progress database check, image pull or VM cutover.
+concurrency:
+  group: borobiya-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check deployment prerequisites
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${VM_HOST:?Configure the production VM_HOST secret}"
+          : "${VM_USER:?Configure the production VM_USER secret}"
+          : "${VM_SSH_PRIVATE_KEY:?Configure the production VM_SSH_PRIVATE_KEY secret}"
+          : "${VM_SSH_KNOWN_HOSTS:?Configure the production VM_SSH_KNOWN_HOSTS secret}"
+          [[ "$VM_HOST" =~ ^[a-zA-Z0-9.-]+$ && "$VM_USER" =~ ^[a-zA-Z_][a-zA-Z0-9_-]*$ ]]
+          echo "BOROBIYA_IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Install and verify the repository gates
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+          python3 -m pip install ruff==0.15.3
+          bun install --frozen-lockfile
+          bun run lint
+          bun run typecheck
+          bun run test
+          node --test map-server/routing-gateway/*.test.mjs
+          bun run build
+      - name: Fetch pinned Photon JAR for the image (never ship its database)
+        run: ./map-server/scripts/download-photon.sh
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packages/server/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.BOROBIYA_IMAGE_PREFIX }}-api:${{ github.sha }}
+      - name: Publish routing gateway image
+        uses: docker/build-push-action@v6
+        with:
+          context: map-server/routing-gateway
+          file: map-server/routing-gateway/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.BOROBIYA_IMAGE_PREFIX }}-routing:${{ github.sha }}
+      - name: Publish Photon runtime (index stays on VM)
+        uses: docker/build-push-action@v6
+        with:
+          context: map-server/photon
+          file: map-server/photon/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.BOROBIYA_IMAGE_PREFIX }}-photon:${{ github.sha }}
+      - name: Transfer built static client and deploy to prepared VM
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          VM_SSH_PRIVATE_KEY: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          VM_SSH_KNOWN_HOSTS: ${{ secrets.VM_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$VM_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$VM_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          ssh_opts=(-T -o BatchMode=yes -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes)
+          target="${VM_USER}@${VM_HOST}"
+          tar -C packages/client/dist -czf "$RUNNER_TEMP/client.tgz" .
+          ssh "${ssh_opts[@]}" "$target" 'umask 077; mkdir -p /opt/borobiya/.deploy'
+          ssh "${ssh_opts[@]}" "$target" "cat > /opt/borobiya/.deploy/${GITHUB_SHA}.tgz" < "$RUNNER_TEMP/client.tgz"
+          ssh "${ssh_opts[@]}" "$target" "cd /opt/borobiya && bash -se -- '${GITHUB_SHA}' '${BOROBIYA_IMAGE_PREFIX}'" < scripts/deploy-vm.sh

@@ -30,6 +30,9 @@ map-server/tools/*.jar
 *.osm.pbf
 *.osrm*
 
+# Remote VM deploy staging (client archive/rollback copies are not source)
+.deploy/
+
 # Generated application code and native builds
 packages/client/src/generated/
 android/

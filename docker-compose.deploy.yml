@@ -1,0 +1,9 @@
+# Registry-only VM overlay. Keep docker-compose.yml's persistent Postgres, uploads,
+# map datasets, Nginx and Caddy volumes unchanged. Use --no-build when launching.
+services:
+  api:
+    image: ${BOROBIYA_IMAGE_PREFIX:?set registry image prefix}-api:${BOROBIYA_DEPLOY_SHA:?set immutable commit SHA}
+  routing-gateway:
+    image: ${BOROBIYA_IMAGE_PREFIX:?set registry image prefix}-routing:${BOROBIYA_DEPLOY_SHA:?set immutable commit SHA}
+  photon:
+    image: ${BOROBIYA_IMAGE_PREFIX:?set registry image prefix}-photon:${BOROBIYA_DEPLOY_SHA:?set immutable commit SHA}
