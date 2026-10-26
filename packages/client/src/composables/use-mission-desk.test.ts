@@ -83,6 +83,55 @@ describe("mission desk cancellation", () => {
     expect(desk.cancellationError.value).toContain("هیچ لغوی ثبت نشد");
   });
 
+  it("does not strand the list spinner when the cancellation dialog opens during a refresh", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    const slowList = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(slowList.promise);
+    const refresh = desk.load();
+    expect(desk.loading.value).toBe(true);
+    await desk.showCancellation();
+    slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await refresh;
+    expect(desk.loading.value).toBe(false);
+    expect(desk.activeMission.value?.id).toBe(mission.id);
+  });
+
+  it("ignores a list started before a committed cancellation even if it answers afterwards", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const slowList = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(slowList.promise);
+    const refresh = desk.load();
+    await desk.confirmCancellation();
+    expect(desk.cancelledMissionId.value).toBe(missionId);
+    slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await refresh;
+    expect(desk.activeMission.value).toBeNull();
+    expect(desk.loading.value).toBe(false);
+  });
+
+  it("does not apply a previous panel's cancellation response after reset for the same account", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const slowCancel = deferred<void>();
+    vi.mocked(cancelRescuerMission).mockReturnValueOnce(slowCancel.promise);
+    const saving = desk.confirmCancellation();
+    desk.reset(); // e.g. the mission view unmounted and reopened for the same account
+    await desk.load();
+    expect(desk.activeMission.value?.id).toBe(missionId);
+    slowCancel.resolve();
+    await saving;
+    expect(desk.activeMission.value?.id).toBe(missionId);
+    expect(desk.cancelledMissionId.value).toBeNull();
+    expect(desk.cancellationOpen.value).toBe(false);
+    expect(desk.cancelling.value).toBe(false);
+  });
+
   it("drops a late mission list after sign-out or account switch", async () => {
     const token = ref<string | null>("token");
     const owner = ref<string | null>(rescuerId);

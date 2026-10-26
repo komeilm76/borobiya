@@ -22,37 +22,46 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   const reasonId = ref("");
   const customReason = ref("");
   const blocked = ref(false);
-  let generation = 0;
+  // List reads, reason reads and panel sessions have different lifetimes. Opening a
+  // dialog must not invalidate a list read without clearing its loading indicator.
+  let listGeneration = 0;
+  let reasonGeneration = 0;
+  let sessionGeneration = 0;
   const activeMission = computed(() => missions.value.find((item) => isActiveMission(item.status)) ?? null);
   const selectedReason = computed(() => reasons.value.find((item) => item.id === reasonId.value));
   const canCancel = computed(() => cancellationOpen.value && !reasonLoading.value && !cancelling.value &&
-    !blocked.value && !!activeMission.value && !!token.value && !!selectedReason.value &&
+    !blocked.value && !!activeMission.value && !!token.value && !!userId.value && !!selectedReason.value &&
     (!selectedReason.value.requiresCustomText ||
       (customReason.value.trim().length >= 10 && customReason.value.trim().length <= 200)));
 
   async function load(): Promise<void> {
-    const current = ++generation;
+    const current = ++listGeneration;
     const owner = userId.value;
-    if (!owner || !token.value) { missions.value = []; return; }
+    if (!owner || !token.value) {
+      missions.value = [];
+      loading.value = false;
+      error.value = null;
+      return;
+    }
     loading.value = true;
     error.value = null;
     try {
       await ensureSession?.();
       const bearer = token.value;
-      if (!bearer || userId.value !== owner || current !== generation) return;
+      if (!bearer || userId.value !== owner || current !== listGeneration) return;
       const page = await listRescuerMissions(bearer);
-      if (current === generation && userId.value === owner) missions.value = page.items;
+      if (current === listGeneration && userId.value === owner) missions.value = page.items;
     } catch (cause) {
-      if (current === generation && userId.value === owner)
+      if (current === listGeneration && userId.value === owner)
         error.value = sosApiErrorMessage(cause, "بارگذاری مأموریت‌ها ممکن نشد؛ دوباره تلاش کنید.");
     } finally {
-      if (current === generation) loading.value = false;
+      if (current === listGeneration) loading.value = false;
     }
   }
 
   async function showCancellation(): Promise<void> {
-    if (!activeMission.value || !token.value || cancelling.value) return;
-    const current = ++generation;
+    if (!activeMission.value || !token.value || !userId.value || cancelling.value) return;
+    const current = ++reasonGeneration;
     const owner = userId.value;
     cancellationOpen.value = true;
     reasonId.value = "";
@@ -62,18 +71,18 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     reasonLoading.value = true;
     try {
       const result = await listRescuerCancellationReasons(token.value);
-      if (current === generation && cancellationOpen.value && userId.value === owner) reasons.value = result;
+      if (current === reasonGeneration && cancellationOpen.value && userId.value === owner) reasons.value = result;
     } catch (cause) {
-      if (current === generation && cancellationOpen.value && userId.value === owner)
+      if (current === reasonGeneration && cancellationOpen.value && userId.value === owner)
         cancellationError.value = sosApiErrorMessage(cause, "دریافت دلایل ممکن نشد؛ دوباره تلاش کنید.");
     } finally {
-      if (current === generation) reasonLoading.value = false;
+      if (current === reasonGeneration) reasonLoading.value = false;
     }
   }
 
   function dismissCancellation(): void {
     if (cancelling.value) return;
-    ++generation;
+    ++reasonGeneration;
     cancellationOpen.value = false;
     reasonLoading.value = false;
     cancellationError.value = null;
@@ -85,35 +94,45 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     const reason = selectedReason.value!;
     const bearer = token.value!;
     const owner = userId.value;
+    const session = sessionGeneration;
     cancelling.value = true;
     cancellationError.value = null;
     try {
       await cancelRescuerMission(bearer, mission.id, reason.id,
         reason.requiresCustomText ? customReason.value.trim() : undefined);
-      if (userId.value !== owner) return;
+      if (session !== sessionGeneration || userId.value !== owner) return;
+      // A pre-commit list can arrive after the mutation and resurrect the old
+      // active status. Ignore it; a later explicit refresh reads the committed row.
+      ++listGeneration;
+      loading.value = false;
+      error.value = null;
       missions.value = missions.value.map((item) => item.id === mission.id
         ? { ...item, status: "cancelled_by_rescuer", cancelledBy: "rescuer", cancellationReasonId: reason.id }
         : item);
       cancelledMissionId.value = mission.id;
       cancellationOpen.value = false;
     } catch (cause) {
-      if (userId.value !== owner) return;
+      if (session !== sessionGeneration || userId.value !== owner) return;
       blocked.value = cause instanceof ApiError && cause.status === 409;
       cancellationError.value = blocked.value
         ? "وضعیت مأموریت تغییر کرده است؛ فهرست را تازه کنید. هیچ لغوی ثبت نشد."
         : sosApiErrorMessage(cause, "ثبت لغو انجام نشد؛ اتصال را بررسی کنید و دوباره تلاش کنید.");
     } finally {
-      cancelling.value = false;
+      if (session === sessionGeneration) cancelling.value = false;
     }
   }
 
   function reset(): void {
-    ++generation;
+    ++sessionGeneration;
+    ++listGeneration;
+    ++reasonGeneration;
     missions.value = [];
     loading.value = false;
     error.value = null;
     cancelledMissionId.value = null;
     cancellationOpen.value = false;
+    reasonLoading.value = false;
+    cancelling.value = false;
     cancellationError.value = null;
     reasons.value = [];
     reasonId.value = "";

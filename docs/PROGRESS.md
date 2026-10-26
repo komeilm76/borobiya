@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — Fix rescuer mission-desk asynchronous cancellation races
+
+- A mission list refresh and the cancellation-reason dialog previously shared one generation counter: opening the dialog discarded a pending list reply but stranded its loading spinner. A list started while the dialog was open could also finish after a confirmed cancellation and restore the old active status; a cancelled request resolving after the panel reset for the same account could mutate the new panel. List, reason and panel-session lifetimes are now isolated; successful cancellation invalidates older list reads, and reset drops in-flight mutation results. Three deferred-response tests reproduced these interleavings before the fix; focused client typechecks pass. This does not claim live database or device acceptance.
+
 ### 2026-10-26 — T4.4.1 rescuer route phone controls (partial)
 
 - The mission route editor uses one transport-profile state for a compact phone select and the desktop button group; both remain locked during active navigation. Under 600px the route actions, waypoint coordinate fields and mission refresh toolbar can stack within the available width, with the route map below the controls in document flow at a definite height. Source-pinned regressions and client build cover the structure. The broader responsive/bottom-sheet audit and browser/device visual acceptance remain open; T4.4.1 is **not** checked complete.
