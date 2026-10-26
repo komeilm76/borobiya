@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 location-share phone footer (partial)
+
+- The location-sharing dialog becomes fullscreen on phones, but its footer previously kept the live status, spacer, Close and Share on one non-wrapping row. A submitting or success status can grow independently of the non-shrinking Vuetify buttons, squeezing or clipping the Share action at narrow widths. Under 600px the status now wraps on its own row, the spacer is hidden and both actions stack at full width with at least 44px touch height. The form body remains the separately scrollable part of the fullscreen dialog. Source-pinned regression failed before the CSS change and passes afterward; no actual phone visual acceptance or site-wide mobile-dialog audit is claimed. T4.4.1 remains **open**.
+
 ### 2026-10-26 — T4.4.1 SOS bottom-sheet submit clipping (partial)
 
 - Vuetify's SOS `v-card-actions` uses a non-wrapping flex row, while its `v-btn` children do not shrink. On a narrow phone the Cancel button, spacer and long emergency Send button could exceed the sheet width and the card's hidden overflow could clip the Send action; at 600px the inset sheet itself also becomes only 70% of the viewport. Through 700px the footer now stacks both buttons at full width, removes the empty spacer, allows long labels to wrap and keeps at least 44px touch height. The form body still scrolls separately and the severity cards still switch to one column only on phones. A source-pinned regression failed before the fix and passes afterward; physical-phone/tablet and short-viewport visual acceptance is not claimed. T4.4.1 stays **open** for the rest of the bottom-sheet/site-wide responsive audit.

@@ -818,4 +818,14 @@ watch(
   font-size: 0.82rem;
   font-weight: 700;
 }
+
+@media (max-width: 599px) {
+  /* Fullscreen phones need room for a changing status message as well as both
+   * non-shrinking Vuetify buttons; keep the separately scrollable form above. */
+  .share-dialog__actions { flex-wrap: wrap; }
+  .share-dialog__status { flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+  .share-dialog__actions :deep(.v-spacer) { display: none; }
+  .share-dialog__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }
+  .share-dialog__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
 </style>
