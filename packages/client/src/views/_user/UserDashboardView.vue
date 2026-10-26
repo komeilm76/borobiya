@@ -177,7 +177,7 @@ function onSharesChanged(): void {
   align-items: center;
   gap: 0.5rem;
   margin: 0;
-  color: #537879;
+  color: #536d6c;
   font-size: 0.82rem;
   font-weight: 800;
 }
@@ -192,7 +192,7 @@ function onSharesChanged(): void {
 
 .user-dashboard__welcome {
   margin: 0;
-  color: #627a7a;
+  color: #536d6c;
   font-size: 0.96rem;
 }
 
@@ -231,7 +231,7 @@ function onSharesChanged(): void {
 
 .user-dashboard__card-kicker {
   margin-bottom: 0.3rem;
-  color: #7b9190;
+  color: var(--bb-color-muted);
   font-size: 0.73rem;
 }
 
@@ -246,7 +246,7 @@ function onSharesChanged(): void {
 
 .user-dashboard__card-header p {
   margin: 0.35rem 0 0;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.84rem;
   line-height: 1.7;
 }
@@ -304,7 +304,7 @@ function onSharesChanged(): void {
 
 .user-dashboard__feature-card > p {
   margin: 0.5rem 0 1.1rem;
-  color: #718584;
+  color: var(--bb-color-muted);
   font-size: 0.84rem;
   line-height: 1.8;
 }
@@ -361,7 +361,7 @@ function onSharesChanged(): void {
 
 .user-dashboard__note-card p {
   margin: 0.25rem 0 0;
-  color: #627a7a;
+  color: #536d6c;
   font-size: 0.76rem;
   line-height: 1.7;
 }

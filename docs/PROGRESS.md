@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.3 dashboard text contrast (partial)
+
+- A measured light-theme audit found small dashboard text below the WCAG AA 4.5:1 text threshold: the page eyebrow narrowly missed, the welcome line missed on the off-white page, card subtitles/kickers missed on white, and note-card copy missed on its translucent tinted background. These light foregrounds now use darker muted values or the readable palette muted token. A source-pinned test checks relative luminance on the actual page/card backgrounds and both possible note-card tint backdrops, and guards dark-theme readability. This is a bounded contrast correction, **not** a site-wide WCAG AA audit, keyboard/screen-reader sign-off or real-browser verification; T4.4.3 stays **open**.
+
 ### 2026-10-26 — T4.4.2 location-share list truthfulness (partial)
 
 - A failed first live-share read used to fall through to “nobody sees your live location,” and history-read failures were ignored, so a partial result could also claim there were no received shares. The share panel now distinguishes first-load, successful-empty, stale-rows and unavailable states for the live and history sources, reports failures separately, and withholds exact count chips when a source is unverified. A newer refresh wins over an older overlapping read, including on unmount, and a missing session clears private rows. After server-confirmed revocation, the removed row disappears even if the follow-up read fails; it is **not** hidden optimistically before acknowledgment. Pure presentation and source-pinned regressions cover the states, with full client/repository checks; no real-browser verification. Other T4.4.2 loading/toast/optimistic surfaces remain **open**.
