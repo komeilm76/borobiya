@@ -22,7 +22,7 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMapConfig } from "@/api/map-config";
-import { registerMapCacheWorker } from "@/services/map-cache";
+import { registerMapCacheWorker, waitForMapCacheStartup } from "@/services/map-cache";
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
@@ -200,7 +200,9 @@ onMounted(() => {
 
   const controller = new AbortController();
   configRequest = controller;
-  void registerMapCacheWorker().then(() => {
+  // The initial map may precede first-time SW activation; never make users wait for the full
+  // registration/ready timeout before loading MapLibre. Existing controlled pages keep their cache.
+  void waitForMapCacheStartup(registerMapCacheWorker).then(() => {
     if (controller.signal.aborted) return;
     return initializeMap(controller);
   }).catch((error: unknown) => {

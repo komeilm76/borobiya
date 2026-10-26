@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.4 bounded map-cache startup (partial)
+
+- MapCanvas previously waited for cache-worker registration/ready before importing MapLibre; on a fresh install this could consume the worker's 1.5s readiness timeout even while the map service was online. The map now waits at most 200ms for worker startup, then initializes while registration continues in the background; worker errors cannot block rendering, and an already controlling worker retains its cache behavior. Focused tests cover immediate readiness, a never-settling registration, failures and the component wiring. Routes were already lazy and the admin user list already paged at 20 rows. This removes a startup gate; it **does not** prove <2s rendered map, <500ms location or site-wide performance targets without browser/VM measurements. T4.4.4 stays **open**.
+
 ### 2026-10-26 — T4.4.3 dashboard text contrast (partial)
 
 - A measured light-theme audit found small dashboard text below the WCAG AA 4.5:1 text threshold: the page eyebrow narrowly missed, the welcome line missed on the off-white page, card subtitles/kickers missed on white, and note-card copy missed on its translucent tinted background. These light foregrounds now use darker muted values or the readable palette muted token. A source-pinned test checks relative luminance on the actual page/card backgrounds and both possible note-card tint backdrops, and guards dark-theme readability. This is a bounded contrast correction, **not** a site-wide WCAG AA audit, keyboard/screen-reader sign-off or real-browser verification; T4.4.3 stays **open**.

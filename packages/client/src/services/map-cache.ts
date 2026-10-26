@@ -1,6 +1,27 @@
 let mapCacheWorkerReady: Promise<void> | undefined;
 
-/** Register and activate the map-only cache worker before a map starts making requests. */
+/** Allow a short head start for an already-installing worker, not a 1.5s map-render blockade. */
+export const MAP_CACHE_STARTUP_BUDGET_MS = 200;
+
+/**
+ * Registration is best-effort. A ready worker can intercept the first tile request, but on a fresh
+ * install (or a blocked service-worker API) the online map must start even if register() never resolves.
+ * The registration continues in the background after the budget expires; its eventual rejection is
+ * handled here rather than becoming an unhandled promise rejection.
+ */
+export async function waitForMapCacheStartup(register: () => Promise<void>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.resolve().then(register).catch(() => undefined),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, MAP_CACHE_STARTUP_BUDGET_MS); })
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/** Register and activate the map-only cache worker when possible. */
 export function registerMapCacheWorker(): Promise<void> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
     return Promise.resolve();
