@@ -23,11 +23,14 @@
       </div>
     </div>
 
-    <v-alert v-if="loadError" class="mt-3" type="error" variant="tonal" density="compact">
+    <v-alert v-if="loadError" class="mt-3" type="error" variant="tonal" density="compact" role="alert">
       {{ loadError }}
     </v-alert>
 
-    <v-skeleton-loader v-if="loading && !loaded" type="list-item@3" class="mt-2" />
+    <div v-if="loading && !loaded" role="status" aria-live="polite">
+      <span class="sr-only">در حال دریافت اشتراک‌های موقعیت…</span>
+      <v-skeleton-loader type="list-item@3" class="mt-2" aria-hidden="true" />
+    </div>
 
     <template v-else>
       <p v-if="pendingRevocation" class="share-lists__pending" role="status">
@@ -37,12 +40,9 @@
       <section class="share-lists__section" aria-labelledby="share-lists-owned-title">
         <h3 id="share-lists-owned-title">
           اشتراک‌های من
-          <v-chip size="x-small" variant="tonal">{{ ownedRows.length }}</v-chip>
+          <v-chip v-if="liveFresh && !loading" size="x-small" variant="tonal">{{ ownedRows.length }}</v-chip>
         </h3>
-        <p v-if="ownedRows.length === 0" class="share-lists__empty">
-          هیچ‌کس موقعیت زندهٔ شما را نمی‌بیند.
-        </p>
-        <ul v-else class="share-lists__rows">
+        <ul v-if="ownedRows.length" class="share-lists__rows">
           <li v-for="row in ownedRows" :key="row.id" class="share-lists__row">
             <v-icon :icon="row.kind === 'expired' ? 'mdi-map-marker-off-outline' : 'mdi-map-marker-outline'" size="20" />
             <div class="share-lists__row-main">
@@ -64,17 +64,21 @@
             </v-btn>
           </li>
         </ul>
+        <p v-else-if="ownState === 'empty'" class="share-lists__empty">هیچ‌کس موقعیت زندهٔ شما را نمی‌بیند.</p>
+        <p v-else-if="ownState === 'unavailable'" class="share-lists__empty">
+          وضعیت دسترسی به موقعیت زنده را نتوانستیم بررسی کنیم؛ دوباره تازه‌سازی کنید.
+        </p>
+        <p v-else class="share-lists__empty" role="status">در حال بررسی اشتراک‌های زنده…</p>
       </section>
 
       <section class="share-lists__section" aria-labelledby="share-lists-received-title">
         <h3 id="share-lists-received-title">
           با من به اشتراک گذاشته‌اند
-          <v-chip size="x-small" variant="tonal">{{ receivedRows.length + receivedHistoryRows.length }}</v-chip>
+          <v-chip v-if="liveFresh && historyFresh && !loading" size="x-small" variant="tonal">
+            {{ receivedRows.length + receivedHistoryRows.length }}
+          </v-chip>
         </h3>
-        <p v-if="receivedRows.length === 0 && receivedHistoryRows.length === 0" class="share-lists__empty">
-          اشتراک فعالی برای شما باز نیست.
-        </p>
-        <ul v-else class="share-lists__rows">
+        <ul v-if="receivedRows.length || receivedHistoryRows.length" class="share-lists__rows">
           <li v-for="row in receivedRows" :key="row.id" class="share-lists__row">
             <v-icon icon="mdi-account-eye-outline" size="20" />
             <div class="share-lists__row-main">
@@ -107,12 +111,17 @@
             </v-btn>
           </li>
         </ul>
+        <p v-else-if="receivedState === 'empty'" class="share-lists__empty">اشتراک فعالی برای شما باز نیست.</p>
+        <p v-else-if="receivedState === 'unavailable'" class="share-lists__empty">
+          وضعیت اشتراک‌های دریافتی را نتوانستیم بررسی کنیم؛ دوباره تازه‌سازی کنید.
+        </p>
+        <p v-else class="share-lists__empty" role="status">در حال بررسی اشتراک‌های دریافتی…</p>
       </section>
 
       <section v-if="historyRows.length > 0" class="share-lists__section" aria-labelledby="share-lists-history-title">
         <h3 id="share-lists-history-title">
           بازه‌های تاریخچه
-          <v-chip size="x-small" variant="tonal">{{ historyRows.length }}</v-chip>
+          <v-chip v-if="historyFresh && !loading" size="x-small" variant="tonal">{{ historyRows.length }}</v-chip>
         </h3>
         <ul class="share-lists__rows">
           <li v-for="row in historyRows" :key="row.id" class="share-lists__row">
@@ -189,6 +198,7 @@ import {
   shareRowLabel,
   type ShareRowKind
 } from "@/sharing/share-form";
+import { shareSectionPresentation } from "@/sharing/share-list-presentation";
 
 /**
  * "My Shares" / "Shared With Me" (spec §7.2, tracker T2.1.7), plus the history grants that share
@@ -226,9 +236,12 @@ interface ReceivedView extends LiveRowView {
 
 const auth = useAuthStore();
 
-const loading = ref(false);
+const loading = ref(true);
 const loaded = ref(false);
+const liveFresh = ref(false);
+const historyFresh = ref(false);
 const loadError = ref<string | null>(null);
+let readVersion = 0;
 const owned = ref<OwnedLocationShare[]>([]);
 const received = ref<ReceivedLocationShare[]>([]);
 const ownedHistory = ref<OwnedLocationHistoryShare[]>([]);
@@ -324,19 +337,38 @@ const receivedHistoryRows = computed<HistoryRowView[]>(() => {
   });
 });
 
+const ownState = computed(() => shareSectionPresentation(loading.value, liveFresh.value, ownedRows.value.length));
+const receivedState = computed(() => shareSectionPresentation(loading.value, liveFresh.value && historyFresh.value,
+  receivedRows.value.length + receivedHistoryRows.value.length));
+
 async function refresh(): Promise<void> {
-  await auth.ensureSession();
-  const token = auth.accessToken;
-  if (!token) return;
+  const version = ++readVersion;
   loading.value = true;
   loadError.value = null;
   // Re-read the clock with the data, so a manual refresh never shows a countdown measured against the
   // last tick (up to 30 s stale).
   nowMs.value = Date.now();
   try {
-    // Both lists in parallel, but a failure of the history call must not blank the live one — the
-    // privacy question ("who can see me right now") is the answer the user came here for.
+    await auth.ensureSession();
+    if (version !== readVersion) return;
+    const token = auth.accessToken;
+    if (!token) {
+      // A prior account's private rows must not linger when this session is no longer available.
+      owned.value = [];
+      received.value = [];
+      ownedHistory.value = [];
+      receivedHistory.value = [];
+      liveFresh.value = false;
+      historyFresh.value = false;
+      loadError.value = "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
+      return;
+    }
+    // Both lists in parallel, but a failure of either one must not discard the other's successful
+    // read. In particular, no failed read may support the claim that nobody has access.
     const [live, history] = await Promise.allSettled([listLocationShares(token), listLocationHistoryShares(token)]);
+    if (version !== readVersion) return;
+    liveFresh.value = live.status === "fulfilled";
+    historyFresh.value = history.status === "fulfilled";
     if (live.status === "fulfilled") {
       owned.value = live.value.owned;
       received.value = live.value.sharedWithMe;
@@ -345,12 +377,24 @@ async function refresh(): Promise<void> {
       ownedHistory.value = history.value.owned;
       receivedHistory.value = history.value.sharedWithMe;
     }
-    if (live.status === "rejected") throw live.reason;
-    loaded.value = true;
+    const failures: string[] = [];
+    if (live.status === "rejected") {
+      failures.push(`خواندن اشتراک‌های زنده ناموفق بود؛ ردیف‌های موجود ممکن است قدیمی باشند: ${friendlyErrorMessage(live.reason, "دوباره تلاش کنید.")}`);
+    }
+    if (history.status === "rejected") {
+      failures.push(`خواندن دسترسی‌های تاریخچه ناموفق بود؛ ردیف‌های موجود ممکن است قدیمی باشند: ${friendlyErrorMessage(history.reason, "دوباره تلاش کنید.")}`);
+    }
+    loadError.value = failures.length ? failures.join(" ") : null;
   } catch (error) {
-    loadError.value = friendlyErrorMessage(error, "فهرست اشتراک‌ها را نشد دید.");
+    if (version !== readVersion) return;
+    liveFresh.value = false;
+    historyFresh.value = false;
+    loadError.value = `${friendlyErrorMessage(error, "فهرست اشتراک‌ها را نشد دید؛ دوباره تلاش کنید.")} ردیف‌های موجود ممکن است قدیمی باشند.`;
   } finally {
-    loading.value = false;
+    if (version === readVersion) {
+      loaded.value = true;
+      loading.value = false;
+    }
   }
 }
 
@@ -408,15 +452,29 @@ function askRevokeHistory(row: HistoryRowView): void {
 
 async function confirmRevoke(): Promise<void> {
   const row = pendingRow.value;
-  await auth.ensureSession();
-  const token = auth.accessToken;
-  if (!row || !token) return;
+  if (!row) return;
 
   revoking.value = true;
   pendingRevocation.value = row.id;
   try {
-    if (row.history) await revokeLocationHistoryShare(row.id, token);
-    else await revokeLocationShare(row.id, token);
+    await auth.ensureSession();
+    const token = auth.accessToken;
+    if (!token) {
+      loadError.value = "برای لغو اشتراک دوباره وارد حساب شوید.";
+      confirmOpen.value = false;
+      return;
+    }
+    // Reconcile only after the server confirms the privacy write. If the subsequent read fails,
+    // the revoked row must not keep claiming to be active, but an empty list cannot be certified yet.
+    if (row.history) {
+      await revokeLocationHistoryShare(row.id, token);
+      ownedHistory.value = ownedHistory.value.filter((share) => share.id !== row.id);
+      historyFresh.value = false;
+    } else {
+      await revokeLocationShare(row.id, token);
+      owned.value = owned.value.filter((share) => share.id !== row.id);
+      liveFresh.value = false;
+    }
     confirmOpen.value = false;
     pendingRow.value = null;
     await refresh();
@@ -481,7 +539,10 @@ watch(
   { immediate: true }
 );
 
-onBeforeUnmount(detachRealtimeShareSync);
+onBeforeUnmount(() => {
+  readVersion += 1;
+  detachRealtimeShareSync();
+});
 onMounted(refresh);
 
 defineExpose({ refresh });

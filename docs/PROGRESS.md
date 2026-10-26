@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.2 location-share list truthfulness (partial)
+
+- A failed first live-share read used to fall through to “nobody sees your live location,” and history-read failures were ignored, so a partial result could also claim there were no received shares. The share panel now distinguishes first-load, successful-empty, stale-rows and unavailable states for the live and history sources, reports failures separately, and withholds exact count chips when a source is unverified. A newer refresh wins over an older overlapping read, including on unmount, and a missing session clears private rows. After server-confirmed revocation, the removed row disappears even if the follow-up read fails; it is **not** hidden optimistically before acknowledgment. Pure presentation and source-pinned regressions cover the states, with full client/repository checks; no real-browser verification. Other T4.4.2 loading/toast/optimistic surfaces remain **open**.
+
 ### 2026-10-26 — T4.4.2 admin catalog loading/feedback (partial)
 
 - Admin incident types and rescuer categories previously showed a blank table during the first request and could report “no items” after a failed read. Both tables now begin with screen-reader-labeled skeletons, keep existing rows visible with a progress indicator on refresh, show empty copy only after a successful empty read, and provide a retry when the read fails. Existing confirmed-write success snackbars and abort/version guards remain; catalog writes are not optimistically shown without server confirmation. Pure presentation-state cases and source-pinned markup tests cover this increment. Other screens, toast consistency, suitable optimistic updates/rollback, and browser accessibility/visual checks remain open. T4.4.2 stays **open**.

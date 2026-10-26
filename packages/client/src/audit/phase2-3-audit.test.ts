@@ -305,7 +305,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
 
     expect(shareLists).toContain("query: { historyShare: row.id }");
     expect(shareLists).toContain("SHARE_ENDED_EVENT");
-    expect(shareLists).toContain("onBeforeUnmount(detachRealtimeShareSync)");
+    expect(shareLists).toMatch(/onBeforeUnmount\(\(\) => \{\s*readVersion \+= 1;\s*detachRealtimeShareSync\(\);\s*\}\);/);
 
     expect(playbackPanel).toContain("route.query.historyShare");
     expect(playbackPanel).toContain('props.api.selectSource("grant")');
