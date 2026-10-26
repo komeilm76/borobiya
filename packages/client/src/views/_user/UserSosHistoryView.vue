@@ -26,17 +26,20 @@
       </section>
       <div v-else class="history__grid">
         <section class="history__list" aria-label="فهرست درخواست‌های امداد">
-          <button v-for="item in history.items.value" :key="item.id" type="button" class="history__item"
-            :class="{ 'history__item--selected': history.selected.value?.id === item.id }"
-            :aria-pressed="history.selected.value?.id === item.id" :disabled="history.cancellation.submitting.value"
-            @click="choose(item)">
-            <span class="history__item-icon"><v-icon icon="mdi-lifebuoy" size="21" /></span>
-            <span class="history__item-copy">
-              <strong>{{ item.description }}</strong>
-              <small>{{ new Date(item.createdAt).toLocaleString('fa-IR') }}</small>
-            </span>
-            <v-chip size="small" :color="statusInfo(item.status).color" variant="tonal">{{ statusInfo(item.status).label }}</v-chip>
-          </button>
+          <div class="history__items" role="region" aria-label="درخواست‌ها؛ برای موارد بیشتر پیمایش کنید"
+            :tabindex="history.items.value.length > 1 ? 0 : -1">
+            <button v-for="item in history.items.value" :key="item.id" type="button" class="history__item"
+              :class="{ 'history__item--selected': history.selected.value?.id === item.id }"
+              :aria-pressed="history.selected.value?.id === item.id" :disabled="history.cancellation.submitting.value"
+              @click="choose(item)">
+              <span class="history__item-icon"><v-icon icon="mdi-lifebuoy" size="21" /></span>
+              <span class="history__item-copy">
+                <strong>{{ item.description }}</strong>
+                <small>{{ new Date(item.createdAt).toLocaleString('fa-IR') }}</small>
+              </span>
+              <v-chip size="small" :color="statusInfo(item.status).color" variant="tonal">{{ statusInfo(item.status).label }}</v-chip>
+            </button>
+          </div>
           <div v-if="history.totalPages.value > 1" class="history__pages">
             <v-btn variant="text" icon="mdi-chevron-right" aria-label="صفحهٔ قبل" :disabled="history.page.value <= 1 || history.loading.value"
               @click="history.load(history.page.value - 1)" />
@@ -207,7 +210,7 @@ onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 .history__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin: 31px 0 17px; }
 .history__toolbar h2 { margin: 0; font-size: 1.23rem; font-weight: 800; }.history__toolbar p { margin: 3px 0 0; opacity: .69; font-size: .82rem; }
 .history__grid { display: grid; grid-template-columns: minmax(275px,400px) minmax(0,1fr); gap: 18px; align-items: start; }
-.history__list { display: grid; gap: 10px; }
+.history__list,.history__items { display: grid; gap: 10px; min-width: 0; }
 .history__item { width: 100%; display: flex; align-items: center; gap: 12px; text-align: start; font: inherit; color: inherit; cursor: pointer; background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.25); border-radius: 17px; padding: 17px; box-shadow: 0 6px 18px rgba(14,70,66,.035); transition: transform .18s,border-color .18s,box-shadow .18s; }
 .history__item:hover { transform: translateY(-2px); box-shadow: 0 14px 27px rgba(14,70,66,.1); }.history__item:focus-visible { outline: 3px solid #26977b; outline-offset: 2px; }.history__item:disabled { cursor: wait; }
 .history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px rgba(38,155,124,.14); }
@@ -223,6 +226,11 @@ onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 .history__mission-selector select { width: 100%; padding: 11px; border: 1px solid rgba(98,146,137,.4); border-radius: 10px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); }
 .history__actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; padding-top: 24px; }.history__actions p { margin: 0; font-size: .83rem; opacity: .74; }.history__hint { font-size: .8rem; opacity: .74; }
 .history__empty { text-align: center; padding: 62px 24px; }.history__empty h3 { margin: 16px 0 5px; }.history__empty p { opacity: .72; }
-@media(max-width:880px) { .history__grid { grid-template-columns: 1fr; }.history__list { grid-template-columns: repeat(2,minmax(0,1fr)); }.history__pages { grid-column: 1 / -1; } }
-@media(max-width:530px) { .history__list { grid-template-columns: 1fr; }.history__item { flex-wrap: wrap; }.history__item .v-chip { margin-inline-start: 49px; } }
+@media(max-width:880px) { .history__grid { grid-template-columns: 1fr; }.history__items { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:780px) {
+  .history__items { grid-template-columns: 1fr; max-height: min(42vh, 22rem); max-height: min(42dvh, 22rem); overflow-y: auto; padding: 3px 4px 6px; }
+  .history__items:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; border-radius: 17px; }
+  .history__toolbar { flex-wrap: wrap; }
+}
+@media(max-width:530px) { .history__item { flex-wrap: wrap; }.history__item .v-chip { margin-inline-start: 49px; } }
 </style>

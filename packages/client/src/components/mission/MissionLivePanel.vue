@@ -125,5 +125,11 @@ onBeforeUnmount(() => { for (const marker of Object.values(markers)) marker?.rem
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: .71rem; opacity: .78; }
 .live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }
-@media(max-width:720px) { .live-panel__grid { grid-template-columns: 1fr; } }
+@media(max-width:720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }
+@media(max-width:599px) {
+  .live-panel__member { flex-wrap: wrap; }
+  .live-panel__member > .v-chip { max-width: 100%; }
+  .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }
+  .live-panel__members :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
 </style>

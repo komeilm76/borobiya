@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 requester history phone flow (partial)
+
+- A long SOS request page previously placed the selected case, cancellation action and live mission map after every card on narrow screens; two card columns stayed active to 530px. The cards now stack by 780px and only their keyboard-focusable, named list scrolls within a viewport-relative cap; pagination stays visible after the list and the selected case/map remain in normal flow below. Nested rating choices wrap without shrinking 48px targets, while live member badges and share-button text can wrap at phone widths. Source-pinned regressions, focused client tests and typechecks cover the change; no browser or device visual acceptance has been performed. Other screens, bottom-sheet review and site-wide breakpoints remain open; T4.4.1 is **not** checked complete.
+
 ### 2026-10-26 — T3.5.5 route-geometry boundary review (partial; VM acceptance blocked)
 
 - Reproduced a malformed OSRM alternative receiving HTTP 200 when no DEM was configured: the browser then rejected the entire route selection. The gateway now validates every returned polyline before serving any alternative; out-of-range, truncated, single-point and oversized geometry produce a scoped 502. A valid long route still reaches the client even when its optional DEM summary exceeds the separate 12,000-sample altitude budget. Gateway tests use synthetic responses and a local server; no Docker, real OSRM graphs, downloaded Skadi tiles or offline browser are available in this workspace. T3.5.5 remains **open** until the VM corridor, per-profile alternatives/elevation and offline browser checks in `docs/MAP_SERVER.md` are recorded.
