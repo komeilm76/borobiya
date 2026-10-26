@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.1 SOS bottom-sheet submit clipping (partial)
+
+- Vuetify's SOS `v-card-actions` uses a non-wrapping flex row, while its `v-btn` children do not shrink. On a narrow phone the Cancel button, spacer and long emergency Send button could exceed the sheet width and the card's hidden overflow could clip the Send action; at 600px the inset sheet itself also becomes only 70% of the viewport. Through 700px the footer now stacks both buttons at full width, removes the empty spacer, allows long labels to wrap and keeps at least 44px touch height. The form body still scrolls separately and the severity cards still switch to one column only on phones. A source-pinned regression failed before the fix and passes afterward; physical-phone/tablet and short-viewport visual acceptance is not claimed. T4.4.1 stays **open** for the rest of the bottom-sheet/site-wide responsive audit.
+
 ### 2026-10-26 — T4.4.1 companion map tablet collision (partial)
 
 - The companion map switched absolute side panels to in-flow controls only at 750px. At 751–815px its 25rem toolbar/search and 24rem history playback card plus 1rem inset on each side need 816px even before leaving a lane for map gestures, so the panels can physically overlap. The in-flow, definite-height map layout now extends through 1023px; the history panel's compact/scrollable treatment and the map's camera-padding media query use the same cutoff, preserving deep-link expansion. Focused regressions failed before the change and pass afterward. This is a structural fix, not a real browser/tablet verification; T4.4.1 remains **open** for broader breakpoints, bottom-sheet audit and device acceptance.

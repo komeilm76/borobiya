@@ -65,6 +65,25 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(sheetSource).toMatch(/\.sos-sheet__subtitle\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/s);
   });
 
+  it("keeps cancel and emergency submit reachable in the narrow bottom-sheet footer", () => {
+    expect(sheetSource).toContain("<v-bottom-sheet");
+    expect(sheetSource).toContain("    scrollable\n");
+    expect(sheetSource).toContain('class="sos-sheet__actions"');
+    expect(sheetSource).toContain('data-test="sos-submit"');
+    expect(sheetSource).toContain('@click="sos.submit()"');
+    // Vuetify's v-card-actions does not wrap and v-btn defaults to flex-shrink: 0.
+    // At 320px, two buttons plus a spacer can push the emergency action outside the clipped card.
+    // The inset sheet drops to 70% width at 600px, so the footer needs the
+    // stacked treatment through small tablets, not just at phone widths.
+    const narrow = sheetSource.split("@media (max-width: 700px) {")[1]!.split("@media (max-width: 600px) {")[0]!;
+    expect(narrow).toContain('.sos-sheet__actions { flex-wrap: wrap; }');
+    expect(narrow).toContain('.sos-sheet__actions :deep(.v-spacer) { display: none; }');
+    expect(narrow).toContain('.sos-sheet__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }');
+    expect(narrow).toContain('.sos-sheet__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
+    expect(sheetSource).toContain('@media (max-width: 600px) {\n  .sos-sheet__severities {');
+    expect(sheetSource).toContain('max-height: min(74vh, 42rem);');
+  });
+
   it("replaces the dashboard 'coming soon' rescue card with an active SOS trigger", () => {
     expect(dashboardSource).toContain("sosSheet.openSheet()");
     expect(dashboardSource).not.toContain("درخواست و پیگیری امداد در گام بعدی اضافه می‌شود");

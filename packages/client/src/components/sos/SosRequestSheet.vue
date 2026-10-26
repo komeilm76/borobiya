@@ -647,6 +647,16 @@ onBeforeUnmount(() => {
   padding: 0.85rem 1.25rem;
 }
 
+/* Vuetify actions are a non-wrapping row with non-shrinking buttons. The
+ * inset sheet narrows to 70% at 600px, so include small tablets as well as
+ * phones or the emergency submit can be clipped inside the card. */
+@media (max-width: 700px) {
+  .sos-sheet__actions { flex-wrap: wrap; }
+  .sos-sheet__actions :deep(.v-spacer) { display: none; }
+  .sos-sheet__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }
+  .sos-sheet__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
+
 @media (max-width: 600px) {
   .sos-sheet__severities {
     grid-template-columns: 1fr;
