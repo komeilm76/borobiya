@@ -53,6 +53,30 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(categories).toContain("unknownTargetLabels(error, selectedIds.value");
   });
 
+  it("distinguishes first-load skeletons, failed reads, empty success and stale rows during refresh", () => {
+    for (const [source, rows, colspan] of [
+      [incidents, "types", "6"],
+      [categories, "categories", "5"]
+    ]) {
+      expect(source).toContain(`catalogListPresentation(loading.value, ${rows}.value.length, listError.value)`);
+      expect(source).toContain("const loading = ref(true)"); // no empty-state flash before onMounted
+      expect(source).toContain('v-progress-linear v-if="listState === \'refreshing\'"');
+      expect(source).toContain(':aria-busy="loading"');
+      expect(source).toMatch(/<p v-if="listState === 'loading'"[^>]*role="status"/);
+      const loadingRow = source.match(/<tr v-if="listState === 'loading'">([\s\S]*?)<\/tr>/)?.[1];
+      expect(loadingRow).toContain(`colspan="${colspan}"`);
+      expect(loadingRow).toContain('<v-skeleton-loader v-for="row in 3"');
+      expect(loadingRow).toContain('aria-hidden="true"');
+      const errorRow = source.match(/<tr v-if="listState === 'error'">([\s\S]*?)<\/tr>/)?.[1];
+      expect(errorRow).toContain(`colspan="${colspan}"`);
+      expect(errorRow).toContain('@click="load"');
+      expect(source).toContain('<tr v-if="listState === \'empty\'">');
+      expect(source).toContain(`v-for="${rows === "types" ? "type in types" : "category in categories"}"`);
+      expect(source).not.toContain(`v-if="!loading && ${rows}.length === 0"`);
+      expect(source).toContain('<v-snackbar v-model="successVisible"');
+    }
+  });
+
   it("aborts and ignores in-flight work when the page unmounts", () => {
     // Both views fetch on mount and after every write, so a fast unmount would otherwise land a response
     // on a dead component (and, before the version guards, overwrite a newer list with an older one).

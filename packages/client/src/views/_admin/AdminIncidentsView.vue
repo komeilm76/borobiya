@@ -23,13 +23,14 @@
     </header>
 
     <v-alert v-if="listError" class="mb-4" type="error" variant="tonal" rounded="lg" role="alert">{{ listError }}</v-alert>
-    <v-alert v-if="!loading && types.length === 0 && !listError" class="mb-4" type="info" variant="tonal" rounded="lg">
+    <v-alert v-if="listState === 'empty'" class="mb-4" type="info" variant="tonal" rounded="lg">
       هنوز هیچ نوع رویدادی تعریف نشده است. برای اولین نوع، «نوع رویداد جدید» را بزنید.
     </v-alert>
 
     <v-card elevation="0" rounded="xl" class="overflow-hidden">
-      <v-progress-linear v-if="loading" indeterminate color="primary" />
-      <v-table class="admin-incidents-table">
+      <p v-if="listState === 'loading'" class="sr-only" role="status" aria-live="polite">در حال بارگذاری نوع رویدادها…</p>
+      <v-progress-linear v-if="listState === 'refreshing'" indeterminate color="primary" aria-label="در حال تازه‌سازی نوع رویدادها" />
+      <v-table class="admin-incidents-table" :aria-busy="loading">
         <thead>
           <tr>
             <th>نام</th>
@@ -41,6 +42,11 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="listState === 'loading'">
+            <td colspan="6">
+              <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" aria-hidden="true" />
+            </td>
+          </tr>
           <tr v-for="type in types" :key="type.id" class="admin-incidents-row" :data-slug="type.slug">
             <td class="font-medium">{{ type.name }}</td>
             <td><code class="admin-incidents-slug">{{ type.slug }}</code></td>
@@ -54,7 +60,13 @@
               <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(type)">ویرایش</v-btn>
             </td>
           </tr>
-          <tr v-if="!loading && types.length === 0">
+          <tr v-if="listState === 'error'">
+            <td colspan="6" class="py-6 text-center">
+              دریافت نوع رویدادها انجام نشد.
+              <v-btn size="small" variant="text" color="primary" @click="load">تلاش دوباره</v-btn>
+            </td>
+          </tr>
+          <tr v-if="listState === 'empty'">
             <td colspan="6" class="py-6 text-center opacity-60">موردی برای نمایش نیست.</td>
           </tr>
         </tbody>
@@ -157,13 +169,15 @@ import {
   type CatalogFieldErrors,
   type IncidentFormDraft
 } from "../../admin/catalog-form";
+import { catalogListPresentation } from "../../admin/catalog-list-presentation";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
 
 const types = ref<IncidentType[]>([]);
-const loading = ref(false);
+const loading = ref(true);
 const listError = ref("");
+const listState = computed(() => catalogListPresentation(loading.value, types.value.length, listError.value));
 const formOpen = ref(false);
 const saving = ref(false);
 const editing = ref<IncidentType | null>(null);

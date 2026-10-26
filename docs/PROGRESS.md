@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-26 — T4.4.2 admin catalog loading/feedback (partial)
+
+- Admin incident types and rescuer categories previously showed a blank table during the first request and could report “no items” after a failed read. Both tables now begin with screen-reader-labeled skeletons, keep existing rows visible with a progress indicator on refresh, show empty copy only after a successful empty read, and provide a retry when the read fails. Existing confirmed-write success snackbars and abort/version guards remain; catalog writes are not optimistically shown without server confirmation. Pure presentation-state cases and source-pinned markup tests cover this increment. Other screens, toast consistency, suitable optimistic updates/rollback, and browser accessibility/visual checks remain open. T4.4.2 stays **open**.
+
 ### 2026-10-26 — T4.4.1 location-share phone footer (partial)
 
 - The location-sharing dialog becomes fullscreen on phones, but its footer previously kept the live status, spacer, Close and Share on one non-wrapping row. A submitting or success status can grow independently of the non-shrinking Vuetify buttons, squeezing or clipping the Share action at narrow widths. Under 600px the status now wraps on its own row, the spacer is hidden and both actions stack at full width with at least 44px touch height. The form body remains the separately scrollable part of the fullscreen dialog. Source-pinned regression failed before the CSS change and passes afterward; no actual phone visual acceptance or site-wide mobile-dialog audit is claimed. T4.4.1 remains **open**.

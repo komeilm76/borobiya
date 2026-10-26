@@ -29,8 +29,9 @@
     </v-alert>
 
     <v-card elevation="0" rounded="xl" class="overflow-hidden">
-      <v-progress-linear v-if="loading" indeterminate color="primary" />
-      <v-table class="admin-categories-table">
+      <p v-if="listState === 'loading'" class="sr-only" role="status" aria-live="polite">در حال بارگذاری گروه‌ها…</p>
+      <v-progress-linear v-if="listState === 'refreshing'" indeterminate color="primary" aria-label="در حال تازه‌سازی گروه‌ها" />
+      <v-table class="admin-categories-table" :aria-busy="loading">
         <thead>
           <tr>
             <th>نام</th>
@@ -41,6 +42,11 @@
           </tr>
         </thead>
         <tbody>
+          <tr v-if="listState === 'loading'">
+            <td colspan="5">
+              <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" aria-hidden="true" />
+            </td>
+          </tr>
           <tr v-for="category in categories" :key="category.id" class="admin-categories-row">
             <td class="font-medium">{{ category.name }}</td>
             <td class="admin-categories-description">{{ category.description || "—" }}</td>
@@ -73,7 +79,13 @@
               <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category)">ویرایش</v-btn>
             </td>
           </tr>
-          <tr v-if="!loading && categories.length === 0">
+          <tr v-if="listState === 'error'">
+            <td colspan="5" class="py-6 text-center">
+              دریافت گروه‌ها انجام نشد.
+              <v-btn size="small" variant="text" color="primary" @click="load">تلاش دوباره</v-btn>
+            </td>
+          </tr>
+          <tr v-if="listState === 'empty'">
             <td colspan="5" class="py-6 text-center opacity-60">هنوز گروهی ساخته نشده است.</td>
           </tr>
         </tbody>
@@ -233,14 +245,16 @@ import {
   type CatalogFieldErrors,
   type CategoryFormDraft
 } from "../../admin/catalog-form";
+import { catalogListPresentation } from "../../admin/catalog-list-presentation";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
 
 const categories = ref<Category[]>([]);
 const incidentTypes = ref<IncidentType[]>([]);
-const loading = ref(false);
+const loading = ref(true);
 const listError = ref("");
+const listState = computed(() => catalogListPresentation(loading.value, categories.value.length, listError.value));
 
 const formOpen = ref(false);
 const editing = ref<Category | null>(null);
