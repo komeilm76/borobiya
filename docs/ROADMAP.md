@@ -192,12 +192,19 @@ gantt
 
 ## Future (Post-MVP, Not in 8w)
 
-- Privacy v2: allowlist/blocklist, granular windows (TODO comment)
-- Device offline pack: download PBF region to phone
-- Voice/video call in mission (WebRTC)
-- Push notifications (FCM)
-- Sharded Postgres, Redis cluster, CDN
-- Public landing + FAQs (`_public`)
+These are **proposals, not implemented features or release gates**. They need their own threat model, contracts, acceptance criteria and prioritized task IDs before work starts. Do not silently expand the existing Phase 2/3 TODOs into these projects.
+
+| Proposal | Prerequisite / boundary |
+|---|---|
+| Privacy v2: recipient allowlists/blocklists and granular windows | Separate authorization/migration design; do not silently implement the `location/shares.ts` §7.4 TODO while finishing Phase 2 acceptance. Existing grants and revocation remain authoritative. |
+| Suspension expiry and abuse policy | Design `suspendedUntil`, a recovery/admin workflow and audited thresholds before enabling automatic suspension. The `realtime/socket.ts` SECURITY §10.1 TODO remains out of Phase 2 scope. Current throttles and review alerts are **not** auto-suspension. |
+| Device offline packs (regional PBF download) | Scope licensed storage, on-device data size, map update/versioning, encryption/privacy and eviction; current offline map library is VM-side, not an APK pack. |
+| Voice/video in missions (WebRTC) | Consent, participant-only authorization, signaling and media retention policy; not implied by private mission location rooms. |
+| Push notifications (FCM) | Explicit device enrollment, notification-content minimization, key rotation and opt-out; Socket.IO alerts are foreground only. |
+| Database/traffic scaling | Measure before choosing Redis rate-limit storage, sharding or a CDN; preserve the current location/photo access boundaries. |
+| Public landing and FAQs (`_public`) | Content/design task, not a reason to widen authenticated SOS or profile reads. |
+
+Current release-blocking and optional backlog items live in [TASKS.md](./TASKS.md), not in this post-MVP list. Phase 1/2 VM acceptance and the T3.5.5 terrain check stay open separately. Historic unchecked milestone lines above are not a second backlog: check `TASKS.md` for the present task status.
 
 ---
 

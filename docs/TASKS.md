@@ -344,7 +344,8 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 ### 4.7 Docs & Cleanup
 
 - [ ] **T4.7.1** Fill `USER_MANUAL.md` screenshots, `PROGRESS.md` 100%, `DIAGRAMS/*` rendered
-- [ ] **T4.7.2** `SECURITY.md` audit, `API.md` links to live Swagger, `ROADMAP.md` Future section
+- [x] **T4.7.2** `SECURITY.md` audit, `API.md` links to live Swagger, `ROADMAP.md` Future section ✅ 2026-10-26
+  - **Delivered:** Source-reviewed credential/session, HTTP/Socket, photo and proxy boundaries against the actual handlers. Corrected false security claims about bcrypt, automatic suspension, unsuspend, HTML sanitization, TLS/HSTS, unsupported timeout env keys and GPS-vs-session presence. Added an explicit findings/remaining-validation table without claiming a penetration test or live VM result. `API.md` links running Swagger UI/JSON under direct and Compose URLs, explains the runtime-status marker, and corrects the mission-transition 409 and admin `/_user` guard. `ROADMAP.md` scopes post-MVP privacy, suspension and offline-device proposals to separate future contracts, not Phase 2 TODO work; live operational acceptance remains P1-G1/P1-A1/P1-A2/P2-A1/P2-A2 and T3.5.5.
 - [ ] **T4.7.3** Tag `v1.0.0` + release notes
 
 ---

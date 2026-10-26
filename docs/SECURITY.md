@@ -1,6 +1,6 @@
 # Borobiya — Security
 
-> TL;DR: All secrets hashed (argon2id), JWT short/long, rate-limit + auto-suspend, CORS allowlist, Zod-only validation, no delete endpoint, audit logs, no sensitive logs.
+> TL;DR: Argon2id credentials, short-lived access JWTs with revocable sessions, request limits, CORS allowlist, validated input, no user-delete endpoint, and scoped audit logs. **Automatic suspension is not implemented.** This is a code/documentation review, not a penetration test or live-deployment certification.
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### 1.2 Passwords
 
-- **Hash:** `argon2id` (preferred, `memoryCost 64MB, timeCost 3, parallelism 1`) or `bcrypt cost 12`.
+- **Hash:** Argon2id only (`memoryCost 64 MiB, timeCost 3, parallelism 1`) in `packages/server/src/security/password.ts`; bcrypt is not implemented.
 - Never store/recover plaintext. Never log.
 - **Policy:** 8–1024 characters, at least one Unicode letter + decimal digit (validated by the shared Zod schema).
 - Login accepts legacy passwords without reapplying the creation policy, but caps submitted credentials at 1024 characters to bound Argon2 work.
@@ -70,7 +70,7 @@ The database seed hashes the local bootstrap admin credential with the same Argo
 | Token | Lifetime | Storage | Usage |
 |-------|----------|---------|-------|
 | `accessToken` | 15 min | Memory (JS var) + `Authorization: Bearer` | Every API call |
-| `refreshToken` | 7 days | HttpOnly, SameSite=Lax cookie with `Secure` on HTTPS (web) or platform Secure Storage (native) | `/_auth/refresh` |
+| `refreshToken` | 7 days | HttpOnly, SameSite=Lax cookie with `Secure` on HTTPS (web) or secure storage provided by a native client (not implemented in this repository) | `/_auth/refresh` |
 | `resetToken` | 10 min | One-time in body | Forgot reset |
 
 - Secrets: `JWT_SECRET` + `JWT_REFRESH_SECRET` — 32+ chars, different values, from `.env`, never commit.
@@ -124,43 +124,25 @@ Every response defaults to `cache-control: no-store` from an `onSend` hook rathe
 
 ## 4. Suspension & Abuse
 
-### 4.1 Auto-Suspend Triggers
+### 4.1 Automatic suspension — not implemented
 
-```ts
-if (failedLoginsIn(15*MIN) > 10) suspend(24*H, "too_many_failed_logins");
-if (locationUpdatesPerSec > 50)   suspend(24*H, "location_spam");
-if (sosCancelsIn(1*HOUR) > 10)     suspend(24*H, "sos_cancel_abuse");
-```
+Request throttles and cancellation review alerts **do not** suspend an account. A future suspension policy needs persistent expiry/reason fields, explicit rules, an administrator recovery path, and tests; do not mistake the intended thresholds in the specification for running protection. In particular, `realtime/socket.ts` has a `suspendedUntil` TODO that is out of the current Phase 2 scope.
 
 - `users.is_suspended` is persisted by the T1.1.4 migration; `suspended_until` and `suspension_reason` remain future schema work.
-- Login and refresh reject an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Refresh also revokes the presented session and clears the browser cookie. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an admin clears it.
+- Login and refresh reject an `isSuspended` account with `403 {code: "ACCOUNT_SUSPENDED"}`. Refresh also revokes the presented session and clears the browser cookie. Until expiry/reason columns are added, the response uses a generic message and the boolean remains set until an authorized operator performs an explicit database recovery; no admin unsuspend endpoint is implemented.
 - Login and refresh reject `isActive=false` with `403 {code: "ACCOUNT_INACTIVE"}`; refresh revokes the presented session.
 - Message: “Account suspended. Contact an administrator.”
 
 ### 4.2 Manual
 
-- `PATCH /_admin/users/:id/unsuspend` → clears suspension, audits.
+- `PATCH /_admin/users/:id/unsuspend` is a contract-only Swagger operation; no runtime handler or admin UI exists. `PATCH /_admin/users/:id/status` changes active status, **not** suspension. Recovery from a suspended account requires an operator procedure until an audited unsuspend path is delivered.
 - Rate: max 3 rescuer cancellation requests/hour → `429` at the authenticated pre-handler. A transaction counts completed cancellations on the UTC day and writes a durable `admin_alerts` review row on the third and later cancellations; Other reasons also write a separate approval-needed row. The T3.6.5 admin-only notice now displays the review flag; an approval/action workflow remains separate.
 
 ---
 
 ## 5. Authorization (Route Prefixes)
 
-The target policy is enforced at **both** layers (fail-closed). Phase 1 runtime status: `GET /_admin/users`, `GET /_admin/users/:id`, `POST /_admin/users`, and `PATCH /_admin/users/:id/status` verify the admin token, current admin account state, and an unrevoked matching session; the `/_user` hook checks access-token validity, current user role/account state, the persisted session, and the onboarding flag. The client implements guest-only auth pages, authenticated user routes, admin-role checks, session restoration, and mandatory onboarding redirects. These Phase 1 account handlers are implemented; domain-level admin handlers for incidents/categories and dispatch are future Phase 3 work (T3.1/T3.3), while location/device user handlers are Phase 2 (T2). They are not missing Phase 1 account-management endpoints.
-
-**Backend policy sketch (shared hooks for future route groups):**
-
-```ts
-fastify.register(authRoutes, { prefix: '/_auth' }); // no auth, but if JWT present → 403 ALREADY_AUTHENTICATED
-fastify.register(async (f) => {
-  f.addHook('preHandler', f.authenticate);
-  f.addHook('preHandler', f.authorize(['user','admin'])); // _user may allow admin? spec: document decision
-}, { prefix: '/_user' });
-fastify.register(async (f) => {
-  f.addHook('preHandler', f.authenticate);
-  f.addHook('preHandler', f.authorize(['admin']));
-}, { prefix: '/_admin' });
-```
+The server is authoritative; client route guards improve navigation but cannot grant access. The `/_user` pre-handler verifies the access JWT, current account/role, live persisted session, and mandatory security-question onboarding. Admins pass this shared hook, but individual user routes may be more restrictive (for example, rescuer-only actions). `/_admin` operations check current admin status and session; incident/category management and SOS dispatch are implemented, not future placeholders. Unknown/foreign resources return scoped 404 responses where required. The OpenAPI `x-borobiya-runtime-status` field distinguishes registered handlers from contract-only descriptors; a contract-only path must not be treated as an authorization-capable endpoint.
 
 **Frontend (implemented router guard):** `/_auth/*` pages redirect signed-in users away; protected user/admin pages redirect guests to login with a safe internal return path; non-admin users are sent back to the user dashboard; and a signed-in account with `mustCompleteSecurityQuestions=true` is redirected to onboarding from every route except the completion form. The server hook remains authoritative if client-side state is stale or tampered with.
 
@@ -174,7 +156,7 @@ fastify.register(async (f) => {
 
 **Mission room authorization (T3.5.3):** `mission:subscribe` accepts only a UUID after a live account/session check. The database confirms active requester/rescuer participation or the authenticated admin role before joining `mission:{id}`; foreign and unknown mission IDs return the same unavailable ack. Reconnects require reauthorization, and account/session revocation disconnects the socket. Status events fan out to participant and admin user rooms as well, so delivery does not rely on a client subscribing early. Never let a client choose an arbitrary Socket.IO room.
 
-**Consented mission GPS (T3.5.7):** Mission sharing is a separate explicit foreground action for each of requester, rescuer and admin. A regular live share or the rescuer’s route-follow camera never enables mission fan-out. Only an authenticated current session with an active participant/admin SQL role may publish a fresh GPS fix. The server reuses the shared device/rate/persistence checks, checks mission state again before broadcasting into *only* `mission:{id}`, and never broadcasts to that room from the generic `location:update` or REST fallback. Foreign and terminal IDs return the same unavailable ack, admin mission-list reads require the admin guard and `Cache-Control: no-store`, and terminal rooms cannot be joined. Watchers stop on mission/account change, terminal events, permission denial, disconnect and unmount; viewers reject malformed/wrong-mission/out-of-order events. Marker history is not replayed or stored on the client. “Online” is a recent-fix indicator, not authoritative presence; multiple admins share a single most-recent admin-role marker.
+**Consented mission GPS (T3.5.7):** Mission sharing is a separate explicit foreground action for each of requester, rescuer and admin. A regular live share or the rescuer’s route-follow camera never enables mission fan-out. Only an authenticated current session with an active participant/admin SQL role may publish a fresh GPS fix. The server reuses the shared device/rate/persistence checks, checks mission state again before broadcasting into *only* `mission:{id}`, and never broadcasts to that room from the generic `location:update` or REST fallback. Foreign and terminal IDs return the same unavailable ack, admin mission-list reads require the admin guard and `Cache-Control: no-store`, and terminal rooms cannot be joined. Watchers stop on mission/account change, terminal events, permission denial, disconnect and unmount; viewers reject malformed/wrong-mission/out-of-order events. Marker history is not replayed or stored on the client. The map labels GPS **freshness** separately from requester/rescuer connection badges; multiple admins share a single most-recent admin-role marker.
 
 **Photo evidence authorization (T3.2.6):** Bearer authentication on `/_user/sos/requests/:id/photo-access` verifies the current account and live session, then restricts issuance to the requester, an admin, or the rescuer on a pending/accepted proposal. The image-only `/uploads/:id` endpoint accepts only the resulting 60-second HMAC URL (not an access/refresh cookie or a bare filename); see §9. The URL remains usable for its brief lifetime if the session is revoked after issuance, so it must not be copied into logs or external links.
 
@@ -186,33 +168,24 @@ The registration, login, refresh, logout, and all forgot-password handlers fail 
 
 - No `DELETE /_admin/users/:id` handler may exist.
 - A runtime regression test sends `DELETE /_admin/users/:id` to the Fastify app and asserts `404`; the OpenAPI contract also contains no DELETE operation for that path.
-- Only `PATCH /.../status {isActive}` + `PATCH /.../unsuspend`.
+- Account status changes use `PATCH /_admin/users/:id/status {isActive}`. The unsuspend descriptor has no handler; user deletion remains absent.
 
 ---
 
 ## 6. Input Validation & Injection
 
-- **Zod everywhere:** No raw `req.body`; every route has `schema: { body: zodToJsonSchema(...) }`.
-- Use `km-api` to co-locate schema+handler (see API.md).
+- **Validation:** Implemented handlers parse applicable bodies, query strings and path parameters with shared Zod schemas before mutation or data access; multipart photo bytes also pass length and structural image checks. Shared `km-api` route descriptors drive the published OpenAPI contract, but their mere existence does not register a handler.
 - DB: parameterized Drizzle queries and reviewed `sql` fragments — never interpolate untrusted strings. The `LIKE` pattern in user search is a bound parameter with `%`, `_`, and backslash escaped, and its expression has been executed against a real PostgreSQL (a `round(double precision, integer)` overload does not exist, which was silently turning every search into a 500).
 - **Errors do not quote the database:** `plugins/error-envelope.ts` answers any failure no handler caught with `INTERNAL_ERROR` and a fixed message, logging the real error server-side. Before it, Fastify's default body shipped the driver's text (including SQL function signatures) to whoever asked; framework 4xx are mapped onto contract codes rather than passing `FST_ERR_*` names through.
-- Sanitize HTML: descriptions rendered as plain text or sanitized via `dompurify` if rich.
+- User descriptions are rendered as text by Vue (escaped), not inserted as raw HTML. No rich-HTML renderer or DOMPurify sanitizer is implemented; adding one requires a separate review.
 
 ---
 
 ## 7. HTTP Hardening
 
-```ts
-await fastify.register(helmet, {
-  contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], connectSrc: ["'self'"] } }
-});
-fastify.register(cors, {
-  origin: (process.env.CORS_ORIGINS || "").split(","), // strict allowlist, not '*'
-  credentials: true
-});
-```
+`packages/server/src/plugins/security.ts` registers Helmet with same-origin default/connect CSP and frameguard `deny`, a credentialed CORS callback that accepts only configured browser origins (or missing `Origin` for native/CLI clients), and a global rate limit. The default API response is `Cache-Control: no-store` except the public security-question catalog.
 
-- Nginx: `X-Frame-Options: DENY`, `HSTS`, TLS 1.2+ via Let's Encrypt.
+The production edge in `Caddyfile.vm` terminates HTTPS and forwards the actual scheme to Nginx; Nginx itself listens on HTTP inside the private network. Do not claim HSTS, a TLS version floor, or a production browser origin without checking the deployed edge response and configuration. The local HTTP-only Compose gateway is **not** a secure browser origin.
 
 ---
 
@@ -229,7 +202,6 @@ fastify.register(cors, {
 
 - `POST /_user/sos/requests/:id/photo` (T3.2.3, live): multipart, max 5MB (`SOS_PHOTO_MAX_SIZE_MB`, default 5 — the parser enforces it and the handler re-measures), allow `image/jpeg,image/png,image/webp`.
 - `POST /_user/sos/requests` (T3.2.2) refuses a `photoUrl` in its body with `400 PHOTO_URL_NOT_ACCEPTED`, and the store's input type has no field for the column at all. That is the difference between "we will validate the path later" and a request that cannot contain one: a URL the requester invents would be loaded by the dispatcher's browser while they read an emergency report, so the only writer of `sos_requests.photo_url` is the upload endpoint above, which mints the path itself.
-- Validate via `file-type` magic bytes (not just extension).
 - Validate by the file's own bytes, in this repo rather than with a general sniffer package: `src/security/image-payload.ts` accepts exactly the three formats above, requires the format's closing structure (PNG `IEND`, JPEG EOI, WebP a RIFF length that matches the file), and says what actually arrived when the name and the bytes disagree — because `file-type` reports "that is a ZIP" without refusing it, and a rescue app that stores a ZIP because it was named `photo.png` has gained a file host, not a photo. The file name and the declared `Content-Type` are never consulted.
 - Store to `data/uploads/` (volume) → later S3. `UPLOAD_DIR` names the directory (relative values anchor at the repository root, the same rule `.env` follows); files are written as `<random UUID>.<ext>` under a server-chosen extension, with a private mode and a `.part`-then-rename write, and the database holds the app-relative path `/uploads/<random UUID>.<ext>` — never a client-supplied URL, which is what `POST /_user/sos/requests` refuses for the same reason.
 - One photo per request, because `photo_url` is one column. A re-post writes the new file first and re-points the row afterwards, deleting the file again if the row refused it, so there is never a moment when the request points at bytes that do not exist. Which photo a request currently means is the row's business; the superseded file stays on the volume, because deleting evidence nobody asked to delete is not this endpoint's decision, and no retention rule for orphans exists yet (recorded in `docs/TASKS.md` alongside the read route). `docs/API.md` §5.4 states the one rule this route adds on its own: only the requester, ever.
@@ -249,20 +221,21 @@ fastify.register(cors, {
 - `LOCATION_HISTORY_MAX_SHARE_DAYS=30` is validated at startup to stay within retention (otherwise a grant could promise points that were already pruned); `POST /_user/location/history/share` (T2.2.3) enforces it per request — checked before any lookup, and refused rather than clamped, so an over-long window shares nothing at all. Recipients are validated as a batch with the identical live-share rule, so the endpoint reveals no more about whether an id exists than live sharing does, and one unusable recipient rejects the whole request. A history grant never expires by clock: it stops being readable when retention prunes the points beneath it (retirement by the owner arrives with the T2.2.4 delete path).
 - Retention deletes history only. Share rows are retired with a flag rather than removed, and no user-initiated purge/export of `location_history` exists yet.
 - Deactivating an account stops it *broadcasting* (the `/_user` hook and the Socket.IO handshake both require a live session, and deactivation clears every refresh-token hash), but it does not retire that account's active share rows: the last stored position and any history grants stay readable to the recipients that account had already chosen, because those reads are scoped to the recipient's own grants rather than to the owner's status. Retiring shares on deactivation is a decision for the admin panel's follow-ups, and until then this is the behaviour to expect rather than a surprise.
-- `SOS_REQUEST_AUTO_EXPIRE_HOURS=24` → pending without dispatch → `expired`, notify requester (Phase 3, not implemented).
-- `MISSION_STATUS_TIMEOUT_HOURS=6` → `on_the_way` too long → alert admin (Phase 3, not implemented).
+- Automatic pending-SOS expiry and an on-the-way timeout alert are **not implemented**; `SOS_REQUEST_AUTO_EXPIRE_HOURS` and `MISSION_STATUS_TIMEOUT_HOURS` are not active environment keys. Do not assume a server job will make either transition or send an alert.
 
 ---
 
-## 11. Checklist for Code Review
+## 11. Code-review findings and remaining validation
 
-- [ ] No plaintext credential column
-- [ ] `trim().toLowerCase()` applied to security answers before hash + verify
-- [ ] `_auth` returns 403 when already authed
-- [ ] No DELETE user endpoint
-- [ ] Rate-limit plugin active on all `_auth` + `location:update` + `sos/create`
-- [ ] Helmet + CORS allowlist
-- [ ] Zod on every body/query/params
-- [ ] Suspended user gets clear message
-- [ ] Photo max 5MB + mime check
+Code paths reviewed for T4.7.2: `packages/server/src/security/password.ts`, the auth login/refresh/guard handlers, `plugins/security.ts`, `plugins/swagger.ts`, `realtime/socket.ts`, the photo upload/access handlers, and the Compose/Caddy proxy settings. Automated route/schema tests cover credentials, prefix guards, revocation, photo bytes and signed reads; they are **not** a live threat-model exercise.
+
+| Finding | Status / next action |
+|---|---|
+| Argon2id credentials and normalized answer verification | Implemented and tested; no plaintext answer/password column. |
+| Guest-only auth, no user deletion, account/session rechecks | Implemented with route-level tests; do not equate a Swagger contract-only operation with a handler. |
+| 5 MB default photo ceiling and JPEG/PNG/WebP byte-structure checks | Implemented; the configured ceiling can change and superseded evidence has no deletion policy. |
+| JWT/header/body redaction and signed photo URLs | Redaction paths exist in `app.ts`; signed URLs remain bearer capabilities for 60s. Keep URLs out of access logs and do not share unsanitized diagnostics. |
+| Sustained-spam auto-suspension / admin unsuspend | **Not implemented.** `is_suspended` is enforced if already set; rate limits and admin-review alerts are not automatic suspensions. |
+| Production headers, reverse-proxy trust, CORS, and mobile trust | Configured in source, but target-VM TLS/HSTS, certificate-install and real browser/Android behavior need operational verification. |
+| Live SOS/mission transport presence, history-grant revocation and PostGIS behavior | Tested locally (including PGlite where applicable); target-VM/browser acceptance remains open under P2-A1/P2-A2 and the Phase 3/4 acceptance follow-ups. |
 
