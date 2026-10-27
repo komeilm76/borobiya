@@ -107,6 +107,14 @@ check() {
     else printf '%-30s OK                                 %s\n' 'docker compose' "$installed"; fi
     if docker info >/dev/null 2>&1; then
       printf '%-30s OK\n' 'Docker daemon access'
+      # vm-env.py must inspect project volumes before generating DB passwords.
+      # A daemon with volume-list authorization denied is not setup-ready.
+      if docker volume ls -q --filter label=com.docker.compose.volume=postgres-data >/dev/null 2>&1; then
+        printf '%-30s OK\n' 'Docker volume inspection'
+      else
+        printf '%-30s UNAVAILABLE (run docker volume ls locally; do not regenerate DB passwords)\n' 'Docker volume inspection'
+        bad=1
+      fi
     elif socket_group_missing; then
       printf '%-30s UNAVAILABLE (current session lacks Docker socket group)\n' 'Docker daemon access'
       echo '  For a trusted operator: ./scripts/vm-install.sh --enable-docker-access'

@@ -20,7 +20,7 @@ Before a first build, verify Ubuntu 24.04, Docker access, enough **free disk and
 #   The last command asks before granting root-equivalent Docker group access; it does not install packages.
 #   Reconnect SSH (start a NEW tmux session) or run 'newgrp docker' in THIS terminal;
 #   scripts cannot update their parent shell's groups. Do not use sudo for vm-env.py or launch.
-./scripts/vm-install.sh --check          # must now report Prerequisites OK before asking for passwords.
+./scripts/vm-install.sh --check          # daemon AND volume-list access must be OK before passwords.
 python3 scripts/vm-env.py               # development or production; secrets + admin password, .env mode 0600
 python3 scripts/vm-map.py               # choose countries/cities, snapshot and cache policy; writes no map data
 # If you enabled the optional proxy in THIS terminal, first run: source ~/.bashrc

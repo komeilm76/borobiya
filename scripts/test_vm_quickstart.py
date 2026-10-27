@@ -110,6 +110,45 @@ class EnvTests(unittest.TestCase):
             volume.assert_called_once_with("postgres-data")
             writer.assert_not_called()
 
+    def test_generated_admin_password_is_not_announced_as_saved_when_volume_appears(self):
+        with patch.object(vm_env, "env_values", return_value={}), \
+             patch.object(vm_env, "volume", side_effect=[None, None, "project_postgres-data"]), \
+             patch.object(vm_env, "update_env") as writer, \
+             patch.object(sys.stdin, "isatty", return_value=True), \
+             patch.object(sys, "argv", ["vm-env.py", "--mode", "development", "--generate-admin"]), \
+             redirect_stdout(io.StringIO()) as output:
+            with patch.object(sys.stdout, "isatty", return_value=True), \
+                 self.assertRaisesRegex(SystemExit, "appeared during setup"):
+                vm_env.main()
+        writer.assert_not_called()
+        self.assertNotIn("Generated admin password", output.getvalue())
+
+    def test_generated_admin_password_is_announced_only_after_env_write(self):
+        with redirect_stdout(io.StringIO()) as output:
+            def writer(changes):
+                self.assertIn("ADMIN_SEED_PASSWORD_B64", changes)
+                self.assertNotIn("Generated admin password", output.getvalue())
+
+            with patch.object(vm_env, "env_values", return_value={}), \
+                 patch.object(vm_env, "volume", return_value=None), \
+                 patch.object(vm_env, "update_env", side_effect=writer), \
+                 patch.object(sys.stdin, "isatty", return_value=True), \
+                 patch.object(sys.stdout, "isatty", return_value=True), \
+                 patch.object(sys, "argv", ["vm-env.py", "--mode", "development", "--generate-admin"]):
+                vm_env.main()
+        self.assertIn("Generated admin password", output.getvalue())
+
+    def test_generated_admin_password_is_not_announced_on_env_write_failure(self):
+        with patch.object(vm_env, "env_values", return_value={}), \
+             patch.object(vm_env, "volume", return_value=None), \
+             patch.object(vm_env, "update_env", side_effect=OSError("disk full")), \
+             patch.object(sys.stdin, "isatty", return_value=True), \
+             patch.object(sys, "argv", ["vm-env.py", "--mode", "development", "--generate-admin"]), \
+             redirect_stdout(io.StringIO()) as output:
+            with patch.object(sys.stdout, "isatty", return_value=True), self.assertRaises(OSError):
+                vm_env.main()
+        self.assertNotIn("Generated admin password", output.getvalue())
+
     def test_volume_created_during_password_prompt_is_not_overwritten(self):
         with patch.object(vm_env, "env_values", return_value={"ADMIN_SEED_PASSWORD_B64": "c2VjcmV0"}), \
              patch.object(vm_env, "volume", side_effect=[None, None, "project_postgres-data"]) as volume, \
@@ -251,6 +290,24 @@ class InstallerTests(unittest.TestCase):
             for expected in ("need Java >=21", "need 1.16.0", "pin 1.4.3"):
                 self.assertIn(expected, result.stdout)
             self.assertIn("Docker daemon access", result.stdout)
+
+    def test_check_rejects_daemon_that_denies_required_volume_listing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            docker = Path(directory) / "docker"
+            docker.write_text("#!/bin/sh\n"
+                              'if [ "$1" = info ]; then exit 0; fi\n'
+                              'if [ "$1" = volume ]; then echo "volume listing denied" >&2; exit 1; fi\n'
+                              'if [ "$1" = compose ]; then echo 5.6.1; exit 0; fi\n'
+                              'echo "Docker version 29.9.2"\n')
+            docker.chmod(0o755)
+            result = subprocess.run(["bash", str(SCRIPTS / "vm-install.sh"), "--check"], cwd=vm.ROOT,
+                                    env={**os.environ, "PATH": directory + ":" + os.environ["PATH"]},
+                                    capture_output=True, text=True, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Docker volume inspection", result.stdout)
+            self.assertIn("UNAVAILABLE", result.stdout)
+            self.assertNotIn("volume listing denied", result.stdout + result.stderr)
+            self.assertNotIn("Prerequisites OK", result.stdout)
 
     def test_group_grant_requires_explicit_option_and_typed_interactive_consent(self):
         installer = (SCRIPTS / "vm-install.sh").read_text()

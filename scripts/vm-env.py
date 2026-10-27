@@ -153,6 +153,7 @@ def main() -> None:
         if not port.isdigit() or not 1 <= int(port) <= 65535:
             fail("POSTGRES_PORT must be a TCP port before generating DATABASE_URL")
         changes["DATABASE_URL"] = f"postgresql://{username}:{changes['POSTGRES_PASSWORD']}@localhost:{port}/{database}"
+    generated_admin = ""
     if not current.get("ADMIN_SEED_PASSWORD_B64"):
         admin = ""
         if not args.generate_admin:
@@ -163,10 +164,10 @@ def main() -> None:
             if sys.stdin.isatty() and not sys.stdout.isatty():
                 fail("cannot safely show generated password with redirected output; use an interactive terminal")
             admin = "Admin-" + secrets.token_hex(16)
-            if sys.stdout.isatty():
-                print(f"Generated admin password (save it now): {admin}")
-            else:
-                print("Generated admin password saved in .env as ADMIN_SEED_PASSWORD_B64 (base64 is NOT encryption).")
+            # Announce it only after update_env succeeds. A volume can appear
+            # during the prompt or a disk write can fail; in either case no
+            # bootstrap password was saved and the operator must not trust it.
+            generated_admin = admin
         if not valid_admin(admin):
             fail("admin password needs 8–1024 UTF-16 characters, a Unicode letter and a decimal digit")
         changes["ADMIN_SEED_PASSWORD_B64"] = base64.b64encode(admin.encode("utf-8")).decode("ascii")
@@ -176,6 +177,11 @@ def main() -> None:
         if volume(vol):
             fail(f"{vol} appeared during setup: refusing to replace {key} without its volume password")
     update_env(changes)
+    if generated_admin:
+        if sys.stdout.isatty():
+            print(f"Generated admin password (save it now): {generated_admin}")
+        else:
+            print("Generated admin password saved in .env as ADMIN_SEED_PASSWORD_B64 (base64 is NOT encryption).")
     print(f"Prepared .env (mode {mode}, permission 0600); existing credentials were not rotated.")
     if mode == "production":
         print("Production edge will use Caddy/ACME. Point public DNS at this VM and allow TCP 80/443 before launch.")
