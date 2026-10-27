@@ -248,12 +248,15 @@ fi
 
 # ---------- 1. Environment + secrets (runbook A6) ----------
 log "Environment (.env)"
-generated_admin_password=0
 FRESH_ENV_FROM_EXAMPLE=0
 EXPLICIT_ADMIN_SEED_PASSWORD="${ADMIN_SEED_PASSWORD:-}"
 set_env() {
   local key="$1" value="$2"
-  if (( DRY_RUN )); then note "would set ${key}=${value} in .env"; return 0; fi
+  # Never echo a value: database URLs and secrets also pass through this writer.
+  if (( DRY_RUN )); then note "would set ${key} in .env (value hidden)"; return 0; fi
+  [[ ! -L .env ]] || fail "refusing symlinked .env; inspect it before running setup"
+  [[ ! -e .env || -f .env ]] || fail "refusing non-file .env; inspect it before running setup"
+
   # A value is never interpolated into a sed replacement here. Paths are user input, and a
   # library directory containing `&` would expand to the whole match while one containing the
   # `|` delimiter aborts sed with "unknown option to `s`" — which, under `set -e`, ends the whole
@@ -261,13 +264,17 @@ set_env() {
   # literally; the rewrite goes through a temp file in the same directory (same filesystem, so
   # the rename is atomic) and .env keeps 0600 because the secrets in it are generated below.
   local tmp
-  if [[ ! -f .env ]]; then
-    printf '%s=%s\n' "$key" "$value" > .env
-    chmod 600 .env
-    return 0
-  fi
   tmp="$(mktemp ".env.borobiya.XXXXXX")" || fail "could not create a temporary file next to .env"
   chmod 600 "$tmp"
+  if [[ ! -f .env ]]; then
+    # Never expose a generated secret even briefly under the process umask (often 0644).
+    if ! printf '%s=%s\n' "$key" "$value" > "$tmp"; then
+      rm -f -- "$tmp"
+      fail "could not create .env securely"
+    fi
+    mv -f -- "$tmp" .env
+    return 0
+  fi
   # One statement per line, and the value through the environment rather than `awk -v`, both
   # deliberately: Ubuntu's default awk is mawk, which refuses a pattern continued onto the next
   # line ("missing ) near end of line") where gawk accepts it, and POSIX `awk -v` processes
@@ -601,6 +608,9 @@ check_database_credentials() {
   fi
 }
 
+# Check before reading/sourcing, even on a dry run or a dangling symlink.
+[[ ! -L .env ]] || fail "refusing symlinked .env; inspect it before running setup"
+[[ ! -e .env || -f .env ]] || fail "refusing non-file .env; inspect it before running setup"
 if [[ ! -f .env ]]; then
   FRESH_ENV_FROM_EXAMPLE=1
   if (( DRY_RUN )); then
@@ -735,8 +745,7 @@ if [[ -z "${ADMIN_SEED_PASSWORD:-}" ]]; then
     ADMIN_SEED_PASSWORD_B64="$(python3 -c 'import base64,sys; print(base64.b64encode(sys.argv[1].encode("utf-8")).decode("ascii"))' "$ADMIN_SEED_PASSWORD")"
     set_env ADMIN_SEED_PASSWORD_B64 "$ADMIN_SEED_PASSWORD_B64"
     export ADMIN_SEED_PASSWORD
-    generated_admin_password=1
-    note "generated ADMIN_SEED_PASSWORD and stored its base64 value in .env (used at seed time below)"
+    note "generated admin password saved in .env as base64 (not encryption); use scripts/vm.py admin-password to set a known password privately"
   fi
 fi
 
@@ -1437,16 +1446,9 @@ note "map areas installed: $REGION_IDS (change later with: $0 --reselect)"
 note "snapshot: $SNAPSHOT_DATE ($SNAPSHOT_MODE); source policy: $SOURCE_POLICY"
 note "map library: $MAP_LIBRARY_DIR"
 note "active dataset: $MAP_DATASET_DIR"
-cat <<EOF
-  Admin login (web client):  username "admin"
-    password: ${generated_admin_password:+the ADMIN_SEED_PASSWORD generated during this run}
-EOF
-if (( ! generated_admin_password )); then
-  note "password: the ADMIN_SEED_PASSWORD used at seed time (when setup saved it, .env stores it as ADMIN_SEED_PASSWORD_B64)."
-  note "If admin login fails, reset it: docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts '<new-password>'"
-else
-  note "password (stored base64 as ADMIN_SEED_PASSWORD_B64 in .env): ${ADMIN_SEED_PASSWORD}"
-fi
+note 'Admin login: username "admin". Passwords are never printed in setup logs.'
+note 'If the seed password was generated and not saved, use python3 scripts/vm.py admin-password'
+note 'from an interactive terminal after the application database is running; store it securely.'
 cat <<'EOF'
 
   Next:

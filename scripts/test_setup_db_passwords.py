@@ -76,6 +76,15 @@ FUNCTIONS = (
 )
 
 
+class SetupOutputSafetyTests(unittest.TestCase):
+    def test_setup_never_prints_generated_admin_secret_at_completion(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        completion = source.split('log "Setup complete"', 1)[1]
+        self.assertNotIn('${ADMIN_SEED_PASSWORD}', completion)
+        self.assertNotIn('reset-admin-password.ts \'<new-password>\'', completion)
+        self.assertIn('scripts/vm.py admin-password', completion)
+
+
 class Fixture(unittest.TestCase):
     """A temp directory with `.env`, the script's functions, and a fake docker on PATH."""
 

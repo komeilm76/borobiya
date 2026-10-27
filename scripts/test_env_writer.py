@@ -95,6 +95,51 @@ class SetEnvValueTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stderr)
         self.assertEqual(result.stderr, "", msg="set_env should not print warnings")
 
+    def test_new_env_is_written_privately_before_it_becomes_visible(self) -> None:
+        source = extract_function("set_env")
+        self.assertNotIn('"$value" > .env', source)
+        (self.env_dir / ".env").unlink()
+        self.write("JWT_SECRET", "test-secret")
+        self.assertEqual(stat.S_IMODE((self.env_dir / ".env").stat().st_mode), 0o600)
+
+    def test_setup_checks_env_before_sourcing_including_on_dry_run(self) -> None:
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertLess(source.index('[[ ! -L .env ]] || fail'), source.index('source .env; set +a'))
+        self.assertLess(source.index('[[ ! -e .env || -f .env ]] || fail'), source.index('source .env; set +a'))
+
+    def test_refuses_symlinked_env_without_touching_target(self) -> None:
+        target = self.env_dir / "other-secret"
+        target.write_text("important\n", encoding="utf-8")
+        (self.env_dir / ".env").unlink()
+        (self.env_dir / ".env").symlink_to(target)
+        result = run_set_env(self.env_dir, "MAP_REGION_IDS", "ir-tehran")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.env_dir / ".env").is_symlink())
+        self.assertEqual(target.read_text(encoding="utf-8"), "important\n")
+
+    def test_refuses_dangling_env_symlink_without_creating_target(self) -> None:
+        target = self.env_dir / "missing-secret"
+        (self.env_dir / ".env").unlink()
+        (self.env_dir / ".env").symlink_to(target)
+        result = run_set_env(self.env_dir, "POSTGRES_PASSWORD", "test-secret")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(target.exists())
+
+    def test_refuses_directory_named_env_without_writing_inside_it(self) -> None:
+        (self.env_dir / ".env").unlink()
+        (self.env_dir / ".env").mkdir()
+        result = run_set_env(self.env_dir, "JWT_SECRET", "not-for-a-directory")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(list((self.env_dir / ".env").iterdir()), [])
+
+    def test_dry_run_never_prints_secrets(self) -> None:
+        script = build_script(extract_function("set_env"), dry_run=True) + '\nset_env POSTGRES_PASSWORD "$1"\nset_env DATABASE_URL "$2"\n'
+        result = subprocess.run(["bash", "-c", script, "dry-run", "test-secret", "postgresql://user:test-secret@localhost/db"],
+                                cwd=self.env_dir, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("test-secret", result.stdout + result.stderr)
+        self.assertEqual(read_line(self.env_dir, "MAP_LIBRARY_DIR"), "/old/path")
+
     def test_value_with_ampersand_is_written_literally(self) -> None:
         self.write("MAP_LIBRARY_DIR", "/data/R&D/maps")
         self.assertEqual(read_line(self.env_dir, "MAP_LIBRARY_DIR"), "/data/R&D/maps")

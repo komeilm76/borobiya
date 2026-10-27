@@ -35,7 +35,7 @@ what to delete if you want to redo just that step.
    extract. Nominatim's state lives in a Docker volume, Photon's in its index directory with a
    stamp file that records which dataset PBF it was built from. Re-running an import without
    clearing that state reuses the existing database and reports success — which is why a changed
-   area selection must be followed by a real reset (§ 8.5).
+   area selection must be activated with `vm.py launch` and verified, not by reusing stale indices.
 3. **`.env` has to be *loaded*, not just written.** A plain `source .env` only exports variables
    that were already exported, so every `.env`-backed value arrives empty in the shell that runs
    scripts. Each terminal you use for this runbook starts with the loader block in § 2.1. The
@@ -44,8 +44,8 @@ what to delete if you want to redo just that step.
    volumes, which destroys the *only* copies of the PostGIS **and uploaded photo** data
    (`borobiya_postgres-data`, `borobiya_borobiya-uploads` — § 8.4 lists exactly what is inside them).
 
-If you just want the two commands: start everything from scratch is § 1.2, resume after a failure
-is § 1.3.
+For the supported launch sequence start at § 1.2; for recovery start at § 1.3. Do not
+copy the manual phase commands unless you are diagnosing a specific failure.
 
 ---
 
@@ -60,12 +60,12 @@ snapshot). The `Check` column is how you prove to yourself that the step worked 
 | --- | --- | --- | --- | --- |
 | A0 | Reach the VM over SSH; install `openssh-server` | `ssh` + `systemctl is-active ssh` | You have a shell on the VM and its IP | one package |
 | A1 | Ubuntu package index up to date | `sudo apt update` | No `Failed to fetch` lines | seconds |
-| A2 | Docker Engine + Compose v2 from the official apt repo | Docker's `get.docker.com` script **or** the manual `apt` block | `docker compose version` prints v2.x | seconds |
+| A2 | Docker Engine + Compose v2 from the official apt repo | After clone (A5): `./scripts/vm-install.sh --check`, then `--install` with opt-in; manual apt source below if provisioning before the clone | `docker compose version` prints v2+ | depends on downloads |
 | A3 | Toolchain: Java 21, Osmium, git, curl, wget, unzip, openssl, Python, `openssh-server` | one `apt install` | A4 reports every one of them | minutes |
 | A4 | Preflight: tool versions vs the pins in this repo, disk, inodes, Docker storage | the § A4 paste block | each pin above matches the value below it; capacity floors met | seconds |
 | A5 | Get the code and prove the pipeline files are in it | `git clone` + the § A5 preflight loop | `PREFLIGHT OK` | seconds |
-| A5b | **Bun**, pinned from the clone's `package.json` | the GitHub release zip + `install` | `bun --version` matches the pin | one download |
-| A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `cp -n .env.example .env` + `chmod 600` + the § A6 blocks | `resolve` prints the same selection you chose | seconds |
+| A5b | **Bun**, pinned from the clone's `package.json` | `./scripts/vm-install.sh --check` / `--install` after A5 (see A5b) | `bun --version` matches the pin | one verified download |
+| A6 | `.env`: secrets, area selection, snapshot policy, map-library location | `python3 scripts/vm-env.py` + `python3 scripts/vm-map.py` (§ A6) | `vm-map.py --show` matches what you chose; setup resolves active paths at launch | seconds |
 | — | *(optional)* proxy for downloads, and proof that it works | `./scripts/enable-proxy.sh` (undo: `./scripts/disable-proxy.sh`) | § 5.2's six checks pass | seconds |
 | 7 | *(optional)* pre-download the big files: Geofabrik extracts + Planetiler's reference layers (≈230 MB + 1.3 GB) | `./map-server/scripts/fetch-planetiler-sources.sh` (steps 8 and 9 otherwise fetch what they need themselves) | Each line ends `cached` or `verified` | it skips already-verified files |
 | 8 | Download + verify + crop + merge the OSM extracts | `./map-server/scripts/prepare-regions-pbf.sh` | `PBF OK` from `verify-map-pbf.sh` | downloads skip, crop+merge re-run |
@@ -84,13 +84,22 @@ messages, and this runbook must stay quotable from all of them.
 Two ways. Pick one, then read the step you are at before you run it — the automated path runs the
 same steps, it just doesn't stop between them.
 
-**a. Automated (recommended).** Everything from A5 onward — clone check, `.env` + secrets, area
-selection, downloads, tiles, routing, geocoding, containers, migrations, seed, verification:
+**a. Automated (recommended).** Follow [the short quickstart](./UBUNTU_VM_QUICKSTART.md):
+install prerequisites, prepare the non-rotating `.env` and map selection once, then launch and
+run the read-only doctor. Do not start a first run by hand-editing secrets.
 
 ```bash
 cd ~/borobiya
-./scripts/setup-ubuntu-vm.sh --reselect          # interactive: pick areas, set the passwords, confirm
+./scripts/vm-install.sh --check
+python3 scripts/vm-env.py                 # first run: interactive mode and admin password
+python3 scripts/vm-map.py                 # first run: choose areas and library path
+python3 scripts/vm.py launch              # build/resume; this may take hours
+python3 scripts/vm.py doctor              # read-only local checks; not browser sign-off
 ```
+
+`vm.py launch` delegates the map build to `setup-ubuntu-vm.sh`. The latter's flags below are for
+**advanced standalone map recovery** (they do not replace the complete browser build, production
+edge or day-two commands). Inspect its plan with `--dry-run` before overriding a selection.
 
 | Flag | What it changes |
 | --- | --- |
@@ -221,9 +230,10 @@ and road graphs for the wrong rectangle, quietly. If your `.env` disagrees, fix 
 `51.0,35.5,51.7,35.9` and the resolver's `51,35.5,51.7,35.9` count as the same bbox and no note
 prints:
 
-```bash
-TMP=$(mktemp); sed "s|^MAP_BBOX=.*|MAP_BBOX=$UNION_BBOX|" .env > "$TMP" && mv "$TMP" .env
-```
+Instead of hand-editing `.env` or rewriting it via `/tmp`, use
+`python3 scripts/vm.py launch` to regenerate and persist the selected bbox and derived paths.
+If it cannot proceed, compare the selection in `python3 scripts/vm-map.py --show` with `.env`
+and stop: a mismatched bbox must not be bypassed to finish an import.
 
 What the block fills in for steps 7–13: `MAP_PBF`, `MAP_PBF_MANIFEST`, `MAP_LIBRARY_DIR`,
 `MAP_DATASET_DIR`/`MAP_DATA_DIR` (the same directory), `MAP_OSRM_DATA_DIR`, `MAP_PHOTON_DATA_DIR`,
@@ -447,20 +457,26 @@ that source's packages become visible.
 
 ### A2. Docker Engine + Compose v2 (from the official Docker repository)
 
-The Ubuntu `docker.io` package works but is older and can lack Compose v2 features, so install
-Docker's own repository. One command, from Docker's official docs — use the URL as published
-there rather than copying one from a blog:
+Once you have the **A5 clone** on Ubuntu 24.04 (install `git`/`python3` first if missing),
+prefer the repo's explicit preflight/installer. It checks installed versions, asks before
+package changes, pins Bun with a verified SHA-256 and will not silently replace an existing
+`docker.io` Engine merely to add a missing Compose plugin. If provisioning Docker **before**
+A5, read the fresh-VM manual form below, then return to the script's `--check` after cloning:
 
 ```bash
-curl -fsSL https://get.docker.com -o /tmp/get-docker.sh    # fetch the installer
-less /tmp/get-docker.sh                                     # read it (it only adds an apt source + installs)
-sudo sh /tmp/get-docker.sh                                  # run it
+./scripts/vm-install.sh --check
+./scripts/vm-install.sh --install          # only after reviewing the reported gaps
+# If Engine works and ONLY the plugin is missing: ./scripts/vm-install.sh --install-compose
+./scripts/vm-install.sh --check            # do not proceed until Prerequisites OK
 ```
 
-To do the same by hand (identical result, and it is what the script does):
+For inspection/recovery, the **manual** official Docker APT source form below is an
+alternative **only on a fresh VM without an installed Docker Engine**. It does not use the
+repository installer's Bun checksum checks, Ubuntu release preflight or engine-migration
+refusal. On any existing installation, run `--check`/`--install-compose` and inspect the
+package provenance instead of copying an installer or removing an Engine:
 
 ```bash
-sudo apt remove -y docker docker-compose docker-compose-plugin docker.io 2>/dev/null || true
 sudo install -m 0755 -d /etc/apt/keyrings
 DOCKER_KEY=$(mktemp)
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o "$DOCKER_KEY"  # official ASCII-armored key
@@ -475,9 +491,11 @@ sudo usermod -aG docker "$USER"
 newgrp docker        # or: log out and back in
 ```
 
-**Existing Engine, missing Compose only?** Do not run the `apt remove` block above or
+**Existing Engine, missing Compose only?** Do not run the manual installation block or
 reinstall Docker. Use `./scripts/vm-install.sh --install-compose` instead; it installs only
-the plugin matching the already-installed Engine package family.
+the plugin matching the already-installed Engine package family without replacing the daemon.
+Docker group access is root-equivalent; use a new login after opting in, not `sudo docker` as
+a workaround for routine application commands.
 
 **Repair for an older version of this runbook:** Its Docker repository command accidentally
 wrote the literal suite `VERSION_CODENAME=noble` instead of `noble` on Ubuntu 24.04,
@@ -634,10 +652,11 @@ What each answer means:
   floor applies to the *Docker* side, while `~` only gets the warning. Images and build layers live
   under the data-root, datasets under `~`: they can run out independently, and only one of them stops
   the run with an error.
-- **`docker system df -v` shows hundreds of MB of old build cache** and space is tight →
-  `docker builder prune -f` is safe (build layers only, never volumes; a rebuild just re-downloads
-  image layers). `docker system prune -a` is **not** safe here: it deletes the pulled images and
-  the locally built `borobiya/photon:1.3.0`, which step 11 cannot re-fetch from any registry.
+- **`docker system df -v` shows old build cache and space is tight** → inspect its ownership
+  before any cleanup. `docker builder prune` does not remove volumes, but it is **global to the
+  Docker daemon**, not scoped to Borobiya; other projects may need those layers for offline
+  rebuilds. `docker system prune -a` also deletes the locally built Photon image and pulled
+  images; do not use it as a map-cache reset.
 - **Java older than 21** → Planetiler's JAR fails at class loading with an
   `UnsupportedClassVersionError`, not with a helpful message.
 
@@ -670,136 +689,62 @@ half-updated pipeline is the classic "it worked ten minutes ago".
 
 ### A5b. Install Bun, pinned by the clone you just made
 
-A3 cannot do this: the pin lives in `package.json`, which only exists after A5. The step is still
-worth doing here, before any import, because the first thing you will want after the map stack is
-running is `bunx vitest run` / `bunx tsc --noEmit` / `bun run dev` on this host, and a missing Bun is
-discovered at the worst possible moment (forty minutes into something else).
+The version lives in this checkout's `package.json`. Do **not** copy a release zip into
+`/usr/local/bin` without verifying its publisher-provided SHA-256, or install whatever the
+one-line latest-version installer serves today. The repository installer handles architecture
+(including x86_64 without AVX2), checksum verification and an explicit prompt before replacing
+an existing shared Bun binary:
 
 ```bash
 cd ~/borobiya
-BUN_VERSION="v$(python3 -c 'import json;print(json.load(open("package.json"))["packageManager"].split("@")[1])')"
-echo "installing Bun $BUN_VERSION"        # the version this checkout declares (1.4.3 today)
-arch=$([ "$(uname -m)" = x86_64 ] && echo x64 || echo aarch64)
-grep -q avx2 /proc/cpuinfo || echo "NOTE: no AVX2 here — use the -baseline zip; bun would otherwise die with 'Illegal instruction'"
-curl -fL --retry 3 -o /tmp/bun.zip \
-  "https://github.com/oven-sh/bun/releases/download/bun-$BUN_VERSION/bun-linux-$arch.zip"
-unzip -o /tmp/bun.zip -d /tmp
-sudo install -m 0755 "/tmp/bun-linux-$arch/bun" /usr/local/bin/bun
-rm -rf /tmp/bun.zip "/tmp/bun-linux-$arch"
-bun --version                             # must print 1.4.3 (or whatever the pin says)
+./scripts/vm-install.sh --check
+./scripts/vm-install.sh --install        # if needed; prompts before package/shared-bin changes
+./scripts/vm-install.sh --check          # must report the Bun pin and Compose as OK
 ```
 
-Why the GitHub asset and not the one-line installer: `curl -fsSL https://bun.sh/install | bash` works
-and installs the *newest* release, which is not the release this repository's lockfile was written
-against. The zip is pinned, auditable, and needs no shell-piped-to-bash. Why it is optional for the
-map stack itself: the API container has its own Bun in its image, and
-`scripts/setup-ubuntu-vm.sh` never looks for a host Bun — its prerequisite check is
-`docker git curl wget python3 openssl java osmium`, which is exactly the list A3 installs.
+The map data builder can run without host Bun, but `vm.py launch` also builds the browser client
+and needs it. If the installer cannot verify the release metadata or digest, stop instead of
+falling back to an unverified asset. `docs/DEVELOPMENT.md` covers non-VM developer toolchains.
 
 ### A6. Configure `.env`: secrets, area, snapshot policy, library location
 
+**Use the scripts; do not copy/paste `sed`, `mktemp` or `openssl` loops into `.env`.** An older
+manual recipe regenerated both database passwords *on every re-run*, even when an existing volume
+held the original values; that broke authentication while leaving the data intact. It also moved
+secret-bearing files through `/tmp`. The supported writer creates `.env` mode `0600`, refuses
+symlinks and existing volumes with missing credentials, and preserves existing secrets:
+
 ```bash
 cd ~/borobiya
-cp -n .env.example .env
-chmod 600 .env                     # secrets go in here; a plain `cp` hands them the umask (0644)
-# Generate every secret once. Never reuse one, and never commit the result.
-for KEY in NOMINATIM_PASSWORD POSTGRES_PASSWORD JWT_SECRET JWT_REFRESH_SECRET; do
-  grep -q "^$KEY=" .env || printf '%s=\n' "$KEY" >> .env
-  NEW=$(openssl rand -hex 32)
-  TMP=$(mktemp); sed "s|^$KEY=.*|$KEY=$NEW|" .env > "$TMP" && mv "$TMP" .env
-done
-# The app database URL must carry the same password as POSTGRES_PASSWORD:
-PGPASS=$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2-)
-TMP=$(mktemp); sed "s|^DATABASE_URL=.*|DATABASE_URL=postgresql://borobiya:$PGPASS@localhost:5432/borobiya|" .env > "$TMP" && mv "$TMP" .env
-# then the loader block (§ 2.1), and a one-line proof that all four secrets are non-empty:
-grep -E '^(JWT_SECRET|JWT_REFRESH_SECRET|POSTGRES_PASSWORD|NOMINATIM_PASSWORD)=' .env | awk -F= 'length($2)>20 {n++} END {print n" of 4 secrets look real"}'
+python3 scripts/vm-env.py               # asks for development/production and the admin password
+python3 scripts/vm-map.py               # choose catalog areas, snapshot and external library
+python3 scripts/vm-map.py --show        # verify the saved selection without touching the live map
 ```
 
-`mode 600` is not ceremony: `.env` is where the generated database, Nominatim and JWT secrets live,
-and `setup-ubuntu-vm.sh` now creates it with `install -m 600` for the same reason (it also rewrites it
-through a temp file rather than `sed -i`, because a value containing `&` or `|` used to be either
-expanded or fatal — see § 10). The `sed` forms below are safe precisely because every value they
-insert is hex or a number; if you ever script this file, keep that invariant or use the `awk` form the
-script uses.
+For unattended *new* installs only, pass `--mode development --generate-admin` to `vm-env.py`;
+the initial admin password is saved in `.env` as base64 (not encryption), and must be transferred
+to a password manager through a secure local channel. For production use `--mode production
+--origin https://your-real-domain` with working public DNS and inbound 80/443. Do not give
+production an example domain or change a populated database's password to get setup unstuck.
+`vm-map.py --list` prints the catalog, `--set ir-tehran --snapshot pinned --policy cache-first`
+selects an area, and `--library /absolute/external/path` moves the library. The selection is
+saved in `.vm-map.json` but **does not change the running map** until `vm.py launch` succeeds.
+`--policy offline` needs pre-cached source files and tool artifacts; it is not a substitute for
+`vm.py launch --serve-only` when no build or network access is allowed. See the
+[quickstart](./UBUNTU_VM_QUICKSTART.md#map-changes-and-offline-reuse).
 
-`POSTGRES_PASSWORD` and `NOMINATIM_PASSWORD` are written **once**: the volumes keep whatever they
-were initialized with, so changing them later makes the containers fail authentication while
-`.env` still looks correct (see § 9.3). The same block is what `setup-ubuntu-vm.sh` does
-automatically; the `-n` on `cp` and the `grep -q` guards mean running it again never overwrites a
-secret you already generated.
+If working through the manual map stages in § 6, use the *trusted* `.env` loader in § 2.1 at
+the start of each terminal; do not print the file or rendered Compose configuration. Only
+`setup-ubuntu-vm.sh` should write the **resolved** `MAP_DATASET_DIR`, `MAP_PBF`, `MAP_BBOX`
+and related paths back into `.env` for Compose. After changing area/library settings, run
+`python3 scripts/vm.py launch` and then `python3 scripts/vm.py doctor`; verify the active
+pointer and data before manually starting services. `DATABASE_URL` must agree with
+`POSTGRES_PASSWORD`, and existing database volumes require the **original** password or
+careful role recovery (§ 9.3), never a fresh generated one.
 
-`setup-ubuntu-vm.sh` also **asks** for those two, the way it asks for the admin password: press Enter and
-it generates 48 hex characters, type a value and it is stored verbatim in both spellings — the key and
-the password inside `DATABASE_URL`, which is the pair that must never disagree. Nothing is printed: the
-answers live only in `.env`, mode 600, and `--yes` skips the questions entirely rather than asking a
-non-interactive run to answer.
-
-Why an alphabet rule instead of accepting anything: Compose interpolates `POSTGRES_PASSWORD` straight
-into the API's `DATABASE_URL`, and the Nominatim image does the same for its own connection string, so a
-`#` starts a fragment, a `/` or `?` ends the authority, a `%` promises an escape, and brackets stop the
-parser outright. Postgres then rejects a password that `.env` plainly contains, which looks like a wrong
-password and is not one (§ 9.3). The script therefore accepts `A-Z a-z 0-9 . _ ~ -`, 12 to 128 of them,
-and refuses the rest where it can still say so cheaply — before the map import rather than after it.
-Editing `.env` by hand buys nothing here: the same characters would be in the same URL.
-
-Then run the loader block from § 2.1 — it is also the cheapest proof that the file parses and that
-the selection you wrote is the selection the pipeline will use.
-
-Area selection is a form, not a guess. `map-server/regions.json` is the catalog; `regions.py` is
-the only thing allowed to interpret it:
-
-```bash
-python3 map-server/scripts/regions.py list                       # every selectable area, with its id
-python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS"  # what that selection means, as KEY='value' lines
-python3 map-server/scripts/regions.py sources "$MAP_REGION_IDS"  # every source file that will be fetched, and from where
-```
-
-`resolve` prints the same `KEY='value'` lines the loader block `eval`s; `list` and `sources` are for
-reading, not sourcing. To change the areas from the command line (this is what the interactive form
-in `setup-ubuntu-vm.sh` writes into `.env` for you):
-
-```bash
-TMP=$(mktemp); sed 's|^MAP_REGION_IDS=.*|MAP_REGION_IDS=ir-tehran,ir-qom|' .env > "$TMP" && mv "$TMP" .env
-# then the loader block again, and read back what it resolved:
-echo "$MAP_REGION_IDS | $UNION_BBOX | $SNAPSHOT_DATE | "$([ "$APPROX_DOWNLOAD_SIZE_UNKNOWN" = 1 ] && echo 'size unknown' || echo "~$APPROX_DOWNLOAD_MB MB to download")
-```
-
-Four `.env` keys decide where files go and how much RAM the build uses; they are read by
-`fetch-planetiler-sources.sh` and `generate-tiles.sh` in both modes, so they must be exported in
-**every** terminal (that's `set -a; source .env; set +a`; the setup script does it itself). Leave
-the path keys blank unless you need to move data off the VM disk:
-
-| Key | Default when blank | Set it when |
-| --- | --- | --- |
-| `MAP_LIBRARY_DIR` | `~/.local/share/borobiya/map-library` | the library must live on a bigger volume |
-| `MAP_PLANETILER_SOURCES_DIR` | `$MAP_LIBRARY_DIR/planetiler-sources` | you want to stage the reference layers from a copy (step 7, § 3.4) |
-| `MAP_SNAPSHOT` | `pinned` | you want `latest` or a specific `MAP_SNAPSHOT_DATE=YYYY-MM-DD` |
-| `MAP_SOURCE_POLICY` | `cache-first` | `refresh` to force re-download, `offline` to prove self-sufficiency |
-
-**Write the resolved paths back into `.env` once, before step 11/12** (the setup script does this for
-you). Compose interpolates `${MAP_DATASET_DIR}` and `${MAP_PHOTON_DATA_DIR}` from the *file*, not from
-your loaded shell, so a blank value there means Nominatim and Photon are pointed at
-`.compose-unconfigured/…` placeholder directories on purpose rather than at the wrong data:
-
-```bash
-for K in MAP_LIBRARY_DIR MAP_DATASET_DIR MAP_DATA_DIR MAP_PBF MAP_OSRM_DATA_DIR MAP_PHOTON_DATA_DIR MAP_BBOX MAP_DATA_VERSION; do
-  V="${!K-}"
-  [[ -n "$V" ]] || { echo "skip $K (empty in this shell — run the loader block first)"; continue; }
-  TMP=$(mktemp); grep -v "^$K=" .env > "$TMP"; printf '%s=%s\n' "$K" "$V" >> "$TMP"; mv "$TMP" .env
-done
-grep -E '^MAP_(LIBRARY_DIR|DATASET_DIR|DATA_DIR|PBF|OSRM_DATA_DIR|PHOTON_DATA_DIR|BBOX|DATA_VERSION)=' .env
-```
-
-Those lines are re-derived on every run of the resolver, which is what keeps a changed
-`MAP_REGION_IDS` from leaving a stale dataset path behind in the file the containers read.
-
-Also in `.env.example`, and worth knowing before step 9 on a small VM: `PLANETILER_HEAP=3g`,
-`OSRM_BUILD_THREADS=2`, `OSRM_RUNTIME_THREADS=1`, `NOMINATIM_THREADS=2`,
-`PHOTON_JAVA_TOOL_OPTIONS="-Xms256m -Xmx1536m"`, `MAP_PHOTON_DATA_DIR`, `MAP_OSRM_DATA_DIR`,
-`PHOTON_DEFAULT_LANGUAGE=fa`, `MAP_PBF`, `MAP_DATA_VERSION` (the last two normally left to the loader
-block, which derives them for the current selection).
-`MAP_PBF` is **derived** by `eval "$(python3 map-server/scripts/regions.py resolve)"`; if a step
-complains about an empty path, that line is missing from your shell, not from `.env`.
+On a small VM, review `PLANETILER_HEAP`, `OSRM_BUILD_THREADS`, `OSRM_RUNTIME_THREADS`,
+`NOMINATIM_THREADS` and `PHOTON_JAVA_TOOL_OPTIONS` in `.env.example` before import. The
+script does not guarantee that 6 GiB RAM or a 50 GB disk will fit a whole-country import.
 
 ---
 
@@ -1326,7 +1271,7 @@ Two things the script does that you would otherwise debug: every graph is built 
 **staging** directory and moved into `$MAP_OSRM_DATA_DIR/<profile>` only at the end (so an interrupted
 run leaves no half-written profile), and every `docker run` passes
 `--user "$(id -u):$(id -g)"`, because the OSRM image runs as root and would otherwise leave
-root-owned graph files that § 8.1's `rm -rf` cannot delete without `sudo`.
+root-owned graph files that cannot be removed by a normal-user cache cleanup. Do not use `sudo rm -rf` on a derived path.
 
 **Check.**
 
@@ -1334,12 +1279,11 @@ root-owned graph files that § 8.1's `rm -rf` cannot delete without `sudo`.
 ls -lh "$MAP_OSRM_DATA_DIR"/{car,bicycle,foot}/*.osrm*      # four+ files each profile
 ```
 
-**Redo just this step.** `rm -rf -- "$MAP_OSRM_DATA_DIR"/{car,bicycle,foot}` then re-run the
-command. To reclaim disk without rebuilding everything, measure first and delete the profiles you
-are not serving (`du -sh "$MAP_OSRM_DATA_DIR"/*`) — a profile's `*.osrm*` set is self-contained, so
-dropping `bicycle/` and `foot/` is legitimate as long as § 7's routing checks are the `car` ones. If you changed the area selection since a previous build, the script **refuses** to
-reuse non-empty profile directories: move `$MAP_OSRM_DATA_DIR/{car,bicycle,foot}` aside first (the
-setup script does this for you, and prunes them after acceptance).
+**Redo just this step.** Run `python3 scripts/vm.py launch` to verify and rebuild stale graphs.
+Check the selection with `python3 scripts/vm-map.py --show` first; setup stages new graphs and
+activates them only after verification. Do not remove profiles by hand using an unverified or
+empty `$MAP_OSRM_DATA_DIR`. If disk is tight, inspect `du -sh "$MAP_OSRM_DATA_DIR"/*` and
+expand storage before attempting a whole-country rebuild.
 
 ### 6.5 Step 11 — Geocoding: Photon JAR, Nominatim import, Nominatim → Photon
 
@@ -1812,23 +1756,19 @@ set -a; source .env; set +a
 docker compose run --rm --build api bun src/db/migrate.ts
 ```
 
-`reset-admin-password` is the documented way back into an account: it sets the bootstrap `admin`'s
-password and revokes that user's existing sessions. The setup script prints the generated admin login
-once, at the end of a run; the password is kept only as `ADMIN_SEED_PASSWORD_B64` in the local `.env`
-and decoded for the seed process, never committed.
+To regain access to the seeded `admin` account, use the terminal-only operator command;
+**do not put a password in a CLI argument, environment assignment or shared log**. Setup no
+longer prints generated passwords at completion. The initial seed is stored as base64 (not
+encryption) in the local private `.env`; the reset tool updates the account, revokes its sessions
+and synchronizes the bootstrap secret for later seeds:
 
 ```bash
-docker compose run --rm api bun src/db/reset-admin-password.ts '<new-password>'
-# or, if the password is already exported in this shell:
-ADMIN_SEED_PASSWORD='<new-password>' docker compose run --rm -e ADMIN_SEED_PASSWORD api bun src/db/reset-admin-password.ts
+python3 scripts/vm.py admin-password           # hidden prompt twice; DB must be running
+# Or: python3 scripts/vm.py admin-password --generate  # prints on a TTY only; save securely
 ```
 
-The password is validated by the same `passwordSchema` registration uses — 8–1024 characters with at
-least a letter and a digit — so a weak recovery password is refused by the tool rather than stored and
-then rejected at login. It also refuses to set the documented local default outside
-development/test, and it refuses to run at all if no `admin` user exists yet (that case is the seed:
-`docker compose run --rm api bun src/db/seed.ts`). Every `run` here is a **new** container, which is
-why it reads the current `.env`; `exec` would reuse the running one's older environment.
+If the admin user does not exist yet, rerun `python3 scripts/vm.py launch` to migrate/seed first.
+A password reset is not a way to fix a PostgreSQL service-account `28P01` (see § 9.3).
 
 ---
 
@@ -1836,18 +1776,17 @@ why it reads the current `.env`; `exec` would reuse the running one's older envi
 
 Three levels. Start at the top; each is stated in terms of what you lose.
 
-### 8.1 Level 1 — rebuild one artifact (no downloads)
+### 8.1 Level 1 — recover a single failed stage without deleting anything
 
-Delete only that artifact and re-run its step (§ 6). Costs: minutes to an hour, no network.
-
-| Lose | Command | Forces |
-| --- | --- | --- |
-| tiles | `rm -f -- "$MAP_DATA_DIR/borobiya.pmtiles" "$MAP_DATA_DIR/borobiya.metadata.json"` | step 9 |
-| road graphs | `rm -rf -- "$MAP_OSRM_DATA_DIR"/{car,bicycle,foot}` | step 10 |
-| Photon index | `rm -rf -- "$MAP_PHOTON_DATA_DIR/photon_data" && rm -f -- "$MAP_PHOTON_DATA_DIR/.borobiya-pbf.sha256"` | step 11c |
-| dataset PBF (not the downloads) | `rm -f -- "$MAP_PBF" "$MAP_PBF_MANIFEST"` | step 8 (re-crops from cache) |
-| a Planetiler reference layer | `rm -f -- "$MAP_PLANETILER_SOURCES_DIR"/<that file>` | step 7 for that one file |
-| build cache (Docker) | `docker builder prune -f` | image rebuilds |
+Use `python3 scripts/vm.py doctor` to locate the failing service and rerun
+`python3 scripts/vm.py launch`. The setup pipeline checks provenance and reuses valid sources;
+its stage-specific verify commands in § 6 and § 7 tell you what still needs work. If an
+artifact verifies but serves the wrong dataset, compare `.vm-map.json`, `.env` and the active
+library pointer *before* rebuilding; do not guess a path to delete. The older table here
+contained bare `rm -rf "$MAP_OSRM_DATA_DIR"/...` commands: with an unset variable they
+could target `/car`, `/bicycle` or `/foot` outside the project. For a full, deliberate cache
+reset, use § 8.2's preview/confirmation instead. Docker builder cache is global to the VM;
+`docker builder prune` is **not** a Borobiya-only cleanup.
 
 ### 8.2 Level 2 — clear the map caches and downloaded files
 
@@ -1858,7 +1797,6 @@ remove and stops.
 cd ~/borobiya
 ./scripts/clear-map-cache.sh                    # same as --dry-run: print the plan only
 ./scripts/clear-map-cache.sh --apply            # ask for the word CLEAR, then remove
-./scripts/clear-map-cache.sh --yes              # remove without a prompt (only after you read the plan)
 ./scripts/clear-map-cache.sh --dry-run --include-nominatim-volume   # preview the one option that touches a volume
 ```
 
@@ -1866,18 +1804,21 @@ cd ~/borobiya
 | --- | --- |
 | `--dry-run` | print only — **the default**, so an accidental invocation destroys nothing |
 | `--apply` | remove, after you type `CLEAR` (needs a terminal) |
-| `--yes` | remove without the prompt |
+| `--yes` | Internal automation only; prefer interactive `--apply` for manual operations |
 | `--include-nominatim-volume` | also drop the Nominatim database volume — only if that import can be rebuilt (hours) |
 | `--library PATH` | point at a library other than `MAP_LIBRARY_DIR` in `.env` |
 
-What it removes, by the label it prints for each: `library sources`, `library crops`,
+What it removes, by the label it prints for each: downloaded OSM `library sources`, `library crops`,
 `library generated datasets (PBF, PMTiles, OSRM, Photon)`, the `active library pointer`
 (`current.json`), unconfigured Compose placeholders, and the legacy project-local equivalents
 (`map-server/data/source`, `map-server/data/crops`, `map-server/osrm/data`,
 `map-server/photon/data`, `map-server/data/{tehran,borobiya}.{osm.pbf,source.json,pmtiles,metadata.json}`).
 Everything it names is re-derivable from the network plus the pipeline. What it keeps: **Docker
-images and build cache**, every named volume, and the committed inputs: `map-server/data` and
-`map-server/tools` themselves are left alone (only the generated files inside them are cleared), because
+images and build cache**, every named volume, and the **Planetiler reference-layer cache**
+(`$MAP_PLANETILER_SOURCES_DIR`, normally `$MAP_LIBRARY_DIR/planetiler-sources`) so a rebuild need not
+redownload its large verified archives. If that source path is configured elsewhere, the cleanup
+never follows it. It also keeps committed inputs: `map-server/data` and
+`map-server/tools` themselves are left alone (only generated files inside them are cleared), because
 `map-server/regions.json`, the styles, sprites and fonts live in that tree and an older checkout may
 keep its Planetiler JAR in `map-server/tools/`. Two protections are worth knowing, because each looks like a bug
 otherwise: it refuses to clear **through a symlink** or outside the configured root (so a bad
@@ -1885,30 +1826,27 @@ otherwise: it refuses to clear **through a symlink** or outside the configured r
 paths it prints `no Borobiya cache markers; preserving it and its unknown contents` and removes
 nothing there.
 
-Cost after Level 2: steps 7–11 in full (≈1.3 GB + 230 MB of downloads, then the builds).
+Cost after Level 2: OSM extracts must be downloaded again and the map/index rebuilt; the
+verified Planetiler reference layers stay cached unless separately refreshed. If you included the
+Nominatim volume, its import also runs again. `--offline`/`--serve-only` cannot reuse deleted data.
 
-### 8.3 Level 3 — full reset of the VM's map + app state
+### 8.3 Level 3 — full project data reset (irreversible)
 
-Order matters; run each line and read it before the next:
+First move a verified **database backup and SOS photo evidence** off the VM. A database dump
+does not include uploads. Then, from an interactive terminal in `~/borobiya`, run:
 
 ```bash
-cd ~/borobiya
-docker compose --profile routing --profile geocoding --profile geocoding-import down   # 1a. map containers
-docker compose down                                                # 1b. api/nginx/postgres (still no -v)
-#     Both lines matter: a volume a container still references cannot be removed, so step 5/6 below
-#     would fail with "volume is in use" if only the profile command had been run.
-./scripts/clear-map-cache.sh --yes                                  # 2. map library (L2 above)
-./scripts/clear-map-cache.sh --yes --include-nominatim-volume       # 3. only if you want the Nominatim import gone too
-docker builder prune -f                                            # 4. reclaimable build cache
-PROJECT="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"
-docker volume ls --filter "label=com.docker.compose.project=$PROJECT"   # 5. what is left, by name
-# 6. only if you deliberately want the APPLICATION database gone (users, SOS rows, sessions):
-docker volume rm <project>_postgres-data
+python3 scripts/vm.py destroy --backup /safe/place/new.dump
 ```
 
-Then rebuild from the top: the loader block (§ 2.1), steps 7 → 13, or `./scripts/setup-ubuntu-vm.sh`
-which does all of them and re-migrates/re-seeds the database (§ 1.2a). `.env` survives, so your
-secrets, selection and pins are already in place; nothing in this document's flow re-creates them.
+The backup path must be a **new file** in an existing directory. `destroy` previews the map
+cache boundary, requires a typed confirmation, stops this Compose project and deletes only its
+labeled database, uploads, Nominatim and TLS volumes plus its map-library caches. It preserves
+`.env`, the checkout, OS tools and global Docker images. `--no-backup` explicitly discards the
+DB; never use it as a remedy for a lost password, since `pg_dump` cannot work until access is
+recovered. Run A6 and `vm.py launch` to rebuild; users, SOS rows and photos cannot be recovered
+without separate backups. To remove *only* the app DB (not photos or maps), use
+`python3 scripts/vm.py stop --clear-db --backup /safe/place/new.dump` instead.
 
 ### 8.4 Never as a shortcut
 
@@ -1923,30 +1861,17 @@ secrets, selection and pins are already in place; nothing in this document's flo
 
 ---
 
-### 8.5 Remove one Compose volume — the only safe way
+### 8.5 Volume recovery without guessing names
 
-Never by name-prefix guessing, and never globally: find the volume by the labels Compose puts on it,
-require exactly one match, then remove that one name. This is what the Nominatim reset in § 9.2 means;
-the same lines work for any service's volume — change the `com.docker.compose.volume=` filter.
+Use `python3 scripts/vm.py stop --clear-db --backup /safe/place/new.dump` for the application
+DB. It verifies Compose labels, backs up first and requires an interactive confirmation; it
+does **not** remove uploads. A Nominatim reset is a separate, rebuildable import: preview with
+`./scripts/clear-map-cache.sh --dry-run --include-nominatim-volume`, then use `--apply
+--include-nominatim-volume` after confirming the selected Compose project and costs. Neither
+command needs a guessed Docker volume name or `docker compose down -v`. If a volume's password
+is lost, first attempt credential recovery (§ 9.3); deletion is not a diagnosis.
 
-```bash
-cd ~/borobiya
-PROJECT="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name", ""))')"
-[[ -n "$PROJECT" ]] || { echo 'Could not determine the Compose project; stop and inspect manually.' >&2; exit 1; }
-VOL="$(docker volume ls -q --filter "label=com.docker.compose.project=$PROJECT" \
-        --filter 'label=com.docker.compose.volume=nominatim-data')"
-[[ -n "$VOL" ]] || { echo 'No labeled Nominatim volume in this project; nothing to remove.' >&2; exit 1; }
-[[ "$(printf '%s\n' "$VOL" | wc -l)" -eq 1 ]] || { echo 'More than one match — inspect the list and stop.' >&2; exit 1; }
-docker compose --profile geocoding-import rm -f nominatim     # drop the container, not the data
-docker volume rm "$VOL"
-```
-
-An empty result means there is nothing to remove (no import ever completed, or it was already reset).
-More than one match means a second project or an orphan — look at
-`docker volume ls --filter "label=com.docker.compose.project=$PROJECT"` before choosing anything.
-Then re-run step 11b and 11c. The half-initialized database volume can also be left alone when the
-failure was an old read-only mount: without its `import finished` marker Nominatim drops and
-re-imports from scratch on the next start (§ 9.2).
+---
 
 ## 9. Troubleshooting index
 
@@ -1987,12 +1912,17 @@ Symptom first, always — grep this section for the error text.
   re-imports from scratch.
 - **`FATAL: password authentication failed for user "nominatim"`** — `.env`'s `NOMINATIM_PASSWORD`
   no longer matches the password stored in the volume. Reload `.env` first (a new terminal is the
-  usual cause) and re-run 11c; otherwise restore the old value in `.env`, or reset **only** the
-  project's Nominatim volume with § 8.5's labeled removal (never `down -v`), then re-run 11b and 11c.
+  usual cause) and re-run 11c; otherwise restore the original credential from a secure backup.
+  If the import is disposable and you deliberately choose to re-import it, § 8.5's guarded
+  Nominatim option also clears **other map caches**; preview the full cost first. Never `down -v`
+  or touch the application database to repair Nominatim.
 - **Changed the area selection after 11b/11c ran** — the Nominatim database and the Photon index
   still describe the old areas, and nothing will warn you. Redo them from scratch: stop both
-  services, remove only this project's Nominatim volume via § 8.5, delete `photon_data` and the
-  `.borobiya-pbf.sha256` stamp (§ 8.1 rows 3–4), then re-run 11b and 11c.
+  services and confirm the new selection with `python3 scripts/vm-map.py --show`. To discard
+  **all rebuildable map caches and the Nominatim import**, preview
+  `./scripts/clear-map-cache.sh --dry-run --include-nominatim-volume`, then use `--apply
+  --include-nominatim-volume` interactively (§ 8.2/§ 8.5) and rerun `python3 scripts/vm.py launch`.
+  This requires the source downloads and long imports again; it never removes the app DB or photos.
 
 ### 9.3 Step 12 (containers)
 
@@ -2006,91 +1936,26 @@ Symptom first, always — grep this section for the error text.
 - **`failed to extract layer … no space left on device`** — Docker/containerd storage is full, not
   a bad JAR (the checksum step passed). `docker system df -v`, `df -h/-i` on
   `$(docker info --format '{{.DockerRootDir}}')` **and** `/var/lib/containerd` if it exists, then
-  § 8.1's `docker builder prune -f`. If the space is inside a database volume, expand or move Docker
+  investigate Docker's own build cache separately (`docker builder prune` affects other projects).
+  If the space is inside a database volume, expand or move Docker
   storage instead of deleting data. The setup script re-checks capacity before the long stages, and
   builds the Photon image *before* the disk-heavy Nominatim import for exactly this reason.
-- **`borobiya-api-1` restart-looping with `Replace the example placeholder secret`** — the example
-  JWT secrets are still in `.env`; step 12's command excludes `api`, so an old container survives
-  untouched. Generate two different secrets, reload `.env` (Compose prefers values already in your
-  shell over the edited file), recreate only the API. Do **not** touch `POSTGRES_PASSWORD` /
-  `NOMINATIM_PASSWORD` now — their volumes hold the first password:
-
-  ```bash
-  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" .env
-  sed -i "s|^JWT_REFRESH_SECRET=.*|JWT_REFRESH_SECRET=$(openssl rand -hex 32)|" .env
-  set -a; source .env; set +a
-  docker compose up -d --build --force-recreate api && docker compose logs --tail=20 api
-  ```
-- **`postgres` `unhealthy`, dependents report `dependency failed to start`** (on older checkouts:
-  `map-server` restart-looping with `password authentication failed`) — the current
-  `POSTGRES_PASSWORD` doesn't match the one `postgres-data` was initialized with, and
-  `pg_isready`-style checks cannot see that, and neither can a container created before § 9.3's healthcheck fix: its check still goes over loopback, which the image trusts, until the service is recreated. Either put the original password back in `.env`, or —
-  while the app database is still empty — reset **only** that volume:
-  `docker compose down && docker volume rm <project>_postgres-data`, reload `.env`, re-run step 12.
-  Tiles, graphs, index and the Nominatim volume live elsewhere and are untouched.
-- **Migration `28P01: password authentication failed for user "borobiya"` while Postgres is
-  `healthy`** — this is the confusing one, and the reason it is confusing is that `healthy` is not
-  evidence about any password. The Postgres image's default `pg_hba.conf` trusts the local socket and
-  loopback TCP and asks for a password only from other addresses, so anything that checks the server
-  from inside it (the healthcheck did, until this section's fix; so does a `psql -h 127.0.0.1` you run
-  by hand) succeeds with any password, right or wrong. The API connects from another container, where a
-  password really is required. Three values are in play: the one in `.env`, the one the **container** was
-  created with, and the one the **role inside `postgres-data`** has kept since its first init — the image
-  applies `POSTGRES_PASSWORD` once, at initdb, and never again. `setup-ubuntu-vm.sh` compares them before
-  it starts anything long and offers to settle the disagreement. By hand, in this order:
-
-  ```bash
-  set -a; source .env; set +a                                    # 1. what the file says
-  docker inspect "$(docker compose ps -q postgres)" | grep -m1 POSTGRES_PASSWORD   # 2. what the container holds
-  printf '%s' "postgresql://borobiya:$POSTGRES_PASSWORD@postgres:5432/borobiya" | sha256sum | cut -c1-12
-  docker compose run --rm --no-deps api sh -c 'printf %s "$DATABASE_URL" | sha256sum | cut -c1-12'
-  ```
-
-  Lines 3 and 4 are the same number when Compose will hand the migrator what you expect; different means
-  it is being interpolated from something else, usually an export in your shell (§ 2.1's loader block
-  exports these names, and an export beats `.env` for Compose). Then the probe that means something — off
-  loopback, and with the connection string on stdin rather than in argv, which every process on the
-  machine can read while the command runs:
-
-  ```bash
-  printf '%s\n' "postgresql://borobiya:$POSTGRES_PASSWORD@postgres:5432/borobiya" | \
-    docker compose exec -T postgres sh -c 'IFS= read -r u; exec psql "$u" -tAc "SELECT 1"'
-  # and to see the trust rule with your own eyes, the same command with a password you know is wrong:
-  printf '%s\n' "postgresql://borobiya:definitely-not-it@postgres:5432/borobiya" | \
-    docker compose exec -T postgres sh -c 'IFS= read -r u; exec psql "$u" -tAc "SELECT 1"'
-  ```
-
-  The second prints `1` if you change `postgres` to `127.0.0.1` — that is the trap. Only the first form
-  can answer a question about the credential.
-
-  - **1 and 2 differ** — the volume is fine and only the container is stale:
-    `docker compose up -d --force-recreate postgres`. Data lives in the volume, not the container, so it
-    costs nothing. A container created before this section was fixed keeps its old loopback healthcheck
-    until it is recreated, so `healthy` goes on meaning nothing there; for newly created ones, a wrong
-    password now reports `unhealthy` and blocks dependents instead of letting them fail at first use.
-  - **1, 2 and the URL agree and the probe still fails** — the role's own password is something else,
-    usually because `.env` was regenerated, or the volume was restored, after the first `up`. Put the old
-    value back, or make the role match the file, which changes one credential and no data. The role to
-    connect as is **`POSTGRES_USER`, not `postgres`**: with `POSTGRES_USER=borobiya`, initdb named the
-    superuser that, and `psql -U postgres` answers `FATAL: role "postgres" does not exist` — over the
-    local socket, without ever asking for a password, because the socket is trusted:
-
-    ```bash
-    printf "ALTER USER \"borobiya\" WITH PASSWORD '%s';\n" "$POSTGRES_PASSWORD" | \
-      docker compose exec -T postgres psql -U borobiya -d postgres -v ON_ERROR_STOP=1 -f -
-    docker compose restart api      # it holds a pool of connections made with the old password
-    ```
-
-    Re-run the probe above afterwards; `1` is the only acceptable answer, and § 7.2's migrate command is
-    the next thing to run.
-  - **the off-loopback probe works and the API still fails** — the password contains a character the URL
-    cannot carry (`#`, `/`, `%`, `[`, a space), so `DATABASE_URL` says something shorter than `.env` does,
-    while `PGPASSWORD`-style clients say the truth. Nothing is wrong with the account. Set a hex password
-    in both spellings (A6), then reconcile the role with the `ALTER USER` above.
-
-  Never resolve this by deleting `postgres-data` unless the database really is disposable: tiles, OSRM
-  graphs, the Photon index and the Nominatim volume are elsewhere (§ 8.5), but every row an operator has
-  entered since the install is not.
+- **API restart-looping with placeholder JWT secrets** — run `python3 scripts/vm-env.py`
+  in a private terminal. It replaces *only placeholders*, preserves existing database passwords
+  and refuses to invent one if a DB volume exists. Then run `python3 scripts/vm.py launch`
+  to recreate the API. Do not paste `.env`, rendered Compose config or secret-bearing logs.
+- **`postgres` unhealthy / migration returns `28P01`** — a healthy local socket is *not* proof
+  that other containers can authenticate. Compare `.env` credentials with the ones originally
+  used to initialize the app database; first try restoring the known old value from a secure
+  backup. Do **not** copy `docker inspect` output to a ticket (it exposes passwords), rotate
+  `POSTGRES_PASSWORD` by hand or delete `postgres-data` as a repair. Run
+  `./scripts/setup-ubuntu-vm.sh --dry-run` for a plan. If the password is known but the role
+  holds an older one, run `./scripts/setup-ubuntu-vm.sh` **interactively** and review its
+  prompted `ALTER USER` offer: it probes over the Compose network and never puts a password in
+  a Docker CLI argument. `vm.py launch` runs setup non-interactively and deliberately cannot
+  approve that credential change. If you intentionally want to discard an *empty, disposable*
+  application DB, § 8.5 requires an interactive scoped deletion (and a backup when possible).
+  Uploaded photos and map caches are separate; neither is a password reset.
 - **Migration `42704: type "geography(Point,4326)" does not exist` while PostGIS is installed** — the
   quotes are the whole bug. A migration once spelled the column type as one quoted identifier, and Postgres
   reads that as a type whose *name* contains the parentheses, rather than as `geography` with a type

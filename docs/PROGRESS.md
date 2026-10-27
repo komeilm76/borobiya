@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — Ubuntu VM guides and setup safety review
+
+- Reconciled the quickstart, diagnostics and long manual runbook with the actual `vm-env.py`, `vm-map.py`, `vm.py`, `vm-install.sh` and cache-cleaner interfaces. Removed a manual `.env` loop that silently **rotated database passwords on rerun**, secret-bearing `/tmp` rewrites, guessed volume deletion, bare unset-path graph removal, CLI admin-password examples and an unguarded Docker reinstall as the recommended path. Destructive recovery now points to preview/typed-confirmation commands and distinguishes retained Planetiler reference archives from caches that are removed. Setup's `.env` writer now refuses symlinks/non-files, creates private files before exposing secrets, and never echoes values on dry-run or a generated admin password at completion. Offline Python regressions failed before the fixes; script suite, markdown checker and static lint pass. **No Ubuntu VM, Docker daemon, real map import, public TLS or browser acceptance was available here.**
+
 ### 2026-10-27 — T4.4.4 companion map route defers MapLibre (partial)
 
 - The companion-map route's direct runtime `Marker` import pulled MapLibre's ~1 MB chunk into the route before `MapCanvas` mounted, making the previous concurrent import ineffective on that screen. `MapCanvas` now hands its already-loaded marker constructor to ready listeners; the companion view imports only types, creates the own-location marker from that constructor and still removes it on teardown. Before/after Vite builds confirm the companion route chunk no longer statically imports the MapLibre chunk; source-pinned tests and client typecheck pass. This is a bundle-graph fix for one route, not a measured <2s rendered map, <500ms GPS fix or live browser/device acceptance. Other map routes remain to be reviewed; T4.4.4 stays **open**.

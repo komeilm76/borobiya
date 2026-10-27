@@ -144,6 +144,23 @@ class EnvTests(unittest.TestCase):
                 vm_env.origin(value)
 
 
+class RunbookSafetyTests(unittest.TestCase):
+    def test_vm_guides_use_one_nonrotating_env_writer_and_scoped_cleanup(self):
+        docs = vm.ROOT / "docs"
+        runbook = (docs / "UBUNTU_VM_RUNBOOK.md").read_text()
+        quick = (docs / "UBUNTU_VM_QUICKSTART.md").read_text()
+        diagnostic = (docs / "UBUNTU_VM_DIAGNOSTICS.md").read_text()
+        for guide in (runbook, quick, diagnostic):
+            self.assertIn("scripts/vm.py doctor", guide)
+        self.assertIn("python3 scripts/vm-env.py", runbook)
+        self.assertIn("python3 scripts/vm-map.py", runbook)
+        self.assertIn("python3 scripts/vm.py destroy --backup", runbook)
+        self.assertNotIn("NEW=$(openssl rand -hex 32)", runbook)
+        self.assertNotIn("docker volume rm <project>_postgres-data", runbook)
+        self.assertNotIn("./scripts/clear-map-cache.sh --yes", runbook)
+        self.assertNotIn('rm -rf -- "$MAP_OSRM_DATA_DIR"', runbook)
+
+
 class InstallerTests(unittest.TestCase):
     def test_runbook_docker_source_uses_codename_value_not_assignment(self):
         runbook = (vm.ROOT / "docs/UBUNTU_VM_RUNBOOK.md").read_text()

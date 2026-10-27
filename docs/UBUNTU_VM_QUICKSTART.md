@@ -1,6 +1,8 @@
 # Ubuntu VM: launch and operate Borobiya
 
-**Ubuntu 24.04; run from the repository root as a normal login user (not `sudo`).** This is the short path. [Full runbook](./UBUNTU_VM_RUNBOOK.md) explains the long map import, disk sizing, network/proxy and recovery details. First map build can take **hours**, needs Internet and ample disk/RAM; it is not a one-minute installation. Keep an SSH session alive with `tmux`.
+**Ubuntu 24.04; run from the repository root as a normal login user (not `sudo`).** This is the supported first-run and day-two path. [Diagnostics](./UBUNTU_VM_DIAGNOSTICS.md) starts with the first failing check; the [full runbook](./UBUNTU_VM_RUNBOOK.md) is a manual map-pipeline and recovery reference, not a second credential-setup recipe. First map build can take **hours**, needs Internet and ample disk/RAM; it is not a one-minute installation. Keep an SSH session alive with `tmux`.
+
+**Safety defaults:** Do not run `docker compose down -v`, delete volume names by guess, hand-regenerate `.env` passwords, or share `.env`/rendered Compose config. Existing DB and SOS photos are not map caches. `vm.py doctor` checks local HTTP and configuration; a green result does **not** prove database operations, HTTPS from outside the VM, or browser/GPS functionality.
 
 ## Before you launch: what you must provide
 
@@ -44,7 +46,7 @@ python3 scripts/vm.py stop
 python3 scripts/vm.py launch --serve-only                     # strict offline relaunch; prebuilt images/UI/data only
 ```
 
-The `--serve-only` path refuses missing artifacts and uses Compose `--no-build --pull never`; it does not fetch anything or silently create a new application database or uploads volume (Nominatim's import-only profile is not started). **Prepare and test it while online first** (images, application DB/uploads volumes, browser build, map sources/reference layers, routes and Photon index must already exist; production also needs a cached Caddy image and existing certificate/ACME volumes; the script checks volume existence, **not** certificate validity). Area selection is a local ignored `.vm-map.json`; live data changes only after a successful launch. `cache-first` reuses verified source bytes; `refresh` asks for a new snapshot; `offline` refuses missing source bytes. Whole countries can be multi-GB. A changed selection may rebuild Photon and reset its **rebuildable Nominatim** import volume; the application database and uploaded photos are not map caches.
+The `--serve-only` path refuses missing artifacts and uses Compose `--no-build --pull never`; it does not fetch anything or silently create a new application database or uploads volume (Nominatim's import-only profile is not started). **Prepare and test it while online first** (images, application DB/uploads volumes, browser build, map sources/reference layers, routes and Photon index must already exist; production also needs a cached Caddy image and existing certificate/ACME volumes; the script checks volume existence, **not** certificate validity). Area selection is a local ignored `.vm-map.json`; live data changes only after a successful launch. `cache-first` reuses verified source bytes; `refresh` asks for a new snapshot; `offline` refuses missing source bytes. Whole countries can be multi-GB. A changed selection may rebuild Photon and reset its **rebuildable Nominatim** import volume; the application database and uploaded photos are not map caches. The map-cache cleaner intentionally retains `$MAP_PLANETILER_SOURCES_DIR` (normally inside the library), so a later rebuild can reuse verified large reference archives.
 
 ## Day-two commands (safe defaults)
 
@@ -54,13 +56,13 @@ The `--serve-only` path refuses missing artifacts and uses Compose `--no-build -
 | Stop, keep DB/uploads/maps | `python3 scripts/vm.py stop` |
 | Back up app DB (new 0600 custom-format archive) | `python3 scripts/vm.py backup /safe/place/borobiya.dump` (move a copy off-VM) |
 | Stop and **remove app database only** | `python3 scripts/vm.py stop --clear-db --backup /safe/place/new.dump` (typed confirmation; `--no-backup` explicitly discards) |
-| Clear all **project** caches (maps + browser build) | `python3 scripts/vm.py clear-caches` previews; `python3 scripts/vm.py clear-caches --apply` stops and confirms. Offline serving needs a rebuild afterwards. |
+| Clear generated map data/OSM downloads + browser build | `python3 scripts/vm.py clear-caches` previews; `python3 scripts/vm.py clear-caches --apply` stops and confirms. Verified Planetiler reference layers and tool JARs remain; offline serving needs a rebuild afterwards. |
 | Clear only map caches | `./scripts/clear-map-cache.sh` previews; `./scripts/clear-map-cache.sh --apply` confirms. |
 | Clear downloaded project tool JARs | `python3 scripts/vm.py clear-tools` previews; `python3 scripts/vm.py clear-tools --apply` confirms |
 | Delete project DB, SOS photos, Nominatim DB, TLS certs **and** map caches | `python3 scripts/vm.py destroy --backup /safe/place/new.dump` (typed confirmation). Back up photo evidence separately first. |
 | Reset admin password | `python3 scripts/vm.py admin-password` (hidden double prompt, revokes admin sessions; `--generate` prints only on a TTY) |
 
-Nothing here runs `docker system prune` or `docker compose down -v`: project-scoped volumes are identified by Compose labels; other projects' data, OS packages, global Docker image cache, Bun and `.env` are preserved. Destructive commands cannot be automated with `--yes`. A database volume with a lost password must be recovered **before** backup/removal; do not reset volumes to fix authentication. The initial admin secret is saved as base64 in `.env` (not encryption); restrict access and use a password manager.
+**Recovery order:** run `doctor` → use [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md) → rerun `launch` to resume verified stages. Before any reset, preview the target, back up the DB to a *new* path, and copy uploads off-VM separately. `clear-caches` and `destroy` do not mean the same thing: the former preserves all data volumes, while the latter deletes the only on-VM copies of accounts and photos. Nothing here runs `docker system prune` or `docker compose down -v`: project-scoped volumes are identified by Compose labels; other projects' data, OS packages, global Docker image cache, Bun and `.env` are preserved. `vm.py` destructive commands require a typed terminal confirmation and do not accept `--yes`. A database volume with a lost password must be recovered **before** backup/removal; do not reset volumes to fix authentication. The initial admin secret is saved as base64 in `.env` (not encryption); restrict access and use a password manager.
 
 ## Proxy (optional; not stored in `.env`)
 
