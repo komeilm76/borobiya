@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — Active-device session-transition bug review
+
+- Found a privacy race after the earlier read-feedback work: a logout with no subsequent refresh left cached private devices/shares visible until route teardown, and a pending request could restore those rows after logout or an in-place account switch. The device-settings composable now invalidates reads synchronously on token loss or account-ID change, clears cached rows/status and reloads the new account; ordinary token rotation for the same account does not discard data. Old write completions cannot update the new account's UI, and a bulk pin change stops before sending additional posts after session loss. Deferred-response regressions cover logout/account switches, delayed single writes and partial bulk writes, with a source-pinned test for the actual view wiring. Physical/browser behavior and site-wide T4.4.2 acceptance remain open.
+
 ### 2026-10-26 — T4.4.2 active-device read feedback (partial)
 
 - The active-devices panel rendered empty-account/share copy on its first frame and after an initial failed read, although neither device sessions nor owned live shares had been confirmed. It now starts unresolved with two labeled skeletons, keeps known rows visible during re-reads with explicit freshness copy, and shows a failed-read/retry state rather than false empty or single-device claims. A missing session clears rows, older pending reads cannot restore them, a recovered read clears its read error, and device-priority edits are disabled until the snapshot is current. Runtime read/failure/race regressions and source-pinned markup checks pass; no browser/device acceptance or site-wide T4.4.2 completion is claimed.

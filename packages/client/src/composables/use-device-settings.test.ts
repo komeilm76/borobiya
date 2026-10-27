@@ -121,11 +121,12 @@ afterEach(() => {
 function mount() {
   const scope = effectScope();
   const token = ref<string | null>("access-token");
+  const accountId = ref<string | null>("owner-a");
   let api!: ReturnType<typeof useDeviceSettings>;
   scope.run(() => {
-    api = useDeviceSettings({ accessToken: token });
+    api = useDeviceSettings({ accessToken: token, accountId });
   });
-  return { scope, token, api };
+  return { scope, token, accountId, api };
 }
 
 async function settle(): Promise<void> {
@@ -188,6 +189,71 @@ describe("reading the two lists", () => {
     expect(api.failed.value).toBe(true);
   });
 
+  it("immediately clears private rows on logout and rejects an older pending response without another refresh", async () => {
+    const { api, token } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const delayed = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let interceptNext = true;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/_user/devices") && interceptNext) {
+        interceptNext = false;
+        return delayed;
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const oldRead = api.refresh();
+    await settle();
+    token.value = null;
+    expect(api.devices.value).toEqual([]);
+    expect(api.liveShares.value).toEqual([]);
+    expect(api.loaded.value).toBe(false);
+    release(jsonResponse([deviceRow(PHONE)], 200));
+    await oldRead;
+    expect(api.deviceRows.value).toEqual([]);
+    expect(api.shareRows.value).toEqual([]);
+  });
+
+  it("invalidates old account reads and loads only the newly signed-in account", async () => {
+    const { api, token, accountId } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const delayed = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let interceptNext = true;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/_user/devices") && interceptNext) {
+        interceptNext = false;
+        return delayed;
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const oldRead = api.refresh();
+    await settle();
+    responder = (url, method) => url.endsWith("/_user/devices")
+      ? { status: 200, body: [deviceRow(LAPTOP, { isCurrentDevice: true })] }
+      : defaultResponder(url, method);
+    token.value = "other-account-token";
+    accountId.value = "owner-b";
+    expect(api.deviceRows.value).toEqual([]);
+    await vi.waitFor(() => expect(api.deviceRows.value[0]?.deviceId).toBe(LAPTOP));
+    release(jsonResponse([deviceRow(PHONE)], 200));
+    await oldRead;
+    expect(api.deviceRows.value[0]?.deviceId).toBe(LAPTOP);
+  });
+
+  it("does not discard the same account's rows on an ordinary access-token rotation", async () => {
+    const { api, token } = mount();
+    await api.refresh();
+    calls = [];
+    token.value = "rotated-token";
+    await settle();
+    expect(api.deviceRows.value).toHaveLength(2);
+    expect(api.shareRows.value).toHaveLength(2);
+    expect(calls).toEqual([]);
+  });
+
   it("joins the shares onto the sessions they pin", async () => {
     const { api } = mount();
     await api.refresh();
@@ -242,6 +308,26 @@ describe("reading the two lists", () => {
 });
 
 describe("changing one share", () => {
+  it("does not report an old account's delayed write as a new session's success", async () => {
+    const { api, token, accountId } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === "POST" ? pendingPost : originalFetch(input, init)
+    ) as typeof fetch;
+    const oldWrite = api.assign(SHARE_ONE, LAPTOP);
+    await settle();
+    expect(api.busyShareId.value).toBe(SHARE_ONE);
+    token.value = null;
+    accountId.value = null;
+    release(jsonResponse(defaultResponder("/_user/location/shares", "POST").body, 200));
+    expect(await oldWrite).toBe(false);
+    expect(api.status.value?.tone).toBe("warn");
+    expect(api.liveShares.value).toEqual([]);
+  });
+
   it("posts the reuse body and re-reads the lists", async () => {
     const { api } = mount();
     await api.refresh();
@@ -309,6 +395,29 @@ describe("changing one share", () => {
 });
 
 describe("applying one device to everything", () => {
+  it("stops the remaining posts on logout instead of mutating more shares with the old bearer", async () => {
+    const { api, token, accountId } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let postsStarted = 0;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") { postsStarted++; return pendingPost; }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const oldSweep = api.assignEverywhere(LAPTOP);
+    await settle();
+    expect(postsStarted).toBe(1);
+    token.value = null;
+    accountId.value = null;
+    release(jsonResponse(defaultResponder("/_user/location/shares", "POST").body, 200));
+    await oldSweep;
+    expect(postsStarted).toBe(1);
+    expect(api.lastBulkSummary.value).toBeNull();
+    expect(api.liveShares.value).toEqual([]);
+  });
+
   it("posts once per share that needs it and counts what it skipped", async () => {
     responder = (url, method) => {
       if (url.endsWith("/_user/location/shares") && method === "GET") {

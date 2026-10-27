@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, type ComputedRef, type Ref } from "vue";
+import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { CreateLocationShareInput, LocationShare, OwnedLocationShare, UserDevice } from "@shared/index";
 import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
@@ -39,6 +39,8 @@ export type DeviceSettings = ReturnType<typeof useDeviceSettings>;
 
 export interface UseDeviceSettingsOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  /** Distinguishes account switches from routine access-token rotation. */
+  accountId?: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<void>;
 }
 
@@ -52,6 +54,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const loaded = ref(false);
   const failed = ref(false);
   let readVersion = 0;
+  let sessionGeneration = 0;
   const busyShareId = ref<string | null>(null);
   const bulkRunning = ref(false);
   const status = ref<DeviceSettingsStatus | null>(null);
@@ -95,6 +98,41 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const READ_FAILED_STALE = "خواندن فهرست دستگاه‌ها ناموفق بود؛ آخرین خوانده‌شده نمایش داده می‌شود.";
   const READ_FAILED_FIRST = "خواندن فهرست دستگاه‌ها ناموفق بود؛ دوباره تلاش کنید.";
   const SIGN_IN_REQUIRED = "برای دیدن دستگاه‌ها وارد حساب شوید.";
+
+  function resetPrivateState(): void {
+    // A pending read/write belongs to the former account even if no manual refresh follows.
+    readVersion += 1;
+    sessionGeneration += 1;
+    devices.value = [];
+    liveShares.value = [];
+    loaded.value = false;
+    loading.value = false;
+    failed.value = false;
+    busyShareId.value = null;
+    bulkRunning.value = false;
+    lastBulkSummary.value = null;
+    status.value = null;
+  }
+
+  watch(options.accessToken, (token, previousToken) => {
+    if (!token && previousToken) {
+      resetPrivateState();
+      failed.value = true;
+      setStatus("warn", SIGN_IN_REQUIRED);
+    }
+  }, { flush: "sync" });
+
+  if (options.accountId) watch(options.accountId, (nextId, previousId) => {
+    if (nextId === previousId) return;
+    if (previousId || loaded.value) resetPrivateState();
+    if (!nextId && !options.accessToken.value) {
+      failed.value = true;
+      setStatus("warn", SIGN_IN_REQUIRED);
+    }
+    // Bootstrap's onMounted refresh already owns its pending read. A later login/account switch
+    // must explicitly load the new owner's rows rather than leaving the empty reset on screen.
+    if (nextId && options.accessToken.value && !loading.value) void refresh();
+  }, { flush: "sync" });
 
   async function refresh(): Promise<void> {
     const version = ++readVersion;
@@ -165,7 +203,9 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }
 
   async function assign(shareId: string, deviceId: string): Promise<boolean> {
+    const session = sessionGeneration;
     const accessToken = await currentAccessToken();
+    if (session !== sessionGeneration) return false;
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
       return false;
@@ -188,6 +228,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     busyShareId.value = shareId;
     try {
       const outcome = await send(plan.body, accessToken);
+      if (session !== sessionGeneration) return false;
       if (!outcome.ok) {
         setStatus("error", outcome.message ?? "تغییر دستگاه انجام نشد.");
         if (outcome.staleList) await refresh();
@@ -195,9 +236,9 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
       }
       setStatus("ok", "دستگاه پخش‌کنندهٔ این اشتراک عوض شد.");
       await refresh();
-      return true;
+      return session === sessionGeneration;
     } finally {
-      busyShareId.value = null;
+      if (session === sessionGeneration) busyShareId.value = null;
     }
   }
 
@@ -210,7 +251,9 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
    * the pin the server actually kept.
    */
   async function assignEverywhere(deviceId: string): Promise<void> {
+    const session = sessionGeneration;
     const accessToken = await currentAccessToken();
+    if (session !== sessionGeneration) return;
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
       return;
@@ -227,10 +270,14 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     bulkRunning.value = true;
     const outcomes: SendOutcome[] = [];
     try {
-      for (const plan of sweep.ready) outcomes.push(await send(plan.body, accessToken));
+      for (const plan of sweep.ready) {
+        if (session !== sessionGeneration) return;
+        outcomes.push(await send(plan.body, accessToken));
+      }
     } finally {
-      bulkRunning.value = false;
+      if (session === sessionGeneration) bulkRunning.value = false;
     }
+    if (session !== sessionGeneration) return;
 
     const summaryValue = summarizeReprioritize(
       sweep,

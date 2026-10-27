@@ -15,7 +15,8 @@
         <p>تنظیمات حساب</p>
         <h1 id="user-devices-title">دستگاه‌ها و پخش موقعیت</h1>
       </div>
-      <v-chip v-if="auth.isAuthenticated" class="user-devices__count" size="small" variant="tonal" color="primary">
+      <v-chip v-if="auth.isAuthenticated && settings.loaded.value && !settings.failed.value && !settings.loading.value"
+        class="user-devices__count" size="small" variant="tonal" color="primary">
         {{ deviceCount }}
       </v-chip>
     </header>
@@ -44,6 +45,7 @@ import { useAuthStore } from "@/stores/auth";
 const auth = useAuthStore();
 const settings = useDeviceSettings({
   accessToken: computed(() => auth.accessToken),
+  accountId: computed(() => auth.user?.id ?? null),
   ensureSession: () => auth.ensureSession()
 });
 

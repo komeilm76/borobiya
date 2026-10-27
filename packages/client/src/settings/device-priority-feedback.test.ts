@@ -3,8 +3,14 @@ import { describe, expect, it } from "vitest";
 
 // Source-pinned view checks; do not mount Vue SFCs in unit tests.
 const panel = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
+const view = readFileSync(new URL("../views/_user/UserDevicesView.vue", import.meta.url), "utf8");
 
 describe("active-device read feedback", () => {
+  it("binds the panel to the account identity and does not claim a device count for an unresolved read", () => {
+    expect(view).toContain("accountId: computed(() => auth.user?.id ?? null)");
+    expect(view).toContain("auth.isAuthenticated && settings.loaded.value && !settings.failed.value && !settings.loading.value");
+  });
+
   it("shows a first-load skeleton for both sources and retains rows with a refresh indicator", () => {
     expect(panel.match(/v-skeleton-loader/g)).toHaveLength(2);
     expect(panel).toContain('v-if="api.loading.value && !api.loaded.value"');
