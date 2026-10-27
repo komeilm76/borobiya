@@ -254,7 +254,7 @@ function applyToAll(): void {
 
 .device-priority__kicker {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -271,7 +271,7 @@ function applyToAll(): void {
 }
 
 .device-priority__table th {
-  color: #718584;
+  color: #536d6c;
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -295,7 +295,7 @@ function applyToAll(): void {
 }
 
 .device-priority__muted {
-  color: #718584;
+  color: #536d6c;
 }
 
 .device-priority__skeleton {
@@ -362,7 +362,7 @@ function applyToAll(): void {
 
 .device-priority__share-now {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.72rem;
 }
 

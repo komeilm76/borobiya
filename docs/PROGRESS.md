@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — T4.4.3 active-device small-text contrast (partial)
+
+- Audited five small light-theme labels on the active-device page and its white cards. The former `#718584` measured only 3.61:1 on the light page and 3.90:1 on the cards. Reusing `#536d6c` gives 5.17:1 and 5.57:1 respectively; existing dark-mode overrides remain untouched and test above 4.5:1 against the dark surfaces. A new source-pinned contrast regression checks these labels, without mounting Vue components. Other screens, keyboard and screen-reader behavior, and actual browser/device WCAG AA acceptance remain open; T4.4.3 is not signed off.
+
 ### 2026-10-27 — Active-device session-transition bug review
 
 - Found a privacy race after the earlier read-feedback work: a logout with no subsequent refresh left cached private devices/shares visible until route teardown, and a pending request could restore those rows after logout or an in-place account switch. The device-settings composable now invalidates reads synchronously on token loss or account-ID change, clears cached rows/status and reloads the new account; ordinary token rotation for the same account does not discard data. Old write completions cannot update the new account's UI, and a bulk pin change stops before sending additional posts after session loss. Deferred-response regressions cover logout/account switches, delayed single writes and partial bulk writes, with a source-pinned test for the actual view wiring. Physical/browser behavior and site-wide T4.4.2 acceptance remain open.

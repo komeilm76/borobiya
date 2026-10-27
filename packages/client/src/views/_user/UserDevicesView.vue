@@ -81,7 +81,7 @@ onMounted(() => {
 
 .user-devices__title-block p {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.72rem;
   font-weight: 700;
 }
