@@ -20,11 +20,42 @@ Start with **`python3 scripts/vm.py doctor`** from the repo root. It changes not
 | Cached Geofabrik PBF has a mismatched MD5 or size | `cache-first` now retries the same dated extract into staging and only replaces the corrupt copy after the downloaded bytes match the trusted checksum. If the download fails, the old copy remains for inspection; a downloaded checksum mismatch is a hard stop, not permission to choose a different snapshot. `offline` does not retry online. Do not delete a verified extract or modify catalog checksums. |
 | Geofabrik download times out after enabling the proxy | APT/Docker proxy settings do **not** update the shell that started `vm.py`. In **that interactive Bash shell**, run `source ~/.bashrc` to reload proxy exports (or open a new SSH terminal); **do not** reset/delete maps or Docker volumes. Verify `https_proxy`/`HTTPS_PROXY` is set without printing its value: `printf 'https_proxy=%s HTTPS_PROXY=%s\n' "${https_proxy:+set}" "${HTTPS_PROXY:+set}"`. Then test `curl -sSI --connect-timeout 8 --max-time 20 -o /dev/null -w 'HTTP=%{http_code}\n' https://download.geofabrik.de/` before restarting launch **from the same shell**. If it fails, compare with `no_proxy= NO_PROXY= curl ...` per [runbook §5.2](./UBUNTU_VM_RUNBOOK.md#52-verify-that-the-proxy-itself-works). Never paste proxy URLs or verbose curl output (they may contain passwords); do not disable certificate verification. |
 | Photon import failed or ran out of disk | Check `df -h` **both** Docker storage and map library; `docker compose --profile geocoding-import logs --tail 40 nominatim`. Initial import can take about an hour. A failed Photon index is **not** a reason to remove the application `postgres-data` volume. |
-| Browser `/` gives gateway text/404, or no MapLibre worker | Run `python3 scripts/vm.py launch` (builds web UI and applies VM Nginx override), then `python3 scripts/vm.py doctor`. `--serve-only` refuses an absent browser build. |
+| Browser `/` gives gateway text/404, or no MapLibre worker | A host-side `OK browser build files` does not prove Nginx mounted it. If `/` returns the **base gateway text**, use the read-only checks and Nginx-only recovery below. For a missing host build or worker, run `python3 scripts/vm.py launch` to build the UI; `--serve-only` refuses an absent build. |
 | TLS edge / public HTTPS fails | Confirm `PUBLIC_DOMAIN`, A/AAAA records point to this VM, public TCP 80/443 reach Caddy, no other service owns those ports, and certificate issuance has Internet access. `docker compose -f docker-compose.yml -f docker-compose.vm.yml -f docker-compose.production.yml --profile production logs --tail 40 edge` locally; redact before sharing. The VM's own HTTPS probe may warn due to NAT hairpin; check from an external browser. |
 | Login works but browser location is blocked | Production must be visited over Caddy's HTTPS origin; remote plain HTTP is not a secure browser context. Development: SSH-tunnel `5173` (HMR) or `8080` (built UI) to localhost. |
 | Offline restart fails | Pre-cache all Docker images, source/reference files, Photon/Planetiler JARs, compiled UI and active dataset online. Use `python3 scripts/vm.py launch --serve-only` after `stop`; this command never pulls or builds. An unresolved `latest`, a `pinned` selection whose active date is not the repository pin, or a disagreement among the saved selection, `.env` snapshot and `MAP_DATA_VERSION` is refused until full launch fixes it; `doctor` warns about the mismatch. The active `current.json` must be a JSON object matching the selected date, dataset and numeric `MAP_BBOX`; a stale bbox would advertise the wrong map bounds. `--serve-only` refuses symlinked library paths and artifacts rather than following them outside the configured library. Successful setup saves its resolved date to `.vm-map.json`. The full `--offline` build forbids online map sources but can still need Docker/npm build dependencies. |
 | Port 8080 not responding | `docker compose -f docker-compose.yml -f docker-compose.vm.yml --profile routing --profile geocoding ps`; check `NGINX_PORT`, `ss -ltn`, and container health. The development gateway binds loopback; use an SSH tunnel or production Caddy HTTPS. |
+
+### Browser root serves the base gateway instead of the built app
+
+`GET /health`, `/api/_public/health` and `/map-config` can all succeed with the **base**
+`nginx.conf`, whose `/` returns `Borobiya API/map gateway…` as plain text. `doctor` checks that
+`dist/index.html` exists **on the host**, not that the running Nginx container mounted it. This can
+happen if Nginx was started/recreated using only `docker-compose.yml` after a VM launch; do not
+reset the DB or map library. On the VM, from `~/borobiya`, check only the effective config/mount
+(no secrets or response bodies are printed):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vm.yml -f docker-compose.production.yml \
+  --profile routing --profile geocoding exec -T nginx sh -c \
+  'if grep -Fq "try_files" /etc/nginx/conf.d/default.conf; then echo "SPA config"; else echo "gateway-only config"; fi;
+   if test -r /usr/share/nginx/html/index.html; then echo "index mounted"; else echo "index missing"; fi'
+```
+
+If it prints `gateway-only config` or `index missing` **and the host build is present**, recreate
+*only* the Nginx container with the VM overrides and existing local image; this leaves API,
+Postgres, uploads and maps untouched. Do not omit the `-f` options or add `down -v`:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vm.yml -f docker-compose.production.yml \
+  --profile routing --profile geocoding up -d --no-deps --no-build --pull never --force-recreate nginx
+python3 scripts/vm.py doctor
+```
+
+If `/` still fails after that, or the config and mount were already correct, inspect the **status
+and content-type only** with `curl -sS -o /dev/null -w 'HTTP=%{http_code} type=%{content_type}\n' \
+http://127.0.0.1:8080/` (replace `8080` with your `NGINX_PORT`); report those values and the two
+labels above. Do not paste `.env`, `docker compose config`, raw logs or tokens.
 
 For a focused status snapshot (inspect/redact before sharing):
 

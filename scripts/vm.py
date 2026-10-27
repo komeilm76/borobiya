@@ -502,7 +502,7 @@ def doctor() -> int:
         print("FAIL browser build missing -> scripts/vm.py launch (online first)")
         errors += 1
     else:
-        print("OK browser build (index + MapLibre worker)")
+        print("OK browser build files on host (index + MapLibre worker; Nginx mount not checked here)")
     try:
         run(["docker", "info"], capture=True, stderr=subprocess.PIPE)
         run([*vm_compose_args(), "config", "--quiet"], capture=True, stderr=subprocess.PIPE)
@@ -562,6 +562,9 @@ def doctor() -> int:
             with opener.open(url, timeout=4) as response:
                 sample = response.read(160)
                 if response.status != 200 or (path == "/" and b"<html" not in sample.lower()):
+                    if path == "/" and response.status == 200 and b"Borobiya API/map gateway." in sample:
+                        raise ValueError("base gateway-only Nginx config is active; use the VM Compose override "
+                                         "to recreate nginx (no map or database reset)")
                     raise ValueError("unexpected response (gateway-only Nginx or bad upstream)")
             print(f"OK {path} ({label})")
         except (URLError, OSError, ValueError) as error:

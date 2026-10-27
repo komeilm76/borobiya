@@ -454,6 +454,40 @@ class OperationsTests(unittest.TestCase):
             self.assertEqual(vm.doctor(), 0)
             self.assertIn("saved map snapshot/version differs", output.getvalue())
 
+    def test_doctor_identifies_base_gateway_root_without_claiming_browser_is_served(self):
+        class Response:
+            status = 200
+            def __init__(self, body):
+                self.body = body
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+            def read(self, _size):
+                return self.body
+
+        def open_url(url, **_kwargs):
+            return Response(b"Borobiya API/map gateway. Start the client with bun run dev.\n"
+                            if url.endswith(":8080/") else b"ok")
+
+        def command(args, **_kwargs):
+            return SimpleNamespace(stdout="1\n" if "psql" in str(args) else "")
+
+        env = {"NODE_ENV": "development", "NGINX_PORT": "8080", "MAP_REGION_IDS": "ir",
+               "JWT_SECRET": "a" * 32, "JWT_REFRESH_SECRET": "b" * 32,
+               "POSTGRES_PASSWORD": "secret", "NOMINATIM_PASSWORD": "secret"}
+        with patch.object(vm, "env_values", return_value=env), \
+             patch.object(vm, "configured_map", return_value={"regions": "ir", "policy": "cache-first"}), \
+             patch.object(vm, "static_ready", return_value=True), \
+             patch.object(vm, "run", side_effect=command), \
+             patch.object(vm, "compose", return_value=SimpleNamespace(stdout="db\n")), \
+             patch.object(vm, "build_opener", return_value=SimpleNamespace(open=open_url)), \
+             redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(vm.doctor(), 1)
+        self.assertIn("base gateway-only Nginx config is active", output.getvalue())
+        self.assertIn("VM Compose override", output.getvalue())
+        self.assertIn("FAIL /:", output.getvalue())
+
     def test_doctor_flags_public_edge_left_running_in_development(self):
         class Response:
             status = 200
