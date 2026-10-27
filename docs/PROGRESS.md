@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — T4.4.1 narrow admin catalog lists (partial)
+
+- Audited the admin incident-type and rescuer-category lists after the user-management card fix. Their wide tables kept edit/member actions behind horizontal scrolling on phones. At widths up to 850px, labeled one-column cards now expose the same rows, fields, membership chips and action handlers as the desktop tables, with first-load skeletons, stale-row refresh, failed-read retry and empty states. Phone dialogs stack their actions into full-width 44px-minimum targets. Source-pinned regressions failed before the change and pass afterward; client typecheck/build and repository gates check the code, not the rendered pixels. T4.4.1 remains **open** for broader breakpoints, bottom-sheet and real browser/device visual/accessibility acceptance.
+
 ### 2026-10-27 — Ubuntu VM guides and setup safety review
 
 - Reconciled the quickstart, diagnostics and long manual runbook with the actual `vm-env.py`, `vm-map.py`, `vm.py`, `vm-install.sh` and cache-cleaner interfaces. Removed a manual `.env` loop that silently **rotated database passwords on rerun**, secret-bearing `/tmp` rewrites, guessed volume deletion, bare unset-path graph removal, CLI admin-password examples and an unguarded Docker reinstall as the recommended path. Destructive recovery now points to preview/typed-confirmation commands and distinguishes retained Planetiler reference archives from caches that are removed. Setup's `.env` writer now refuses symlinks/non-files, creates private files before exposing secrets, and never echoes values on dry-run or a generated admin password at completion. Offline Python regressions failed before the fixes; script suite, markdown checker and static lint pass. **No Ubuntu VM, Docker daemon, real map import, public TLS or browser acceptance was available here.**

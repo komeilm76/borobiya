@@ -90,6 +90,40 @@
           </tr>
         </tbody>
       </v-table>
+      <ul class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading">
+        <li v-if="listState === 'loading'" class="admin-categories-mobile__card" aria-hidden="true">
+          <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" />
+        </li>
+        <li v-for="category in categories" :key="category.id" class="admin-categories-mobile__card">
+          <h2>{{ category.name }}</h2>
+          <dl class="admin-categories-mobile__details">
+            <div><dt>توضیح</dt><dd>{{ category.description || "—" }}</dd></div>
+            <div><dt>نوع رویدادها</dt><dd class="admin-categories-mobile__chips">
+              <v-chip v-for="id in category.incidentTypeIds" :key="id" size="small" variant="tonal" :title="id">
+                {{ incidentTypeName(id) }}
+              </v-chip>
+              <span v-if="category.incidentTypeIds.length === 0">هیچ‌کدام</span>
+            </dd></div>
+            <div><dt>اعضا</dt><dd class="admin-categories-mobile__chips">
+              <v-chip v-for="member in category.members" :key="member.id" size="small" variant="tonal" color="primary">
+                <span dir="ltr">{{ member.username }}</span>
+              </v-chip>
+              <span v-if="category.members.length === 0">بدون عضو</span>
+            </dd></div>
+          </dl>
+          <div class="admin-categories-mobile__actions">
+            <v-btn variant="tonal" prepend-icon="mdi-account-plus-outline" @click="openMembers(category)">
+              افزودن عضو ({{ category.members.length }})
+            </v-btn>
+            <v-btn variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category)">ویرایش</v-btn>
+          </div>
+        </li>
+        <li v-if="listState === 'error'" class="admin-categories-mobile__card">
+          دریافت گروه‌ها انجام نشد.
+          <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
+        </li>
+        <li v-if="listState === 'empty'" class="admin-categories-mobile__card">هنوز گروهی ساخته نشده است.</li>
+      </ul>
     </v-card>
 
     <v-dialog v-model="formOpen" max-width="640" persistent>
@@ -136,7 +170,7 @@
             <p v-if="formNotice" class="admin-categories-notice text-sm opacity-80" aria-live="polite">{{ formNotice }}</p>
           </div>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="admin-catalog-dialog-actions">
           <v-spacer />
           <v-btn variant="text" rounded="lg" :disabled="saving" @click="formOpen = false">انصراف</v-btn>
           <v-btn color="primary" variant="flat" rounded="lg" :loading="saving" @click="submit">ذخیره</v-btn>
@@ -206,7 +240,7 @@
           </p>
           <v-alert v-if="membersError" type="error" variant="tonal" rounded="lg" class="mt-2" role="alert">{{ membersError }}</v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="admin-catalog-dialog-actions">
           <v-spacer />
           <v-btn variant="text" rounded="lg" :disabled="saving" @click="membersOpen = false">بستن</v-btn>
           <v-btn color="primary" variant="flat" rounded="lg" :loading="saving" :disabled="selectedIds.length === 0" @click="addMembers">
@@ -548,5 +582,31 @@ onUnmounted(() => {
 .admin-categories-members {
   max-height: 15rem;
   overflow-y: auto;
+}
+
+.admin-categories-mobile { display: none; margin: 0; padding: 0; list-style: none; }
+.admin-categories-mobile__card { min-width: 0; padding: 1rem; border-block-start: 1px solid rgba(var(--v-theme-on-surface), .12); overflow-wrap: anywhere; }
+.admin-categories-mobile__card h2 { font-size: 1rem; font-weight: 700; }
+.admin-categories-mobile__details { display: grid; gap: .75rem; margin-block: .75rem; }
+.admin-categories-mobile__details > div { display: grid; grid-template-columns: minmax(4.5rem, .35fr) minmax(0, 1fr); gap: .5rem; }
+.admin-categories-mobile__details dt { opacity: .75; }
+.admin-categories-mobile__details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.admin-categories-mobile__chips { display: flex; flex-wrap: wrap; gap: .25rem; }
+.admin-categories-mobile__chips :deep(.v-chip) { max-width: 100%; height: auto; min-height: 32px; }
+.admin-categories-mobile__chips :deep(.v-chip__content) { white-space: normal; overflow-wrap: anywhere; }
+.admin-categories-mobile__actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.admin-categories-mobile__actions :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; }
+
+@media (max-width: 850px) {
+  .admin-categories-table { display: none; }
+  .admin-categories-mobile { display: grid; }
+}
+
+@media (max-width: 600px) {
+  .admin-categories-mobile__actions { flex-direction: column; }
+  .admin-categories-mobile__actions :deep(.v-btn) { width: 100%; }
+  .admin-catalog-dialog-actions { flex-direction: column; align-items: stretch; }
+  .admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }
+  .admin-catalog-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; white-space: normal; }
 }
 </style>

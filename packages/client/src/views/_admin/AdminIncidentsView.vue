@@ -71,6 +71,32 @@
           </tr>
         </tbody>
       </v-table>
+      <ul class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading">
+        <li v-if="listState === 'loading'" class="admin-incidents-mobile__card" aria-hidden="true">
+          <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" />
+        </li>
+        <li v-for="type in types" :key="type.id" class="admin-incidents-mobile__card">
+          <div class="admin-incidents-mobile__heading">
+            <h2>{{ type.name }}</h2>
+            <v-btn variant="tonal" size="small" prepend-icon="mdi-pencil-outline"
+              :aria-label="`ویرایش ${type.name}`" @click="openEdit(type)">ویرایش</v-btn>
+          </div>
+          <dl class="admin-incidents-mobile__details">
+            <div><dt>نامک</dt><dd><code class="admin-incidents-slug" dir="ltr">{{ type.slug }}</code></dd></div>
+            <div><dt>نماد</dt><dd><v-icon v-if="type.icon" :icon="type.icon" size="20" /><span v-else>—</span></dd></div>
+            <div><dt>رنگ</dt><dd>
+              <span v-if="type.color" class="admin-incidents-swatch" :style="{ backgroundColor: type.color }" aria-hidden="true" />
+              {{ type.color || "—" }}
+            </dd></div>
+            <div><dt>توضیح</dt><dd>{{ type.description || "—" }}</dd></div>
+          </dl>
+        </li>
+        <li v-if="listState === 'error'" class="admin-incidents-mobile__card">
+          دریافت نوع رویدادها انجام نشد.
+          <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
+        </li>
+        <li v-if="listState === 'empty'" class="admin-incidents-mobile__card">موردی برای نمایش نیست.</li>
+      </ul>
     </v-card>
 
     <v-dialog v-model="formOpen" max-width="640" persistent>
@@ -138,7 +164,7 @@
             <p v-if="formNotice" class="admin-incidents-notice text-sm opacity-80" aria-live="polite">{{ formNotice }}</p>
           </v-form>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="admin-catalog-dialog-actions">
           <v-spacer />
           <v-btn variant="text" rounded="lg" :disabled="saving" @click="closeForm">انصراف</v-btn>
           <v-btn color="primary" variant="flat" rounded="lg" :loading="saving" @click="submit">ذخیره</v-btn>
@@ -365,5 +391,26 @@ onUnmounted(() => {
 .admin-incidents-description {
   max-width: 24rem;
   overflow-wrap: anywhere;
+}
+
+.admin-incidents-mobile { display: none; margin: 0; padding: 0; list-style: none; }
+.admin-incidents-mobile__card { min-width: 0; padding: 1rem; border-block-start: 1px solid rgba(var(--v-theme-on-surface), .12); overflow-wrap: anywhere; }
+.admin-incidents-mobile__heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
+.admin-incidents-mobile__heading h2 { min-width: 0; font-size: 1rem; font-weight: 700; }
+.admin-incidents-mobile__details { display: grid; gap: .6rem; margin-block-start: .75rem; }
+.admin-incidents-mobile__details > div { display: grid; grid-template-columns: minmax(4rem, .35fr) minmax(0, 1fr); gap: .5rem; }
+.admin-incidents-mobile__details dt { opacity: .75; }
+.admin-incidents-mobile__details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
+
+@media (max-width: 850px) {
+  .admin-incidents-table { display: none; }
+  .admin-incidents-mobile { display: grid; }
+  .admin-incidents-mobile__heading :deep(.v-btn) { min-height: 44px; }
+}
+
+@media (max-width: 600px) {
+  .admin-catalog-dialog-actions { flex-direction: column; align-items: stretch; }
+  .admin-catalog-dialog-actions :deep(.v-spacer) { display: none; }
+  .admin-catalog-dialog-actions :deep(.v-btn) { width: 100%; min-height: 44px; height: auto; white-space: normal; }
 }
 </style>
