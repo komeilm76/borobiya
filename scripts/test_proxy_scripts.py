@@ -401,6 +401,37 @@ class TestOtherPeoplesConfigSurvives(ScriptCase):
         self.assertEqual(json.loads(self.docker_config.read_text()), prior)
         self.assertFalse(backup.exists())
 
+    def test_disable_with_backup_preserves_docker_config_changes_made_since_enable(self) -> None:
+        """Restoring a whole backup would erase Docker logins/settings added after enable."""
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        prior = {"auths": {"registry.old": {}},
+                 "proxies": {"default": {"httpProxy": "http://admin:3128"},
+                             "registry.old": {"httpProxy": "http://old:3128"}}}
+        self.docker_config.write_text(json.dumps(prior) + "\n")
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        updated = json.loads(self.docker_config.read_text())
+        updated["auths"]["registry.new"] = {"auth": "new-login"}
+        updated["proxies"]["registry.new"] = {"httpProxy": "http://new:3128"}
+        self.docker_config.write_text(json.dumps(updated) + "\n")
+        removed = self.disable()
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        expected = {"auths": updated["auths"],
+                    "proxies": {**updated["proxies"], "default": prior["proxies"]["default"]}}
+        self.assertEqual(json.loads(self.docker_config.read_text()), expected)
+        self.assertFalse((self.state_file.parent / "proxy.docker-config.bak").exists())
+
+    def test_disable_without_backup_preserves_later_named_docker_proxies(self) -> None:
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        config = json.loads(self.docker_config.read_text())
+        config["proxies"]["registry.new"] = {"httpProxy": "http://new:3128"}
+        self.docker_config.write_text(json.dumps(config) + "\n")
+        removed = self.disable()
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        self.assertEqual(json.loads(self.docker_config.read_text())["proxies"],
+                         {"registry.new": {"httpProxy": "http://new:3128"}})
+
     def test_a_second_enable_does_not_backup_its_own_output(self) -> None:
         """Otherwise disable would resurrect our key instead of removing it."""
         self.enable("10.0.2.5:3128", "--skip-checks")
@@ -490,6 +521,50 @@ class TestOtherPeoplesConfigSurvives(ScriptCase):
         removed = self.disable()
         self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
         self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+
+    def test_non_object_proxies_refused_before_any_shell_or_system_change(self) -> None:
+        """A top-level JSON object can still carry a proxies value apply cannot merge."""
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        for value in (None, ["not", "a", "mapping"]):
+            with self.subTest(value=value):
+                initial = {"proxies": value}
+                self.docker_config.write_text(json.dumps(initial) + "\n")
+                result = self.enable("10.0.2.5:3128", "--skip-checks")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("proxies", result.stdout + result.stderr)
+                self.assertNotIn(BLOCK_BEGIN, self.bashrc.read_text())
+                self.assertFalse(self.apt_file.exists())
+                self.assertFalse((self.state_file.parent / "proxy.docker-config.bak").exists())
+                self.assertEqual(json.loads(self.docker_config.read_text()), initial)
+
+    def test_missing_current_config_keeps_the_previous_proxy_backup(self) -> None:
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        self.docker_config.write_text(json.dumps({"proxies": {"default": {"httpProxy": "http://admin:3128"}}}))
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        backup = self.state_file.parent / "proxy.docker-config.bak"
+        self.assertTrue(backup.exists())
+        self.docker_config.unlink()
+        removed = self.disable()
+        self.assertNotEqual(removed.returncode, 0)
+        self.assertIn("backup", removed.stdout + removed.stderr)
+        self.assertTrue(backup.exists())
+        self.assertTrue(self.state_file.exists())
+        self.assertFalse(self.docker_config.exists())
+
+    def test_malformed_current_config_is_not_overwritten_from_backup(self) -> None:
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        self.docker_config.write_text(json.dumps({"proxies": {"default": {"httpProxy": "http://admin:3128"}}}))
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        backup = self.state_file.parent / "proxy.docker-config.bak"
+        self.assertTrue(backup.exists())
+        self.docker_config.write_text("{incomplete")
+        removed = self.disable()
+        self.assertNotEqual(removed.returncode, 0)
+        self.assertEqual(self.docker_config.read_text(), "{incomplete")
+        self.assertTrue(backup.exists())
+        self.assertTrue(self.state_file.exists())
 
     def test_malformed_docker_config_is_reported_not_rewritten(self) -> None:
         self.docker_config.parent.mkdir(parents=True, exist_ok=True)

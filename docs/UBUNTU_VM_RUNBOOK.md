@@ -1047,8 +1047,11 @@ up its own proxy as though it were your previous Docker config. `--system-only` 
 key and clears that state, even though the shell block remains; a subsequent enable can then back up
 a new, user-configured Docker proxy. A later full disable leaves that restored/user-owned proxy
 alone; it removes only a Docker proxy for which managed state or a backup still exists. Run without
-partial flags when you want to remove all remaining *managed* settings. Either way the host-side rule
-from § 5.1a is still yours to delete.
+partial flags when you want to remove all remaining *managed* settings. When a Docker client proxy
+predated enable, the script restores its previous `proxies.default` from its private backup; it does
+**not** replace the whole `config.json`, so Docker logins and other proxy mappings added since enable
+survive. If that file is no longer valid JSON, disable refuses to overwrite it and keeps the backup
+for manual recovery. Either way the host-side rule from § 5.1a is still yours to delete.
 
 First, find every proxy file that exists, whatever wrote it. This section used `/etc/apt/apt.conf.d/
 95proxy` and `/etc/systemd/system/docker.service.d/proxy.conf` before the scripts existed, and those
@@ -1068,16 +1071,20 @@ and every line is safe to run when the thing it removes was never there):
 ```bash
 sed -i '/# >>> borobiya proxy >>>/,/# <<< borobiya proxy <<</d' ~/.bashrc   # drop exactly the block § 5.1 added
 unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY no_proxy NO_PROXY all_proxy ALL_PROXY
-python3 - <<'JSONW'          # drop only the proxies key; leave any other docker client config alone
+python3 - <<'JSONW'          # if configured manually, drop only proxies.default; keep other Docker settings
 import json, os, pathlib
 path = pathlib.Path(os.environ.get("DOCKER_CONFIG", os.path.expanduser("~/.docker"))) / "config.json"
 if path.is_file():
     config = json.loads(path.read_text())
-    if config.pop("proxies", None) is not None:
+    proxies = config.get("proxies")
+    if isinstance(proxies, dict) and "default" in proxies:
+        del proxies["default"]
+        if not proxies:
+            del config["proxies"]
         path.write_text(json.dumps(config, indent=2) + "\n")
-        print(f"removed the proxies key from {path}")
+        print(f"removed proxies.default from {path}")
     else:
-        print(f"no proxies key in {path}; nothing to do")
+        print(f"no proxies.default in {path}; nothing to do")
 JSONW
 sudo rm -f /etc/apt/apt.conf.d/95borobiya-proxy /etc/systemd/system/docker.service.d/borobiya-proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart docker

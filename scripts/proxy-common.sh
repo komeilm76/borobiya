@@ -415,8 +415,8 @@ proxy_state_get() { # $1 = key → prints the value, or nothing when absent
 }
 
 # ---------- Docker client config: the only setting that reaches build containers ----------
-# The previous file is backed up once, before the first write, and restored on disable: a `proxies`
-# key the user already had may point somewhere else entirely, and deleting it would not be undoing.
+# The previous file is backed up once, before the first write. Disable restores only its previous
+# proxies.default entry, leaving Docker logins and other proxy mappings added since enable intact.
 proxy_docker_client_apply() { # $1 = proxy url, $2 = no_proxy
   if (( DRY_RUN )); then
     proxy_note "would set proxies.default in $PROXY_DOCKER_CONFIG"
@@ -449,6 +449,8 @@ if path.is_file():
                  "(docs/UBUNTU_VM_RUNBOOK.md § 5.3)")
     if not isinstance(config, dict):
         sys.exit(f"{path}: top level is not a JSON object; refusing to rewrite it")
+    if "proxies" in config and not isinstance(config["proxies"], dict):
+        sys.exit(f"{path}: proxies must be a JSON object; refusing to rewrite it")
     if "proxies" in config and not backup.exists() and os.environ.get("PROXY_FIRST_ENABLE") == "1":
         backup.parent.mkdir(parents=True, exist_ok=True)
         backup.write_text(path.read_text())
@@ -474,37 +476,58 @@ PY
 
 proxy_docker_client_strip() {
   if (( DRY_RUN )); then
-    proxy_note "would clear proxies.default from $PROXY_DOCKER_CONFIG"
+    proxy_note "would restore or clear proxies.default in $PROXY_DOCKER_CONFIG (preserving other keys)"
     return 0
   fi
   PROXY_DOCKER_BACKUP="$PROXY_DOCKER_BACKUP" python3 - "$PROXY_DOCKER_CONFIG" <<'PY'
 import json
 import os
 import pathlib
-import shutil
 import sys
 
 path = pathlib.Path(sys.argv[1])
 backup = pathlib.Path(os.environ["PROXY_DOCKER_BACKUP"])
 if not path.is_file():
+    if backup.is_file():
+        sys.exit(f"{path}: missing while a previous proxy backup exists at {backup}; "
+                 "leaving state and backup for manual recovery")
     print(f"    no {path}; nothing to do")
-elif backup.is_file():
-    shutil.copyfile(backup, path)
-    os.chmod(path, 0o600)
-    backup.unlink()
-    print(f"    restored the config.json that was there before (from {backup})")
-else:
+    raise SystemExit(0)
+
+
+def read_config(source):
     try:
-        config = json.loads(path.read_text() or "{}")
+        value = json.loads(source.read_text() or "{}")
     except ValueError:
-        sys.exit(f"{path}: not valid JSON; leaving it alone — delete the proxies key by hand")
-    if isinstance(config, dict) and config.get("proxies") is not None:
-        del config["proxies"]
-        path.write_text(json.dumps(config, indent=2) + "\n")
-        os.chmod(path, 0o600)
-        print(f"    removed the proxies key from {path}")
-    else:
-        print(f"    no proxies key in {path}; nothing to do")
+        sys.exit(f"{source}: not valid JSON; leaving it alone — edit proxies.default by hand")
+    if not isinstance(value, dict) or ("proxies" in value and not isinstance(value["proxies"], dict)):
+        sys.exit(f"{source}: expected a JSON object with an object-valued proxies key; leaving it alone")
+    return value
+
+
+config = read_config(path)
+original = read_config(backup) if backup.is_file() else {}
+updated = {**config}
+proxies = dict(config.get("proxies", {}))
+original_proxies = original.get("proxies", {})
+if "default" in original_proxies:
+    proxies["default"] = original_proxies["default"]
+else:
+    proxies.pop("default", None)
+if proxies or "proxies" in original:
+    updated["proxies"] = proxies
+else:
+    updated.pop("proxies", None)
+if updated != config:
+    tmp = path.with_name(path.name + ".borobiya.tmp")
+    tmp.write_text(json.dumps(updated, indent=2) + "\n")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+if backup.is_file():
+    backup.unlink()
+    print(f"    restored the previous proxies.default from {backup}; kept other Docker settings in {path}")
+else:
+    print(f"    removed managed proxies.default from {path}; kept other Docker settings")
 PY
 }
 
@@ -646,6 +669,8 @@ except ValueError:
              "(docs/UBUNTU_VM_RUNBOOK.md § 5.3)")
 if not isinstance(config, dict):
     sys.exit(f"{path}: top level is not a JSON object; refusing to rewrite it")
+if "proxies" in config and not isinstance(config["proxies"], dict):
+    sys.exit(f"{path}: proxies must be a JSON object; refusing to rewrite it")
 print(f"    {path}: readable JSON with {len(config)} key(s) already in it")
 JSONCHECK
 }
