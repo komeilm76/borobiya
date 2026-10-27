@@ -319,10 +319,14 @@ proxy itself answering fine (§ 5.2), is the host being down.
 
 Extract URLs are date-stamped: `iran-261018.osm.pbf` means 2026-10-18, it is not a version number.
 Geofabrik keeps dated files for a rolling window, so a `pinned` snapshot stops resolving weeks later.
-That failure is loud, and the remedy is one `.env` line: `MAP_SNAPSHOT=latest` means "the newest common
-dated snapshot for all selected sources" (the resolver's own words) and **requires an online check** —
-in offline mode it fails and tells you to use `pinned` or a specific date instead.
-`MAP_SNAPSHOT=YYYY-MM-DD` asks for one date you chose. What you must **not** do is hand-point a source at
+A 404 can also be returned by a proxy; check the exact URL and a current extract from the **same shell**
+before changing the selection (see [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md)). If the dated file is
+actually gone, use `python3 scripts/vm-map.py --snapshot latest --policy cache-first`, then
+`python3 scripts/vm.py launch`. The resolver checks the newest common **dated** snapshot and its official
+MD5 sidecars online; `cache-first` preserves verified source bytes. Do not edit only `MAP_SNAPSHOT` in
+`.env`: `vm.py launch` uses the saved `.vm-map.json` snapshot and would override that edit.
+`python3 scripts/vm-map.py --snapshot YYYY-MM-DD` asks for one date you chose. Offline mode cannot
+resolve `latest`; use a specific date or previously cached sources instead. What you must **not** do is hand-point a source at
 a moving `*-latest.osm.pbf` URL: everything here is addressed by a date plus a checksum, and `-latest`
 silently changes what "the same dataset" means the next time anyone re-runs step 8. **Do not hand-edit an `md5` in
 `map-server/regions.json`, or the `borobiya.source.json` manifest in the dataset directory, to make a
@@ -1904,8 +1908,9 @@ Symptom first, always — grep this section for the error text.
    copy the values from another area to make the message go away.
 4. **`Could not download … water-polygons-split-3857.zip` / `Could not HEAD …`** — upstream host
    outage, § 3.4. Nothing in this repo is broken, and `--force` is not a re-download fix.
-5. **`Geofabrik … 404`** (step 8) — the pinned dated extract aged out of the mirror's window;
-   § 3.3.
+5. **`Geofabrik … 404`** (step 8) — the dated extract may have aged out, or a proxy may have
+   returned the 404. Compare the exact URL with a current extract from the same shell; if the
+   dated file is gone, change the saved selection's snapshot via `vm-map.py`, not only `.env` (§ 3.3).
 6. **A step says everything is fine but the tiles look wrong (ocean drawn as land)** — the reference
    layers are placeholder/stale data; re-fetch with `MAP_SOURCE_POLICY=refresh` and rebuild step 9.
 7. **Planetiler "insufficient disk/RAM" warnings** — `--force` in `generate-tiles.sh` already means

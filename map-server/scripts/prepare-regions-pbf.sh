@@ -93,6 +93,21 @@ sha256_file() {
   fi
 }
 
+download_geofabrik_file() {
+  local url="$1" destination="$2" source_id="$3" status=""
+  # curl's -f returns 22 for both a missing dated extract and a proxy-generated
+  # HTTP error. Capture only the final HTTP code (not headers, bodies or proxy
+  # credentials); never silently switch snapshots or skip checksum verification.
+  if status="$(curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 \
+      -w '%{http_code}' "$url" -o "$destination")"; then
+    return 0
+  fi
+  if [[ "$status" == 404 || "$status" == 410 ]]; then
+    fail "Geofabrik HTTP $status for $source_id ($url). This dated snapshot may have expired, or the proxy may have returned $status. Check the exact URL and a current extract in this same shell. If the pin is gone, run: python3 scripts/vm-map.py --snapshot latest --policy cache-first; then python3 scripts/vm.py launch. No replacement snapshot was selected automatically."
+  fi
+  fail "Geofabrik download failed for $source_id (HTTP ${status:-unknown}); check this shell's HTTPS proxy/no_proxy and test the exact source URL before retrying"
+}
+
 is_project_local_regular_file() {
   local candidate="$1" resolved=""
   [[ -f "$candidate" && ! -L "$candidate" ]] || return 1
@@ -245,15 +260,13 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     trap 'rm -rf -- "${source_tmp_dir:-}"' EXIT
     if [[ "$MAP_SNAPSHOT_MODE" != "pinned" ]]; then
       sidecar_tmp="$source_tmp_dir/$source_file_name.md5"
-      curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 "${source_url}.md5" -o "$sidecar_tmp" ||
-        fail "Geofabrik checksum fetch failed for $source_id; check this shell's HTTPS proxy/no_proxy and test the source URL before retrying"
+      download_geofabrik_file "${source_url}.md5" "$sidecar_tmp" "$source_id"
       sidecar_md5="$(awk '{print tolower($1); exit}' "$sidecar_tmp")"
       [[ "$sidecar_md5" == "$source_md5" ]] || \
         fail "official sidecar MD5 for $source_id changed while resolving the snapshot: expected $source_md5, received $sidecar_md5"
     fi
     printf 'Downloading Geofabrik snapshot extract %s...\n' "$source_file_name"
-    curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 "$source_url" -o "$source_tmp" ||
-      fail "Geofabrik download failed for $source_id; check this shell's HTTPS proxy/no_proxy and test the source URL before retrying"
+    download_geofabrik_file "$source_url" "$source_tmp" "$source_id"
     [[ -n "$source_md5" ]] || fail "no trusted MD5 available for source $source_id; refusing to install the download"
     download_md5="$(md5_file "$source_tmp")"
     [[ "$download_md5" == "$source_md5" ]] || \

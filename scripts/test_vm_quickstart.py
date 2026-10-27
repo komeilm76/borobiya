@@ -243,6 +243,17 @@ class RunbookSafetyTests(unittest.TestCase):
         self.assertNotIn("./scripts/clear-map-cache.sh --yes", runbook)
         self.assertNotIn('rm -rf -- "$MAP_OSRM_DATA_DIR"', runbook)
 
+    def test_expired_snapshot_guidance_updates_saved_selection_not_only_env(self):
+        docs = vm.ROOT / "docs"
+        for name in ("UBUNTU_VM_QUICKSTART.md", "UBUNTU_VM_RUNBOOK.md", "UBUNTU_VM_DIAGNOSTICS.md"):
+            guide = (docs / name).read_text()
+            self.assertIn("scripts/vm-map.py --snapshot latest --policy cache-first", guide)
+        runbook = (docs / "UBUNTU_VM_RUNBOOK.md").read_text()
+        self.assertNotIn("remedy is one `.env` line", runbook)
+        diagnostic = (docs / "UBUNTU_VM_DIAGNOSTICS.md").read_text()
+        self.assertIn("pinned HTTP=%{http_code}", diagnostic)
+        self.assertIn("proxy can return its own 404", diagnostic)
+
     def test_guides_describe_doctor_as_an_auth_probe_not_a_migration_check(self):
         docs = vm.ROOT / "docs"
         quick = (docs / "UBUNTU_VM_QUICKSTART.md").read_text()
@@ -684,7 +695,9 @@ class OperationsTests(unittest.TestCase):
 
     def test_geofabrik_fetch_fails_fast_on_unreachable_host_without_limiting_transfer_time(self):
         script = (vm.ROOT / "map-server/scripts/prepare-regions-pbf.sh").read_text()
-        self.assertEqual(script.count("curl -fL --connect-timeout 20 --retry 3"), 2)
+        self.assertEqual(script.count("curl -fL --connect-timeout 20 --retry 3"), 1)
+        self.assertIn('download_geofabrik_file "${source_url}.md5"', script)
+        self.assertIn('download_geofabrik_file "$source_url"', script)
         self.assertIn("check this shell's HTTPS proxy/no_proxy", script)
         self.assertNotIn("--max-time", script)  # large source transfers can take hours
 
