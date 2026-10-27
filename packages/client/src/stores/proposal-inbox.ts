@@ -80,23 +80,23 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
       if (identity.value !== userId || session !== sessionGeneration || !auth.accessToken) return false;
       if (action === "accept") {
         const missionId = await (runtime.accept ?? acceptProposal)(auth.accessToken, id);
-        if (identity.value === userId && session === sessionGeneration) {
-          generation++; // invalidate any pre-accept inbox read
-          loading.value = false;
-          acceptedMissionId.value = missionId;
-          acceptedOffer.value = proposals.value.find((offer) => offer.id === id) ?? null;
-          proposals.value = [];
-          total.value = 0;
-          totalPages.value = 0;
-        }
+        // The server may have committed, but the former account's reply is not a success for the
+        // current view. Do not clear its dialog or alter its inbox after a session transition.
+        if (identity.value !== userId || session !== sessionGeneration) return false;
+        generation++; // invalidate any pre-accept inbox read
+        loading.value = false;
+        acceptedMissionId.value = missionId;
+        acceptedOffer.value = proposals.value.find((offer) => offer.id === id) ?? null;
+        proposals.value = [];
+        total.value = 0;
+        totalPages.value = 0;
       } else {
         await (runtime.decline ?? declineProposal)(auth.accessToken, id, reason);
-        if (identity.value === userId && session === sessionGeneration) {
-          proposals.value = proposals.value.filter((item) => item.id !== id);
-          total.value = Math.max(0, total.value - 1);
-        }
+        if (identity.value !== userId || session !== sessionGeneration) return false;
+        proposals.value = proposals.value.filter((item) => item.id !== id);
+        total.value = Math.max(0, total.value - 1);
       }
-      if (identity.value === userId && session === sessionGeneration) void refresh();
+      void refresh();
       return true;
     } catch (error) {
       if (identity.value === userId && session === sessionGeneration) {

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — Proposal inbox late-decision feedback bug review
+
+- A delayed accept or decline could resolve after logout/account switch. The inbox already prevented old responses from mutating the new session, but `decide()` unconditionally returned `true`; its view treated that as success and closed/cleared the confirmation state. The operation now returns false whenever the originating session has gone, and only triggers the follow-up refresh on a current-session result. Deferred tests reproduce both old successes before the fix, cover the new account's untouched inbox, and preserve normal same-session success. This is a bounded feedback fix, not proof of live network/browser behavior or site-wide T4.4.2 completion.
+
 ### 2026-10-27 — T4.4.4 concurrent map startup (partial)
 
 - MapCanvas used the bounded 200ms cache-worker head start *before* importing the roughly 1 MB MapLibre chunk. Starting the lazy MapLibre import concurrently with worker registration removes that serialized network-start delay without skipping the bounded cache opportunity; both operations settle before map construction, and unmount/error guards remain. Deferred tests prove an import starts while registration is blocked, a slow import is awaited, and import failures propagate. This is a code-level critical-path improvement, not a measured <2s rendered map, <500ms location acquisition or VM/browser acceptance. T4.4.4 remains open.

@@ -33,6 +33,7 @@ describe("rescuer inbox markup and route", () => {
     expect(view).toContain('confirmAction = \'accept\'');
     expect(view).toContain("پیشنهادهای دیگر شما خودکار بسته می‌شوند");
     expect(view).toContain("inbox.decide(id, action");
+    expect(view).toContain("if (success) { confirmAction.value = null; declineReason.value = \"\"; }");
     expect(view).toContain("v-textarea");
   });
 });

@@ -191,8 +191,9 @@ describe("proposal inbox", () => {
   it("does not let a late decision response restore another account's inbox", async () => {
     let resolve!: (id: string) => void;
     const waiting = new Promise<string>((done) => { resolve = done; });
+    const accept = vi.fn(async () => waiting);
     configureProposalInboxForTests({
-      list: async () => page([proposal]), accept: async () => waiting,
+      list: async () => page([proposal]), accept,
       openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() })
     });
     const auth = useAuthStore();
@@ -202,14 +203,40 @@ describe("proposal inbox", () => {
     await vi.waitFor(() => expect(inbox.total).toBe(1));
     auth.initialized = true;
     const decision = inbox.decide(proposal.id, "accept");
-    await vi.waitFor(() => expect(inbox.decidingId).toBe(proposal.id));
+    await vi.waitFor(() => expect(accept).toHaveBeenCalledOnce());
     auth.accessToken = null;
     auth.user = null;
     await nextTick();
     resolve("77777777-7777-4777-8777-777777777777");
-    await decision;
+    expect(await decision).toBe(false);
     expect(inbox.acceptedMissionId).toBeNull();
     expect(inbox.total).toBe(0);
+  });
+
+  it("does not report a delayed decline as a success for a different signed-in account", async () => {
+    let finish!: () => void;
+    const waiting = new Promise<void>((resolve) => { finish = resolve; });
+    const decline = vi.fn(async () => waiting);
+    configureProposalInboxForTests({ list: async (token) => token === "rescuer-token" ? page([proposal]) : page([]), decline, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(1));
+    const decision = inbox.decide(proposal.id, "decline");
+    await vi.waitFor(() => expect(decline).toHaveBeenCalledOnce());
+    const otherId = "44444444-4444-4444-8444-444444444444";
+    auth.user = { id: otherId, username: "other", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "other-token";
+    await nextTick();
+    finish();
+    expect(await decision).toBe(false);
+    expect(inbox.proposals).toEqual([]);
+    expect(inbox.decisionError).toBeNull();
+    expect(inbox.acceptedMissionId).toBeNull();
   });
 
   it("ignores a late inbox reply from the previous account", async () => {
