@@ -415,6 +415,39 @@ class OperationsTests(unittest.TestCase):
             vm.stop_inactive_edge()
         self.assertEqual(run.call_count, 1)
 
+    def test_doctor_reports_saved_snapshot_pending_without_claiming_it_is_active(self):
+        class Response:
+            status = 200
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+            def read(self, _size):
+                return b"<html>ok</html>"
+
+        def command(args, **_kwargs):
+            return SimpleNamespace(stdout="1\n" if "psql" in str(args) else "")
+
+        env = {"NODE_ENV": "development", "NGINX_PORT": "8080", "MAP_REGION_IDS": "ir-tehran",
+               "MAP_LIBRARY_DIR": "/library", "MAP_SNAPSHOT": "pinned", "MAP_SNAPSHOT_DATE": "2026-10-18",
+               "JWT_SECRET": "a" * 32, "JWT_REFRESH_SECRET": "b" * 32,
+               "POSTGRES_PASSWORD": "secret", "NOMINATIM_PASSWORD": "secret"}
+        config = {"regions": "ir-tehran", "library": "/library", "snapshot": "latest", "policy": "cache-first"}
+        with patch.object(vm, "env_values", return_value=env), \
+             patch.object(vm, "configured_map", return_value=config), \
+             patch.object(vm, "static_ready", return_value=True), \
+             patch.object(vm, "run", side_effect=command), \
+             patch.object(vm, "compose", return_value=SimpleNamespace(stdout="db\n")), \
+             patch.object(vm, "build_opener", return_value=SimpleNamespace(open=lambda *_a, **_kw: Response())), \
+             redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(vm.doctor(), 0)
+            self.assertIn("latest map snapshot is pending", output.getvalue())
+            config["snapshot"] = "2026-10-26"
+            output.seek(0)
+            output.truncate()
+            self.assertEqual(vm.doctor(), 0)
+            self.assertIn("saved map snapshot differs", output.getvalue())
+
     def test_doctor_flags_public_edge_left_running_in_development(self):
         class Response:
             status = 200
@@ -476,6 +509,62 @@ class OperationsTests(unittest.TestCase):
             compose.assert_called_once_with("down")
             remove.assert_called_once_with(["postgres-data", "borobiya-uploads", "nominatim-data", "caddy-data", "caddy-config"])
 
+    def test_latest_snapshot_is_pinned_after_verified_setup_not_on_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_file = Path(directory) / ".vm-map.json"
+            selection = {"regions": "ir-tehran", "library": directory,
+                         "snapshot": "latest", "policy": "cache-first"}
+            config_file.write_text(json.dumps(selection))
+            active = {"MAP_REGION_IDS": "ir-tehran", "MAP_LIBRARY_DIR": directory,
+                      "MAP_SNAPSHOT": "2026-10-27", "MAP_SNAPSHOT_DATE": "2026-10-27"}
+            with patch.object(vm, "MAP_CONFIG", config_file), patch.object(vm_common, "MAP_CONFIG", config_file):
+                with self.assertRaises(SystemExit):
+                    vm.pin_resolved_snapshot(selection, {**active, "MAP_SNAPSHOT_DATE": "2026-10-26"})
+                self.assertEqual(json.loads(config_file.read_text()), selection)
+                operator_edit = {**selection, "regions": "de-berlin"}
+                config_file.write_text(json.dumps(operator_edit))
+                with self.assertRaisesRegex(SystemExit, "changed during launch"):
+                    vm.pin_resolved_snapshot(selection, active)
+                self.assertEqual(json.loads(config_file.read_text()), operator_edit)
+                config_file.write_text(json.dumps(selection))
+                updated = vm.pin_resolved_snapshot(selection, active)
+            self.assertEqual(updated["snapshot"], "2026-10-27")
+            self.assertEqual(json.loads(config_file.read_text()), updated)
+            self.assertEqual(config_file.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(updated["regions"], "ir-tehran")
+
+    def test_full_launch_pins_latest_only_after_setup_succeeds(self):
+        selection = {"regions": "ir-tehran", "snapshot": "latest", "policy": "cache-first", "library": "/maps"}
+        active = {"MAP_SNAPSHOT_DATE": "2026-10-27", "MAP_SNAPSHOT": "2026-10-27",
+                  "MAP_REGION_IDS": "ir-tehran", "MAP_LIBRARY_DIR": "/maps"}
+        with patch.object(vm, "require_env", return_value={"NODE_ENV": "development"}), \
+             patch.object(vm, "configured_map", return_value=selection), \
+             patch.object(vm, "stop_inactive_edge"), \
+             patch.object(vm, "run", side_effect=subprocess.CalledProcessError(1, "setup")), \
+             patch.object(vm, "pin_resolved_snapshot") as pin:
+            with self.assertRaises(subprocess.CalledProcessError):
+                vm.launch(SimpleNamespace(serve_only=False, offline=False))
+            pin.assert_not_called()
+
+        calls = []
+        def fake_run(_args):
+            calls.append("setup" if "setup-ubuntu-vm.sh" in str(_args) else "build")
+        def fake_pin(config, env):
+            calls.append("pin")
+            self.assertEqual(config["snapshot"], "latest")
+            self.assertEqual(env, active)
+            return {**config, "snapshot": active["MAP_SNAPSHOT_DATE"]}
+        with patch.object(vm, "require_env", return_value={"NODE_ENV": "development"}), \
+             patch.object(vm, "configured_map", return_value=selection), \
+             patch.object(vm, "env_values", return_value=active), \
+             patch.object(vm, "stop_inactive_edge"), \
+             patch.object(vm, "run", side_effect=fake_run), \
+             patch.object(vm, "pin_resolved_snapshot", side_effect=fake_pin), \
+             patch.object(vm, "verify_serving_artifacts"), \
+             patch.object(vm, "vm_compose"):
+            vm.launch(SimpleNamespace(serve_only=False, offline=False))
+        self.assertEqual(calls[:2], ["setup", "pin"])
+
     def test_strict_offline_launch_rejects_mismatched_selection_and_never_builds(self):
         with tempfile.TemporaryDirectory() as directory:
             library = Path(directory)
@@ -490,7 +579,8 @@ class OperationsTests(unittest.TestCase):
             (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
                                                                "datasetDir": str(dataset), "snapshotDate": "2026-10-18"}))
             values = {"MAP_REGION_IDS": "ir-tehran", "MAP_LIBRARY_DIR": directory, "MAP_REGION": "borobiya",
-                      "MAP_SNAPSHOT_DATE": "2026-10-18", "MAP_DATASET_DIR": str(dataset), "MAP_DATA_DIR": str(dataset),
+                      "MAP_SNAPSHOT": "pinned", "MAP_SNAPSHOT_DATE": "2026-10-18",
+                      "MAP_DATASET_DIR": str(dataset), "MAP_DATA_DIR": str(dataset),
                       "MAP_OSRM_DATA_DIR": str(dataset / "routing"), "MAP_PHOTON_DATA_DIR": str(dataset / "geocoding")}
             selection = {"regions": "de-berlin", "library": directory, "snapshot": "pinned", "policy": "offline"}
             with patch.object(vm, "require_env", return_value=values), \
@@ -503,6 +593,15 @@ class OperationsTests(unittest.TestCase):
                     vm.launch(SimpleNamespace(serve_only=True, offline=False))
                 compose.assert_not_called()
                 selection["regions"] = values["MAP_REGION_IDS"]
+                selection["snapshot"] = "latest"
+                with self.assertRaisesRegex(SystemExit, "pending"):  # unresolved latest must not serve old data
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                selection["snapshot"] = "2026-10-26"
+                with self.assertRaisesRegex(SystemExit, "snapshot"):  # explicit date differs from active one
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                selection["snapshot"] = "pinned"
                 vm.launch(SimpleNamespace(serve_only=True, offline=False))
                 stop_edge.assert_called()
                 compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")

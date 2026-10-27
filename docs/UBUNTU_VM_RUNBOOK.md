@@ -323,7 +323,9 @@ A 404 can also be returned by a proxy; check the exact URL and a current extract
 before changing the selection (see [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md)). If the dated file is
 actually gone, use `python3 scripts/vm-map.py --snapshot latest --policy cache-first`, then
 `python3 scripts/vm.py launch`. The resolver checks the newest common **dated** snapshot and its official
-MD5 sidecars online; `cache-first` preserves verified source bytes. Do not edit only `MAP_SNAPSHOT` in
+MD5 sidecars online; `cache-first` preserves verified source bytes. After setup succeeds, the VM helper
+replaces `latest` in `.vm-map.json` with the concrete verified date so routine re-launches cannot silently
+re-import a newer map. If setup fails before verifying the dataset, `latest` remains pending. Do not edit only `MAP_SNAPSHOT` in
 `.env`: `vm.py launch` uses the saved `.vm-map.json` snapshot and would override that edit.
 `python3 scripts/vm-map.py --snapshot YYYY-MM-DD` asks for one date you chose. Offline mode cannot
 resolve `latest`; use a specific date or previously cached sources instead. What you must **not** do is hand-point a source at

@@ -14,11 +14,13 @@ import subprocess
 import sys
 import tempfile
 import unicodedata
+from datetime import date
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 
 from vm_common import (
+    MAP_CONFIG,
     PROFILES,
     ROOT,
     compose,
@@ -80,7 +82,48 @@ def static_ready() -> bool:
     return (dist / "index.html").is_file() and (dist / "maplibre-gl-worker.mjs").is_file()
 
 
+def pin_resolved_snapshot(config: dict[str, str], active: dict[str, str]) -> dict[str, str]:
+    """Freeze a successful 'latest' build so normal launch does not import again tomorrow."""
+    if config["snapshot"] != "latest":
+        return config
+    snapshot = active.get("MAP_SNAPSHOT_DATE", "")
+    try:
+        if date.fromisoformat(snapshot).isoformat() != snapshot:
+            raise ValueError("non-canonical snapshot date")
+    except ValueError:
+        fail("setup did not record a valid resolved snapshot date; saved selection is unchanged")
+    if (active.get("MAP_SNAPSHOT") != snapshot or active.get("MAP_REGION_IDS") != config["regions"]
+            or active.get("MAP_LIBRARY_DIR") != config["library"]):
+        fail("resolved snapshot/area/library disagrees with setup; saved selection is unchanged")
+    if configured_map() != config:
+        fail("map selection changed during launch; refusing to replace the operator's edits")
+    updated = {**config, "snapshot": snapshot}
+    fd, temp = tempfile.mkstemp(prefix=".vm-map-", dir=MAP_CONFIG.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as output:
+            json.dump(updated, output, indent=2)
+            output.write("\n")
+            output.flush()
+            os.fsync(output.fileno())
+        if configured_map() != config:
+            fail("map selection changed during launch; refusing to replace the operator's edits")
+        os.replace(temp, MAP_CONFIG)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+    print(f"Saved resolved map snapshot {snapshot} in .vm-map.json; later launches reuse this date.")
+    return updated
+
+
 def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> None:
+    snapshot = config["snapshot"]
+    if snapshot == "latest":
+        fail("latest snapshot is pending; finish a full online launch before --serve-only")
+    if snapshot not in ("pinned", env.get("MAP_SNAPSHOT_DATE")) or (
+        snapshot == "pinned" and env.get("MAP_SNAPSHOT") not in (None, "pinned")
+    ):
+        fail("saved map snapshot differs from active .env; run full launch before --serve-only")
     if env.get("MAP_REGION_IDS") != config["regions"] or env.get("MAP_LIBRARY_DIR") != config["library"]:
         fail("saved map selection differs from active .env; run launch (build) or restore the previous selection")
     library = Path(config["library"])
@@ -142,6 +185,7 @@ def launch(args: argparse.Namespace) -> None:
                    "offline" if args.offline else config["policy"], "--map-library", config["library"]]
         print("Setup verifies the map artifacts and database before enabling the gateway; this may take hours.", flush=True)
         run(command)
+        config = pin_resolved_snapshot(config, env_values())
         if not args.offline and config["policy"] != "offline":
             # Vite reads the resolved MAP_* values written by setup. Keep the bundle and active map in sync.
             run(["bun", "install", "--frozen-lockfile"])
@@ -354,8 +398,17 @@ def doctor() -> int:
     try:
         config = configured_map()
         print(f"OK map selection: {config['regions']} (policy: {config['policy']})")
-        if values.get("MAP_REGION_IDS") != config["regions"]:
-            print("WARN saved selection differs from active .env; run launch to rebuild")
+        if values.get("MAP_REGION_IDS") != config["regions"] or (
+            config.get("library") and values.get("MAP_LIBRARY_DIR") != config["library"]
+        ):
+            print("WARN saved selection/library differs from active .env; run launch to rebuild")
+        if config.get("snapshot") == "latest":
+            print("WARN latest map snapshot is pending; run a full online launch to resolve and pin it")
+        elif (config.get("snapshot") not in (None, "pinned")
+              and config["snapshot"] != values.get("MAP_SNAPSHOT_DATE")) or (
+            config.get("snapshot") == "pinned" and values.get("MAP_SNAPSHOT") not in (None, "pinned")
+        ):
+            print("WARN saved map snapshot differs from active .env; run launch to rebuild")
     except SystemExit as error:
         print(f"FAIL map selection: {error}")
         errors += 1

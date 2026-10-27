@@ -25,9 +25,11 @@ avoids mixing object versions in the merged PBF.
 | `YYYY-MM-DD` | A specific dated Geofabrik snapshot. It is accepted only when the official `.md5` sidecar exists for every selected source, or when trusted library metadata already proves that date in offline mode. |
 
 The concrete installed date is stored separately as `MAP_SNAPSHOT_DATE` and
-mirrored to `MAP_DATA_VERSION`. After `latest` resolves, ordinary re-runs do
-not silently move to a newer release; update deliberately with
-`--update-map` or `--snapshot latest`.
+mirrored to `MAP_DATA_VERSION`. When `vm.py launch` completes the setup pipeline
+for a saved `latest` selection, it also atomically saves that verified date to
+`.vm-map.json`; a failed setup leaves `latest` pending for retry. Ordinary
+re-runs therefore do not silently move to a newer release; update deliberately
+with `vm-map.py --snapshot latest` or the setup script's `--update-map`.
 
 Geofabrik does not guarantee that every historical calendar date remains
 downloadable forever. A date is usable only while its dated PBF and official
