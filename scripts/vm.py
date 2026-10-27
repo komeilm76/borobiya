@@ -357,9 +357,25 @@ def destroy(backup_path: str | None, no_backup: bool) -> None:
     print("Project data removed. Check your off-VM backup before deleting it.")
 
 
+def require_project_cache_path(path: Path) -> None:
+    """Never follow a symlink in a project-local cleanup path, including parent directories."""
+    try:
+        parts = path.relative_to(ROOT).parts
+    except ValueError:
+        fail(f"refusing project cache path outside checkout: {path}")
+    if ROOT.is_symlink():
+        fail(f"refusing symlinked project cache path: {ROOT}")
+    current = ROOT
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            fail(f"refusing symlinked project cache path: {current}")
+
+
 def clear_caches(apply: bool) -> None:
     dist = ROOT / "packages/client/dist"
-    if dist.is_symlink() or (dist.exists() and not dist.is_dir()):
+    require_project_cache_path(dist)
+    if dist.exists() and not dist.is_dir():
         fail("refusing unexpected browser-build cache path")
     print("Project map data cache plan (includes offline source files):")
     run([sys.executable, str(ROOT / "scripts/clear-map-cache.py")])
@@ -369,8 +385,10 @@ def clear_caches(apply: bool) -> None:
         print("Dry run. Re-run with clear-caches --apply for typed confirmation.")
         return
     confirm("CLEAR PROJECT CACHES")
+    require_project_cache_path(dist)
     vm_compose("down")
     run([sys.executable, str(ROOT / "scripts/clear-map-cache.py"), "--yes"])
+    require_project_cache_path(dist)
     if dist.is_dir():
         shutil.rmtree(dist)
     print("Project caches removed. A full online launch is needed before offline serving.")
@@ -378,11 +396,15 @@ def clear_caches(apply: bool) -> None:
 
 def clear_tools(apply: bool) -> None:
     # Explicit list of project-local downloaded JARs, never apt packages or shared Docker images.
-    targets = [*(ROOT / "map-server/tools").glob("planetiler-*.jar"),
-               *(ROOT / "map-server/photon").glob("photon-*.jar"),
-               *(ROOT / "map-server/data").glob("planetiler-*.jar")]
+    directories = [(ROOT / "map-server/tools", "planetiler-*.jar"),
+                   (ROOT / "map-server/photon", "photon-*.jar"),
+                   (ROOT / "map-server/data", "planetiler-*.jar")]
+    for directory, _pattern in directories:
+        require_project_cache_path(directory)
+    targets = [path for directory, pattern in directories for path in directory.glob(pattern)]
     for path in targets:
-        if not path.is_file() or path.is_symlink():
+        require_project_cache_path(path)
+        if not path.is_file():
             fail(f"refusing unexpected tool path {path}")
     print("Project-local tool JARs (Docker, apt, Java, Osmium and Bun are shared OS tools and stay installed):")
     for path in targets:
@@ -394,7 +416,11 @@ def clear_tools(apply: bool) -> None:
         return
     if targets:
         confirm("CLEAR TOOLS")
+        # A directory may be swapped after preview/confirmation; check again before every unlink.
         for path in targets:
+            require_project_cache_path(path)
+            if not path.is_file():
+                fail(f"refusing unexpected tool path {path}")
             path.unlink()
 
 

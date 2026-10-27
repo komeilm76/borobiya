@@ -60,7 +60,7 @@ The `--serve-only` path refuses missing artifacts and uses Compose `--no-build -
 | Stop and **remove app database only** | `python3 scripts/vm.py stop --clear-db --backup /safe/place/new.dump` (typed confirmation; `--no-backup` explicitly discards) |
 | Clear generated map data/OSM downloads + browser build | `python3 scripts/vm.py clear-caches` previews; `python3 scripts/vm.py clear-caches --apply` stops and confirms. Verified Planetiler reference layers and tool JARs remain; offline serving needs a rebuild afterwards. |
 | Clear only map caches | `./scripts/clear-map-cache.sh` previews; `./scripts/clear-map-cache.sh --apply` confirms. |
-| Clear downloaded project tool JARs | `python3 scripts/vm.py clear-tools` previews; `python3 scripts/vm.py clear-tools --apply` confirms |
+| Clear downloaded project tool JARs | `python3 scripts/vm.py clear-tools` previews; `python3 scripts/vm.py clear-tools --apply` confirms. Refuses symlinks in tool directories/parents so cleanup cannot reach JARs outside this checkout. |
 | Delete project DB, SOS photos, Nominatim DB, TLS certs **and** map caches | `python3 scripts/vm.py destroy --backup /safe/place/new.dump` (typed confirmation). Back up photo evidence separately first. |
 | Reset admin password | `python3 scripts/vm.py admin-password` (hidden double prompt, revokes admin sessions; `--generate` prints only on a TTY) |
 

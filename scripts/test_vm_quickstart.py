@@ -759,6 +759,99 @@ class OperationsTests(unittest.TestCase):
                 self.assertEqual(calls, ["preview", "preview", "confirmed", "stop", "apply"])
                 self.assertFalse(dist.exists())
 
+    def test_clear_caches_refuses_symlinked_browser_build_parent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "repo"
+            (root / "packages").mkdir(parents=True)
+            outside = base / "outside-client"
+            dist = outside / "dist"
+            dist.mkdir(parents=True)
+            protected = dist / "index.html"
+            protected.write_text("not a project cache")
+            (root / "packages/client").symlink_to(outside, target_is_directory=True)
+            with patch.object(vm, "ROOT", root), patch.object(vm, "run") as run, \
+                 patch.object(vm, "vm_compose") as compose, patch.object(vm, "confirm") as confirm:
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_caches(True)
+                run.assert_not_called()
+                compose.assert_not_called()
+                confirm.assert_not_called()
+            self.assertEqual(protected.read_text(), "not a project cache")
+
+    def test_clear_tools_refuses_symlinked_jar_parent(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "repo"
+            (root / "map-server").mkdir(parents=True)
+            outside = base / "outside-tools"
+            outside.mkdir()
+            protected = outside / "planetiler-1.20.0.jar"
+            protected.write_bytes(b"not a project tool")
+            (root / "map-server/tools").symlink_to(outside, target_is_directory=True)
+            with patch.object(vm, "ROOT", root), patch.object(vm, "confirm") as confirm:
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_tools(True)
+                confirm.assert_not_called()
+            self.assertEqual(protected.read_bytes(), b"not a project tool")
+
+    def test_clear_caches_rechecks_browser_build_parent_after_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "repo"
+            client = root / "packages/client"
+            (client / "dist").mkdir(parents=True)
+            outside = base / "outside-client"
+            (outside / "dist").mkdir(parents=True)
+            protected = outside / "dist/index.html"
+            protected.write_text("external build")
+
+            def replace_parent(_phrase):
+                client.rename(root / "packages/old-client")
+                client.symlink_to(outside, target_is_directory=True)
+
+            with patch.object(vm, "ROOT", root), patch.object(vm, "run") as run, \
+                 patch.object(vm, "confirm", side_effect=replace_parent), \
+                 patch.object(vm, "vm_compose") as compose:
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_caches(True)
+                run.assert_called_once()  # preview only; do not run the apply cleaner
+                compose.assert_not_called()
+            self.assertEqual(protected.read_text(), "external build")
+
+    def test_clear_tools_rechecks_parent_after_confirmation_and_accepts_regular_jars(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            root = base / "repo"
+            tools = root / "map-server/tools"
+            tools.mkdir(parents=True)
+            local = tools / "planetiler-1.20.0.jar"
+            local.write_bytes(b"local jar")
+            extra = tools / "keep.txt"
+            extra.write_text("keep")
+            outside = base / "outside-tools"
+            outside.mkdir()
+            protected = outside / local.name
+            protected.write_bytes(b"external jar")
+
+            def replace_parent(_phrase):
+                tools.rename(root / "map-server/old-tools")
+                tools.symlink_to(outside, target_is_directory=True)
+
+            with patch.object(vm, "ROOT", root), patch.object(vm, "confirm", side_effect=replace_parent):
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_tools(True)
+            self.assertEqual(protected.read_bytes(), b"external jar")
+            self.assertEqual((root / "map-server/old-tools" / local.name).read_bytes(), b"local jar")
+            tools.unlink()
+            (root / "map-server/old-tools").rename(tools)
+            with patch.object(vm, "ROOT", root), patch.object(vm, "confirm") as confirm:
+                vm.clear_tools(True)
+                confirm.assert_called_once_with("CLEAR TOOLS")
+            self.assertFalse(local.exists())
+            self.assertEqual(extra.read_text(), "keep")
+            self.assertEqual(protected.read_bytes(), b"external jar")
+
     def test_backup_is_private_valid_pg_dump_and_refuses_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "new.dump"

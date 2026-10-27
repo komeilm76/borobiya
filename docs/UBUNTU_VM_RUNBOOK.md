@@ -1864,7 +1864,9 @@ keep its Planetiler JAR in `map-server/tools/`. Two protections are worth knowin
 otherwise: it refuses to clear **through a symlink** or outside the configured root (so a bad
 `MAP_LIBRARY_DIR` cannot be aimed at `/`), and if the configured library carries none of its marker
 paths it prints `no Borobiya cache markers; preserving it and its unknown contents` and removes
-nothing there.
+nothing there. `vm.py clear-caches` and `clear-tools` also refuse symlinks in *any parent* of the
+browser build or project-local tool JARs and recheck after confirmation: do not replace one of those
+directories with a symlink to an external build or tool store to work around the refusal.
 
 Cost after Level 2: OSM extracts must be downloaded again and the map/index rebuilt; the
 verified Planetiler reference layers stay cached unless separately refreshed. If you included the
