@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — T4.4.4 companion map route defers MapLibre (partial)
+
+- The companion-map route's direct runtime `Marker` import pulled MapLibre's ~1 MB chunk into the route before `MapCanvas` mounted, making the previous concurrent import ineffective on that screen. `MapCanvas` now hands its already-loaded marker constructor to ready listeners; the companion view imports only types, creates the own-location marker from that constructor and still removes it on teardown. Before/after Vite builds confirm the companion route chunk no longer statically imports the MapLibre chunk; source-pinned tests and client typecheck pass. This is a bundle-graph fix for one route, not a measured <2s rendered map, <500ms GPS fix or live browser/device acceptance. Other map routes remain to be reviewed; T4.4.4 stays **open**.
+
 ### 2026-10-27 — Proposal inbox late-decision feedback bug review
 
 - A delayed accept or decline could resolve after logout/account switch. The inbox already prevented old responses from mutating the new session, but `decide()` unconditionally returned `true`; its view treated that as success and closed/cleared the confirmation state. The operation now returns false whenever the originating session has gone, and only triggers the follow-up refresh on a current-session result. Deferred tests reproduce both old successes before the fix, cover the new account's untouched inbox, and preserve normal same-session success. This is a bounded feedback fix, not proof of live network/browser behavior or site-wide T4.4.2 completion.

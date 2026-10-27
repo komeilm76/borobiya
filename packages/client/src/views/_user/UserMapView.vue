@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import { Marker, type Map as MapLibreMap, type MapMouseEvent } from "maplibre-gl";
+import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
@@ -108,14 +108,15 @@ const playback = useHistoryPlayback({
 const map = shallowRef<MapLibreMap | null>(null);
 const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
 let ownMarker: Marker | null = null;
+let markerConstructor: typeof Marker | null = null;
 let focusOnNextFix = false;
 
 function syncOwnMarker(): void {
   const instance = map.value;
   const fix = own.position.value;
-  if (!instance || !fix) { ownMarker?.remove(); ownMarker = null; return; }
+  if (!instance || !fix || !markerConstructor) { ownMarker?.remove(); ownMarker = null; return; }
   if (!ownMarker) {
-    ownMarker = new Marker({ color: "#2563eb" }).setLngLat([fix.lon, fix.lat]).addTo(instance);
+    ownMarker = new markerConstructor({ color: "#2563eb" }).setLngLat([fix.lon, fix.lat]).addTo(instance);
     ownMarker.getElement().setAttribute("aria-label", "موقعیت زندهٔ من");
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
 }
@@ -285,7 +286,8 @@ function onMapLongPress(event: MapMouseEvent): void {
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 
-function onMapReady(instance: MapLibreMap): void {
+function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
+  markerConstructor = MarkerClass;
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
   // `ready` (and every `styledata`/`idle` after an async style reload) re-ensures the overlay instead
@@ -334,6 +336,7 @@ onBeforeUnmount(() => {
   // still alive here and nothing else can paint after this point.
   const instance = map.value;
   map.value = null;
+  markerConstructor = null;
   own.stop();
   ownMarker?.remove();
   ownMarker = null;

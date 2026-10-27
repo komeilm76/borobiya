@@ -52,7 +52,7 @@ const props = withDefaults(defineProps<{
 });
 
 const emit = defineEmits<{
-  ready: [map: MapLibreMap];
+  ready: [map: MapLibreMap, marker: typeof import("maplibre-gl").Marker];
   "config-error": [error: Error];
   "map-error": [error: Error];
 }>();
@@ -137,7 +137,7 @@ watch(() => props.styleUrl, updateStyle);
 
 function initializeMap(controller: AbortController, maplibre: typeof import("maplibre-gl")): void {
   if (controller.signal.aborted || !container.value) return;
-  const { Map: MapLibre, NavigationControl, ScaleControl, setWorkerUrl } = maplibre;
+  const { Map: MapLibre, Marker, NavigationControl, ScaleControl, setWorkerUrl } = maplibre;
   // MapLibre v6 otherwise locates its worker relative to the (pre)bundled
   // chunk URL, where the sibling worker file does not exist ("Worker failed
   // to load"); the Vite config serves the packaged worker at this path instead.
@@ -166,7 +166,7 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
   instance.getCanvas().setAttribute("aria-label", props.ariaLabel);
   instance.getCanvas().setAttribute("role", "application");
 
-  instance.on("load", () => emit("ready", instance));
+  instance.on("load", () => emit("ready", instance, Marker));
   instance.on("error", (event) => reportMapError(event.error));
 
   void getMapConfig(controller.signal).then((config) => {

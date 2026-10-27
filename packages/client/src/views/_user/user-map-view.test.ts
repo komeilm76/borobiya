@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
  */
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("../../components/map/LiveCompanionPanel.vue", import.meta.url), "utf8");
+const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import.meta.url), "utf8");
 
 function body(name: string): string {
   const start = view.indexOf(`function ${name}(`);
@@ -21,6 +22,16 @@ function body(name: string): string {
 }
 
 describe("UserMapView live overlay", () => {
+  it("keeps the large MapLibre chunk lazy until MapCanvas mounts while retaining own-position markers", () => {
+    // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
+    // defeating MapCanvas's concurrent dynamic import and worker startup.
+    expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
+    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl"');
+    expect(canvas).toContain('emit("ready", instance, Marker)');
+    expect(body("onMapReady")).toContain("markerConstructor = MarkerClass");
+    expect(body("syncOwnMarker")).toContain('new markerConstructor(');
+  });
+
   it("restores missing layers on idle without rewriting every existing source on each idle event", () => {
     const restore = body("repaintOverlays");
     expect(restore).toContain("needsOverlayRestore(");
@@ -108,7 +119,7 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('ownPositionLabel(own.position.value, own.active.value, own.error.value)');
     expect(view).toContain('نمایش زندهٔ موقعیت من');
     expect(view).toContain('نمایش موقعیت، اشتراک‌گذاری را فعال نمی‌کند');
-    expect(body("syncOwnMarker")).toContain('new Marker(');
+    expect(body("syncOwnMarker")).toContain('new markerConstructor(');
     expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
     expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation()');
     expect(body("centerOnOwnLocation")).toContain('userPickedPlace.value = true');
