@@ -83,9 +83,13 @@ def static_ready() -> bool:
 
 
 def pin_resolved_snapshot(config: dict[str, str], active: dict[str, str]) -> dict[str, str]:
-    """Freeze a successful 'latest' build so normal launch does not import again tomorrow."""
-    if config["snapshot"] != "latest":
+    """Freeze a verified latest or fallback date after setup, never on failure."""
+    requested = config["snapshot"]
+    if requested != "latest" and active.get("MAP_SNAPSHOT") == requested:
         return config
+    if requested != "latest" and (config["policy"] != "cache-first"
+                                  or active.get("MAP_SOURCE_POLICY") != "cache-first"):
+        fail("setup changed the requested snapshot without cache-first fallback; saved selection is unchanged")
     snapshot = active.get("MAP_SNAPSHOT_DATE", "")
     try:
         if date.fromisoformat(snapshot).isoformat() != snapshot:
@@ -112,7 +116,7 @@ def pin_resolved_snapshot(config: dict[str, str], active: dict[str, str]) -> dic
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
-    print(f"Saved resolved map snapshot {snapshot} in .vm-map.json; later launches reuse this date.")
+    print(f"Saved verified map snapshot {snapshot} in .vm-map.json; later launches reuse this date.")
     return updated
 
 

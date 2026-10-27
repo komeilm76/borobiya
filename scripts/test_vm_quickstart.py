@@ -533,6 +533,28 @@ class OperationsTests(unittest.TestCase):
             self.assertEqual(config_file.stat().st_mode & 0o777, 0o600)
             self.assertEqual(updated["regions"], "ir-tehran")
 
+    def test_cache_first_fallback_is_pinned_only_after_verified_setup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            config_file = Path(directory) / ".vm-map.json"
+            active = {"MAP_REGION_IDS": "ir", "MAP_LIBRARY_DIR": directory,
+                      "MAP_SOURCE_POLICY": "cache-first",
+                      "MAP_SNAPSHOT": "2026-10-26", "MAP_SNAPSHOT_DATE": "2026-10-26"}
+            with patch.object(vm, "MAP_CONFIG", config_file), patch.object(vm_common, "MAP_CONFIG", config_file):
+                for requested in ("pinned", "2026-10-18"):
+                    selection = {"regions": "ir", "library": directory,
+                                 "snapshot": requested, "policy": "cache-first"}
+                    config_file.write_text(json.dumps(selection))
+                    updated = vm.pin_resolved_snapshot(selection, active)
+                    self.assertEqual(updated["snapshot"], "2026-10-26")
+                    self.assertEqual(json.loads(config_file.read_text()), updated)
+                    config_file.write_text(json.dumps({**selection, "policy": "offline"}))
+                    with self.assertRaisesRegex(SystemExit, "without cache-first fallback"):
+                        vm.pin_resolved_snapshot({**selection, "policy": "offline"}, active)
+                    config_file.write_text(json.dumps(selection))
+                    with self.assertRaisesRegex(SystemExit, "without cache-first fallback"):
+                        vm.pin_resolved_snapshot(selection, {**active, "MAP_SOURCE_POLICY": "offline"})
+                self.assertEqual(json.loads(config_file.read_text())["snapshot"], "2026-10-18")
+
     def test_full_launch_pins_latest_only_after_setup_succeeds(self):
         selection = {"regions": "ir-tehran", "snapshot": "latest", "policy": "cache-first", "library": "/maps"}
         active = {"MAP_SNAPSHOT_DATE": "2026-10-27", "MAP_SNAPSHOT": "2026-10-27",
@@ -823,6 +845,67 @@ class OperationsTests(unittest.TestCase):
         )
         normalized = normalized.replace("\n\n}\n", "\n\n    location / {\n        return 404;\n    }\n}\n")
         self.assertEqual(normalized, base.split("server {", 1)[1])
+
+
+class MapSourceFallbackTests(unittest.TestCase):
+    def test_setup_retries_unavailable_dates_before_persisting_any_map_paths(self):
+        setup = (SCRIPTS / "setup-ubuntu-vm.sh").read_text()
+        function = ("preflight_map_sources() {" + setup.split("preflight_map_sources() {", 1)[1]
+                    .split("\n}\npreflight_map_sources", 1)[0] + "\n}")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script_dir = root / "map-server" / "scripts"
+            script_dir.mkdir(parents=True)
+            prepare = script_dir / "prepare-regions-pbf.sh"
+            prepare.write_text(
+                "#!/bin/bash\n"
+                "printf '%s|%s\\n' \"$MAP_SNAPSHOT\" \"$MAP_SNAPSHOT_DATE\" >> \"$ATTEMPTS\"\n"
+                "if [[ \"${FAKE_STATUS:-}\" == 7 ]]; then exit 7; fi\n"
+                "case \"$MAP_SNAPSHOT_DATE\" in 2026-10-18|2026-10-27) exit 42 ;; esac\n"
+                "exit 0\n",
+            )
+            prepare.chmod(0o755)
+            attempts = root / "attempts"
+            shell = ("set -euo pipefail\n"
+                     "fail() { printf '%s\\n' \"$*\" >&2; exit 1; }\n"
+                     "note() { :; }\nlog() { :; }\nprint_selection_summary() { :; }\n"
+                     "resolve_selection() {\n"
+                     "  [[ \"$SNAPSHOT_INPUT\" == latest ]] || exit 9\n"
+                     "  SNAPSHOT_MODE=latest\n"
+                     "  if [[ \"$SKIP_SNAPSHOT_DATES\" == 2026-10-18 ]]; then\n"
+                     "    SNAPSHOT_DATE=2026-10-27\n"
+                     "  elif [[ \"$SKIP_SNAPSHOT_DATES\" == 2026-10-18,2026-10-27 ]]; then\n"
+                     "    SNAPSHOT_DATE=2026-10-26\n"
+                     "  else exit 8; fi\n"
+                     "}\n"
+                     "DATASET=borobiya; REGION_IDS=ir; SELECTION_INPUT=ir\n"
+                     "SNAPSHOT_INPUT=pinned; SNAPSHOT_MODE=pinned; SNAPSHOT_DATE=2026-10-18\n"
+                     "SOURCE_POLICY_INPUT=${TEST_POLICY:-cache-first}; DRY_RUN=${TEST_DRY_RUN:-0}\n"
+                     "MAP_LIBRARY_DIR=$PWD/library\n" + function + "\npreflight_map_sources\n"
+                     "printf 'result=%s|%s|%s\\n' \"$SNAPSHOT_INPUT\" \"$SNAPSHOT_DATE\" "
+                     "\"${SKIP_SNAPSHOT_DATES:-}\"\n")
+            env = {**os.environ, "ATTEMPTS": str(attempts)}
+            ok = subprocess.run(["bash", "-c", shell], cwd=root, env=env,
+                                capture_output=True, text=True, check=False)
+            self.assertEqual(ok.returncode, 0, ok.stderr)
+            self.assertIn("result=latest|2026-10-26|2026-10-18,2026-10-27", ok.stdout)
+            self.assertEqual(attempts.read_text().splitlines(),
+                             ["pinned|2026-10-18", "2026-10-27|2026-10-27", "2026-10-26|2026-10-26"])
+            for policy, dry_run in (("offline", "0"), ("refresh", "0"), ("cache-first", "1")):
+                attempts.unlink(missing_ok=True)
+                skipped = subprocess.run(["bash", "-c", shell], cwd=root,
+                                         env={**env, "TEST_POLICY": policy, "TEST_DRY_RUN": dry_run},
+                                         capture_output=True, text=True, check=False)
+                self.assertEqual(skipped.returncode, 0, skipped.stderr)
+                self.assertFalse(attempts.exists())
+                self.assertIn("result=pinned|2026-10-18|", skipped.stdout)
+            attempts.unlink(missing_ok=True)
+            network = subprocess.run(["bash", "-c", shell], cwd=root,
+                                     env={**env, "FAKE_STATUS": "7"},
+                                     capture_output=True, text=True, check=False)
+            self.assertNotEqual(network.returncode, 0)
+            self.assertIn("no automatic fallback for network/checksum errors", network.stderr)
+            self.assertEqual(attempts.read_text().splitlines(), ["pinned|2026-10-18"])
 
 
 if __name__ == "__main__":

@@ -22,19 +22,29 @@ avoids mixing object versions in the merged PBF.
 |---|---|
 | `pinned` | The repository-reviewed date in `map-server/regions.json` (default). Sources with committed MD5s use those pins; sidecar-backed sources resolve the official MD5 on first online use and cache it in the library. |
 | `latest` | Resolve the newest common dated snapshot available for every selected source. Setup searches back up to 32 UTC days and then persists the concrete resolved date. |
-| `YYYY-MM-DD` | A specific dated Geofabrik snapshot. It is accepted only when the official `.md5` sidecar exists for every selected source, or when trusted library metadata already proves that date in offline mode. |
+| `YYYY-MM-DD` | A specific dated Geofabrik snapshot. `cache-first` setup verifies existing sources or retrieves the official `.md5` and dated PBF; if either has expired (HTTP 404/410), it searches for a newer available date. Offline mode requires previously trusted library metadata. |
 
 The concrete installed date is stored separately as `MAP_SNAPSHOT_DATE` and
 mirrored to `MAP_DATA_VERSION`. When `vm.py launch` completes the setup pipeline
 for a saved `latest` selection, it also atomically saves that verified date to
 `.vm-map.json`; a failed setup leaves `latest` pending for retry. Ordinary
-re-runs therefore do not silently move to a newer release; update deliberately
-with `vm-map.py --snapshot latest` or the setup script's `--update-map`.
+re-runs keep the installed date **while its sources remain cached**. To request a
+new release deliberately, use `vm-map.py --snapshot latest` or the setup
+script's `--update-map`.
 
-Geofabrik does not guarantee that every historical calendar date remains
-downloadable forever. A date is usable only while its dated PBF and official
-MD5 sidecar are available for all selected sources, or after it has already
-been downloaded and verified into the library.
+With `cache-first` VM setup, the requested date is tried in this order: reuse
+the matching verified dataset/source extracts; fetch missing dated extracts
+from Geofabrik and check their official MD5; if a required dated PBF or MD5
+sidecar returns HTTP 404/410, try the newest common **dated** snapshot in the
+last 32 UTC days (skipping dates whose PBF/sidecar already failed), verifying
+every source before building. A successful fallback is saved as the concrete
+date in `.env` and, through `vm.py launch`, `.vm-map.json`; a failed build does
+not pin `.vm-map.json`. No fallback occurs on a timeout/HTTP 403/checksum
+mismatch: those require investigation, not a different map. A proxy can itself
+return 404, so inspect its behavior if repeated candidates fail. `--offline`
+never contacts Geofabrik; `refresh` keeps its explicit-date semantics. Direct
+`prepare-regions-pbf.sh` runs do not change the VM selection; use `vm.py launch`
+for automatic fallback and persistence.
 
 ### Source policy
 
@@ -42,7 +52,7 @@ been downloaded and verified into the library.
 
 | Value | Behavior |
 |---|---|
-| `cache-first` | Default. Reuse a verified library file; download only when missing. |
+| `cache-first` | Default. Reuse verified cache; download missing sources. VM setup automatically tries another dated snapshot only on source/sidecar HTTP 404/410, as described above. |
 | `refresh` | Download the selected dated file again, verify it in staging, then atomically replace the library copy. |
 | `offline` | Never download map sources. Fail with the exact missing library path instead. `latest` cannot be resolved in this mode. |
 

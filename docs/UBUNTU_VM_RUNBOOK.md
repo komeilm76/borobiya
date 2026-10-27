@@ -320,12 +320,14 @@ proxy itself answering fine (§ 5.2), is the host being down.
 Extract URLs are date-stamped: `iran-261018.osm.pbf` means 2026-10-18, it is not a version number.
 Geofabrik keeps dated files for a rolling window, so a `pinned` snapshot stops resolving weeks later.
 A 404 can also be returned by a proxy; check the exact URL and a current extract from the **same shell**
-before changing the selection (see [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md)). If the dated file is
-actually gone, use `python3 scripts/vm-map.py --snapshot latest --policy cache-first`, then
-`python3 scripts/vm.py launch`. The resolver checks the newest common **dated** snapshot and its official
-MD5 sidecars online; `cache-first` preserves verified source bytes. After setup succeeds, the VM helper
-replaces `latest` in `.vm-map.json` with the concrete verified date so routine re-launches cannot silently
-re-import a newer map. If setup fails before verifying the dataset, `latest` remains pending. Do not edit only `MAP_SNAPSHOT` in
+if a retry fails (see [diagnostics](./UBUNTU_VM_DIAGNOSTICS.md)). `cache-first` VM setup first
+reuses verified source bytes, downloads missing extracts, then on a dated PBF/sidecar HTTP 404/410
+tries the newest common **dated** snapshot, skipping dates already found unavailable. It never
+falls back on network failures or checksum mismatches; `offline` and `refresh` do not auto-switch
+dates. To request the newest snapshot deliberately, run
+`python3 scripts/vm-map.py --snapshot latest --policy cache-first`, then `python3 scripts/vm.py launch`.
+After setup succeeds, the VM helper replaces `latest` **or an unavailable requested date** in
+`.vm-map.json` with the concrete verified date so routine re-launches reuse that cache. If setup fails before verifying the dataset, `latest` remains pending. Do not edit only `MAP_SNAPSHOT` in
 `.env`: `vm.py launch` uses the saved `.vm-map.json` snapshot and would override that edit.
 `python3 scripts/vm-map.py --snapshot YYYY-MM-DD` asks for one date you chose. Offline mode cannot
 resolve `latest`; use a specific date or previously cached sources instead. What you must **not** do is hand-point a source at
@@ -1910,9 +1912,9 @@ Symptom first, always — grep this section for the error text.
    copy the values from another area to make the message go away.
 4. **`Could not download … water-polygons-split-3857.zip` / `Could not HEAD …`** — upstream host
    outage, § 3.4. Nothing in this repo is broken, and `--force` is not a re-download fix.
-5. **`Geofabrik … 404`** (step 8) — the dated extract may have aged out, or a proxy may have
-   returned the 404. Compare the exact URL with a current extract from the same shell; if the
-   dated file is gone, change the saved selection's snapshot via `vm-map.py`, not only `.env` (§ 3.3).
+5. **`Geofabrik … 404`** (step 8) — `cache-first` VM launch retries with a newer common
+   dated snapshot, but a proxy may itself return 404. If fallback cannot verify a dated source,
+   compare the exact URL with a current extract from the same shell. Do not edit only `.env` (§ 3.3).
 6. **A step says everything is fine but the tiles look wrong (ocean drawn as land)** — the reference
    layers are placeholder/stale data; re-fetch with `MAP_SOURCE_POLICY=refresh` and rebuild step 9.
 7. **Planetiler "insufficient disk/RAM" warnings** — `--force` in `generate-tiles.sh` already means

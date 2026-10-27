@@ -504,8 +504,11 @@ def snapshot_date_for_spec(
     policy: str = "cache-first",
     fetcher=fetch_text,
     today: date | None = None,
+    skip_dates: frozenset[date] = frozenset(),
 ) -> tuple[str, date]:
     mode, requested = parse_snapshot_spec(spec, catalog)
+    if skip_dates and mode != "latest":
+        fail("--skip-snapshot-dates is only valid with --snapshot latest")
     current_day = today or datetime.now(timezone.utc).date()
     if mode == "pinned":
         return mode, catalog_snapshot_date(catalog)
@@ -520,6 +523,8 @@ def snapshot_date_for_spec(
         fail("snapshot 'latest' requires an online check; choose pinned or a specific date in offline mode")
     for offset in range(32):
         candidate = current_day - timedelta(days=offset)
+        if candidate in skip_dates:
+            continue
         available = True
         for source_id in source_ids:
             url = dated_source_url(catalog["sources"][source_id]["url"], candidate)
@@ -891,11 +896,15 @@ def command_resolve(catalog: dict, args: argparse.Namespace) -> None:
     resolved = resolve_selection(catalog, args.selection)
     snapshot_spec = getattr(args, "snapshot", "pinned")
     policy = validate_source_policy(getattr(args, "source_policy", "cache-first"))
+    skipped = getattr(args, "skip_snapshot_dates", "")
+    skip_dates = (frozenset(parse_snapshot_date(raw, "--skip-snapshot-dates")
+                            for raw in skipped.split(",")) if skipped else frozenset())
     snapshot_mode, snapshot_date = snapshot_date_for_spec(
         catalog,
         snapshot_spec,
         resolved["sourceIds"],
         policy=policy,
+        skip_dates=skip_dates,
     )
     payload = {
         "areas": resolved["ids"],
@@ -1978,6 +1987,7 @@ def main() -> None:
     resolve.add_argument("--json", action="store_true")
     resolve.add_argument("--snapshot", default="pinned")
     resolve.add_argument("--source-policy", default="cache-first")
+    resolve.add_argument("--skip-snapshot-dates", default="", help="unavailable dates to exclude when resolving latest")
     resolve.add_argument("--library")
     resolve.add_argument("--dataset", default="borobiya")
 

@@ -771,9 +771,12 @@ log "Map area selection"
 resolve_selection() {
   # $1 = csv; evals REGION_IDS/UNION_BBOX/snapshot/library paths or fails.
   local output
-  if ! output="$(python3 "$REGIONS_PY" resolve "$1" \
-      --snapshot "$SNAPSHOT_INPUT" --source-policy "$SOURCE_POLICY_INPUT" \
-      --library "$MAP_LIBRARY_DIR" --dataset "$DATASET")"; then
+  local resolve_args=(resolve "$1" --snapshot "$SNAPSHOT_INPUT" \
+    --source-policy "$SOURCE_POLICY_INPUT" --library "$MAP_LIBRARY_DIR" --dataset "$DATASET")
+  if [[ -n "${SKIP_SNAPSHOT_DATES:-}" ]]; then
+    resolve_args+=(--skip-snapshot-dates "$SKIP_SNAPSHOT_DATES")
+  fi
+  if ! output="$(python3 "$REGIONS_PY" "${resolve_args[@]}")"; then
     fail "invalid map selection/snapshot (see above; list areas with: $0 --list-regions)"
   fi
   eval "$output"
@@ -1083,6 +1086,45 @@ while :; do
     break
   fi
 done
+
+# Cache-first preflights all selected source extracts BEFORE writing the new
+# dataset paths into .env. A missing source is fetched and MD5-verified; only a
+# dated source/sidecar HTTP 404 or 410 may move us to another common date.
+# Never substitute a different date for offline/refresh, checksum failures,
+# transient network errors, or a dry-run. Every retry excludes failed dates.
+preflight_map_sources() {
+  if (( DRY_RUN )) || [[ "$SOURCE_POLICY_INPUT" != "cache-first" ]]; then
+    return 0
+  fi
+  SKIP_SNAPSHOT_DATES=""
+  while :; do
+    preflight_snapshot="$SNAPSHOT_DATE"
+    [[ "$SNAPSHOT_MODE" == "pinned" ]] && preflight_snapshot="pinned"
+    log "Verify cached map sources or download $SNAPSHOT_DATE before activating paths"
+    if MAP_REGION_IDS="$REGION_IDS" MAP_REGION="$DATASET" \
+        MAP_SNAPSHOT="$preflight_snapshot" MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE" \
+        MAP_SOURCE_POLICY="$SOURCE_POLICY_INPUT" MAP_LIBRARY_DIR="$MAP_LIBRARY_DIR" \
+        ./map-server/scripts/prepare-regions-pbf.sh --sources-only; then
+      break
+    else
+      preflight_status=$?
+    fi
+    [[ "$preflight_status" == 42 ]] || fail "source preflight failed; keeping requested snapshot (no automatic fallback for network/checksum errors)"
+    if [[ -n "$SKIP_SNAPSHOT_DATES" ]]; then
+      SKIP_SNAPSHOT_DATES+=",$SNAPSHOT_DATE"
+    else
+      SKIP_SNAPSHOT_DATES="$SNAPSHOT_DATE"
+    fi
+    note "WARNING: snapshot $SNAPSHOT_DATE returned HTTP 404/410; trying the newest common dated snapshot instead."
+    note "A proxy can also return 404; subsequent downloads still require official MD5 verification."
+    SNAPSHOT_INPUT="latest"
+    SNAPSHOT_SOURCE="automatic fallback after $SKIP_SNAPSHOT_DATES unavailable"
+    resolve_selection "$SELECTION_INPUT"
+    MAP_SNAPSHOT_DATE="$SNAPSHOT_DATE"
+    print_selection_summary
+  done
+}
+preflight_map_sources
 
 if [[ "${MAP_REGION:-}" != "" && "${MAP_REGION:-}" != "$DATASET" ]]; then
   note "MAP_REGION was '${MAP_REGION}'; the dataset slug is now standardized to '${DATASET}'"

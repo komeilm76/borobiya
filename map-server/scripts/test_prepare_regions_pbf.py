@@ -35,8 +35,8 @@ class GeofabrikErrorTests(unittest.TestCase):
                       'https://download.geofabrik.de/asia/iran-261018.osm.pbf '
                       '"$FAKE_OUTPUT" iran\n')
             for status, curl_exit, expected in (
-                ("404", "22", "--snapshot latest --policy cache-first"),
-                ("410", "22", "dated snapshot may have expired"),
+                ("404", "22", "Geofabrik HTTP 404"),
+                ("410", "22", "Geofabrik HTTP 410"),
                 ("403", "22", "HTTP 403"),
                 ("000", "7", "HTTPS proxy/no_proxy"),
                 ("200", "0", ""),
@@ -48,7 +48,7 @@ class GeofabrikErrorTests(unittest.TestCase):
                                                  "https_proxy": "http://token:private@proxy:2080",
                                                  "FAKE_STATUS": status, "FAKE_EXIT": curl_exit,
                                                  "FAKE_OUTPUT": str(output)}, check=False)
-                    self.assertEqual(result.returncode, 0 if curl_exit == "0" else 1)
+                    self.assertEqual(result.returncode, 0 if curl_exit == "0" else 42 if status in ("404", "410") else 1)
                     self.assertIn(expected, result.stderr)
                     self.assertNotIn("token:private", result.stdout + result.stderr)
                     self.assertFalse(output.exists())  # The fake curl never writes to disk.
@@ -162,8 +162,8 @@ class ManifestRetryTests(unittest.TestCase):
             self.assertTrue(target.is_symlink())
             self.assertEqual(candidate.read_bytes(), b"new merge")
 
-    def test_full_offline_retry_heals_matching_orphan_without_redownload(self):
-        """Exercise the shipped shell entry point against a synthetic cached source."""
+    def test_full_retry_reuses_cache_and_fetches_missing_sources_safely(self):
+        """Exercise the shipped shell against a cached source and fake HTTP responses."""
         catalog = copy.deepcopy(regions.load_catalog())
         snapshot_date = regions.parse_snapshot_date("2026-10-26")
         with tempfile.TemporaryDirectory() as directory:
@@ -236,3 +236,65 @@ class ManifestRetryTests(unittest.TestCase):
             self.assertIn("differs from the verified re-merge", result.stderr)
             self.assertEqual(paths["pbf"].read_bytes(), b"unknown pre-existing data")
             self.assertFalse(paths["manifest"].exists())
+
+            # A missing source and its sidecar must be fetched before a build;
+            # only HTTP 404/410 signals the orchestrator to try another date.
+            source.unlink()
+            (source.parent / "source.json").unlink()
+            source.with_name(source.name + ".md5").unlink()
+            remote_source = root / "remote-source"
+            remote_md5 = root / "remote-md5"
+            remote_source.write_bytes(source_bytes)
+            remote_md5.write_text(f"{hashlib.md5(source_bytes).hexdigest()} {source.name}\n")
+            curl.write_text(
+                "#!/bin/bash\n"
+                "destination=''\nurl=''\n"
+                "while (( $# )); do\n"
+                "  case \"$1\" in -o) destination=$2; shift 2 ;; *) url=$1; shift ;; esac\n"
+                "done\n"
+                "if [[ \"$FAKE_HTTP\" != 200 && "
+                "( \"$FAKE_HTTP\" != PBF404 || \"$url\" == *.osm.pbf ) ]]; then "
+                "printf '404'; exit 22; fi\n"
+                "if [[ \"$url\" == *.md5 ]]; then cp \"$FAKE_MD5\" \"$destination\"; "
+                "else cp \"$FAKE_SOURCE\" \"$destination\"; fi\n"
+                "printf '200'\n", encoding="utf-8",
+            )
+            curl.chmod(0o755)
+            online = {**env, "FAKE_SOURCE": str(remote_source), "FAKE_MD5": str(remote_md5)}
+            missing = subprocess.run(["bash", str(script), "--sources-only"],
+                                     env={**online, "FAKE_HTTP": "404"},
+                                     capture_output=True, text=True, check=False)
+            self.assertEqual(missing.returncode, 42, missing.stderr)
+            self.assertFalse(source.exists())
+            self.assertEqual(paths["pbf"].read_bytes(), b"unknown pre-existing data")
+            sidecar = source.with_name(source.name + ".md5")
+            pbf_unavailable = subprocess.run(["bash", str(script), "--sources-only"],
+                                             env={**online, "FAKE_HTTP": "PBF404"},
+                                             capture_output=True, text=True, check=False)
+            self.assertEqual(pbf_unavailable.returncode, 42, pbf_unavailable.stderr)
+            self.assertFalse(sidecar.exists())  # do not persist unverified provenance
+            fetched = subprocess.run(["bash", str(script), "--sources-only"],
+                                     env={**online, "FAKE_HTTP": "200"},
+                                     capture_output=True, text=True, check=False)
+            self.assertEqual(fetched.returncode, 0, fetched.stderr)
+            self.assertIn("Downloading Geofabrik", fetched.stdout)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            self.assertEqual(paths["pbf"].read_bytes(), b"unknown pre-existing data")
+            source.unlink()
+            missing_pbf = subprocess.run(["bash", str(script), "--sources-only"],
+                                         env={**online, "FAKE_HTTP": "PBF404"},
+                                         capture_output=True, text=True, check=False)
+            self.assertEqual(missing_pbf.returncode, 42, missing_pbf.stderr)
+            self.assertFalse(source.exists())
+            self.assertEqual(paths["pbf"].read_bytes(), b"unknown pre-existing data")
+            sidecar.unlink()
+            (source.parent / "source.json").unlink()
+            remote_md5.write_text(f"{'f' * 32} {source.name}\n")
+            mismatched = subprocess.run(["bash", str(script), "--sources-only"],
+                                        env={**online, "FAKE_HTTP": "200"},
+                                        capture_output=True, text=True, check=False)
+            self.assertNotEqual(mismatched.returncode, 42)
+            self.assertNotEqual(mismatched.returncode, 0)
+            self.assertIn("MD5 mismatch", mismatched.stderr)
+            self.assertFalse(source.exists())
+            self.assertFalse(sidecar.exists())

@@ -23,7 +23,17 @@
 # Re-running is safe: a version-3 dataset that already verifies for the
 # requested selection/snapshot is left untouched, verified crops are reused,
 # and changing the selection/date builds the corresponding library dataset.
+# --sources-only is the VM setup preflight: verify/download sources without
+# cropping/merging, before setup persists a resolved snapshot in .env.
 set -euo pipefail
+
+SOURCES_ONLY=0
+case "${1:-}" in
+  --sources-only) SOURCES_ONLY=1; shift ;;
+  '') ;;
+  *) printf 'prepare-regions-pbf: unknown option: %s\n' "$1" >&2; exit 2 ;;
+esac
+(( $# == 0 )) || { printf 'prepare-regions-pbf: unexpected arguments\n' >&2; exit 2; }
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
@@ -97,13 +107,15 @@ download_geofabrik_file() {
   local url="$1" destination="$2" source_id="$3" status=""
   # curl's -f returns 22 for both a missing dated extract and a proxy-generated
   # HTTP error. Capture only the final HTTP code (not headers, bodies or proxy
-  # credentials); never silently switch snapshots or skip checksum verification.
+  # credentials). Exit 42 only for dated-file 404/410, so setup can try a
+  # different date without treating proxy outages or bad checksums as expiry.
   if status="$(curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 \
       -w '%{http_code}' "$url" -o "$destination")"; then
     return 0
   fi
   if [[ "$status" == 404 || "$status" == 410 ]]; then
-    fail "Geofabrik HTTP $status for $source_id ($url). This dated snapshot may have expired, or the proxy may have returned $status. Check the exact URL and a current extract in this same shell. If the pin is gone, run: python3 scripts/vm-map.py --snapshot latest --policy cache-first; then python3 scripts/vm.py launch. No replacement snapshot was selected automatically."
+    printf 'prepare-regions-pbf: Geofabrik HTTP %s for %s (%s). This date may have expired, or a proxy may have returned %s; the VM setup command can try another dated snapshot.\n' "$status" "$source_id" "$url" "$status" >&2
+    exit 42
   fi
   fail "Geofabrik download failed for $source_id (HTTP ${status:-unknown}); check this shell's HTTPS proxy/no_proxy and test the exact source URL before retrying"
 }
@@ -205,6 +217,38 @@ else
   printf 'Selected areas: %s (union bbox %s, ~%s MB of source downloads)\n' \
     "$MAP_REGION_IDS" "$UNION_BBOX" "$APPROX_DOWNLOAD_MB"
 fi
+pending_sidecars=()
+cleanup_pending_sidecars() {
+  if (( ${#pending_sidecars[@]} )); then
+    rm -f -- "${pending_sidecars[@]}"
+  fi
+}
+
+# The source resolver needs an official MD5 before it can produce rows for an
+# uncached date. In preflight, fetch missing sidecars first so HTTP 404/410 can
+# be distinguished from network errors (and trigger a bounded date fallback).
+# Offline mode and the normal build never perform this extra probe.
+if (( SOURCES_ONLY )) && [[ "$MAP_SOURCE_POLICY" == "cache-first" ]]; then
+  offline_rows="$(python3 "$SCRIPT_DIR/regions.py" sources "$MAP_REGION_IDS" \
+    --snapshot "$MAP_SNAPSHOT_DATE" --source-policy offline --library "$MAP_LIBRARY_DIR")"
+  while IFS=$'\t' read -r pre_id pre_url pre_name pre_md5 _rest1 _rest2 _rest3 _rest4 _rest5 pre_path _rest6; do
+    if [[ "$pre_md5" == '-' ]]; then
+      pre_dir="$(dirname -- "$pre_path")"
+      mkdir -p "$pre_dir"
+      pre_tmp_dir="$(mktemp -d "$pre_dir/.borobiya-sidecar.XXXXXX")"
+      trap 'rm -rf -- "${pre_tmp_dir:-}"; cleanup_pending_sidecars' EXIT
+      download_geofabrik_file "${pre_url}.md5" "$pre_tmp_dir/$pre_name.md5" "$pre_id"
+      pre_checksum="$(awk '{print tolower($1); exit}' "$pre_tmp_dir/$pre_name.md5")"
+      pre_filename="$(awk '{print $2; exit}' "$pre_tmp_dir/$pre_name.md5")"
+      [[ "$pre_checksum" =~ ^[a-f0-9]{32}$ && "${pre_filename#\*}" == "$pre_name" ]] ||
+        fail "invalid official MD5 sidecar for $pre_id; refusing to cache it"
+      mv -- "$pre_tmp_dir/$pre_name.md5" "$pre_path.md5"
+      pending_sidecars+=("$pre_path.md5")
+      rmdir -- "$pre_tmp_dir"
+      trap cleanup_pending_sidecars EXIT
+    fi
+  done <<< "$offline_rows"
+fi
 if ! sources_output="$(python3 "$SCRIPT_DIR/regions.py" sources "$MAP_REGION_IDS" \
     --snapshot "$MAP_SNAPSHOT_DATE" --source-policy "$MAP_SOURCE_POLICY" \
     --library "$MAP_LIBRARY_DIR")"; then
@@ -259,7 +303,7 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     source_tmp_dir="$(mktemp -d "$source_dir/.borobiya-source.XXXXXX")"
     source_tmp="$source_tmp_dir/$source_file_name"
     sidecar_tmp=""
-    trap 'rm -rf -- "${source_tmp_dir:-}"' EXIT
+    trap 'rm -rf -- "${source_tmp_dir:-}"; cleanup_pending_sidecars' EXIT
     if [[ "$MAP_SNAPSHOT_MODE" != "pinned" ]]; then
       sidecar_tmp="$source_tmp_dir/$source_file_name.md5"
       download_geofabrik_file "${source_url}.md5" "$sidecar_tmp" "$source_id"
@@ -278,7 +322,7 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
       mv -- "$sidecar_tmp" "$source_sidecar"
     fi
     rmdir -- "$source_tmp_dir"
-    trap - EXIT
+    trap cleanup_pending_sidecars EXIT
   fi
 
   [[ -n "$source_md5" ]] || \
@@ -312,6 +356,16 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
   source_path_by_id["$source_id"]="$source_pbf"
   source_sha_by_id["$source_id"]="$source_sha"
 done <<< "$sources_output"
+
+# All sources passed their MD5/size checks. Keep newly verified sidecars; on
+# any earlier failure the EXIT trap removed only those staged in this run.
+pending_sidecars=()
+trap - EXIT
+if (( SOURCES_ONLY )); then
+  printf 'Verified source extracts for %s (snapshot %s); no crops or dataset were built.\n' \
+    "$MAP_REGION_IDS" "$MAP_SNAPSHOT_DATE"
+  exit 0
+fi
 
 # ---- 2. Per-area crops (whole countries merge straight from the source) ----
 merge_inputs=()

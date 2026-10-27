@@ -397,6 +397,26 @@ class SnapshotAndLibraryPathTests(unittest.TestCase):
         self.assertEqual(mode, "latest")
         self.assertEqual(resolved_date, date(2026, 10, 18))
 
+    def test_latest_snapshot_skips_dates_with_unavailable_extracts(self) -> None:
+        seen: list[str] = []
+
+        def fake_fetch(url: str) -> str | None:
+            seen.append(url)
+            filename = url.removesuffix(".md5").rsplit("/", 1)[-1]
+            return f"{'a' * 32} {filename}"
+
+        mode, chosen = regions.snapshot_date_for_spec(
+            CATALOG, "latest", ["iran", "hessen"], policy="cache-first",
+            today=date(2026, 10, 27), fetcher=fake_fetch,
+            skip_dates=frozenset({date(2026, 10, 27), date(2026, 10, 26)}),
+        )
+        self.assertEqual((mode, chosen), ("latest", date(2026, 10, 25)))
+        self.assertTrue(all("-261027" not in url and "-261026" not in url for url in seen))
+        with self.assertRaises(SystemExit):
+            regions.snapshot_date_for_spec(
+                CATALOG, "pinned", ["iran"], skip_dates=frozenset({date(2026, 10, 27)}),
+            )
+
     def test_latest_snapshot_is_rejected_offline(self) -> None:
         with self.assertRaises(SystemExit):
             regions.snapshot_date_for_spec(
