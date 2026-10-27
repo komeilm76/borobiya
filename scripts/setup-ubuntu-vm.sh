@@ -1339,9 +1339,11 @@ check_nominatim_database_auth() {
   # a wrong password and the Photon import — which reaches this server from outside the container, where
   # a password really is required — would fail an hour later, after the long one.
   local result=""
-  if result="$(docker compose --profile geocoding-import exec -T \
-      -e "PGPASSWORD=${NOMINATIM_PASSWORD}" nominatim \
-      psql -h nominatim -U nominatim -d nominatim -tAc 'SELECT 1' 2>&1)"; then
+  # `docker compose exec -e PGPASSWORD=value` puts the secret in the host's process argv.
+  # Pass it on stdin and export only inside the container, like the application DB probe.
+  if result="$(printf '%s\n' "$NOMINATIM_PASSWORD" | \
+      docker compose --profile geocoding-import exec -T nominatim sh -ec \
+      'IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -h nominatim -U nominatim -d nominatim -tAc "SELECT 1"' 2>&1)"; then
     [[ "${result//[[:space:]]/}" == "1" ]] || \
       fail "Nominatim database auth probe returned an unexpected result: ${result:-<empty>}"
     note "Nominatim database authentication verified for the Photon import"

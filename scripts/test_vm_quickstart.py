@@ -160,6 +160,19 @@ class RunbookSafetyTests(unittest.TestCase):
         self.assertNotIn("./scripts/clear-map-cache.sh --yes", runbook)
         self.assertNotIn('rm -rf -- "$MAP_OSRM_DATA_DIR"', runbook)
 
+    def test_guides_describe_doctor_as_an_auth_probe_not_a_migration_check(self):
+        docs = vm.ROOT / "docs"
+        quick = (docs / "UBUNTU_VM_QUICKSTART.md").read_text()
+        diagnostic = (docs / "UBUNTU_VM_DIAGNOSTICS.md").read_text()
+        runbook = (docs / "UBUNTU_VM_RUNBOOK.md").read_text()
+        self.assertIn("SELECT 1", quick)
+        self.assertIn("SELECT 1", diagnostic)
+        self.assertIn("SELECT 1", runbook)
+        self.assertIn("does **not** prove migrations", quick)
+        self.assertIn("does not verify migrations", diagnostic)
+        self.assertIn("-password", runbook)
+        self.assertIn("host Java process arguments", runbook)
+
 
 class InstallerTests(unittest.TestCase):
     def test_runbook_docker_source_uses_codename_value_not_assignment(self):

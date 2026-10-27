@@ -22,6 +22,7 @@ that "the password never travels as an argument" is a checked claim, not a comme
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -74,6 +75,43 @@ FUNCTIONS = (
     "set_database_passwords",
     "check_database_credentials",
 )
+
+
+class NominatimProbeSafetyTests(unittest.TestCase):
+    def test_auth_probe_keeps_password_out_of_docker_argv(self) -> None:
+        # The check runs before a potentially hours-long import. Exercise the shipped function,
+        # not an invented command, with a fake Docker process recording argv and stdin.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            docker = root / "docker"
+            docker.write_text('''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+args = sys.argv[1:]
+body = sys.stdin.read()
+Path(os.environ["STUB_CAPTURE"]).write_text(json.dumps({"argv": args, "stdin": body}))
+if os.environ["NOMINATIM_PASSWORD"] in " ".join(args):
+    raise SystemExit(9)
+if body.strip() == os.environ["NOMINATIM_PASSWORD"] and "-h nominatim" in " ".join(args):
+    print("1")
+else:
+    raise SystemExit(9)
+''', encoding="utf-8")
+            docker.chmod(0o755)
+            capture = root / "capture.json"
+            probe = extract_function("check_nominatim_database_auth")
+            script = ('set -euo pipefail\nfail() { echo "$*" >&2; exit 1; }\n'
+                      'note() { :; }\n' + probe + '\ncheck_nominatim_database_auth\n')
+            secret = "Secret-Nominatim-123"
+            result = subprocess.run(["bash", "-c", script], input="", text=True,
+                                    capture_output=True, check=False, env={**os.environ,
+                                    "PATH": str(root) + ":" + os.environ["PATH"],
+                                    "NOMINATIM_PASSWORD": secret, "STUB_CAPTURE": str(capture)})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = json.loads(capture.read_text(encoding="utf-8"))
+            self.assertNotIn(secret, " ".join(calls["argv"]))
+            self.assertEqual(calls["stdin"].strip(), secret)
+            self.assertNotIn(secret, result.stdout + result.stderr)
 
 
 class SetupOutputSafetyTests(unittest.TestCase):

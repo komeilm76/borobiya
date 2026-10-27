@@ -94,7 +94,7 @@ cd ~/borobiya
 python3 scripts/vm-env.py                 # first run: interactive mode and admin password
 python3 scripts/vm-map.py                 # first run: choose areas and library path
 python3 scripts/vm.py launch              # build/resume; this may take hours
-python3 scripts/vm.py doctor              # read-only local checks; not browser sign-off
+python3 scripts/vm.py doctor              # read-only checks including app DB auth (SELECT 1); not migration/browser sign-off
 ```
 
 `vm.py launch` delegates the map build to `setup-ubuntu-vm.sh`. The latter's flags below are for
@@ -1358,7 +1358,12 @@ mkdir -p "$MAP_PHOTON_DATA_DIR"
 sha256sum "$MAP_PBF" | awk '{print $1}' > "$MAP_PHOTON_DATA_DIR/.borobiya-pbf.sha256"
 ```
 
-The password guard is not decoration: Photon reads the *persistent* Nominatim database, and a
+Photon 1.3.0 takes this database password via its `-password` option, so the import exposes
+it in the host Java process arguments while it runs. Run imports only on a trusted VM; restrict
+process inspection and do not paste `ps`/process listings or shell traces into reports. The
+setup script's Nominatim `psql` authentication probe, unlike this Photon CLI, passes its
+password on stdin rather than in Docker command arguments. The password guard is not
+decoration: Photon reads the *persistent* Nominatim database, and a
 `.env` that drifted from the password stored in that volume fails with
 `FATAL: password authentication failed for user "nominatim"` (§ 9.2). The final `sha256sum` line is
 what makes later runs skip a re-import for the same dataset — the setup script compares the same

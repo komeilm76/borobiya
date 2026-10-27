@@ -2,7 +2,7 @@
 
 **Ubuntu 24.04; run from the repository root as a normal login user (not `sudo`).** This is the supported first-run and day-two path. [Diagnostics](./UBUNTU_VM_DIAGNOSTICS.md) starts with the first failing check; the [full runbook](./UBUNTU_VM_RUNBOOK.md) is a manual map-pipeline and recovery reference, not a second credential-setup recipe. First map build can take **hours**, needs Internet and ample disk/RAM; it is not a one-minute installation. Keep an SSH session alive with `tmux`.
 
-**Safety defaults:** Do not run `docker compose down -v`, delete volume names by guess, hand-regenerate `.env` passwords, or share `.env`/rendered Compose config. Existing DB and SOS photos are not map caches. `vm.py doctor` checks local HTTP and configuration; a green result does **not** prove database operations, HTTPS from outside the VM, or browser/GPS functionality.
+**Safety defaults:** Do not run `docker compose down -v`, delete volume names by guess, hand-regenerate `.env` passwords, or share `.env`/rendered Compose config. Existing DB and SOS photos are not map caches. `vm.py doctor` checks configuration, local HTTP, and application Postgres authentication with a read-only `SELECT 1` over the Compose network. A green result does **not** prove migrations, application data operations, HTTPS from outside the VM, or browser/GPS functionality.
 
 ## Before you launch: what you must provide
 
@@ -24,7 +24,7 @@ python3 scripts/vm-map.py               # choose countries/cities, snapshot and 
 # If you enabled the optional proxy in THIS terminal, first run: source ~/.bashrc
 # Or open a new SSH terminal; see the Proxy section below before any large download.
 python3 scripts/vm.py launch            # resume/build maps + images, migrate/seed DB, verify, build web UI, start Compose
-python3 scripts/vm.py doctor            # read-only status/HTTP checks
+python3 scripts/vm.py doctor            # read-only status/HTTP + app DB authentication probe
 ```
 
 Open **`http://localhost:8080/`** (or your `NGINX_PORT`) on the VM. From a workstation, forward it with `ssh -N -L 8080:127.0.0.1:8080 USER@VM`. The VM-specific Compose override mounts the compiled SPA into Nginx: `/`, `/api`, `/map` and sockets share one origin. The base `docker-compose.yml` remains the gateway-only development stack. For HMR, after launch use `bun --filter @borobiya/client dev` in another terminal and forward port 5173; do **not** run `bun run dev` alongside the already-running Compose API on port 3000.
