@@ -1,13 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, registerAccessTokenRefresher, requestJson } from "./http";
+import { ApiError, apiBasePath, registerAccessTokenRefresher, requestJson } from "./http";
+import { sameOriginPrefix } from "./same-origin-prefix";
 
 afterEach(() => {
   registerAccessTokenRefresher(null);
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
 describe("same-origin API client", () => {
+  it("never resolves a configured API prefix to a foreign origin with a bearer token", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    for (const prefix of ["//foreign.example", "/\\foreign.example", "/\n/foreign.example",
+      "/api?redirect=//foreign.example", "https://foreign.example/api"]) {
+      vi.stubEnv("VITE_API_URL", prefix);
+      expect(apiBasePath()).toBe("/api");
+      expect(sameOriginPrefix(prefix, "/map")).toBe("/map"); // Vite's map proxy shares the rule
+      await requestJson("/_user/profile", { accessToken: "private-access-token" });
+      const [url, init] = fetchMock.mock.lastCall as unknown as [string, RequestInit];
+      expect(url).toBe("/api/_user/profile");
+      expect(new URL(url, "https://app.example").origin).toBe("https://app.example");
+      expect(new Headers(init.headers).get("authorization")).toBe("Bearer private-access-token");
+    }
+    vi.stubEnv("VITE_API_URL", "/gateway/api/");
+    expect(apiBasePath()).toBe("/gateway/api");
+  });
+
   it("uses the configured same-origin API path, credentials, JSON body, and bearer token", async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true }), {
       status: 200,

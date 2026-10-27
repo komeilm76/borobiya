@@ -73,8 +73,8 @@
 | `MAP_GEOCODE_URL` | Host-side geocoding verification script URL; browser uses same-origin `/geocode`. |
 | `MAP_REVERSE_URL` | Host-side reverse-geocoding verification script URL; browser uses same-origin `/reverse`. |
 | `API_PROXY_TARGET` | Vite **server-side** target for host/Compose API. Do not point browser code at it. |
-| `VITE_API_URL` | Browser-visible **same-origin relative path prefix** for API requests (`/api`); never set to localhost/third-party URL. |
-| `VITE_MAP_URL` | Browser-visible **same-origin relative path prefix** for map resources (`/map`); never set to localhost/third-party URL. |
+| `VITE_API_URL` | Browser-visible **same-origin root-relative path prefix** for API requests (e.g. `/api`, `/gateway/api`). Only a single leading slash and URL path characters are accepted; malformed values (including `//host` and `/\\host`) fall back to `/api` in both the browser and Vite proxy, rather than sending bearer tokens to another origin. Never set to localhost/third-party URL. |
+| `VITE_MAP_URL` | Browser-visible **same-origin root-relative path prefix** for map resources (`/map`); invalid prefixes fall back to `/map` in Vite. Never set to localhost/third-party URL. |
 
 **Intentional non-template values:** `OPENAPI_SERVER_PATH` defaults to `/` on a host API and `/api` in Compose; set only when the public gateway prefix changes. `ADMIN_SEED_PASSWORD` is the plaintext value passed **only to the seed process**; the VM helper derives it from `ADMIN_SEED_PASSWORD_B64`. `ELEVATION_DIR`, the three `OSRM_*_URL`s and `PHOTON_*_URL`s are container-internal upstream settings supplied by Compose, not browser or host `.env` credentials. `SETUP_*`, `MAP_REQUIRE_ELEVATION`, download/proxy diagnostics and cache-maintenance flags are command-specific overrides described next to their respective commands, not permanent app configuration. The proposed SOS auto-expiry and mission-timeout variables are not implemented; adding them to `.env` would not start those jobs.
 

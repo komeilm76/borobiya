@@ -6,16 +6,12 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadEnv, type Plugin } from "vite";
 import { parseMapConfig } from "../../map-server/routing-gateway/map-config.mjs";
+import { sameOriginPrefix } from "./src/api/same-origin-prefix";
 import { defineConfig } from "vitest/config";
 import vuetify from "vite-plugin-vuetify";
 
 const packageRoot = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(packageRoot, "../..");
-
-function proxyPrefix(value: string | undefined, fallback: string): string {
-  const normalized = value?.trim().replace(/\/+$/, "");
-  return normalized?.startsWith("/") && normalized !== "/" ? normalized : fallback;
-}
 
 function stripPrefix(prefix: string) {
   return (requestPath: string) => requestPath.slice(prefix.length) || "/";
@@ -50,8 +46,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repositoryRoot, "");
   // Validate the same public MAP_* settings that the routing gateway exposes at /map-config.
   const mapConfig = parseMapConfig(env);
-  const apiPrefix = proxyPrefix(env.VITE_API_URL, "/api");
-  const mapPrefix = proxyPrefix(env.VITE_MAP_URL, "/map");
+  const apiPrefix = sameOriginPrefix(env.VITE_API_URL, "/api");
+  const mapPrefix = sameOriginPrefix(env.VITE_MAP_URL, "/map");
   const mapServerTarget = env.MAP_SERVER_URL || "http://127.0.0.1:8000";
   const routingTarget = new URL(env.MAP_ROUTING_URL || "http://127.0.0.1:8001/route").origin;
   // Opt-in dev HTTPS, selected by scripts/dev-lan.sh. Keys live outside Git;

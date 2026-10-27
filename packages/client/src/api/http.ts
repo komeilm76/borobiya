@@ -1,4 +1,5 @@
 import { apiRoutes } from "@shared/api";
+import { sameOriginPrefix } from "./same-origin-prefix";
 
 export interface JsonRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -37,14 +38,9 @@ export async function refreshAccessTokenAfterUnauthorized(failedToken: string): 
   }
 }
 
-/**
- * Same-origin prefix the browser uses for API traffic. A relative `VITE_API_URL` becomes the
- * proxy prefix (nginx and Vite both strip it before the API sees the request); an absolute URL
- * means the client talks to the API directly and no prefix is prepended.
- */
+/** Same-origin API proxy path; never allow configuration to select a foreign browser origin. */
 export function apiBasePath(): string {
-  const configured = import.meta.env.VITE_API_URL?.trim().replace(/\/+$/, "");
-  return configured?.startsWith("/") && configured !== "/" ? configured : "/api";
+  return sameOriginPrefix(import.meta.env.VITE_API_URL, "/api");
 }
 
 export class ApiError extends Error {
