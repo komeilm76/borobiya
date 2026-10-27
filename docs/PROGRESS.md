@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-27 — T4.4.4 concurrent map startup (partial)
+
+- MapCanvas used the bounded 200ms cache-worker head start *before* importing the roughly 1 MB MapLibre chunk. Starting the lazy MapLibre import concurrently with worker registration removes that serialized network-start delay without skipping the bounded cache opportunity; both operations settle before map construction, and unmount/error guards remain. Deferred tests prove an import starts while registration is blocked, a slow import is awaited, and import failures propagate. This is a code-level critical-path improvement, not a measured <2s rendered map, <500ms location acquisition or VM/browser acceptance. T4.4.4 remains open.
+
 ### 2026-10-27 — T4.4.3 active-device small-text contrast (partial)
 
 - Audited five small light-theme labels on the active-device page and its white cards. The former `#718584` measured only 3.61:1 on the light page and 3.90:1 on the cards. Reusing `#536d6c` gives 5.17:1 and 5.57:1 respectively; existing dark-mode overrides remain untouched and test above 4.5:1 against the dark surfaces. A new source-pinned contrast regression checks these labels, without mounting Vue components. Other screens, keyboard and screen-reader behavior, and actual browser/device WCAG AA acceptance remain open; T4.4.3 is not signed off.

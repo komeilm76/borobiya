@@ -21,6 +21,19 @@ export async function waitForMapCacheStartup(register: () => Promise<void>): Pro
   }
 }
 
+/**
+ * Download the lazy MapLibre module while the worker gets its bounded cache head start. Waiting for
+ * one and only then importing the other serializes two independent startup costs. Promise.all attaches
+ * rejection handlers to both immediately, so an early import failure cannot become unhandled.
+ */
+export async function prepareMapRuntime<T>(register: () => Promise<void>, load: () => Promise<T>): Promise<T> {
+  const [, maplibre] = await Promise.all([
+    waitForMapCacheStartup(register),
+    Promise.resolve().then(load)
+  ]);
+  return maplibre;
+}
+
 /** Register and activate the map-only cache worker when possible. */
 export function registerMapCacheWorker(): Promise<void> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {

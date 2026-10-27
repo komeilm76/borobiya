@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { waitForMapCacheStartup, MAP_CACHE_STARTUP_BUDGET_MS } from "./map-cache";
+import { prepareMapRuntime, waitForMapCacheStartup, MAP_CACHE_STARTUP_BUDGET_MS } from "./map-cache";
 
 // Source-pinned: the repo's Vitest suite deliberately does not mount Vue SFCs.
 const canvas = readFileSync(new URL("../components/map/MapCanvas.vue", import.meta.url), "utf8");
@@ -46,10 +46,43 @@ describe("map startup cache budget", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("uses the budget in MapCanvas rather than awaiting the full worker lifecycle", () => {
-    expect(canvas).toContain("waitForMapCacheStartup(registerMapCacheWorker).then(() => {");
-    expect(canvas).toContain("return initializeMap(controller);");
-    expect(canvas).not.toContain("registerMapCacheWorker().then(() => {");
+  it("starts the MapLibre download while the cache worker gets its bounded head start", async () => {
+    vi.useFakeTimers();
+    const load = vi.fn(async () => ({ library: "maplibre" }));
+    const pending = prepareMapRuntime(() => new Promise<void>(() => undefined), load);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(load).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(MAP_CACHE_STARTUP_BUDGET_MS - 1);
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toEqual({ library: "maplibre" });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("waits for a slow library import after a fast worker, without starting a map early", async () => {
+    let release!: (value: number) => void;
+    const slowImport = new Promise<number>((resolve) => { release = resolve; });
+    let done = false;
+    const pending = prepareMapRuntime(() => Promise.resolve(), () => slowImport).then((value) => { done = true; return value; });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(done).toBe(false);
+    release(42);
+    await expect(pending).resolves.toBe(42);
+  });
+
+  it("reports an import failure rather than swallowing it as a cache registration error", async () => {
+    await expect(prepareMapRuntime(() => Promise.resolve(), async () => {
+      throw new Error("map chunk failed");
+    })).rejects.toThrow("map chunk failed");
+  });
+
+  it("starts both operations only when MapCanvas mounts and rejects stale unmounted instances", () => {
+    expect(canvas).toContain('prepareMapRuntime(registerMapCacheWorker, () => import("maplibre-gl"))');
+    expect(canvas).toContain("return initializeMap(controller, maplibre);");
+    expect(canvas).not.toContain("waitForMapCacheStartup(registerMapCacheWorker).then(() => {");
     expect(canvas).toContain("if (controller.signal.aborted) return;");
+    expect(canvas).toContain("import type { Map as MapLibreMap } from \"maplibre-gl\";");
   });
 });

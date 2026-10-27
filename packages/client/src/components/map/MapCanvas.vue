@@ -22,7 +22,7 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMapConfig } from "@/api/map-config";
-import { registerMapCacheWorker, waitForMapCacheStartup } from "@/services/map-cache";
+import { prepareMapRuntime, registerMapCacheWorker } from "@/services/map-cache";
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
@@ -135,13 +135,13 @@ function handleServiceWorkerMessage(event: MessageEvent): void {
 
 watch(() => props.styleUrl, updateStyle);
 
-async function initializeMap(controller: AbortController): Promise<void> {
-  const { Map: MapLibre, NavigationControl, ScaleControl, setWorkerUrl } = await import("maplibre-gl");
+function initializeMap(controller: AbortController, maplibre: typeof import("maplibre-gl")): void {
+  if (controller.signal.aborted || !container.value) return;
+  const { Map: MapLibre, NavigationControl, ScaleControl, setWorkerUrl } = maplibre;
   // MapLibre v6 otherwise locates its worker relative to the (pre)bundled
   // chunk URL, where the sibling worker file does not exist ("Worker failed
   // to load"); the Vite config serves the packaged worker at this path instead.
   setWorkerUrl("/maplibre-gl-worker.mjs");
-  if (controller.signal.aborted || !container.value) return;
   const initialStyleUrl = pendingStyleUrl ?? props.styleUrl;
 
   const instance = new MapLibre({
@@ -200,11 +200,11 @@ onMounted(() => {
 
   const controller = new AbortController();
   configRequest = controller;
-  // The initial map may precede first-time SW activation; never make users wait for the full
-  // registration/ready timeout before loading MapLibre. Existing controlled pages keep their cache.
-  void waitForMapCacheStartup(registerMapCacheWorker).then(() => {
+  // Start the lazy MapLibre download at mount time in parallel with the cache worker's 200ms head
+  // start. Neither must make the other wait to *start*, but both settle before map construction.
+  void prepareMapRuntime(registerMapCacheWorker, () => import("maplibre-gl")).then((maplibre) => {
     if (controller.signal.aborted) return;
-    return initializeMap(controller);
+    return initializeMap(controller, maplibre);
   }).catch((error: unknown) => {
     if (controller.signal.aborted) return;
     reportMapError(error);
