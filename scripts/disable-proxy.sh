@@ -25,7 +25,7 @@ key that scripts/enable-proxy.sh wrote. Reports anything it refuses to touch bec
 Options:
   --shell-only        only the ~/.bashrc block and the credential file it sources
   --system-only       only the root-owned files and ~/.docker/config.json
-  --keep-docker-config  leave the build-proxy key in place (you configured your own)
+  --keep-docker-config  leave the Docker client proxy key in place (partial undo)
   --yes               no confirmation, and no prompt before restarting Docker
   --dry-run           print every removal, make none
   --status            report what is configured right now and exit
@@ -105,7 +105,12 @@ fi
 
 if (( DO_DOCKER_CONFIG )); then
   proxy_log "Build containers"
-  proxy_docker_client_strip
+  if [[ -f "$PROXY_DOCKER_BACKUP" ]] || { [[ -f "$PROXY_STATE_FILE" ]] &&
+    [[ "$(proxy_state_get DOCKER_CONFIG_MANAGED)" != 0 ]]; }; then
+    proxy_docker_client_strip
+  else
+    proxy_note "no managed Docker client proxy recorded; leaving the Docker config alone"
+  fi
 else
   proxy_note "build-proxy key left in place"
 fi
@@ -119,7 +124,13 @@ else
 fi
 
 if [[ -f "$PROXY_STATE_FILE" ]]; then
-  if (( DRY_RUN )); then
+  # The state file is the Docker backup's first-enable sentinel. Keep it only when a managed Docker
+  # key was deliberately left behind: otherwise the next enable might back up its own old key, or
+  # mistake a newly added user key for ours. Legacy state without the field used this sentinel for
+  # all Docker enables, so treat it as managed for backwards compatibility.
+  if (( ! DO_DOCKER_CONFIG )) && [[ "$(proxy_state_get DOCKER_CONFIG_MANAGED)" != 0 ]]; then
+    proxy_note "kept $PROXY_STATE_FILE (managed Docker config left in place; run without partial flags for full cleanup)"
+  elif (( DRY_RUN )); then
     proxy_note "would remove $PROXY_STATE_FILE"
   else
     rm -f "$PROXY_STATE_FILE"

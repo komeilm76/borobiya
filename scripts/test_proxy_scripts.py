@@ -410,6 +410,87 @@ class TestOtherPeoplesConfigSurvives(ScriptCase):
         self.disable()
         self.assertNotIn("proxies", self.docker_config.read_text())
 
+    def test_partial_disable_keeps_state_so_reenable_cannot_backup_its_own_proxy(self) -> None:
+        """The state file is the first-enable sentinel; partial undo must not discard it."""
+        for flag in ("--shell-only", "--keep-docker-config"):
+            with self.subTest(flag=flag):
+                enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+                self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+                partial = self.disable(flag)
+                self.assertEqual(partial.returncode, 0, partial.stdout + partial.stderr)
+                self.assertTrue(self.state_file.exists(), "partial disable must preserve the sentinel")
+                reenabling = self.enable("10.0.2.5:9999", "--skip-checks")
+                self.assertEqual(reenabling.returncode, 0, reenabling.stdout + reenabling.stderr)
+                self.assertFalse((self.state_file.parent / "proxy.docker-config.bak").exists())
+                removed = self.disable()
+                self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+                self.assertNotIn("proxies", json.loads(self.docker_config.read_text()))
+                self.assertFalse(self.state_file.exists(), "full disable should remove the sentinel")
+
+    def test_skipped_docker_does_not_claim_a_later_user_proxy(self) -> None:
+        """A shell-only setup cannot use its state file as evidence of Docker key ownership."""
+        for partial in (None, "--shell-only", "--keep-docker-config"):
+            with self.subTest(partial=partial):
+                enabled = self.enable("10.0.2.5:3128", "--skip-checks", "--no-docker-config")
+                self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+                self.assertIn("DOCKER_CONFIG_MANAGED=0", self.state_file.read_text())
+                if partial:
+                    undone = self.disable(partial)
+                    self.assertEqual(undone.returncode, 0, undone.stdout + undone.stderr)
+                    self.assertFalse(self.state_file.exists())
+                self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+                foreign = {"proxies": {"default": {"httpProxy": "http://admin:3128"}}}
+                self.docker_config.write_text(json.dumps(foreign) + "\n")
+                reenabling = self.enable("10.0.2.5:9999", "--skip-checks")
+                self.assertEqual(reenabling.returncode, 0, reenabling.stdout + reenabling.stderr)
+                self.assertTrue((self.state_file.parent / "proxy.docker-config.bak").exists())
+                removed = self.disable()
+                self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+                self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+
+    def test_disable_without_managed_docker_state_leaves_foreign_proxy_alone(self) -> None:
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        foreign = {"proxies": {"default": {"httpProxy": "http://admin:3128"}}}
+        self.docker_config.write_text(json.dumps(foreign) + "\n")
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks", "--no-docker-config")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        removed = self.disable()
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+        self.assertIn("leaving the Docker config alone", removed.stdout)
+
+    def test_full_disable_after_system_only_preserves_restored_foreign_proxy(self) -> None:
+        """Finishing a partial undo must not strip the user's original Docker proxy again."""
+        self.docker_config.parent.mkdir(parents=True, exist_ok=True)
+        foreign = {"proxies": {"default": {"httpProxy": "http://admin:3128"}}}
+        self.docker_config.write_text(json.dumps(foreign) + "\n")
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        partial = self.disable("--system-only")
+        self.assertEqual(partial.returncode, 0, partial.stdout + partial.stderr)
+        self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+        self.assertFalse(self.state_file.exists())
+        finished = self.disable()
+        self.assertEqual(finished.returncode, 0, finished.stdout + finished.stderr)
+        self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+        self.assertNotIn(BLOCK_BEGIN, self.bashrc.read_text())
+
+    def test_system_only_disable_allows_a_new_foreign_docker_proxy_to_be_backed_up(self) -> None:
+        """Once our Docker key is gone, the next enable must regard a new key as user-owned."""
+        enabled = self.enable("10.0.2.5:3128", "--skip-checks")
+        self.assertEqual(enabled.returncode, 0, enabled.stdout + enabled.stderr)
+        partial = self.disable("--system-only")
+        self.assertEqual(partial.returncode, 0, partial.stdout + partial.stderr)
+        self.assertFalse(self.state_file.exists())
+        foreign = {"proxies": {"default": {"httpProxy": "http://admin:3128"}}}
+        self.docker_config.write_text(json.dumps(foreign) + "\n")
+        reenabling = self.enable("10.0.2.5:9999", "--skip-checks")
+        self.assertEqual(reenabling.returncode, 0, reenabling.stdout + reenabling.stderr)
+        self.assertTrue((self.state_file.parent / "proxy.docker-config.bak").exists())
+        removed = self.disable()
+        self.assertEqual(removed.returncode, 0, removed.stdout + removed.stderr)
+        self.assertEqual(json.loads(self.docker_config.read_text()), foreign)
+
     def test_malformed_docker_config_is_reported_not_rewritten(self) -> None:
         self.docker_config.parent.mkdir(parents=True, exist_ok=True)
         self.docker_config.write_text("{ not json")

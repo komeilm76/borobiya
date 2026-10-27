@@ -292,8 +292,16 @@ else
 fi
 
 # ---------- 6. what disable will need to know ----------
+# Preserve ownership if a re-run skips Docker, but do not claim an existing user proxy on a first
+# --no-docker-config enable. Legacy state without this field denotes the old managed-Docker default.
+docker_config_managed=0
+if (( DO_DOCKER_CONFIG )) || { [[ -f "$PROXY_STATE_FILE" ]] &&
+  [[ "$(proxy_state_get DOCKER_CONFIG_MANAGED)" != 0 ]]; }; then
+  docker_config_managed=1
+fi
 {
   printf 'PROXY_URL=%s\n' "$PROXY_URL"
+  printf 'DOCKER_CONFIG_MANAGED=%s\n' "$docker_config_managed"
   printf 'PROXY_HOST=%s\n' "$PROXY_HOST"
   printf 'PROXY_PORT=%s\n' "$PROXY_PORT"
   printf 'NO_PROXY=%s\n' "$PROXY_NO_PROXY"

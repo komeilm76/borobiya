@@ -426,7 +426,11 @@ proxy_docker_client_apply() { # $1 = proxy url, $2 = no_proxy
   # that: on a re-run the file we would save is our own last output, and treating it as pristine would
   # make disable resurrect our key instead of removing it.
   local first_enable=0
-  [[ -f "$PROXY_STATE_FILE" ]] || first_enable=1
+  # A state file from --no-docker-config does not mean we own the Docker key. An absent field is an
+  # older state file: preserve its previous first-enable behavior for existing installations.
+  if [[ ! -f "$PROXY_STATE_FILE" || "$(proxy_state_get DOCKER_CONFIG_MANAGED)" == 0 ]]; then
+    first_enable=1
+  fi
   PROXY_FIRST_ENABLE="$first_enable" PROXY_DOCKER_BACKUP="$PROXY_DOCKER_BACKUP" \
     PROXY_DOCKER_URL="$1" PROXY_DOCKER_NOPROXY="$2" python3 - "$PROXY_DOCKER_CONFIG" <<'PY'
 import json

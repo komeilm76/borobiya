@@ -1039,7 +1039,16 @@ downloader's own `-Dhttps.proxyHost=… -Dhttps.proxyPort=…` (plus the `http.`
 
 It asks for confirmation only when there is something of ours to remove; on a machine that was never
 enabled it says so and stops, because a proxy file you wrote by hand is listed as left alone rather
-than silently kept. Either way the host-side rule from § 5.1a is still yours to delete.
+than silently kept. `--shell-only` and `--keep-docker-config` retain the private
+`~/.config/borobiya/proxy.state` **if Docker's managed proxy was configured and left in place**. A
+prior enable with `--no-docker-config` does not claim Docker's proxy key. Do not delete this state file by
+hand while Docker's managed proxy is still configured: it prevents a later re-enable from backing
+up its own proxy as though it were your previous Docker config. `--system-only` strips Docker's proxy
+key and clears that state, even though the shell block remains; a subsequent enable can then back up
+a new, user-configured Docker proxy. A later full disable leaves that restored/user-owned proxy
+alone; it removes only a Docker proxy for which managed state or a backup still exists. Run without
+partial flags when you want to remove all remaining *managed* settings. Either way the host-side rule
+from § 5.1a is still yours to delete.
 
 First, find every proxy file that exists, whatever wrote it. This section used `/etc/apt/apt.conf.d/
 95proxy` and `/etc/systemd/system/docker.service.d/proxy.conf` before the scripts existed, and those
