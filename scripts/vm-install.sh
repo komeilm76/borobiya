@@ -1,18 +1,62 @@
 #!/usr/bin/env bash
 # Ubuntu 24.04 prerequisites: report first, install only on explicit --install.
+# Docker group enrollment is separate because it grants root-equivalent access.
 set -euo pipefail
 ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 ACTION=check
+usage='usage: vm-install.sh [--check|--install|--install-compose|--enable-docker-access]'
 case "${1:---check}" in
-  --check) [[ $# -le 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
-  --install) ACTION=install; [[ $# -eq 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
-  --install-compose) ACTION=install-compose; [[ $# -eq 1 ]] || { echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2; } ;;
-  *) echo 'usage: vm-install.sh [--check|--install|--install-compose]' >&2; exit 2 ;;
+  --check) [[ $# -le 1 ]] || { echo "$usage" >&2; exit 2; } ;;
+  --install) ACTION=install; [[ $# -eq 1 ]] || { echo "$usage" >&2; exit 2; } ;;
+  --install-compose) ACTION=install-compose; [[ $# -eq 1 ]] || { echo "$usage" >&2; exit 2; } ;;
+  --enable-docker-access) ACTION=enable-docker-access; [[ $# -eq 1 ]] || { echo "$usage" >&2; exit 2; } ;;
+  *) echo "$usage" >&2; exit 2 ;;
 esac
 
 as_root() { if (( EUID == 0 )); then "$@"; else sudo "$@"; fi; }
 version() { "$@" 2>&1 | head -n 1 || true; }
+
+socket_group_missing() {
+  # Do not guess that every Docker failure is a group issue (daemon may be down,
+  # or DOCKER_HOST may point elsewhere). Only offer enrollment for this socket.
+  [[ -z "${DOCKER_HOST:-}${DOCKER_CONTEXT:-}" && -S /var/run/docker.sock ]] || return 1
+  local gid
+  gid="$(stat -c %g /var/run/docker.sock)" || return 1
+  [[ "$(stat -c %G /var/run/docker.sock)" == docker && " $(id -G) " != *" $gid "* ]]
+}
+
+next_docker_session() {
+  echo "Open a fresh SSH login (and a new tmux session), or run 'newgrp docker' in your terminal."
+  echo 'A child script cannot change the groups of its parent shell. Re-run --check before vm-env.py or launch.'
+}
+
+enable_docker_access() {
+  (( EUID != 0 )) || { echo 'Run this as your normal VM login user, not root.' >&2; return 1; }
+  command -v docker >/dev/null 2>&1 || { echo 'Docker Engine is not installed; no permissions changed.' >&2; return 1; }
+  if docker info >/dev/null 2>&1; then echo 'Docker access already works for this session.'; return 0; fi
+  if ! socket_group_missing; then
+    echo 'Cannot safely identify a missing Docker socket group. Check docker info and the daemon/socket locally; no permissions changed.' >&2
+    return 1
+  fi
+  local login gid answer
+  login="$(id -un)"
+  gid="$(stat -c %g /var/run/docker.sock)"
+  if [[ " $(id -G "$login") " == *" $gid "* ]]; then
+    echo "Account $login is already in the docker group, but this session is not."
+    next_docker_session
+    return 0
+  fi
+  [[ -t 0 && -t 1 ]] || { echo 'Group enrollment requires an interactive terminal; no permissions changed.' >&2; return 1; }
+  echo 'The docker group grants root-equivalent access to this VM. Only grant it to a trusted operator.'
+  printf 'Type GRANT DOCKER ACCESS to add %s to the docker group: ' "$login"
+  IFS= read -r answer || return 1
+  [[ "$answer" == 'GRANT DOCKER ACCESS' ]] || { echo 'No permissions changed.'; return 1; }
+  as_root usermod -aG docker "$login"
+  echo "Added $login to the docker group. No data or volumes changed."
+  next_docker_session
+}
+
 # Read pinned values as data, not `source .env` (which executes arbitrary shell code).
 expected_osmium="$(awk -F= '$1=="MAP_OSMIUM_VERSION" {print $2; exit}' .env 2>/dev/null || true)"
 [[ -n "$expected_osmium" ]] || expected_osmium="$(awk -F= '$1=="MAP_OSMIUM_VERSION" {print $2; exit}' .env.example)"
@@ -61,8 +105,17 @@ check() {
     if ! [[ "$compose_major" =~ ^[0-9]+$ ]] || (( compose_major < 2 )); then
       printf '%-30s INCOMPATIBLE (need Compose plugin v2+)  %s\n' 'docker compose' "${installed:-missing}"; bad=1
     else printf '%-30s OK                                 %s\n' 'docker compose' "$installed"; fi
-    if docker info >/dev/null 2>&1; then printf '%-30s OK\n' 'Docker daemon access'
-    else printf '%-30s UNAVAILABLE (daemon/group; re-login after group change)\n' 'Docker daemon access'; bad=1; fi
+    if docker info >/dev/null 2>&1; then
+      printf '%-30s OK\n' 'Docker daemon access'
+    elif socket_group_missing; then
+      printf '%-30s UNAVAILABLE (current session lacks Docker socket group)\n' 'Docker daemon access'
+      echo '  For a trusted operator: ./scripts/vm-install.sh --enable-docker-access'
+      next_docker_session
+      bad=1
+    else
+      printf '%-30s UNAVAILABLE (check docker info / daemon / socket locally)\n' 'Docker daemon access'
+      bad=1
+    fi
   else
     printf '%-30s MISSING (Docker Engine first)\n' 'docker compose'
     printf '%-30s UNAVAILABLE (Docker Engine first)\n' 'Docker daemon access'
@@ -72,7 +125,7 @@ check() {
       printf '%-30s OK\n' "$tool"
     else printf '%-30s MISSING\n' "$tool"; bad=1; fi
   done
-  if (( bad )); then echo 'Repair with --install on Ubuntu 24.04; Docker group changes need a new login.'; return 1; fi
+  if (( bad )); then echo "Use --install only for missing/incompatible tools; it does not fix an existing shell's Docker access."; return 1; fi
   echo 'Prerequisites OK.'
 }
 
@@ -114,6 +167,7 @@ install_compose_plugin() {
 }
 
 if [[ "$ACTION" == check ]]; then check; exit $?; fi
+if [[ "$ACTION" == enable-docker-access ]]; then enable_docker_access; exit $?; fi
 [[ -r /etc/os-release ]] || { echo 'Ubuntu 24.04 required' >&2; exit 1; }
 # shellcheck disable=SC1091 # Ubuntu's OS metadata is trusted by apt as well.
 source /etc/os-release
@@ -193,9 +247,7 @@ PY
   unzip -q "$temp/bun.zip" -d "$temp"
   as_root install -m 0755 "$temp/bun-linux-${arch}${cpu_suffix}/bun" /usr/local/bin/bun
 fi
-if ! docker info >/dev/null 2>&1 && (( EUID != 0 )); then
-  printf 'Grant the current user root-equivalent Docker access? [y/N] '
-  read -r answer
-  if [[ "$answer" == [yY] ]]; then as_root usermod -aG docker "$(id -un)"; echo 'Log out and back in before launching.'; fi
+if ! docker info >/dev/null 2>&1 && (( EUID != 0 )) && socket_group_missing; then
+  enable_docker_access || true  # declined grant leaves --check failing safely
 fi
 check

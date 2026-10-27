@@ -465,8 +465,11 @@ A5, read the fresh-VM manual form below, then return to the script's `--check` a
 
 ```bash
 ./scripts/vm-install.sh --check
-./scripts/vm-install.sh --install          # only after reviewing the reported gaps
+# For missing packages only: ./scripts/vm-install.sh --install
 # If Engine works and ONLY the plugin is missing: ./scripts/vm-install.sh --install-compose
+# If only Docker socket access is denied: ./scripts/vm-install.sh --enable-docker-access
+# After accepting the root-equivalent group grant, reconnect SSH (new tmux session) or run
+# 'newgrp docker' IN YOUR TERMINAL; the script cannot modify its parent shell's groups.
 ./scripts/vm-install.sh --check            # do not proceed until Prerequisites OK
 ```
 
@@ -545,12 +548,14 @@ Two traps, both of which look like "the script is broken":
 - **Never `curl … | sudo apt-key add -` or disable APT signature checks.** Keep the official
   key in the source's explicit `signed-by` path, readable by APT. `sudo command > /root/file`
   redirects as your unprivileged shell, not as root; use `sudo install` for the key.
-- **Docker's groups don't apply to an existing shell.** If you skipped `newgrp docker` and re-run
-  `setup-ubuntu-vm.sh`, it reports `Docker daemon unreachable (is your user in the docker group?)`
-  even though `groups` prints `docker`. The group change applies to a *new* login — a new SSH
-  session, or (inside a hypervisor console with no login to reopen) `exec sg docker "$SHELL"`
-  followed by `exit` + re-login when you can. `docker run --hello-world` printing `permission
-  denied … docker.sock` means exactly this and nothing else.
+- **Docker group changes don't apply to an existing shell.** If `docker info` reports permission
+  denied on `/var/run/docker.sock`, `./scripts/vm-install.sh --check` identifies the missing
+  socket group; use its interactive `--enable-docker-access` option only for a trusted operator.
+  `sudo usermod` changes future logins, not your current shell. Reconnect SSH (start a new tmux
+  session rather than attaching an old one), or run `newgrp docker` **in your terminal** and
+  verify `id -nG` and `docker info` there. A child script cannot change its parent's groups.
+  If access still fails with effective group membership, check daemon/socket status locally;
+  don't loosen socket permissions or run `vm-env.py` with `sudo`.
 
 Verify — all three must pass:
 

@@ -99,6 +99,50 @@ class EnvTests(unittest.TestCase):
                 self.assertIn(secrets["POSTGRES_PASSWORD"], secrets["DATABASE_URL"])
                 self.assertNotIn("change-me", env.read_text())
 
+    def test_missing_password_checks_docker_before_mode_prompt_or_env_write(self):
+        with patch.object(vm_env, "env_values", return_value={}), \
+             patch.object(vm_env, "volume", side_effect=SystemExit("docker socket denied")) as volume, \
+             patch.object(vm_env, "update_env") as writer, \
+             patch("builtins.input", side_effect=AssertionError("mode prompt came before Docker check")), \
+             patch.object(sys, "argv", ["vm-env.py"]):
+            with self.assertRaisesRegex(SystemExit, "docker socket denied"):
+                vm_env.main()
+            volume.assert_called_once_with("postgres-data")
+            writer.assert_not_called()
+
+    def test_volume_created_during_password_prompt_is_not_overwritten(self):
+        with patch.object(vm_env, "env_values", return_value={"ADMIN_SEED_PASSWORD_B64": "c2VjcmV0"}), \
+             patch.object(vm_env, "volume", side_effect=[None, None, "project_postgres-data"]) as volume, \
+             patch.object(vm_env, "update_env") as writer, \
+             patch.object(sys, "argv", ["vm-env.py", "--mode", "development"]):
+            with self.assertRaisesRegex(SystemExit, "appeared during setup"):
+                vm_env.main()
+        self.assertEqual(volume.call_count, 3)
+        writer.assert_not_called()
+
+    def test_docker_access_hint_only_offers_group_repair_for_inaccessible_local_socket(self):
+        with patch.dict(os.environ, {"DOCKER_HOST": "", "DOCKER_CONTEXT": ""}), \
+             patch.object(vm_common.os, "geteuid", return_value=1000), \
+             patch.object(vm_common.os, "getegid", return_value=1000), \
+             patch.object(vm_common.os, "getgroups", return_value=[1000]), \
+             patch.object(vm_common.Path, "is_socket", return_value=True), \
+             patch.object(vm_common.Path, "stat", return_value=SimpleNamespace(st_gid=999)), \
+             patch.object(vm_common.grp, "getgrgid", return_value=SimpleNamespace(gr_name="docker")):
+            self.assertIn("--enable-docker-access", vm_common.docker_access_hint())
+        with patch.dict(os.environ, {"DOCKER_HOST": "tcp://other-host"}):
+            self.assertNotIn("--enable-docker-access", vm_common.docker_access_hint())
+
+    def test_volume_listing_permission_error_provides_session_repair_without_leaking_stderr(self):
+        denied = subprocess.CalledProcessError(1, ["docker", "volume", "ls"], stderr="secret from daemon")
+        with patch.object(vm_common, "project", return_value="borobiya"), \
+             patch.object(vm_common, "run", side_effect=[denied, denied]), \
+             patch.object(vm_common, "docker_access_hint", return_value="reconnect SSH or newgrp docker"):
+            with self.assertRaises(SystemExit) as error:
+                vm_common.volume("postgres-data")
+        message = str(error.exception)
+        self.assertIn("reconnect SSH or newgrp docker", message)
+        self.assertNotIn("secret from daemon", message)
+
     def test_production_rerun_keeps_existing_origin_and_credentials(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -207,6 +251,55 @@ class InstallerTests(unittest.TestCase):
             for expected in ("need Java >=21", "need 1.16.0", "pin 1.4.3"):
                 self.assertIn(expected, result.stdout)
             self.assertIn("Docker daemon access", result.stdout)
+
+    def test_group_grant_requires_explicit_option_and_typed_interactive_consent(self):
+        installer = (SCRIPTS / "vm-install.sh").read_text()
+        self.assertIn("--enable-docker-access", installer)
+        self.assertIn("[[ -t 0 && -t 1 ]]", installer)
+        self.assertIn("GRANT DOCKER ACCESS", installer)
+        self.assertIn('as_root usermod -aG docker "$login"', installer)
+        self.assertIn("A child script cannot change the groups of its parent shell", installer)
+        with tempfile.TemporaryDirectory() as directory:
+            docker = Path(directory) / "docker"
+            docker.write_text("#!/bin/sh\n[ \"$1\" = info ]\n")
+            docker.chmod(0o755)
+            result = subprocess.run(["bash", str(SCRIPTS / "vm-install.sh"), "--enable-docker-access"],
+                                    cwd=vm.ROOT, env={**os.environ, "PATH": directory + ":" + os.environ["PATH"]},
+                                    capture_output=True, text=True, check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("already works", result.stdout)
+
+    def test_group_grant_does_not_escalate_when_login_is_stale_or_no_tty(self):
+        # Exercise the real installer function without running sudo or touching host groups.
+        source = (SCRIPTS / "vm-install.sh").read_text()
+        function = "enable_docker_access() {" + source.split("enable_docker_access() {", 1)[1].split("\n}\n", 1)[0] + "\n}"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, body in {
+                "docker": "exit 1",
+                "stat": 'echo 1234',
+                "id": 'if [ "$1" = -un ]; then echo operator; elif [ "${LOGIN_IS_MEMBER:-}" = 1 ]; '
+                      'then echo "1001 1234"; else echo 1001; fi',
+            }.items():
+                binary = root / name
+                binary.write_text("#!/bin/sh\n" + body + "\n")
+                binary.chmod(0o755)
+            shell = ("set -euo pipefail\n"
+                     "as_root() { touch \"$CAPTURE\"; }\n"
+                     "socket_group_missing() { return 0; }\n"
+                     "next_docker_session() { echo 'new group shell required'; }\n"
+                     + function + "\nenable_docker_access\n")
+            for member, expected_code, expected_text in (
+                ("1", 0, "already in the docker group"),
+                ("0", 1, "requires an interactive terminal"),
+            ):
+                capture = root / "unexpected-grant"
+                result = subprocess.run(["bash", "-c", shell], cwd=vm.ROOT, capture_output=True, text=True,
+                                        env={**os.environ, "PATH": directory + ":" + os.environ["PATH"],
+                                             "CAPTURE": str(capture), "LOGIN_IS_MEMBER": member}, check=False)
+                self.assertEqual(result.returncode, expected_code, result.stderr)
+                self.assertIn(expected_text, result.stdout + result.stderr)
+                self.assertFalse(capture.exists())
 
     def test_compose_plugin_accepts_newer_major_and_has_plugin_only_repair(self):
         with tempfile.TemporaryDirectory() as directory:

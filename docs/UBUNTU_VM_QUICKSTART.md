@@ -13,12 +13,14 @@ Before a first build, verify Ubuntu 24.04, Docker access, enough **free disk and
 ## First launch
 
 ```bash
-./scripts/vm-install.sh --check          # installed / missing / incompatible versions
-./scripts/vm-install.sh --install        # explicit opt-in: Ubuntu packages, official Docker apt repo, pinned Bun
-# If Docker Engine works and ONLY Compose is missing: ./scripts/vm-install.sh --install-compose
-# The plugin-only command matches docker.io vs docker-ce-cli; it does not replace Docker Engine.
-# Re-login if you accepted membership in the root-equivalent docker group; then rerun --check.
-# Do not continue until --check reports Prerequisites OK (including Docker daemon + Compose plugin).
+./scripts/vm-install.sh --check          # installed / missing / incompatible versions AND current Docker access
+# For missing tools only: ./scripts/vm-install.sh --install  # explicit package-install opt-in
+# If Engine works but ONLY Compose is missing: ./scripts/vm-install.sh --install-compose
+# If ONLY Docker socket access fails: ./scripts/vm-install.sh --enable-docker-access
+#   The last command asks before granting root-equivalent Docker group access; it does not install packages.
+#   Reconnect SSH (start a NEW tmux session) or run 'newgrp docker' in THIS terminal;
+#   scripts cannot update their parent shell's groups. Do not use sudo for vm-env.py or launch.
+./scripts/vm-install.sh --check          # must now report Prerequisites OK before asking for passwords.
 python3 scripts/vm-env.py               # development or production; secrets + admin password, .env mode 0600
 python3 scripts/vm-map.py               # choose countries/cities, snapshot and cache policy; writes no map data
 # If you enabled the optional proxy in THIS terminal, first run: source ~/.bashrc

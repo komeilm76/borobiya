@@ -1,7 +1,9 @@
 """Small, non-shell-evaluating helpers shared by Ubuntu VM operator commands."""
 from __future__ import annotations
 
+import grp
 import json
+import os
 import re
 import subprocess
 import sys
@@ -41,6 +43,24 @@ def compose(*args: str, capture: bool = False) -> subprocess.CompletedProcess[st
     return run(["docker", "compose", *PROFILES, *args], capture=capture)
 
 
+def docker_access_hint() -> str:
+    """Diagnose daemon access without printing Docker/Compose output or changing permissions."""
+    socket = Path("/var/run/docker.sock")
+    if not (os.environ.get("DOCKER_HOST") or os.environ.get("DOCKER_CONTEXT")):
+        try:
+            if (os.geteuid() != 0 and socket.is_socket()
+                    and grp.getgrgid(socket.stat().st_gid).gr_name == "docker"
+                    and socket.stat().st_gid not in {os.getegid(), *os.getgroups()}):
+                return ("this login cannot access the Docker socket. For a trusted VM user, run "
+                        "./scripts/vm-install.sh --enable-docker-access (explicit root-equivalent grant), "
+                        "then reconnect SSH or run 'newgrp docker' in your terminal; rerun this command "
+                        "in that new shell. Never run vm-env.py with sudo")
+        except (OSError, KeyError):
+            pass
+    return ("Docker daemon is inaccessible; run docker info locally and ./scripts/vm-install.sh --check. "
+            "If your group was just changed, reconnect SSH or run 'newgrp docker' in your terminal")
+
+
 def project() -> str:
     """Identify the owning project without guessing when Docker/Compose is broken."""
     try:
@@ -59,8 +79,7 @@ def project() -> str:
             fail("Docker Compose plugin v2+ is missing or not working; run ./scripts/vm-install.sh --check "
                  "and --install-compose if Docker Engine already works")
         if not works(["docker", "info"]):
-            fail("Docker daemon is inaccessible; run ./scripts/vm-install.sh --check, "
-                 "then verify docker info (re-login after docker group changes)")
+            fail(docker_access_hint())
         if works(["docker", "compose", "config", "--quiet"]):
             fail("Docker Compose accepts the configuration but cannot produce JSON; "
                  "upgrade the Compose v2 plugin and rerun --check")
@@ -83,8 +102,13 @@ def volume(name: str) -> str | None:
         items = run(["docker", "volume", "ls", "-q", "--filter", f"label=com.docker.compose.project={owner}",
                      "--filter", f"label=com.docker.compose.volume={name}"],
                     capture=True, stderr=subprocess.PIPE).stdout.splitlines()
-    except (OSError, subprocess.CalledProcessError) as error:
-        fail(f"cannot verify this project's {name} volume ({error}); nothing deleted")
+    except (OSError, subprocess.CalledProcessError):
+        try:
+            run(["docker", "info"], capture=True, stderr=subprocess.PIPE)
+        except (OSError, subprocess.CalledProcessError):
+            fail(f"cannot check this project's {name} volume: {docker_access_hint()}; nothing changed")
+        fail(f"Docker is reachable but cannot list this project's {name} volume. "
+             "Run docker volume ls locally to inspect the error; nothing changed")
     if len(items) > 1 or any(not re.fullmatch(r"[a-zA-Z0-9_.-]+", item) for item in items):
         fail(f"ambiguous {name} volumes for project {owner}; nothing deleted")
     return items[0] if items else None

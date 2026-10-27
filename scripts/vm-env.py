@@ -86,6 +86,19 @@ def main() -> None:
     parser.add_argument("--generate-admin", action="store_true", help="generate admin password instead of prompting")
     args = parser.parse_args()
     current = env_values()
+    # Before asking for a mode or password, verify any existing DB volumes. A
+    # Docker permission failure must not send the operator through prompts that
+    # cannot finish or tempt them to regenerate passwords over populated data.
+    credentials = {
+        "POSTGRES_PASSWORD": "postgres-data",
+        "NOMINATIM_PASSWORD": "nominatim-data",
+    }
+    missing = {key: vol for key, vol in credentials.items()
+               if not current.get(key) or current[key].startswith("replace-") or current[key] == "change-me"}
+    existing_volumes = {vol: volume(vol) for vol in missing.values()}
+    for key, vol in missing.items():
+        if existing_volumes[vol]:
+            fail(f"{vol} already exists: cannot replace {key} in .env without the actual volume password")
     saved_mode = current.get("NODE_ENV", "development")
     mode = args.mode
     if not mode:
@@ -121,16 +134,7 @@ def main() -> None:
             dev_origins.append(f"http://localhost:{port}")
         changes["CORS_ORIGINS"] = ",".join(dev_origins)
         changes["PUBLIC_DOMAIN"] = ""
-    credentials = {
-        "POSTGRES_PASSWORD": "postgres-data",
-        "NOMINATIM_PASSWORD": "nominatim-data",
-    }
-    for key, vol in credentials.items():
-        old = current.get(key, "")
-        if old and not old.startswith("replace-") and old != "change-me":
-            continue
-        if volume(vol):
-            fail(f"{vol} already exists: cannot replace {key} in .env without the actual volume password")
+    for key in missing:
         changes[key] = secrets.token_hex(24)
     for key in ("JWT_SECRET", "JWT_REFRESH_SECRET"):
         old = current.get(key, "")
@@ -166,6 +170,11 @@ def main() -> None:
         if not valid_admin(admin):
             fail("admin password needs 8–1024 UTF-16 characters, a Unicode letter and a decimal digit")
         changes["ADMIN_SEED_PASSWORD_B64"] = base64.b64encode(admin.encode("utf-8")).decode("ascii")
+    # Recheck immediately before writing: prompts can take minutes, during which
+    # another setup may initialize a volume with a different password.
+    for key, vol in missing.items():
+        if volume(vol):
+            fail(f"{vol} appeared during setup: refusing to replace {key} without its volume password")
     update_env(changes)
     print(f"Prepared .env (mode {mode}, permission 0600); existing credentials were not rotated.")
     if mode == "production":
