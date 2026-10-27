@@ -4,6 +4,35 @@
 
 Legend: `→` dependency, `AI` ideal for AI agent, `H` human-preferred.
 
+### Open work at a glance (2026-10-28)
+
+This is an index of the **unchecked task boxes below**, not a second backlog. “Not started”
+means the named acceptance run or deliverable has not begun, even when prerequisite code exists;
+“Partial” means code, docs, or a subset of verification already exists but the task is not signed
+off. Reconcile changes with `python3 scripts/list_open_tasks.py --check` (included in `bun run lint`);
+run without `--check` to print the list. The longer task entries below remain authoritative for
+scope, evidence and safety caveats. Neither the latest VM `doctor` output nor local tests close a
+real-browser, external-network-offline, PostGIS or Android acceptance item.
+
+<!-- open-tasks:begin -->
+| ID | State | Remaining |
+| --- | --- | --- |
+| `P1-G1` | Not started | External-library migration and no-Internet map verification on the target VM. |
+| `P1-A1` | Not started | Warm/cold browser map outage tests over a secure origin. |
+| `P1-A2` | Partial | Extended migrated-Postgres auth, recovery, onboarding and admin-flow smoke evidence; core flows were user-reported. |
+| `P1-M1` | Not started | Measure at least 10 warm theme switches, report median/p95 and browser. |
+| `P2-A1` | Not started | Two-browser live location, revoke, expiry, priority and polling measurement on the VM. |
+| `P2-A2` | Partial | Target-VM PostGIS, Docker env refusal and retention/expiry verification; PGlite subset passed. |
+| `T3.5.5` | Partial | Offline elevation/routing acceptance on the target VM; core route UI exists. |
+| `T4.4.1` | Partial | Remaining responsive/bottom-sheet audit and real phone/tablet/browser visual acceptance. |
+| `T4.4.2` | Partial | Remaining screen feedback, toasts and eligible optimistic writes with rollback. |
+| `T4.4.3` | Partial | Site-wide keyboard/screen-reader and contrast/WCAG AA audit beyond two tested views. |
+| `T4.4.4` | Partial | Remaining virtual-scroll/map consumers and measured map/GPS latency on devices. |
+| `T4.5.3` | Not started | Full Playwright E2E login-to-rating workflow, including stream behavior; route/unit tests exist. |
+| `T4.7.1` | Partial | Manual screenshots, rendered diagram review and honest progress completion. |
+| `T4.7.3` | Not started | v1.0.0 tag and release notes after release acceptance. |
+<!-- open-tasks:end -->
+
 ---
 
 ## Phase 1 — Foundation (Auth & Map)

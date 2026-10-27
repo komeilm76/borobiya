@@ -17,5 +17,6 @@ shellcheck -S warning "${shell_scripts[@]}"
 ruff check --select E4,E7,E9,F,W,I,B,EXE,PLW1510 scripts map-server/scripts
 python3 scripts/check_runbook_markdown.py "${markdown_files[@]}"
 python3 scripts/check_env_documentation.py
+python3 scripts/list_open_tasks.py --check
 python3 scripts/test_deploy_workflow.py
 python3 scripts/test_android_workflow.py
