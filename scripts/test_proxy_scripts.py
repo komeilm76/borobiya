@@ -768,6 +768,34 @@ class TestNoProxyCoversTheComposeNetwork(ScriptCase):
         self.assertIn("applied to builds and to every container compose starts", enable)
 
 class TestStatusReports(ScriptCase):
+    def test_shell_proxy_credentials_are_redacted_in_both_status_commands(self) -> None:
+        url = "http://alice:s%40cret@10.0.2.5:3128"
+        for result in (self.enable("--status", http_proxy=url),
+                       self.disable("--status", HTTP_PROXY=url)):
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("http://***:***@10.0.2.5:3128", result.stdout)
+            self.assertNotIn("alice", result.stdout + result.stderr)
+            self.assertNotIn("s%40cret", result.stdout + result.stderr)
+
+    def test_foreign_proxy_credentials_are_redacted_in_status_and_refusal(self) -> None:
+        foreign = self.etc / "apt" / "apt.conf.d" / "95proxy"
+        foreign.write_text('Acquire::http::Proxy "http://corp:s%40cret@host.lan:3128";\n')
+        for result in (self.enable("--status"), self.enable("10.0.2.5:3128", "--skip-checks")):
+            self.assertIn("http://***:***@host.lan:3128", result.stdout)
+            self.assertNotIn("corp", result.stdout + result.stderr)
+            self.assertNotIn("s%40cret", result.stdout + result.stderr)
+        self.assertFalse(self.state_file.exists())
+
+    def test_username_only_proxy_urls_are_redacted_too(self) -> None:
+        # Some pre-existing proxy files use URL userinfo with no literal colon.
+        foreign = self.etc / "apt" / "apt.conf.d" / "95proxy"
+        foreign.write_text('Acquire::http::Proxy "http://foreign-user@host.lan:3128";\n')
+        result = self.enable("--status", http_proxy="http://shell-user@host.lan:3128")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(result.stdout.count("http://***:***@host.lan:3128"), 2)
+        self.assertNotIn("foreign-user", result.stdout + result.stderr)
+        self.assertNotIn("shell-user", result.stdout + result.stderr)
+
     def stub(self, names: dict[str, str]) -> str:
         """A PATH holding fake docker/systemctl, so a test can describe a machine this sandbox is not.
 
@@ -814,6 +842,17 @@ class TestStatusReports(ScriptCase):
         self.assertIn("daemon env", result.stdout)
         self.assertIn("http://10.0.2.5:3128", result.stdout)
         self.assertNotIn("Environment=", result.stdout)  # systemctl's field name is not part of the value
+    def test_daemon_proxy_credentials_are_redacted_in_status(self) -> None:
+        path = self.stub({
+            "docker": 'if [ "$1" = info ]; then exit 0; fi\nexit 0',
+            "systemctl": 'printf "Environment=http_proxy=http://alice:s%%40cret@host.lan:3128\\n"\nexit 0',
+        })
+        result = self.enable("--status", PATH_EXTRA=path, BOROBIYA_PROXY_NO_SYSTEMD="0")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("http://***:***@host.lan:3128", result.stdout)
+        self.assertNotIn("alice", result.stdout + result.stderr)
+        self.assertNotIn("s%40cret", result.stdout + result.stderr)
+
     def test_status_survives_a_daemon_that_does_not_answer(self) -> None:
         """A docker CLI with no daemon behind it (the usual state before step 12) skips the line."""
         path = self.stub({"docker": "exit 1", "systemctl": "exit 1"})

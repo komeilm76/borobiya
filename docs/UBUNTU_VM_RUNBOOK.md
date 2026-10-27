@@ -781,9 +781,10 @@ one of the two. Both open by printing what each of the four places holds right n
 (`how much is set : 2 of 4 places`), the Docker daemon's own environment — where a machine with no proxy
 answers "no proxy in the unit environment", which is information and not a failure — and every file in
 the two root-owned directories that sets a proxy but was not written here. Both accept `--status` (that
-report alone) and `--dry-run` (the whole run, with nothing written) without a network or root rights. The
-sections below stay the reference: they say what each of the four settings is for, they are what to fall
-back on when a script's assumption does not fit the machine, and
+report alone) and `--dry-run` (the whole run, with nothing written) without a network or root rights.
+Their reports mask URL credentials from the current shell, foreign proxy files, and the daemon's unit
+environment; the actual proxy settings remain unchanged. The sections below explain what each of
+the four settings does and remain the fallback when a script's assumptions do not fit the machine.
 § 5.1a is the host-side half that no script in this repository can do for you.
 
 Whether the gateway is the right address depends on VMware's network mode, and the wrong answer
@@ -898,26 +899,31 @@ already-running `setup-ubuntu-vm.sh` will not pick them up.
 ### 5.2 Verify that the proxy itself works
 
 ```bash
+# Mask URL credentials before displaying proxy diagnostics (the on-disk settings are unchanged).
+redact_proxy_url() { sed -E 's#//[^/@[:space:]]+@#//***:***@#g'; }
 # 1. What does this shell think its proxy is? (empty = exports not loaded in THIS terminal)
-env | grep -iE '^(http|https|no|all)_proxy=' || echo "no proxy in this shell"
+{ env | grep -iE '^(http|https|no|all)_proxy=' || echo "no proxy in this shell"; } | redact_proxy_url
 # 2. Direct egress: does the VM reach the internet without the proxy? (000/timeout = needs it)
 curl --noproxy '*' -sS --max-time 10 -o /dev/null -w 'direct: %{http_code}\n' https://github.com/ || echo "direct: failed"
 # 3. Through the proxy: did curl pick the exported value up at all? (works on every curl version)
 curl -sS --max-time 15 -o /dev/null -w 'proxied: %{http_code}\n' https://github.com/
-curl -v -o /dev/null --max-time 15 https://github.com/ 2>&1 | grep -E -m2 'Uses proxy env variable|Connected to'
+curl -v -o /dev/null --max-time 15 https://github.com/ 2>&1 | grep -E -m2 'Uses proxy env variable|Connected to' | redact_proxy_url
 # 4. The real targets, in order: apt, GitHub (page then a slice of the asset), Geofabrik
 curl -sS --max-time 15 -o /dev/null -w 'docker apt repo: %{http_code}\n' https://download.docker.com/linux/ubuntu/dists/noble/Release
 curl -sS --max-time 15 -o /dev/null -w 'release page: %{http_code}\n' https://github.com/onthegomap/planetiler/releases/tag/v0.10.2
 curl -sS --max-time 20 -o /dev/null -r 0-1023 -w 'jar, first 1 KiB: %{http_code} %{size_download} bytes\n' -L https://github.com/onthegomap/planetiler/releases/download/v0.10.2/planetiler.jar
 curl -sS --max-time 15 -o /dev/null -w 'geofabrik: %{http_code}\n' -I https://download.geofabrik.de/
 # 5. Do apt and Docker agree with the shell? (these are three separate proxy settings)
-sudo apt-get -o Debug::Acquire::http=true download ca-certificates 2>&1 | grep -i proxy | head -3
-apt-config dump | grep -iE 'Acquire::.*Proxy' || echo "apt: no proxy configured (uses the shell env only when sudo passes it)"
-docker info 2>/dev/null | grep -i -A2 proxy || echo "docker daemon: no proxy"
-systemctl show docker --property=Environment | tr ' ' '\n' | grep -i proxy || echo "docker systemd env: no proxy"
+sudo apt-get -o Debug::Acquire::http=true download ca-certificates 2>&1 | grep -i proxy | head -3 | redact_proxy_url
+{ apt-config dump | grep -iE 'Acquire::.*Proxy' || echo "apt: no proxy configured (uses the shell env only when sudo passes it)"; } | redact_proxy_url
+{ docker info 2>/dev/null | grep -i -A2 proxy || echo "docker daemon: no proxy"; } | redact_proxy_url
+{ systemctl show docker --property=Environment | tr ' ' '\n' | grep -i proxy || echo "docker systemd env: no proxy"; } | redact_proxy_url
 # 6. Does a *container* have egress? Images are pulled by the daemon, not by curl.
 docker run --rm alpine:3 sh -c 'apk update >/dev/null 2>&1 && echo "container: ok" || echo "container: FAILED (daemon needs its own proxy)"'
 ```
+
+URL redaction in these diagnostic lines is not comprehensive log sanitization: other tool output may
+still contain secrets. Do not paste terminal transcripts or raw proxy files into tickets.
 
 Read it as a decision table: **200** = the path works. **`000`** with the same result through and
 around the proxy = that host is down or unreachable from here (try § 3.2's site-root check before

@@ -107,7 +107,8 @@ proxy_log() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 proxy_note() { printf '    %s\n' "$*"; }
 proxy_fail() { printf '\n%s: %s\n' "$PROXY_PROG" "$*" >&2; exit 1; }
 proxy_mask() { # hide credentials that may sit inside a URL before anything prints it
-  sed -e 's#//[^/@ ]*:[^/@ ]*@#//***:***@#g'
+  # Match URL userinfo whether it has a password, an empty password, or just a username.
+  sed -E -e 's#//[^/@[:space:]]+@#//***:***@#g'
 }
 
 # ---------- small primitives ----------
@@ -619,7 +620,7 @@ proxy_foreign_note() { # the advice that belongs wherever the list is printed
     # Its own proxy lines, quoted back, because "there is another file" is not actionable and
     # "there is another file pointing at a different address" is.
     line="$(grep -h -iE '::[a-z]*proxy|proxy=' "$f" | head -2 | tr '\n' ' ')"
-    [[ -n "$line" ]] && printf '      %s\n' "$line"
+    [[ -n "$line" ]] && printf '      %s\n' "$(printf '%s' "$line" | proxy_mask)"
   done <<<"$hits"
   proxy_note "apt merges apt.conf.d in filename order (the last value read wins) and systemd appends"
   proxy_note "Environment= across drop-ins, so this file and ours will disagree in ways that are hard"
@@ -798,7 +799,7 @@ proxy_is_configured() {
 proxy_status() {
   proxy_log "Proxy state, as far as this machine shows it"
   local here="${http_proxy:-${HTTP_PROXY:-}}"
-  printf '  this shell   : %s\n' "${here:-nothing exported (the block affects new terminals, not this one)}"
+  printf '  this shell   : %s\n' "$(printf '%s' "${here:-nothing exported (the block affects new terminals, not this one)}" | proxy_mask)"
   if [[ -f "$PROXY_BASHRC" ]] && grep -qF -- "$PROXY_BLOCK_BEGIN" "$PROXY_BASHRC"; then
     printf '  %s\n' "$PROXY_BASHRC: block present"
     awk -v begin="$PROXY_BLOCK_BEGIN" -v end="$PROXY_BLOCK_END" '
@@ -852,7 +853,7 @@ proxy_status() {
     # inside an assignment is exactly the fatal status that ended this report under `set -e`.
     daemon_env="$(systemctl show docker --property=Environment 2>/dev/null \
       | sed -e 's/^Environment=//' | tr ' ' '\n' | grep -i proxy | paste -sd' ' - || true)"
-    printf '  daemon env    : %s\n' "${daemon_env:-no proxy in the unit environment}"
+    printf '  daemon env    : %s\n' "$(printf '%s' "${daemon_env:-no proxy in the unit environment}" | proxy_mask)"
   fi
   return 0
 }
