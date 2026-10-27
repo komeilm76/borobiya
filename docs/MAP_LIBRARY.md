@@ -25,7 +25,13 @@ avoids mixing object versions in the merged PBF.
 | `YYYY-MM-DD` | A specific dated Geofabrik snapshot. `cache-first` setup verifies existing sources or retrieves the official `.md5` and dated PBF; if either has expired (HTTP 404/410), it searches for a newer available date. Offline mode requires previously trusted library metadata. |
 
 The concrete installed date is stored separately as `MAP_SNAPSHOT_DATE` and
-mirrored to `MAP_DATA_VERSION`. When `vm.py launch` completes the setup pipeline
+mirrored to `MAP_DATA_VERSION`. Before strict offline serving, `vm.py` checks
+both fields against the saved selection (`pinned` means the repository's
+reviewed date), `.env`'s `MAP_SNAPSHOT`, and the active map pointer. It also
+compares `.env`'s `MAP_BBOX` numerically with the active pointer's union bbox;
+otherwise the gateway could advertise bounds for a different area. It refuses
+symlinked library paths/artifacts rather than serving outside the selected
+library. When `vm.py launch` completes the setup pipeline
 for a saved `latest` selection, it also atomically saves that verified date to
 `.vm-map.json`; a failed setup leaves `latest` pending for retry. Ordinary
 re-runs keep the installed date **while its sources remain cached**. To request a

@@ -446,7 +446,13 @@ class OperationsTests(unittest.TestCase):
             output.seek(0)
             output.truncate()
             self.assertEqual(vm.doctor(), 0)
-            self.assertIn("saved map snapshot differs", output.getvalue())
+            self.assertIn("saved map snapshot/version differs", output.getvalue())
+            config["snapshot"] = "pinned"
+            env["MAP_DATA_VERSION"] = "2026-10-26"
+            output.seek(0)
+            output.truncate()
+            self.assertEqual(vm.doctor(), 0)
+            self.assertIn("saved map snapshot/version differs", output.getvalue())
 
     def test_doctor_flags_public_edge_left_running_in_development(self):
         class Response:
@@ -599,9 +605,11 @@ class OperationsTests(unittest.TestCase):
                          *(dataset / "routing" / profile / "borobiya.osrm" for profile in ("car", "bicycle", "foot"))):
                 path.write_bytes(b"data")
             (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
-                                                               "datasetDir": str(dataset), "snapshotDate": "2026-10-18"}))
+                                                               "datasetDir": str(dataset), "snapshotDate": "2026-10-18",
+                                                               "bbox": [51.0, 35.5, 51.7, 35.9]}))
             values = {"MAP_REGION_IDS": "ir-tehran", "MAP_LIBRARY_DIR": directory, "MAP_REGION": "borobiya",
                       "MAP_SNAPSHOT": "pinned", "MAP_SNAPSHOT_DATE": "2026-10-18",
+                      "MAP_DATA_VERSION": "2026-10-18", "MAP_BBOX": "51,35.5,51.7,35.9",
                       "MAP_DATASET_DIR": str(dataset), "MAP_DATA_DIR": str(dataset),
                       "MAP_OSRM_DATA_DIR": str(dataset / "routing"), "MAP_PHOTON_DATA_DIR": str(dataset / "geocoding")}
             selection = {"regions": "de-berlin", "library": directory, "snapshot": "pinned", "policy": "offline"}
@@ -628,6 +636,85 @@ class OperationsTests(unittest.TestCase):
                 stop_edge.assert_called()
                 compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")
                 compose.reset_mock()
+                # A seemingly complete dataset may still describe a different
+                # release/bbox to the browser or point outside the verified library.
+                values["MAP_BBOX"] = "0,0,1,1"
+                with self.assertRaisesRegex(SystemExit, "MAP_BBOX"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values["MAP_BBOX"] = "51.0,35.5,51.7,35.9"  # numeric formatting is equivalent
+                vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")
+                compose.reset_mock()
+                values["MAP_BBOX"] = "51,35.5,51.7,35.9"
+                values["MAP_DATA_VERSION"] = "2026-10-26"
+                with self.assertRaisesRegex(SystemExit, "snapshot|version"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values["MAP_DATA_VERSION"] = "2026-10-18"
+                values["MAP_SNAPSHOT_DATE"] = "2026-10-26"
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-26",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
+                with self.assertRaisesRegex(SystemExit, "snapshot"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values["MAP_SNAPSHOT_DATE"] = "2026-10-18"
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
+                selection["snapshot"] = "2026-10-18"
+                with self.assertRaisesRegex(SystemExit, "snapshot"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values["MAP_SNAPSHOT"] = "2026-10-18"
+                vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")
+                compose.reset_mock()
+                values["MAP_SNAPSHOT"] = "pinned"
+                selection["snapshot"] = "pinned"
+                (library / "current.json").write_text("[]")
+                with self.assertRaisesRegex(SystemExit, "pointer"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [10**1000, 35.5, 51.7, 35.9]}))
+                with self.assertRaisesRegex(SystemExit, "MAP_BBOX"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
+                (library / "current.json").rename(library / "pointer-real.json")
+                (library / "current.json").symlink_to("pointer-real.json")
+                with self.assertRaisesRegex(SystemExit, "pointer is a symlink"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                (library / "current.json").unlink()
+                (library / "pointer-real.json").rename(library / "current.json")
+                (dataset / "routing").rename(dataset / "routing-real")
+                (dataset / "routing").symlink_to("routing-real", target_is_directory=True)
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                (dataset / "routing").unlink()
+                (dataset / "routing-real").rename(dataset / "routing")
+                (dataset / "geocoding/photon_data").rename(dataset / "geocoding/photon-real")
+                (dataset / "geocoding/photon_data").symlink_to("photon-real", target_is_directory=True)
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                (dataset / "geocoding/photon_data").unlink()
+                (dataset / "geocoding/photon-real").rename(dataset / "geocoding/photon_data")
                 # Offline serving uses the Photon index, not Nominatim's import DB.
                 with patch.object(vm, "volume", side_effect=lambda name: None if name == "nominatim-data" else "present") as volume:
                     vm.launch(SimpleNamespace(serve_only=True, offline=False))

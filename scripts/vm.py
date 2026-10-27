@@ -6,6 +6,7 @@ import argparse
 import base64
 import getpass
 import json
+import math
 import os
 import re
 import secrets
@@ -120,20 +121,65 @@ def pin_resolved_snapshot(config: dict[str, str], active: dict[str, str]) -> dic
     return updated
 
 
+def repository_pinned_snapshot() -> str:
+    """Read the reviewed date, rather than treating any .env date as 'pinned'."""
+    try:
+        catalog = json.loads((ROOT / "map-server/regions.json").read_text(encoding="utf-8"))
+        pinned = catalog["snapshot"]["dataDate"]
+        if not isinstance(pinned, str) or date.fromisoformat(pinned).isoformat() != pinned:
+            raise ValueError("non-canonical repository snapshot date")
+        return pinned
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        fail(f"repository map snapshot pin is invalid: {error}")
+
+
+def snapshot_matches_active(snapshot: str, env: dict[str, str]) -> bool:
+    if snapshot == "latest":
+        return False
+    if snapshot == "pinned":
+        resolved = repository_pinned_snapshot()
+    else:
+        try:
+            if date.fromisoformat(snapshot).isoformat() != snapshot:
+                return False
+        except ValueError:
+            return False
+        resolved = snapshot
+    return (env.get("MAP_SNAPSHOT") == snapshot
+            and env.get("MAP_SNAPSHOT_DATE") == resolved
+            and env.get("MAP_DATA_VERSION") == resolved)
+
+
+def bbox_matches_pointer(raw: str | None, bbox: object) -> bool:
+    if not isinstance(raw, str) or not isinstance(bbox, list) or len(bbox) != 4:
+        return False
+    if any(type(value) not in (int, float) for value in bbox):
+        return False
+    try:
+        coordinates = [float(part) for part in raw.split(",")]
+        expected_coordinates = [float(value) for value in bbox]
+    except (ValueError, OverflowError):
+        return False
+    return len(coordinates) == 4 and all(
+        math.isfinite(actual) and math.isfinite(expected) and abs(actual - expected) <= 1e-6
+        for actual, expected in zip(coordinates, expected_coordinates, strict=True)
+    )
+
+
 def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> None:
     snapshot = config["snapshot"]
     if snapshot == "latest":
         fail("latest snapshot is pending; finish a full online launch before --serve-only")
-    if snapshot not in ("pinned", env.get("MAP_SNAPSHOT_DATE")) or (
-        snapshot == "pinned" and env.get("MAP_SNAPSHOT") not in (None, "pinned")
-    ):
-        fail("saved map snapshot differs from active .env; run full launch before --serve-only")
+    if not snapshot_matches_active(snapshot, env):
+        fail("saved map snapshot/version differs from active .env; run full launch before --serve-only")
     if env.get("MAP_REGION_IDS") != config["regions"] or env.get("MAP_LIBRARY_DIR") != config["library"]:
         fail("saved map selection differs from active .env; run launch (build) or restore the previous selection")
     library = Path(config["library"])
     dataset = Path(env.get("MAP_DATASET_DIR", ""))
     if not library.is_absolute() or not dataset.is_absolute() or not dataset.is_dir():
         fail("active map dataset is missing; run launch while online first")
+    if any(path.is_symlink() for path in (library, *library.parents, dataset, *dataset.parents)):
+        fail("map library/dataset path traverses a symlink; run full launch to inspect it")
     try:
         dataset.relative_to(library / "datasets")
     except ValueError:
@@ -143,20 +189,33 @@ def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> Non
     for key, path in expected.items():
         if env.get(key) != str(path) or not path.is_dir():
             fail(f"{key} does not point to the prepared dataset")
+        if path.is_symlink():
+            fail(f"{key} traverses a symlink; run full launch to inspect it")
+    pointer_path = library / "current.json"
+    if pointer_path.is_symlink():
+        fail("active map-library pointer is a symlink; refusing to follow it")
     try:
-        pointer = json.loads((library / "current.json").read_text(encoding="utf-8"))
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         fail(f"active map-library pointer missing or invalid: {error}")
+    if not isinstance(pointer, dict):
+        fail("active map-library pointer must be a JSON object; run full launch to inspect it")
     if (pointer.get("areas") != config["regions"].split(",") or pointer.get("datasetDir") != str(dataset)
             or pointer.get("snapshotDate") != env.get("MAP_SNAPSHOT_DATE")):
         fail("active map pointer, snapshot and .env disagree; rerun full launch")
+    if not bbox_matches_pointer(env.get("MAP_BBOX"), pointer.get("bbox")):
+        fail("MAP_BBOX differs from the active map pointer; rerun full launch")
     slug = env.get("MAP_REGION", "borobiya")
     files = [dataset / f"{slug}.pmtiles", dataset / f"{slug}.osm.pbf",
              dataset / f"{slug}.source.json",
              *(dataset / "routing" / profile / f"{slug}.osrm" for profile in ("car", "bicycle", "foot"))]
+    if any(path.is_symlink() for path in files):
+        fail("map tiles/PBF/routing graphs contain a symlink; run full launch to inspect it")
     if any(not path.is_file() or path.stat().st_size == 0 for path in files):
         fail("map tiles/PBF/routing graphs are incomplete; run full launch before offline relaunch")
     photon = dataset / "geocoding/photon_data"
+    if photon.is_symlink():
+        fail("Photon index is a symlink; run full launch to inspect it")
     if not photon.is_dir() or not any(photon.iterdir()):
         fail("Photon index is missing; run full launch before offline relaunch")
     if not static_ready():
@@ -408,11 +467,8 @@ def doctor() -> int:
             print("WARN saved selection/library differs from active .env; run launch to rebuild")
         if config.get("snapshot") == "latest":
             print("WARN latest map snapshot is pending; run a full online launch to resolve and pin it")
-        elif (config.get("snapshot") not in (None, "pinned")
-              and config["snapshot"] != values.get("MAP_SNAPSHOT_DATE")) or (
-            config.get("snapshot") == "pinned" and values.get("MAP_SNAPSHOT") not in (None, "pinned")
-        ):
-            print("WARN saved map snapshot differs from active .env; run launch to rebuild")
+        elif config.get("snapshot") is not None and not snapshot_matches_active(config["snapshot"], values):
+            print("WARN saved map snapshot/version differs from active .env; run launch to rebuild")
     except SystemExit as error:
         print(f"FAIL map selection: {error}")
         errors += 1
