@@ -187,8 +187,10 @@ if [[ "$MAP_SOURCE_POLICY" != "refresh" && -s "$merged_pbf" && -s "$manifest" &&
     exit 0
   fi
   printf 'Existing dataset does not match the requested selection/snapshot; rebuilding it.\n'
-elif [[ -e "$merged_pbf" && ! -s "$manifest" && "${MAP_CROP_OVERWRITE:-0}" != '1' ]]; then
-  fail "a dataset PBF without a provenance manifest already exists; inspect it, or set MAP_CROP_OVERWRITE=1 to replace it: $merged_pbf"
+elif [[ ( -e "$merged_pbf" || -L "$merged_pbf" ) && ! -s "$manifest" && "${MAP_CROP_OVERWRITE:-0}" != '1' ]]; then
+  [[ -f "$merged_pbf" && ! -L "$merged_pbf" ]] ||
+    fail "unmanifested dataset PBF is not a regular file; inspect it before retrying: $merged_pbf"
+  printf 'Unmanifested dataset PBF exists; re-merging verified inputs to compare before reuse: %s\n' "$merged_pbf"
 fi
 
 if [[ "$APPROX_DOWNLOAD_SIZE_UNKNOWN" == "1" ]]; then
@@ -365,6 +367,35 @@ while IFS=$'\t' read -r area_id _country_id source_id area_bbox area_name _conti
   merge_inputs+=("$crop_pbf")
 done <<< "$areas_output"
 
+# An interrupted manifest write can leave a fully merged, but unmanifested,
+# PBF. Only reuse it when a fresh merge of the verified inputs has identical
+# bytes. A mismatch is not permission to overwrite unknown data.
+install_merged_pbf() {
+  local candidate="$1" target="$2" provenance="$3"
+  if [[ ( -e "$target" || -L "$target" ) && ! -s "$provenance" && "${MAP_CROP_OVERWRITE:-0}" != '1' ]]; then
+    [[ -f "$target" && ! -L "$target" ]] ||
+      fail "unmanifested dataset PBF is not a regular file; inspect it before retrying: $target"
+    if [[ "$(sha256_file "$candidate")" != "$(sha256_file "$target")" ]]; then
+      fail "unmanifested dataset PBF differs from the verified re-merge; inspect it, or set MAP_CROP_OVERWRITE=1 to replace it: $target"
+    fi
+    rm -- "$candidate"
+    printf 'Reusing byte-identical unmanifested dataset PBF: %s\n' "$target"
+  else
+    mv -- "$candidate" "$target"
+  fi
+}
+
+write_dataset_manifest() {
+  python3 "$SCRIPT_DIR/regions.py" write-manifest \
+    --data-dir "$MAP_DATA_DIR" --dataset "$MAP_REGION" \
+    --selection "$MAP_REGION_IDS" --merged "$merged_pbf" \
+    --osmium-version "$osmium_version" \
+    --library "$MAP_LIBRARY_DIR" \
+    --snapshot "$MAP_SNAPSHOT" \
+    --snapshot-date "$MAP_SNAPSHOT_DATE" \
+    --source-policy "$MAP_SOURCE_POLICY"
+}
+
 # ---- 3. Merge into the single shared dataset PBF + provenance manifest ----
 merged_tmp_dir="$(mktemp -d "$MAP_DATA_DIR/.borobiya-merge.XXXXXX")"
 merged_tmp="$merged_tmp_dir/$MAP_REGION.osm.pbf"
@@ -373,18 +404,13 @@ printf 'Merging %d area input(s) into %s...\n' "${#merge_inputs[@]}" "$merged_pb
 osmium merge --output="$merged_tmp" "${merge_inputs[@]}"
 [[ -s "$merged_tmp" ]] || fail 'osmium merge did not produce a non-empty dataset PBF'
 osmium fileinfo "$merged_tmp" >/dev/null
-mv -- "$merged_tmp" "$merged_pbf"
+install_merged_pbf "$merged_tmp" "$merged_pbf" "$manifest"
 rmdir -- "$merged_tmp_dir"
 trap - EXIT
 
-python3 "$SCRIPT_DIR/regions.py" write-manifest \
-  --data-dir "$MAP_DATA_DIR" --dataset "$MAP_REGION" \
-  --selection "$MAP_REGION_IDS" --merged "$merged_pbf" \
-  --osmium-version "$osmium_version" \
-  --library "$MAP_LIBRARY_DIR" \
-  --snapshot "$MAP_SNAPSHOT_MODE" \
-  --snapshot-date "$MAP_SNAPSHOT_DATE" \
-  --source-policy "$MAP_SOURCE_POLICY"
+# MAP_SNAPSHOT_MODE is "date" for concrete snapshots, not a --snapshot spec.
+# Pass the original spec; --snapshot-date retains the already-resolved date.
+write_dataset_manifest
 
 printf 'Prepared shared dataset PBF: %s (%s bytes)\n' "$merged_pbf" "$(wc -c < "$merged_pbf" | tr -d '[:space:]')"
 printf 'Areas: %s\nSnapshot: %s\nUnion bbox (MAP_BBOX): %s\n' "$MAP_REGION_IDS" "$MAP_SNAPSHOT_DATE" "$UNION_BBOX"
