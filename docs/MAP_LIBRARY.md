@@ -57,7 +57,12 @@ for automatic fallback and persistence.
 | `offline` | Never download map sources. Fail with the exact missing library path instead. `latest` cannot be resolved in this mode. |
 
 Checksums are verified in every mode. A corrupt library file is never used
-just because it exists.
+just because it exists. If a cached source's MD5 or size differs from its
+trusted metadata, `cache-first` downloads a **same-date** replacement into a
+temporary file and swaps it in only after verification. A failed download leaves
+the original file untouched; a downloaded checksum mismatch stops without
+switching dates. `offline` still refuses a corrupt cache without contacting the
+network.
 
 ## 2. Standard layout
 

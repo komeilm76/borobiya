@@ -37,6 +37,7 @@ class GeofabrikErrorTests(unittest.TestCase):
             for status, curl_exit, expected in (
                 ("404", "22", "Geofabrik HTTP 404"),
                 ("410", "22", "Geofabrik HTTP 410"),
+                ("404", "56", "HTTPS proxy/no_proxy"),  # network error after HTTP status
                 ("403", "22", "HTTP 403"),
                 ("000", "7", "HTTPS proxy/no_proxy"),
                 ("200", "0", ""),
@@ -48,7 +49,7 @@ class GeofabrikErrorTests(unittest.TestCase):
                                                  "https_proxy": "http://token:private@proxy:2080",
                                                  "FAKE_STATUS": status, "FAKE_EXIT": curl_exit,
                                                  "FAKE_OUTPUT": str(output)}, check=False)
-                    self.assertEqual(result.returncode, 0 if curl_exit == "0" else 42 if status in ("404", "410") else 1)
+                    self.assertEqual(result.returncode, 0 if curl_exit == "0" else 42 if curl_exit == "22" and status in ("404", "410") else 1)
                     self.assertIn(expected, result.stderr)
                     self.assertNotIn("token:private", result.stdout + result.stderr)
                     self.assertFalse(output.exists())  # The fake curl never writes to disk.
@@ -298,3 +299,41 @@ class ManifestRetryTests(unittest.TestCase):
             self.assertIn("MD5 mismatch", mismatched.stderr)
             self.assertFalse(source.exists())
             self.assertFalse(sidecar.exists())
+
+            # A corrupt cached PBF must not be accepted, but cache-first can
+            # repair it with a same-date download without deleting it first.
+            remote_md5.write_text(f"{hashlib.md5(source_bytes).hexdigest()} {source.name}\n")
+            source.write_bytes(source_bytes)
+            regions.write_source_metadata(
+                catalog, library, "iran", snapshot_date,
+                md5=hashlib.md5(source_bytes).hexdigest(),
+                sha256=hashlib.sha256(source_bytes).hexdigest(),
+            )
+            source.write_bytes(b"corrupt cached data")
+            original = source.read_bytes()
+            offline = subprocess.run(["bash", str(script), "--sources-only"],
+                                     env={**online, "MAP_SOURCE_POLICY": "offline", "FAKE_HTTP": "200"},
+                                     capture_output=True, text=True, check=False)
+            self.assertNotEqual(offline.returncode, 0)
+            self.assertIn("MD5 mismatch", offline.stderr)
+            self.assertEqual(source.read_bytes(), original)
+            unavailable = subprocess.run(["bash", str(script), "--sources-only"],
+                                         env={**online, "FAKE_HTTP": "PBF404"},
+                                         capture_output=True, text=True, check=False)
+            self.assertEqual(unavailable.returncode, 42, unavailable.stderr)
+            self.assertEqual(source.read_bytes(), original)
+            remote_source.write_bytes(b"bad new download")
+            bad_download = subprocess.run(["bash", str(script), "--sources-only"],
+                                          env={**online, "FAKE_HTTP": "200"},
+                                          capture_output=True, text=True, check=False)
+            self.assertNotEqual(bad_download.returncode, 0)
+            self.assertIn("downloaded source PBF MD5 mismatch", bad_download.stderr)
+            self.assertEqual(source.read_bytes(), original)
+            remote_source.write_bytes(source_bytes)
+            repaired = subprocess.run(["bash", str(script), "--sources-only"],
+                                      env={**online, "FAKE_HTTP": "200"},
+                                      capture_output=True, text=True, check=False)
+            self.assertEqual(repaired.returncode, 0, repaired.stderr)
+            self.assertIn("mismatched MD5", repaired.stderr)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            self.assertEqual(paths["pbf"].read_bytes(), b"unknown pre-existing data")

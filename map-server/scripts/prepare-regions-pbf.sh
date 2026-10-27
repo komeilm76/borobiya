@@ -104,7 +104,7 @@ sha256_file() {
 }
 
 download_geofabrik_file() {
-  local url="$1" destination="$2" source_id="$3" status=""
+  local url="$1" destination="$2" source_id="$3" status="" curl_exit=0
   # curl's -f returns 22 for both a missing dated extract and a proxy-generated
   # HTTP error. Capture only the final HTTP code (not headers, bodies or proxy
   # credentials). Exit 42 only for dated-file 404/410, so setup can try a
@@ -112,8 +112,12 @@ download_geofabrik_file() {
   if status="$(curl -fL --connect-timeout 20 --retry 3 --retry-delay 2 \
       -w '%{http_code}' "$url" -o "$destination")"; then
     return 0
+  else
+    curl_exit=$?
   fi
-  if [[ "$status" == 404 || "$status" == 410 ]]; then
+  # A network/TLS failure can occur after an HTTP response was observed. Only
+  # curl's HTTP-error exit code (22) is evidence for date fallback.
+  if [[ "$curl_exit" == 22 && ( "$status" == 404 || "$status" == 410 ) ]]; then
     printf 'prepare-regions-pbf: Geofabrik HTTP %s for %s (%s). This date may have expired, or a proxy may have returned %s; the VM setup command can try another dated snapshot.\n' "$status" "$source_id" "$url" "$status" >&2
     exit 42
   fi
@@ -295,6 +299,20 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
   download_required=0
   if [[ "$MAP_SOURCE_POLICY" == "refresh" || ! -s "$source_pbf" ]]; then
     download_required=1
+  elif [[ "$MAP_SOURCE_POLICY" == "cache-first" && -n "$source_md5" ]]; then
+    # A file's existence does not prove it is cached correctly. Retry the same
+    # date online, but do not replace the bad copy unless staging verifies.
+    cached_md5="$(md5_file "$source_pbf")"
+    if [[ "$cached_md5" != "$source_md5" ]]; then
+      printf 'Cached source %s has a mismatched MD5; trying a verified replacement without deleting it first.\n' "$source_pbf" >&2
+      download_required=1
+    elif [[ -n "$source_bytes" ]]; then
+      cached_bytes="$(wc -c < "$source_pbf" | tr -d '[:space:]')"
+      if [[ "$cached_bytes" != "$source_bytes" ]]; then
+        printf 'Cached source %s has a mismatched size; trying a verified replacement without deleting it first.\n' "$source_pbf" >&2
+        download_required=1
+      fi
+    fi
   fi
   if (( download_required )); then
     if [[ "$MAP_SOURCE_POLICY" == "offline" ]]; then
@@ -329,7 +347,7 @@ while IFS=$'\t' read -r source_id source_url source_file_name source_md5 source_
     fail "no trusted MD5 metadata for cached source $source_id at $source_pbf; run online once or restore its .md5/source.json"
   actual_md5="$(md5_file "$source_pbf")"
   [[ "$actual_md5" == "$source_md5" ]] || \
-    fail "source PBF MD5 mismatch for $source_id: expected $source_md5, received $actual_md5; refusing to crop (delete $source_pbf to re-download)"
+    fail "source PBF MD5 mismatch for $source_id: expected $source_md5, received $actual_md5; refusing to crop. Retry with cache-first online to stage a verified replacement: $source_pbf"
   if [[ -n "$source_bytes" ]]; then
     actual_bytes="$(wc -c < "$source_pbf" | tr -d '[:space:]')"
     [[ "$actual_bytes" == "$source_bytes" ]] || \
