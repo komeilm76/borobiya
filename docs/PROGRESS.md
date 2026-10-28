@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — History-playback overlay label and input contrast (T4.4.3 partial)
+
+- The small heading and manual date-field labels in the translucent map playback card used `#718584`, only about 3.9:1 even over solid white; the typed date text inherited that color. The field boundary also blended into both themes. The light labels now use `#536d6c`, preserving existing readable dark overrides; the date input border uses theme-aware muted ink and gets a distinct visible keyboard focus outline. Source-pinned checks failed before the change and verify small-text 4.5:1 and input-boundary/focus 3:1 against a conservative black/white tile beneath the overlay. No Vue SFC was mounted, no live map/browser was tested, and the wider WCAG/site audit remains open.
+
 ### 2026-10-28 — Share privacy flow dark-theme contrast (T4.4.3 partial)
 
 - The location-share dialog and list cards used light-only dark ink for headings, row states, preset labels, input text and the submission status; on the dark surface, representative colors measured only 1.24:1–3.1:1, below the 4.5:1 small-text target. These foregrounds now use existing theme-aware text/muted/success tokens, with a dark warning override and a visible keyboard focus outline; the confirmed preset retains its white-on-green state. Source-pinned CSS/contrast regressions failed before the fix and cover both palette surfaces, not rendered pixel blending, keyboard or screen-reader behavior, or a site-wide WCAG audit. T4.4.3 stays open.

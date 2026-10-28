@@ -377,7 +377,7 @@ function scrub(value: number | readonly number[]): void {
 
 .history-playback__title-block p {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -439,7 +439,7 @@ function scrub(value: number | readonly number[]): void {
   flex: 1 1 auto;
   flex-direction: column;
   gap: 0.15rem;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.66rem;
   font-weight: 700;
 }
@@ -448,12 +448,17 @@ function scrub(value: number | readonly number[]): void {
   width: 100%;
   min-width: 0;
   padding: 0.3rem 0.4rem;
-  border: 1px solid rgba(23, 59, 60, 0.22);
+  border: 1px solid var(--bb-color-muted);
   border-radius: 0.5rem;
   background: transparent;
   color: inherit;
   font: inherit;
   font-size: 0.72rem;
+}
+
+.history-playback__field input:focus-visible {
+  outline: 2px solid var(--bb-color-primary);
+  outline-offset: 2px;
 }
 
 .history-playback__apply {
@@ -510,7 +515,7 @@ function scrub(value: number | readonly number[]): void {
 }
 
 :global(:root.dark) .history-playback__field input {
-  border-color: rgba(226, 240, 238, 0.22);
+  border-color: var(--bb-color-muted);
 }
 
 @media (max-width: 1023px) {
