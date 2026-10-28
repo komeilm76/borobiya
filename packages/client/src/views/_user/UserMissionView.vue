@@ -240,6 +240,7 @@ import { buildElevationChart } from "@/sos/elevation-chart";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
+import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import { useAuthStore } from "@/stores/auth";
 
 const auth = useAuthStore();
@@ -426,8 +427,18 @@ const steps = [
 ];
 const activeStep = computed(() => steps.findIndex((step) => step.status === desk.activeMission.value?.status));
 const currentStatusLabel = computed(() => steps[activeStep.value]?.label ?? "در حال بررسی");
-onMounted(() => { void desk.load(); });
-watch(() => auth.user?.id, () => { closeRoutes(); desk.reset(); if (auth.user?.id) void desk.load(); });
+const missionSession = computed(() => {
+  const owner = auth.user?.id;
+  const claims = decodeAccessTokenClaims(auth.accessToken);
+  if (!owner || claims?.sub !== owner || typeof claims.sessionId !== "string") return null;
+  return JSON.stringify([owner, claims.sessionId]);
+});
+onMounted(() => { if (missionSession.value) void desk.load(); });
+watch(missionSession, (next) => {
+  closeRoutes();
+  desk.reset();
+  if (next) void desk.load();
+}, { flush: "sync" });
 onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 </script>
 

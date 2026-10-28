@@ -1,6 +1,7 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import type { CancellationReason, Mission } from "@shared/index";
 import { ApiError } from "../api/http";
+import { decodeAccessTokenClaims } from "./device-identity";
 import { cancelRescuerMission, listRescuerCancellationReasons, listRescuerMissions } from "../api/mission";
 import { sosApiErrorMessage } from "../sos/sos-form";
 
@@ -27,17 +28,30 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   let listGeneration = 0;
   let reasonGeneration = 0;
   let sessionGeneration = 0;
+  // Treat bearer renewal in the same session as continuous, but discard private
+  // state synchronously if the owner, session, or token availability changes.
+  const sessionKey = computed(() => {
+    const owner = userId.value;
+    const bearer = token.value;
+    if (!owner || !bearer) return null;
+    const claims = decodeAccessTokenClaims(bearer);
+    // JWT-shaped tokens must have a readable, matching owner and session
+    // before they may fetch private rows; opaque bearers keep their caller's owner.
+    if (bearer.includes(".") && (claims?.sub !== owner || typeof claims.sessionId !== "string")) return null;
+    return JSON.stringify([owner, claims?.sessionId ?? null]);
+  });
+  watch(sessionKey, () => reset(), { flush: "sync" });
   const activeMission = computed(() => missions.value.find((item) => isActiveMission(item.status)) ?? null);
   const selectedReason = computed(() => reasons.value.find((item) => item.id === reasonId.value));
   const canCancel = computed(() => cancellationOpen.value && !reasonLoading.value && !cancelling.value &&
-    !blocked.value && !!activeMission.value && !!token.value && !!userId.value && !!selectedReason.value &&
+    !blocked.value && !!activeMission.value && !!sessionKey.value && !!selectedReason.value &&
     (!selectedReason.value.requiresCustomText ||
       (customReason.value.trim().length >= 10 && customReason.value.trim().length <= 200)));
 
   async function load(): Promise<void> {
     const current = ++listGeneration;
     const owner = userId.value;
-    if (!owner || !token.value) {
+    if (!owner || !sessionKey.value) {
       missions.value = [];
       loading.value = false;
       error.value = null;
@@ -48,7 +62,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     try {
       await ensureSession?.();
       const bearer = token.value;
-      if (!bearer || userId.value !== owner || current !== listGeneration) return;
+      if (!bearer || !sessionKey.value || userId.value !== owner || current !== listGeneration) return;
       const page = await listRescuerMissions(bearer);
       if (current === listGeneration && userId.value === owner) missions.value = page.items;
     } catch (cause) {
@@ -60,9 +74,10 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   }
 
   async function showCancellation(): Promise<void> {
-    if (!activeMission.value || !token.value || !userId.value || cancelling.value) return;
-    const current = ++reasonGeneration;
     const owner = userId.value;
+    const bearer = token.value;
+    if (!owner || !bearer || !activeMission.value || !sessionKey.value || cancelling.value) return;
+    const current = ++reasonGeneration;
     cancellationOpen.value = true;
     reasonId.value = "";
     customReason.value = "";
@@ -70,7 +85,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     blocked.value = false;
     reasonLoading.value = true;
     try {
-      const result = await listRescuerCancellationReasons(token.value);
+      const result = await listRescuerCancellationReasons(bearer);
       if (current === reasonGeneration && cancellationOpen.value && userId.value === owner) reasons.value = result;
     } catch (cause) {
       if (current === reasonGeneration && cancellationOpen.value && userId.value === owner)

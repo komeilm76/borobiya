@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Rescuer mission desk account-boundary fix (T3.6.3 follow-up)
+
+- The mounted mission desk kept private mission rows and cancellation state when its token disappeared while the profile remained loaded; a changed owner could see old rows until Vue's next tick. The desk now synchronously clears its state and invalidates in-flight reads/cancellations when the owner, token availability, or JWT session changes. The view stops routes and only reloads after the bearer subject/session matches the displayed account; same-session bearer renewal preserves the panel. Deferred client regressions failed before the fix and now cover late replies, token loss, owner switch, session renewal and mismatch. These unit and source-pinned view tests do not establish browser/device behavior or server authorization (which remains authoritative).
+
 ### 2026-10-28 — T4.4.4 SOS picker marker import (partial)
 
 - The SOS picker requested MapLibre a second time to construct its draggable pin, despite `MapCanvas` already loading the module and emitting its `Marker` constructor on ready. The picker now uses that ready constructor, preserving GPS/manual pin updates, drag-to-select and close/unmount cleanup without the extra async import. A source-pinned regression failed before the change; typechecks and a production build validate the wiring. This is not a measured load-time, bundle-size, or real-browser/device acceptance claim, and T4.4.4 remains open.

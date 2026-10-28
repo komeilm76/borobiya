@@ -22,6 +22,9 @@ const reasons: CancellationReason[] = [
   { id: "a0000000-0000-4000-8000-000000000005", type: "rescuer", key: "other",
     label: "Other", labelFa: "سایر", isActive: true, requiresCustomText: true }
 ];
+function bearer(sub: string, sessionId: string, nonce = 0): string {
+  return `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, sessionId, nonce }))}.signature`;
+}
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((r) => { resolve = r; });
@@ -43,6 +46,18 @@ describe("mission desk cancellation", () => {
     expect(view).toContain('desk.selectedReason.value?.requiresCustomText');
     expect(view).toContain(':disabled="!desk.canCancel.value"');
     expect(view).toContain('desk.cancellationError.value');
+  });
+
+  it("only reloads the mission view for a matching JWT owner and session, with synchronous cleanup", () => {
+    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    expect(view).toContain("const missionSession = computed(() => {");
+    expect(view).toContain("claims?.sub !== owner");
+    expect(view).toContain('typeof claims.sessionId !== "string"');
+    expect(view).toContain("return JSON.stringify([owner, claims.sessionId]);");
+    expect(view).toContain("watch(missionSession, (next) => {\n  closeRoutes();\n  desk.reset();");
+    expect(view).toContain("if (next) void desk.load()");
+    expect(view).toMatch(/watch\(missionSession,[\s\S]*?\{ flush: "sync" \}\);/);
+    expect(view).toContain("onMounted(() => { if (missionSession.value) void desk.load(); });");
   });
 
   it("never cancels without a reason or short Other explanation; sends only once while waiting", async () => {
@@ -130,6 +145,106 @@ describe("mission desk cancellation", () => {
     expect(desk.cancelledMissionId.value).toBeNull();
     expect(desk.cancellationOpen.value).toBe(false);
     expect(desk.cancelling.value).toBe(false);
+  });
+
+  it("clears private missions and cancellation state immediately on token loss without an explicit reset", async () => {
+    const token = ref<string | null>("token");
+    const owner = ref<string | null>(rescuerId);
+    const desk = useMissionDesk(token, owner);
+    await desk.load();
+    await desk.showCancellation();
+    expect(desk.missions.value).toHaveLength(1);
+    expect(desk.cancellationOpen.value).toBe(true);
+    token.value = null;
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.cancellationOpen.value).toBe(false);
+    expect(desk.reasons.value).toEqual([]);
+    expect(desk.loading.value).toBe(false);
+  });
+
+  it("does not carry old rows or a late reply into a new owner before the view's next tick", async () => {
+    const token = ref<string | null>("token-a");
+    const owner = ref<string | null>(rescuerId);
+    const desk = useMissionDesk(token, owner);
+    await desk.load();
+    const pending = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(pending.promise);
+    const oldRead = desk.load();
+    expect(desk.loading.value).toBe(true);
+    owner.value = requesterId;
+    token.value = "token-b";
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.loading.value).toBe(false);
+    pending.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await oldRead;
+    expect(desk.missions.value).toEqual([]);
+  });
+
+  it("keeps missions and an open reason panel through same-session bearer rotation", async () => {
+    const token = ref<string | null>(bearer(rescuerId, "session-a"));
+    const desk = useMissionDesk(token, ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    const pending = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(pending.promise);
+    const refresh = desk.load();
+    token.value = bearer(rescuerId, "session-a", 1);
+    expect(desk.missions.value).toEqual([mission]);
+    expect(desk.cancellationOpen.value).toBe(true);
+    pending.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await refresh;
+    expect(desk.loading.value).toBe(false);
+    expect(desk.activeMission.value?.id).toBe(missionId);
+  });
+
+  it("clears on a new session for the same owner and rejects a mismatched bearer before reading", async () => {
+    const token = ref<string | null>(bearer(rescuerId, "session-a"));
+    const desk = useMissionDesk(token, ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    token.value = bearer(rescuerId, "session-b");
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.cancellationOpen.value).toBe(false);
+    await desk.load();
+    expect(desk.missions.value).toEqual([mission]);
+    token.value = bearer(requesterId, "session-c");
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.canCancel.value).toBe(false);
+    await desk.load();
+    await desk.showCancellation();
+    expect(listRescuerMissions).toHaveBeenCalledTimes(2);
+    expect(listRescuerCancellationReasons).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not send a mission read after session recovery changes to a different owner", async () => {
+    const token = ref<string | null>(bearer(rescuerId, "session-a"));
+    const recovery = deferred<void>();
+    const desk = useMissionDesk(token, ref(rescuerId), () => recovery.promise);
+    const loading = desk.load();
+    token.value = bearer(requesterId, "session-b");
+    expect(desk.loading.value).toBe(false);
+    recovery.resolve();
+    await loading;
+    expect(listRescuerMissions).not.toHaveBeenCalled();
+    expect(desk.missions.value).toEqual([]);
+  });
+
+  it("discards an in-flight cancellation after the token vanishes without explicit reset", async () => {
+    const token = ref<string | null>(bearer(rescuerId, "session-a"));
+    const desk = useMissionDesk(token, ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelRescuerMission).mockReturnValueOnce(pending.promise);
+    const saving = desk.confirmCancellation();
+    token.value = null;
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.cancelling.value).toBe(false);
+    pending.resolve();
+    await saving;
+    expect(desk.cancelledMissionId.value).toBeNull();
+    expect(desk.cancellationOpen.value).toBe(false);
   });
 
   it("drops a late mission list after sign-out or account switch", async () => {
