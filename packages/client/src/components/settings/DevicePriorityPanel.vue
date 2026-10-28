@@ -85,7 +85,7 @@
           variant="flat"
           color="primary"
           :loading="api.bulkRunning.value"
-          :disabled="api.loading.value || api.failed.value"
+          :disabled="api.loading.value || api.failed.value || Boolean(api.busyShareId.value) || api.bulkRunning.value"
           @click="applyToAll"
         >
           اعمال این دستگاه برای همه
@@ -111,7 +111,7 @@
               :items="api.choicesFor(entry.share)"
               item-title="label"
               item-value="value"
-              :disabled="entry.row.kind === 'expired' || busy(entry.share.id) || api.loading.value || api.failed.value"
+              :disabled="entry.row.kind === 'expired' || Boolean(api.busyShareId.value) || api.bulkRunning.value || api.loading.value || api.failed.value"
               density="compact"
               variant="outlined"
               hide-details="auto"
@@ -212,7 +212,8 @@ function busy(shareId: string): boolean {
 
 function canApply(entry: { share: LocationShare; row: { kind: ShareRowKind } }): boolean {
   const chosen = drafts[entry.share.id];
-  if (!chosen || entry.row.kind === "expired" || busy(entry.share.id) || props.api.loading.value || props.api.failed.value) return false;
+  if (!chosen || entry.row.kind === "expired" || props.api.busyShareId.value || props.api.bulkRunning.value ||
+      props.api.loading.value || props.api.failed.value) return false;
   // The button is disabled when it would do nothing the server has not already done. The composable
   // refuses the same case; a control that is lit for a no-op is a bug the user finds by pressing it.
   return chosen !== entry.share.priorityDeviceId;

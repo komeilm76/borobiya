@@ -355,6 +355,78 @@ describe("device write session recovery", () => {
   });
 });
 
+describe("serializing priority changes", () => {
+  it("locks a single-share change before session recovery and refuses competing single/bulk writes", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let hold = false;
+    const { api, scope } = mount(() => hold ? gate : Promise.resolve());
+    try {
+      await api.refresh();
+      calls = [];
+      hold = true;
+      const first = api.assign(SHARE_ONE, LAPTOP);
+      const second = api.assign(SHARE_ONE, PHONE);
+      const bulk = api.assignEverywhere(LAPTOP);
+      expect(api.busyShareId.value).toBe(SHARE_ONE);
+      release();
+      const [firstResult, secondResult] = await Promise.all([first, second, bulk]);
+      expect(firstResult).toBe(true);
+      expect(secondResult).toBe(false);
+      expect(posts()).toHaveLength(1);
+      expect(api.busyShareId.value).toBeNull();
+      expect(api.bulkRunning.value).toBe(false);
+    } finally { release(); scope.stop(); }
+  });
+
+  it("keeps the write lock through the post-write device refresh", async () => {
+    const { api, scope } = mount();
+    let release!: (response: Response) => void;
+    const pendingRead = new Promise<Response>((resolve) => { release = resolve; });
+    try {
+      await api.refresh();
+      calls = [];
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+        String(input).endsWith("/_user/devices") && init?.method !== "POST"
+          ? pendingRead : originalFetch(input, init)) as typeof fetch;
+      const first = api.assign(SHARE_ONE, LAPTOP);
+      await settle();
+      expect(posts()).toHaveLength(1);
+      expect(api.loading.value).toBe(true);
+      expect(api.busyShareId.value).toBe(SHARE_ONE);
+      expect(await api.assignEverywhere(PHONE)).toBeUndefined();
+      expect(posts()).toHaveLength(1);
+      release(jsonResponse(defaultResponder("/_user/devices", "GET").body, 200));
+      expect(await first).toBe(true);
+      expect(api.busyShareId.value).toBeNull();
+    } finally { release(jsonResponse([], 200)); scope.stop(); }
+  });
+
+  it("locks a bulk pass before session recovery and refuses single and second bulk changes", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let hold = false;
+    const { api, scope } = mount(() => hold ? gate : Promise.resolve());
+    try {
+      await api.refresh();
+      calls = [];
+      hold = true;
+      const bulk = api.assignEverywhere(LAPTOP);
+      const single = api.assign(SHARE_ONE, LAPTOP);
+      const secondBulk = api.assignEverywhere(PHONE);
+      const currentDevice = api.assignCurrentDevice();
+      expect(api.bulkRunning.value).toBe(true);
+      release();
+      await Promise.all([bulk, single, secondBulk, currentDevice]);
+      expect(posts()).toHaveLength(2);
+      expect(api.lastBulkSummary.value).toEqual({ applied: 2, failed: 0, skipped: 0, all: true });
+      expect(api.bulkRunning.value).toBe(false);
+      expect(api.busyShareId.value).toBeNull();
+    } finally { release(); scope.stop(); }
+  });
+});
+
 describe("changing one share", () => {
   it("does not report an old account's delayed write as a new session's success", async () => {
     const { api, token, accountId } = mount();
@@ -603,5 +675,7 @@ describe("leaving the screen", () => {
     expect(panelSource).toContain("share.targetUsername");
     expect(panelSource).toContain("api.currentDeviceId.value");
     expect(panelSource).toContain("api.assignEverywhere(");
+    expect(panelSource).toContain("Boolean(api.busyShareId.value) || api.bulkRunning.value");
+    expect(panelSource).toContain("props.api.busyShareId.value || props.api.bulkRunning.value");
   });
 });

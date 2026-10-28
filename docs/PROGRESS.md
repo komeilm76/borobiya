@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Active-device priority write serialization (T2.3.5 follow-up)
+
+- Single-share and bulk priority changes only marked themselves busy **after** awaiting session recovery. Rapid taps could send contradictory `POST /_user/location/share` writes for the same share, with response order overriding the user's intended device; a bulk change could overlap a row change as well. A shared panel-wide write guard now locks before the first await, stays active through the post-write refresh, refuses competing row/bulk/current-device edits, and releases only the same session's lock. Controls reflect the lock. Deferred-session regressions failed before the fix and now verify one write sequence at a time. No Vue SFC was mounted or live multi-device/browser acceptance performed; P2-A1 and the broader T4.4.2 feedback audit remain open.
+
 ### 2026-10-28 — Admin dispatch mission-list feedback (T4.4.2 partial)
 
 - The selected SOS's mission-history area silently disappeared while its read was pending or failed, making an unverified empty list look like no missions. The panel now shows a labeled loading skeleton, an explicit retryable failure, and a “no missions yet” message only after a successful empty read. A small composable owns the scoped read, clears the previous selection on request/token/status changes, and ignores late replies and unmount; pure deferred tests and a source-pinned view test cover these states without mounting a Vue SFC. Other T4.4.2 screens, toasts, eligible optimistic writes/rollback, and real browser/device acceptance remain open.

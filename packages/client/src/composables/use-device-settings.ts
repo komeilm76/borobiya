@@ -203,7 +203,19 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }
 
   async function assign(shareId: string, deviceId: string): Promise<boolean> {
+    // Lock before ensureSession's first await: another tap (including bulk) cannot
+    // race this share's pin, then make the last response overwrite the user's choice.
+    if (busyShareId.value || bulkRunning.value) return false;
     const session = sessionGeneration;
+    busyShareId.value = shareId;
+    try {
+      return await assignUnlocked(shareId, deviceId, session);
+    } finally {
+      if (session === sessionGeneration) busyShareId.value = null;
+    }
+  }
+
+  async function assignUnlocked(shareId: string, deviceId: string, session: number): Promise<boolean> {
     let accessToken: string | null;
     try {
       accessToken = await currentAccessToken();
@@ -232,21 +244,16 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
       return false;
     }
 
-    busyShareId.value = shareId;
-    try {
-      const outcome = await send(plan.body, accessToken);
-      if (session !== sessionGeneration) return false;
-      if (!outcome.ok) {
-        setStatus("error", outcome.message ?? "تغییر دستگاه انجام نشد.");
-        if (outcome.staleList) await refresh();
-        return false;
-      }
-      setStatus("ok", "دستگاه پخش‌کنندهٔ این اشتراک عوض شد.");
-      await refresh();
-      return session === sessionGeneration;
-    } finally {
-      if (session === sessionGeneration) busyShareId.value = null;
+    const outcome = await send(plan.body, accessToken);
+    if (session !== sessionGeneration) return false;
+    if (!outcome.ok) {
+      setStatus("error", outcome.message ?? "تغییر دستگاه انجام نشد.");
+      if (outcome.staleList) await refresh();
+      return false;
     }
+    setStatus("ok", "دستگاه پخش‌کنندهٔ این اشتراک عوض شد.");
+    await refresh();
+    return session === sessionGeneration;
   }
 
   /**
@@ -258,7 +265,17 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
    * the pin the server actually kept.
    */
   async function assignEverywhere(deviceId: string): Promise<void> {
+    if (busyShareId.value || bulkRunning.value) return;
     const session = sessionGeneration;
+    bulkRunning.value = true;
+    try {
+      await assignEverywhereUnlocked(deviceId, session);
+    } finally {
+      if (session === sessionGeneration) bulkRunning.value = false;
+    }
+  }
+
+  async function assignEverywhereUnlocked(deviceId: string, session: number): Promise<void> {
     let accessToken: string | null;
     try {
       accessToken = await currentAccessToken();
@@ -281,15 +298,10 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
       return;
     }
 
-    bulkRunning.value = true;
     const outcomes: SendOutcome[] = [];
-    try {
-      for (const plan of sweep.ready) {
-        if (session !== sessionGeneration) return;
-        outcomes.push(await send(plan.body, accessToken));
-      }
-    } finally {
-      if (session === sessionGeneration) bulkRunning.value = false;
+    for (const plan of sweep.ready) {
+      if (session !== sessionGeneration) return;
+      outcomes.push(await send(plan.body, accessToken));
     }
     if (session !== sessionGeneration) return;
 
@@ -309,6 +321,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }
 
   async function assignCurrentDevice(): Promise<void> {
+    if (busyShareId.value || bulkRunning.value) return;
     const targetDeviceId = currentDeviceId.value;
     if (!targetDeviceId) {
       setStatus("warn", "نشست فعلی در فهرست دستگاه‌ها پیدا نشد؛ فهرست را تازه کنید.");

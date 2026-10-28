@@ -27,7 +27,7 @@ describe("active-device read feedback", () => {
     expect(panel).toContain('v-else class="device-priority__hint"');
     expect(panel).toContain('@click="api.refresh()"');
     expect(panel).toContain('role="alert"');
-    expect(panel).toContain(':disabled="api.loading.value || api.failed.value"');
-    expect(panel).toContain('|| props.api.loading.value || props.api.failed.value) return false;');
+    expect(panel).toContain(':disabled="api.loading.value || api.failed.value || Boolean(api.busyShareId.value) || api.bulkRunning.value"');
+    expect(panel).toContain('props.api.loading.value || props.api.failed.value) return false;');
   });
 });
