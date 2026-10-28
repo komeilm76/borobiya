@@ -186,7 +186,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from "vue";
-import { Marker, type Map as MapLibreMap } from "maplibre-gl";
+import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import { useRoute } from "vue-router";
 import type { ProposalInboxItem } from "@shared/index";
 import MapCanvas from "@/components/map/MapCanvas.vue";
@@ -217,28 +217,31 @@ let photoGeneration = 0;
 let locationGeneration = 0;
 let marker: Marker | null = null;
 let acceptedMap: MapLibreMap | null = null;
+let markerConstructor: typeof Marker | null = null;
 let acceptedIncidentMarker: Marker | null = null;
 let acceptedRescuerMarker: Marker | null = null;
 
 function severity(item: ProposalInboxItem) {
   return proposalSeverity[item.details?.sosRequest.severity ?? "medium"];
 }
-function markIncident(map: MapLibreMap): void {
+function markIncident(map: MapLibreMap, MarkerClass: typeof Marker): void {
   marker?.remove();
+  marker = null;
   const point = selected.value?.details?.sosRequest.location;
   if (!point) return;
-  marker = new Marker({ color: "#e4564f" }).setLngLat([point.lon, point.lat]).addTo(map);
+  marker = new MarkerClass({ color: "#e4564f" }).setLngLat([point.lon, point.lat]).addTo(map);
 }
 function syncAcceptedMap(): void {
   const incident = inbox.acceptedOffer?.details?.sosRequest.location;
   const map = acceptedMap;
-  if (!incident || !map) return;
+  const MarkerClass = markerConstructor;
+  if (!incident || !map || !MarkerClass) return;
   acceptedIncidentMarker?.remove();
   acceptedRescuerMarker?.remove();
-  acceptedIncidentMarker = new Marker({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
+  acceptedIncidentMarker = new MarkerClass({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
   acceptedIncidentMarker.getElement().setAttribute("aria-label", "محل حادثه");
   if (myPosition.value) {
-    acceptedRescuerMarker = new Marker({ color: "#16826c" })
+    acceptedRescuerMarker = new MarkerClass({ color: "#16826c" })
       .setLngLat([myPosition.value.lon, myPosition.value.lat]).addTo(map);
     acceptedRescuerMarker.getElement().setAttribute("aria-label", "موقعیت من");
   } else acceptedRescuerMarker = null;
@@ -249,8 +252,9 @@ function syncAcceptedMap(): void {
     map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 650 });
   }
 }
-function onAcceptedMapReady(map: MapLibreMap): void {
+function onAcceptedMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
   acceptedMap = map;
+  markerConstructor = MarkerClass;
   syncAcceptedMap();
 }
 
@@ -319,10 +323,11 @@ watch(() => auth.user?.id, () => {
   acceptedIncidentMarker?.remove();
   acceptedRescuerMarker?.remove();
   acceptedMap = null;
+  markerConstructor = null;
   photoGeneration++;
   photoSrc.value = null;
 });
-onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acceptedRescuerMarker?.remove(); acceptedMap = null; photoGeneration++; locationGeneration++; photoSrc.value = null; });
+onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acceptedRescuerMarker?.remove(); acceptedMap = null; markerConstructor = null; photoGeneration++; locationGeneration++; photoSrc.value = null; });
 </script>
 
 <style scoped>

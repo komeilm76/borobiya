@@ -20,6 +20,20 @@ describe("rescuer inbox markup and route", () => {
     expect(view).not.toContain(':src="selected.details.sosRequest.photoUrl"');
   });
 
+  it("defers MapLibre until a proposal or accepted-mission map is ready", () => {
+    // MapCanvas sends the already-loaded constructor to both ready handlers. The route
+    // must not import its large runtime chunk before an incident map even mounts.
+    expect(view).toContain('import type { Map as MapLibreMap, Marker } from "maplibre-gl"');
+    expect(view).not.toMatch(/import\s*\{\s*Marker\b/);
+    expect(view).toContain('function markIncident(map: MapLibreMap, MarkerClass: typeof Marker)');
+    expect(view).toContain('marker = new MarkerClass(');
+    expect(view).toContain('function onAcceptedMapReady(map: MapLibreMap, MarkerClass: typeof Marker)');
+    expect(view).toContain('markerConstructor = MarkerClass;');
+    expect(view).toContain('const MarkerClass = markerConstructor;');
+    expect(view).toContain('acceptedIncidentMarker = new MarkerClass(');
+    expect(view).toContain('acceptedRescuerMarker = new MarkerClass(');
+  });
+
   it("shows the accepted incident map, explicit location consent, and a two-point fitBounds camera", () => {
     expect(view).toContain('v-if="inbox.acceptedOffer?.details"');
     expect(view).toContain('aria-label="نمای مأموریت پذیرفته‌شده"');

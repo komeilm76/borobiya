@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.4 proposal-inbox MapLibre startup (partial)
+
+- The proposal inbox route previously had a runtime `Marker` import, causing its production chunk to statically import MapLibre (~1.09 MB) even before an offer or accepted-mission map was ready. Both map ready paths now use the `Marker` constructor emitted after `MapCanvas` loads; the accepted view retains that constructor for subsequent GPS updates and clears it at the account/unmount boundary. A source-pinned test reproduced the eager import before the fix, while before/after Vite chunks show the static MapLibre dependency removed from `UserProposalsView` and its route preload set. This is a dependency-graph improvement, not a measured <2s map paint, <500ms GPS, virtual-scroll or browser/device sign-off. T4.4.4 remains open.
+
 ### 2026-10-28 — SOS submission account-boundary bug (T3.2.4 follow-up)
 
 - The SOS sheet previously awaited session recovery and then sent an old draft with whichever bearer was current. If the account changed during that wait, the new account could file the previous user's emergency; an in-flight create or photo upload could also update the abandoned sheet and continue uploading after logout. The composable now requires the authenticated owner, invalidates queued work synchronously on account/token loss or sheet disposal, checks ownership after each async step, and keeps older `finally` blocks from unlocking a new submission. Same-owner token renewal continues to work. Deferred-response regressions reproduced the cross-account create, retry and unmount paths before the fix, plus coverage for late create/upload responses and concurrent session changes. A create sent before logout can still commit server-side and must be checked in that account's history; no browser/device acceptance is claimed.
