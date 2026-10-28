@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Navigation GPS consent on same-tick account change (T3.5.6 follow-up)
+
+- Route-follow navigation deferred its owner/mission/route watcher until Vue's next tick. If an account changed away and back within that tick, the watcher could miss both transitions and keep the earlier GPS watch and map-follow consent running. It now stops the watch synchronously when any of those inputs changes; a new login needs an explicit Start, and old callbacks cannot move the map. A pure composable regression failed before the fix and verifies immediate cleanup and same-tick logout/login isolation. No Vue SFC was mounted or browser/device GPS timing verified.
+
 ### 2026-10-28 — Requester history cancellation state across pages (T3.7.1 follow-up)
 
 - A successful cancellation or rejected confirmation could leave its `cancelled`/`blocked` dialog state on the next SOS request when a page load or deep link auto-selected a different request without calling `choose()`. In particular, the new active request appeared cancelled and lost its Cancel action. Successful reads now reset cancellation state only when the selected request ID changes; refreshing the same request or failing a page read keeps the last-known confirmation. A pure composable regression failed before the fix and covers all three cases. No Vue SFC was mounted or browser/device acceptance performed.

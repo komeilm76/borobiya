@@ -73,6 +73,29 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(clear).toHaveBeenCalledTimes(3);
   });
 
+  it("revokes GPS consent immediately across a same-tick logout and login", async () => {
+    const owner = ref<string | null>("rescuer");
+    const clear = vi.fn();
+    let onFix!: (fix: { lat: number; lon: number }) => void;
+    const camera = vi.fn();
+    const nav = useRouteNavigation(owner, ref(mission), ref(route), ref("car"), camera, {
+      subscribe: (fix) => { onFix = fix; return clear; }, now: () => 1000
+    });
+    expect(nav.start()).toBe(true);
+    owner.value = null;
+    expect(nav.active.value).toBe(false);
+    expect(nav.fix.value).toBeNull();
+    expect(clear).toHaveBeenCalledOnce();
+    owner.value = "rescuer"; // a fresh login cannot inherit the earlier watch/consent
+    await nextTick();
+    onFix({ lat: 38.5, lon: -120.2 });
+    expect(nav.active.value).toBe(false);
+    expect(camera).not.toHaveBeenCalled();
+    expect(nav.start()).toBe(true); // the user must explicitly start again
+    nav.stop();
+    expect(clear).toHaveBeenCalledTimes(2);
+  });
+
   it("ignores queued callbacks from a stopped watch after a fresh navigation start", () => {
     const fixes: Array<(fix: { lat: number; lon: number }) => void> = [];
     const failures: Array<(denied: boolean) => void> = [];

@@ -103,6 +103,8 @@ export function useRouteNavigation(
       return false;
     }
   }
-  watch([owner, missionId, selectedRoute, profile], () => { if (active.value) stop(); });
+  // Logout or a route/mission switch revokes this GPS consent at the ref change,
+  // not at Vue's next tick (which could coalesce a logout and new login).
+  watch([owner, missionId, selectedRoute, profile], () => { if (active.value) stop(); }, { flush: "sync" });
   return { active, fix, error, start, stop };
 }
