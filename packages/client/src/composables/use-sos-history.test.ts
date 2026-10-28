@@ -88,10 +88,47 @@ describe("requester SOS history and cancellation", () => {
     await history.load(1, olderId);
     expect(history.selected.value?.id).toBe(requestId);
     expect(history.linkError.value).toContain("دسترسی ندارید");
+    expect(history.linkRetryable.value).toBe(false);
+
+    // On the first visit the list succeeds, but an off-page linked detail is unavailable.
+    // The old code incorrectly reported that the entire list failed and left it empty.
+    const unavailable = useSosHistory(ref("token"), ref(requesterId));
+    vi.mocked(getRequesterSosRequest).mockRejectedValueOnce(new ApiError(503, "SERVICE_UNAVAILABLE", "Offline"));
+    await unavailable.load(1, olderId);
+    expect(unavailable.error.value).toBeNull();
+    expect(unavailable.items.value).toEqual([record]);
+    expect(unavailable.total.value).toBe(1);
+    expect(unavailable.selected.value?.id).toBe(requestId);
+    expect(unavailable.linkError.value).toBeTruthy();
+    expect(unavailable.linkRetryable.value).toBe(true);
+    const view = readFileSync(new URL("../views/_user/UserSosHistoryView.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="history.linkRetryable.value"');
+    expect(view).toContain('@click="history.retryLink()"');
+
+    vi.mocked(getRequesterSosRequest).mockResolvedValueOnce({ ...record, id: olderId });
+    await unavailable.retryLink();
+    expect(unavailable.selected.value?.id).toBe(olderId);
+    expect(unavailable.linkError.value).toBeNull();
+    expect(unavailable.linkRetryable.value).toBe(false);
+  });
+
+  it("clears the linked retry and all private list metadata on a missing session", async () => {
+    const token = ref<string | null>("token");
+    const userId = ref<string | null>(requesterId);
+    const history = useSosHistory(token, userId);
     vi.mocked(getRequesterSosRequest).mockRejectedValueOnce(new ApiError(503, "SERVICE_UNAVAILABLE", "Offline"));
     await history.load(1, olderId);
-    expect(history.error.value).toBeTruthy();
+    expect(history.linkRetryable.value).toBe(true);
+    token.value = null;
+    userId.value = null;
+    await history.load();
+    await history.retryLink();
+    expect(history.items.value).toEqual([]);
+    expect(history.total.value).toBe(0);
+    expect(history.selected.value).toBeNull();
     expect(history.linkError.value).toBeNull();
+    expect(history.linkRetryable.value).toBe(false);
+    expect(getRequesterSosRequest).toHaveBeenCalledTimes(1);
   });
 
   it("resolves a deep-link outside page one through an owner-scoped read and discards late data after logout", async () => {

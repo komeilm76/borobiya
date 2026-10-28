@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.2 requester-history linked-detail feedback (partial)
+
+- A first-load requester SOS history deep link outside the current page fetched its list successfully, but a transient linked-detail failure discarded the whole list and reported a history-read error. The list now remains available with an explicit linked-request warning; Retry re-reads that same ID instead of dropping it or guessing another. A not-found/inaccessible 404 remains non-retryable, and a missing-session refresh clears private list metadata and retry state. A focused composable regression reproduced the first-load failure before the fix; source-pinned view checks do not replace a browser test. Other loading/toast/optimistic feedback surfaces remain open.
+
 ### 2026-10-28 — VM browser-build preflight and staged deploy review
 
 - `--serve-only` and `doctor` previously treated any nonempty `dist/index.html` plus a MapLibre worker as a usable browser build, even if the HTML's JS/CSS entry had been deleted. The production deploy script used the same two-file test for an uploaded archive, potentially cutting over to a blank UI. Both now check nonempty HTML, a built module entry and the HTML's directly referenced local script/link files, reject symlinked build paths and occupied deploy staging slots (which could mask absent archive files), and fail before offline startup or deployment image pulls. Offline fixtures reproduced the missing-file defect before the fix and cover staged releases, zero-byte assets, source-index and symlink cases. These checks cannot prove lazy chunks, Nginx bind-mount state or real browser behavior; no live VM/deploy acceptance is claimed.

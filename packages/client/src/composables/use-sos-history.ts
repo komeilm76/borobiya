@@ -18,6 +18,8 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   const loading = ref(false);
   const error = ref<string | null>(null);
   const linkError = ref<string | null>(null);
+  const linkRetryable = ref(false);
+  let retryId: string | null = null;
   let generation = 0;
   const cancellation = useSosCancellation(token, computed(() => selected.value?.id ?? null), userId);
   const canCancelSelected = computed(() => !!selected.value && CANCELLABLE.has(selected.value.status) && !cancellation.cancelled.value);
@@ -25,10 +27,12 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   async function load(nextPage = page.value, deepLink?: string): Promise<void> {
     const current = ++generation;
     const owner = userId.value;
-    if (!owner || !token.value) { items.value = []; selected.value = null; return; }
+    if (!owner || !token.value) { reset(); return; }
     loading.value = true;
     error.value = null;
     linkError.value = null;
+    linkRetryable.value = false;
+    retryId = null;
     try {
       await ensureSession?.();
       const bearer = token.value;
@@ -42,9 +46,17 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
         if (idSchema.safeParse(requested).success) {
           try { detail = await getRequesterSosRequest(bearer, requested); }
           catch (cause) {
-            if (!(cause instanceof ApiError) || cause.status !== 404) throw cause;
-            if (current === generation && userId.value === owner)
+            if (current !== generation || userId.value !== owner) return;
+            if (cause instanceof ApiError && cause.status === 404) {
               linkError.value = "درخواست پیوندشده یافت نشد یا به آن دسترسی ندارید؛ فهرست درخواست‌های خودتان نمایش داده می‌شود.";
+            } else {
+              // The list succeeded. A transient detail failure must not turn it
+              // into a failed/empty history or silently lose the linked request.
+              linkError.value = sosApiErrorMessage(cause,
+                "دریافت درخواست پیوندشده انجام نشد؛ فهرست درخواست‌های خودتان نمایش داده می‌شود. دوباره تلاش کنید.");
+              linkRetryable.value = true;
+              retryId = requested;
+            }
           }
         } else {
           linkError.value = "درخواست پیوندشده یافت نشد یا به آن دسترسی ندارید؛ فهرست درخواست‌های خودتان نمایش داده می‌شود.";
@@ -64,11 +76,17 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
     }
   }
 
+  function retryLink(): Promise<void> {
+    return retryId && linkRetryable.value ? load(page.value, retryId) : Promise.resolve();
+  }
+
   function choose(item: SosRequest): void {
     if (cancellation.submitting.value) return;
     ++generation;
     loading.value = false;
     linkError.value = null;
+    linkRetryable.value = false;
+    retryId = null;
     cancellation.reset();
     selected.value = item;
   }
@@ -94,9 +112,11 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
     loading.value = false;
     error.value = null;
     linkError.value = null;
+    linkRetryable.value = false;
+    retryId = null;
     cancellation.reset();
   }
 
-  return { items, selected, page, total, totalPages, loading, error, linkError, cancellation,
-    canCancelSelected, load, choose, markCancelled, reset };
+  return { items, selected, page, total, totalPages, loading, error, linkError, linkRetryable, cancellation,
+    canCancelSelected, load, retryLink, choose, markCancelled, reset };
 }

@@ -11,6 +11,8 @@
       </v-alert>
       <v-alert v-if="history.linkError.value" type="warning" variant="tonal" rounded="lg" role="status" class="mt-5">
         {{ history.linkError.value }}
+        <v-btn v-if="history.linkRetryable.value" size="small" variant="text" :loading="history.loading.value"
+          @click="history.retryLink()">تلاش دوباره برای پیوند</v-btn>
       </v-alert>
       <div class="history__toolbar">
         <div><h2>درخواست‌های ثبت‌شده</h2><p>{{ history.total.value.toLocaleString('fa-IR') }} درخواست</p></div>
