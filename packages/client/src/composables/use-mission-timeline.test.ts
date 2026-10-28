@@ -51,6 +51,68 @@ describe("mission timeline lifecycle", () => {
     } finally { scope.stop(); }
   });
 
+  it("clears timeline rows and closes the old room on a direct same-account session replacement", async () => {
+    const bearer = (sessionId: string, nonce = 0) =>
+      `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: OWNER, sessionId, nonce }))}.signature`;
+    const token = ref<string | null>(bearer("first"));
+    const first = fakeSocket();
+    const second = fakeSocket();
+    const sockets = [first, second];
+    const read = vi.fn(async (accessToken: string) => accessToken === bearer("first") ? [row] : []);
+    const openSocket = vi.fn(async () => sockets.shift()!.client);
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(ref(ID), "user", token, ref(OWNER), undefined,
+      { read, openSocket }))!;
+    try {
+      await settle();
+      expect(timeline.entries.value).toEqual([row]);
+      token.value = bearer("first", 1); // a normal JWT rotation must preserve the panel
+      expect(timeline.entries.value).toEqual([row]);
+      expect(first.close).not.toHaveBeenCalled();
+      token.value = bearer("second"); // no null-token render between revoked and new sessions
+      expect(timeline.entries.value).toEqual([]);
+      expect(first.close).toHaveBeenCalledOnce();
+      await settle();
+      expect(read).toHaveBeenCalledWith(bearer("second"), ID, "user", expect.any(AbortSignal));
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      expect(timeline.entries.value).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("does not show the old timeline or read for a new bearer before the account profile catches up", async () => {
+    const bearer = (sub: string) =>
+      `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, sessionId: "session" }))}.signature`;
+    const otherOwner = "70000000-0000-4000-8000-000000000004";
+    const token = ref<string | null>(bearer(OWNER));
+    const owner = ref<string | null>(OWNER);
+    const first = fakeSocket();
+    const second = fakeSocket();
+    let finishOld!: (rows: MissionTimeline) => void;
+    const read = vi.fn().mockResolvedValueOnce([row]).mockImplementationOnce(() =>
+      new Promise<MissionTimeline>((resolve) => { finishOld = resolve; })).mockResolvedValueOnce([]);
+    const openSocket = vi.fn().mockResolvedValueOnce(first.client).mockResolvedValueOnce(second.client);
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(ref(ID), "user", token, owner, undefined,
+      { read, openSocket }))!;
+    try {
+      await settle();
+      expect(timeline.entries.value).toEqual([row]);
+      const oldRead = timeline.load();
+      await settle();
+      token.value = bearer(otherOwner);
+      expect(timeline.entries.value).toEqual([]);
+      expect(first.close).toHaveBeenCalledOnce();
+      expect(read).toHaveBeenCalledTimes(2); // never fetch under the mismatched profile
+      finishOld([row]);
+      await oldRead;
+      expect(timeline.entries.value).toEqual([]);
+      owner.value = otherOwner;
+      await settle();
+      expect(read).toHaveBeenCalledWith(bearer(otherOwner), ID, "user", expect.any(AbortSignal));
+      expect(openSocket).toHaveBeenCalledTimes(2);
+    } finally { scope.stop(); }
+  });
+
   it("clears the selected mission's steps immediately before a different mission loads", async () => {
     const id = ref<string | null>(ID);
     const first = fakeSocket();

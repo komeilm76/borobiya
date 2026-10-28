@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Mission timeline direct-session replacement boundary (T3.5.8 follow-up)
+
+- Timeline rows and the live mission socket were cleared on token loss or owner/mission change, but replacing a bearer directly with a *different session for the same account* kept both attached and displayed the old session's rows. The timeline now keys its lifecycle to the mission and account/session claims: a new session closes the old room and clears the rows synchronously; a same-session renewal retains them. A bearer with a different subject is suppressed until the matching profile arrives, including while an old read is in flight. Pure composable regressions reproduced the direct replacement failure before the fix and cover account-profile lag. No Vue SFC was mounted or browser/VM acceptance performed.
+
 ### 2026-10-28 — Recipient-picker same-tick search invalidation (T2.1.7 follow-up)
 
 - The recipient search invalidated old candidates with Vue's deferred watchers: directly after changing the term/filter, the old list was still selectable until the next tick. Pressing Enter in that gap started a read which the term watcher then cancelled and repeated after 300 ms, wasting a request and delaying the requested result. Term and filter watchers now invalidate synchronously, while ordinary typing still debounces. Pure composable regressions reproduced both defects before the fix; no Vue SFC was mounted or browser/VM interaction acceptance performed.
