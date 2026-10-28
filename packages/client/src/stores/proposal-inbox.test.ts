@@ -188,6 +188,91 @@ describe("proposal inbox", () => {
     expect(decline).toHaveBeenCalledWith("rescuer-token", proposal.id, "Unavailable today");
   });
 
+  it("returns to the last real page after declining the sole offer on a now-empty page", async () => {
+    const previous = Array.from({ length: 20 }, (_, index) => ({ ...proposal, id: `older-${index}` }));
+    let declined = false;
+    const list = vi.fn(async (_token: string, currentPage = 1) => ({
+      items: currentPage === 1 ? previous : declined ? [] : [proposal],
+      total: declined ? 20 : 21,
+      page: currentPage,
+      limit: 20,
+      totalPages: declined ? 1 : 2
+    }));
+    const decline = vi.fn(async () => { declined = true; });
+    configureProposalInboxForTests({ list, decline, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(21));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    expect(await inbox.decide(proposal.id, "decline")).toBe(true);
+    await vi.waitFor(() => expect(inbox.loading).toBe(false));
+    expect(inbox.page).toBe(1);
+    expect(inbox.proposals).toEqual(previous);
+    expect(inbox.total).toBe(20);
+    expect(inbox.failed).toBe(false);
+    expect(list).toHaveBeenLastCalledWith("rescuer-token", 1);
+  });
+
+  it("returns to page one without another fetch when the server reports a truly empty inbox", async () => {
+    let expired = false;
+    const previous = Array.from({ length: 20 }, (_, index) => ({ ...proposal, id: `older-${index}` }));
+    const list = vi.fn(async (_token: string, currentPage = 1) => ({
+      items: expired ? [] : currentPage === 1 ? previous : [proposal],
+      total: expired ? 0 : 21, page: currentPage, limit: 20, totalPages: expired ? 0 : 2
+    }));
+    configureProposalInboxForTests({ list, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.totalPages).toBe(2));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    expired = true;
+    await inbox.refresh();
+    expect(inbox.page).toBe(1);
+    expect(inbox.proposals).toEqual([]);
+    expect(inbox.total).toBe(0);
+    expect(inbox.failed).toBe(false);
+    expect(list).toHaveBeenCalledTimes(3);
+  });
+
+  it("reports a failed page rewind instead of claiming there are no pending offers", async () => {
+    let declined = false;
+    const previous = Array.from({ length: 20 }, (_, index) => ({ ...proposal, id: `older-${index}` }));
+    const list = vi.fn(async (_token: string, currentPage = 1) => {
+      if (declined && currentPage === 1) throw new Error("offline during page rewind");
+      return { items: currentPage === 1 ? previous : declined ? [] : [proposal],
+        total: declined ? 20 : 21, page: currentPage, limit: 20, totalPages: declined ? 1 : 2 };
+    });
+    configureProposalInboxForTests({ list, decline: async () => { declined = true; }, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.totalPages).toBe(2));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([proposal]));
+    expect(await inbox.decide(proposal.id, "decline")).toBe(true);
+    await vi.waitFor(() => expect(inbox.failed).toBe(true));
+    expect(inbox.page).toBe(1);
+    expect(inbox.proposals).toEqual([]);
+    expect(inbox.total).toBe(20);
+    expect(inbox.loading).toBe(false);
+    expect(list).toHaveBeenLastCalledWith("rescuer-token", 1);
+  });
+
   it("does not let a late decision response restore another account's inbox", async () => {
     let resolve!: (id: string) => void;
     const waiting = new Promise<string>((done) => { resolve = done; });

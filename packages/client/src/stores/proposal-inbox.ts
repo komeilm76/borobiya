@@ -49,8 +49,22 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     const gen = ++generation;
     loading.value = true;
     try {
-      const result = await (runtime.list ?? listPendingProposals)(token, page.value);
+      const read = runtime.list ?? listPendingProposals;
+      let requestedPage = page.value;
+      let result = await read(token, requestedPage);
       if (gen !== generation || identity.value !== userId) return;
+      // Declining/expiring the sole offer on the last page can leave a valid
+      // total but an empty out-of-range page. Rewind before claiming the inbox
+      // has no pending offers; bound retries if the total keeps changing.
+      for (let redirects = 0; requestedPage > Math.max(1, result.totalPages); redirects++) {
+        requestedPage = Math.max(1, result.totalPages);
+        page.value = requestedPage;
+        proposals.value = [];
+        if (result.totalPages === 0) break;
+        if (redirects >= 2) throw new Error("Proposal pages changed during refresh");
+        result = await read(token, requestedPage);
+        if (gen !== generation || identity.value !== userId) return;
+      }
       proposals.value = result.items;
       total.value = result.total;
       totalPages.value = result.totalPages;

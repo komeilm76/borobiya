@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Proposal inbox empty last-page bug (T4.4.2 partial)
+
+- When the only offer on page 2 was declined, the next API read could return `items: []`, `total: 20`, `totalPages: 1`. The inbox stayed on page 2 and announced there were no pending offers even though page 1 held 20. Refresh now rewinds to the last valid page with bounded requests; a genuinely empty inbox resets to page 1, while a failed rewind shows a retryable error instead of a false empty state. The store test reproduced the original 21→20 failure before the fix and covers external expiry and rewind failure after it. No browser/device acceptance or site-wide T4.4.2 completion is claimed.
+
 ### 2026-10-28 — Rescuer history linked-detail failure and retry (T4.4.2 partial)
 
 - A deep link to a mission outside the rescuer history page could fail at its separate detail request after the list had loaded. The UI then claimed that the entire history failed and offered a generic list retry that lost the linked ID. It now keeps the list and a fallback selection, shows a distinct retryable linked-detail warning, and retries that exact ID. A 404 or foreign detail remains a non-retryable access warning; switching selection or account clears the retry and late failures cannot overwrite a newer choice. Focused deferred-response tests reproduced the bug before the fix and pass after it; no Vue mounting or live browser acceptance is claimed. The wider T4.4.2 audit stays open.
