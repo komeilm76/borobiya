@@ -193,9 +193,16 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
           const nextToken = options.accessToken.value;
           if (nextToken && nextToken !== token) {
             const retryRequest = ++requestId;
-            const retried = await readShares(nextToken);
-            if (retryRequest === requestId && options.accessToken.value === nextToken &&
-              options.ownUserId.value === owner && !disposed) applyShares(retried);
+            try {
+              const retried = await readShares(nextToken);
+              if (retryRequest === requestId && options.accessToken.value === nextToken &&
+                options.ownUserId.value === owner && !disposed) applyShares(retried);
+            } catch {
+              // The retry superseded the expired-token read. Report its failure against the
+              // refreshed bearer, unless a newer read/account has already taken over.
+              if (retryRequest === requestId && options.accessToken.value === nextToken &&
+                options.ownUserId.value === owner && !disposed) readFailed.value = true;
+            }
             return;
           }
         } catch {

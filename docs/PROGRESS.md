@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Live companion share-list retry failure (T2.1.8 follow-up)
+
+- After a share-list 401 refreshed the bearer, a second failed read was silently discarded: the retry had superseded the original read's generation, so the map never showed its retry/error state even though no share list was verified. The receiver now reports that failure only if the retried bearer and read still belong to the current account; a newer successful read cannot be overwritten by an older failed retry. Focused pure composable tests reproduced the missing error before the fix and cover the superseding-read race. No Vue SFC was mounted or live two-browser/VM acceptance performed; P2-A1 remains open.
+
 ### 2026-10-28 — SOS GPS setup exception fallback (T3.2.4 follow-up)
 
 - A synchronous exception while obtaining the geolocation provider or starting `getCurrentPosition()` escaped the SOS sheet's GPS request; the latter also left its locating indicator stuck instead of offering manual incident placement. Both paths now settle locating and show a manual map/coordinate fallback without discarding the draft. Pure composable regressions reproduced the thrown-provider and thrown-watch cases before the fix and confirm manual selection still works. No Vue SFC was mounted or browser/device permission-policy acceptance performed.

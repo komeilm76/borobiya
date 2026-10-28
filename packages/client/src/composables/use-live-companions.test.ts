@@ -491,6 +491,57 @@ describe("useLiveCompanions", () => {
     scope.stop();
   });
 
+  it("reports a failed share-list retry after refreshing an expired token", async () => {
+    const token = ref<string | null>("expired-map-token");
+    const ensureSession = vi.fn(async () => { token.value = "fresh-map-token"; });
+    const readShares = vi.fn(async (supplied: string) => {
+      if (supplied === "expired-map-token") {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      throw new Error("Share list unavailable after renewal");
+    });
+    const scope = effectScope();
+    const api = scope.run(() => useLiveCompanions({
+      accessToken: token, ownUserId: ref(ME), ensureSession, readShares,
+      openSocket: () => ({ socket: fakeSocket() as unknown as RealtimeClient["socket"],
+        close: vi.fn(), connect: vi.fn(), updateToken: vi.fn() })
+    }))!;
+    await settle();
+
+    expect(ensureSession).toHaveBeenCalledOnce();
+    expect(readShares.mock.calls.map(([supplied]) => supplied)).toEqual(["expired-map-token", "fresh-map-token"]);
+    expect(api.readFailed.value).toBe(true);
+    expect(api.status.value.line).toContain("فهرست اشتراک‌ها خوانده نشد");
+    scope.stop();
+  });
+
+  it("does not report an old failed token retry after a newer share read succeeds", async () => {
+    const token = ref<string | null>("expired-map-token");
+    let rejectRetry!: (error: Error) => void;
+    const pendingRetry = new Promise<{ sharedWithMe: [] }>((_resolve, reject) => { rejectRetry = reject; });
+    let freshReads = 0;
+    const readShares = vi.fn(async (supplied: string) => {
+      if (supplied === "expired-map-token") {
+        throw Object.assign(new Error("Unauthorized"), { status: 401 });
+      }
+      return ++freshReads === 1 ? pendingRetry : { sharedWithMe: [] };
+    });
+    const scope = effectScope();
+    const api = scope.run(() => useLiveCompanions({
+      accessToken: token, ownUserId: ref(ME),
+      ensureSession: async () => { token.value = "fresh-map-token"; }, readShares,
+      openSocket: () => ({ socket: fakeSocket() as unknown as RealtimeClient["socket"],
+        close: vi.fn(), connect: vi.fn(), updateToken: vi.fn() })
+    }))!;
+    await settle();
+    expect(freshReads).toBe(1);
+    await api.refresh();
+    rejectRetry(new Error("Older read timed out"));
+    await settle();
+    expect(api.readFailed.value).toBe(false);
+    scope.stop();
+  });
+
   it("does not restore a signed-out account's companions when an older share read finishes late", async () => {
     const harness = mount({ blockReads: true, captureReadSnapshot: true });
     await settle();
