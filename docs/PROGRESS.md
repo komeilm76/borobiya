@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — History playback 401 retry after account switch (T2.2.6 follow-up)
+
+- A history-window or received-grant-list read that returned 401 could wait on session recovery, then replay its old request with a different account's bearer even after logout and a new read had replaced it. The eventual stale response was already ignored, but the extra cross-session request should not be sent. Both recovery paths now recheck their read generation immediately after `refreshSession()` and before any retry. Deferred composable tests reproduced both unwanted requests before the fix and now verify they are absent; a current same-session bearer renewal still retries both reads successfully. Server-side ownership checks remain authoritative. No Vue SFC was mounted or browser/VM acceptance claimed.
+
 ### 2026-10-28 — History-playback overlay label and input contrast (T4.4.3 partial)
 
 - The small heading and manual date-field labels in the translucent map playback card used `#718584`, only about 3.9:1 even over solid white; the typed date text inherited that color. The field boundary also blended into both themes. The light labels now use `#536d6c`, preserving existing readable dark overrides; the date input border uses theme-aware muted ink and gets a distinct visible keyboard focus outline. Source-pinned checks failed before the change and verify small-text 4.5:1 and input-boundary/focus 3:1 against a conservative black/white tile beneath the overlay. No Vue SFC was mounted, no live map/browser was tested, and the wider WCAG/site audit remains open.

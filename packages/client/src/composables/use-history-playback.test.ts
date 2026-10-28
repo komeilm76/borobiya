@@ -206,6 +206,96 @@ describe("range controls", () => {
     scope.stop();
   });
 
+  it("still retries current history and grant reads after a same-session bearer renewal", async () => {
+    const scope = effectScope();
+    const token = ref<string | null>("expiring-token");
+    const refreshSession = vi.fn(async () => { token.value = "renewed-token"; return true; });
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({ accessToken: token, refreshSession }); });
+    try {
+      const history = api.selectPreset(7);
+      await settle();
+      autoRespond = () => historyBody([point(35.7, 51.4, new Date(NOW - HOUR).toISOString())]);
+      calls[0]!.resolve({ __status: 401, __body: { code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] } });
+      await history;
+      expect(calls).toHaveLength(2);
+      expect(api.points.value).toHaveLength(1);
+      expect(refreshSession).toHaveBeenCalledOnce();
+
+      autoRespond = null;
+      const grants = api.loadShares();
+      await settle();
+      autoRespond = () => ({ owned: [], sharedWithMe: [grantRow("c")] });
+      calls[2]!.resolve({ __status: 401, __body: { code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] } });
+      await grants;
+      expect(calls).toHaveLength(4);
+      expect(api.grants.value).toHaveLength(1);
+      expect(refreshSession).toHaveBeenCalledTimes(2);
+    } finally { scope.stop(); }
+  });
+
+  it("does not replay an obsolete private history window with a new account after 401 recovery", async () => {
+    const scope = effectScope();
+    const token = ref<string | null>("old-account-token");
+    const waiting: Array<(refreshed: boolean) => void> = [];
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({
+      accessToken: token,
+      refreshSession: () => new Promise<boolean>((resolve) => { waiting.push(resolve); })
+    }); });
+    try {
+      const old = api.selectPreset(7);
+      await settle();
+      calls[0]!.resolve({ __status: 401, __body: { code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] } });
+      await settle();
+      expect(waiting).toHaveLength(1);
+
+      token.value = null;
+      token.value = "new-account-token";
+      const current = api.selectPreset(1);
+      await settle();
+      expect(calls).toHaveLength(2);
+      calls[1]!.resolve(historyBody([]));
+      await current;
+      autoRespond = () => historyBody([]); // settle a wrong replay too, so the regression cannot hang
+      waiting[0]!(true);
+      await old;
+      expect(calls).toHaveLength(2);
+      expect(api.points.value).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("does not replay an obsolete grant-list read with a new account after 401 recovery", async () => {
+    const scope = effectScope();
+    const token = ref<string | null>("old-account-token");
+    const waiting: Array<(refreshed: boolean) => void> = [];
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({
+      accessToken: token,
+      refreshSession: () => new Promise<boolean>((resolve) => { waiting.push(resolve); })
+    }); });
+    try {
+      const old = api.loadShares();
+      await settle();
+      calls[0]!.resolve({ __status: 401, __body: { code: "INVALID_ACCESS_TOKEN", message: "Expired", issues: [] } });
+      await settle();
+      expect(waiting).toHaveLength(1);
+
+      token.value = null;
+      token.value = "new-account-token";
+      const current = api.loadShares();
+      await settle();
+      expect(calls).toHaveLength(2);
+      calls[1]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
+      await current;
+      autoRespond = () => ({ owned: [], sharedWithMe: [] });
+      waiting[0]!(true);
+      await old;
+      expect(calls).toHaveLength(2);
+      expect(api.grants.value).toHaveLength(1);
+    } finally { scope.stop(); }
+  });
+
   it("does not restore another session's share list after sign-out", async () => {
     const { token, api } = mount();
     api.selectSource("grant");

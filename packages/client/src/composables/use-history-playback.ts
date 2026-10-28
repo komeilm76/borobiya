@@ -158,6 +158,9 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       } catch (error) {
         if (error instanceof ApiError && error.status === 401 && options.refreshSession) {
           const refreshed = await options.refreshSession();
+          // Another account/read may have replaced this one while the 401 recovery waited.
+          // Never replay its private grant list with the new session's bearer.
+          if (requestIdForThisLoad !== grantsRequestId) return;
           if (refreshed && options.accessToken.value) {
             response = await listLocationHistoryShares(options.accessToken.value);
           } else {
@@ -261,6 +264,9 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       } catch (error) {
         if (error instanceof ApiError && error.status === 401 && options.refreshSession) {
           const refreshed = await options.refreshSession();
+          // A canceled range (including logout/account switch) must not be retried with
+          // whatever bearer now happens to be current.
+          if (requestIdForThisLoad !== requestId) return;
           if (refreshed && options.accessToken.value) {
             response = await runPlan(options.accessToken.value);
           } else {
