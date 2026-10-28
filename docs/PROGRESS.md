@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Short-viewport share revoke confirmation (T4.4.1 partial)
+
+- The live/history revoke confirmation did not scroll its content and kept a one-line footer; on a short or narrow phone, a long recipient label and privacy warning could push Back/Confirm beyond reach. The confirmation body now scrolls, long text wraps, and phone actions stack as full-width wrapping 44px-minimum targets. Existing disabled/loading and server-acknowledged revoke wiring are unchanged. A source-pinned regression failed before the change; this does not establish rendered phone/keyboard, screen-reader, or site-wide responsive acceptance. T4.4.1 remains open.
+
 ### 2026-10-28 — Rescuer history synchronous account privacy boundary (T3.7.1 follow-up)
 
 - The mission-history view's default-scheduled account watcher left the previous rescuer's private list, detail and verified count visible until Vue's next tick after token loss/account switch. The history composable now synchronously resets on token loss or owner change, invalidating late list/detail replies without requiring a new read, while a same-account bearer renewal preserves the current snapshot. Pure composable regressions failed before the fix and now cover immediate clearing, pending responses, owner switches and renewal. No Vue SFC mount or real-browser timing/VM acceptance is claimed.

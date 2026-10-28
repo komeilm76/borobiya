@@ -150,10 +150,10 @@
       </section>
     </template>
 
-    <v-dialog v-model="confirmOpen" max-width="420">
+    <v-dialog v-model="confirmOpen" max-width="420" scrollable>
       <v-card rounded="xl" v-if="pendingRow">
         <v-card-title>{{ pendingRow.history ? "حذف دسترسی تاریخچه؟" : "لغو این اشتراک؟" }}</v-card-title>
-        <v-card-text>
+        <v-card-text class="share-lists__confirm-body">
           <p v-if="pendingRow.history" class="share-lists__confirm">
             دسترسی <bdi dir="ltr">{{ pendingRow.label }}</bdi> به این بازهٔ تاریخچهٔ مسیر بلافاصله قطع می‌شود.
           </p>
@@ -162,7 +162,7 @@
             تاریخچهٔ بازه‌های قبلی پاک نمی‌شود.
           </p>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="share-lists__confirm-actions">
           <v-spacer />
           <v-btn variant="text" :disabled="revoking" @click="confirmOpen = false">بازگشت</v-btn>
           <v-btn color="error" variant="flat" :loading="revoking" @click="confirmRevoke">
@@ -687,5 +687,15 @@ defineExpose({ refresh });
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.share-lists__confirm-body { min-height: 0; overflow-y: auto; }
+
+@media (max-width: 599px) {
+  .share-lists__confirm-actions { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .share-lists__confirm-actions :deep(.v-spacer) { display: none; }
+  .share-lists__confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
+  .share-lists__confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 </style>
