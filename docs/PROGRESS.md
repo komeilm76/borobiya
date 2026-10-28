@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.4 SOS picker marker import (partial)
+
+- The SOS picker requested MapLibre a second time to construct its draggable pin, despite `MapCanvas` already loading the module and emitting its `Marker` constructor on ready. The picker now uses that ready constructor, preserving GPS/manual pin updates, drag-to-select and close/unmount cleanup without the extra async import. A source-pinned regression failed before the change; typechecks and a production build validate the wiring. This is not a measured load-time, bundle-size, or real-browser/device acceptance claim, and T4.4.4 remains open.
+
 ### 2026-10-28 — Admin category member removal feedback (T4.4.2 partial)
 
 - A confirmed member removal followed by a failed list refresh still showed the removed person in the category and members dialog while announcing success, allowing a second DELETE. After server acknowledgement, the page now removes only that member from both known snapshots before its best-effort re-read; a failed DELETE leaves them unchanged, and a failed re-read still gets its own error. A source-pinned ordering regression failed before the fix and a pure transform test covers preserved members/other categories; no Vue component was mounted and no browser/device or site-wide T4.4.2 acceptance is claimed.

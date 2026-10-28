@@ -63,6 +63,19 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(sheetSource).toContain(':disabled="sos.submitting.value"');
   });
 
+  it("reuses the SOS map's loaded Marker constructor rather than starting a second import (T4.4.4)", () => {
+    expect(sheetSource).toContain('@ready="onPickerMapReady"');
+    expect(sheetSource).toContain("function onPickerMapReady(map: MapLibreMap, MarkerClass: typeof Marker)");
+    expect(sheetSource).toContain("markerConstructor = MarkerClass;");
+    expect(sheetSource).toContain("const MarkerClass = markerConstructor;");
+    expect(sheetSource).toContain("new MarkerClass({ color:");
+    expect(sheetSource).toContain('marker.on("dragend", () => {');
+    expect(sheetSource).toContain("sos.setManualLocation(point.lat, point.lng)");
+    expect(sheetSource).toContain("pinMarker.value.setLngLat([current.lon, current.lat])");
+    expect(sheetSource).not.toContain('await import("maplibre-gl")');
+    expect(sheetSource).toMatch(/mapInstance\.value = null;\s*markerConstructor = null;/);
+  });
+
   it("keeps the sheet in a non-dismissable attaching state after SOS creation until photo upload settles", () => {
     expect(sheetSource).toContain('v-else-if="sos.createdRequestId.value && sos.submitting.value"');
     expect(sheetSource).toContain('!sos.createdRequestId.value && !sos.isCompleted.value && !sos.awaitingPhotoRetry.value');

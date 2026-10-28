@@ -404,42 +404,31 @@ const galleryInput = ref<HTMLInputElement | null>(null);
 
 const mapInstance = shallowRef<MapLibreMap | null>(null);
 const pinMarker = shallowRef<Marker | null>(null);
+let markerConstructor: typeof Marker | null = null;
 
-async function syncPinMarker(): Promise<void> {
+function syncPinMarker(): void {
   const map = mapInstance.value;
+  const MarkerClass = markerConstructor;
   const current = sos.location.value;
-  if (!map || !current) {
+  if (!map || !MarkerClass || !current) {
     pinMarker.value?.remove();
     pinMarker.value = null;
     return;
   }
 
   if (!pinMarker.value) {
-    const { Marker: MapLibreMarker } = await import("maplibre-gl");
-    const latest = sos.location.value;
-    if (mapInstance.value !== map || !latest) return;
-    const existing = pinMarker.value as Marker | null;
-    if (!existing) {
-      const marker = new MapLibreMarker({ color: "#dc2626", draggable: true })
-        .setLngLat([latest.lon, latest.lat])
-        .addTo(map);
-      marker.on("dragend", () => {
-        const point = marker.getLngLat();
-        sos.setManualLocation(point.lat, point.lng);
-      });
-      pinMarker.value = marker;
-    } else {
-      existing.setLngLat([latest.lon, latest.lat]);
-    }
-    map.easeTo({
-      center: [latest.lon, latest.lat],
-      zoom: Math.max(map.getZoom(), 14),
-      duration: 250
+    // MapCanvas already loaded MapLibre before emitting ready; do not import it again here.
+    const marker = new MarkerClass({ color: "#dc2626", draggable: true })
+      .setLngLat([current.lon, current.lat])
+      .addTo(map);
+    marker.on("dragend", () => {
+      const point = marker.getLngLat();
+      sos.setManualLocation(point.lat, point.lng);
     });
-    return;
+    pinMarker.value = marker;
+  } else {
+    pinMarker.value.setLngLat([current.lon, current.lat]);
   }
-
-  pinMarker.value.setLngLat([current.lon, current.lat]);
   map.easeTo({
     center: [current.lon, current.lat],
     zoom: Math.max(map.getZoom(), 14),
@@ -447,12 +436,13 @@ async function syncPinMarker(): Promise<void> {
   });
 }
 
-function onPickerMapReady(map: MapLibreMap): void {
+function onPickerMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
   mapInstance.value = map;
+  markerConstructor = MarkerClass;
   map.on("click", (event: MapMouseEvent) => {
     sos.setManualLocation(event.lngLat.lat, event.lngLat.lng);
   });
-  void syncPinMarker();
+  syncPinMarker();
 }
 
 function onLatTyped(value: unknown): void {
@@ -491,7 +481,7 @@ function close(): void {
 watch(
   () => sos.location.value,
   () => {
-    void syncPinMarker();
+    syncPinMarker();
   }
 );
 
@@ -507,6 +497,7 @@ watch(
     pinMarker.value?.remove();
     pinMarker.value = null;
     mapInstance.value = null;
+    markerConstructor = null;
     if (sos.isCompleted.value || cancellation.cancelled.value) {
       sos.reset();
       cancellation.reset();
@@ -519,6 +510,7 @@ onBeforeUnmount(() => {
   pinMarker.value?.remove();
   pinMarker.value = null;
   mapInstance.value = null;
+  markerConstructor = null;
 });
 </script>
 
