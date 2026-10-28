@@ -354,6 +354,150 @@ describe("client auth store", () => {
     expect(refreshCalls).toHaveLength(1);
   });
 
+  it.each([
+    { label: "another account", nextOwner: "00000000-0000-4000-8000-000000000088" },
+    { label: "a new session for the same account", nextOwner: user.id }
+  ])("does not replay an old write after the refresh cookie switches to $label", async ({ nextOwner }) => {
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    const initial = bearer(user.id, "session-a");
+    const replacement = bearer(nextOwner, "session-b");
+    const nextProfile = { ...profile, id: nextOwner, username: nextOwner === user.id ? user.username : "rescue_user2" };
+    let finishWrite!: (response: Response) => void;
+    const oldWriteReply = new Promise<Response>((resolve) => { finishWrite = resolve; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: initial, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse(profile),
+      () => oldWriteReply,
+      jsonResponse({ accessToken: replacement }),
+      jsonResponse(nextProfile),
+      jsonResponse({ ok: true }) // only consumed by an unsafe cross-session replay
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    const oldWrite = requestJson<{ ok: boolean }>("/_user/location/share", {
+      method: "POST", accessToken: initial, body: { note: "A's pending choice" }
+    });
+    await auth.refreshSession(); // cookie was changed by another tab, without logout in this tab
+    expect(auth.accessToken).toBe(replacement);
+    finishWrite(jsonResponse({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }, 401));
+
+    await expect(oldWrite).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/_user/location/share")).toHaveLength(1);
+  });
+
+  it("clears the old profile before a different cookie session's profile read finishes or fails", async () => {
+    const other = "00000000-0000-4000-8000-000000000088";
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    const initial = bearer(user.id, "session-a");
+    const replacement = bearer(other, "session-b");
+    let failProfile!: (reason: Error) => void;
+    const profileReply = new Promise<Response>((_resolve, reject) => { failProfile = reject; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: initial, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse({ ...profile, categories: [{ id: "20000000-0000-4000-8000-000000000001", name: "امداد کوهستان" }] }),
+      jsonResponse({ accessToken: replacement }),
+      () => profileReply
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    expect(auth.user?.id).toBe(user.id);
+    expect(auth.userCategories).toHaveLength(1);
+
+    const refreshing = auth.refreshSession();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
+    expect(auth.accessToken).toBe(replacement);
+    expect(auth.user).toBeNull(); // never display A alongside B's bearer
+    expect(auth.userCategories).toEqual([]);
+    failProfile(new Error("new profile temporarily unavailable"));
+    await refreshing;
+    expect(auth.user).toBeNull(); // do not restore A on a transient B profile error
+  });
+
+  it("ignores an old onboarding reply after a cross-tab cookie switch", async () => {
+    const other = "00000000-0000-4000-8000-000000000088";
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    let finishCompletion!: (response: Response) => void;
+    const pendingCompletion = new Promise<Response>((resolve) => { finishCompletion = resolve; });
+    const questionIds = Array.from({ length: 5 }, (_, index) =>
+      `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`);
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: bearer(user.id, "session-a"), user }),
+      () => pendingCompletion,
+      jsonResponse({ accessToken: bearer(other, "session-b") }),
+      jsonResponse({ code: "SECURITY_QUESTIONS_REQUIRED", message: "Complete questions" }, 403)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    const completing = auth.completeSecurityQuestions({
+      securityQuestions: questionIds.map((questionId, index) => ({ questionId, answer: `Answer ${index + 1}` }))
+    });
+    await auth.refreshSession();
+    expect(auth.user).toBeNull();
+    expect(auth.mustCompleteSecurityQuestions).toBe(true);
+    finishCompletion(jsonResponse({ ok: true }));
+    await completing;
+    expect(auth.mustCompleteSecurityQuestions).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(4); // no stale account's profile refresh
+  });
+
+  it("does not replay a pending write when its own 401 refresh discovers a different cookie session", async () => {
+    const nextOwner = "00000000-0000-4000-8000-000000000088";
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    const initial = bearer(user.id, "session-a");
+    const replacement = bearer(nextOwner, "session-b");
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: initial, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse(profile),
+      jsonResponse({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }, 401),
+      jsonResponse({ accessToken: replacement }),
+      jsonResponse({ ...profile, id: nextOwner, username: "rescue_user2" }),
+      jsonResponse({ ok: true }) // must not replay the prior user's POST
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    await expect(requestJson("/_user/location/share", {
+      method: "POST", accessToken: initial, body: { note: "A's pending choice" }
+    })).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(auth.accessToken).toBe(replacement);
+    expect(auth.user?.id).toBe(nextOwner);
+  });
+
+  it("still retries a delayed 401 after a normal same-session JWT renewal", async () => {
+    const bearer = (nonce: number) =>
+      `e30.${Buffer.from(JSON.stringify({ sub: user.id, sessionId: "session-a", nonce })).toString("base64url")}.sig`;
+    const initial = bearer(0);
+    const renewed = bearer(1);
+    let finishRead!: (response: Response) => void;
+    const oldReadReply = new Promise<Response>((resolve) => { finishRead = resolve; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: initial, user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse(profile),
+      () => oldReadReply,
+      jsonResponse({ accessToken: renewed }),
+      jsonResponse(profile),
+      jsonResponse({ items: ["same-session"] })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    const oldRead = requestJson<{ items: string[] }>("/_user/devices", { accessToken: initial });
+    await auth.refreshSession();
+    finishRead(jsonResponse({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }, 401));
+    await expect(oldRead).resolves.toEqual({ items: ["same-session"] });
+    expect(new Headers((fetchMock.mock.calls[5]?.[1] as RequestInit).headers).get("authorization"))
+      .toBe(`Bearer ${renewed}`);
+  });
+
   it("does not retry an old account's 401 request using a newer account's bearer", async () => {
     let finishOldRead!: (response: Response) => void;
     const oldReadReply = new Promise<Response>((resolve) => { finishOldRead = resolve; });

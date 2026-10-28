@@ -22,6 +22,7 @@ import {
   requestJson,
   userApiRoutes
 } from "../api/http";
+import { decodeAccessTokenClaims } from "../composables/device-identity";
 
 const USER_STORAGE_KEY = "borobiya.auth-user";
 const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60_000;
@@ -58,6 +59,20 @@ function accessTokenExpiry(token: string): number | null {
   } catch {
     return null;
   }
+}
+
+function sameBearerSession(failedToken: string, replacement: string): boolean {
+  const claims = decodeAccessTokenClaims(failedToken);
+  const next = decodeAccessTokenClaims(replacement);
+  const session = typeof claims?.sub === "string" && typeof claims.sessionId === "string"
+    ? JSON.stringify([claims.sub, claims.sessionId]) : null;
+  const nextSession = typeof next?.sub === "string" && typeof next.sessionId === "string"
+    ? JSON.stringify([next.sub, next.sessionId]) : null;
+  // Production bearers are JWTs with both claims. Do not treat an unreadable or
+  // incomplete JWT as proof that another tab's refresh cookie still names this
+  // account/session. Opaque test/legacy tokens retain the prior in-store fence.
+  if (failedToken.includes(".") || replacement.includes(".")) return session !== null && session === nextSession;
+  return true;
 }
 
 function userFromProfile(profile: UserProfile): AuthUser {
@@ -167,8 +182,18 @@ export const useAuthStore = defineStore("auth", () => {
         method: "POST"
       }));
       if (generation !== sessionGeneration) return;
+      if (accessToken.value && !sameBearerSession(accessToken.value, response.accessToken)) {
+        // The shared refresh cookie may now belong to another tab's account or
+        // login. Clear the previous profile before exposing the new bearer, even
+        // if the new profile read later fails, and invalidate old async mutations.
+        ++sessionGeneration;
+        refreshPromiseGeneration = sessionGeneration;
+        sessionTokens.clear();
+        userCategories.value = [];
+        setUser(null);
+      }
       setAccessToken(response.accessToken);
-      await loadCurrentUser(response.accessToken, generation);
+      await loadCurrentUser(response.accessToken, sessionGeneration);
     })();
     refreshPromise = pending;
     refreshPromiseGeneration = generation;
@@ -230,10 +255,12 @@ export const useAuthStore = defineStore("auth", () => {
   registerAccessTokenRefresher(async (failedToken: string) => {
     if (!sessionTokens.has(failedToken)) return null;
     if (accessToken.value && accessToken.value !== failedToken) {
-      return accessToken.value;
+      return sameBearerSession(failedToken, accessToken.value) ? accessToken.value : null;
     }
     const refreshed = await refreshSession();
-    return refreshed ? accessToken.value : null;
+    const replacement = accessToken.value;
+    return refreshed && replacement && sessionTokens.has(failedToken) && sameBearerSession(failedToken, replacement)
+      ? replacement : null;
   });
 
   function acceptLogin(response: unknown): void {

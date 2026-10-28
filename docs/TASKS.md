@@ -63,6 +63,7 @@ real-browser, external-network-offline, PostGIS or Android acceptance item.
 - [x] **T1.2.5** `POST /_admin/users` — active admin access-token authorization, Argon2id password hash, role `user`, optional initial active state, duplicate-username conflict, no question rows, and `mustCompleteSecurityQuestions=true` — completed 2026-10-18
 - [x] **T1.2.6** `POST /_user/complete-security-questions` — validate five unique catalog question IDs, store normalized Argon2id answer hashes, atomically clear `mustCompleteSecurityQuestions`, and gate other `/_user` routes with `403 SECURITY_QUESTIONS_REQUIRED` — completed 2026-10-18
 - [x] **T1.2.7** Frontend: `/_auth/{login,register,forgot-password}` + `/_user/complete-security-questions`, guest-only `_auth` and authenticated user/admin guards, session restoration, and mandatory onboarding redirects — completed 2026-10-18
+  - **Cross-tab cookie bug review (2026-10-28):** An old pending 401 request could replay its write using the bearer returned from a shared refresh cookie that another tab had switched to a different account or JWT session. The auth refresher now requires matching JWT subject and session for retries, while a genuine cookie session change invalidates pending auth operations, clears the old profile/categories before installing the new bearer and refuses to keep the old profile if the new read fails. Deferred regressions reproduced replay and stale-profile cases; ordinary same-session rotation still retries. No live cross-tab/browser acceptance is claimed.
 
 ### 1.3 Admin User Management (No Delete!)
 

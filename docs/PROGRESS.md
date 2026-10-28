@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Cross-tab refresh-cookie session boundary (T1.2.7 follow-up)
+
+- A different tab could replace the shared refresh cookie while this tab still held an old JWT. On its next refresh, the auth store added the new session's bearer to its token set without removing the old one: a pending 401 POST could then be retried under the new account (or a new session of the same account). The refresher now permits a retry only when both JWTs identify the same account **and** session; an actual session change invalidates old pending auth operations and clears the old profile/categories *before* exposing the new bearer. A failed new-profile read cannot leave the old account shown beside the new bearer. Deferred tests reproduced the write replay and stale-profile paths before their respective fixes; same-session renewal still retries. Opaque test/legacy tokens retain their prior in-store fence; live cross-tab/browser acceptance remains unverified.
+
 ### 2026-10-28 — Mission timeline direct-session replacement boundary (T3.5.8 follow-up)
 
 - Timeline rows and the live mission socket were cleared on token loss or owner/mission change, but replacing a bearer directly with a *different session for the same account* kept both attached and displayed the old session's rows. The timeline now keys its lifecycle to the mission and account/session claims: a new session closes the old room and clears the rows synchronously; a same-session renewal retains them. A bearer with a different subject is suppressed until the matching profile arrives, including while an old read is in flight. Pure composable regressions reproduced the direct replacement failure before the fix and cover account-profile lag. No Vue SFC was mounted or browser/VM acceptance performed.
