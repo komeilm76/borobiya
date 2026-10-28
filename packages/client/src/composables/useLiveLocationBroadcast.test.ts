@@ -124,6 +124,84 @@ describe("useLiveLocationBroadcast", () => {
     } finally { finishSession(); scope.stop(); }
   });
 
+  it("stops GPS and offers retry when opening the realtime transport fails", async () => {
+    vi.useFakeTimers();
+    const pause = vi.fn();
+    const resume = vi.fn();
+    const recovered = makeFakeSocket();
+    const openSocket = vi.fn().mockRejectedValueOnce(new Error("socket module unavailable"))
+      .mockReturnValueOnce(recovered.client);
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), resume, pause }, openSocket
+    }))!;
+    try {
+      await expect(api.start()).resolves.toBeUndefined();
+      expect(resume).toHaveBeenCalledOnce();
+      expect(pause).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(api.status.value).toBe("rejected");
+      expect(api.lastErrorCode.value).toBe("SOCKET_UNAVAILABLE");
+      await api.start();
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      expect(recovered.connectCalls).toBe(1);
+      expect(vi.getTimerCount()).toBe(1);
+      expect(api.status.value).toBe("broadcasting");
+      expect(api.lastErrorCode.value).toBeNull();
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("does not let a late failed open stop a newer broadcast attempt", async () => {
+    const transport = makeFakeSocket();
+    const pause = vi.fn();
+    let failOld!: (reason: unknown) => void;
+    const oldSocket = new Promise<RealtimeClient>((_resolve, reject) => { failOld = reject; });
+    const openSocket = vi.fn().mockReturnValueOnce(oldSocket).mockReturnValueOnce(transport.client);
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket
+    }))!;
+    try {
+      const first = api.start();
+      api.stop();
+      await api.start();
+      expect(api.status.value).toBe("broadcasting");
+      const pausesBeforeOldResult = pause.mock.calls.length;
+      failOld(new Error("old module failed"));
+      await expect(first).resolves.toBeUndefined();
+      expect(api.status.value).toBe("broadcasting");
+      expect(pause).toHaveBeenCalledTimes(pausesBeforeOldResult);
+      expect(transport.closeCalls).toBe(0);
+    } finally { failOld(new Error("cleanup")); scope.stop(); }
+  });
+
+  it("closes a transport whose connect throws, leaving GPS stopped and retry possible", async () => {
+    const broken = makeFakeSocket();
+    const connect = broken.client.connect.bind(broken.client);
+    broken.client.connect = () => { connect(); throw new Error("connect failed"); };
+    const recovered = makeFakeSocket();
+    const openSocket = vi.fn().mockReturnValueOnce(broken.client).mockReturnValueOnce(recovered.client);
+    const pause = vi.fn();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket
+    }))!;
+    try {
+      await expect(api.start()).resolves.toBeUndefined();
+      expect(api.status.value).toBe("rejected");
+      expect(api.lastErrorCode.value).toBe("SOCKET_UNAVAILABLE");
+      expect(pause).toHaveBeenCalledOnce();
+      expect(broken.closeCalls).toBe(1);
+      await api.start();
+      expect(openSocket).toHaveBeenCalledTimes(2);
+      expect(recovered.connectCalls).toBe(1);
+      expect(api.status.value).toBe("broadcasting");
+    } finally { scope.stop(); }
+  });
+
   it("closes a socket opened after Stop while a connection was pending", async () => {
     const token = ref<string | null>(makeJwt("device-alpha"));
     const ownerId = ref<string | null>("user-1");

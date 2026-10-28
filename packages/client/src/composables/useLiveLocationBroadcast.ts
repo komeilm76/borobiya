@@ -277,23 +277,33 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     geolocation.resume?.();
     ticker ??= setInterval(sendPendingUpdate, intervalMs);
 
-    const activeClient = await ensureClient();
-    if (attempt !== broadcastAttempt || options.ownerId.value !== owner) return;
-    if (!activeClient) {
-      if (status.value === "connecting") {
+    try {
+      const activeClient = await ensureClient();
+      if (attempt !== broadcastAttempt || options.ownerId.value !== owner || status.value !== "connecting") return;
+      if (!activeClient) {
         clearTicker();
         geolocation.pause?.();
         status.value = "rejected";
         lastErrorCode.value = "UNAUTHORIZED";
+        return;
       }
-      return;
-    }
 
-    if (activeClient.socket.connected) {
-      status.value = "broadcasting";
-      sendPendingUpdate();
-    } else {
-      activeClient.connect();
+      if (activeClient.socket.connected) {
+        status.value = "broadcasting";
+        sendPendingUpdate();
+      } else {
+        activeClient.connect();
+      }
+    } catch {
+      // A failed dynamic import/open/connect must not leave GPS watching with a stuck
+      // "connecting" status. A late failure from a stopped attempt cannot reject a new one.
+      if (attempt !== broadcastAttempt || options.ownerId.value !== owner ||
+        (status.value !== "connecting" && status.value !== "broadcasting")) return;
+      clearTicker();
+      geolocation.pause?.();
+      teardownClient();
+      lastErrorCode.value = "SOCKET_UNAVAILABLE";
+      status.value = "rejected";
     }
   }
 

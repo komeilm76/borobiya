@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Live broadcast transport-start failure (T2.1.5 follow-up)
+
+- If opening the realtime module/socket rejected after Start woke GPS, the async start rejected without clearing the location watcher or 4-second ticker, leaving the bar stuck at “connecting.” A synchronous `connect()` throw did the same, even if it had already emitted `connect`. The broadcaster now stops GPS/ticker, closes an attached failed client, and shows a retryable connection error; an old failed open after Stop/restart cannot interrupt the newer broadcast. Focused regressions failed before the fix and verify cleanup, retry, and attempt isolation. No Vue SFC was mounted or two-browser/target-VM acceptance performed; P2-A1 remains open.
+
 ### 2026-10-28 — Requester SOS history synchronous account boundary (T3.7.1 follow-up)
 
 - A mounted requester history could keep the previous account's private requests, selected case, count and cancellation confirmation until the view's deferred auth watcher ran. The history composable now resets synchronously on token loss or owner change, invalidating pending list replies and cancellation state; the view's owner watcher also clears its mission/photo state in the same turn. Same-account bearer renewal preserves the current snapshot. Pure deferred/composable and source-pinned regressions failed before the fix. No Vue SFC was mounted or live browser/VM privacy timing verified.
