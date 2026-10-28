@@ -182,10 +182,14 @@ export const useAuthStore = defineStore("auth", () => {
         method: "POST"
       }));
       if (generation !== sessionGeneration) return;
-      if (accessToken.value && !sameBearerSession(accessToken.value, response.accessToken)) {
-        // The shared refresh cookie may now belong to another tab's account or
-        // login. Clear the previous profile before exposing the new bearer, even
-        // if the new profile read later fails, and invalidate old async mutations.
+      const restoredClaims = decodeAccessTokenClaims(response.accessToken);
+      const cachedProfileMismatch = !accessToken.value && !!user.value && response.accessToken.includes(".") &&
+        (restoredClaims?.sub !== user.value.id || typeof restoredClaims.sessionId !== "string");
+      if ((accessToken.value && !sameBearerSession(accessToken.value, response.accessToken)) || cachedProfileMismatch) {
+        // The shared cookie can name a different login even on cold start, when
+        // sessionStorage restored a user but there is no prior bearer to compare.
+        // Discard that profile before exposing the new bearer; a failed profile
+        // read must not leave the previous account in memory or sessionStorage.
         ++sessionGeneration;
         refreshPromiseGeneration = sessionGeneration;
         sessionTokens.clear();

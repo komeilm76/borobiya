@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Cached profile isolation on cookie restore (T1.2.7 follow-up)
+
+- On a cold tab restore, `sessionStorage` could supply account A's cached profile before the HttpOnly refresh cookie returned a bearer for account B. With no previous bearer to compare, the existing session-change fence left A visible next to B's token; a temporary `/_user/me` failure kept that mismatch indefinitely. Cookie restoration now checks a JWT's subject/session claims against the cached profile and clears mismatched/unverifiable cached identity before installing the bearer. A matching cached owner remains available during a transient same-account profile outage. Pure auth-store regressions reproduced the mismatch before the fix; no live two-tab/browser acceptance performed.
+
 ### 2026-10-28 — Cross-tab refresh-cookie session boundary (T1.2.7 follow-up)
 
 - A different tab could replace the shared refresh cookie while this tab still held an old JWT. On its next refresh, the auth store added the new session's bearer to its token set without removing the old one: a pending 401 POST could then be retried under the new account (or a new session of the same account). The refresher now permits a retry only when both JWTs identify the same account **and** session; an actual session change invalidates old pending auth operations and clears the old profile/categories *before* exposing the new bearer. A failed new-profile read cannot leave the old account shown beside the new bearer. Deferred tests reproduced the write replay and stale-profile paths before their respective fixes; same-session renewal still retries. Opaque test/legacy tokens retain their prior in-store fence; live cross-tab/browser acceptance remains unverified.

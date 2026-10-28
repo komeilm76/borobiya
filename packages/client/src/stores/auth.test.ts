@@ -111,6 +111,51 @@ describe("client auth store", () => {
     expect(new Headers((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).get("authorization")).toBe(`Bearer ${accessToken}`);
   });
 
+  it("drops a cached profile when the restored cookie belongs to another account, even if its profile read fails", async () => {
+    const saved = new Map([["borobiya.auth-user", JSON.stringify(user)]]);
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value); },
+      removeItem: (key: string) => { saved.delete(key); }
+    } });
+    const other = "00000000-0000-4000-8000-000000000088";
+    const replacement = `e30.${Buffer.from(JSON.stringify({ sub: other, sessionId: "session-b" })).toString("base64url")}.sig`;
+    let failProfile!: (reason: Error) => void;
+    const profileReply = new Promise<Response>((_resolve, reject) => { failProfile = reject; });
+    const fetchMock = fakeFetch(jsonResponse({ accessToken: replacement }), () => profileReply);
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+
+    const restoring = auth.ensureSession();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(auth.accessToken).toBe(replacement);
+    expect(auth.user).toBeNull(); // cached A must not accompany B's bearer
+    expect(saved.has("borobiya.auth-user")).toBe(false);
+    failProfile(new Error("B profile offline"));
+    await restoring;
+    expect(auth.user).toBeNull();
+    expect(auth.initialized).toBe(true);
+  });
+
+  it("keeps a matching cached profile when the cookie's profile read is temporarily unavailable", async () => {
+    const saved = new Map([["borobiya.auth-user", JSON.stringify(user)]]);
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => { saved.set(key, value); },
+      removeItem: (key: string) => { saved.delete(key); }
+    } });
+    const matching = `e30.${Buffer.from(JSON.stringify({ sub: user.id, sessionId: "session-a" })).toString("base64url")}.sig`;
+    vi.stubGlobal("fetch", fakeFetch(
+      jsonResponse({ accessToken: matching }),
+      () => Promise.reject(new Error("profile offline"))
+    ));
+    const auth = useAuthStore();
+    await auth.ensureSession();
+    expect(auth.accessToken).toBe(matching);
+    expect(auth.user).toEqual(user);
+    expect(saved.get("borobiya.auth-user")).toBe(JSON.stringify(user));
+  });
+
   it("recognizes the onboarding gate when the profile endpoint returns SECURITY_QUESTIONS_REQUIRED", async () => {
     const fetchMock = fakeFetch(
       jsonResponse({ accessToken }),
