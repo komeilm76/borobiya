@@ -28,6 +28,10 @@ class DeployWorkflowTests(unittest.TestCase):
     def test_preflight_preserves_vm_data_and_requires_explicit_migrations(self) -> None:
         script = (ROOT / "scripts/deploy-vm.sh").read_text(encoding="utf-8")
         self.assertIn("vm.verify_serving_artifacts(vm.require_env(), vm.configured_map())", script)
+        self.assertIn("browser_build_ready(Path(sys.argv[1]))", script)
+        self.assertIn('[[ ! -e "$release" && ! -L "$release" ]]', script)
+        self.assertLess(script.index('[[ ! -e "$release" && ! -L "$release" ]]'), script.index('tar -xzf'))
+        self.assertLess(script.index("browser_build_ready(Path(sys.argv[1]))"), script.index('"${compose[@]}" pull'))
         self.assertIn("git merge --ff-only FETCH_HEAD", script)
         self.assertIn("bun src/db/check-schema.ts", script)
         self.assertIn("--no-deps --wait --wait-timeout", script)

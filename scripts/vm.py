@@ -16,6 +16,7 @@ import sys
 import tempfile
 import unicodedata
 from datetime import date
+from html.parser import HTMLParser
 from pathlib import Path
 from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
@@ -78,9 +79,82 @@ def require_env() -> dict[str, str]:
     return values
 
 
+class BrowserBuildIndex(HTMLParser):
+    """Collect local HTML entry assets, not dynamically imported chunks or CSS dependencies."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.entries: list[str] = []
+        self.references: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        attributes = dict(attrs)
+        if tag == "script":
+            source = attributes.get("src")
+            if attributes.get("type") == "module":
+                self.entries.append(source or "")
+        elif tag == "link":
+            source = attributes.get("href")
+        else:
+            return
+        if source:
+            self.references.append(source)
+
+
+def browser_build_ready(dist: Path) -> bool:
+    """Require a complete local HTML entry, whether in the live build or a staged release."""
+    if not dist.is_absolute():
+        dist = ROOT / dist
+    try:
+        parts = dist.relative_to(ROOT).parts
+    except ValueError:
+        return False
+    if not parts or any(part in (".", "..") for part in parts):
+        return False
+    current = ROOT
+    if current.is_symlink():
+        return False
+    for part in parts:
+        current /= part
+        if current.is_symlink():
+            return False
+
+    def regular_nonempty(path: Path) -> bool:
+        return not path.is_symlink() and path.is_file() and path.stat().st_size > 0
+
+    try:
+        index = dist / "index.html"
+        if not regular_nonempty(index) or index.stat().st_size > 256_000 or not regular_nonempty(
+            dist / "maplibre-gl-worker.mjs"
+        ):
+            return False
+        markup = index.read_text(encoding="utf-8")
+        if "<html" not in markup.lower():
+            return False
+        parsed = BrowserBuildIndex()
+        parsed.feed(markup)
+        if not parsed.entries or any(not entry.startswith("/assets/") for entry in parsed.entries):
+            return False
+        for reference in parsed.references:
+            if not reference.startswith("/"):
+                continue  # The generated HTML can also contain non-local links.
+            parts = reference[1:].split("/")
+            if any(not re.fullmatch(r"[A-Za-z0-9_.-]+", part) or part in (".", "..") for part in parts):
+                return False
+            path = dist
+            for part in parts:
+                path /= part
+                if path.is_symlink():
+                    return False
+            if not regular_nonempty(path):
+                return False
+        return True
+    except (OSError, UnicodeError, ValueError):
+        return False
+
+
 def static_ready() -> bool:
-    dist = ROOT / "packages/client/dist"
-    return (dist / "index.html").is_file() and (dist / "maplibre-gl-worker.mjs").is_file()
+    return browser_build_ready(ROOT / "packages/client/dist")
 
 
 def pin_resolved_snapshot(config: dict[str, str], active: dict[str, str]) -> dict[str, str]:
@@ -219,7 +293,7 @@ def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> Non
     if not photon.is_dir() or not any(photon.iterdir()):
         fail("Photon index is missing; run full launch before offline relaunch")
     if not static_ready():
-        fail("built web client missing; run launch while online once before --serve-only")
+        fail("built web client missing/incomplete; run launch while online once before --serve-only")
 
 
 def launch(args: argparse.Namespace) -> None:
@@ -242,7 +316,7 @@ def launch(args: argparse.Namespace) -> None:
     else:
         if config["policy"] == "offline" or args.offline:
             if not static_ready():
-                fail("offline map builds cannot download a missing browser build; build once online first")
+                fail("offline map builds cannot download a missing/incomplete browser build; build once online first")
         command = [str(ROOT / "scripts/setup-ubuntu-vm.sh"), "--yes", "--regions", config["regions"],
                    "--snapshot", config["snapshot"], "--source-policy",
                    "offline" if args.offline else config["policy"], "--map-library", config["library"]]
@@ -499,10 +573,10 @@ def doctor() -> int:
         print(f"FAIL map selection: {error}")
         errors += 1
     if not static_ready():
-        print("FAIL browser build missing -> scripts/vm.py launch (online first)")
+        print("FAIL browser build missing/incomplete -> scripts/vm.py launch (online first)")
         errors += 1
     else:
-        print("OK browser build files on host (index + MapLibre worker; Nginx mount not checked here)")
+        print("OK browser build files on host (HTML entry + direct local assets + MapLibre worker; Nginx mount not checked here)")
     try:
         run(["docker", "info"], capture=True, stderr=subprocess.PIPE)
         run([*vm_compose_args(), "config", "--quiet"], capture=True, stderr=subprocess.PIPE)

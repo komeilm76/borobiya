@@ -5,6 +5,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -389,6 +390,59 @@ class InstallerTests(unittest.TestCase):
 
 
 class OperationsTests(unittest.TestCase):
+    def test_static_ready_requires_complete_local_browser_entry_and_safe_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "repo"
+            dist = root / "packages/client/dist"
+            assets = dist / "assets"
+            assets.mkdir(parents=True)
+            index = dist / "index.html"
+            index.write_text('<!doctype html><html><head><script src="/theme-init.js"></script>'
+                             '<script type="module" src="/assets/index-abc.js"></script>'
+                             '<link rel="stylesheet" href="/assets/index-abc.css"></head></html>')
+            worker = dist / "maplibre-gl-worker.mjs"
+            worker.write_text("worker")
+            script = assets / "index-abc.js"
+            script.write_text("app")
+            style = assets / "index-abc.css"
+            style.write_text("css")
+            (dist / "theme-init.js").write_text("theme")
+            with patch.object(vm, "ROOT", root):
+                self.assertTrue(vm.static_ready())
+                staged = root / ".deploy/client-release"
+                shutil.copytree(dist, staged)
+                self.assertTrue(vm.browser_build_ready(staged))
+                self.assertTrue(vm.browser_build_ready(Path(".deploy/client-release")),
+                                "the deploy script passes a repo-relative staging path")
+                (staged / "assets/index-abc.js").unlink()
+                self.assertFalse(vm.browser_build_ready(Path(".deploy/client-release")),
+                                 "reject incomplete release archive before cutover")
+                script.unlink()
+                self.assertFalse(vm.static_ready(), "missing JS entry must not pass --serve-only")
+                script.write_text("")
+                self.assertFalse(vm.static_ready(), "zero-byte JS entry must not pass --serve-only")
+                script.write_text("app")
+                style.unlink()
+                self.assertFalse(vm.static_ready(), "missing stylesheet must not pass --serve-only")
+                style.write_text("css")
+                (dist / "theme-init.js").unlink()
+                self.assertFalse(vm.static_ready(), "a directly referenced public script is required")
+                (dist / "theme-init.js").write_text("theme")
+                script.unlink()
+                outside_asset = Path(directory) / "outside.js"
+                outside_asset.write_text("app")
+                script.symlink_to(outside_asset)
+                self.assertFalse(vm.static_ready(), "do not follow a symlinked entry asset")
+                script.unlink()
+                script.write_text("app")
+                index.write_text('<html><script type="module" src="/src/main.ts"></script></html>')
+                self.assertFalse(vm.static_ready(), "a Vite source index is not a built SPA")
+                index.write_text('<html><script type="module" src="/assets/index-abc.js"></script></html>')
+                external = Path(directory) / "external-client"
+                (root / "packages/client").rename(external)
+                (root / "packages/client").symlink_to(external, target_is_directory=True)
+                self.assertFalse(vm.static_ready(), "never follow a symlinked build parent")
+
     def test_down_stops_import_and_previous_production_profiles_without_starting_them(self):
         with patch.object(vm, "env_values", return_value={"NODE_ENV": "development"}), \
              patch.object(vm, "run") as run:

@@ -31,11 +31,22 @@ PYTHONPATH=scripts python3 -c 'import vm; vm.verify_serving_artifacts(vm.require
 
 # Stage the new static bundle without touching the live Nginx bind mount yet.
 release=".deploy/client-$sha"
-mkdir -p "$release"
-tar -xzf ".deploy/$sha.tgz" -C "$release" --no-same-owner
-[[ -s "$release/index.html" && -s "$release/maplibre-gl-worker.mjs" ]] || {
-  echo 'Client archive is incomplete' >&2; exit 1;
+# Never overlay a failed/stale staging directory: old files could mask a missing archive asset.
+[[ ! -e "$release" && ! -L "$release" ]] || {
+  echo 'Client staging slot is occupied; inspect and remove it manually before retrying' >&2; exit 1;
 }
+mkdir "$release"
+tar -xzf ".deploy/$sha.tgz" -C "$release" --no-same-owner
+# A bundle can contain index.html and the worker while omitting its entry JS/CSS.
+# Refuse that archive before pulling images or switching the running Nginx mount.
+PYTHONPATH=scripts python3 - "$release" <<'PY'
+import sys
+from pathlib import Path
+from vm import browser_build_ready
+
+if not browser_build_ready(Path(sys.argv[1])):
+    raise SystemExit("Client archive is incomplete (HTML entry, direct asset or worker missing)")
+PY
 
 "${compose[@]}" pull api routing-gateway photon
 # No implicit migration or destructive reset. Schema drift fails *before* switching

@@ -189,8 +189,10 @@ key verification or writes `.env` from CI.
 
 The [VM script](../scripts/deploy-vm.sh) verifies that `main` still points to the
 SHA that triggered the workflow (no stale rollout), fast-forwards the checkout,
-checks production environment and existing map artifacts, pulls only the new
-application images with [the registry overlay](../docker-compose.deploy.yml),
+checks production environment and existing map artifacts, and refuses a staged
+client archive whose HTML entry, directly referenced local assets or worker are
+missing/empty (this does not validate lazy chunks or a rendered page). It then
+pulls only the new application images with [the registry overlay](../docker-compose.deploy.yml),
 and runs `bun src/db/check-schema.ts` in the new image **before** cutover. If a
 schema migration is needed, back up and review/apply it using the VM runbook;
 **do not** disable the check or let a deployment silently migrate live data.
@@ -204,6 +206,9 @@ static client and attempts to relaunch the previous SHA-tagged images if
 database or git rollback. Before the first tagged deploy, manual intervention
 may be needed after a failure. Previous client bundles remain in `.deploy` for
 operator inspection; remove old bundles only after confirming a healthy release.
+A failed preflight can leave `.deploy/client-<SHA>` behind; inspect/remove that
+staging slot before retrying, since overlaying it could conceal a missing file
+in the newly uploaded archive.
 
 A green workflow proves code/build checks and SSH script exit, **not** a live
 browser/physical-device/security or real map-library acceptance. The Action

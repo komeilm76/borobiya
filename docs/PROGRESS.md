@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — VM browser-build preflight and staged deploy review
+
+- `--serve-only` and `doctor` previously treated any nonempty `dist/index.html` plus a MapLibre worker as a usable browser build, even if the HTML's JS/CSS entry had been deleted. The production deploy script used the same two-file test for an uploaded archive, potentially cutting over to a blank UI. Both now check nonempty HTML, a built module entry and the HTML's directly referenced local script/link files, reject symlinked build paths and occupied deploy staging slots (which could mask absent archive files), and fail before offline startup or deployment image pulls. Offline fixtures reproduced the missing-file defect before the fix and cover staged releases, zero-byte assets, source-index and symlink cases. These checks cannot prove lazy chunks, Nginx bind-mount state or real browser behavior; no live VM/deploy acceptance is claimed.
+
 ### 2026-10-28 — T4.4.2 rescuer-history detail retry (partial)
 
 - A failed detail fetch cleared `selected`, so retrying through `load()` fetched the list and opened its first mission rather than the one the rescuer had chosen. The composable now tracks the requested ID independently of a successful detail record, keeps its card selected through a failure, and retries that ID without a list read. A later list refresh also preserves the requested ID while it remains on the page. Focused regressions failed before the change and pass afterward; Vue remains unmounted per test convention. This is one feedback-path fix, not site-wide T4.4.2 sign-off or live browser verification.
