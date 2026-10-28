@@ -1,4 +1,4 @@
-import { onScopeDispose, ref, type Ref } from "vue";
+import { computed, onScopeDispose, ref, type Ref } from "vue";
 import { idSchema, type Mission, type MissionDetail } from "@shared/index";
 import { getMission, listRescuerMissions } from "../api/mission";
 import { ApiError } from "../api/http";
@@ -17,6 +17,9 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
   const loading = ref(false);
   const detailLoading = ref(false);
   const error = ref<string | null>(null);
+  // A cached total (or empty page) is not proof of the latest list while a read is pending/failed.
+  const listLoaded = ref(false);
+  const listVerified = computed(() => listLoaded.value && !loading.value && !error.value);
   const detailError = ref<string | null>(null);
   const linkError = ref<string | null>(null);
   const linkRetryable = ref(false);
@@ -79,6 +82,7 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
       page.value = nextPage;
       total.value = result.total;
       totalPages.value = result.totalPages;
+      listLoaded.value = true;
       const selectedId = previous && result.items.some((item) => item.id === previous) ? previous : result.items[0]?.id;
       if (deepLink && !result.items.some((item) => item.id === deepLink)) {
         if (idSchema.safeParse(deepLink).success && token.value) {
@@ -132,12 +136,13 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     loading.value = false;
     detailLoading.value = false;
     error.value = null;
+    listLoaded.value = false;
     detailError.value = null;
     linkError.value = null;
     linkRetryable.value = false;
     retryId = null;
   }
   onScopeDispose(reset);
-  return { items, selected, requestedId, page, total, totalPages, loading, detailLoading, error, detailError, linkError,
+  return { items, selected, requestedId, page, total, totalPages, loading, listVerified, detailLoading, error, detailError, linkError,
     linkRetryable, load, choose, retryDetail, retryLink, reset };
 }

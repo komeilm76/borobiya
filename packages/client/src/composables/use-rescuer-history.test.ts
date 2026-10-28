@@ -83,6 +83,7 @@ describe("rescuer mission history", () => {
       vi.mocked(getMission).mockResolvedValueOnce({ ...detail, id: otherId });
       await state.retryLink();
       expect(state.selected.value?.id).toBe(otherId);
+      expect(state.listVerified.value).toBe(true); // the off-page detail returns early after a successful list read
       expect(state.linkError.value).toBeNull();
       expect(state.linkRetryable.value).toBe(false);
       expect(getMission).toHaveBeenLastCalledWith("token", otherId);
@@ -176,6 +177,47 @@ describe("rescuer mission history", () => {
       await first;
       expect(state.selected.value?.id).toBe(otherId);
     } finally { scope.stop(); }
+  });
+
+  it("does not certify a zero count or cached mission rows before a successful latest list read", async () => {
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      expect(state.listVerified.value).toBe(false);
+      vi.mocked(listRescuerMissions).mockRejectedValueOnce(new Error("offline"));
+      await state.load();
+      expect(state.items.value).toEqual([]);
+      expect(state.error.value).toBeTruthy();
+      expect(state.listVerified.value).toBe(false);
+      await state.load();
+      expect(state.items.value).toEqual([mission]);
+      expect(state.listVerified.value).toBe(true);
+      const delayed = pending<{ items: Mission[]; total: number; totalPages: number }>();
+      vi.mocked(listRescuerMissions).mockReturnValueOnce(delayed.promise);
+      const refreshing = state.load();
+      expect(state.listVerified.value).toBe(false);
+      delayed.resolve({ items: [mission], total: 1, totalPages: 1 });
+      await refreshing;
+      expect(state.listVerified.value).toBe(true);
+      vi.mocked(listRescuerMissions).mockRejectedValueOnce(new Error("offline"));
+      await state.load();
+      expect(state.items.value).toEqual([mission]);
+      expect(state.error.value).toBeTruthy();
+      expect(state.listVerified.value).toBe(false);
+      await state.load();
+      expect(state.listVerified.value).toBe(true);
+      state.reset();
+      expect(state.listVerified.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
+  it("shows only verified counts and pagination, and labels retained rows after a failed refresh", () => {
+    const view = readFileSync(new URL("../views/_user/UserRescuerHistoryView.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="history.listVerified.value">{{ history.total.value.toLocaleString');
+    expect(view).toContain('v-if="history.items.value.length && !history.listVerified.value"');
+    expect(view).toContain('v-else-if="!history.items.value.length && history.listVerified.value"');
+    expect(view).toContain('v-else-if="!history.items.value.length"');
+    expect(view).toContain('v-if="history.listVerified.value && history.totalPages.value > 1"');
   });
 
   it("clears linked retry and private list metadata on logout", async () => {

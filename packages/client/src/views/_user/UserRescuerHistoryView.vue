@@ -7,7 +7,10 @@
         <p>مأموریت‌های خود را مرور کنید؛ زمان هر گام از سوابق ثبت‌شدهٔ سرور خوانده می‌شود.</p>
       </header>
       <div class="history__toolbar">
-        <div><h2>مأموریت‌های من</h2><p>{{ history.total.value.toLocaleString('fa-IR') }} مأموریت</p></div>
+        <div><h2>مأموریت‌های من</h2>
+          <p v-if="history.listVerified.value">{{ history.total.value.toLocaleString('fa-IR') }} مأموریت</p>
+          <p v-else>{{ history.loading.value ? 'در حال بررسی شمار مأموریت‌ها…' : 'شمار مأموریت‌ها تأیید نشده است' }}</p>
+        </div>
         <v-btn color="primary" variant="tonal" prepend-icon="mdi-refresh" :loading="history.loading.value"
           @click="history.load()">تازه‌سازی</v-btn>
       </div>
@@ -19,13 +22,20 @@
         <v-btn v-if="history.linkRetryable.value" variant="text" :loading="history.loading.value"
           @click="history.retryLink()">تلاش دوباره برای پیوند</v-btn>
       </v-alert>
+      <v-alert v-if="history.items.value.length && !history.listVerified.value" type="warning" variant="tonal"
+        role="status" class="mb-4">
+        موارد نمایشی از آخرین فهرست دریافت‌شده‌اند؛ ممکن است وضعیت مأموریت‌ها تغییر کرده باشد. برای بررسی دوباره، تازه‌سازی کنید.
+      </v-alert>
       <v-progress-linear v-if="history.loading.value && !history.items.value.length" indeterminate color="primary"
         aria-label="دریافت سوابق مأموریت" />
-      <section v-else-if="!history.items.value.length && !history.error.value" class="history__empty">
+      <section v-else-if="!history.items.value.length && history.listVerified.value" class="history__empty">
         <v-icon icon="mdi-lifebuoy" size="42" color="primary" />
         <h2>هنوز مأموریتی ندارید</h2>
         <p>پیشنهادهای مأموریت از بخش «پیشنهادها» در دسترس‌اند.</p>
         <v-btn to="/_user/proposals" color="primary" variant="tonal">مشاهدهٔ پیشنهادها</v-btn>
+      </section>
+      <section v-else-if="!history.items.value.length" class="history__empty" role="status">
+        نبودن مأموریت قابل تأیید نیست؛ لطفاً فهرست را دوباره تازه‌سازی کنید.
       </section>
       <div v-else class="history__grid">
         <section class="history__list" aria-label="فهرست مأموریت‌های امدادگری">
@@ -39,7 +49,7 @@
               <v-icon v-if="item.status === 'completed'" icon="mdi-check-circle" color="success" size="20" />
             </button>
           </div>
-          <div v-if="history.totalPages.value > 1" class="history__pages">
+          <div v-if="history.listVerified.value && history.totalPages.value > 1" class="history__pages">
             <v-btn icon="mdi-chevron-right" aria-label="صفحهٔ قبل" variant="text"
               :disabled="history.page.value <= 1 || history.loading.value" @click="history.load(history.page.value - 1)" />
             <span>صفحهٔ {{ history.page.value.toLocaleString('fa-IR') }} از {{ history.totalPages.value.toLocaleString('fa-IR') }}</span>

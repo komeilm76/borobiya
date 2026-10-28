@@ -8,7 +8,7 @@ const offers = readFileSync(new URL("./UserProposalsView.vue", import.meta.url),
 describe("rescuer stacked master/detail screens (T4.4.1)", () => {
   it("keeps mission pagination and the selected timeline outside a bounded, accessible card list", () => {
     expect(missions).toMatch(/<div class="history__items" role="region"[^>]*:tabindex="history\.items\.value\.length > 1 \? 0 : -1"[^>]*>[\s\S]*?<button v-for="item in history\.items\.value"/);
-    expect(missions).toMatch(/<\/button>\s*<\/div>\s*<div v-if="history\.totalPages\.value > 1" class="history__pages">/);
+    expect(missions).toMatch(/<\/button>\s*<\/div>\s*<div v-if="history\.listVerified\.value && history\.totalPages\.value > 1" class="history__pages">/);
     expect(missions.indexOf('class="history__detail" aria-label="جزئیات مأموریت"')).toBeGreaterThan(missions.indexOf('class="history__pages"'));
     expect(missions).toContain('@click="history.choose(item.id)"');
     expect(missions).toContain('<MissionTimelinePanel');

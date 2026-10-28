@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Rescuer mission history unverified counts and retained rows (T4.4.2 bug review)
+
+- The rescuer history page claimed “0 missions” before its first list read succeeded and kept a cached count and pagination looking current after a failed refresh. It now verifies the count and empty state only after a successful list read, labels retained rows as potentially stale while refreshing or failed, hides unverified pagination, and keeps retry plus selected details available. Pure composable and source-pinned regressions failed before the fix and now cover first failure, pending refresh, refresh failure, recovery, and reset. No Vue SFC was mounted; real browser/device feedback acceptance and the broader T4.4.2 audit remain open.
+
 ### 2026-10-28 — Active-device priority writes on session-check failure (T4.4.2 bug review)
 
 - A failed `ensureSession()` before a single-share or bulk priority edit rejected out of the composable; the panel invokes both as `void`, so no write happened and no error was shown. Both paths now resolve without posting and show a localized error for the current account. A delayed failure from an old account leaves the new session's sign-in warning untouched. Focused unit regressions reproduced all three paths before the fix and pass afterward. No Vue SFC was mounted or browser/device acceptance claimed; the wider feedback/toast audit remains open.
