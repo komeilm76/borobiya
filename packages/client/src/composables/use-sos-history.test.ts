@@ -30,6 +30,11 @@ describe("requester SOS history and cancellation", () => {
     expect(view).toContain('referrerpolicy="no-referrer"');
     expect(view).toContain('getSosPhotoSrc(id, token)');
     expect(view).toContain('history.canCancelSelected.value');
+    expect(view).toContain('v-if="history.listVerified.value"');
+    expect(view).toContain('v-if="history.items.value.length && !history.listVerified.value"');
+    expect(view).toContain('v-else-if="!history.items.value.length" class="history__empty" role="status"');
+    expect(view).toContain('v-if="history.listVerified.value && history.totalPages.value > 1"');
+    expect(view).toContain(':disabled="!history.listVerified.value" @click="history.cancellation.show()"');
   });
 
   it("selects the owner's active request and marks a successful cancel without pretending another one changed", async () => {
@@ -80,6 +85,44 @@ describe("requester SOS history and cancellation", () => {
     expect(history.items.value[0]?.status).toBe("cancelled_by_requester");
     expect(history.canCancelSelected.value).toBe(false);
     expect(history.loading.value).toBe(false);
+  });
+
+  it("does not verify a requester history count before success or after a failed refresh", async () => {
+    const history = useSosHistory(ref("token"), ref(requesterId));
+    expect(history.listVerified.value).toBe(false);
+    await history.load();
+    expect(history.listVerified.value).toBe(true);
+    expect(history.total.value).toBe(1);
+    const waiting = pending<{ items: SosRequest[]; total: number; page: number; limit: number; totalPages: number }>();
+    vi.mocked(listRequesterSosHistory).mockReturnValueOnce(waiting.promise);
+    const refresh = history.load();
+    expect(history.listVerified.value).toBe(false); // last-known rows are not a current count during refresh
+    waiting.resolve({ items: [record], total: 1, page: 1, limit: 12, totalPages: 1 });
+    await refresh;
+    expect(history.listVerified.value).toBe(true);
+    vi.mocked(listRequesterSosHistory).mockRejectedValueOnce(new Error("offline"));
+    await history.load();
+    expect(history.error.value).toBeTruthy();
+    expect(history.items.value).toEqual([record]); // keep cached rows; don't call them current
+    expect(history.total.value).toBe(1);
+    expect(history.listVerified.value).toBe(false);
+    await history.load();
+    expect(history.error.value).toBeNull();
+    expect(history.listVerified.value).toBe(true);
+    history.reset();
+    expect(history.listVerified.value).toBe(false);
+  });
+
+  it("does not claim the account has no requests after a failed first history read", async () => {
+    vi.mocked(listRequesterSosHistory).mockRejectedValueOnce(new Error("offline"));
+    const history = useSosHistory(ref("token"), ref(requesterId));
+    await history.load();
+    expect(history.items.value).toEqual([]);
+    expect(history.error.value).toBeTruthy();
+    expect(history.listVerified.value).toBe(false);
+    await history.load();
+    expect(history.error.value).toBeNull();
+    expect(history.listVerified.value).toBe(true);
   });
 
   it("handles a foreign deep link without showing another request and does not confuse a network error with 404", async () => {

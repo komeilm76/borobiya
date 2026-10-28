@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Requester SOS history unverified counts and retained rows (T4.4.2 bug review)
+
+- A failed first history read still rendered a "0 requests" count, and a failed refresh left cached rows, pagination and cancellable status looking current. The history now verifies the count/empty state only after a successful read, labels retained rows as potentially stale, hides pagination and disables cancellation while the snapshot is loading or failed, and keeps retry plus previously selected data. Pure composable and source-pinned regressions reproduced the unverified state before the fix and now cover first failure, pending read, refresh failure, recovery and reset. No Vue SFC was mounted; broader feedback/toasts and real browser/device acceptance remain open.
+
 ### 2026-10-28 — Admin SOS responder search verification feedback (T4.4.2 partial)
 
 - The nearest-responder card could claim zero eligible rescuers before a first successful read or after a failed search, even while showing a read-error banner. A current result is now marked verified only after a successful request; the panel distinguishes loading, failed-with-retry, verified empty, populated and unverified states, hiding old candidates during refresh while keeping separately selected rescuer chips for server-validated dispatch. Deferred Pinia and source-pinned tests failed before the fix and now cover failure, retry, query change and success without mounting Vue. The broader site-wide feedback/toasts/optimistic-write task and real browser/device accessibility review remain open.

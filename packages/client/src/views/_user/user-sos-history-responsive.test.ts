@@ -10,7 +10,7 @@ describe("requester SOS history on narrow screens (source-pinned; no Vue mount)"
     expect(history).toContain('<section class="history__list" aria-label="فهرست درخواست‌های امداد">');
     expect(history).toMatch(/<div class="history__items"[^>]*role="region"[^>]*:tabindex="history\.items\.value\.length > 1 \? 0 : -1"[^>]*>[\s\S]*?<button v-for="item in history\.items\.value"/);
     const list = history.split('<section class="history__list"')[1]!.split('</section>')[0]!;
-    expect(list).toMatch(/<\/button>\s*<\/div>\s*<div v-if="history\.totalPages\.value > 1" class="history__pages">/);
+    expect(list).toMatch(/<\/button>\s*<\/div>\s*<div v-if="history\.listVerified\.value && history\.totalPages\.value > 1" class="history__pages">/);
     expect(history.indexOf('class="history__panel" aria-label="جزئیات درخواست"')).toBeGreaterThan(
       history.indexOf('class="history__pages"')
     );

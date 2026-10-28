@@ -15,16 +15,26 @@
           @click="history.retryLink()">تلاش دوباره برای پیوند</v-btn>
       </v-alert>
       <div class="history__toolbar">
-        <div><h2>درخواست‌های ثبت‌شده</h2><p>{{ history.total.value.toLocaleString('fa-IR') }} درخواست</p></div>
+        <div><h2>درخواست‌های ثبت‌شده</h2>
+          <p v-if="history.listVerified.value">{{ history.total.value.toLocaleString('fa-IR') }} درخواست</p>
+          <p v-else>{{ history.loading.value ? 'در حال بررسی شمار درخواست‌ها…' : 'شمار درخواست‌ها تأیید نشده است' }}</p>
+        </div>
         <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-refresh"
           :loading="history.loading.value" @click="history.load()">تازه‌سازی</v-btn>
       </div>
+      <v-alert v-if="history.items.value.length && !history.listVerified.value" type="warning" variant="tonal"
+        rounded="lg" role="status" class="mb-4">
+        موارد نمایشی از آخرین فهرست دریافت‌شده‌اند؛ ممکن است وضعیت آن‌ها تغییر کرده باشد. برای بررسی دوباره، تازه‌سازی کنید.
+      </v-alert>
       <v-skeleton-loader v-if="history.loading.value && !history.items.value.length" type="article, actions" class="history__panel" />
-      <section v-else-if="!history.items.value.length && !history.error.value" class="history__empty">
+      <section v-else-if="!history.items.value.length && history.listVerified.value" class="history__empty">
         <v-icon icon="mdi-text-box-search-outline" size="42" color="primary" />
         <h3>هنوز درخواستی ثبت نکرده‌اید</h3>
         <p>در زمان نیاز، دکمهٔ شناور SOS در دسترس شماست.</p>
         <v-btn to="/_user/dashboard" color="primary" variant="tonal" rounded="lg">بازگشت به پیشخوان</v-btn>
+      </section>
+      <section v-else-if="!history.items.value.length" class="history__empty" role="status">
+        نبودن درخواست قابل تأیید نیست؛ لطفاً دریافت فهرست را دوباره امتحان کنید.
       </section>
       <div v-else class="history__grid">
         <section class="history__list" aria-label="فهرست درخواست‌های امداد">
@@ -42,7 +52,7 @@
               <v-chip size="small" :color="statusInfo(item.status).color" variant="tonal">{{ statusInfo(item.status).label }}</v-chip>
             </button>
           </div>
-          <div v-if="history.totalPages.value > 1" class="history__pages">
+          <div v-if="history.listVerified.value && history.totalPages.value > 1" class="history__pages">
             <v-btn variant="text" icon="mdi-chevron-right" aria-label="صفحهٔ قبل" :disabled="history.page.value <= 1 || history.loading.value"
               @click="history.load(history.page.value - 1)" />
             <span>صفحهٔ {{ history.page.value.toLocaleString('fa-IR') }} از {{ history.totalPages.value.toLocaleString('fa-IR') }}</span>
@@ -99,7 +109,7 @@
             <div class="history__actions">
               <p v-if="history.canCancelSelected.value">اگر هنوز به کمک نیاز دارید، درخواست را باز بگذارید.</p>
               <v-btn v-if="history.canCancelSelected.value" variant="outlined" color="error" rounded="lg"
-                prepend-icon="mdi-close-circle-outline" :disabled="history.loading.value" @click="history.cancellation.show()">
+                prepend-icon="mdi-close-circle-outline" :disabled="!history.listVerified.value" @click="history.cancellation.show()">
                 لغو این درخواست
               </v-btn>
               <p v-else-if="history.selected.value.status !== 'cancelled_by_rescuer'" class="history__hint">

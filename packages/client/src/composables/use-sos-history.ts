@@ -17,6 +17,8 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   const totalPages = ref(0);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const listLoaded = ref(false);
+  const listVerified = computed(() => listLoaded.value && !loading.value && !error.value);
   const linkError = ref<string | null>(null);
   const linkRetryable = ref(false);
   let retryId: string | null = null;
@@ -68,6 +70,7 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
       total.value = result.total;
       totalPages.value = result.totalPages;
       selected.value = detail ?? result.items[0] ?? null;
+      listLoaded.value = true;
     } catch (cause) {
       if (userId.value === owner && current === generation)
         error.value = sosApiErrorMessage(cause, "دریافت تاریخچهٔ درخواست‌ها انجام نشد؛ دوباره تلاش کنید.");
@@ -111,12 +114,13 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
     totalPages.value = 0;
     loading.value = false;
     error.value = null;
+    listLoaded.value = false;
     linkError.value = null;
     linkRetryable.value = false;
     retryId = null;
     cancellation.reset();
   }
 
-  return { items, selected, page, total, totalPages, loading, error, linkError, linkRetryable, cancellation,
+  return { items, selected, page, total, totalPages, loading, error, listVerified, linkError, linkRetryable, cancellation,
     canCancelSelected, load, retryLink, choose, markCancelled, reset };
 }
