@@ -26,13 +26,29 @@ import {
  */
 export const PEER_TICK_MS = 5_000;
 
+function bearerBelongsToOwner(token: string, owner: string): boolean {
+  // This is only a conservative display gate, never authentication: the server
+  // verifies the signature and share scope. The production bearer is a JWT with
+  // `sub`; refuse a recognisable JWT for a different/missing subject while the
+  // auth store is still loading its profile (e.g. another tab changed accounts).
+  const parts = token.split(".");
+  if (parts.length !== 3) return true; // opaque bearers remain subject to server authorization
+  try {
+    const encoded = parts[1]!.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "="))) as { sub?: unknown };
+    return payload.sub === owner;
+  } catch {
+    return false;
+  }
+}
+
 export interface UseLiveCompanionsOptions {
   accessToken: Ref<string | null> | ComputedRef<string | null>;
   /**
-   * The signed-in user's own id. The server echoes an accepted fix into the *sender's* room as well, so
-   * without this a broadcaster would appear as one of their own companions.
+   * The signed-in user's own id is both the peer-echo filter and the ownership boundary for
+   * private positions. A changed account must discard its old map and Socket.IO room.
    */
-  ownUserId?: Ref<string | null> | ComputedRef<string | null>;
+  ownUserId: Ref<string | null> | ComputedRef<string | null>;
   /**
    * Opens the realtime connection. Production resolves `socket.io-client` lazily — see the note in
    * `useLiveCompanions` — and tests hand in a fake, which may be synchronous.
@@ -87,10 +103,29 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   let requestId = 0;
   let refreshing = false;
   let activeReads = 0;
+  let readsGeneration = 0;
   let refreshingAuth = false;
   let inRefreshRetry = false;
+  let authGeneration = 0;
   let timer: ReturnType<typeof setInterval> | null = null;
   let openShareIds = new Set<string>();
+  let restartQueued = false;
+  let disposed = false;
+
+  function queueRestart(): void {
+    if (restartQueued) return;
+    restartQueued = true;
+    // Coalesce the owner's and token's synchronous changes during a login. Never
+    // open an old owner's socket with the next owner's bearer in between them.
+    queueMicrotask(() => {
+      restartQueued = false;
+      const token = options.accessToken.value;
+      const owner = options.ownUserId.value;
+      if (disposed || !token || !owner || !bearerBelongsToOwner(token, owner)) return;
+      void ensureClient();
+      if (!inRefreshRetry) void refresh();
+    });
+  }
 
   const peers = computed(() => peersOf(registry.value, nowMs.value));
   const overlay = computed(() => peersOverlay(registry.value, nowMs.value));
@@ -120,6 +155,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     // Invalidate older HTTP replies before even awaiting a session refresh. Otherwise
     // a sign-out/revocation during that await can resurrect another account's peers.
     const request = ++requestId;
+    const owner = options.ownUserId.value;
     let token = options.accessToken.value;
     if (!token && options.ensureSession) {
       try {
@@ -129,46 +165,55 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       }
       token = options.accessToken.value;
     }
-    if (request !== requestId) return;
-    if (!token) {
+    if (request !== requestId || options.ownUserId.value !== owner || disposed) return;
+    if (!token || !owner || !bearerBelongsToOwner(token, owner)) {
       registry.value = emptyRegistry;
       openShareIds = new Set();
       shareCount.value = 0;
       readFailed.value = false;
       return;
     }
+    const readsSession = readsGeneration;
     activeReads++;
     refreshing = true;
     try {
       const shares = await readShares(token);
-      if (request !== requestId || options.accessToken.value !== token) return;
+      if (request !== requestId || options.accessToken.value !== token || options.ownUserId.value !== owner || disposed) return;
       applyShares(shares);
     } catch (error) {
       const statusCode = (error as { status?: unknown } | null)?.status;
+      if (request !== requestId || options.ownUserId.value !== owner || disposed) return;
       if (statusCode === 401 && options.ensureSession && !refreshingAuth) {
         refreshingAuth = true;
         inRefreshRetry = true;
+        const authSession = authGeneration;
         try {
           await options.ensureSession();
+          if (request !== requestId || options.ownUserId.value !== owner || disposed) return;
           const nextToken = options.accessToken.value;
           if (nextToken && nextToken !== token) {
             const retryRequest = ++requestId;
             const retried = await readShares(nextToken);
-            if (retryRequest === requestId && options.accessToken.value === nextToken) applyShares(retried);
+            if (retryRequest === requestId && options.accessToken.value === nextToken &&
+              options.ownUserId.value === owner && !disposed) applyShares(retried);
             return;
           }
         } catch {
           // Fall through to mark readFailed cleanly.
         } finally {
-          inRefreshRetry = false;
-          refreshingAuth = false;
+          if (authSession === authGeneration) {
+            inRefreshRetry = false;
+            refreshingAuth = false;
+          }
         }
       }
-      if (request !== requestId || options.accessToken.value !== token) return;
+      if (request !== requestId || options.accessToken.value !== token || options.ownUserId.value !== owner || disposed) return;
       readFailed.value = true;
     } finally {
-      activeReads--;
-      refreshing = activeReads > 0;
+      if (readsSession === readsGeneration) {
+        activeReads--;
+        refreshing = activeReads > 0;
+      }
     }
   }
 
@@ -176,7 +221,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     const result = applyPeerUpdate(
       registry.value,
       payload as { userId?: unknown; lat?: unknown; lon?: unknown; accuracy?: unknown; timestamp?: unknown },
-      options.ownUserId?.value ?? null
+      options.ownUserId.value
     );
     if (result.changed) {
       registry.value = result.registry;
@@ -224,19 +269,23 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     connected.value = false;
     if (!options.ensureSession || refreshingAuth) return;
     const previousToken = options.accessToken.value;
+    const owner = options.ownUserId.value;
+    const currentClient = client;
+    const authSession = authGeneration;
     refreshingAuth = true;
     try {
       await options.ensureSession();
       const nextToken = options.accessToken.value;
-      if (nextToken && nextToken !== previousToken && client) {
-        client.updateToken(nextToken);
-        if (client.reconnect) client.reconnect();
-        else client.connect();
+      if (nextToken && nextToken !== previousToken && owner &&
+        options.ownUserId.value === owner && client === currentClient && currentClient && !disposed) {
+        currentClient.updateToken(nextToken);
+        if (currentClient.reconnect) currentClient.reconnect();
+        else currentClient.connect();
       }
     } catch {
       // Next reconnect attempt or explicit user navigation will retry cleanly.
     } finally {
-      refreshingAuth = false;
+      if (authSession === authGeneration) refreshingAuth = false;
     }
   }
 
@@ -257,9 +306,25 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
 
   let generation = 0;
 
+  function clearPrivateState(): void {
+    requestId++;
+    readsGeneration++;
+    activeReads = 0;
+    refreshing = false;
+    authGeneration++;
+    refreshingAuth = false;
+    inRefreshRetry = false;
+    teardownClient();
+    registry.value = emptyRegistry;
+    openShareIds = new Set();
+    shareCount.value = 0;
+    readFailed.value = false;
+  }
+
   async function ensureClient(): Promise<void> {
     const token = options.accessToken.value;
-    if (!token) {
+    const owner = options.ownUserId.value;
+    if (!token || !owner || !bearerBelongsToOwner(token, owner) || disposed) {
       teardownClient();
       return;
     }
@@ -269,8 +334,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     }
     const request = ++generation;
     const opened = await openSocket(token);
-    if (request !== generation) {
-      // Signing out (or a newer open) finished first; a client nobody will listen to must not stay open.
+    if (request !== generation || options.ownUserId.value !== owner ||
+      options.accessToken.value !== token || !bearerBelongsToOwner(token, owner) || disposed) {
+      // A newer owner, bearer or view won the race. Never attach the old room's listener.
       opened.close();
       return;
     }
@@ -289,34 +355,30 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     if (pruned.changed) registry.value = pruned.registry;
   }, tickMs);
 
-  watch(
-    () => options.accessToken.value,
-    (token) => {
-      if (token) {
-        void ensureClient();
-        if (!inRefreshRetry) void refresh();
-        return;
-      }
-      // Signing out must not leave somebody else's companions on the screen, nor a socket that keeps
-      // receiving their positions. Invalidate reads that started under the old bearer too.
-      requestId++;
-      teardownClient();
-      registry.value = emptyRegistry;
-      openShareIds = new Set();
-      shareCount.value = 0;
-      readFailed.value = false;
-    }
-  );
+  watch(options.ownUserId, () => {
+    // A new account can arrive via another tab's refresh cookie without an intervening
+    // token-null render. Remove the previous owner's coordinates and room immediately.
+    clearPrivateState();
+    queueRestart();
+  }, { flush: "sync" });
+  watch(options.accessToken, (token) => {
+    const owner = options.ownUserId.value;
+    if (!token || !owner || !bearerBelongsToOwner(token, owner)) clearPrivateState();
+    else queueRestart();
+  }, { flush: "sync" });
 
   onScopeDispose(() => {
-    requestId++;
+    disposed = true;
+    clearPrivateState();
     if (timer) clearInterval(timer);
     timer = null;
-    teardownClient();
   });
 
-  void ensureClient();
-  if (options.accessToken.value) void refresh();
+  if (options.accessToken.value && options.ownUserId.value &&
+    bearerBelongsToOwner(options.accessToken.value, options.ownUserId.value)) {
+    void ensureClient();
+    void refresh();
+  }
 
   return { registry, peers, overlay, status, connected, shareCount, readFailed, nowMs, refresh };
 }

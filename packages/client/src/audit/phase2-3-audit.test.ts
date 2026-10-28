@@ -115,6 +115,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     const api = scope.run(() =>
       useLiveCompanions({
         accessToken: token,
+        ownUserId: ref("11111111-1111-4111-8111-111111111111"),
         ensureSession,
         readShares,
         openSocket: () => ({

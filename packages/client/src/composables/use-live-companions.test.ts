@@ -102,7 +102,7 @@ function mount(
   });
 
   const token = ref<string | null>(options.token === undefined ? "token" : options.token);
-  const ownUserId = ref<string | null>(options.ownUserId ?? null);
+  const ownUserId = ref<string | null>(options.ownUserId === undefined ? ME : options.ownUserId);
   const scope = effectScope();
   let api!: ReturnType<typeof useLiveCompanions>;
   scope.run(() => {
@@ -155,6 +155,8 @@ async function settle(): Promise<void> {
 }
 
 const SHARE_OWNER = { id: ALICE, username: "مریم", lastLocation: { lat: 35.7, lon: 51.4 } };
+const bearerFor = (owner: string, nonce = "initial") =>
+  `e30.${Buffer.from(JSON.stringify({ sub: owner, nonce })).toString("base64url")}.sig`;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -174,6 +176,11 @@ describe("the composable's own imports", () => {
     expect(source).toContain('await import("@/services/socket")');
     expect(source).not.toMatch(/^import \{[^}]*\} from "@\/services\/socket";$/m);
     expect(source).toContain('from "@/services/socket-events"');
+  });
+
+  it("binds the map receiver to the authenticated account", () => {
+    const mapView = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
+    expect(mapView).toContain('ownUserId: computed(() => auth.user?.id ?? null)');
   });
 });
 
@@ -341,15 +348,78 @@ describe("useLiveCompanions", () => {
     harness.scope.stop();
   });
 
+  it("clears private peer positions and closes the old socket synchronously when the account changes", async () => {
+    const harness = mount({ ownUserId: ME, blockReads: true, captureReadSnapshot: true });
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+    harness.setShares([{ id: BOB, username: "new account peer", lastLocation: { lat: 36, lon: 50 } }]);
+    harness.setOwnUserId("other-account");
+    harness.token.value = "other-account-token";
+    expect(harness.peers()).toEqual([]); // no render tick may expose account A's coordinates
+    expect(harness.api.shareCount.value).toBe(0);
+    expect(harness.closeCalls()).toBe(1);
+    harness.socket.dispatch("location:peer-update", {
+      userId: ALICE, lat: 35.8, lon: 51.5, timestamp: Date.now()
+    });
+    expect(harness.peers()).toEqual([]);
+    await settle();
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([BOB]);
+    expect(harness.connectCalls()).toBe(2);
+    harness.scope.stop();
+  });
+
+  it("invalidates an old pending read and refuses a new owner's map under the old bearer", async () => {
+    const harness = mount({ token: bearerFor(ME), ownUserId: ME, blockReads: true, captureReadSnapshot: true });
+    await settle();
+    const oldReadCount = harness.reads();
+    harness.setShares([{ id: BOB, username: "new account peer", lastLocation: { lat: 36, lon: 50 } }]);
+    harness.setOwnUserId(BOB);
+    expect(harness.closeCalls()).toBe(1);
+    expect(harness.peers()).toEqual([]);
+    await settle();
+    expect(harness.reads()).toBe(oldReadCount); // A's JWT is not usable for B's map
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers()).toEqual([]); // old A response cannot reappear
+    harness.token.value = bearerFor(BOB);
+    await settle();
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([BOB]);
+    expect(harness.api.shareCount.value).toBe(1);
+    harness.scope.stop();
+  });
+
+  it("hides old peers while a new bearer arrives before the matching account profile", async () => {
+    const harness = mount({ token: bearerFor(ME), ownUserId: ME });
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+    const oldReads = harness.reads();
+    harness.setShares([{ id: BOB, username: "new account peer", lastLocation: { lat: 36, lon: 50 } }]);
+    harness.token.value = bearerFor(BOB); // refresh cookie switched tabs, profile is still A
+    expect(harness.peers()).toEqual([]);
+    expect(harness.closeCalls()).toBe(1);
+    await settle();
+    expect(harness.reads()).toBe(oldReads);
+    harness.setOwnUserId(BOB); // profile finally catches up to the bearer
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([BOB]);
+    expect(harness.connectCalls()).toBe(2);
+    harness.scope.stop();
+  });
+
   it("empties the map and closes the socket on sign-out", async () => {
     const harness = mount();
     await settle();
     expect(harness.connectCalls()).toBe(1);
     harness.token.value = null;
-    await settle();
     expect(harness.peers()).toEqual([]);
     expect(harness.api.shareCount.value).toBe(0);
     expect(harness.closeCalls()).toBe(1);
+    await settle();
     expect(harness.api.connected.value).toBe(false);
     harness.token.value = "rotated";
     await settle();
@@ -358,10 +428,10 @@ describe("useLiveCompanions", () => {
     harness.scope.stop();
   });
 
-  it("re-authenticates the open socket when the token rotates", async () => {
-    const harness = mount();
+  it("re-authenticates the open socket when the token rotates for the same owner", async () => {
+    const harness = mount({ token: bearerFor(ME), ownUserId: ME });
     await settle();
-    harness.token.value = "rotated";
+    harness.token.value = bearerFor(ME, "renewed");
     await settle();
     expect(harness.updateTokenCalls()).toBe(1);
     expect(harness.connectCalls()).toBe(1);
@@ -401,6 +471,7 @@ describe("useLiveCompanions", () => {
     const api = scope.run(() =>
       useLiveCompanions({
         accessToken: token,
+        ownUserId: ref(ME),
         ensureSession,
         readShares,
         openSocket: () => ({
@@ -502,6 +573,48 @@ describe("useLiveCompanions", () => {
     expect(harness.api.shareCount.value).toBe(0);
     expect(harness.api.status.value.line).toBe("هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.");
     harness.scope.stop();
+  });
+
+  it("rejects a socket opened for an old account after a newer account is active", async () => {
+    const owner = ref<string | null>(ME);
+    const token = ref<string | null>("old-token");
+    const oldSocket = fakeSocket();
+    const newSocket = fakeSocket();
+    const oldClose = vi.fn();
+    const newClose = vi.fn();
+    const newConnect = vi.fn();
+    let releaseOld!: (client: RealtimeClient) => void;
+    const oldOpening = new Promise<RealtimeClient>((resolve) => { releaseOld = resolve; });
+    const scope = effectScope();
+    scope.run(() => useLiveCompanions({
+      accessToken: token, ownUserId: owner,
+      openSocket: (bearer) => bearer === "old-token" ? oldOpening : {
+        socket: newSocket as unknown as RealtimeClient["socket"],
+        close: newClose, connect: newConnect, updateToken: vi.fn()
+      },
+      readShares: async () => ({ sharedWithMe: [] })
+    }));
+    owner.value = "next-account";
+    token.value = "new-token";
+    await settle();
+    expect(newConnect).toHaveBeenCalledOnce();
+    releaseOld({ socket: oldSocket as unknown as RealtimeClient["socket"],
+      close: oldClose, connect: vi.fn(), updateToken: vi.fn() });
+    await settle();
+    expect(oldClose).toHaveBeenCalledOnce();
+    expect(oldSocket.listeners("location:peer-update")).toEqual([]);
+    expect(newClose).not.toHaveBeenCalled();
+    scope.stop();
+  });
+
+  it("does not restart the socket from a queued token update after scope disposal", async () => {
+    const harness = mount();
+    await settle();
+    harness.token.value = "rotated";
+    harness.scope.stop();
+    await settle();
+    expect(harness.connectCalls()).toBe(1);
+    expect(harness.closeCalls()).toBe(1);
   });
 
   it("detaches its listeners and stops its clock when the scope ends", async () => {

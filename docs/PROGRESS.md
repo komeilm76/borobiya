@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Live-companion account-boundary privacy bug (T2.1.8 follow-up)
+
+- The live-companion receiver only watched the access token. A mounted map could keep showing account A's private peer locations and remain subscribed to A's socket when account B replaced the authenticated profile, including during a cross-tab refresh-cookie switch; sign-out clearing was deferred to Vue's watcher tick. It now requires the current owner, clears coordinates/count and closes the socket synchronously on owner change or token loss, ignores old reads/opens/reconnects, and defers new owner reads until the production JWT subject matches the loaded profile. The decoded subject only prevents an inconsistent UI; the server still verifies the token and share authorization. Deferred tests reproduced old-coordinate exposure and stale socket timing before the fix and now cover late responses, token-before-profile order, same-owner token rotation and unmount. These are injected client tests, not P2-A1's target-VM/two-browser acceptance.
+
 ### 2026-10-28 — T4.4.4 proposal-inbox MapLibre startup (partial)
 
 - The proposal inbox route previously had a runtime `Marker` import, causing its production chunk to statically import MapLibre (~1.09 MB) even before an offer or accepted-mission map was ready. Both map ready paths now use the `Marker` constructor emitted after `MapCanvas` loads; the accepted view retains that constructor for subsequent GPS updates and clears it at the account/unmount boundary. A source-pinned test reproduced the eager import before the fix, while before/after Vite chunks show the static MapLibre dependency removed from `UserProposalsView` and its route preload set. This is a dependency-graph improvement, not a measured <2s map paint, <500ms GPS, virtual-scroll or browser/device sign-off. T4.4.4 remains open.
