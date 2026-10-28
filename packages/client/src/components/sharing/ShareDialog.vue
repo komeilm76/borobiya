@@ -701,7 +701,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__title {
   display: flex;
   align-items: center;
-  color: #173b3c;
+  color: var(--bb-color-text);
   font-weight: 800;
 }
 
@@ -711,7 +711,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__lead {
   margin: 0 0 1rem;
-  color: rgba(var(--v-theme-on-surface), 0.72);
+  color: var(--bb-color-text);
   font-size: 0.92rem;
   line-height: 1.7;
 }
@@ -722,7 +722,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__label {
   margin: 0 0 0.4rem;
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.82rem;
   font-weight: 800;
 }
@@ -742,7 +742,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 
 .share-dialog__hint {
   margin: 0.5rem 0 0;
-  color: rgba(var(--v-theme-on-surface), 0.62);
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   line-height: 1.6;
 }
@@ -750,6 +750,10 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__warn {
   color: #a8560e;
   font-weight: 700;
+}
+
+:global(:root.dark) .share-dialog__warn {
+  color: var(--bb-color-secondary);
 }
 
 .share-dialog__results {
@@ -785,7 +789,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -795,7 +799,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   padding: 0.35rem 0.6rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.24);
   border-radius: 10px;
-  color: rgba(var(--v-theme-on-surface), 0.88);
+  color: var(--bb-color-text);
   background: transparent;
   font: inherit;
 }
@@ -805,13 +809,13 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   align-items: baseline;
   gap: 0.5rem;
   margin: 0 0 0.25rem;
-  color: #173b3c;
+  color: var(--bb-color-text);
   font-size: 0.95rem;
   font-weight: 700;
 }
 
 .share-dialog__duration-units {
-  color: rgba(var(--v-theme-on-surface), 0.55);
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -829,7 +833,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
   border-radius: 999px;
   background: rgba(var(--v-theme-on-surface), 0.03);
-  color: #23504f;
+  color: var(--bb-color-text);
   cursor: pointer;
   font: inherit;
   font-size: 0.8rem;
@@ -842,7 +846,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__chip:focus-visible {
-  outline: 2px solid #173b3c;
+  outline: 2px solid var(--bb-color-text);
   outline-offset: 2px;
 }
 
@@ -861,7 +865,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-device-chooser__body :deep(.v-label) { white-space: normal; overflow-wrap: anywhere; }
 
 .share-dialog__status {
-  color: #2f6b46;
+  color: var(--bb-color-success);
   font-size: 0.82rem;
   font-weight: 700;
 }

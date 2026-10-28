@@ -592,14 +592,14 @@ defineExpose({ refresh });
 
 .share-lists__kicker {
   margin: 0;
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   font-weight: 800;
 }
 
 .share-lists__header h2 {
   margin: 0.3rem 0 0;
-  color: #173b3c;
+  color: var(--bb-color-text);
   font-size: 1.1rem;
   font-weight: 800;
 }
@@ -620,20 +620,20 @@ defineExpose({ refresh });
   align-items: center;
   gap: 0.45rem;
   margin: 0 0 0.35rem;
-  color: #23504f;
+  color: var(--bb-color-text);
   font-size: 0.9rem;
   font-weight: 800;
 }
 
 .share-lists__empty {
   margin: 0;
-  color: rgba(var(--v-theme-on-surface), 0.62);
+  color: var(--bb-color-muted);
   font-size: 0.84rem;
 }
 
 .share-lists__pending {
   margin: 0.5rem 0 0;
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
 }
 
@@ -664,20 +664,20 @@ defineExpose({ refresh });
   align-items: center;
   gap: 0.45rem;
   margin: 0;
-  color: #173b3c;
+  color: var(--bb-color-text);
   font-size: 0.88rem;
   font-weight: 700;
 }
 
 .share-lists__row-state {
-  color: #537879;
+  color: var(--bb-color-muted);
   font-size: 0.72rem;
   font-weight: 600;
 }
 
 .share-lists__row-sub {
   margin: 0.15rem 0 0;
-  color: rgba(var(--v-theme-on-surface), 0.66);
+  color: var(--bb-color-muted);
   font-size: 0.78rem;
   line-height: 1.6;
   overflow-wrap: anywhere;

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Share privacy flow dark-theme contrast (T4.4.3 partial)
+
+- The location-share dialog and list cards used light-only dark ink for headings, row states, preset labels, input text and the submission status; on the dark surface, representative colors measured only 1.24:1–3.1:1, below the 4.5:1 small-text target. These foregrounds now use existing theme-aware text/muted/success tokens, with a dark warning override and a visible keyboard focus outline; the confirmed preset retains its white-on-green state. Source-pinned CSS/contrast regressions failed before the fix and cover both palette surfaces, not rendered pixel blending, keyboard or screen-reader behavior, or a site-wide WCAG audit. T4.4.3 stays open.
+
 ### 2026-10-28 — Location-share revocation session boundary (T4.4.2 bug review)
 
 - A delayed live/history revoke could remove a new account's row, report an old error, or emit a stale change after logout, account switch, or unmount. Revocation now captures an owner/generation fence and checks it after session refresh, the server write, and the follow-up read; reset synchronously invalidates pending work and clears its spinner, while unmount invalidates it too. Other revoke buttons stay disabled during a pending write. Removal still happens **only after** server acknowledgment, and same-session bearer renewal remains valid. A source-pinned regression failed before the fix; pure deferred lifecycle tests, client checks and build cover the bounded wiring without mounting Vue. Real browser/device acceptance and the broader feedback audit remain open.
