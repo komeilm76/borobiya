@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Proposal inbox stale-refresh feedback (T4.4.2 partial)
+
+- On a failed inbox refresh, previously loaded offer rows remained visible but the page gave no failure warning; the hero, bell and navigation displayed the cached count as if it were current. The page now marks retained rows as potentially stale with Retry and suppresses unverified counts on those surfaces, including after a failed first read. A server-confirmed acceptance clears the old failure flag even though no further list read runs in the accepted state. Store-state and source-pinned tests reproduced the missing warning and lingering accepted-state failure before the fixes; no Vue mounting or browser/device acceptance is claimed. Broader T4.4.2 feedback/toast work remains open.
+
 ### 2026-10-28 — Proposal inbox empty last-page bug (T4.4.2 partial)
 
 - When the only offer on page 2 was declined, the next API read could return `items: []`, `total: 20`, `totalPages: 1`. The inbox stayed on page 2 and announced there were no pending offers even though page 1 held 20. Refresh now rewinds to the last valid page with bounded requests; a genuinely empty inbox resets to page 1, while a failed rewind shows a retryable error instead of a false empty state. The store test reproduced the original 21→20 failure before the fix and covers external expiry and rewind failure after it. No browser/device acceptance or site-wide T4.4.2 completion is claimed.

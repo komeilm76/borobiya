@@ -104,6 +104,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         proposals.value = [];
         total.value = 0;
         totalPages.value = 0;
+        failed.value = false; // The server confirmed this mission and closed other pending offers.
       } else {
         await (runtime.decline ?? declineProposal)(auth.accessToken, id, reason);
         if (identity.value !== userId || session !== sessionGeneration) return false;

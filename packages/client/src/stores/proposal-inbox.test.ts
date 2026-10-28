@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { createPinia, setActivePinia } from "pinia";
 import { nextTick } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -60,6 +61,61 @@ describe("proposal inbox", () => {
     expect(inbox.proposals).toEqual([]);
     expect(inbox.total).toBe(0);
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("retains known offers but marks their count unverified after a failed refresh", async () => {
+    let online = true;
+    const list = vi.fn(async () => {
+      if (!online) throw new Error("temporary network outage");
+      return page([proposal]);
+    });
+    configureProposalInboxForTests({ list, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(1));
+    online = false;
+    await inbox.refresh();
+    expect(inbox.failed).toBe(true);
+    expect(inbox.proposals).toEqual([proposal]);
+    expect(inbox.total).toBe(1); // last-known count, not a verified current count
+    const view = readFileSync(new URL("../views/_user/UserProposalsView.vue", import.meta.url), "utf8");
+    const app = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="inbox.failed && inbox.proposals.length"');
+    expect(view).toContain('به‌روزرسانی پیشنهادها انجام نشد');
+    expect(view).toContain('variant="text" :loading="inbox.loading" @click="inbox.refresh()"');
+    expect(view).toContain("تعداد تأیید نشده");
+    expect(app).toContain('!proposalInbox.failed && proposalInbox.total > 0');
+    expect(app).toContain("proposalInbox.failed ? 'نامشخص' : proposalInbox.total");
+    expect(app).toContain('label: !proposalInbox.failed && proposalInbox.total ?');
+    online = true;
+    await inbox.refresh();
+    expect(inbox.failed).toBe(false);
+  });
+
+  it("clears a stale-list warning after the server confirms accepting an offer", async () => {
+    let online = true;
+    configureProposalInboxForTests({
+      list: async () => { if (!online) throw new Error("offline"); return page([proposal]); },
+      accept: async () => "77777777-7777-4777-8777-777777777777",
+      openSocket: async () => ({ socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn() })
+    });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    auth.initialized = true;
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.total).toBe(1));
+    online = false;
+    await inbox.refresh();
+    expect(inbox.failed).toBe(true);
+    expect(await inbox.decide(proposal.id, "accept")).toBe(true);
+    expect(inbox.acceptedMissionId).toBe("77777777-7777-4777-8777-777777777777");
+    expect(inbox.failed).toBe(false);
+    expect(inbox.total).toBe(0);
   });
 
   it("reopens a failed SOS socket on the next inbox poll without retrying after logout", async () => {

@@ -9,8 +9,8 @@
         </div>
         <div class="offers__stat" aria-live="polite">
           <v-icon icon="mdi-bell-ring-outline" size="27" />
-          <span class="offers__stat-number">{{ inbox.total.toLocaleString('fa-IR') }}</span>
-          <span>پیشنهاد در انتظار</span>
+          <span class="offers__stat-number">{{ inbox.failed || (inbox.loading && !inbox.proposals.length) ? '؟' : inbox.total.toLocaleString('fa-IR') }}</span>
+          <span>{{ inbox.failed ? 'تعداد تأیید نشده' : inbox.loading && !inbox.proposals.length ? 'در حال دریافت' : 'پیشنهاد در انتظار' }}</span>
         </div>
       </header>
 
@@ -20,6 +20,10 @@
         مأموریت پذیرفته شد. پیشنهادهای دیگر شما به‌صورت خودکار بسته شدند. شناسهٔ مأموریت:
         <bdi dir="ltr">{{ inbox.acceptedMissionId }}</bdi>
         <v-btn class="ms-3" to="/_user/mission" color="primary" variant="tonal" size="small">مشاهدهٔ مأموریت</v-btn>
+      </v-alert>
+      <v-alert v-if="inbox.failed && inbox.proposals.length" class="mb-5" type="warning" variant="tonal" role="alert">
+        به‌روزرسانی پیشنهادها انجام نشد؛ موارد زیر آخرین فهرست شناخته‌شده‌اند و ممکن است تغییر کرده باشند.
+        <v-btn size="small" variant="text" :loading="inbox.loading" @click="inbox.refresh()">تلاش دوباره</v-btn>
       </v-alert>
 
       <section v-if="inbox.acceptedOffer?.details" class="accepted-map" aria-label="نمای مأموریت پذیرفته‌شده">

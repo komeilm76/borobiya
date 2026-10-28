@@ -42,15 +42,15 @@
         <v-menu v-if="auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions" location="bottom end">
           <template #activator="{ props: inboxProps }">
             <v-btn v-bind="inboxProps" icon variant="text" aria-label="پیشنهادهای مأموریت" @click="proposalInbox.refresh()">
-              <v-badge :content="proposalInbox.total" :model-value="proposalInbox.total > 0" color="error">
+              <v-badge :content="proposalInbox.total" :model-value="!proposalInbox.failed && proposalInbox.total > 0" color="error">
                 <v-icon icon="mdi-bell-outline" />
               </v-badge>
             </v-btn>
           </template>
           <v-list density="compact" min-width="260" aria-label="پیشنهادهای امدادگری در انتظار پاسخ">
-            <v-list-subheader>پیشنهادهای مأموریت ({{ proposalInbox.total }})</v-list-subheader>
+            <v-list-subheader>پیشنهادهای مأموریت ({{ proposalInbox.failed ? 'نامشخص' : proposalInbox.total }})</v-list-subheader>
             <v-list-item v-if="proposalInbox.loading" title="در حال دریافت…" />
-            <v-list-item v-else-if="proposalInbox.failed" title="دریافت پیشنهادها ناموفق بود؛ دوباره تلاش کنید." @click="proposalInbox.refresh()" />
+            <v-list-item v-else-if="proposalInbox.failed" title="دریافت پیشنهادها ناموفق بود؛ فهرست قبلی ممکن است قدیمی باشد. دوباره تلاش کنید." @click="proposalInbox.refresh()" />
             <v-list-item v-else-if="proposalInbox.total === 0" title="پیشنهاد جدیدی ندارید." />
             <v-list-item
               v-for="proposal in proposalInbox.proposals"
@@ -254,7 +254,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   return [
     { to: "/_user/dashboard", label: "پیشخوان", icon: "mdi-view-dashboard-outline" },
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
-    { to: "/_user/proposals", label: proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
+    { to: "/_user/proposals", label: !proposalInbox.failed && proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
     { to: "/_user/mission", label: "مأموریت من", icon: "mdi-lifebuoy" },
     { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
     { to: "/_user/mission-history", label: "سوابق امدادگری", icon: "mdi-timeline-clock-outline" },
