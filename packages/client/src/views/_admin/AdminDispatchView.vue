@@ -41,13 +41,13 @@
           @update:model-value="onFilterChange"
         >
           <v-btn value="pending">
-            در انتظار رسیدگی ({{ adminSos.pendingCount }})
+            در انتظار رسیدگی
           </v-btn>
           <v-btn value="dispatched">
-            اعزام‌شده ({{ adminSos.dispatchedCount }})
+            اعزام‌شده
           </v-btn>
           <v-btn value="all">
-            همه ({{ adminSos.requests.length }})
+            همه
           </v-btn>
         </v-btn-toggle>
 
@@ -136,17 +136,33 @@
         <v-card class="mb-4" rounded="xl" variant="outlined">
           <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
             <span>صف درخواست‌های اضطراری</span>
-            <v-chip color="error" size="small" variant="flat">
-              {{ adminSos.visibleRequests.length }} مورد
+            <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
+              {{ adminSos.visibleRequests.length }} مورد در این نما
             </v-chip>
+            <v-chip v-else color="warning" size="small" variant="tonal">فهرست نامطمئن</v-chip>
           </v-card-title>
           <v-divider />
 
-          <v-card-text v-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
+          <v-card-text v-if="adminSos.visibleRequests.length === 0 && adminSos.loading" class="py-8 text-center" role="status">
+            <v-progress-circular indeterminate color="primary" size="28" class="me-2" />
+            در حال بررسی صف درخواست‌های اضطراری…
+          </v-card-text>
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0 && !adminSos.queueVerified"
+            class="py-8 text-center" role="status">
+            صف هنوز تأیید نشده است؛ نبودن درخواست اضطراری را نمی‌توان نتیجه گرفت.
+            <span v-if="adminSos.listTruncated">فقط بخشی از درخواست‌ها دریافت شده‌اند.</span>
+            <v-btn variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
+          </v-card-text>
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0" class="py-8 text-center text-medium-emphasis">
             در حال حاضر درخواست اضطراری فعالی در این نما ثبت نشده است. به محض ارسال SOS جدید، نشانگر تپنده و هشدار صوتی فعال می‌شود.
           </v-card-text>
+          <v-alert v-if="adminSos.visibleRequests.length && !adminSos.queueVerified" type="warning" variant="tonal"
+            density="compact" role="status" class="ma-3">
+            این فهرست هنوز تأیید نشده است؛ وضعیت موارد نمایشی ممکن است قدیمی باشد یا درخواست‌های بیشتری در صف باشند.
+            <span v-if="adminSos.listTruncated">فقط نخستین ۱۰۰ مورد خوانده شدند.</span>
+          </v-alert>
 
-          <v-list v-else class="dispatch-request-list py-0" lines="two">
+          <v-list v-if="adminSos.visibleRequests.length" class="dispatch-request-list py-0" lines="two">
             <template v-for="(item, index) in adminSos.visibleRequests" :key="item.id">
               <v-divider v-if="index > 0" />
               <v-list-item
@@ -585,11 +601,11 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
-const dispatchFilters = computed(() => [
-  { title: `در انتظار رسیدگی (${adminSos.pendingCount})`, value: "pending" },
-  { title: `اعزام‌شده (${adminSos.dispatchedCount})`, value: "dispatched" },
-  { title: `همه (${adminSos.requests.length})`, value: "all" }
-]);
+const dispatchFilters = [
+  { title: "در انتظار رسیدگی", value: "pending" },
+  { title: "اعزام‌شده", value: "dispatched" },
+  { title: "همه", value: "all" }
+];
 const auth = useAuthStore(pinia);
 const requestMissions = ref<Mission[]>([]);
 const activeMissions = computed(() => requestMissions.value.filter((mission) =>

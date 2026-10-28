@@ -59,6 +59,97 @@ describe("useAdminSosStore (T3.2.5)", () => {
     });
   }
 
+  it("does not verify an empty dispatch queue until a list succeeds, and marks retained rows stale after failure", async () => {
+    const row = makeSosRecord();
+    let answerFirst!: (value: { items: SosRequestRecord[]; total: number }) => void;
+    const first = new Promise<{ items: SosRequestRecord[]; total: number }>((resolve) => { answerFirst = resolve; });
+    const listRequests = vi.fn().mockReturnValueOnce(first)
+      .mockRejectedValueOnce(new Error("network unavailable"))
+      .mockResolvedValueOnce({ items: [row], total: 1 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    expect(store.listLoaded).toBe(false);
+    expect(store.queueVerified).toBe(false);
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledTimes(1));
+    answerFirst({ items: [row], total: 1 });
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    expect(store.visibleRequests).toEqual([row]);
+    await store.refreshRequests();
+    expect(store.errorMessage).toBeTruthy();
+    expect(store.visibleRequests).toEqual([row]);
+    expect(store.listLoaded).toBe(true);
+    expect(store.queueVerified).toBe(false);
+    store.errorMessage = null; // dismissing the banner cannot verify a failed read
+    expect(store.queueVerified).toBe(false);
+    await store.refreshRequests();
+    expect(store.queueVerified).toBe(true);
+    store.resetState();
+    expect(store.listLoaded).toBe(false);
+    expect(store.queueVerified).toBe(false);
+  });
+
+  it("does not verify a truncated first page or call a filtered subset a complete queue", async () => {
+    const firstPage = Array.from({ length: 100 }, (_, index) => makeSosRecord({
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`
+    }));
+    const listRequests = vi.fn().mockResolvedValueOnce({ items: firstPage, total: 101 })
+      .mockResolvedValueOnce({ items: [], total: 0 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.listLoaded).toBe(true));
+    expect(store.listTruncated).toBe(true);
+    expect(store.queueVerified).toBe(false);
+    store.setFilterStatus("dispatched");
+    await vi.waitFor(() => expect(listRequests).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(store.loading).toBe(false));
+    expect(store.queueVerified).toBe(true); // complete dispatched subset for this filter only
+    expect(listRequests.mock.calls[1]?.[1]).toMatchObject({ status: "dispatched" });
+  });
+
+  it("does not verify socket/retained rows missing from the latest successful list", async () => {
+    const row = makeSosRecord();
+    const live = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
+    const listRequests = vi.fn().mockResolvedValueOnce({ items: [row], total: 1 })
+      .mockResolvedValueOnce({ items: [row], total: 1 })
+      .mockResolvedValueOnce({ items: [row, live], total: 2 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    store.handleIncomingPayload({ sosRequest: live });
+    expect(store.visibleRequests).toHaveLength(2);
+    expect(store.queueVerified).toBe(false);
+    await store.refreshRequests();
+    expect(store.queueVerified).toBe(false); // merge retains the live row absent from the HTTP page
+    await store.refreshRequests();
+    expect(store.queueVerified).toBe(true);
+  });
+
+  it("does not claim a successfully empty queue after the first read fails", async () => {
+    const listRequests = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ items: [], total: 0 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-token";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.errorMessage).toBeTruthy());
+    expect(store.visibleRequests).toEqual([]);
+    expect(store.listLoaded).toBe(false);
+    expect(store.queueVerified).toBe(false);
+    await store.refreshRequests();
+    expect(store.visibleRequests).toEqual([]);
+    expect(store.queueVerified).toBe(true);
+  });
+
   it("retries failed SOS socket setup and handshake, then stops retrying on logout", async () => {
     vi.useFakeTimers();
     try {

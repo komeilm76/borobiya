@@ -8,8 +8,9 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     expect(source).toMatch(/<v-select\s+:model-value="adminSos\.filterStatus"[\s\S]*?class="admin-dispatch__filter-select d-sm-none"[\s\S]*?label="وضعیت درخواست‌های اضطراری"[\s\S]*?@update:model-value="onFilterChange"/);
     expect(source).toMatch(/<v-btn-toggle\s+class="d-none d-sm-inline-flex"\s+:model-value="adminSos\.filterStatus"/);
     expect(source).toContain("adminSos.setFilterStatus(value)");
-    expect(source).toContain("adminSos.pendingCount");
-    expect(source).toContain("adminSos.dispatchedCount");
+    // The filter remains usable even while the server snapshot/counts are unverified.
+    expect(source).toContain('title: "در انتظار رسیدگی", value: "pending"');
+    expect(source).toContain('title: "اعزام‌شده", value: "dispatched"');
   });
 
   it("presents the SOS queue first and removes map overlays at every stacked width", () => {

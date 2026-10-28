@@ -243,7 +243,9 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   }
   if (auth.user?.role === "admin") {
     const dispatchLabel =
-      adminSos.pendingCount > 0 ? `مرکز امداد (${adminSos.pendingCount})` : "مرکز امداد";
+      adminSos.queueVerified && adminSos.filterStatus !== "dispatched" && adminSos.pendingCount > 0
+        ? `مرکز امداد (${adminSos.pendingCount})`
+        : "مرکز امداد";
     return [
       { to: "/_admin/dispatch", label: dispatchLabel, icon: "mdi-radar" },
       { to: "/_admin/users", label: "مدیریت کاربران", icon: "mdi-account-group-outline" },

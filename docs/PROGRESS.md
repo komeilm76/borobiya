@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin SOS queue verification and retry feedback (T4.4.2 partial)
+
+- The dispatch queue used to claim there were no active SOS requests before its first successful read or after a failed one; cached/socket rows and counts could appear authoritative even if a read was incomplete. The queue now distinguishes loading, unverified/failed, verified-empty and retained-row states, offers retry, and shows counts only when the latest full response covers the visible rows (including the shell's pending count only for pending/all filters). Filter labels no longer publish stale counts. Pinia tests cover the initial/failed/retried reads, 100-row truncation, and retained rows omitted from a later successful snapshot; source-pinned tests check the view/shell without mounting Vue. This does not replace real browser/device verification or sign off site-wide feedback/toasts/optimistic updates.
+
 ### 2026-10-28 — Rescuer offer confirmation on short/narrow phones (T4.4.1 partial)
 
 - The persistent proposal confirmation did not scroll its content, and its optional 500-character decline reason auto-grew above an unwrapped actions row. On a short or narrow viewport this could make the accept/decline confirmation hard to reach. Its body is now scrollable with a three-row textarea, and phone actions stack as full-width, wrapping 44px-minimum targets. Disabled/loading and decision callbacks remain unchanged. A source-pinned regression failed before the edit; no actual phone, keyboard-open viewport, rendered browser, or site-wide responsive acceptance is claimed. T4.4.1 remains open.

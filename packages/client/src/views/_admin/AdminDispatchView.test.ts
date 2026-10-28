@@ -2,6 +2,24 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 describe("AdminDispatchView and App shell live SOS alert & dispatch console wiring (T3.2.5 / T3.3.4)", () => {
+  it("does not call an unverified SOS queue empty or publish stale counts as current", () => {
+    const view = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="adminSos.visibleRequests.length === 0 && adminSos.loading"');
+    expect(view).toContain('v-else-if="adminSos.visibleRequests.length === 0 && !adminSos.queueVerified"');
+    expect(view).toContain('v-else-if="adminSos.visibleRequests.length === 0"');
+    expect(view).toContain('v-if="adminSos.visibleRequests.length && !adminSos.queueVerified"');
+    expect(view).toContain('v-if="adminSos.queueVerified"');
+    expect(view).not.toContain('در انتظار رسیدگی ({{ adminSos.pendingCount }})');
+    expect(view).not.toContain('اعزام‌شده ({{ adminSos.dispatchedCount }})');
+    expect(view).not.toContain('همه ({{ adminSos.requests.length }})');
+    expect(view).not.toContain('(${adminSos.pendingCount})');
+    expect(view).not.toContain('(${adminSos.dispatchedCount})');
+    expect(view).not.toContain('(${adminSos.requests.length})');
+    expect(view).toContain('v-if="adminSos.listTruncated"');
+    expect(view).toContain('@click="adminSos.refreshRequests()"');
+    const shell = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
+    expect(shell).toContain('adminSos.queueVerified && adminSos.filterStatus !== "dispatched" && adminSos.pendingCount > 0');
+  });
   it("renders pulsing MapLibre circle layers, floating map alert card, nearest responder list, multi-select dispatch controls, and global admin alert banner", () => {
     const viewSource = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
     expect(viewSource).toContain("admin-sos-pulse");

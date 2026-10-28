@@ -87,6 +87,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const connected = ref(false);
   const loading = ref(false);
   const errorMessage = ref<string | null>(null);
+  const listLoaded = ref(false);
+  const listFailed = ref(false);
+  const listTruncated = ref(false);
+  const lastSnapshotIds = ref<Set<string>>(new Set());
 
   const nearestResponders = ref<NearestResponder[]>([]);
   const nearestLoading = ref(false);
@@ -124,6 +128,11 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
     return requests.value;
   });
+
+  // A read can be successful yet incomplete (100-row cap), or merged with rows
+  // from an earlier page/socket event not present in its latest server snapshot.
+  const queueVerified = computed(() => listLoaded.value && !loading.value && !listFailed.value &&
+    !listTruncated.value && visibleRequests.value.every((row) => lastSnapshotIds.value.has(row.id)));
 
   const pendingCount = computed(
     () =>
@@ -196,11 +205,16 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
         }
       }
       requests.value = mergeSosAlertSnapshot(requests.value, response.items);
+      listLoaded.value = true;
+      listFailed.value = false;
+      listTruncated.value = response.total > response.items.length;
+      lastSnapshotIds.value = new Set(response.items.map((item) => item.id));
       if (!selectedId.value && requests.value.length > 0) {
         selectedId.value = (visibleRequests.value[0] ?? requests.value[0])!.id;
       }
     } catch (err) {
       if (gen !== refreshGeneration) return;
+      listFailed.value = true;
       errorMessage.value = friendlyErrorMessage(
         err,
         "دریافت فهرست درخواست‌های اضطراری انجام نشد."
@@ -613,6 +627,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     latestAlert.value = null;
     errorMessage.value = null;
     loading.value = false;
+    listLoaded.value = false;
+    listFailed.value = false;
+    listTruncated.value = false;
+    lastSnapshotIds.value = new Set();
     nearestResponders.value = [];
     nearestLoading.value = false;
     nearestError.value = null;
@@ -707,6 +725,10 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     connected,
     loading,
     errorMessage,
+    listLoaded,
+    listFailed,
+    listTruncated,
+    queueVerified,
     nearestResponders,
     nearestLoading,
     nearestError,
