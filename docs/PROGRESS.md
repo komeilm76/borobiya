@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Requester rating account/mission boundary fix (T3.7.4 follow-up)
+
+- Switching selected missions while the rating panel stayed mounted left the previous mission's score or drafted comment visible until Vue's deferred watcher ran. A JWT belonging to another requester could also leave the form enabled under the stale displayed account. The rating model now synchronously invalidates form state and in-flight replies on mission, owner, token-loss or JWT session changes and refuses mismatched subjects; same-session bearer renewal keeps the draft and in-flight submit. Focused regressions reproduced three failures before the fix and now cover immediate cleanup, late replies, session mismatch and token renewal. Server ownership remains authoritative; this is not a mounted/browser/VM acceptance run.
+
 ### 2026-10-28 — Completed-mission rating keyboard semantics (T4.4.3 partial)
 
 - The star picker represented one score as five independently pressed buttons, adding five keyboard Tab stops without native radio arrow-key selection. Its stars are now labels for an instance-unique native radio group with a fieldset/legend, accessible score names and a visible focus ring. The 48px targets, disabled-on-submit behavior and existing score validation are preserved. Source-pinned regressions failed before the edit and typechecks/build validate the template; this is not a mounted Vue, browser, screen-reader, or site-wide WCAG AA sign-off. T4.4.3 remains open.

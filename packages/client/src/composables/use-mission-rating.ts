@@ -2,6 +2,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import type { Mission } from "@shared/index";
 import { getMission, rateMission } from "../api/mission";
 import { ApiError } from "../api/http";
+import { decodeAccessTokenClaims } from "./device-identity";
 import { sosApiErrorMessage } from "../sos/sos-form";
 
 /** Requester-only rating state; never carry a stale response into another mission/account. */
@@ -15,8 +16,18 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
   const submitting = ref(false);
   const error = ref<string | null>(null);
   let generation = 0;
+  // Bind the form to the displayed account and JWT session, not the raw bearer:
+  // refreshing a token in the same session must not erase a drafted rating.
+  const sessionKey = computed(() => {
+    const owner = userId.value;
+    const bearer = token.value;
+    if (!owner || !bearer) return null;
+    const claims = decodeAccessTokenClaims(bearer);
+    if (bearer.includes(".") && (claims?.sub !== owner || typeof claims.sessionId !== "string")) return null;
+    return JSON.stringify([owner, claims?.sessionId ?? null]);
+  });
   const eligible = computed(() => mission.value?.status === "completed" &&
-    mission.value.requesterId === userId.value && !!token.value);
+    mission.value.requesterId === userId.value && !!sessionKey.value);
   const canSubmit = computed(() => eligible.value && loaded.value && rating.value === null && !loading.value && !submitting.value &&
     Number.isInteger(score.value) && score.value >= 1 && score.value <= 5 && comment.value.trim().length <= 500);
 
@@ -35,7 +46,7 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
     loading.value = true;
     try {
       await ensureSession?.();
-      if (!token.value || userId.value !== owner || mission.value?.id !== id || generation !== current) return;
+      if (!token.value || !sessionKey.value || userId.value !== owner || mission.value?.id !== id || generation !== current) return;
       const detail = await getMission(token.value, id);
       if (generation === current && userId.value === owner && mission.value?.id === id) {
         rating.value = detail.rating;
@@ -58,7 +69,7 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
     error.value = null;
     try {
       await ensureSession?.();
-      if (!token.value || userId.value !== owner || mission.value?.id !== id || generation !== current) return;
+      if (!token.value || !sessionKey.value || userId.value !== owner || mission.value?.id !== id || generation !== current) return;
       await rateMission(token.value, id, { rating: chosen, ...(comment.value.trim() ? { comment: comment.value.trim() } : {}) });
       if (generation === current && userId.value === owner && mission.value?.id === id) rating.value = chosen;
     } catch (cause) {
@@ -74,12 +85,10 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
     }
   }
 
-  // Access-token rotation for the same account is not a new mission. In particular,
-  // ensureSession() can refresh the token during submit; watching its raw value
-  // cancels that submission before it reaches the API. Logout/restoration still
-  // invalidates the read through the presence bit, while userId scopes accounts.
-  watch([() => mission.value?.id, () => mission.value?.status, () => Boolean(token.value), userId],
-    () => { void load(); }, { immediate: true });
+  // Invalidate a prior mission's score/draft before the next render or an async
+  // reply, without resetting the form on a same-session bearer renewal.
+  watch([() => mission.value?.id, () => mission.value?.status, sessionKey],
+    () => { void load(); }, { immediate: true, flush: "sync" });
   onScopeDispose(() => { ++generation; });
   return { rating, score, comment, loading, loaded, submitting, error, eligible, canSubmit, load, submit };
 }
