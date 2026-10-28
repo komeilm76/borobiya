@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Socket location post-commit acknowledgement (T2.1.5 follow-up)
+
+- Socket `location:update` persisted an accepted fix before refreshing optional session presence and emitting to rooms. If either step threw, its outer handler reported `SERVICE_UNAVAILABLE` for a committed write, encouraging duplicate retries; a failed presence touch or one room's emit also blocked the remaining notifications. Post-persistence failures now log warnings, continue independent room deliveries, and acknowledge the committed fix. Regressions reproduced both failures before the change; a real `applyUpdate` failure still produces the existing unavailable ack with no emission. Focused and full server tests/typechecks passed; live socket/VM acceptance (P2-A1/P2-A2) remains open.
+
 ### 2026-10-28 — REST location fallback post-commit fan-out (T2.1.5 follow-up)
 
 - The deprecated `POST /_user/location/update` persisted a fix, then allowed a throwing Socket.IO fan-out adapter to turn the response into a 500. A client retry could append the same history point despite the first write succeeding. The route now logs fan-out failure after persistence and acknowledges the committed fix; persistence failure still returns 500 and emits nothing. A Fastify route regression reproduced the 500-after-write before the fix and tests both boundaries. Live socket/VM acceptance (P2-A1/P2-A2) remains open.

@@ -328,7 +328,7 @@ export async function handleLocationUpdate(
 async function locationUpdateAck(
   sender: UpdateSender,
   payload: unknown,
-  dependencies: Pick<HandleLocationUpdateDependencies, "live" | "users">
+  dependencies: HandleLocationUpdateDependencies
 ): Promise<LocationUpdateAck> {
   const identity = sender.data;
   if (!identity?.userId || !identity.deviceId) {
@@ -399,22 +399,30 @@ async function locationUpdateAck(
     return { ok: false, status: "rejected", code: result.code, message: result.message };
   }
 
+  // The accepted fix is already persisted. A failed presence heartbeat or adapter
+  // delivery must not turn its ack into a retryable failure or block other rooms.
   if (identity.sessionId && dependencies.users?.touchSessionPresence) {
-    await dependencies.users.touchSessionPresence({
-      userId: identity.userId,
-      sessionId: identity.sessionId,
-      deviceId: identity.deviceId,
-      isOnline: true
-    });
+    try {
+      await dependencies.users.touchSessionPresence({
+        userId: identity.userId,
+        sessionId: identity.sessionId,
+        deviceId: identity.deviceId,
+        isOnline: true
+      });
+    } catch (err) {
+      dependencies.logger?.warn({ err }, "location presence update failed after persistence");
+    }
   }
 
   const update: PeerLocationUpdate = { userId: identity.userId, ...result.fix };
-  for (const peerId of result.peers) {
-    sender.to(userRoom(peerId)).emit(PEER_UPDATE_EVENT, update);
+  // Echo to the sender's other tabs too, even if one peer delivery fails.
+  for (const recipientId of [...result.peers, identity.userId]) {
+    try {
+      sender.to(userRoom(recipientId)).emit(PEER_UPDATE_EVENT, update);
+    } catch (err) {
+      dependencies.logger?.warn({ err }, "location peer fan-out failed after persistence");
+    }
   }
-  // Echo the accepted fix so the sender (and any other tab on the same account) can confirm
-  // the server stored it, including when there is nobody to receive it yet.
-  sender.to(userRoom(identity.userId)).emit(PEER_UPDATE_EVENT, update);
 
   return { ok: true, status: "accepted", peers: result.peers };
 }

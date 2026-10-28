@@ -312,6 +312,48 @@ describe("location:update handling", () => {
     ]);
   });
 
+  it("acknowledges a persisted fix when the optional presence heartbeat fails", async () => {
+    const peer = randomUUID();
+    const socket = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const warn = vi.fn();
+    const persisted = vi.fn().mockResolvedValue({ status: "accepted", peers: [peer],
+      fix: { lat: 35.7, lon: 51.4, accuracy: 5, timestamp: "2026-10-21T09:00:00.000Z" } });
+    const users = {
+      ...makeStore(userRecord()),
+      touchSessionPresence: vi.fn(async () => { throw new Error("Presence write unavailable"); })
+    };
+    const ack = await handleLocationUpdate(socket as never, updatePayload(), {
+      live: { applyUpdate: persisted } as unknown as LiveLocationService, users, logger: { warn }
+    });
+
+    expect(persisted).toHaveBeenCalledOnce();
+    expect(users.touchSessionPresence).toHaveBeenCalledWith({ userId, sessionId, deviceId, isOnline: true });
+    expect(ack).toEqual({ ok: true, status: "accepted", peers: [peer] });
+    expect(socket.emitted.map(({ room }) => room)).toEqual([userRoom(peer), userRoom(userId)]);
+    expect(warn).toHaveBeenCalledWith({ err: expect.any(Error) }, "location presence update failed after persistence");
+  });
+
+  it("acknowledges a persisted fix and continues other room notifications when one emit fails", async () => {
+    const failedPeer = randomUUID();
+    const otherPeer = randomUUID();
+    const socket = makeSocket({ data: { userId, role: "user", deviceId, sessionId } });
+    const emitRoom = socket.to.bind(socket);
+    socket.to = (room: string) => room === userRoom(failedPeer)
+      ? { emit: () => { throw new Error("Adapter publish unavailable"); } }
+      : emitRoom(room);
+    const warn = vi.fn();
+    const persisted = vi.fn().mockResolvedValue({ status: "accepted", peers: [failedPeer, otherPeer],
+      fix: { lat: 35.7, lon: 51.4, accuracy: 5, timestamp: "2026-10-21T09:00:00.000Z" } });
+    const ack = await handleLocationUpdate(socket as never, updatePayload(), {
+      live: { applyUpdate: persisted } as unknown as LiveLocationService, logger: { warn }
+    });
+
+    expect(persisted).toHaveBeenCalledOnce();
+    expect(ack).toEqual({ ok: true, status: "accepted", peers: [failedPeer, otherPeer] });
+    expect(socket.emitted.map(({ room }) => room)).toEqual([userRoom(otherPeer), userRoom(userId)]);
+    expect(warn).toHaveBeenCalledWith({ err: expect.any(Error) }, "location peer fan-out failed after persistence");
+  });
+
   it("rejects updates from a socket without an authenticated identity", async () => {
     const socket = makeSocket({ data: {} });
     const ack = await handleLocationUpdate(socket as never, updatePayload(), { live: makeLive([]) });
