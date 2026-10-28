@@ -69,7 +69,11 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
       page.value = result.page;
       total.value = result.total;
       totalPages.value = result.totalPages;
-      selected.value = detail ?? result.items[0] ?? null;
+      const nextSelected = detail ?? result.items[0] ?? null;
+      // A page change or deep link can replace the selected request without `choose()`.
+      // Never apply the previous request's cancellation/blocked dialog to the new one.
+      if (selected.value?.id !== nextSelected?.id) cancellation.reset();
+      selected.value = nextSelected;
       listLoaded.value = true;
     } catch (cause) {
       if (userId.value === owner && current === generation)

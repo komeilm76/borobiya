@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Requester history cancellation state across pages (T3.7.1 follow-up)
+
+- A successful cancellation or rejected confirmation could leave its `cancelled`/`blocked` dialog state on the next SOS request when a page load or deep link auto-selected a different request without calling `choose()`. In particular, the new active request appeared cancelled and lost its Cancel action. Successful reads now reset cancellation state only when the selected request ID changes; refreshing the same request or failing a page read keeps the last-known confirmation. A pure composable regression failed before the fix and covers all three cases. No Vue SFC was mounted or browser/device acceptance performed.
+
 ### 2026-10-28 — Mission timeline synchronous session boundary (T3.5.8 follow-up)
 
 - A mounted mission timeline retained the previous session's private steps and socket until Vue's deferred watcher ran after logout or mission selection. If a second login replaced a null token within the same tick, the watcher coalesced both changes and reused the old socket/rows indefinitely rather than loading the new session. The token, owner and mission watchers now invalidate rows, in-flight reads, fallback and socket synchronously at the boundary; same-session bearer renewal still updates the existing socket. Pure composable regressions reproduced the immediate stale rows before the change. No Vue SFC was mounted or browser/VM privacy timing verified.

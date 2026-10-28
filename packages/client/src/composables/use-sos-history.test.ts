@@ -55,6 +55,41 @@ describe("requester SOS history and cancellation", () => {
     expect(history.canCancelSelected.value).toBe(false);
   });
 
+  it("does not carry a cancelled request's confirmation or conflict into the next page's selection", async () => {
+    const history = useSosHistory(ref("token"), ref(requesterId));
+    await history.load();
+    history.cancellation.cancelled.value = true;
+    history.markCancelled();
+    expect(history.canCancelSelected.value).toBe(false);
+    vi.mocked(listRequesterSosHistory).mockResolvedValueOnce({
+      items: [{ ...record, status: "cancelled_by_requester" }], total: 2, page: 1, limit: 12, totalPages: 2
+    });
+    await history.load();
+    expect(history.cancellation.cancelled.value).toBe(true); // same request keeps its confirmation
+    vi.mocked(listRequesterSosHistory).mockRejectedValueOnce(new Error("offline"));
+    await history.load(2);
+    expect(history.selected.value?.id).toBe(requestId);
+    expect(history.cancellation.cancelled.value).toBe(true); // failed page navigation retains the last good selection
+
+    const nextRequest = { ...record, id: olderId };
+    vi.mocked(listRequesterSosHistory).mockResolvedValueOnce({
+      items: [nextRequest], total: 2, page: 2, limit: 12, totalPages: 2
+    });
+    await history.load(2);
+    expect(history.selected.value?.id).toBe(olderId);
+    expect(history.cancellation.cancelled.value).toBe(false);
+    expect(history.canCancelSelected.value).toBe(true);
+
+    history.cancellation.blocked.value = true;
+    vi.mocked(listRequesterSosHistory).mockResolvedValueOnce({
+      items: [record], total: 2, page: 1, limit: 12, totalPages: 2
+    });
+    await history.load(1);
+    expect(history.selected.value?.id).toBe(requestId);
+    expect(history.cancellation.blocked.value).toBe(false);
+    expect(history.canCancelSelected.value).toBe(true);
+  });
+
   it("keeps the chosen request selected when an older page response arrives late", async () => {
     const history = useSosHistory(ref("token"), ref(requesterId));
     await history.load();
