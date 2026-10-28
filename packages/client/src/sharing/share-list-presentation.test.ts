@@ -19,8 +19,8 @@ describe("privacy-sensitive share list feedback", () => {
 
   it("removes a confirmed revocation locally before a potentially failed re-read", () => {
     // Never remove before server acknowledgment: a failed privacy write must not look successful.
-    expect(source).toMatch(/await revokeLocationShare\(row\.id, token\);\s*owned\.value = owned\.value\.filter/);
-    expect(source).toMatch(/await revokeLocationHistoryShare\(row\.id, token\);\s*ownedHistory\.value = ownedHistory\.value\.filter/);
+    expect(source).toMatch(/await revokeLocationShare\(row\.id, token\);\s*if \(!revocationFence\.isCurrent\(revocation\)\) return;\s*owned\.value = owned\.value\.filter/);
+    expect(source).toMatch(/await revokeLocationHistoryShare\(row\.id, token\);\s*if \(!revocationFence\.isCurrent\(revocation\)\) return;\s*ownedHistory\.value = ownedHistory\.value\.filter/);
     expect(source).toContain("liveFresh.value = false;");
     expect(source).toContain("historyFresh.value = false;");
     expect(source).toContain("await refresh();");

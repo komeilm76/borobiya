@@ -57,6 +57,7 @@
               variant="text"
               color="error"
               :loading="pendingRevocation === row.id"
+              :disabled="revoking"
               :aria-label="`لغو اشتراک با ${row.label}`"
               @click="askRevoke(row)"
             >
@@ -138,6 +139,7 @@
               variant="text"
               color="error"
               :loading="pendingRevocation === row.id"
+              :disabled="revoking"
               :aria-label="`حذف دسترسی ${row.label} به این بازه`"
               @click="askRevokeHistory(row)"
             >
@@ -200,6 +202,7 @@ import {
 } from "@/sharing/share-form";
 import { shareSectionPresentation } from "@/sharing/share-list-presentation";
 import { createShareEndedSubscription } from "@/sharing/share-list-session";
+import { createShareSubmissionFence } from "@/sharing/share-submission-fence";
 
 /**
  * "My Shares" / "Shared With Me" (spec §7.2, tracker T2.1.7), plus the history grants that share
@@ -251,6 +254,14 @@ const pendingRow = ref<LiveRowView | HistoryRowView | null>(null);
 const confirmOpen = ref(false);
 const revoking = ref(false);
 const pendingRevocation = ref<string | null>(null);
+let disposed = false;
+const revocationFence = createShareSubmissionFence({
+  ownerId: () => auth.user?.id ?? null,
+  accessToken: () => auth.accessToken,
+  // The confirmation may close after the server acknowledges the write. That must not
+  // suppress the same owner's local removal/re-read, only a session change or unmount.
+  isOpen: () => !disposed
+});
 
 /**
  * Names for owned rows whose `targetUsername` the server could not read (it left-joins the target for
@@ -442,56 +453,72 @@ function formatInstant(value: string): string {
 }
 
 function askRevoke(row: LiveRowView): void {
+  if (revoking.value) return;
   pendingRow.value = row;
   confirmOpen.value = true;
 }
 
 function askRevokeHistory(row: HistoryRowView): void {
+  if (revoking.value) return;
   pendingRow.value = row;
   confirmOpen.value = true;
 }
 
 async function confirmRevoke(): Promise<void> {
   const row = pendingRow.value;
-  if (!row) return;
+  if (!row || revoking.value) return;
+  const revocation = revocationFence.begin();
+  if (!revocation) return;
 
   revoking.value = true;
   pendingRevocation.value = row.id;
   try {
     await auth.ensureSession();
+    if (!revocationFence.isActive(revocation)) return;
     const token = auth.accessToken;
     if (!token) {
       loadError.value = "برای لغو اشتراک دوباره وارد حساب شوید.";
       confirmOpen.value = false;
       return;
     }
+    if (!revocationFence.isCurrent(revocation)) return;
     // Reconcile only after the server confirms the privacy write. If the subsequent read fails,
     // the revoked row must not keep claiming to be active, but an empty list cannot be certified yet.
     if (row.history) {
       await revokeLocationHistoryShare(row.id, token);
+      if (!revocationFence.isCurrent(revocation)) return;
       ownedHistory.value = ownedHistory.value.filter((share) => share.id !== row.id);
       historyFresh.value = false;
     } else {
       await revokeLocationShare(row.id, token);
+      if (!revocationFence.isCurrent(revocation)) return;
       owned.value = owned.value.filter((share) => share.id !== row.id);
       liveFresh.value = false;
     }
     confirmOpen.value = false;
     pendingRow.value = null;
     await refresh();
+    if (!revocationFence.isCurrent(revocation)) return;
     emit("changed");
   } catch (error) {
+    if (!revocationFence.isCurrent(revocation)) return;
     loadError.value = friendlyErrorMessage(error, "لغو اشتراک انجام نشد.");
     confirmOpen.value = false;
   } finally {
-    revoking.value = false;
-    pendingRevocation.value = null;
+    if (revocationFence.isActive(revocation)) {
+      revoking.value = false;
+      pendingRevocation.value = null;
+    }
   }
 }
 
 function resetShareRows(): void {
-  // A logout/account switch must invalidate any pending read before its old bearer can write rows.
+  // A logout/account switch must invalidate both pending reads and privacy writes before
+  // an old bearer can update this session's rows or announce a false success.
   readVersion += 1;
+  revocationFence.invalidate();
+  revoking.value = false;
+  pendingRevocation.value = null;
   owned.value = [];
   received.value = [];
   ownedHistory.value = [];
@@ -529,7 +556,7 @@ watch(
     void shareSync.setToken(token);
     if (!token && previousToken) resetShareRows();
   },
-  { immediate: true }
+  { immediate: true, flush: "sync" }
 );
 
 watch(() => auth.user?.id, (nextId, previousId) => {
@@ -538,9 +565,11 @@ watch(() => auth.user?.id, (nextId, previousId) => {
   // The initial onMounted read already handles a restored session. On an in-place account switch,
   // reload only the new owner's grants; do not revive results from the old in-flight request.
   if (nextId && auth.accessToken && (previousId || loaded.value)) void refresh();
-});
+}, { flush: "sync" });
 
 onBeforeUnmount(() => {
+  disposed = true;
+  revocationFence.invalidate();
   readVersion += 1;
   shareSync.close();
 });

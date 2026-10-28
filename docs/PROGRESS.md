@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Location-share revocation session boundary (T4.4.2 bug review)
+
+- A delayed live/history revoke could remove a new account's row, report an old error, or emit a stale change after logout, account switch, or unmount. Revocation now captures an owner/generation fence and checks it after session refresh, the server write, and the follow-up read; reset synchronously invalidates pending work and clears its spinner, while unmount invalidates it too. Other revoke buttons stay disabled during a pending write. Removal still happens **only after** server acknowledgment, and same-session bearer renewal remains valid. A source-pinned regression failed before the fix; pure deferred lifecycle tests, client checks and build cover the bounded wiring without mounting Vue. Real browser/device acceptance and the broader feedback audit remain open.
+
 ### 2026-10-28 — Location-share submission session boundary (T4.4.2 bug review)
 
 - A delayed share write or priority-device lookup could still update a closed dialog, emit success after navigation/logout, or reopen the device chooser for a different account. A generation/owner fence now checks every awaited stage of live and history submissions and the 409 device lookup; close, unmount, token loss, and account change invalidate it synchronously, with old recipient selection cleared on account switch. Closing/search cancellation also immediately invalidates and clears pending recipient search results, even if a response ignores abort; a late 401 recovery no longer replays the old query with a new session. Same-session bearer renewal remains allowed. A source-pinned wiring regression and a deferred recipient-search test failed before the fix; pure fence tests cover the new guard (including delayed close/reopen). No Vue SFC was mounted or browser/device acceptance claimed. Broader feedback and VM checks remain open.

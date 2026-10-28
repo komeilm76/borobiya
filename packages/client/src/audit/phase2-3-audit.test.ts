@@ -308,7 +308,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     expect(shareLists).toContain("query: { historyShare: row.id }");
     const shareSession = readFileSync(new URL("../sharing/share-list-session.ts", import.meta.url), "utf8");
     expect(shareSession).toContain("SHARE_ENDED_EVENT");
-    expect(shareLists).toMatch(/onBeforeUnmount\(\(\) => \{\s*readVersion \+= 1;\s*shareSync\.close\(\);\s*\}\);/);
+    expect(shareLists).toMatch(/onBeforeUnmount\(\(\) => \{\s*disposed = true;\s*revocationFence\.invalidate\(\);\s*readVersion \+= 1;\s*shareSync\.close\(\);\s*\}\);/);
 
     expect(playbackPanel).toContain("route.query.historyShare");
     expect(playbackPanel).toContain('props.api.selectSource("grant")');
