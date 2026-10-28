@@ -118,13 +118,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function mount() {
+function mount(ensureSession?: () => Promise<void>) {
   const scope = effectScope();
   const token = ref<string | null>("access-token");
   const accountId = ref<string | null>("owner-a");
   let api!: ReturnType<typeof useDeviceSettings>;
   scope.run(() => {
-    api = useDeviceSettings({ accessToken: token, accountId });
+    api = useDeviceSettings({ accessToken: token, accountId, ensureSession });
   });
   return { scope, token, accountId, api };
 }
@@ -304,6 +304,54 @@ describe("reading the two lists", () => {
     await settle();
     expect(calls).toEqual([]);
     expect(api.status.value).toMatchObject({ tone: "warn" });
+  });
+});
+
+describe("device write session recovery", () => {
+  it("reports a failed session check without posting or rejecting a single-device change", async () => {
+    let offline = false;
+    const { api, scope } = mount(async () => { if (offline) throw new Error("offline"); });
+    try {
+      await api.refresh();
+      offline = true;
+      calls = [];
+      await expect(api.assign(SHARE_ONE, LAPTOP)).resolves.toBe(false);
+      expect(posts()).toHaveLength(0);
+      expect(api.busyShareId.value).toBeNull();
+      expect(api.status.value).toMatchObject({ tone: "error" });
+      expect(api.status.value?.text).toContain("بررسی نشست");
+    } finally { scope.stop(); }
+  });
+
+  it("reports a failed session check for bulk and current-device changes without posting", async () => {
+    let offline = false;
+    const { api, scope } = mount(async () => { if (offline) throw new Error("offline"); });
+    try {
+      await api.refresh();
+      offline = true;
+      calls = [];
+      await expect(api.assignEverywhere(LAPTOP)).resolves.toBeUndefined();
+      expect(api.status.value).toMatchObject({ tone: "error" });
+      await expect(api.assignCurrentDevice()).resolves.toBeUndefined();
+      expect(api.status.value).toMatchObject({ tone: "error" });
+      expect(api.bulkRunning.value).toBe(false);
+      expect(posts()).toHaveLength(0);
+    } finally { scope.stop(); }
+  });
+
+  it("does not replace a sign-in warning with a late old-account session error", async () => {
+    let fail!: (reason: unknown) => void;
+    const { api, token, accountId, scope } = mount(() => new Promise<void>((_resolve, reject) => { fail = reject; }));
+    try {
+      const oldWrite = api.assign(SHARE_ONE, LAPTOP);
+      token.value = null;
+      accountId.value = null;
+      fail(new Error("old session failed"));
+      await expect(oldWrite).resolves.toBe(false);
+      expect(api.status.value).toMatchObject({ tone: "warn" });
+      expect(api.status.value?.text).toContain("وارد حساب شوید");
+      expect(posts()).toHaveLength(0);
+    } finally { scope.stop(); }
   });
 });
 

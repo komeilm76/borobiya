@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Active-device priority writes on session-check failure (T4.4.2 bug review)
+
+- A failed `ensureSession()` before a single-share or bulk priority edit rejected out of the composable; the panel invokes both as `void`, so no write happened and no error was shown. Both paths now resolve without posting and show a localized error for the current account. A delayed failure from an old account leaves the new session's sign-in warning untouched. Focused unit regressions reproduced all three paths before the fix and pass afterward. No Vue SFC was mounted or browser/device acceptance claimed; the wider feedback/toast audit remains open.
+
 ### 2026-10-28 — History playback 401 retry after account switch (T2.2.6 follow-up)
 
 - A history-window or received-grant-list read that returned 401 could wait on session recovery, then replay its old request with a different account's bearer even after logout and a new read had replaced it. The eventual stale response was already ignored, but the extra cross-session request should not be sent. Both recovery paths now recheck their read generation immediately after `refreshSession()` and before any retry. Deferred composable tests reproduced both unwanted requests before the fix and now verify they are absent; a current same-session bearer renewal still retries both reads successfully. Server-side ownership checks remain authoritative. No Vue SFC was mounted or browser/VM acceptance claimed.

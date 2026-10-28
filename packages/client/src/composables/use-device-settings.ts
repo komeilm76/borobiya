@@ -204,7 +204,14 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
 
   async function assign(shareId: string, deviceId: string): Promise<boolean> {
     const session = sessionGeneration;
-    const accessToken = await currentAccessToken();
+    let accessToken: string | null;
+    try {
+      accessToken = await currentAccessToken();
+    } catch (error) {
+      if (session === sessionGeneration)
+        setStatus("error", friendlyErrorMessage(error, "بررسی نشست انجام نشد؛ دوباره تلاش کنید."));
+      return false;
+    }
     if (session !== sessionGeneration) return false;
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
@@ -252,7 +259,14 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
    */
   async function assignEverywhere(deviceId: string): Promise<void> {
     const session = sessionGeneration;
-    const accessToken = await currentAccessToken();
+    let accessToken: string | null;
+    try {
+      accessToken = await currentAccessToken();
+    } catch (error) {
+      if (session === sessionGeneration)
+        setStatus("error", friendlyErrorMessage(error, "بررسی نشست انجام نشد؛ دوباره تلاش کنید."));
+      return;
+    }
     if (session !== sessionGeneration) return;
     if (!accessToken) {
       setStatus("warn", "برای تغییر دستگاه وارد حساب شوید.");
