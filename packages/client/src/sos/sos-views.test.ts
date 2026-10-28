@@ -49,6 +49,20 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(appSource).toContain("if (!visible) sosSheet.closeSheet()");
   });
 
+  it("uses native radios with a named fieldset and visible keyboard focus for SOS severity (T4.4.3)", () => {
+    const severity = sheetSource.slice(sheetSource.indexOf('class="sos-sheet__section sos-sheet__severity-fieldset"'), sheetSource.indexOf('class="sos-severity-dot"'));
+    expect(severity).toContain('class="sos-sheet__section sos-sheet__severity-fieldset"'); // keep spacing before the next section
+    expect(severity).toContain('<legend class="sos-sheet__label">شدت حادثه</legend>');
+    expect(severity).toContain('<label');
+    expect(severity).toContain('type="radio"');
+    expect(severity).toContain('name="sos-severity"');
+    expect(severity).toContain(':checked="sos.severity.value === option.value"');
+    expect(severity).toContain('@change="sos.severity.value = option.value"');
+    expect(severity).not.toContain('role="radio"');
+    expect(sheetSource).toMatch(/\.sos-severity-card:focus-within\s*\{[^}]*outline:/s);
+    expect(sheetSource).toContain(':disabled="sos.submitting.value"');
+  });
+
   it("keeps the sheet in a non-dismissable attaching state after SOS creation until photo upload settles", () => {
     expect(sheetSource).toContain('v-else-if="sos.createdRequestId.value && sos.submitting.value"');
     expect(sheetSource).toContain('!sos.createdRequestId.value && !sos.isCompleted.value && !sos.awaitingPhotoRetry.value');

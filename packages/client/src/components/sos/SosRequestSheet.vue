@@ -119,27 +119,25 @@
             {{ sos.submitError.value }}
           </v-alert>
 
-          <div class="sos-sheet__section">
-            <label class="sos-sheet__label">شدت حادثه</label>
-            <div class="sos-sheet__severities" role="radiogroup" aria-label="شدت حادثه">
-              <button
+          <fieldset class="sos-sheet__section sos-sheet__severity-fieldset" :disabled="sos.submitting.value">
+            <legend class="sos-sheet__label">شدت حادثه</legend>
+            <div class="sos-sheet__severities">
+              <label
                 v-for="option in severityOptions"
                 :key="option.value"
-                type="button"
-                role="radio"
                 class="sos-severity-card"
                 :class="{ 'is-selected': sos.severity.value === option.value }"
-                :aria-checked="sos.severity.value === option.value"
-                :disabled="sos.submitting.value"
                 :style="sos.severity.value === option.value ? { borderColor: option.hex } : undefined"
-                @click="sos.severity.value = option.value"
               >
+                <input class="sr-only" type="radio" name="sos-severity" :value="option.value"
+                  :checked="sos.severity.value === option.value"
+                  @change="sos.severity.value = option.value" />
                 <span class="sos-severity-dot" :style="{ backgroundColor: option.hex }" aria-hidden="true" />
                 <span class="sos-severity-title">{{ option.label }}</span>
                 <small class="sos-severity-hint">{{ option.hint }}</small>
-              </button>
+              </label>
             </div>
-          </div>
+          </fieldset>
 
           <div class="sos-sheet__section">
             <div class="flex items-center justify-between gap-2">
@@ -592,6 +590,13 @@ onBeforeUnmount(() => {
   font-weight: 800;
 }
 
+.sos-sheet__severity-fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
 .sos-sheet__severities {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -609,6 +614,16 @@ onBeforeUnmount(() => {
   background: transparent;
   text-align: start;
   cursor: pointer;
+}
+
+.sos-severity-card:focus-within {
+  outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.sos-sheet__severity-fieldset:disabled .sos-severity-card {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .sos-severity-card.is-selected {

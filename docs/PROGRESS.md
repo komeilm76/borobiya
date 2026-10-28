@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.3 SOS severity keyboard semantics (partial)
+
+- The severity cards in the SOS form advertised ARIA radios but were plain buttons, so their keyboard interaction did not follow radio-group conventions. The form now uses a named native radio group in a fieldset with a legend, preserving the same card labels and selected state, disabling choices during submission and outlining the focused card. A source-pinned regression failed before the change; client typecheck/build and unit checks cover the markup but not rendered keyboard or screen-reader behavior. Site-wide WCAG AA and device/browser acceptance remain open.
+
 ### 2026-10-28 — T4.4.2 admin category member-search feedback (partial)
 
 - Editing the admin category member search used to leave the previous query's candidates selectable through a 300 ms debounce; a late earlier response could also repopulate the wrong list. A small testable search composable now invalidates candidates and errors on each edit, signals loading during debounce, excludes inactive/already-assigned users, and ignores older replies after edits, dialog close, category change or unmount. The view still uses the authenticated admin search endpoint and preserves its assignment controls. Deferred-response tests and source wiring checks cover this picker without mounting Vue; other screens, toasts, eligible optimistic writes and browser/device feedback acceptance remain open.
