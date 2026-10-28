@@ -390,6 +390,7 @@ const auth = useAuthStore();
 const theme = useThemeStore();
 
 const sos = useSosRequest({
+  ownerId: computed(() => auth.user?.id ?? null),
   accessToken: computed(() => auth.accessToken),
   ensureSession: () => auth.ensureSession()
 });

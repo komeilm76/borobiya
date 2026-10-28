@@ -1,4 +1,4 @@
-import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { IncidentType, Severity, SosLocation } from "@shared/index";
 import { createSosRequest, listSosIncidentTypes, uploadSosRequestPhoto } from "../api/sos";
 import {
@@ -25,6 +25,7 @@ export interface GeolocationProvider {
 }
 
 export interface UseSosRequestOptions {
+  ownerId: ComputedRef<string | null> | Ref<string | null>;
   accessToken: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<unknown>;
   geolocation?: () => GeolocationProvider | null;
@@ -42,7 +43,8 @@ function defaultGeolocation(): GeolocationProvider | null {
  * optional photo evidence (`POST /_user/sos/requests/:id/photo`) are two separate network calls.
  * If step 1 succeeds (`201`) and step 2 fails on a weak field connection, `createdRequestId` is
  * retained so retrying uploads *only* the photo instead of filing duplicate emergency requests or
- * burning the user's `3 req/min` SOS rate-limit budget.
+ * burning the user's `3 req/min` SOS rate-limit budget. The draft is also bound to its
+ * authenticated owner: a pending session refresh must never submit it as the next account.
  */
 export function useSosRequest(options: UseSosRequestOptions) {
   const incidentTypes = ref<IncidentType[]>([]);
@@ -67,6 +69,16 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const photoUploadedUrl = ref<string | null>(null);
   const awaitingPhotoRetry = ref(false);
   let gpsRequestId = 0;
+  let operationGeneration = 0;
+  const isCurrent = (owner: string, operation: number) =>
+    operation === operationGeneration && options.ownerId.value === owner;
+
+  // The sheet can outlive a token refresh, but must not outlive the account that drafted
+  // the emergency. Invalidate synchronously: logout + login may happen before a pending
+  // ensureSession/create/upload promise settles.
+  watch(options.ownerId, () => reset(), { flush: "sync" });
+  watch(options.accessToken, (token) => { if (!token) reset(); }, { flush: "sync" });
+  if (getCurrentScope()) onScopeDispose(() => reset());
 
   const draft = computed<SosFormDraft>(() => ({
     severity: severity.value,
@@ -232,6 +244,12 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
     // Snapshot what the user approved at tap time. A late GPS fix, map drag or file-picker
     // event during session refresh must not silently change the submitted SOS or attachment.
+    const owner = options.ownerId.value;
+    if (!owner) {
+      submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
+      return false;
+    }
+    const operation = operationGeneration;
     const payload = buildSosCreatePayload(draft.value);
     const selectedPhoto = photoFile.value;
     gpsRequestId++; // discard a geolocation callback already in flight
@@ -241,19 +259,25 @@ export function useSosRequest(options: UseSosRequestOptions) {
     submitting.value = true;
     try {
       const token = await requireToken();
+      if (!isCurrent(owner, operation)) return false;
       if (!token) {
         submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
         return false;
       }
       const created = await createSosRequest(payload, token);
+      // A network request may already have committed when the user signed out. We cannot
+      // undo that server operation, but must not upload its photo or show it to the next user.
+      if (!isCurrent(owner, operation)) return false;
       createdRequestId.value = created.requestId;
 
       if (selectedPhoto) {
         try {
           const uploaded = await uploadSosRequestPhoto(created.requestId, selectedPhoto, token);
+          if (!isCurrent(owner, operation)) return false;
           photoUploadedUrl.value = uploaded.photoUrl;
           awaitingPhotoRetry.value = false;
         } catch (uploadError) {
+          if (!isCurrent(owner, operation)) return false;
           awaitingPhotoRetry.value = true;
           submitError.value = sosApiErrorMessage(
             uploadError,
@@ -265,13 +289,15 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
       return true;
     } catch (error) {
-      submitError.value = sosApiErrorMessage(
-        error,
-        "ثبت درخواست امداد انجام نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
-      );
+      if (isCurrent(owner, operation)) {
+        submitError.value = sosApiErrorMessage(
+          error,
+          "ثبت درخواست امداد انجام نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
+        );
+      }
       return false;
     } finally {
-      submitting.value = false;
+      if (operation === operationGeneration) submitting.value = false;
     }
   }
 
@@ -279,34 +305,43 @@ export function useSosRequest(options: UseSosRequestOptions) {
     if (submitting.value || !createdRequestId.value || !photoFile.value) return false;
     const requestId = createdRequestId.value;
     const selectedPhoto = photoFile.value;
+    const owner = options.ownerId.value;
+    if (!owner) return false;
+    const operation = operationGeneration;
     submitError.value = null;
 
     // The photo retry is also single-flight across an asynchronous token refresh.
     submitting.value = true;
     try {
       const token = await requireToken();
+      if (!isCurrent(owner, operation)) return false;
       if (!token) {
         submitError.value = "برای ارسال تصویر دوباره وارد حساب کاربری شوید.";
         return false;
       }
       const uploaded = await uploadSosRequestPhoto(requestId, selectedPhoto, token);
+      if (!isCurrent(owner, operation)) return false;
       photoUploadedUrl.value = uploaded.photoUrl;
       awaitingPhotoRetry.value = false;
       return true;
     } catch (error) {
-      awaitingPhotoRetry.value = true;
-      submitError.value = sosApiErrorMessage(
-        error,
-        "ارسال دوبارهٔ تصویر انجام نشد. درخواست امداد شما همچنان ثبت و فعال است."
-      );
+      if (isCurrent(owner, operation)) {
+        awaitingPhotoRetry.value = true;
+        submitError.value = sosApiErrorMessage(
+          error,
+          "ارسال دوبارهٔ تصویر انجام نشد. درخواست امداد شما همچنان ثبت و فعال است."
+        );
+      }
       return false;
     } finally {
-      submitting.value = false;
+      if (operation === operationGeneration) submitting.value = false;
     }
   }
 
   function reset(): void {
+    operationGeneration++;
     gpsRequestId++;
+    submitting.value = false;
     locating.value = false;
     severity.value = "high";
     description.value = "";

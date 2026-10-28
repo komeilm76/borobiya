@@ -1,4 +1,5 @@
-import { ref } from "vue";
+import { readFileSync } from "node:fs";
+import { effectScope, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/api/http";
 import * as sosApi from "@/api/sos";
@@ -10,6 +11,12 @@ const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
 describe("useSosRequest composable", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("wires the authenticated account to the sheet without mounting a Vue component", () => {
+    const source = readFileSync(new URL("../components/sos/SosRequestSheet.vue", import.meta.url), "utf8");
+    expect(source).toContain("ownerId: computed(() => auth.user?.id ?? null)");
+    expect(source).toContain("accessToken: computed(() => auth.accessToken)");
   });
 
   it("loads incident catalog and GPS fix on open, then submits SOS without photo", async () => {
@@ -42,7 +49,7 @@ describe("useSosRequest composable", () => {
     };
 
     const sos = useSosRequest({
-      accessToken: ref("token-ok"),
+      ownerId: ref("owner"), accessToken: ref("token-ok"),
       ensureSession: async () => true,
       geolocation: () => geolocation
     });
@@ -69,12 +76,163 @@ describe("useSosRequest composable", () => {
     expect(sos.createdRequestId.value).toBe(REQUEST_ID);
   });
 
+  it("never files an old SOS draft under a different account after session recovery", async () => {
+    let releaseSession!: () => void;
+    const pendingSession = new Promise<void>((resolve) => { releaseSession = resolve; });
+    const ownerId = ref<string | null>("owner-a");
+    const accessToken = ref<string | null>("token-a");
+    const create = vi.spyOn(sosApi, "createSosRequest").mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({ ownerId, accessToken, ensureSession: () => pendingSession });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A request drafted by account A before account B signed in.";
+    sos.setManualLocation(35.7, 51.4);
+    const sending = sos.submit();
+    ownerId.value = "owner-b";
+    accessToken.value = "token-b";
+    releaseSession();
+    expect(await sending).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+    expect(sos.submitting.value).toBe(false);
+    expect(sos.description.value).toBe("");
+  });
+
+  it("does not upload account A's photo or display its SOS after an in-flight create crosses logout", async () => {
+    let finishCreate!: (result: { requestId: string; status: "pending" }) => void;
+    const pendingCreate = new Promise<{ requestId: string; status: "pending" }>((resolve) => { finishCreate = resolve; });
+    const create = vi.spyOn(sosApi, "createSosRequest").mockReturnValue(pendingCreate);
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto");
+    const ownerId = ref<string | null>("owner-a");
+    const accessToken = ref<string | null>("token-a");
+    const sos = useSosRequest({ ownerId, accessToken });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A request filed by account A before logout.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    const sending = sos.submit();
+    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce());
+    accessToken.value = null;
+    ownerId.value = null;
+    finishCreate({ requestId: REQUEST_ID, status: "pending" });
+    expect(await sending).toBe(false); // the server may have committed; never claim the new session owns it
+    expect(upload).not.toHaveBeenCalled();
+    expect(sos.createdRequestId.value).toBeNull();
+    expect(sos.submitting.value).toBe(false);
+  });
+
+  it("does not retry account A's photo with account B's token or reapply an old upload response", async () => {
+    let releaseSession!: () => void;
+    const pendingSession = new Promise<void>((resolve) => { releaseSession = resolve; });
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto").mockResolvedValue({ photoUrl: "/uploads/a.png" });
+    const ownerId = ref<string | null>("owner-a");
+    const accessToken = ref<string | null>("token-a");
+    const sos = useSosRequest({ ownerId, accessToken, ensureSession: () => pendingSession });
+    sos.createdRequestId.value = REQUEST_ID;
+    sos.awaitingPhotoRetry.value = true;
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    const retry = sos.retryPhotoUpload();
+    ownerId.value = "owner-b";
+    accessToken.value = "token-b";
+    releaseSession();
+    expect(await retry).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
+    expect(sos.createdRequestId.value).toBeNull();
+  });
+
+  it("does not resume a queued SOS submission after the sheet is unmounted", async () => {
+    let releaseSession!: () => void;
+    const pendingSession = new Promise<void>((resolve) => { releaseSession = resolve; });
+    const create = vi.spyOn(sosApi, "createSosRequest").mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const scope = effectScope();
+    const sos = scope.run(() => useSosRequest({
+      ownerId: ref("owner-a"), accessToken: ref("token-a"), ensureSession: () => pendingSession
+    }))!;
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A request abandoned when the sheet leaves the page.";
+    sos.setManualLocation(35.7, 51.4);
+    const sending = sos.submit();
+    scope.stop();
+    releaseSession();
+    expect(await sending).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("does not apply an old photo upload response after logout", async () => {
+    let finishUpload!: (result: { photoUrl: string }) => void;
+    const pendingUpload = new Promise<{ photoUrl: string }>((resolve) => { finishUpload = resolve; });
+    vi.spyOn(sosApi, "createSosRequest").mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto").mockReturnValue(pendingUpload);
+    const ownerId = ref<string | null>("owner-a");
+    const accessToken = ref<string | null>("token-a");
+    const sos = useSosRequest({ ownerId, accessToken });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A request with a photo upload interrupted by logout.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    const sending = sos.submit();
+    await vi.waitFor(() => expect(upload).toHaveBeenCalledOnce());
+    accessToken.value = null;
+    ownerId.value = null;
+    finishUpload({ photoUrl: "/uploads/a.png" });
+    expect(await sending).toBe(false);
+    expect(sos.createdRequestId.value).toBeNull();
+    expect(sos.photoUploadedUrl.value).toBeNull();
+    expect(sos.submitting.value).toBe(false);
+  });
+
+  it("does not let account A's late create response unlock account B's submission", async () => {
+    let finishFirst!: (result: { requestId: string; status: "pending" }) => void;
+    let finishSecond!: (result: { requestId: string; status: "pending" }) => void;
+    const first = new Promise<{ requestId: string; status: "pending" }>((resolve) => { finishFirst = resolve; });
+    const second = new Promise<{ requestId: string; status: "pending" }>((resolve) => { finishSecond = resolve; });
+    vi.spyOn(sosApi, "createSosRequest").mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const ownerId = ref<string | null>("owner-a");
+    const accessToken = ref<string | null>("token-a");
+    const sos = useSosRequest({ ownerId, accessToken });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "First account emergency that is already on the wire.";
+    sos.setManualLocation(35.7, 51.4);
+    const sendingFirst = sos.submit();
+    await vi.waitFor(() => expect(sosApi.createSosRequest).toHaveBeenCalledOnce());
+    ownerId.value = "owner-b";
+    accessToken.value = "token-b";
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "Second account emergency after account switch.";
+    sos.setManualLocation(35.8, 51.5);
+    const sendingSecond = sos.submit();
+    await vi.waitFor(() => expect(sosApi.createSosRequest).toHaveBeenCalledTimes(2));
+    finishFirst({ requestId: REQUEST_ID, status: "pending" });
+    expect(await sendingFirst).toBe(false);
+    expect(sos.submitting.value).toBe(true);
+    expect(sos.createdRequestId.value).toBeNull();
+    const secondId = "33333333-3333-4333-8333-333333333333";
+    finishSecond({ requestId: secondId, status: "pending" });
+    expect(await sendingSecond).toBe(true);
+    expect(sos.submitting.value).toBe(false);
+    expect(sos.createdRequestId.value).toBe(secondId);
+  });
+
+  it("still submits for the same owner after a normal access-token rotation", async () => {
+    const token = ref<string | null>("expiring-token");
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({
+      ownerId: ref("owner-a"), accessToken: token,
+      ensureSession: async () => { token.value = "renewed-token"; }
+    });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "Normal token renewal must not lose an SOS.";
+    sos.setManualLocation(35.7, 51.4);
+    expect(await sos.submit()).toBe(true);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ incidentTypeId: INCIDENT_A }), "renewed-token");
+    expect(sos.createdRequestId.value).toBe(REQUEST_ID);
+  });
+
   it("does not create duplicate emergencies on double submit during session refresh or after success", async () => {
     let releaseSession!: () => void;
     const waitingForSession = new Promise<void>((resolve) => { releaseSession = resolve; });
     const createSpy = vi.spyOn(sosApi, "createSosRequest")
       .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
-    const sos = useSosRequest({ accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
     sos.incidentTypeId.value = INCIDENT_A;
     sos.description.value = "An urgent rescue is needed at the incident location.";
     sos.setManualLocation(35.7, 51.4);
@@ -127,7 +285,7 @@ describe("useSosRequest composable", () => {
     };
 
     const sos = useSosRequest({
-      accessToken: ref("token-ok"),
+      ownerId: ref("owner"), accessToken: ref("token-ok"),
       ensureSession: async () => true,
       geolocation: () => failingGeolocation
     });
@@ -166,7 +324,7 @@ describe("useSosRequest composable", () => {
     const waitingForSession = new Promise<void>((resolve) => { releaseSession = resolve; });
     const uploadSpy = vi.spyOn(sosApi, "uploadSosRequestPhoto")
       .mockResolvedValue({ photoUrl: `/uploads/${REQUEST_ID}.png` });
-    const sos = useSosRequest({ accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok"), ensureSession: () => waitingForSession });
     sos.createdRequestId.value = REQUEST_ID;
     sos.awaitingPhotoRetry.value = true;
     sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
@@ -184,7 +342,7 @@ describe("useSosRequest composable", () => {
     const pendingUpload = new Promise<{ photoUrl: string }>((resolve) => { finishUpload = resolve; });
     vi.spyOn(sosApi, "createSosRequest").mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
     const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto").mockReturnValue(pendingUpload);
-    const sos = useSosRequest({ accessToken: ref("token-ok") });
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok") });
     sos.incidentTypeId.value = INCIDENT_A;
     sos.description.value = "An urgent rescue is needed at the incident location.";
     sos.setManualLocation(35.7, 51.4);
@@ -209,7 +367,7 @@ describe("useSosRequest composable", () => {
       .mockResolvedValue({ photoUrl: `/uploads/${REQUEST_ID}.png` });
     let lateGps!: Parameters<GeolocationProvider["getCurrentPosition"]>[0];
     const sos = useSosRequest({
-      accessToken: ref("token-ok"), ensureSession: () => pendingSession,
+      ownerId: ref("owner"), accessToken: ref("token-ok"), ensureSession: () => pendingSession,
       geolocation: () => ({ getCurrentPosition: (success) => { lateGps = success; } })
     });
     sos.incidentTypeId.value = INCIDENT_A;
@@ -251,7 +409,7 @@ describe("useSosRequest composable", () => {
     ]);
 
     const sos = useSosRequest({
-      accessToken: ref("token-ok"),
+      ownerId: ref("owner"), accessToken: ref("token-ok"),
       ensureSession: async () => true,
       geolocation: () => ({
         getCurrentPosition: (ok) =>
@@ -287,7 +445,7 @@ describe("useSosRequest composable", () => {
       | undefined;
 
     const sos = useSosRequest({
-      accessToken: ref("token-ok"),
+      ownerId: ref("owner"), accessToken: ref("token-ok"),
       ensureSession: async () => true,
       geolocation: () => ({
         getCurrentPosition: (ok) => {

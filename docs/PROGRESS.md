@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — SOS submission account-boundary bug (T3.2.4 follow-up)
+
+- The SOS sheet previously awaited session recovery and then sent an old draft with whichever bearer was current. If the account changed during that wait, the new account could file the previous user's emergency; an in-flight create or photo upload could also update the abandoned sheet and continue uploading after logout. The composable now requires the authenticated owner, invalidates queued work synchronously on account/token loss or sheet disposal, checks ownership after each async step, and keeps older `finally` blocks from unlocking a new submission. Same-owner token renewal continues to work. Deferred-response regressions reproduced the cross-account create, retry and unmount paths before the fix, plus coverage for late create/upload responses and concurrent session changes. A create sent before logout can still commit server-side and must be checked in that account's history; no browser/device acceptance is claimed.
+
 ### 2026-10-28 — Proposal inbox stale-refresh feedback (T4.4.2 partial)
 
 - On a failed inbox refresh, previously loaded offer rows remained visible but the page gave no failure warning; the hero, bell and navigation displayed the cached count as if it were current. The page now marks retained rows as potentially stale with Retry and suppresses unverified counts on those surfaces, including after a failed first read. A server-confirmed acceptance clears the old failure flag even though no further list read runs in the accepted state. Store-state and source-pinned tests reproduced the missing warning and lingering accepted-state failure before the fixes; no Vue mounting or browser/device acceptance is claimed. Broader T4.4.2 feedback/toast work remains open.
