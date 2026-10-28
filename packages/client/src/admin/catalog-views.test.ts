@@ -47,6 +47,15 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(dialog).toContain('data-test="member-search"');
   });
 
+  it("invalidates member-picker results as soon as the query changes and when the dialog closes", () => {
+    expect(categories).toContain('v-model="memberSearch"');
+    expect(categories).toContain('@update:model-value="queueSearch($event)"');
+    expect(categories).toContain('useCategoryMemberSearch(async (term) =>');
+    expect(categories).toContain('if (!open) resetSearch()');
+    expect(categories).toContain('onUnmounted(() => {');
+    expect(categories).toContain('  resetSearch();');
+  });
+
   it("names a refused user rather than the index the server pointed at", () => {
     // `unknown_target` issues carry `path: ["userIds", 2]`; the screen turns that back into the username
     // it offered, which is the only entity name the admin has ever seen.

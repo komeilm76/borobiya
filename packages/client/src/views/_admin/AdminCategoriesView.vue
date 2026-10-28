@@ -215,7 +215,7 @@
             :loading="searching"
             :disabled="saving"
             data-test="member-search"
-            @update:model-value="queueSearch"
+            @update:model-value="queueSearch($event)"
           />
           <div class="admin-categories-members mt-3" aria-live="polite">
             <p v-if="searchError" class="text-sm text-error">{{ searchError }}</p>
@@ -257,9 +257,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import type { Category, CategoryMember, IncidentType, UserProfile } from "@shared/index";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import type { Category, CategoryMember, IncidentType } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
+import { ApiError } from "../../api/http";
 import { listAdminUsers } from "../../api/admin-users";
 import {
   assignCategoryUsers,
@@ -280,6 +281,7 @@ import {
   type CategoryFormDraft
 } from "../../admin/catalog-form";
 import { catalogListPresentation } from "../../admin/catalog-list-presentation";
+import { useCategoryMemberSearch } from "../../admin/use-category-member-search";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
@@ -300,11 +302,15 @@ const saving = ref(false);
 
 const membersOpen = ref(false);
 const membersFor = ref<Category | null>(null);
-const memberSearch = ref("");
-const candidates = ref<UserProfile[]>([]);
 const selectedIds = ref<string[]>([]);
-const searching = ref(false);
-const searchError = ref("");
+const {
+  memberSearch, candidates, searching, searchError, queueSearch, reset: resetSearch
+} = useCategoryMemberSearch(async (term) => {
+  const accessToken = await adminToken();
+  if (!accessToken) throw new ApiError(401, "INVALID_REFRESH", "Admin session unavailable");
+  const response = await listAdminUsers({ q: term, page: 1, limit: 10 }, accessToken);
+  return response.items;
+}, () => new Set((membersFor.value?.members ?? []).map((member) => member.id)));
 const membersError = ref("");
 const removingMemberId = ref<string | null>(null);
 
@@ -313,8 +319,6 @@ const successMessage = ref("");
 
 let requestVersion = 0;
 let activeController: AbortController | null = null;
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
-let searchVersion = 0;
 
 const hasSelection = computed(() => selectedIds.value.length > 0);
 
@@ -444,61 +448,18 @@ async function submit(): Promise<void> {
 }
 
 function openMembers(category: Category): void {
+  resetSearch();
   membersFor.value = category;
-  memberSearch.value = "";
-  candidates.value = [];
   selectedIds.value = [];
-  searchError.value = "";
   membersError.value = "";
   membersOpen.value = true;
 }
 
-function queueSearch(): void {
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    searchTimer = null;
-    void searchMembers();
-  }, 300);
-}
-
-/**
- * The picker is the admin user search, so a person is chosen by their username rather than by pasting
- * a uuid. The result list is deliberately not filtered to "not already a member": membership cannot be
- * read here, and pretending otherwise would need a rule the API does not expose.
- */
-async function searchMembers(): Promise<void> {
-  const version = ++searchVersion;
-  const term = memberSearch.value.trim();
-  if (!term) {
-    candidates.value = [];
-    searchError.value = "";
-    searching.value = false;
-    return;
-  }
-
-  searching.value = true;
-  searchError.value = "";
-  try {
-    const accessToken = await adminToken();
-    if (version !== searchVersion) return;
-    if (!accessToken) {
-      searchError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
-      return;
-    }
-    const response = await listAdminUsers({ q: term, page: 1, limit: 10 }, accessToken);
-    if (version !== searchVersion) return;
-    const assignedIds = new Set((membersFor.value?.members ?? []).map((member) => member.id));
-    candidates.value = response.items.filter(
-      (candidate) => candidate.isActive && !assignedIds.has(candidate.id)
-    );
-  } catch (error) {
-    if (version !== searchVersion) return;
-    candidates.value = [];
-    searchError.value = friendlyErrorMessage(error, "جست‌وجوی امدادگرها انجام نشد. دوباره تلاش کنید.");
-  } finally {
-    if (version === searchVersion) searching.value = false;
-  }
-}
+// The picker is an admin username search, not a raw-UUID form. Closing or switching categories
+// invalidates replies that might otherwise offer candidates for an old dialog context.
+watch(membersOpen, (open) => {
+  if (!open) resetSearch();
+}, { flush: "sync" });
 
 function toggleMember(id: string, checked: boolean): void {
   const next = new Set(selectedIds.value);
@@ -567,8 +528,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   requestVersion += 1;
-  searchVersion += 1;
-  if (searchTimer) clearTimeout(searchTimer);
+  resetSearch();
   activeController?.abort();
 });
 </script>
