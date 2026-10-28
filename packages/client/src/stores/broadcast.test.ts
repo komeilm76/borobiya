@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { createPinia, setActivePinia } from "pinia";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "./auth";
 import { useBroadcastStore } from "./broadcast";
@@ -32,6 +32,19 @@ describe("broadcast start consent across the priority-device read", () => {
   it("wires the owner into the real broadcaster without mounting a Vue component", () => {
     const source = readFileSync(new URL("./broadcast.ts", import.meta.url), "utf8");
     expect(source).toContain("ownerId: computed(() => auth.user?.id ?? null)");
+  });
+
+  it("waits for the profile and token to agree before refreshing a switched account", async () => {
+    const auth = useAuthStore();
+    auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt(A, session);
+    useBroadcastStore();
+    auth.user = { id: B, username: "b", role: "user", mustCompleteSecurityQuestions: false };
+    await nextTick();
+    expect(refresh).not.toHaveBeenCalled();
+    auth.accessToken = jwt(B, "44444444-4444-4444-8444-444444444444");
+    await nextTick();
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
   it("does not transfer account A's tap to B when the priority read settles late", async () => {

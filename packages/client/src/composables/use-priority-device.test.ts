@@ -66,10 +66,11 @@ function okResponder(url: string) {
   return { status: 200, body: {} };
 }
 
-function token(deviceId: string | null): string {
+function token(deviceId: string | null, owner = "user-1", sessionId?: string): string {
   const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
-  const payload: Record<string, unknown> = { sub: "user-1", role: "user" };
+  const payload: Record<string, unknown> = { sub: owner, role: "user" };
   if (deviceId) payload.deviceId = deviceId;
+  if (sessionId) payload.sessionId = sessionId;
   return `${encode({ alg: "HS256" })}.${encode(payload)}.signature`;
 }
 
@@ -93,11 +94,12 @@ afterEach(() => {
 function mount(deviceId: string | null = PHONE) {
   const scope = effectScope();
   const accessToken = ref<string | null>(token(deviceId));
+  const ownerId = ref<string | null>("user-1");
   let api!: ReturnType<typeof usePriorityDevice>;
   scope.run(() => {
-    api = usePriorityDevice({ accessToken });
+    api = usePriorityDevice({ accessToken, ownerId });
   });
-  return { scope, accessToken, api };
+  return { scope, accessToken, ownerId, api };
 }
 
 async function settle(): Promise<void> {
@@ -122,7 +124,7 @@ describe("who am I", () => {
     const override = ref<string | null>(LAPTOP);
     let api!: ReturnType<typeof usePriorityDevice>;
     scope.run(() => {
-      api = usePriorityDevice({ accessToken: ref(token(PHONE)), ownDeviceId: override });
+      api = usePriorityDevice({ accessToken: ref(token(PHONE)), ownerId: ref("user-1"), ownDeviceId: override });
     });
     expect(api.ownId.value).toBe(LAPTOP);
     override.value = "";
@@ -131,6 +133,111 @@ describe("who am I", () => {
 });
 
 describe("deriving from the two lists", () => {
+  it("does not restore private devices or shares after logout while a read is pending", async () => {
+    const { api, accessToken, scope } = mount();
+    await api.refresh();
+    expect(api.devices.value).toHaveLength(2);
+    let release!: (response: Response) => void;
+    const pendingDevices = new Promise<Response>((resolve) => { release = resolve; });
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      return url.endsWith("/_user/devices") ? pendingDevices : jsonResponse(okResponder(url).body, 200);
+    }) as unknown as typeof fetch;
+    const oldRead = api.refresh();
+    accessToken.value = null;
+    api.clear(); // the app-scoped broadcast store also clears on sign-out
+    expect(api.devices.value).toEqual([]);
+    release(jsonResponse([deviceRow(PHONE), deviceRow(LAPTOP)], 200));
+    await oldRead;
+    expect(api.devices.value).toEqual([]);
+    expect(api.liveShares.value).toEqual([]);
+    expect(api.loadedAtMs.value).toBeNull();
+    expect(api.loading.value).toBe(false);
+    scope.stop();
+  });
+
+  it("does not renew a stale request's session when its 401 arrives after logout", async () => {
+    const accessToken = ref<string | null>(token(PHONE));
+    const ensureSession = vi.fn(async () => { accessToken.value = token(PHONE); });
+    const scope = effectScope();
+    const api = scope.run(() => usePriorityDevice({ accessToken, ownerId: ref("user-1"), ensureSession }))!;
+    let release!: (response: Response) => void;
+    const pendingDevices = new Promise<Response>((resolve) => { release = resolve; });
+    globalThis.fetch = vi.fn(async (input: unknown) =>
+      String(input).endsWith("/_user/devices") ? pendingDevices : jsonResponse(okResponder(String(input)).body, 200)
+    ) as unknown as typeof fetch;
+    const oldRead = api.refresh();
+    accessToken.value = null;
+    release(jsonResponse({ code: "UNAUTHORIZED", message: "Expired", issues: [] }, 401));
+    await oldRead;
+    expect(ensureSession).not.toHaveBeenCalled();
+    expect(api.failed.value).toBe(false);
+    expect(api.loading.value).toBe(false);
+    scope.stop();
+  });
+
+  it("clears the previous owner's priority rows before a new account read settles", async () => {
+    const { api, accessToken, scope, ownerId } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingDevices = new Promise<Response>((resolve) => { release = resolve; });
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith("/_user/devices") && accessToken.value === token(PHONE)) return pendingDevices;
+      if (url.endsWith("/_user/devices")) return jsonResponse([deviceRow(LAPTOP)], 200);
+      return jsonResponse({ owned: [shareRow("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", LAPTOP)], sharedWithMe: [] }, 200);
+    }) as unknown as typeof fetch;
+    const oldRead = api.refresh();
+    ownerId.value = "user-2";
+    accessToken.value = token(LAPTOP, "user-2");
+    expect(api.devices.value).toEqual([]);
+    expect(api.liveShares.value).toEqual([]);
+    await api.refresh();
+    release(jsonResponse([deviceRow(PHONE), deviceRow(LAPTOP)], 200));
+    await oldRead;
+    expect(api.devices.value.map((row) => row.deviceId)).toEqual([LAPTOP]);
+    expect(api.liveShares.value.map((row) => row.id)).toEqual(["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"]);
+    scope.stop();
+  });
+
+  it("does not retain a previous session's rows for the same user, but keeps them for token renewal", async () => {
+    const { api, accessToken, scope } = mount();
+    accessToken.value = token(PHONE, "user-1", "session-1");
+    await api.refresh();
+    expect(api.devices.value).toHaveLength(2);
+    // A renewed bearer for the same session does not discard a last-good answer.
+    accessToken.value = token(LAPTOP, "user-1", "session-1");
+    expect(api.devices.value).toHaveLength(2);
+    accessToken.value = token(LAPTOP, "user-1", "session-2");
+    expect(api.devices.value).toEqual([]);
+    expect(api.liveShares.value).toEqual([]);
+    expect(api.loadedAtMs.value).toBeNull();
+    scope.stop();
+  });
+
+  it("ignores an older same-session response after a newer refresh succeeds", async () => {
+    const { api, scope } = mount();
+    let release!: (response: Response) => void;
+    const pendingDevices = new Promise<Response>((resolve) => { release = resolve; });
+    let first = true;
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith("/_user/devices") && first) {
+        first = false;
+        return pendingDevices;
+      }
+      if (url.endsWith("/_user/devices")) return jsonResponse([deviceRow(LAPTOP)], 200);
+      return jsonResponse({ owned: [], sharedWithMe: [] }, 200);
+    }) as unknown as typeof fetch;
+    const older = api.refresh();
+    await api.refresh();
+    release(jsonResponse([deviceRow(PHONE)], 200));
+    await older;
+    expect(api.devices.value.map((row) => row.deviceId)).toEqual([LAPTOP]);
+    expect(api.failed.value).toBe(false);
+    scope.stop();
+  });
+
   it("counts the shares this device broadcasts and the ones it does not", async () => {
     const { api } = mount();
     await api.refresh();
@@ -203,6 +310,18 @@ describe("deriving from the two lists", () => {
     expect(api.loadedAtMs.value).toBe(NOW);
   });
 
+  it("still reads after recovering a missing bearer for the same owner", async () => {
+    const accessToken = ref<string | null>(null);
+    const ensureSession = vi.fn(async () => { accessToken.value = token(PHONE); });
+    const scope = effectScope();
+    const api = scope.run(() => usePriorityDevice({ accessToken, ownerId: ref("user-1"), ensureSession }))!;
+    await api.refresh();
+    expect(ensureSession).toHaveBeenCalledOnce();
+    expect(api.devices.value).toHaveLength(2);
+    expect(api.failed.value).toBe(false);
+    scope.stop();
+  });
+
   it("recovers from a 401 response via ensureSession and retries with the refreshed token", async () => {
     const accessToken = ref<string | null>("expired-token");
     const ensureSession = vi.fn(async () => {
@@ -217,7 +336,7 @@ describe("deriving from the two lists", () => {
       return okResponder(url);
     };
     const scope = effectScope();
-    const api = scope.run(() => usePriorityDevice({ accessToken, ensureSession }))!;
+    const api = scope.run(() => usePriorityDevice({ accessToken, ownerId: ref("user-1"), ensureSession }))!;
     await api.refresh();
     await settle();
     expect(ensureSession).toHaveBeenCalledTimes(1);

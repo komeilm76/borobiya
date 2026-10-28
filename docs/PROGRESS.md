@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Broadcast priority snapshot account-boundary bug (T2.3.6 follow-up)
+
+- A pending device/share read could refill the broadcast bar's read-only priority snapshot after logout; on an account switch, old rows remained visible until refresh and could overwrite the new owner's result. The composable now clears synchronously when the authenticated owner, token subject or session changes, and invalidates in-flight reads on clear or a newer refresh. The store waits for a matching owner and bearer before reading, and refreshes when the new profile arrives; normal same-session bearer renewal and retaining a last-good answer on a same-session read failure remain intact. Deferred-response tests reproduced the logout/account bugs before the fix and cover concurrent reads and session renewal. This does not constitute VM/two-browser P2-A1 acceptance; server-side priority enforcement is unchanged.
+
 ### 2026-10-28 — T4.4.1 mobile cancellation dialogs (partial)
 
 - The rescuer's mission-cancellation dialog and the requester's SOS-cancellation dialog each had long Persian action labels beside a spacer and a Back button; on narrow screens the confirmation could crowd or clip, and a short viewport had no explicit scrollable reason body. Both dialogs now use Vuetify's scrollable dialog/card-text layout, and below 600px stack full-width, wrapping, minimum-44px actions without the spacer. Existing reason validation, loading locks and confirmation handlers are unchanged. Source-pinned regressions failed before the change, and client typechecks/build pass; this is not a rendered phone/tablet test or a site-wide responsive/bottom-sheet sign-off.

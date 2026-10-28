@@ -1,8 +1,8 @@
-import { computed, ref, type ComputedRef, type Ref } from "vue";
+import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationShare, UserDevice } from "@shared/index";
 import { fetchUserDevices } from "@/api/devices";
 import { listLocationShares } from "@/api/location";
-import { ownDeviceId } from "@/composables/device-identity";
+import { decodeAccessTokenClaims, ownDeviceId } from "@/composables/device-identity";
 
 /**
  * “Am I the device that broadcasts?” — the read-only half of spec §7.3, for the screens that have to say
@@ -20,6 +20,8 @@ import { ownDeviceId } from "@/composables/device-identity";
  */
 export interface UsePriorityDeviceOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  /** The authenticated account, independently of the bearer (which may rotate within a session). */
+  ownerId: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<unknown>;
   /**
    * Overrides the id read from the access token. The native shell is the reason this exists: a build that
@@ -36,6 +38,17 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
   const failed = ref(false);
   /** When the two lists were last read, so a caller can age its own sentence instead of guessing. */
   const loadedAtMs = ref<number | null>(null);
+  let readVersion = 0;
+  // Null while signed out or while the account and token belong to different users during a switch.
+  // Access-token renewal for the same account/session must not discard a last-good answer.
+  const sessionKey = computed(() => {
+    const owner = options.ownerId.value;
+    const bearer = options.accessToken.value;
+    if (!owner || !bearer) return null;
+    const claims = decodeAccessTokenClaims(bearer);
+    if (claims && claims.sub !== owner) return null;
+    return JSON.stringify([owner, typeof claims?.sessionId === "string" ? claims.sessionId : null]);
+  });
 
   const ownId = computed(() => {
     const override = options.ownDeviceId?.value;
@@ -60,13 +73,23 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
   const hasData = computed(() => loadedAtMs.value !== null);
 
   function clear(): void {
+    ++readVersion; // Also invalidates responses already on the wire, not just the displayed rows.
     devices.value = [];
     liveShares.value = [];
     loadedAtMs.value = null;
     failed.value = false;
+    loading.value = false;
   }
 
+  watch(sessionKey, (next, previous) => {
+    // Going from no session to a first session has no old rows to clear. In particular, a
+    // refresh that just recovered its own token through ensureSession can continue.
+    if (previous !== null || next === null) clear();
+  }, { flush: "sync" });
+
   async function refresh(): Promise<void> {
+    const version = ++readVersion;
+    const startingOwner = options.ownerId.value;
     let accessToken = options.accessToken.value;
     if (!accessToken && options.ensureSession) {
       try {
@@ -76,35 +99,40 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
       }
       accessToken = options.accessToken.value;
     }
-    if (!accessToken) {
+    const key = sessionKey.value;
+    if (version !== readVersion || startingOwner !== options.ownerId.value) return;
+    if (!accessToken || !key) {
       clear();
       return;
     }
+    const isCurrent = () => version === readVersion && sessionKey.value === key;
     loading.value = true;
     try {
-      let [deviceList, shares] = await Promise.all([
+      const [deviceList, shares] = await Promise.all([
         fetchUserDevices(accessToken),
         listLocationShares(accessToken)
       ]).catch(async (error: unknown) => {
-        if ((error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
+        if (isCurrent() && (error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
           await options.ensureSession();
           const refreshed = options.accessToken.value;
-          if (refreshed && refreshed !== accessToken) {
+          if (isCurrent() && refreshed && refreshed !== accessToken) {
             return Promise.all([fetchUserDevices(refreshed), listLocationShares(refreshed)]);
           }
         }
         throw error;
       });
+      if (!isCurrent()) return;
       devices.value = deviceList;
       liveShares.value = shares.owned;
       loadedAtMs.value = Date.now();
       failed.value = false;
     } catch {
-      // A failed refresh keeps the previous answer: “you are not the priority device” is a claim about the
-      // server's current state, and a list that could not be re-read is not evidence that it changed.
+      if (!isCurrent()) return;
+      // A failed refresh keeps the previous *same-session* answer: a failed read is not evidence
+      // that this device's priority changed. Account/session changes clear it synchronously above.
       failed.value = true;
     } finally {
-      loading.value = false;
+      if (isCurrent()) loading.value = false;
     }
   }
 

@@ -381,7 +381,10 @@ describe("client auth store", () => {
   it("does not resurrect a logged-out session via broadcast priority watcher even if /_auth/logout fails offline", async () => {
     const fetchMock = fakeFetch(
       // Initial login + profile + broadcast priority watcher (/devices + /location/shares)
-      jsonResponse({ accessToken: "token-live", user: { ...user, mustCompleteSecurityQuestions: false } }),
+      jsonResponse({
+        accessToken: `e30.${Buffer.from(JSON.stringify({ sub: user.id, sessionId: "33333333-3333-4333-8333-333333333333" })).toString("base64url")}.sig`,
+        user: { ...user, mustCompleteSecurityQuestions: false }
+      }),
       jsonResponse(profile),
       jsonResponse([]),
       jsonResponse({ owned: [], sharedWithMe: [] }),

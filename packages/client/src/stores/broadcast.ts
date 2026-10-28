@@ -24,6 +24,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
   });
   const priority = usePriorityDevice({
     accessToken,
+    ownerId: computed(() => auth.user?.id ?? null),
     ensureSession: () => auth.refreshSession()
   });
 
@@ -63,14 +64,16 @@ export const useBroadcastStore = defineStore("broadcast", () => {
     await live.start();
   }
 
-  watch([accessToken, () => auth.mustCompleteSecurityQuestions], ([nextToken, onboardingIncomplete]) => {
-    if (!nextToken || onboardingIncomplete) {
-      live.stop();
-      priority.clear();
-      return;
-    }
-    void priority.refresh();
-  });
+  watch([accessToken, () => auth.user?.id ?? null, () => auth.mustCompleteSecurityQuestions],
+    ([nextToken, owner, onboardingIncomplete]) => {
+      const claims = decodeAccessTokenClaims(nextToken);
+      if (!nextToken || !owner || claims?.sub !== owner || onboardingIncomplete) {
+        live.stop();
+        priority.clear();
+        return;
+      }
+      void priority.refresh();
+    });
 
   return {
     status: live.status,
