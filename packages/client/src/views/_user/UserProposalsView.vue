@@ -163,17 +163,17 @@
       </div>
     </div>
 
-    <v-dialog :model-value="confirmAction !== null" max-width="460" persistent @update:model-value="(open: boolean) => { if (!open) confirmAction = null; }">
+    <v-dialog :model-value="confirmAction !== null" max-width="460" scrollable persistent @update:model-value="(open: boolean) => { if (!open) confirmAction = null; }">
       <v-card rounded="xl" class="pa-2">
         <v-card-title>{{ confirmAction === 'accept' ? 'پذیرش مأموریت' : 'رد پیشنهاد' }}</v-card-title>
         <v-card-text>
           <p v-if="confirmAction === 'accept'">با پذیرش این مأموریت، پیشنهادهای دیگر شما خودکار بسته می‌شوند. برای ادامه مطمئن هستید؟</p>
           <template v-else>
             <p class="mb-4">اگر نمی‌توانید این مأموریت را انجام دهید، می‌توانید دلیل کوتاهی ثبت کنید (اختیاری).</p>
-            <v-textarea v-model="declineReason" label="دلیل رد (اختیاری)" :counter="500" maxlength="500" rows="3" auto-grow variant="outlined" />
+            <v-textarea v-model="declineReason" label="دلیل رد (اختیاری)" :counter="500" maxlength="500" rows="3" variant="outlined" />
           </template>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="offer-confirm-actions">
           <v-btn variant="text" :disabled="Boolean(inbox.decidingId)" @click="confirmAction = null">بازگشت</v-btn>
           <v-spacer />
           <v-btn :color="confirmAction === 'accept' ? 'primary' : 'error'" :loading="Boolean(inbox.decidingId)"
@@ -399,6 +399,10 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
   .offer-detail__buttons > * { flex: 1 1 100%; }
   .accepted-map__intro :deep(.v-btn),.offer-detail .offer-detail__locate { max-width: 100%; min-width: 0; min-height: 44px; height: auto; }
   .accepted-map__intro :deep(.v-btn__content),.offer-detail__locate :deep(.v-btn__content) { white-space: normal; text-align: center; }
+  .offer-confirm-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .offer-confirm-actions :deep(.v-spacer) { display: none; }
+  .offer-confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
+  .offer-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 @media (prefers-reduced-motion: reduce) { .offer-card { transition: none; } }
 </style>

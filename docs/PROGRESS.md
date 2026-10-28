@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Rescuer offer confirmation on short/narrow phones (T4.4.1 partial)
+
+- The persistent proposal confirmation did not scroll its content, and its optional 500-character decline reason auto-grew above an unwrapped actions row. On a short or narrow viewport this could make the accept/decline confirmation hard to reach. Its body is now scrollable with a three-row textarea, and phone actions stack as full-width, wrapping 44px-minimum targets. Disabled/loading and decision callbacks remain unchanged. A source-pinned regression failed before the edit; no actual phone, keyboard-open viewport, rendered browser, or site-wide responsive acceptance is claimed. T4.4.1 remains open.
+
 ### 2026-10-28 — Requester rating account/mission boundary fix (T3.7.4 follow-up)
 
 - Switching selected missions while the rating panel stayed mounted left the previous mission's score or drafted comment visible until Vue's deferred watcher ran. A JWT belonging to another requester could also leave the form enabled under the stale displayed account. The rating model now synchronously invalidates form state and in-flight replies on mission, owner, token-loss or JWT session changes and refuses mismatched subjects; same-session bearer renewal keeps the draft and in-flight submit. Focused regressions reproduced three failures before the fix and now cover immediate cleanup, late replies, session mismatch and token renewal. Server ownership remains authoritative; this is not a mounted/browser/VM acceptance run.

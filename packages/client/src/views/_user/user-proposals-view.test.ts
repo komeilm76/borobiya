@@ -43,6 +43,23 @@ describe("rescuer inbox markup and route", () => {
     expect(view).toContain("موقعیت شما فقط با اجازهٔ دستگاه");
   });
 
+  it("keeps proposal confirmation reachable on short and narrow phones", () => {
+    const dialog = view.split('    <v-dialog :model-value="confirmAction !== null"')[1]?.split("    </v-dialog>")[0];
+    expect(dialog).toBeDefined();
+    expect(dialog).toContain('max-width="460" scrollable persistent');
+    expect(dialog).toContain('<v-card-text>');
+    expect(dialog).toContain('<v-textarea v-model="declineReason" label="دلیل رد (اختیاری)" :counter="500" maxlength="500" rows="3" variant="outlined" />');
+    expect(dialog).toContain('<v-card-actions class="offer-confirm-actions">');
+    expect(dialog).toContain(':disabled="Boolean(inbox.decidingId)" @click="confirmAction = null"');
+    expect(dialog).toContain(':loading="Boolean(inbox.decidingId)"');
+    expect(dialog).toContain('@click="submitDecision"');
+    const phone = view.split("@media (max-width: 580px) {")[1]?.split("\n}\n")[0] ?? "";
+    expect(phone).toContain('.offer-confirm-actions { flex-direction: column; align-items: stretch; gap: 8px; }');
+    expect(phone).toContain('.offer-confirm-actions :deep(.v-spacer) { display: none; }');
+    expect(phone).toContain('.offer-confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }');
+    expect(phone).toContain('.offer-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
+  });
+
   it("requires confirmation and discloses other offers will close when one is accepted", () => {
     expect(view).toContain('confirmAction = \'accept\'');
     expect(view).toContain("پیشنهادهای دیگر شما خودکار بسته می‌شوند");
