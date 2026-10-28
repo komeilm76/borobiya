@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, shallowRef, watch } from "vue";
-import { Marker, type Map as MapLibreMap } from "maplibre-gl";
+import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
@@ -83,6 +83,8 @@ const presence = useMissionPresence(computed(() => props.mission.id), computed((
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
 const map = shallowRef<MapLibreMap | null>(null);
+// MapCanvas supplies the constructor after its lazy MapLibre import finishes.
+let markerConstructor: typeof Marker | null = null;
 const hasMarkers = computed(() => Object.values(live.locations.value).some(Boolean));
 const presentRoles = computed(() => Object.keys(live.locations.value).sort().join(","));
 const markers: Partial<Record<"requester" | "rescuer" | "admin", Marker>> = {};
@@ -90,8 +92,8 @@ function syncMarkers() {
   for (const member of live.participantStatus.value) {
     markers[member.role]?.remove();
     delete markers[member.role];
-    if (!map.value || !member.entry) continue;
-    const marker = new Marker({ color: member.role === "rescuer" ? "#16826c" : member.role === "admin" ? "#5555ae" : "#dc593b", scale: member.fresh ? 1 : 0.8 })
+    if (!map.value || !markerConstructor || !member.entry) continue;
+    const marker = new markerConstructor({ color: member.role === "rescuer" ? "#16826c" : member.role === "admin" ? "#5555ae" : "#dc593b", scale: member.fresh ? 1 : 0.8 })
       .setLngLat([member.entry.lon, member.entry.lat]).addTo(map.value);
     marker.getElement().setAttribute("aria-label", `${member.role === "rescuer" ? "امدادگر" : member.role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${member.fresh ? "موقعیت تازه" : "موقعیت قدیمی"}`);
     marker.getElement().style.opacity = member.fresh ? "1" : "0.55";
@@ -105,10 +107,19 @@ function focusMembers() {
   if (camera.kind === "single") map.value.easeTo({ center: camera.center, zoom: camera.zoom, duration: 350 });
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
 }
-function onMapReady(instance: MapLibreMap) { map.value = instance; syncMarkers(); focusMembers(); }
+function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
+  markerConstructor = MarkerClass;
+  map.value = instance;
+  syncMarkers();
+  focusMembers();
+}
 watch(presentRoles, (next, previous) => { if (next !== previous) focusMembers(); });
 watch(() => [live.locations.value, ...live.participantStatus.value.map((member) => member.fresh)], syncMarkers);
-onBeforeUnmount(() => { for (const marker of Object.values(markers)) marker?.remove(); map.value = null; });
+onBeforeUnmount(() => {
+  for (const marker of Object.values(markers)) marker?.remove();
+  map.value = null;
+  markerConstructor = null;
+});
 </script>
 
 <style scoped>

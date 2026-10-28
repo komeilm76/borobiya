@@ -17,6 +17,20 @@ describe("three-role mission live UI (T3.5.7)", () => {
       .toContain("listActiveSosMissions(token, id, true)");
   });
 
+  it("defers MapLibre on the live panel until its canvas is ready, without losing markers", () => {
+    const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
+    const canvas = readFileSync(new URL("../map/MapCanvas.vue", import.meta.url), "utf8");
+    // A value import here pulls MapLibre into requester history even when the panel is hidden.
+    expect(panel).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
+    expect(panel).toContain('import type { Map as MapLibreMap, Marker } from "maplibre-gl"');
+    expect(canvas).toContain('emit("ready", instance, Marker)');
+    expect(panel).toContain('function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker)');
+    expect(panel).toContain('markerConstructor = MarkerClass');
+    expect(panel).toContain('new markerConstructor(');
+    expect(panel).toContain('markers[member.role]?.remove()');
+    expect(panel).toContain('markerConstructor = null');
+  });
+
   it("keeps explicit sharing consent, three markers, last-seen text and an accessible stale badge", () => {
     const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
     expect(panel).toContain('aria-label="نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر"');

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.4 mission live-panel MapLibre startup (partial)
+
+- The live mission panel's runtime `Marker` import pulled MapLibre (~1.09 MB) into the requester SOS history and admin dispatch route graphs even before their canvases mounted; the requester route could load it without an active live mission. `MapCanvas` already emits the marker constructor after its lazy import, so the panel now takes that constructor at ready time and keeps three-role marker creation/removal. A source-pinned regression failed on the original value import; before/after production builds show requester history and admin dispatch no longer statically reference the MapLibre chunk. The rescuer mission route has its own eager import and is not fixed here. This is bundle dependency evidence, **not** measured <2s map paint, <500ms GPS, virtual-scroll or browser/VM acceptance. T4.4.4 remains open.
+
 ### 2026-10-28 — T4.4.3 proposal-card timestamp contrast (partial)
 
 - Audited the rescuer proposal inbox's small timestamp/clock label against its actual light and dark card surfaces. The light primary at 80% opacity blended to 4.31:1 on white, below the 4.5:1 normal-text threshold; 90% yields 5.39:1 light and 6.44:1 dark. A source-pinned compositing test failed before the one-rule change and passes now. This is a CSS-level result, not browser-rendered WCAG AA, keyboard or screen-reader acceptance; T4.4.3 remains open.
