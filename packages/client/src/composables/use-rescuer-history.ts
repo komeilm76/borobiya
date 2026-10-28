@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, type Ref } from "vue";
+import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import { idSchema, type Mission, type MissionDetail } from "@shared/index";
 import { getMission, listRescuerMissions } from "../api/mission";
 import { ApiError } from "../api/http";
@@ -142,6 +142,14 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     linkRetryable.value = false;
     retryId = null;
   }
+  // The route's ordinary watcher reloads on account change, but its default scheduling can leave
+  // private rows visible until the next tick. Invalidate them at the auth boundary itself.
+  watch(token, (next, previous) => {
+    if (!next && previous) reset();
+  }, { flush: "sync" });
+  watch(userId, (next, previous) => {
+    if (next !== previous) reset();
+  }, { flush: "sync" });
   onScopeDispose(reset);
   return { items, selected, requestedId, page, total, totalPages, loading, listVerified, detailLoading, error, detailError, linkError,
     linkRetryable, load, choose, retryDetail, retryLink, reset };

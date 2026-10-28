@@ -220,6 +220,87 @@ describe("rescuer mission history", () => {
     expect(view).toContain('v-if="history.listVerified.value && history.totalPages.value > 1"');
   });
 
+  it("clears private mission rows synchronously on token loss and account switch without a manual reset", async () => {
+    const token = ref<string | null>("token");
+    const user = ref<string | null>(rescuer);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(token, user))!;
+    try {
+      await state.load();
+      expect(state.selected.value?.id).toBe(id);
+      token.value = null;
+      expect(state.items.value).toEqual([]);
+      expect(state.selected.value).toBeNull();
+      expect(state.total.value).toBe(0);
+      expect(state.listVerified.value).toBe(false);
+
+      token.value = "new-token";
+      await state.load();
+      expect(state.items.value).toHaveLength(1);
+      user.value = requester;
+      expect(state.items.value).toEqual([]);
+      expect(state.selected.value).toBeNull();
+      expect(state.total.value).toBe(0);
+      expect(state.listVerified.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps verified rows on a same-account bearer renewal", async () => {
+    const token = ref<string | null>("token");
+    const user = ref<string | null>(rescuer);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(token, user))!;
+    try {
+      await state.load();
+      token.value = "renewed-token";
+      expect(state.items.value).toHaveLength(1);
+      expect(state.selected.value?.id).toBe(id);
+      expect(state.listVerified.value).toBe(true);
+      expect(listRescuerMissions).toHaveBeenCalledTimes(1);
+    } finally { scope.stop(); }
+  });
+
+  it("discards an in-flight list after sign-out without requiring another refresh", async () => {
+    const token = ref<string | null>("token");
+    const user = ref<string | null>(rescuer);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(token, user))!;
+    try {
+      const waiting = pending<{ items: Mission[]; total: number; totalPages: number }>();
+      vi.mocked(listRescuerMissions).mockReturnValueOnce(waiting.promise);
+      const old = state.load();
+      await vi.waitFor(() => expect(listRescuerMissions).toHaveBeenCalledOnce());
+      token.value = null;
+      expect(state.loading.value).toBe(false);
+      waiting.resolve({ items: [mission], total: 1, totalPages: 1 });
+      await old;
+      expect(state.items.value).toEqual([]);
+      expect(state.selected.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
+  it("ignores an in-flight private mission detail after account change", async () => {
+    const token = ref<string | null>("token");
+    const user = ref<string | null>(rescuer);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(token, user))!;
+    try {
+      await state.load();
+      const waiting = pending<MissionDetail>();
+      vi.mocked(getMission).mockReturnValueOnce(waiting.promise);
+      const previousReads = vi.mocked(getMission).mock.calls.length;
+      const old = state.choose(id);
+      await vi.waitFor(() => expect(getMission).toHaveBeenCalledTimes(previousReads + 1));
+      user.value = requester;
+      expect(state.items.value).toEqual([]);
+      expect(state.detailLoading.value).toBe(false);
+      waiting.resolve(detail);
+      await old;
+      expect(state.selected.value).toBeNull();
+      expect(state.detailError.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
   it("clears linked retry and private list metadata on logout", async () => {
     const token = ref<string | null>("token");
     const user = ref<string | null>(rescuer);

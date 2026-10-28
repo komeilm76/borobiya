@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Rescuer history synchronous account privacy boundary (T3.7.1 follow-up)
+
+- The mission-history view's default-scheduled account watcher left the previous rescuer's private list, detail and verified count visible until Vue's next tick after token loss/account switch. The history composable now synchronously resets on token loss or owner change, invalidating late list/detail replies without requiring a new read, while a same-account bearer renewal preserves the current snapshot. Pure composable regressions failed before the fix and now cover immediate clearing, pending responses, owner switches and renewal. No Vue SFC mount or real-browser timing/VM acceptance is claimed.
+
 ### 2026-10-28 — Rescuer mission history unverified counts and retained rows (T4.4.2 bug review)
 
 - The rescuer history page claimed “0 missions” before its first list read succeeded and kept a cached count and pagination looking current after a failed refresh. It now verifies the count and empty state only after a successful list read, labels retained rows as potentially stale while refreshing or failed, hides unverified pagination, and keeps retry plus selected details available. Pure composable and source-pinned regressions failed before the fix and now cover first failure, pending refresh, refresh failure, recovery, and reset. No Vue SFC was mounted; real browser/device feedback acceptance and the broader T4.4.2 audit remain open.
