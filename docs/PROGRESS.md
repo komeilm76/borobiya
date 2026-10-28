@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Completed-mission rating keyboard semantics (T4.4.3 partial)
+
+- The star picker represented one score as five independently pressed buttons, adding five keyboard Tab stops without native radio arrow-key selection. Its stars are now labels for an instance-unique native radio group with a fieldset/legend, accessible score names and a visible focus ring. The 48px targets, disabled-on-submit behavior and existing score validation are preserved. Source-pinned regressions failed before the edit and typechecks/build validate the template; this is not a mounted Vue, browser, screen-reader, or site-wide WCAG AA sign-off. T4.4.3 remains open.
+
 ### 2026-10-28 — Mission presence account/session boundary fix (T4.3.3 follow-up)
 
 - A mounted mission panel could show the previous mission/account's private online badge until Vue's deferred watcher ran; it also polled under a JWT subject that did not match the displayed owner and restarted its poll on a same-session bearer renewal. The presence model now synchronously clears/aborts on mission, account, token-loss or JWT session changes, refuses a mismatched bearer and retains its snapshot/poll timer on ordinary renewal. Injected-read regressions failed before the fix and now cover immediate cleanup, late replies, subject gating, session switches and same-session rotation. Server authorization is unchanged, and these are not rendered browser/VM acceptance tests.
