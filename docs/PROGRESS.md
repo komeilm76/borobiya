@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Requester SOS history synchronous account boundary (T3.7.1 follow-up)
+
+- A mounted requester history could keep the previous account's private requests, selected case, count and cancellation confirmation until the view's deferred auth watcher ran. The history composable now resets synchronously on token loss or owner change, invalidating pending list replies and cancellation state; the view's owner watcher also clears its mission/photo state in the same turn. Same-account bearer renewal preserves the current snapshot. Pure deferred/composable and source-pinned regressions failed before the fix. No Vue SFC was mounted or live browser/VM privacy timing verified.
+
 ### 2026-10-28 — Short-viewport share revoke confirmation (T4.4.1 partial)
 
 - The live/history revoke confirmation did not scroll its content and kept a one-line footer; on a short or narrow phone, a long recipient label and privacy warning could push Back/Confirm beyond reach. The confirmation body now scrolls, long text wraps, and phone actions stack as full-width wrapping 44px-minimum targets. Existing disabled/loading and server-acknowledged revoke wiring are unchanged. A source-pinned regression failed before the change; this does not establish rendered phone/keyboard, screen-reader, or site-wide responsive acceptance. T4.4.1 remains open.

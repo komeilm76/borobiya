@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import { idSchema, type SosRequest } from "@shared/index";
 import { ApiError } from "../api/http";
 import { getRequesterSosRequest, listRequesterSosHistory } from "../api/sos-history";
@@ -120,6 +120,15 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
     retryId = null;
     cancellation.reset();
   }
+
+  // The view reloads when the account changes, but its ordinary watcher runs on the next tick.
+  // Private requests and cancellation state must disappear synchronously at the auth boundary.
+  watch(token, (next, previous) => {
+    if (!next && previous) reset();
+  }, { flush: "sync" });
+  watch(userId, (next, previous) => {
+    if (next !== previous) reset();
+  }, { flush: "sync" });
 
   return { items, selected, page, total, totalPages, loading, error, listVerified, linkError, linkRetryable, cancellation,
     canCancelSelected, load, retryLink, choose, markCancelled, reset };

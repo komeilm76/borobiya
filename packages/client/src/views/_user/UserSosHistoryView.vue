@@ -205,7 +205,7 @@ async function loadPhoto() {
   }
 }
 onMounted(() => { void history.load(1, typeof route.query.request === "string" ? route.query.request : undefined); });
-watch(() => auth.user?.id, () => { ++missionGeneration; selectedMissions.value = []; timelineMissionId.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); });
+watch(() => auth.user?.id, () => { ++missionGeneration; selectedMissions.value = []; timelineMissionId.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); }, { flush: "sync" });
 watch(() => history.selected.value?.id, () => { clearPhoto(); void loadSelectedMission(); });
 watch(() => [history.selected.value?.status, auth.accessToken] as const, () => { void loadSelectedMission(); });
 watch(() => history.cancellation.cancelled.value, (value) => { if (value) history.markCancelled(); });

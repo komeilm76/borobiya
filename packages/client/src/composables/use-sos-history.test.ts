@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { ref } from "vue";
+import { effectScope, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SosRequest } from "@shared/index";
 import { getRequesterSosRequest, listRequesterSosHistory } from "../api/sos-history";
@@ -153,6 +153,59 @@ describe("requester SOS history and cancellation", () => {
     expect(unavailable.selected.value?.id).toBe(olderId);
     expect(unavailable.linkError.value).toBeNull();
     expect(unavailable.linkRetryable.value).toBe(false);
+  });
+
+  it("immediately drops private requester history and cancellation state when auth changes", async () => {
+    const token = ref<string | null>("token");
+    const userId = ref<string | null>(requesterId);
+    const scope = effectScope();
+    const history = scope.run(() => useSosHistory(token, userId))!;
+    try {
+      await history.load();
+      expect(history.selected.value?.id).toBe(requestId);
+      history.cancellation.open.value = true;
+      token.value = "same-account-renewal";
+      expect(history.selected.value?.id).toBe(requestId);
+      expect(history.listVerified.value).toBe(true);
+      token.value = null;
+      expect(history.items.value).toEqual([]);
+      expect(history.selected.value).toBeNull();
+      expect(history.total.value).toBe(0);
+      expect(history.listVerified.value).toBe(false);
+      expect(history.cancellation.open.value).toBe(false);
+
+      token.value = "new-account-token";
+      await history.load();
+      expect(history.items.value).toHaveLength(1);
+      userId.value = olderId;
+      expect(history.items.value).toEqual([]);
+      expect(history.selected.value).toBeNull();
+      expect(history.total.value).toBe(0);
+    } finally { scope.stop(); }
+  });
+
+  it("invalidates a pending list when the bearer disappears without an explicit reset", async () => {
+    const token = ref<string | null>("token");
+    const userId = ref<string | null>(requesterId);
+    const scope = effectScope();
+    const history = scope.run(() => useSosHistory(token, userId))!;
+    try {
+      const waiting = pending<{ items: SosRequest[]; total: number; page: number; limit: number; totalPages: number }>();
+      vi.mocked(listRequesterSosHistory).mockReturnValueOnce(waiting.promise);
+      const oldRead = history.load();
+      await vi.waitFor(() => expect(listRequesterSosHistory).toHaveBeenCalledOnce());
+      token.value = null;
+      expect(history.loading.value).toBe(false);
+      waiting.resolve({ items: [record], total: 1, page: 1, limit: 12, totalPages: 1 });
+      await oldRead;
+      expect(history.items.value).toEqual([]);
+      expect(history.selected.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
+  it("clears the view's other private mission and photo state in the same auth turn", () => {
+    const view = readFileSync(new URL("../views/_user/UserSosHistoryView.vue", import.meta.url), "utf8");
+    expect(view).toContain('watch(() => auth.user?.id, () => { ++missionGeneration; selectedMissions.value = []; timelineMissionId.value = null; clearPhoto(); history.reset(); if (auth.user?.id) void history.load(); }, { flush: "sync" });');
   });
 
   it("clears the linked retry and all private list metadata on a missing session", async () => {
