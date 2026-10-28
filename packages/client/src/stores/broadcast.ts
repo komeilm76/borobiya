@@ -2,6 +2,7 @@ import { computed, watch } from "vue";
 import { defineStore } from "pinia";
 import { describeBroadcastState } from "@/live/broadcast-status";
 import { useLiveLocationBroadcast } from "@/composables/useLiveLocationBroadcast";
+import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import { usePriorityDevice } from "@/composables/use-priority-device";
 import { useAuthStore } from "./auth";
 
@@ -18,6 +19,7 @@ export const useBroadcastStore = defineStore("broadcast", () => {
 
   const live = useLiveLocationBroadcast({
     accessToken,
+    ownerId: computed(() => auth.user?.id ?? null),
     ensureSession: () => auth.refreshSession()
   });
   const priority = usePriorityDevice({
@@ -49,7 +51,15 @@ export const useBroadcastStore = defineStore("broadcast", () => {
       live.stop();
       return;
     }
+    const owner = auth.user?.id;
+    const session = decodeAccessTokenClaims(auth.accessToken)?.sessionId;
+    if (!owner || !session || auth.mustCompleteSecurityQuestions) return;
     await priority.refresh();
+    const current = decodeAccessTokenClaims(auth.accessToken);
+    // Refreshing the access token for this same session is fine. An old tap must
+    // not start B's GPS after the priority read begun by A finally returns.
+    if (auth.user?.id !== owner || current?.sub !== owner || current.sessionId !== session ||
+      auth.mustCompleteSecurityQuestions) return;
     await live.start();
   }
 

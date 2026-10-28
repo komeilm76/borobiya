@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { RealtimeClient } from "@/services/socket";
 import { useLiveLocationBroadcast } from "./useLiveLocationBroadcast";
 
-function makeJwt(deviceId: string, expSeconds = 9999999999): string {
+function makeJwt(deviceId: string, expSeconds = 9999999999, owner = "user-1"): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(
-    JSON.stringify({ sub: "user-1", deviceId, role: "user", exp: expSeconds })
+    JSON.stringify({ sub: owner, deviceId, role: "user", exp: expSeconds })
   ).toString("base64url");
   return `${header}.${payload}.sig`;
 }
@@ -71,6 +71,151 @@ async function flush(): Promise<void> {
 }
 
 describe("useLiveLocationBroadcast", () => {
+  it("does not start GPS after Stop cancels a pending session recovery", async () => {
+    const token = ref<string | null>(null);
+    const ownerId = ref<string | null>("user-1");
+    let finishSession!: () => void;
+    const gate = new Promise<void>((resolve) => { finishSession = resolve; });
+    const resume = vi.fn();
+    const transport = makeFakeSocket();
+    const openSocket = vi.fn(() => transport.client);
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId, ensureSession: () => gate,
+      geolocation: { coords: ref(null), isSupported: ref(true), resume, pause: vi.fn() }, openSocket
+    }))!;
+    try {
+      const starting = api.start();
+      api.stop();
+      token.value = makeJwt("device-alpha");
+      finishSession();
+      await starting;
+      await flush();
+      expect(api.status.value).toBe("stopped");
+      expect(resume).not.toHaveBeenCalled();
+      expect(openSocket).not.toHaveBeenCalled();
+    } finally { finishSession(); scope.stop(); }
+  });
+
+  it("locks double Start while waiting for session recovery", async () => {
+    const token = ref<string | null>(null);
+    const ownerId = ref<string | null>("user-1");
+    let finishSession!: () => void;
+    const gate = new Promise<void>((resolve) => { finishSession = resolve; });
+    const ensureSession = vi.fn(() => gate);
+    const resume = vi.fn();
+    const transport = makeFakeSocket();
+    const openSocket = vi.fn(() => transport.client);
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId, ensureSession,
+      geolocation: { coords: ref(null), isSupported: ref(true), resume, pause: vi.fn() }, openSocket
+    }))!;
+    try {
+      const first = api.start();
+      const second = api.start();
+      token.value = makeJwt("device-alpha");
+      finishSession();
+      await Promise.all([first, second]);
+      await flush();
+      expect(ensureSession).toHaveBeenCalledOnce();
+      expect(resume).toHaveBeenCalledOnce();
+      expect(openSocket).toHaveBeenCalledOnce();
+    } finally { finishSession(); scope.stop(); }
+  });
+
+  it("closes a socket opened after Stop while a connection was pending", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const ownerId = ref<string | null>("user-1");
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    let finishOpen!: (client: RealtimeClient) => void;
+    const pendingOpen = new Promise<RealtimeClient>((resolve) => { finishOpen = resolve; });
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket: () => pendingOpen
+    }))!;
+    try {
+      const starting = api.start();
+      expect(api.status.value).toBe("connecting");
+      api.stop();
+      finishOpen(transport.client);
+      await starting;
+      expect(transport.closeCalls).toBe(1);
+      expect(transport.connectCalls).toBe(0);
+      expect(api.status.value).toBe("stopped");
+      expect(pause).toHaveBeenCalled();
+    } finally { finishOpen(transport.client); scope.stop(); }
+  });
+
+  it("stops GPS and closes the old room synchronously on owner change, without auto-resuming", async () => {
+    const ownerId = ref<string | null>("user-1");
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords, isSupported: ref(true), pause }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      expect(api.status.value).toBe("broadcasting");
+      ownerId.value = "user-2";
+      expect(api.status.value).not.toBe("broadcasting");
+      expect(pause).toHaveBeenCalled();
+      expect(transport.closeCalls).toBe(1);
+      token.value = makeJwt("device-beta", 9999999999, "user-2");
+      await flush();
+      expect(api.status.value).not.toBe("broadcasting");
+      expect(transport.emitted).toHaveLength(1);
+    } finally { scope.stop(); }
+  });
+
+  it("does not broadcast account A's GPS fix when B's bearer arrives before B's profile", async () => {
+    const ownerId = ref<string | null>("user-1");
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords, isSupported: ref(true), pause }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      token.value = makeJwt("device-beta", 9999999999, "user-2");
+      expect(api.status.value).not.toBe("broadcasting");
+      expect(pause).toHaveBeenCalled();
+      expect(transport.closeCalls).toBe(1);
+      ownerId.value = "user-2";
+      await flush();
+      expect(api.status.value).not.toBe("broadcasting"); // new consent required
+    } finally { scope.stop(); }
+  });
+
+  it("keeps explicit GPS consent through a same-owner access-token renewal", async () => {
+    const ownerId = ref<string | null>("user-1");
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      token.value = makeJwt("device-alpha", 9999999998);
+      expect(api.status.value).toBe("broadcasting");
+      expect(transport.closeCalls).toBe(0);
+      expect(pause).not.toHaveBeenCalled();
+    } finally { scope.stop(); }
+  });
+
   it("starts GPS only on start(), keeps stationary users alive past 60s, and pauses GPS on stop()", async () => {
     vi.useFakeTimers();
     let now = 1_700_000_000_000;
@@ -85,6 +230,7 @@ describe("useLiveLocationBroadcast", () => {
     const api = scope.run(() =>
       useLiveLocationBroadcast({
         accessToken: token,
+        ownerId: ref("user-1"),
         geolocation: { coords, error, isSupported: ref(true), resume, pause },
         openSocket: () => transport.client,
         now: () => now,
@@ -137,6 +283,7 @@ describe("useLiveLocationBroadcast", () => {
     const scope = effectScope();
     const api = scope.run(() => useLiveLocationBroadcast({
       accessToken: token,
+        ownerId: ref("user-1"),
       geolocation: { coords, isSupported: ref(true), pause },
       openSocket: () => transport.client,
       now: () => now,
@@ -195,6 +342,7 @@ describe("useLiveLocationBroadcast", () => {
     const scope = effectScope();
     const api = scope.run(() => useLiveLocationBroadcast({
       accessToken: token,
+        ownerId: ref("user-1"),
       ensureSession,
       geolocation: { coords, isSupported: ref(true) },
       openSocket: () => transport.client
@@ -248,6 +396,7 @@ describe("useLiveLocationBroadcast", () => {
     const api = scope.run(() =>
       useLiveLocationBroadcast({
         accessToken: token,
+        ownerId: ref("user-1"),
         ensureSession,
         geolocation: { coords, isSupported: ref(true) },
         openSocket: () => transport.client
@@ -274,6 +423,7 @@ describe("useLiveLocationBroadcast", () => {
     const api = scope.run(() =>
       useLiveLocationBroadcast({
         accessToken: token,
+        ownerId: ref("user-1"),
         geolocation: { coords, error, isSupported: ref(true), pause },
         openSocket: () => transport.client
       })

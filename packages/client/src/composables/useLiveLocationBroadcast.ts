@@ -8,7 +8,7 @@ import {
   describeAck,
   shouldSendUpdate
 } from "./location-broadcast";
-import { ownDeviceId } from "./device-identity";
+import { decodeAccessTokenClaims, ownDeviceId } from "./device-identity";
 
 export type BroadcastStatus = "idle" | "connecting" | "broadcasting" | "stopped" | "rejected";
 
@@ -25,6 +25,7 @@ export interface BroadcastGeolocationSource {
 }
 
 export interface UseLiveLocationBroadcastOptions {
+  ownerId: Ref<string | null> | ComputedRef<string | null>;
   accessToken?: Ref<string | null> | ComputedRef<string | null>;
   /** Refreshes an expired access token via the HttpOnly refresh cookie when a socket auth check fails. */
   ensureSession?: () => Promise<unknown>;
@@ -44,7 +45,7 @@ function geolocationErrorCode(error: { readonly code?: number } | null | undefin
  * Socket.IO connection, a throttled `location:update` every 3-5s, hardware GPS start/stop symmetry,
  * stationary heartbeat keepalive, and automatic access-token refresh on 15m JWT expiry.
  */
-export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOptions = {}) {
+export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOptions) {
   const auth = options.accessToken ? null : useAuthStore();
   const accessToken = options.accessToken ?? computed(() => auth!.accessToken);
   const ensureSession = options.ensureSession ?? (auth ? () => auth.refreshSession() : undefined);
@@ -84,6 +85,12 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     return accessToken.value;
   }
 
+  function belongsToOwner(token: string | null, owner: string | null): boolean {
+    // Only suppress broadcasting on inconsistent local state. The server still
+    // verifies the JWT, session, device priority, and each share's permissions.
+    return !!token && !!owner && decodeAccessTokenClaims(token)?.sub === owner;
+  }
+
   function clearTicker(): void {
     if (ticker !== null) {
       clearInterval(ticker);
@@ -96,16 +103,17 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     const recoveringClient = client;
     const recoveringGeneration = generation;
     const recoveringAttempt = broadcastAttempt;
+    const owner = options.ownerId.value;
     const previousToken = requireToken();
     refreshingAuth = true;
     try {
       await ensureSession();
       // A slow refresh must not reconnect a socket after Stop, logout, or a new Start.
       if (client !== recoveringClient || generation !== recoveringGeneration ||
-        broadcastAttempt !== recoveringAttempt ||
+        broadcastAttempt !== recoveringAttempt || options.ownerId.value !== owner ||
         (status.value !== "connecting" && status.value !== "broadcasting")) return false;
       const nextToken = requireToken();
-      if (!nextToken || nextToken === previousToken) return false;
+      if (!nextToken || !belongsToOwner(nextToken, owner) || nextToken === previousToken) return false;
       if (client) {
         status.value = "connecting";
         client.updateToken(nextToken);
@@ -160,17 +168,21 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   async function ensureClient(): Promise<RealtimeClient | null> {
     const token = requireToken();
-    if (!token) return null;
+    const owner = options.ownerId.value;
+    if (!token || !belongsToOwner(token, owner)) return null;
     if (client) {
       client.updateToken(token);
       return client;
     }
     const currentGeneration = ++generation;
     const opened = await openSocket(token);
-    if (currentGeneration !== generation) {
+    const currentToken = requireToken();
+    if (currentGeneration !== generation || options.ownerId.value !== owner ||
+      !belongsToOwner(currentToken, owner)) {
       opened.close();
       return null;
     }
+    opened.updateToken(currentToken!);
     client = opened;
     client.socket.on("connect", onConnect);
     client.socket.on("disconnect", onDisconnect);
@@ -180,7 +192,8 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   function sendPendingUpdate(): void {
     const activeClient = client;
-    if (!activeClient?.socket.connected) return;
+    if (status.value !== "broadcasting" || !activeClient?.socket.connected ||
+      !belongsToOwner(requireToken(), options.ownerId.value)) return;
     if (geolocation.error?.value) return;
 
     const currentNow = clock();
@@ -208,8 +221,10 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
     const attempt = broadcastAttempt;
     const sentToken = requireToken();
+    const owner = options.ownerId.value;
     const stillCurrent = () => attempt === broadcastAttempt && client === activeClient &&
-      status.value === "broadcasting" && !!sentToken && requireToken() === sentToken;
+      status.value === "broadcasting" && owner === options.ownerId.value &&
+      !!sentToken && requireToken() === sentToken;
     activeClient.socket.timeout(5_000).emit(LOCATION_UPDATE_EVENT, payload, async (error: Error | null, ack: unknown) => {
       if (!stillCurrent()) return;
       const outcome = error ? { ok: false, code: "SOCKET_TIMEOUT" } : describeAck(ack);
@@ -237,6 +252,10 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       lastErrorCode.value = "GEOLOCATION_UNAVAILABLE";
       return;
     }
+    const owner = options.ownerId.value;
+    const attempt = ++broadcastAttempt; // lock before awaiting session recovery
+    status.value = "connecting";
+    lastErrorCode.value = null;
     let token = requireToken();
     if (!token && ensureSession) {
       try {
@@ -246,21 +265,20 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       }
       token = requireToken();
     }
-    if (!token) {
+    if (attempt !== broadcastAttempt || status.value !== "connecting" || options.ownerId.value !== owner) return;
+    if (!belongsToOwner(token, owner)) {
       status.value = "rejected";
       lastErrorCode.value = "UNAUTHORIZED";
       return;
     }
 
-    broadcastAttempt++;
-    lastErrorCode.value = null;
     hasLiveFix = geolocation.coords.value !== null && Number.isFinite(geolocation.coords.value.latitude);
     if (hasLiveFix && sampledAt.value === null) sampledAt.value = clock();
-    status.value = "connecting";
     geolocation.resume?.();
     ticker ??= setInterval(sendPendingUpdate, intervalMs);
 
     const activeClient = await ensureClient();
+    if (attempt !== broadcastAttempt || options.ownerId.value !== owner) return;
     if (!activeClient) {
       if (status.value === "connecting") {
         clearTicker();
@@ -281,6 +299,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   function stop(): void {
     broadcastAttempt++;
+    generation++; // a socket opened for a cancelled start must not attach later
     clearTicker();
     hasLiveFix = false;
     geolocation.pause?.();
@@ -292,25 +311,31 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     else void start();
   }
 
-  watch(
-    () => accessToken.value,
-    (token) => {
-      if (!token) {
-        stop();
-        status.value = "idle";
-        lastErrorCode.value = null;
-        lastSentAt.value = null;
-        peerCount.value = 0;
-        sampledAt.value = null;
-        teardownClient();
-        return;
-      }
-      client?.updateToken(token);
-      if ((status.value === "connecting" || status.value === "broadcasting") && client && !client.socket.connected) {
-        client.connect();
-      }
+  function clearSessionBroadcast(): void {
+    stop();
+    status.value = "idle";
+    lastErrorCode.value = null;
+    lastSentAt.value = null;
+    peerCount.value = 0;
+    sampledAt.value = null;
+    teardownClient();
+  }
+
+  watch(options.ownerId, () => {
+    // An account can change without a token-null render (e.g. another tab's cookie).
+    // Consent and GPS coordinates from the previous owner must not follow it.
+    clearSessionBroadcast();
+  }, { flush: "sync" });
+  watch(accessToken, (token) => {
+    if (!belongsToOwner(token, options.ownerId.value)) {
+      clearSessionBroadcast();
+      return;
     }
-  );
+    client?.updateToken(token!);
+    if ((status.value === "connecting" || status.value === "broadcasting") && client && !client.socket.connected) {
+      client.connect();
+    }
+  }, { flush: "sync" });
 
   watch(
     () => geolocation.coords.value,
@@ -340,9 +365,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   }
 
   onScopeDispose(() => {
-    clearTicker();
-    hasLiveFix = false;
-    geolocation.pause?.();
+    stop();
     teardownClient();
   });
 

@@ -158,6 +158,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     const broadcast = scope.run(() =>
       useLiveLocationBroadcast({
         accessToken: currentToken,
+        ownerId: ref("11111111-1111-4111-8111-111111111111"),
         ensureSession: async () => {
           currentToken.value = makeJwt("device-alpha", 1800);
         },

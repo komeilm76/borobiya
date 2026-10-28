@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Live-broadcast consent and account-boundary bug (T2.1.5 follow-up)
+
+- Starting a location broadcast did not lock until after session recovery: a second tap duplicated the attempt, while Stop during the wait could still wake GPS and connect later. The app-scoped store had an earlier priority-device read, so an old account's Start tap could also cross into a new account/session before reaching the composable. The broadcaster now locks before awaiting, discards pending starts and socket opens after Stop/disposal, and synchronously stops GPS/closes the socket if the authenticated owner or JWT subject changes. The store checks owner and session ID again after the priority read; a normal token renewal within the same session preserves explicit consent. Deferred composable regressions reproduced cancelled/duplicate starts and owner transitions before the fix; Pinia regressions cover the priority-read handoff and a source-pinned check guards production owner wiring. This is not live P2-A1 two-browser/VM acceptance; the server remains authoritative for JWT, device and share authorization.
+
 ### 2026-10-28 — Live-companion account-boundary privacy bug (T2.1.8 follow-up)
 
 - The live-companion receiver only watched the access token. A mounted map could keep showing account A's private peer locations and remain subscribed to A's socket when account B replaced the authenticated profile, including during a cross-tab refresh-cookie switch; sign-out clearing was deferred to Vue's watcher tick. It now requires the current owner, clears coordinates/count and closes the socket synchronously on owner change or token loss, ignores old reads/opens/reconnects, and defers new owner reads until the production JWT subject matches the loaded profile. The decoded subject only prevents an inconsistent UI; the server still verifies the token and share authorization. Deferred tests reproduced old-coordinate exposure and stale socket timing before the fix and now cover late responses, token-before-profile order, same-owner token rotation and unmount. These are injected client tests, not P2-A1's target-VM/two-browser acceptance.
