@@ -69,6 +69,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const photoUploadedUrl = ref<string | null>(null);
   const awaitingPhotoRetry = ref(false);
   let gpsRequestId = 0;
+  let catalogVersion = 0;
   let operationGeneration = 0;
   const isCurrent = (owner: string, operation: number) =>
     operation === operationGeneration && options.ownerId.value === owner;
@@ -99,21 +100,24 @@ export function useSosRequest(options: UseSosRequestOptions) {
   const isCompleted = computed(() => createdRequestId.value !== null && !submitting.value && !awaitingPhotoRetry.value);
 
   async function loadCatalog(): Promise<void> {
+    const version = ++catalogVersion;
     loadingCatalog.value = true;
     catalogError.value = null;
     try {
       const types = await listSosIncidentTypes();
+      if (version !== catalogVersion) return;
       incidentTypes.value = types;
       if (!incidentTypeId.value && types.length > 0) {
         incidentTypeId.value = types[0]!.id;
       }
     } catch (error) {
+      if (version !== catalogVersion) return;
       catalogError.value = sosApiErrorMessage(
         error,
         "دریافت فهرست نوع حوادث انجام نشد؛ دوباره تلاش کنید."
       );
     } finally {
-      loadingCatalog.value = false;
+      if (version === catalogVersion) loadingCatalog.value = false;
     }
   }
 

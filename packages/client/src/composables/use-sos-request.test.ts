@@ -6,7 +6,14 @@ import * as sosApi from "@/api/sos";
 import { useSosRequest, type GeolocationProvider } from "./use-sos-request";
 
 const INCIDENT_A = "11111111-1111-4111-8111-111111111111";
+const INCIDENT_B = "33333333-3333-4333-8333-333333333333";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
+
+function catalogRow(id: string) {
+  return { id, name: id === INCIDENT_A ? "امداد جاده‌ای" : "امداد کوهستان",
+    slug: id === INCIDENT_A ? "road-rescue" : "mountain-rescue", icon: null, color: "#dc2626",
+    description: null, createdAt: "2026-10-23T00:00:00Z" };
+}
 
 describe("useSosRequest composable", () => {
   beforeEach(() => {
@@ -17,6 +24,62 @@ describe("useSosRequest composable", () => {
     const source = readFileSync(new URL("../components/sos/SosRequestSheet.vue", import.meta.url), "utf8");
     expect(source).toContain("ownerId: computed(() => auth.user?.id ?? null)");
     expect(source).toContain("accessToken: computed(() => auth.accessToken)");
+  });
+
+  it("does not replace a newer incident catalog with an older response", async () => {
+    let releaseOld!: (rows: ReturnType<typeof catalogRow>[]) => void;
+    const oldReply = new Promise<ReturnType<typeof catalogRow>[]>((resolve) => { releaseOld = resolve; });
+    const read = vi.spyOn(sosApi, "listSosIncidentTypes")
+      .mockReturnValueOnce(oldReply).mockResolvedValueOnce([catalogRow(INCIDENT_B)]);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok") });
+
+    const older = sos.loadCatalog();
+    const newer = sos.loadCatalog();
+    await newer;
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(sos.incidentTypes.value.map((row) => row.id)).toEqual([INCIDENT_B]);
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
+    releaseOld([catalogRow(INCIDENT_A)]);
+    await older;
+    expect(sos.incidentTypes.value.map((row) => row.id)).toEqual([INCIDENT_B]);
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
+    expect(sos.loadingCatalog.value).toBe(false);
+  });
+
+  it("does not show an old catalog failure after a newer retry succeeded", async () => {
+    let rejectOld!: (reason: Error) => void;
+    const oldReply = new Promise<ReturnType<typeof catalogRow>[]>((_resolve, reject) => { rejectOld = reject; });
+    vi.spyOn(sosApi, "listSosIncidentTypes")
+      .mockReturnValueOnce(oldReply).mockResolvedValueOnce([catalogRow(INCIDENT_B)]);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok") });
+
+    const older = sos.loadCatalog();
+    await sos.loadCatalog();
+    rejectOld(new Error("old offline error"));
+    await older;
+    expect(sos.incidentTypes.value.map((row) => row.id)).toEqual([INCIDENT_B]);
+    expect(sos.catalogError.value).toBeNull();
+    expect(sos.loadingCatalog.value).toBe(false);
+  });
+
+  it("keeps the catalog loading until the latest read settles", async () => {
+    let releaseOld!: (rows: ReturnType<typeof catalogRow>[]) => void;
+    let releaseNew!: (rows: ReturnType<typeof catalogRow>[]) => void;
+    const oldReply = new Promise<ReturnType<typeof catalogRow>[]>((resolve) => { releaseOld = resolve; });
+    const newReply = new Promise<ReturnType<typeof catalogRow>[]>((resolve) => { releaseNew = resolve; });
+    vi.spyOn(sosApi, "listSosIncidentTypes").mockReturnValueOnce(oldReply).mockReturnValueOnce(newReply);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok") });
+
+    const older = sos.loadCatalog();
+    const newer = sos.loadCatalog();
+    releaseOld([catalogRow(INCIDENT_A)]);
+    await older;
+    expect(sos.loadingCatalog.value).toBe(true);
+    expect(sos.incidentTypes.value).toEqual([]);
+    releaseNew([catalogRow(INCIDENT_B)]);
+    await newer;
+    expect(sos.loadingCatalog.value).toBe(false);
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
   });
 
   it("loads incident catalog and GPS fix on open, then submits SOS without photo", async () => {

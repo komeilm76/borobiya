@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — SOS incident catalog retry race (T3.2.4 follow-up)
+
+- When the incident-type catalog loader was called again before an earlier read settled, an older reply could replace the latest picker list or show an error after a newer successful read. The loader now applies success, failure and loading completion only for its latest request. Deferred-response tests reproduced both composable races before the fix and verify that an older reply cannot mark a newer pending read as finished. The current sheet normally hides Retry while loading; these tests do not establish a reproduced browser double-click. The public catalog API and live/browser SOS acceptance are unchanged.
+
 ### 2026-10-28 — T4.4.3 SOS severity keyboard semantics (partial)
 
 - The severity cards in the SOS form advertised ARIA radios but were plain buttons, so their keyboard interaction did not follow radio-group conventions. The form now uses a named native radio group in a fieldset with a legend, preserving the same card labels and selected state, disabling choices during submission and outlining the focused card. A source-pinned regression failed before the change; client typecheck/build and unit checks cover the markup but not rendered keyboard or screen-reader behavior. Site-wide WCAG AA and device/browser acceptance remain open.
