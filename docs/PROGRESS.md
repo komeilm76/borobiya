@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — SOS GPS setup exception fallback (T3.2.4 follow-up)
+
+- A synchronous exception while obtaining the geolocation provider or starting `getCurrentPosition()` escaped the SOS sheet's GPS request; the latter also left its locating indicator stuck instead of offering manual incident placement. Both paths now settle locating and show a manual map/coordinate fallback without discarding the draft. Pure composable regressions reproduced the thrown-provider and thrown-watch cases before the fix and confirm manual selection still works. No Vue SFC was mounted or browser/device permission-policy acceptance performed.
+
 ### 2026-10-28 — Active-device priority write serialization (T2.3.5 follow-up)
 
 - Single-share and bulk priority changes only marked themselves busy **after** awaiting session recovery. Rapid taps could send contradictory `POST /_user/location/share` writes for the same share, with response order overriding the user's intended device; a bulk change could overlap a row change as well. A shared panel-wide write guard now locks before the first await, stays active through the post-write refresh, refuses competing row/bulk/current-device edits, and releases only the same session's lock. Controls reflect the lock. Deferred-session regressions failed before the fix and now verify one write sequence at a time. No Vue SFC was mounted or live multi-device/browser acceptance performed; P2-A1 and the broader T4.4.2 feedback audit remain open.

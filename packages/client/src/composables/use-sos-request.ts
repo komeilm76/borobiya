@@ -124,7 +124,13 @@ export function useSosRequest(options: UseSosRequestOptions) {
   function requestGpsLocation(): void {
     if (submitting.value) return;
     const currentGpsRequest = ++gpsRequestId;
-    const provider = (options.geolocation ?? defaultGeolocation)();
+    let provider: GeolocationProvider | null;
+    try {
+      provider = (options.geolocation ?? defaultGeolocation)();
+    } catch {
+      // A native bridge or browser policy can fail before it returns a provider.
+      provider = null;
+    }
     if (!provider) {
       locating.value = false;
       locationHint.value =
@@ -134,27 +140,34 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
     locating.value = true;
     locationHint.value = null;
-    provider.getCurrentPosition(
-      (position) => {
-        if (currentGpsRequest !== gpsRequestId) return;
-        locating.value = false;
-        const resolved = gpsLocationDraft(position.coords);
-        if (!resolved) {
-          locationHint.value = "موقعیت GPS معتبر نبود؛ نقطهٔ حادثه را روی نقشه انتخاب کنید.";
-          return;
-        }
-        location.value = resolved;
-        latInput.value = String(resolved.lat);
-        lonInput.value = String(resolved.lon);
-      },
-      () => {
-        if (currentGpsRequest !== gpsRequestId) return;
-        locating.value = false;
-        locationHint.value =
-          "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
-      },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 15_000 }
-    );
+    try {
+      provider.getCurrentPosition(
+        (position) => {
+          if (currentGpsRequest !== gpsRequestId) return;
+          locating.value = false;
+          const resolved = gpsLocationDraft(position.coords);
+          if (!resolved) {
+            locationHint.value = "موقعیت GPS معتبر نبود؛ نقطهٔ حادثه را روی نقشه انتخاب کنید.";
+            return;
+          }
+          location.value = resolved;
+          latInput.value = String(resolved.lat);
+          lonInput.value = String(resolved.lon);
+        },
+        () => {
+          if (currentGpsRequest !== gpsRequestId) return;
+          locating.value = false;
+          locationHint.value =
+            "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
+        },
+        { enableHighAccuracy: true, timeout: 10_000, maximumAge: 15_000 }
+      );
+    } catch {
+      if (currentGpsRequest !== gpsRequestId) return;
+      locating.value = false;
+      locationHint.value =
+        "دریافت خودکار موقعیت انجام نشد؛ لطفاً محل دقیق حادثه را روی نقشه لمس کنید یا مختصات را وارد کنید.";
+    }
   }
 
   function setManualLocation(lat: number, lon: number): boolean {

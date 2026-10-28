@@ -82,6 +82,20 @@ describe("useSosRequest composable", () => {
     expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
   });
 
+  it("recovers from synchronous GPS setup failures and still accepts manual incident coordinates", () => {
+    for (const geolocation of [
+      () => { throw new Error("Geolocation policy blocked access"); },
+      () => ({ getCurrentPosition: () => { throw new Error("GPS bridge failed"); } })
+    ]) {
+      const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok"), geolocation });
+      expect(() => sos.requestGpsLocation()).not.toThrow();
+      expect(sos.locating.value).toBe(false);
+      expect(sos.locationHint.value).toContain("نقشه");
+      expect(sos.setManualLocation(35.7, 51.4)).toBe(true);
+      expect(sos.location.value).toEqual({ lat: 35.7, lon: 51.4, isManual: true });
+    }
+  });
+
   it("loads incident catalog and GPS fix on open, then submits SOS without photo", async () => {
     vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([
       {
