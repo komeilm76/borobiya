@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.3 proposal-card timestamp contrast (partial)
+
+- Audited the rescuer proposal inbox's small timestamp/clock label against its actual light and dark card surfaces. The light primary at 80% opacity blended to 4.31:1 on white, below the 4.5:1 normal-text threshold; 90% yields 5.39:1 light and 6.44:1 dark. A source-pinned compositing test failed before the one-rule change and passes now. This is a CSS-level result, not browser-rendered WCAG AA, keyboard or screen-reader acceptance; T4.4.3 remains open.
+
 ### 2026-10-28 — T4.4.2 requester-history linked-detail feedback (partial)
 
 - A first-load requester SOS history deep link outside the current page fetched its list successfully, but a transient linked-detail failure discarded the whole list and reported a history-read error. The list now remains available with an explicit linked-request warning; Retry re-reads that same ID instead of dropping it or guessing another. A not-found/inaccessible 404 remains non-retryable, and a missing-session refresh clears private list metadata and retry state. A focused composable regression reproduced the first-load failure before the fix; source-pinned view checks do not replace a browser test. Other loading/toast/optimistic feedback surfaces remain open.
