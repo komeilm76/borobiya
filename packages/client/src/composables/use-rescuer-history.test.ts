@@ -56,6 +56,7 @@ describe("rescuer mission history", () => {
       vi.mocked(getMission).mockResolvedValueOnce({ ...detail, id: otherId, rescuerId: requester });
       await state.load(1, otherId);
       expect(state.linkError.value).toContain("دسترسی ندارید");
+      expect(state.linkRetryable.value).toBe(false);
       expect(state.selected.value?.id).toBe(id);
       expect(state.requestedId.value).toBe(id);
       vi.mocked(getMission).mockRejectedValueOnce(new ApiError(404, "MISSION_NOT_FOUND", "Not found"));
@@ -63,6 +64,63 @@ describe("rescuer mission history", () => {
       expect(state.linkError.value).toContain("دسترسی ندارید");
     } finally { scope.stop(); }
   });
+  it("retains a successful list and retries a transient off-page deep link", async () => {
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
+      await state.load(1, otherId);
+      expect(state.items.value).toEqual([mission]);
+      expect(state.error.value).toBeNull();
+      expect(state.selected.value?.id).toBe(id);
+      expect(state.linkError.value).toContain("پیوندشده");
+      expect(state.linkError.value).not.toContain("دسترسی ندارید");
+      expect(state.linkRetryable.value).toBe(true);
+      const view = readFileSync(new URL("../views/_user/UserRescuerHistoryView.vue", import.meta.url), "utf8");
+      expect(view).toContain('v-if="history.linkRetryable.value"');
+      expect(view).toContain('@click="history.retryLink()"');
+
+      vi.mocked(getMission).mockResolvedValueOnce({ ...detail, id: otherId });
+      await state.retryLink();
+      expect(state.selected.value?.id).toBe(otherId);
+      expect(state.linkError.value).toBeNull();
+      expect(state.linkRetryable.value).toBe(false);
+      expect(getMission).toHaveBeenLastCalledWith("token", otherId);
+
+      vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
+      await state.load(1, otherId);
+      expect(state.linkRetryable.value).toBe(true);
+      await state.choose(id);
+      expect(state.linkError.value).toBeNull();
+      expect(state.linkRetryable.value).toBe(false);
+      const reads = vi.mocked(getMission).mock.calls.length;
+      await state.retryLink();
+      expect(getMission).toHaveBeenCalledTimes(reads);
+    } finally { scope.stop(); }
+  });
+
+  it("ignores a late linked-detail error after choosing another mission", async () => {
+    const started = pending<void>();
+    let rejectDetail!: (reason: unknown) => void;
+    vi.mocked(getMission).mockImplementationOnce(() => new Promise<MissionDetail>((_resolve, reject) => {
+      rejectDetail = reject;
+      started.resolve();
+    })).mockResolvedValueOnce(detail);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      const linked = state.load(1, otherId);
+      await started.promise;
+      await state.choose(id);
+      rejectDetail(new ApiError(503, "UNAVAILABLE", "Offline"));
+      await linked;
+      expect(state.selected.value?.id).toBe(id);
+      expect(state.linkError.value).toBeNull();
+      expect(state.linkRetryable.value).toBe(false);
+      expect(state.error.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
   it("keeps a failed detail selected and retries that mission without reloading the list", async () => {
     const second = { ...mission, id: otherId };
     vi.mocked(listRescuerMissions).mockResolvedValue({ items: [mission, second], total: 2, totalPages: 1 });
@@ -117,6 +175,28 @@ describe("rescuer mission history", () => {
       waiting.resolve(detail);
       await first;
       expect(state.selected.value?.id).toBe(otherId);
+    } finally { scope.stop(); }
+  });
+
+  it("clears linked retry and private list metadata on logout", async () => {
+    const token = ref<string | null>("token");
+    const user = ref<string | null>(rescuer);
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(token, user))!;
+    try {
+      vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
+      await state.load(1, otherId);
+      expect(state.linkRetryable.value).toBe(true);
+      token.value = null;
+      user.value = null;
+      await state.load();
+      await state.retryLink();
+      expect(state.items.value).toEqual([]);
+      expect(state.total.value).toBe(0);
+      expect(state.selected.value).toBeNull();
+      expect(state.linkError.value).toBeNull();
+      expect(state.linkRetryable.value).toBe(false);
+      expect(listRescuerMissions).toHaveBeenCalledTimes(1);
     } finally { scope.stop(); }
   });
 

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Rescuer history linked-detail failure and retry (T4.4.2 partial)
+
+- A deep link to a mission outside the rescuer history page could fail at its separate detail request after the list had loaded. The UI then claimed that the entire history failed and offered a generic list retry that lost the linked ID. It now keeps the list and a fallback selection, shows a distinct retryable linked-detail warning, and retries that exact ID. A 404 or foreign detail remains a non-retryable access warning; switching selection or account clears the retry and late failures cannot overwrite a newer choice. Focused deferred-response tests reproduced the bug before the fix and pass after it; no Vue mounting or live browser acceptance is claimed. The wider T4.4.2 audit stays open.
+
 ### 2026-10-28 — T4.4.4 rescuer route MapLibre startup (partial)
 
 - The rescuer mission route still had a runtime `Marker` import, pulling the ~1.09 MB MapLibre chunk into its route graph even with no active mission and no route map. Its incident/rescuer/waypoint markers now use the constructor supplied by `MapCanvas` on ready; existing marker labels, cleanup, GPS camera behavior and style-layer restoration remain wired. A source-pinned regression failed before the fix, and before/after builds show the `UserMissionView` chunk no longer statically references MapLibre. The proposal inbox still has another eager import. This is bundle-graph evidence, not <2s map paint, <500ms GPS, virtual scroll or browser/device acceptance. T4.4.4 remains open.

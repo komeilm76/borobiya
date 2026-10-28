@@ -16,6 +16,8 @@
       </v-alert>
       <v-alert v-if="history.linkError.value" type="warning" variant="tonal" role="status" class="mb-4">
         {{ history.linkError.value }}
+        <v-btn v-if="history.linkRetryable.value" variant="text" :loading="history.loading.value"
+          @click="history.retryLink()">تلاش دوباره برای پیوند</v-btn>
       </v-alert>
       <v-progress-linear v-if="history.loading.value && !history.items.value.length" indeterminate color="primary"
         aria-label="دریافت سوابق مأموریت" />

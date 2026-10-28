@@ -19,14 +19,21 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
   const error = ref<string | null>(null);
   const detailError = ref<string | null>(null);
   const linkError = ref<string | null>(null);
+  const linkRetryable = ref(false);
+  let retryId: string | null = null;
   let generation = 0;
   let detailGeneration = 0;
 
-  async function choose(id: string): Promise<void> {
+  async function choose(id: string, preserveLinkFeedback = false): Promise<void> {
     const owner = userId.value;
     const bearer = token.value;
     if (!owner || !bearer || !items.value.some((item) => item.id === id)) return;
     const current = ++detailGeneration;
+    if (!preserveLinkFeedback) {
+      linkError.value = null;
+      linkRetryable.value = false;
+      retryId = null;
+    }
     requestedId.value = id;
     selected.value = null;
     detailError.value = null;
@@ -48,6 +55,10 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     return requestedId.value ? choose(requestedId.value) : Promise.resolve();
   }
 
+  function retryLink(): Promise<void> {
+    return !loading.value && linkRetryable.value && retryId ? load(page.value, retryId) : Promise.resolve();
+  }
+
   async function load(nextPage = page.value, deepLink?: string): Promise<void> {
     const current = ++generation;
     const owner = userId.value;
@@ -57,6 +68,8 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     loading.value = true;
     error.value = null;
     linkError.value = null;
+    linkRetryable.value = false;
+    retryId = null;
     try {
       await ensureSession?.();
       if (current !== generation || userId.value !== owner || !token.value) return;
@@ -82,13 +95,21 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
               return;
             }
           } catch (cause) {
-            if (!(cause instanceof ApiError) || cause.status !== 404) throw cause;
+            if (current !== generation || userId.value !== owner || selectionVersion !== detailGeneration) return;
+            if (!(cause instanceof ApiError && cause.status === 404)) {
+              // The list was read successfully. Keep it available and retry this
+              // exact link, rather than claiming the whole history is unavailable.
+              linkError.value = sosApiErrorMessage(cause,
+                "دریافت مأموریت پیوندشده انجام نشد؛ فهرست مأموریت‌های خودتان نمایش داده می‌شود. دوباره تلاش کنید.");
+              linkRetryable.value = true;
+              retryId = deepLink;
+            }
           }
         }
-        linkError.value = "مأموریت پیوندشده یافت نشد یا به آن دسترسی ندارید؛ فهرست مأموریت‌های خودتان نمایش داده می‌شود.";
+        linkError.value ??= "مأموریت پیوندشده یافت نشد یا به آن دسترسی ندارید؛ فهرست مأموریت‌های خودتان نمایش داده می‌شود.";
       }
       if (current === generation && selectionVersion === detailGeneration) {
-        if (selectedId) await choose(selectedId);
+        if (selectedId) await choose(selectedId, true);
         else { ++detailGeneration; requestedId.value = null; selected.value = null; }
       }
     } catch (cause) {
@@ -113,8 +134,10 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     error.value = null;
     detailError.value = null;
     linkError.value = null;
+    linkRetryable.value = false;
+    retryId = null;
   }
   onScopeDispose(reset);
   return { items, selected, requestedId, page, total, totalPages, loading, detailLoading, error, detailError, linkError,
-    load, choose, retryDetail, reset };
+    linkRetryable, load, choose, retryDetail, retryLink, reset };
 }
