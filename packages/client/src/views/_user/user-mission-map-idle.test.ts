@@ -5,6 +5,20 @@ const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "ut
 const credits = readFileSync(new URL("../../../public/terrain-attribution.html", import.meta.url), "utf8");
 
 describe("mission map style restoration", () => {
+  it("starts the lazy map before loading Marker for the rescuer route", () => {
+    const canvas = readFileSync(new URL("../../components/map/MapCanvas.vue", import.meta.url), "utf8");
+    // A value import here pulls the 1MB MapLibre chunk before this route can mount MapCanvas.
+    expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
+    expect(view).toContain('import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl"');
+    expect(canvas).toContain('emit("ready", instance, Marker)');
+    expect(view).toContain('function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker)');
+    expect(view).toContain('markerConstructor = MarkerClass;');
+    expect(view).toContain('if (!map || !incident || !MarkerClass) return;');
+    expect(view).toContain('new MarkerClass(');
+    expect(view).toContain('markerConstructor = null;');
+    expect(view).toContain('waypointMarkers.forEach((marker) => marker.remove());');
+  });
+
   it("shows measured elevation only when present and credits the offline DEM", () => {
     expect(view).toContain('v-if="choice.elevation"');
     expect(view).toContain("choice.elevation.gain_m");

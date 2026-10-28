@@ -228,7 +228,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouteNavigation } from "@/composables/use-route-navigation";
-import { Marker, type GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent } from "maplibre-gl";
+import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -310,6 +310,8 @@ function chartForRoute(choice: RouteChoice) {
 const ROUTE_SOURCE = "rescuer-route-preview";
 const ROUTE_LAYER = "rescuer-route-preview-line";
 let routeMap: MapLibreMap | null = null;
+// MapCanvas supplies Marker only after its lazy MapLibre import and map load.
+let markerConstructor: typeof Marker | null = null;
 let incidentMarker: Marker | null = null;
 let rescuerMarker: Marker | null = null;
 let waypointMarkers: Marker[] = [];
@@ -329,19 +331,20 @@ function routeGeometry(): RouteLineData {
 }
 function syncRouteMap(): void {
   const map = routeMap;
+  const MarkerClass = markerConstructor;
   const incident = routing.target.value?.incident;
-  if (!map || !incident) return;
+  if (!map || !incident || !MarkerClass) return;
   incidentMarker?.remove();
   rescuerMarker?.remove();
   waypointMarkers.forEach((marker) => marker.remove());
   waypointMarkers = routing.via.value.map((point, index) => {
-    const marker = new Marker({ color: "#c27c14" }).setLngLat([point.lon, point.lat]).addTo(map);
+    const marker = new MarkerClass({ color: "#c27c14" }).setLngLat([point.lon, point.lat]).addTo(map);
     marker.getElement().setAttribute("aria-label", `ایستگاه ${index + 1}`);
     return marker;
   });
-  incidentMarker = new Marker({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
+  incidentMarker = new MarkerClass({ color: "#dc2626" }).setLngLat([incident.lon, incident.lat]).addTo(map);
   incidentMarker.getElement().setAttribute("aria-label", "محل حادثه");
-  rescuerMarker = routing.from.value ? new Marker({ color: "#16826c" })
+  rescuerMarker = routing.from.value ? new MarkerClass({ color: "#16826c" })
     .setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
   rescuerMarker?.getElement().setAttribute("aria-label", "موقعیت من");
   const line = routing.selectedRoute.value;
@@ -378,8 +381,9 @@ function restoreRouteLayer(): void {
   }, [ROUTE_SOURCE], [ROUTE_LAYER])) return;
   applyRouteLayer();
 }
-function onRouteMapReady(map: MapLibreMap): void {
+function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
   detachRouteMap?.();
+  markerConstructor = MarkerClass;
   routeMap = map;
   mapReady.value = true;
   const onStyleReady = () => restoreRouteLayer();
@@ -404,6 +408,7 @@ function closeRoutes(): void {
   incidentMarker = null;
   rescuerMarker = null;
   routeMap = null;
+  markerConstructor = null;
 }
 watch(() => [routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const, () => syncRouteMap());
 watch(() => navigation.active.value, (active) => { if (active) pickingWaypoint.value = false; });
