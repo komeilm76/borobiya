@@ -20,4 +20,23 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
     expect(phone).toContain('.share-dialog__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }');
     expect(phone).toContain('.share-dialog__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
   });
+
+  it("keeps the multi-device chooser scrollable with reachable actions on short phones", () => {
+    const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
+    expect(chooser).toBeDefined();
+    expect(source).toContain('<v-dialog v-model="deviceChooserOpen" max-width="480" scrollable persistent>');
+    expect(chooser).toContain('<v-card-text class="share-device-chooser__body">');
+    expect(source).toContain('.share-device-chooser__body { min-height: 0; overflow-y: auto; }');
+    expect(source).toContain('.share-device-chooser__body :deep(.v-label) { white-space: normal; overflow-wrap: anywhere; }');
+    expect(chooser).toContain('<v-radio-group v-model="chosenDeviceId"');
+    expect(chooser).toContain('<v-card-actions class="share-device-chooser__actions">');
+    expect(chooser).toContain(':disabled="submitting" @click="deviceChooserOpen = false"');
+    expect(chooser).toContain(':disabled="!chosenDeviceId"');
+    expect(chooser).toContain(':loading="submitting"');
+    const phone = source.split('@media (max-width: 599px) {')[1]!;
+    expect(phone).toContain('.share-device-chooser__actions { flex-wrap: wrap; }');
+    expect(phone).toContain('.share-device-chooser__actions :deep(.v-spacer) { display: none; }');
+    expect(phone).toContain('.share-device-chooser__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }');
+    expect(phone).toContain('.share-device-chooser__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
+  });
 });

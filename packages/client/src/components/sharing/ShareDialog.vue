@@ -292,10 +292,10 @@
     </v-card>
   </v-dialog>
 
-  <v-dialog v-model="deviceChooserOpen" max-width="480" persistent>
+  <v-dialog v-model="deviceChooserOpen" max-width="480" scrollable persistent>
     <v-card rounded="xl">
       <v-card-title class="share-dialog__title">کدام دستگاه موقعیت بفرستد؟</v-card-title>
-      <v-card-text>
+      <v-card-text class="share-device-chooser__body">
         <p class="mb-3 share-dialog__lead">
           حساب شما روی چند دستگاه هم‌زمان فعال است. برای این اشتراک باید یک دستگاه را مشخص کنید؛
           تا وقتی این اشتراک باز است، فقط همان دستگاه موقعیت می‌فرستد.
@@ -309,7 +309,7 @@
           />
         </v-radio-group>
       </v-card-text>
-      <v-card-actions>
+      <v-card-actions class="share-device-chooser__actions">
         <v-spacer />
         <v-btn variant="text" :disabled="submitting" @click="deviceChooserOpen = false">انصراف</v-btn>
         <v-btn
@@ -813,6 +813,10 @@ watch(
   padding: 0.75rem clamp(1rem, 3vw, 1.75rem) 1rem;
 }
 
+/* Only the device choices scroll; the confirmation controls remain reachable. */
+.share-device-chooser__body { min-height: 0; overflow-y: auto; }
+.share-device-chooser__body :deep(.v-label) { white-space: normal; overflow-wrap: anywhere; }
+
 .share-dialog__status {
   color: #2f6b46;
   font-size: 0.82rem;
@@ -827,5 +831,9 @@ watch(
   .share-dialog__actions :deep(.v-spacer) { display: none; }
   .share-dialog__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }
   .share-dialog__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+  .share-device-chooser__actions { flex-wrap: wrap; }
+  .share-device-chooser__actions :deep(.v-spacer) { display: none; }
+  .share-device-chooser__actions :deep(.v-btn) { flex: 1 1 100%; min-width: 0; min-height: 44px; height: auto; }
+  .share-device-chooser__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 </style>

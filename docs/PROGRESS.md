@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Location-share device chooser on short phones (T4.4.1 partial)
+
+- The secondary persistent device chooser can contain up to 50 active-device radio options but did not scroll its body separately from the confirmation buttons. Short phone viewports could push later choices and Continue/Cancel out of reach. It now uses a scrollable dialog/body, wraps long device labels, and stacks the phone actions as full-width, wrapping 44px-minimum targets. Device-selection, cancel and submit guards are unchanged. A source-pinned regression failed before the change; focused tests, typecheck and build check structure only, not rendered short-viewport, keyboard-open or screen-reader acceptance. The broader responsive/bottom-sheet audit remains open.
+
 ### 2026-10-28 — Requester SOS history unverified counts and retained rows (T4.4.2 bug review)
 
 - A failed first history read still rendered a "0 requests" count, and a failed refresh left cached rows, pagination and cancellable status looking current. The history now verifies the count/empty state only after a successful read, labels retained rows as potentially stale, hides pagination and disables cancellation while the snapshot is loading or failed, and keeps retry plus previously selected data. Pure composable and source-pinned regressions reproduced the unverified state before the fix and now cover first failure, pending read, refresh failure, recovery and reset. No Vue SFC was mounted; broader feedback/toasts and real browser/device acceptance remain open.
