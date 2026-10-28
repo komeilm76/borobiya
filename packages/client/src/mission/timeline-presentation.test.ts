@@ -23,7 +23,10 @@ describe("mission timeline UI (T3.5.8)", () => {
     expect(requester).toContain('audience="user"');
     expect(requester).toContain('listRequesterMissions(token, page, id)');
     expect(admin).toContain('audience="admin"');
-    expect(admin).toContain('listActiveSosMissions(token, id, true)');
+    expect(admin).toContain('useAdminRequestMissions(');
+    const adminRead = readFileSync(new URL("../composables/use-admin-request-missions.ts", import.meta.url), "utf8");
+    expect(adminRead).toContain('read: typeof listActiveSosMissions = listActiveSosMissions');
+    expect(adminRead).toContain('read(bearer, id, true)');
     expect(requester).toContain('<MissionLivePanel v-if="selectedMission"');
     expect(admin).toContain('v-for="mission in activeMissions"');
     expect(panel).toContain('<time :datetime="step.createdAt"');

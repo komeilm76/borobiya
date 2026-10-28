@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin dispatch mission-list feedback (T4.4.2 partial)
+
+- The selected SOS's mission-history area silently disappeared while its read was pending or failed, making an unverified empty list look like no missions. The panel now shows a labeled loading skeleton, an explicit retryable failure, and a “no missions yet” message only after a successful empty read. A small composable owns the scoped read, clears the previous selection on request/token/status changes, and ignores late replies and unmount; pure deferred tests and a source-pinned view test cover these states without mounting a Vue SFC. Other T4.4.2 screens, toasts, eligible optimistic writes/rollback, and real browser/device acceptance remain open.
+
 ### 2026-10-28 — Navigation GPS consent on same-tick account change (T3.5.6 follow-up)
 
 - Route-follow navigation deferred its owner/mission/route watcher until Vue's next tick. If an account changed away and back within that tick, the watcher could miss both transitions and keep the earlier GPS watch and map-follow consent running. It now stops the watch synchronously when any of those inputs changes; a new login needs an explicit Start, and old callbacks cannot move the map. A pure composable regression failed before the fix and verifies immediate cleanup and same-tick logout/login isolation. No Vue SFC was mounted or browser/device GPS timing verified.

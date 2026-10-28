@@ -14,7 +14,10 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(readFileSync(new URL("../../views/_user/UserSosHistoryView.vue", import.meta.url), "utf8"))
       .toContain("listRequesterMissions(token, page, id)");
     expect(readFileSync(new URL("../../views/_admin/AdminDispatchView.vue", import.meta.url), "utf8"))
-      .toContain("listActiveSosMissions(token, id, true)");
+      .toContain("useAdminRequestMissions(");
+    const adminRead = readFileSync(new URL("../../composables/use-admin-request-missions.ts", import.meta.url), "utf8");
+    expect(adminRead).toContain("read: typeof listActiveSosMissions = listActiveSosMissions");
+    expect(adminRead).toContain("read(bearer, id, true)");
   });
 
   it("defers MapLibre on the live panel until its canvas is ready, without losing markers", () => {

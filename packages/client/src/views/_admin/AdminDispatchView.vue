@@ -386,7 +386,9 @@
         <v-alert v-if="missionError" type="warning" variant="tonal" class="mb-3" role="alert">
           {{ missionError }} <v-btn size="small" variant="text" @click="loadActiveMissions()">تلاش دوباره</v-btn>
         </v-alert>
-        <div v-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
+        <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
+          role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
+        <div v-else-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
           <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
           <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
             <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
@@ -396,6 +398,9 @@
           <MissionTimelinePanel v-if="selectedTimelineMission" :key="selectedTimelineMission.id"
             :mission="selectedTimelineMission" audience="admin" />
         </div>
+        <p v-else-if="adminSos.selectedRequest && missionLoaded" class="mb-3 text-body-2 text-medium-emphasis" role="status">
+          برای این درخواست هنوز مأموریتی ثبت نشده است.
+        </p>
         <v-btn v-if="adminSos.selectedRequest?.status === 'cancelled_by_rescuer'"
           color="error" variant="flat" class="mb-3" :loading="adminSos.dispatchSubmitting"
           :disabled="adminSos.dispatchSubmitting"
@@ -579,9 +584,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
-import type { IncidentType, Severity, SosRequestRecord, Mission } from "@shared/index";
+import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
 import { getSosPhotoSrc } from "@/api/admin-sos";
+import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
 import {
   buildSosAlertsGeoJson,
   formatResponderDistance,
@@ -592,7 +598,6 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MissionTimelinePanel from "@/components/mission/MissionTimelinePanel.vue";
 import { statusLabel } from "@/mission/timeline-presentation";
-import { listActiveSosMissions } from "@/api/mission";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { pinia } from "@/stores";
@@ -612,33 +617,12 @@ const dispatchFilters = [
   { title: "همه", value: "all" }
 ];
 const auth = useAuthStore(pinia);
-const requestMissions = ref<Mission[]>([]);
-const activeMissions = computed(() => requestMissions.value.filter((mission) =>
-  ["pending", "on_the_way", "arrived", "in_progress"].includes(mission.status)));
-const timelineMissionId = ref<string | null>(null);
-const selectedTimelineMission = computed(() => requestMissions.value.find((mission) => mission.id === timelineMissionId.value) ?? null);
-const missionError = ref<string | null>(null);
-let missionGeneration = 0;
-async function loadActiveMissions() {
-  const id = adminSos.selectedRequest?.id;
-  const token = auth.accessToken;
-  const generation = ++missionGeneration;
-  requestMissions.value = [];
-  timelineMissionId.value = null;
-  missionError.value = null;
-  if (!id || !token) return;
-  try {
-    const missions = await listActiveSosMissions(token, id, true);
-    if (generation === missionGeneration && adminSos.selectedRequest?.id === id && auth.accessToken === token) {
-      requestMissions.value = missions;
-      timelineMissionId.value = missions[0]?.id ?? null;
-    }
-  } catch {
-    if (generation === missionGeneration) missionError.value = "سابقهٔ مأموریت‌ها بارگذاری نشد.";
-  }
-}
-watch(() => [adminSos.selectedRequest?.id, adminSos.selectedRequest?.status, auth.accessToken] as const,
-  () => { void loadActiveMissions(); }, { immediate: true });
+const { requestMissions, activeMissions, timelineMissionId, selectedTimelineMission,
+  missionLoading, missionLoaded, missionError, loadActiveMissions } = useAdminRequestMissions(
+  computed(() => adminSos.selectedRequest?.id ?? null),
+  computed(() => adminSos.selectedRequest?.status ?? null),
+  computed(() => auth.accessToken)
+);
 
 const themeStore = useThemeStore(pinia);
 const photoSrc = ref<string | null>(null);
@@ -922,7 +906,6 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  ++missionGeneration;
   stopPulseLoop();
   detachMapEvents?.();
   detachMapEvents = null;

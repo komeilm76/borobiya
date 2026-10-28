@@ -28,6 +28,15 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     expect(view).toContain('v-else-if="adminSos.nearestLoaded" class="responder-list');
     expect(view).toContain('@click="adminSos.loadNearestResponders()"');
   });
+  it("distinguishes loading, failed and verified-empty mission history for the selected SOS", () => {
+    const view = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="adminSos.selectedRequest && missionLoading"');
+    expect(view).toContain('v-else-if="requestMissions.length"');
+    expect(view).toContain('v-else-if="adminSos.selectedRequest && missionLoaded"');
+    expect(view).toContain('role="status" aria-label="در حال دریافت مأموریت‌های این درخواست"');
+    expect(view).toContain('useAdminRequestMissions(');
+    expect(view).toContain('@click="loadActiveMissions()"');
+  });
   it("renders pulsing MapLibre circle layers, floating map alert card, nearest responder list, multi-select dispatch controls, and global admin alert banner", () => {
     const viewSource = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
     expect(viewSource).toContain("admin-sos-pulse");
