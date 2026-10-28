@@ -20,6 +20,14 @@ describe("AdminDispatchView and App shell live SOS alert & dispatch console wiri
     const shell = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
     expect(shell).toContain('adminSos.queueVerified && adminSos.filterStatus !== "dispatched" && adminSos.pendingCount > 0');
   });
+  it("does not show a no-responder result or a zero badge while the responder read is unverified", () => {
+    const view = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-if="adminSos.nearestLoaded && !adminSos.nearestLoading"');
+    expect(view).toContain('v-else-if="adminSos.nearestError"');
+    expect(view).toContain('v-else-if="adminSos.nearestLoaded && adminSos.nearestResponders.length === 0"');
+    expect(view).toContain('v-else-if="adminSos.nearestLoaded" class="responder-list');
+    expect(view).toContain('@click="adminSos.loadNearestResponders()"');
+  });
   it("renders pulsing MapLibre circle layers, floating map alert card, nearest responder list, multi-select dispatch controls, and global admin alert banner", () => {
     const viewSource = readFileSync(new URL("./AdminDispatchView.vue", import.meta.url), "utf8");
     expect(viewSource).toContain("admin-sos-pulse");

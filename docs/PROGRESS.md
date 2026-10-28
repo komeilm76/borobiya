@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin SOS responder search verification feedback (T4.4.2 partial)
+
+- The nearest-responder card could claim zero eligible rescuers before a first successful read or after a failed search, even while showing a read-error banner. A current result is now marked verified only after a successful request; the panel distinguishes loading, failed-with-retry, verified empty, populated and unverified states, hiding old candidates during refresh while keeping separately selected rescuer chips for server-validated dispatch. Deferred Pinia and source-pinned tests failed before the fix and now cover failure, retry, query change and success without mounting Vue. The broader site-wide feedback/toasts/optimistic-write task and real browser/device accessibility review remain open.
+
 ### 2026-10-28 — Admin SOS queue spinner after confirmed dispatch (T4.4.2 bug review)
 
 - A successful manual dispatch or quick redispatch invalidated any older queue read, but that read's generation-guarded `finally` could no longer turn off its spinner. The console could remain in a perpetual loading/unverified state even after the ignored response settled. Confirmed dispatches now end the invalidated loading state and withhold queue verification until a fresh successful read. Both paths failed new deferred-response Pinia regressions before the fix; the tests also confirm a late old response cannot undo the dispatched status and retry can verify the queue. Browser/device acceptance and broader T4.4.2 feedback coverage remain open.

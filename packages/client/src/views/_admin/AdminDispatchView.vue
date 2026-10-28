@@ -409,14 +409,17 @@
             <div class="d-flex align-center ga-2">
               <v-icon color="primary" icon="mdi-account-group-outline" />
               <span>نزدیک‌ترین امدادگران واجد شرایط</span>
-              <v-chip color="primary" size="x-small" variant="tonal">
+              <v-chip v-if="adminSos.nearestLoaded && !adminSos.nearestLoading" color="primary" size="x-small" variant="tonal">
                 {{ adminSos.nearestResponders.length }} نفر
+              </v-chip>
+              <v-chip v-else color="warning" size="x-small" variant="tonal">
+                {{ adminSos.nearestLoading ? 'در حال بررسی' : 'نامطمئن' }}
               </v-chip>
             </div>
 
             <div class="d-flex align-center ga-1">
               <v-btn
-                :disabled="adminSos.nearestResponders.length === 0"
+                :disabled="!adminSos.nearestLoaded || adminSos.nearestLoading || adminSos.nearestResponders.length === 0"
                 size="small"
                 variant="text"
                 @click="adminSos.selectAllNearestResponders()"
@@ -473,30 +476,28 @@
             {{ adminSos.dispatchFeedback.message }}
           </v-alert>
 
-          <v-alert
-            v-if="adminSos.nearestError"
-            class="ma-4 mb-0"
-            type="error"
-            variant="tonal"
-          >
-            {{ adminSos.nearestError }}
-          </v-alert>
-
-          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis">
+          <v-card-text v-if="adminSos.nearestLoading" class="py-6 text-center text-medium-emphasis" role="status">
             <v-progress-circular class="me-2" color="primary" indeterminate size="22" width="2" />
             در حال جستجوی نزدیک‌ترین امدادگران فعال و هم‌تخصص…
           </v-card-text>
 
+          <v-alert v-else-if="adminSos.nearestError" class="ma-4" type="error" variant="tonal" role="alert">
+            {{ adminSos.nearestError }}
+            <template #append>
+              <v-btn variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
+            </template>
+          </v-alert>
+
           <v-card-text
-            v-else-if="adminSos.nearestResponders.length === 0"
-            class="py-6 text-center text-medium-emphasis"
+            v-else-if="adminSos.nearestLoaded && adminSos.nearestResponders.length === 0"
+            class="py-6 text-center text-medium-emphasis" role="status"
           >
             {{ adminSos.responderSearch
               ? 'برای این نام کاربری امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده یافت نشد.'
               : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
           </v-card-text>
 
-          <v-list v-else class="responder-list py-0" lines="two">
+          <v-list v-else-if="adminSos.nearestLoaded" class="responder-list py-0" lines="two">
             <template v-for="(responder, rIndex) in adminSos.nearestResponders" :key="responder.userId">
               <v-divider v-if="rIndex > 0" />
               <v-list-item
@@ -545,6 +546,10 @@
               </v-list-item>
             </template>
           </v-list>
+          <v-card-text v-else class="py-6 text-center text-medium-emphasis" role="status">
+            فهرست امدادگران هنوز تأیید نشده است؛ نتیجهٔ خالی نمی‌توان گرفت.
+            <v-btn variant="text" size="small" @click="adminSos.loadNearestResponders()">تلاش دوباره</v-btn>
+          </v-card-text>
 
           <v-divider />
           <v-card-actions class="pa-4 d-flex flex-wrap align-center justify-space-between ga-2">

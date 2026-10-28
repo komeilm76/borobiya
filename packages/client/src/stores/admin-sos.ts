@@ -94,6 +94,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
 
   const nearestResponders = ref<NearestResponder[]>([]);
   const nearestLoading = ref(false);
+  const nearestLoaded = ref(false);
   const nearestError = ref<string | null>(null);
   const responderSearch = ref("");
   const selectedResponderIds = ref<string[]>([]);
@@ -242,6 +243,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     // repopulates the picker with responders for an SOS that is no longer selected.
     const gen = ++nearestGeneration;
     const targetId = requestId ?? selectedId.value;
+    nearestLoaded.value = false;
     if (!isAdminSession.value || !targetId) {
       nearestResponders.value = [];
       clearResponderSelection();
@@ -261,6 +263,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
         : nearestFn(targetId, token));
       if (gen !== nearestGeneration || !response) return;
       nearestResponders.value = response.responders;
+      nearestLoaded.value = true;
       // Retain selections from earlier searches; the dispatch endpoint rechecks availability.
       // Clearing these here would silently discard a chosen rescuer outside the nearest ten.
     } catch (err) {
@@ -280,6 +283,9 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   function setResponderSearch(value: string): void {
     responderSearch.value = value.trim();
     nearestGeneration++; // a previous query cannot overwrite results for the new term
+    nearestLoading.value = false;
+    nearestLoaded.value = false;
+    nearestError.value = null;
     nearestResponders.value = [];
   }
 
@@ -644,6 +650,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     lastSnapshotIds.value = new Set();
     nearestResponders.value = [];
     nearestLoading.value = false;
+    nearestLoaded.value = false;
     nearestError.value = null;
     responderSearch.value = "";
     clearResponderSelection();
@@ -680,6 +687,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   watch(selectedId, (nextId) => {
     // A responder list is scoped to its SOS, not to the dispatch page as a whole. Do not
     // display or allow selecting the previous SOS's candidates while the next read is pending.
+    nearestLoaded.value = false;
     nearestResponders.value = [];
     responderSearch.value = "";
     clearResponderSelection();
@@ -742,6 +750,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     queueVerified,
     nearestResponders,
     nearestLoading,
+    nearestLoaded,
     nearestError,
     responderSearch,
     selectedResponderIds,

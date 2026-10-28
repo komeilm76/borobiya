@@ -631,6 +631,45 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.selectedResponderIds).toEqual([]);
   });
 
+  it("does not treat failed or pending responder reads as verified empty search results", async () => {
+    const request = makeSosRecord();
+    const near = { userId: "44444444-4444-4444-8444-444444444441", username: "rescuer_near",
+      distance: 100, avgRating: null, categoryName: "امداد", lastActiveAt: request.createdAt };
+    let rejectInitial!: (reason: Error) => void;
+    const initial = new Promise<{ responders: typeof near[] }>((_resolve, reject) => { rejectInitial = reject; });
+    let finishRetry!: (result: { responders: typeof near[] }) => void;
+    const retry = new Promise<{ responders: typeof near[] }>((resolve) => { finishRetry = resolve; });
+    const getNearestResponders = vi.fn().mockReturnValueOnce(initial)
+      .mockReturnValueOnce(retry).mockResolvedValue({ responders: [near] });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(),
+      listRequests: async () => ({ items: [request], total: 1 }), getNearestResponders });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(getNearestResponders).toHaveBeenCalledOnce());
+    expect(store.nearestLoaded).toBe(false);
+    rejectInitial(new Error("offline"));
+    await vi.waitFor(() => expect(store.nearestError).toBeTruthy());
+    expect(store.nearestLoading).toBe(false);
+    expect(store.nearestLoaded).toBe(false);
+    const retrying = store.loadNearestResponders();
+    expect(store.nearestLoading).toBe(true);
+    expect(store.nearestLoaded).toBe(false);
+    finishRetry({ responders: [] });
+    await retrying;
+    expect(store.nearestLoaded).toBe(true);
+    expect(store.nearestError).toBeNull();
+    expect(store.nearestResponders).toEqual([]);
+    store.setResponderSearch("rescuer_near");
+    expect(store.nearestLoaded).toBe(false);
+    await store.loadNearestResponders();
+    expect(store.nearestLoaded).toBe(true);
+    expect(store.nearestResponders).toEqual([near]);
+    store.resetState();
+    expect(store.nearestLoaded).toBe(false);
+  });
+
   it("hides the previous SOS's responders while loading a different SOS", async () => {
     const first = makeSosRecord();
     const second = makeSosRecord({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd" });
