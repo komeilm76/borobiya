@@ -267,6 +267,69 @@ describe("useAdminSosStore (T3.2.5)", () => {
     expect(store.replacementByRequest[cancelled.id]).toBeUndefined();
   });
 
+  it("stops an in-flight queue spinner when a confirmed manual dispatch invalidates its read", async () => {
+    const pendingRow = makeSosRecord();
+    let finishStale!: (value: { items: SosRequestRecord[]; total: number }) => void;
+    const stale = new Promise<{ items: SosRequestRecord[]; total: number }>((resolve) => { finishStale = resolve; });
+    const listRequests = vi.fn().mockResolvedValueOnce({ items: [pendingRow], total: 1 })
+      .mockReturnValueOnce(stale)
+      .mockResolvedValueOnce({ items: [{ ...pendingRow, status: "dispatched" }], total: 1 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests,
+      getNearestResponders: async () => ({ responders: [] }),
+      dispatchResponders: async () => ({ proposals: [] }) });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    const outdatedRead = store.refreshRequests();
+    expect(store.loading).toBe(true);
+    store.selectedResponderIds = ["44444444-4444-4444-8444-444444444441"];
+    expect(await store.dispatchSelectedResponders()).toBe(true);
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.loading).toBe(false);
+    expect(store.queueVerified).toBe(false); // the invalidated response cannot verify the queue
+    finishStale({ items: [pendingRow], total: 1 });
+    await outdatedRead;
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.loading).toBe(false);
+    await store.refreshRequests();
+    expect(store.queueVerified).toBe(true);
+  });
+
+  it("stops an in-flight queue spinner when confirmed quick redispatch invalidates its read", async () => {
+    const cancelled = makeSosRecord({ status: "cancelled_by_rescuer" });
+    let finishStale!: (value: { items: SosRequestRecord[]; total: number }) => void;
+    const stale = new Promise<{ items: SosRequestRecord[]; total: number }>((resolve) => { finishStale = resolve; });
+    const listRequests = vi.fn().mockResolvedValueOnce({ items: [cancelled], total: 1 })
+      .mockReturnValueOnce(stale)
+      .mockResolvedValueOnce({ items: [{ ...cancelled, status: "dispatched" }], total: 1 });
+    configureAdminSosRuntimeForTests({ openSocket: fakeSocketOpener(), listRequests,
+      getRequest: async () => cancelled,
+      listRequestMissions: async () => [],
+      getNearestResponders: async () => ({ responders: [{ userId: "44444444-4444-4444-8444-444444444441",
+        username: "rescuer_one", categoryName: "rescue", distance: 100, avgRating: null,
+        lastActiveAt: cancelled.createdAt }] }),
+      dispatchResponders: async () => ({ proposals: [] }) });
+    const auth = useAuthStore();
+    auth.accessToken = "admin-jwt";
+    auth.user = { id: "admin-1", username: "admin", role: "admin", mustCompleteSecurityQuestions: false };
+    const store = useAdminSosStore();
+    await vi.waitFor(() => expect(store.queueVerified).toBe(true));
+    const outdatedRead = store.refreshRequests();
+    expect(store.loading).toBe(true);
+    expect(await store.redispatchNearest(cancelled.id)).toBe(true);
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.loading).toBe(false);
+    expect(store.queueVerified).toBe(false);
+    finishStale({ items: [cancelled], total: 1 });
+    await outdatedRead;
+    expect(store.selectedRequest?.status).toBe("dispatched");
+    expect(store.loading).toBe(false);
+    await store.refreshRequests();
+    expect(store.queueVerified).toBe(true);
+  });
+
   it("re-dispatches immediately to up to ten new nearby responders, never a previously assigned rescuer", async () => {
     const row = makeSosRecord({ status: "cancelled_by_rescuer" });
     const old = "22222222-2222-4222-8222-222222222222";

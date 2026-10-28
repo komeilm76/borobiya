@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin SOS queue spinner after confirmed dispatch (T4.4.2 bug review)
+
+- A successful manual dispatch or quick redispatch invalidated any older queue read, but that read's generation-guarded `finally` could no longer turn off its spinner. The console could remain in a perpetual loading/unverified state even after the ignored response settled. Confirmed dispatches now end the invalidated loading state and withhold queue verification until a fresh successful read. Both paths failed new deferred-response Pinia regressions before the fix; the tests also confirm a late old response cannot undo the dispatched status and retry can verify the queue. Browser/device acceptance and broader T4.4.2 feedback coverage remain open.
+
 ### 2026-10-28 — Admin SOS queue verification and retry feedback (T4.4.2 partial)
 
 - The dispatch queue used to claim there were no active SOS requests before its first successful read or after a failed one; cached/socket rows and counts could appear authoritative even if a read was incomplete. The queue now distinguishes loading, unverified/failed, verified-empty and retained-row states, offers retry, and shows counts only when the latest full response covers the visible rows (including the shell's pending count only for pending/all filters). Filter labels no longer publish stale counts. Pinia tests cover the initial/failed/retried reads, 100-row truncation, and retained rows omitted from a later successful snapshot; source-pinned tests check the view/shell without mounting Vue. This does not replace real browser/device verification or sign off site-wide feedback/toasts/optimistic updates.

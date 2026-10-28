@@ -226,6 +226,17 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     }
   }
 
+  function invalidateListAfterConfirmedDispatch(): void {
+    // The committed status must not be overwritten by a pre-dispatch list response.
+    // Its finally block is generation-guarded too, so settle the spinner here and
+    // require a fresh read before treating the retained snapshot as verified.
+    refreshGeneration++;
+    if (loading.value) {
+      loading.value = false;
+      listLoaded.value = false;
+    }
+  }
+
   async function loadNearestResponders(requestId?: string | null): Promise<void> {
     // Even an empty selection invalidates the previous request: otherwise a late HTTP reply
     // repopulates the picker with responders for an SOS that is no longer selected.
@@ -331,7 +342,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       };
       const { items } = upsertSosAlert(requests.value, updatedRecord);
       requests.value = items;
-      refreshGeneration++; // Ignore an older list response that could undo the committed dispatch.
+      invalidateListAfterConfirmedDispatch();
       resolveReplacement(activeRequest.id);
       // The dispatcher may have selected another SOS while this request was in flight. The
       // first SOS still needs its updated status, but the new selection and banner are its own.
@@ -424,7 +435,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       if (!sent || !current()) return false;
       proposalsByRequestId.value = { ...proposalsByRequestId.value, [requestId]: sent.proposals };
       requests.value = upsertSosAlert(requests.value, { ...record, status: "dispatched" }).items;
-      refreshGeneration++; // An older queue response cannot undo this dispatch.
+      invalidateListAfterConfirmedDispatch();
       resolveReplacement(requestId);
       quickDispatchFeedback.value = { type: "success",
         message: `پیشنهاد جایگزین برای ${sent.proposals.length} امدادگر جدید ارسال شد.` };
