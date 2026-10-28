@@ -32,6 +32,8 @@ describe("rescuer mission history", () => {
     expect(routeRecords.find((route) => route.path === "/_user/mission-history")?.component).toEqual(expect.any(Function));
     expect(view).toContain("<MissionTimelinePanel");
     expect(view).toContain("history.selected.value.rating");
+    expect(view).toContain('@click="history.retryDetail()"');
+    expect(view).toContain("history.requestedId.value === item.id");
     expect(requesterView).toContain("<MissionRatingPanel");
     expect(stars(4)).toBe("★★★★☆");
   });
@@ -55,11 +57,49 @@ describe("rescuer mission history", () => {
       await state.load(1, otherId);
       expect(state.linkError.value).toContain("دسترسی ندارید");
       expect(state.selected.value?.id).toBe(id);
+      expect(state.requestedId.value).toBe(id);
       vi.mocked(getMission).mockRejectedValueOnce(new ApiError(404, "MISSION_NOT_FOUND", "Not found"));
       await state.load(1, otherId);
       expect(state.linkError.value).toContain("دسترسی ندارید");
     } finally { scope.stop(); }
   });
+  it("keeps a failed detail selected and retries that mission without reloading the list", async () => {
+    const second = { ...mission, id: otherId };
+    vi.mocked(listRescuerMissions).mockResolvedValue({ items: [mission, second], total: 2, totalPages: 1 });
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      await state.load();
+      vi.mocked(getMission).mockRejectedValueOnce(new Error("offline"))
+        .mockResolvedValueOnce({ ...detail, id: otherId });
+      await state.choose(otherId);
+      expect(state.selected.value).toBeNull();
+      expect(state.detailError.value).toBeTruthy();
+      expect(state.requestedId.value).toBe(otherId);
+      await state.retryDetail();
+      expect(state.selected.value?.id).toBe(otherId);
+      expect(state.detailError.value).toBeNull();
+      expect(getMission).toHaveBeenLastCalledWith("token", otherId);
+      expect(listRescuerMissions).toHaveBeenCalledTimes(1);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps the last requested mission on list refresh after a failed detail read", async () => {
+    const second = { ...mission, id: otherId };
+    vi.mocked(listRescuerMissions).mockResolvedValue({ items: [mission, second], total: 2, totalPages: 1 });
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      await state.load();
+      vi.mocked(getMission).mockRejectedValueOnce(new Error("offline"))
+        .mockResolvedValueOnce({ ...detail, id: otherId });
+      await state.choose(otherId);
+      await state.load();
+      expect(state.selected.value?.id).toBe(otherId);
+      expect(getMission).toHaveBeenLastCalledWith("token", otherId);
+    } finally { scope.stop(); }
+  });
+
   it("keeps a new selection when an older detail reply arrives after it", async () => {
     const second = { ...mission, id: otherId };
     const waiting = pending<MissionDetail>();
@@ -95,6 +135,7 @@ describe("rescuer mission history", () => {
       waiting.resolve({ items: [mission], total: 1, totalPages: 1 });
       await load;
       expect(state.selected.value).toBeNull();
+      expect(state.requestedId.value).toBeNull();
       expect(state.items.value).toEqual([]);
     } finally { scope.stop(); }
   });

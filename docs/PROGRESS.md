@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.2 rescuer-history detail retry (partial)
+
+- A failed detail fetch cleared `selected`, so retrying through `load()` fetched the list and opened its first mission rather than the one the rescuer had chosen. The composable now tracks the requested ID independently of a successful detail record, keeps its card selected through a failure, and retries that ID without a list read. A later list refresh also preserves the requested ID while it remains on the page. Focused regressions failed before the change and pass afterward; Vue remains unmounted per test convention. This is one feedback-path fix, not site-wide T4.4.2 sign-off or live browser verification.
+
 ### 2026-10-28 — Open-work inventory and documentation guard
 
 - Reconciled the current unchecked IDs in `TASKS.md` into a status index: **14 open tasks**, eight partial and six whose named work or target-environment acceptance run has not started. `scripts/list_open_tasks.py` prints the list and its `--check` mode runs in repository lint, rejecting missing, duplicate, completed or invalid-status index rows when task boxes change. This records what remains; it does not close any acceptance item or imply that this workspace ran Ubuntu Docker, PostGIS, a browser, Playwright or Android. The older whole-project estimate and phase snapshot below were not recalculated; use the current `TASKS.md` inventory for actionable status.

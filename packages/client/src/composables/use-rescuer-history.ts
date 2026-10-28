@@ -9,6 +9,8 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
   ensureSession?: () => Promise<unknown>) {
   const items = ref<Mission[]>([]);
   const selected = ref<MissionDetail | null>(null);
+  // A failed detail read has no `selected` record, but its card and retry must keep the user's choice.
+  const requestedId = ref<string | null>(null);
   const page = ref(1);
   const total = ref(0);
   const totalPages = ref(0);
@@ -21,12 +23,13 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
   let detailGeneration = 0;
 
   async function choose(id: string): Promise<void> {
-    const current = ++detailGeneration;
-    selected.value = null;
-    detailError.value = null;
     const owner = userId.value;
     const bearer = token.value;
     if (!owner || !bearer || !items.value.some((item) => item.id === id)) return;
+    const current = ++detailGeneration;
+    requestedId.value = id;
+    selected.value = null;
+    detailError.value = null;
     detailLoading.value = true;
     try {
       await ensureSession?.();
@@ -41,10 +44,14 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     }
   }
 
+  function retryDetail(): Promise<void> {
+    return requestedId.value ? choose(requestedId.value) : Promise.resolve();
+  }
+
   async function load(nextPage = page.value, deepLink?: string): Promise<void> {
     const current = ++generation;
     const owner = userId.value;
-    const previous = deepLink ?? selected.value?.id;
+    const previous = deepLink ?? requestedId.value;
     const selectionVersion = detailGeneration;
     if (!owner || !token.value) { reset(); return; }
     loading.value = true;
@@ -69,7 +76,9 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
             // nevertheless refuse a non-rescuer deep link, even for that account.
             if (detail.rescuerId === owner) {
               ++detailGeneration;
+              requestedId.value = deepLink;
               selected.value = detail;
+              detailError.value = null;
               return;
             }
           } catch (cause) {
@@ -80,7 +89,7 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
       }
       if (current === generation && selectionVersion === detailGeneration) {
         if (selectedId) await choose(selectedId);
-        else { ++detailGeneration; selected.value = null; }
+        else { ++detailGeneration; requestedId.value = null; selected.value = null; }
       }
     } catch (cause) {
       if (current === generation && userId.value === owner)
@@ -95,6 +104,7 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     ++detailGeneration;
     items.value = [];
     selected.value = null;
+    requestedId.value = null;
     page.value = 1;
     total.value = 0;
     totalPages.value = 0;
@@ -105,6 +115,6 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     linkError.value = null;
   }
   onScopeDispose(reset);
-  return { items, selected, page, total, totalPages, loading, detailLoading, error, detailError, linkError,
-    load, choose, reset };
+  return { items, selected, requestedId, page, total, totalPages, loading, detailLoading, error, detailError, linkError,
+    load, choose, retryDetail, reset };
 }

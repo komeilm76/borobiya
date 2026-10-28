@@ -30,8 +30,8 @@
           <div class="history__items" role="region" aria-label="مأموریت‌ها؛ برای موارد بیشتر پیمایش کنید"
             :tabindex="history.items.value.length > 1 ? 0 : -1">
             <button v-for="item in history.items.value" :key="item.id" type="button" class="history__item"
-              :class="{ 'history__item--selected': history.selected.value?.id === item.id }"
-              :aria-pressed="history.selected.value?.id === item.id" @click="history.choose(item.id)">
+              :class="{ 'history__item--selected': history.requestedId.value === item.id }"
+              :aria-pressed="history.requestedId.value === item.id" @click="history.choose(item.id)">
               <v-icon icon="mdi-lifebuoy" color="primary" />
               <span><strong>{{ statusLabel(item.status) }}</strong><small>{{ new Date(item.createdAt).toLocaleString('fa-IR') }}</small></span>
               <v-icon v-if="item.status === 'completed'" icon="mdi-check-circle" color="success" size="20" />
@@ -49,7 +49,7 @@
           <v-progress-linear v-if="history.detailLoading.value" indeterminate color="primary" aria-label="دریافت جزئیات" />
           <v-alert v-if="history.detailError.value" type="error" variant="tonal" role="alert">
             {{ history.detailError.value }}
-            <v-btn variant="text" @click="history.load()">تلاش دوباره</v-btn>
+            <v-btn variant="text" @click="history.retryDetail()">تلاش دوباره</v-btn>
           </v-alert>
           <template v-if="history.selected.value">
             <span class="history__eyebrow">مأموریت · {{ new Date(history.selected.value.createdAt).toLocaleString('fa-IR') }}</span>
