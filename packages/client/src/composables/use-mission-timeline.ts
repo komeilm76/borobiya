@@ -133,7 +133,9 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
       startFallback();
     }
   }
-  watch([missionId, owner], () => { void start(); }, { immediate: true });
+  // These refs can change during logout or mission selection. Dispose the old private
+  // rows/socket before the next render, even if a new login arrives in the same tick.
+  watch([missionId, owner], () => { void start(); }, { immediate: true, flush: "sync" });
   watch(token, (next) => {
     if (!next) stop();
     else if (!client) {
@@ -143,7 +145,7 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
       client.updateToken(next);
       if (fallback || fallbackRetry) { stopFallback(); startFallback(); }
     }
-  });
+  }, { flush: "sync" });
   onScopeDispose(stop);
   return { entries, loading, error, load, stop };
 }

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Mission timeline synchronous session boundary (T3.5.8 follow-up)
+
+- A mounted mission timeline retained the previous session's private steps and socket until Vue's deferred watcher ran after logout or mission selection. If a second login replaced a null token within the same tick, the watcher coalesced both changes and reused the old socket/rows indefinitely rather than loading the new session. The token, owner and mission watchers now invalidate rows, in-flight reads, fallback and socket synchronously at the boundary; same-session bearer renewal still updates the existing socket. Pure composable regressions reproduced the immediate stale rows before the change. No Vue SFC was mounted or browser/VM privacy timing verified.
+
 ### 2026-10-28 — Live broadcast transport-start failure (T2.1.5 follow-up)
 
 - If opening the realtime module/socket rejected after Start woke GPS, the async start rejected without clearing the location watcher or 4-second ticker, leaving the bar stuck at “connecting.” A synchronous `connect()` throw did the same, even if it had already emitted `connect`. The broadcaster now stops GPS/ticker, closes an attached failed client, and shows a retryable connection error; an old failed open after Stop/restart cannot interrupt the newer broadcast. Focused regressions failed before the fix and verify cleanup, retry, and attempt isolation. No Vue SFC was mounted or two-browser/target-VM acceptance performed; P2-A1 remains open.

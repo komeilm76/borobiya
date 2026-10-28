@@ -22,6 +22,51 @@ function fakeSocket() {
 }
 
 describe("mission timeline lifecycle", () => {
+  it("clears private steps and closes the socket synchronously on logout, even if another login follows in the same tick", async () => {
+    const token = ref<string | null>("first-session");
+    const oldSocket = fakeSocket();
+    const newSocket = fakeSocket();
+    const sockets = [oldSocket, newSocket];
+    const openSocket = vi.fn(async () => sockets.shift()!.client);
+    const read = vi.fn(async (bearer: string) => bearer === "first-session" ? [row] : []);
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(ref(ID), "user", token, ref(OWNER), undefined,
+      { read, openSocket }))!;
+    try {
+      await settle();
+      expect(timeline.entries.value).toEqual([row]);
+      expect(oldSocket.close).not.toHaveBeenCalled();
+      token.value = "first-session-renewed";
+      expect(timeline.entries.value).toEqual([row]);
+      expect(oldSocket.client.updateToken).toHaveBeenCalledWith("first-session-renewed");
+      expect(oldSocket.close).not.toHaveBeenCalled();
+      token.value = null;
+      expect(timeline.entries.value).toEqual([]);
+      expect(oldSocket.close).toHaveBeenCalledOnce();
+      token.value = "second-session";
+      await settle();
+      expect(read).toHaveBeenCalledWith("second-session", ID, "user", expect.any(AbortSignal));
+      expect(timeline.entries.value).toEqual([]);
+      expect(openSocket).toHaveBeenCalledTimes(2);
+    } finally { scope.stop(); }
+  });
+
+  it("clears the selected mission's steps immediately before a different mission loads", async () => {
+    const id = ref<string | null>(ID);
+    const first = fakeSocket();
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(id, "user", ref("bearer"), ref(OWNER), undefined, {
+      read: async () => [row], openSocket: async () => first.client
+    }))!;
+    try {
+      await settle();
+      expect(timeline.entries.value).toEqual([row]);
+      id.value = OTHER;
+      expect(timeline.entries.value).toEqual([]);
+      expect(first.close).toHaveBeenCalledOnce();
+    } finally { scope.stop(); }
+  });
+
   it("reads committed steps, reacts only to its own validated events, and closes on mission/account changes", async () => {
     const id = ref<string | null>(ID);
     const owner = ref<string | null>(OWNER);
