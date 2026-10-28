@@ -327,7 +327,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import {
   MAX_LOCATION_HISTORY_SHARE_POINTS,
   MAX_LOCATION_SHARE_MINUTES,
@@ -345,6 +345,7 @@ import { createLocationHistoryShare, createLocationShare } from "@/api/location"
 import { isoToLocalInput, localInputToIso } from "@/history/playback";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
+import { createShareSubmissionFence } from "@/sharing/share-submission-fence";
 import {
   addRecipient,
   buildHistorySharePayload,
@@ -427,6 +428,23 @@ const deviceChooserOpen = ref(false);
 const deviceIds = ref<string[]>([]);
 const knownDevices = ref<UserDevice[]>([]);
 const chosenDeviceId = ref<string | null>(null);
+const submissionFence = createShareSubmissionFence({
+  ownerId: () => auth.user?.id ?? null,
+  accessToken: () => auth.accessToken,
+  isOpen: () => props.modelValue
+});
+
+function invalidateSubmission(): void {
+  submissionFence.invalidate();
+  submitting.value = false;
+  formError.value = null;
+  createdCount.value = 0;
+  reusedCount.value = 0;
+  deviceChooserOpen.value = false;
+  deviceIds.value = [];
+  knownDevices.value = [];
+  chosenDeviceId.value = null;
+}
 
 const maxMinutes = MAX_LOCATION_SHARE_MINUTES;
 const maxHistoryPoints = MAX_LOCATION_HISTORY_SHARE_POINTS;
@@ -517,6 +535,9 @@ function remove(id: string): void {
 
 /** One submit path for both the first attempt and the retry after a device was chosen. */
 async function submit(): Promise<void> {
+  if (submitting.value) return;
+  const submission = submissionFence.begin();
+  if (!submission) return;
   const current = draft.value;
   formError.value = null;
   const found = shareDraftIssues(current);
@@ -525,15 +546,16 @@ async function submit(): Promise<void> {
     return;
   }
 
-  await auth.ensureSession();
-  const token = accessToken.value;
-  if (!token) {
-    formError.value = "برای ثبت اشتراک دوباره وارد شوید.";
-    return;
-  }
-
-  submitting.value = true;
   try {
+    await auth.ensureSession();
+    if (!submissionFence.isActive(submission)) return;
+    const token = accessToken.value;
+    if (!token) {
+      formError.value = "برای ثبت اشتراک دوباره وارد شوید.";
+      return;
+    }
+    if (!submissionFence.isCurrent(submission)) return;
+    submitting.value = true;
     if (current.mode === "history") {
       const historyBody = buildHistorySharePayload(current, {
         from: current.historyFrom!,
@@ -541,6 +563,7 @@ async function submit(): Promise<void> {
         maxPoints: current.historyMaxPoints
       });
       const created = await createLocationHistoryShare(historyBody, token);
+      if (!submissionFence.isCurrent(submission)) return;
       createdCount.value = created.createdShareIds.length;
       reusedCount.value = created.reusedShareIds.length;
       emit("shared");
@@ -555,18 +578,22 @@ async function submit(): Promise<void> {
       : payload;
 
     const created = await createLocationShare(body, token);
+    if (!submissionFence.isCurrent(submission)) return;
     createdCount.value = created.createdShareIds.length;
     reusedCount.value = created.reusedShareIds.length;
     deviceChooserOpen.value = false;
     emit("shared");
   } catch (error) {
+    if (!submissionFence.isCurrent(submission)) return;
     createdCount.value = 0;
     reusedCount.value = 0;
     if (needsPriorityDevice(error)) {
       const ids = priorityDeviceIds(error);
       if (ids.length > 0) {
+        const devices = await fetchUserDevices(accessToken.value!).catch(() => []);
+        if (!submissionFence.isCurrent(submission)) return;
         deviceIds.value = ids;
-        knownDevices.value = await fetchUserDevices(token).catch(() => []);
+        knownDevices.value = devices;
         const currentDevice = knownDevices.value.find(
           (device) => device.isCurrentDevice && ids.includes(device.deviceId)
         );
@@ -588,7 +615,7 @@ async function submit(): Promise<void> {
         ? issueText(issues.value[0].code)
         : friendlyErrorMessage(error, "اشتراک ثبت نشد. دوباره تلاش کنید."));
   } finally {
-    submitting.value = false;
+    if (submissionFence.isCurrent(submission)) submitting.value = false;
   }
 }
 
@@ -618,10 +645,12 @@ function issueText(code: string | undefined): string {
 }
 
 function onVisibility(value: boolean): void {
+  if (!value) invalidateSubmission();
   emit("update:modelValue", value);
 }
 
 function close(): void {
+  invalidateSubmission();
   emit("update:modelValue", false);
 }
 
@@ -644,14 +673,28 @@ watch(
       void loadIncidentTypes();
       return;
     }
+    invalidateSubmission();
     cancelPending();
     searchTerm.value = "";
     incidentTypeChoice.value = null;
-    deviceChooserOpen.value = false;
-    deviceIds.value = [];
-    chosenDeviceId.value = null;
-  }
+  },
+  { flush: "sync" }
 );
+
+watch(
+  () => [auth.user?.id, auth.accessToken] as const,
+  ([owner, token], [previousOwner]) => {
+    if (owner === previousOwner && token) return; // same-session bearer rotation
+    invalidateSubmission();
+    if (owner !== previousOwner) {
+      recipients.value = [];
+      searchTerm.value = "";
+      cancelPending();
+    }
+  },
+  { flush: "sync" }
+);
+onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 </script>
 
 <style scoped>

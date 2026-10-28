@@ -191,6 +191,46 @@ describe("useTargetSearch", () => {
     } finally { scope.stop(); }
   });
 
+  it("invalidates an in-flight recipient search immediately when its dialog closes", async () => {
+    const older = deferred<Response>();
+    vi.stubGlobal("fetch", vi.fn(async () => older.promise)); // deliberately ignores AbortSignal
+    const { search, scope } = mountComposable();
+    try {
+      search.term.value = "ham";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(search.loading.value).toBe(true);
+      search.cancelPending();
+      expect(search.loading.value).toBe(false);
+      older.resolve(jsonResponse(page([row("old_account", "3")])));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(search.results.value).toEqual([]);
+      expect(search.total.value).toBe(0);
+    } finally { scope.stop(); }
+  });
+
+  it("does not retry an old recipient query with a new session after cancellation during 401 recovery", async () => {
+    const refresh = deferred<void>();
+    const fetchMock = vi.fn(async () => jsonResponse({ code: "INVALID_ACCESS_TOKEN", message: "Expired" }, 401));
+    vi.stubGlobal("fetch", fetchMock);
+    const scope = effectScope();
+    let search!: ReturnType<typeof useTargetSearch>;
+    scope.run(() => { search = useTargetSearch({ accessToken: token,
+      ensureSession: async () => { await refresh.promise; token.value = "next-account-token"; } }); });
+    try {
+      search.term.value = "old_account_query";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      search.cancelPending();
+      refresh.resolve();
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(search.results.value).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
   it("reports a failure instead of leaving the previous list on screen", async () => {
     vi.stubGlobal(
       "fetch",

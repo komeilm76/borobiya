@@ -46,6 +46,13 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     }
     controller?.abort();
     controller = null;
+    // A response may ignore abort or already be queued on a microtask. Closing the dialog
+    // must hide the old account's candidates immediately, not at the next watcher tick.
+    requestId++;
+    results.value = [];
+    total.value = 0;
+    failed.value = false;
+    loading.value = false;
   }
 
   async function run(): Promise<void> {
@@ -102,6 +109,9 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
       const page = await searchUsers(searchParams, accessToken, signal).catch(async (error: unknown) => {
         if ((error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
           await options.ensureSession();
+          // A closed dialog/account switch must not replay its old query with the
+          // newly refreshed session, even if the transport ignored the abort.
+          if (!isLatestSearch(requestIdForThisRun, requestId) || signal.aborted) throw error;
           const refreshed = options.accessToken.value;
           if (refreshed && refreshed !== accessToken) {
             return searchUsers(searchParams, refreshed, signal);
@@ -135,11 +145,6 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     // Invalidate at the keystroke, not after the 300 ms debounce. Otherwise an
     // older response can resolve during that window and offer the wrong recipient.
     cancelPending();
-    requestId += 1;
-    results.value = [];
-    total.value = 0;
-    failed.value = false;
-    loading.value = false;
     if (!shouldSearch(term.value)) return;
     timer = setTimeout(() => {
       timer = null;

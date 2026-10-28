@@ -21,6 +21,18 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
     expect(phone).toContain('.share-dialog__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
   });
 
+  it("does not reopen a device chooser or publish a stale share result after the dialog/session ends", () => {
+    expect(source).toContain('const submission = submissionFence.begin();');
+    expect(source).toContain('if (!submissionFence.isCurrent(submission)) return;');
+    expect(source).toMatch(/await createLocationHistoryShare\(historyBody, token\);\s*if \(!submissionFence\.isCurrent\(submission\)\) return;/);
+    expect(source).toMatch(/await createLocationShare\(body, token\);\s*if \(!submissionFence\.isCurrent\(submission\)\) return;/);
+    expect(source).toMatch(/await fetchUserDevices\(accessToken\.value!\)\.catch\(\(\) => \[\]\);\s*if \(!submissionFence\.isCurrent\(submission\)\) return;/);
+    expect(source).not.toContain('knownDevices.value = await fetchUserDevices(token).catch(() => []);');
+    expect(source).toContain('submissionFence.invalidate();');
+    expect(source).toContain('onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });');
+    expect(source).toContain('flush: "sync"');
+  });
+
   it("keeps the multi-device chooser scrollable with reachable actions on short phones", () => {
     const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
     expect(chooser).toBeDefined();

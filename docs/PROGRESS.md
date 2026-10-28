@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Location-share submission session boundary (T4.4.2 bug review)
+
+- A delayed share write or priority-device lookup could still update a closed dialog, emit success after navigation/logout, or reopen the device chooser for a different account. A generation/owner fence now checks every awaited stage of live and history submissions and the 409 device lookup; close, unmount, token loss, and account change invalidate it synchronously, with old recipient selection cleared on account switch. Closing/search cancellation also immediately invalidates and clears pending recipient search results, even if a response ignores abort; a late 401 recovery no longer replays the old query with a new session. Same-session bearer renewal remains allowed. A source-pinned wiring regression and a deferred recipient-search test failed before the fix; pure fence tests cover the new guard (including delayed close/reopen). No Vue SFC was mounted or browser/device acceptance claimed. Broader feedback and VM checks remain open.
+
 ### 2026-10-28 — Location-share device chooser on short phones (T4.4.1 partial)
 
 - The secondary persistent device chooser can contain up to 50 active-device radio options but did not scroll its body separately from the confirmation buttons. Short phone viewports could push later choices and Continue/Cancel out of reach. It now uses a scrollable dialog/body, wraps long device labels, and stacks the phone actions as full-width, wrapping 44px-minimum targets. Device-selection, cancel and submit guards are unchanged. A source-pinned regression failed before the change; focused tests, typecheck and build check structure only, not rendered short-viewport, keyboard-open or screen-reader acceptance. The broader responsive/bottom-sheet audit remains open.
