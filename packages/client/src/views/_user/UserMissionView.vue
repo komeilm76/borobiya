@@ -191,7 +191,7 @@
       </section>
     </div>
 
-    <v-dialog :model-value="desk.cancellationOpen.value" max-width="510" :persistent="desk.cancelling.value"
+    <v-dialog :model-value="desk.cancellationOpen.value" max-width="510" scrollable :persistent="desk.cancelling.value"
       @update:model-value="(visible: boolean) => { if (!visible) desk.dismissCancellation(); }">
       <v-card rounded="xl" class="pa-2" dir="rtl">
         <v-card-title class="text-wrap">واقعاً قادر به ادامهٔ مأموریت نیستید؟</v-card-title>
@@ -214,7 +214,7 @@
             persistent-hint counter="200" maxlength="200" variant="outlined" rows="2" :disabled="desk.cancelling.value" />
           <p class="mission-desk__limit">حداکثر ۳ لغو در هر ساعت؛ از استفادهٔ غیرضروری خودداری کنید.</p>
         </v-card-text>
-        <v-card-actions class="flex-wrap">
+        <v-card-actions class="mission-cancel-actions">
           <v-spacer />
           <v-btn variant="text" :disabled="desk.cancelling.value" @click="desk.dismissCancellation()">ادامهٔ مأموریت</v-btn>
           <v-btn color="error" variant="flat" rounded="lg" :loading="desk.cancelling.value"
@@ -480,6 +480,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-desk__empty-icon { width: 70px; height: 70px; border-radius: 20px; background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); display: grid; place-items: center; margin: 0 auto 16px; }
 .mission-desk__empty h3 { font-size: 1.28rem; margin: 0 0 8px; }.mission-desk__empty p { opacity: .7; margin-bottom: 22px; }
 .mission-desk__limit { font-size: .8rem; opacity: .68; margin: 20px 0 0; }
+.mission-cancel-actions { flex-wrap: wrap; }
 @media(max-width: 780px) { .mission-steps { grid-template-columns: repeat(2, 1fr); }.mission-desk__toolbar { align-items: flex-start; }.mission-desk__toolbar p { max-width: 230px; } }
 @media(max-width: 599px) {
   .mission-desk { padding-inline: 12px; }
@@ -493,6 +494,10 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
   .mission-route__route-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
   .mission-route__stops { padding: 12px; }
   .mission-route__coordinate { flex: 1 1 100%; max-width: none; min-width: 0; }
+  .mission-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .mission-cancel-actions :deep(.v-spacer) { display: none; }
+  .mission-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
+  .mission-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 @media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
 </style>

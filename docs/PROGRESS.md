@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — T4.4.1 mobile cancellation dialogs (partial)
+
+- The rescuer's mission-cancellation dialog and the requester's SOS-cancellation dialog each had long Persian action labels beside a spacer and a Back button; on narrow screens the confirmation could crowd or clip, and a short viewport had no explicit scrollable reason body. Both dialogs now use Vuetify's scrollable dialog/card-text layout, and below 600px stack full-width, wrapping, minimum-44px actions without the spacer. Existing reason validation, loading locks and confirmation handlers are unchanged. Source-pinned regressions failed before the change, and client typechecks/build pass; this is not a rendered phone/tablet test or a site-wide responsive/bottom-sheet sign-off.
+
 ### 2026-10-28 — Live-broadcast consent and account-boundary bug (T2.1.5 follow-up)
 
 - Starting a location broadcast did not lock until after session recovery: a second tap duplicated the attempt, while Stop during the wait could still wake GPS and connect later. The app-scoped store had an earlier priority-device read, so an old account's Start tap could also cross into a new account/session before reaching the composable. The broadcaster now locks before awaiting, discards pending starts and socket opens after Stop/disposal, and synchronously stops GPS/closes the socket if the authenticated owner or JWT subject changes. The store checks owner and session ID again after the priority read; a normal token renewal within the same session preserves explicit consent. Deferred composable regressions reproduced cancelled/duplicate starts and owner transitions before the fix; Pinia regressions cover the priority-read handoff and a source-pinned check guards production owner wiring. This is not live P2-A1 two-browser/VM acceptance; the server remains authoritative for JWT, device and share authorization.

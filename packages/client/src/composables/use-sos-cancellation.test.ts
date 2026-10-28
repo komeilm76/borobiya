@@ -44,6 +44,18 @@ describe("requester SOS cancellation confirmation", () => {
     expect(dialog).toContain('cancellation.error.value');
   });
 
+  it("keeps the SOS cancel confirmation reachable on narrow and short screens", () => {
+    const dialog = readFileSync(new URL("../components/sos/SosCancellationDialog.vue", import.meta.url), "utf8");
+    expect(dialog).toContain('max-width="500" scrollable');
+    expect(dialog).toContain('<v-card-actions class="sos-cancel-actions">');
+    const phone = dialog.split("@media (max-width: 599px) {")[1]?.split("\n}\n</style>")[0] ?? "";
+    expect(phone).toContain('.sos-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }');
+    expect(phone).toContain('.sos-cancel-actions :deep(.v-spacer) { display: none; }');
+    expect(phone).toContain('.sos-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }');
+    expect(phone).toContain('.sos-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
+    expect(dialog).toContain(':disabled="!cancellation.canConfirm.value" @click="cancellation.confirm()"');
+  });
+
   it("requires an explicit reason, validates Other, and never sends twice while saving", async () => {
     const token = ref<string | null>("token");
     const id = ref<string | null>(requesterId);

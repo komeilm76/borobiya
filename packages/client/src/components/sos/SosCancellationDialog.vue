@@ -1,5 +1,5 @@
 <template>
-  <v-dialog :model-value="cancellation.open.value" max-width="500" :persistent="cancellation.submitting.value"
+  <v-dialog :model-value="cancellation.open.value" max-width="500" scrollable :persistent="cancellation.submitting.value"
       @update:model-value="(visible: boolean) => { if (!visible) cancellation.dismiss(); }">
       <v-card rounded="xl" class="pa-2">
         <v-card-title class="text-wrap">لغو درخواست امداد</v-card-title>
@@ -20,7 +20,7 @@
             label="توضیح دلیل (۱۰ تا ۲۰۰ نویسه)" counter="200" maxlength="200" variant="outlined" rows="2"
             :disabled="cancellation.submitting.value" hint="برای «سایر» توضیح حداقل ۱۰ نویسه لازم است." persistent-hint />
         </v-card-text>
-        <v-card-actions class="flex-wrap">
+        <v-card-actions class="sos-cancel-actions">
           <v-spacer />
           <v-btn variant="text" :disabled="cancellation.submitting.value" @click="cancellation.dismiss()">بازگشت</v-btn>
           <v-btn color="error" variant="flat" rounded="lg" :loading="cancellation.submitting.value"
@@ -35,3 +35,13 @@ import type { useSosCancellation } from "@/composables/use-sos-cancellation";
 
 defineProps<{ cancellation: ReturnType<typeof useSosCancellation> }>();
 </script>
+
+<style scoped>
+.sos-cancel-actions { flex-wrap: wrap; }
+@media (max-width: 599px) {
+  .sos-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .sos-cancel-actions :deep(.v-spacer) { display: none; }
+  .sos-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
+  .sos-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
+</style>

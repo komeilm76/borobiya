@@ -11,6 +11,17 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('] satisfies { title: string; value: TransportProfile }[];');
   });
 
+  it("keeps mission cancellation actions reachable on narrow and short screens", () => {
+    const phone = view.split("@media(max-width: 599px) {")[1]!.split("@media(max-width: 480px)")[0]!;
+    expect(view).toContain('<v-dialog :model-value="desk.cancellationOpen.value" max-width="510" scrollable');
+    expect(view).toContain('<v-card-actions class="mission-cancel-actions">');
+    expect(phone).toContain('.mission-cancel-actions { flex-direction: column; align-items: stretch; gap: 8px; }');
+    expect(phone).toContain('.mission-cancel-actions :deep(.v-spacer) { display: none; }');
+    expect(phone).toContain('.mission-cancel-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }');
+    expect(phone).toContain('.mission-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }');
+    expect(view).toContain(':disabled="!desk.canCancel.value" @click="desk.confirmCancellation()"');
+  });
+
   it("wraps mission actions and route coordinates before the definite-height, unobscured map", () => {
     const phone = view.split("@media(max-width: 599px) {")[1]!.split("@media(max-width: 480px)")[0]!;
     expect(phone).toContain(".mission-desk__toolbar { flex-wrap: wrap; }");
