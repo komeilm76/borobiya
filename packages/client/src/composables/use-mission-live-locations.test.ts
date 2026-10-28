@@ -152,6 +152,90 @@ describe("mission live positions (T3.5.7)", () => {
     scope.stop();
   });
 
+  it("clears private fixes and GPS synchronously on logout and a direct session replacement", async () => {
+    const first = fakeSocket();
+    const second = fakeSocket();
+    const opener = vi.fn(async () => opener.mock.calls.length === 1 ? first.client : second.client);
+    const clear = vi.fn();
+    const firstToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-1" }))}.x`;
+    const replacementToken = `x.${btoa(JSON.stringify({ sub: mission.requesterId, role: "user",
+      deviceId: "device-2", sessionId: "session-2" }))}.x`;
+    const bearer = ref<string | null>(firstToken);
+    const owner = ref<string | null>(mission.rescuerId);
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, owner, async () => {},
+      { openSocket: opener, watchPosition: () => clear }))!;
+    await settle();
+    first.listeners.get(MISSION_LOCATION_EVENT)?.({ missionId: mission.id, userId: mission.requesterId,
+      role: "requester", lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() });
+    live.startSharing();
+    expect(live.locations.value.requester?.lat).toBe(35.7);
+    expect(live.sharing.value).toBe(true);
+
+    // The old participant's private marker/watch must disappear before Vue's next tick.
+    bearer.value = null;
+    expect(live.locations.value).toEqual({});
+    expect(live.sharing.value).toBe(false);
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(clear).toHaveBeenCalledOnce();
+
+    bearer.value = replacementToken; // Profile still belongs to the old account.
+    await settle();
+    expect(opener).toHaveBeenCalledTimes(1);
+    expect(live.connected.value).toBe(false);
+    owner.value = mission.requesterId;
+    await settle();
+    expect(opener).toHaveBeenCalledTimes(2);
+    expect(second.emitted).toContainEqual({ event: MISSION_SUBSCRIBE_EVENT, payload: { missionId: mission.id } });
+    expect(live.sharing.value).toBe(false); // A new account must explicitly opt in again.
+    scope.stop();
+  });
+
+  it("does not carry private markers or GPS consent across a direct same-account session swap", async () => {
+    const first = fakeSocket();
+    const second = fakeSocket();
+    const clear = vi.fn();
+    const opener = vi.fn(async () => opener.mock.calls.length === 1 ? first.client : second.client);
+    const bearer = ref(`x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-1" }))}.x`);
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, ref(mission.rescuerId),
+      async () => {}, { openSocket: opener, watchPosition: () => clear }))!;
+    await settle();
+    first.listeners.get(MISSION_LOCATION_EVENT)?.({ missionId: mission.id, userId: mission.requesterId,
+      role: "requester", lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() });
+    live.startSharing();
+    expect(live.locations.value.requester?.lat).toBe(35.7);
+
+    bearer.value = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",
+      deviceId: "device-1", sessionId: "session-2" }))}.x`;
+    expect(live.locations.value).toEqual({});
+    expect(live.sharing.value).toBe(false);
+    expect(clear).toHaveBeenCalledOnce();
+    expect(first.close).toHaveBeenCalledOnce();
+    await settle();
+    expect(second.emitted).toContainEqual({ event: MISSION_SUBSCRIBE_EVENT, payload: { missionId: mission.id } });
+    expect(live.sharing.value).toBe(false);
+    scope.stop();
+  });
+
+  it("clears private mission markers immediately when the selected mission changes", async () => {
+    const first = fakeSocket();
+    const missionRef = ref<typeof mission | null>(mission);
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(missionRef, ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => first.client }))!;
+    await settle();
+    first.listeners.get(MISSION_LOCATION_EVENT)?.({ missionId: mission.id, userId: mission.requesterId,
+      role: "requester", lat: 35.7, lon: 51.4, accuracy: null, timestamp: new Date().toISOString() });
+    expect(live.locations.value.requester?.lat).toBe(35.7);
+    missionRef.value = null;
+    expect(live.locations.value).toEqual({});
+    expect(first.close).toHaveBeenCalledOnce();
+    scope.stop();
+  });
+
   it("keeps consent through an access-token refresh of the same session", async () => {
     const session = fakeSocket();
     const firstToken = `x.${btoa(JSON.stringify({ sub: mission.rescuerId, role: "user",

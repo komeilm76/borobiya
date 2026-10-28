@@ -17,6 +17,12 @@ function sessionIdentity(token: string | null): string | null {
   return claims ? JSON.stringify([claims.sub, claims.role, claims.deviceId, claims.sessionId]) : null;
 }
 
+/** Do not open a private mission room while the refreshed bearer and cached profile disagree. */
+function matchesOwner(token: string | null, owner: string | null): boolean {
+  const subject = decodeAccessTokenClaims(token)?.sub;
+  return Boolean(token && owner && (typeof subject !== "string" || subject === owner));
+}
+
 export interface LiveMissionIdentity {
   id: string;
   requesterId: string;
@@ -126,7 +132,8 @@ export function useMissionLiveLocations(
   function subscribe(): void {
     const current = mission.value;
     const socket = client?.socket;
-    if (!current || !socket?.connected || socketIdentity !== sessionIdentity(token.value)) return;
+    if (!current || !socket?.connected || !matchesOwner(token.value, userId.value) ||
+      socketIdentity !== sessionIdentity(token.value)) return;
     const gen = generation;
     const owner = userId.value;
     socket.timeout(5000).emit(MISSION_SUBSCRIBE_EVENT, { missionId: current.id },
@@ -199,13 +206,14 @@ export function useMissionLiveLocations(
     stop();
     const current = mission.value;
     const owner = userId.value;
-    if (!current || !owner || !token.value) return;
+    if (!current || !owner || !token.value || !matchesOwner(token.value, owner)) return;
     const gen = generation;
     clockTicker = setInterval(() => { now.value = currentTime(); }, 1000);
     clockTicker.unref?.();
     try {
       await ensureSession?.();
-      if (gen !== generation || !token.value || mission.value?.id !== current.id || userId.value !== owner) return;
+      if (gen !== generation || !token.value || !matchesOwner(token.value, owner) ||
+        mission.value?.id !== current.id || userId.value !== owner) return;
       const opener = runtime.openSocket ?? (async (bearer: string) => {
         const { createRealtimeClient } = await import("@/services/socket");
         return createRealtimeClient(bearer);
@@ -213,14 +221,16 @@ export function useMissionLiveLocations(
       const openingToken = token.value;
       const openingIdentity = sessionIdentity(openingToken);
       const opened = await opener(openingToken);
+      const currentBearer = token.value;
       if (gen !== generation || mission.value?.id !== current.id || userId.value !== owner ||
-        !openingIdentity || openingIdentity !== sessionIdentity(token.value)) {
+        !currentBearer || !matchesOwner(currentBearer, owner) || !openingIdentity ||
+        openingIdentity !== sessionIdentity(currentBearer)) {
         opened.close(); return;
       }
       client = opened;
       socketIdentity = openingIdentity;
       const active = () => gen === generation && client === opened &&
-        socketIdentity === sessionIdentity(token.value) &&
+        socketIdentity === sessionIdentity(token.value) && matchesOwner(token.value, owner) &&
         mission.value?.id === current.id && userId.value === owner;
       opened.socket.on("connect", () => {
         if (!active()) return;
@@ -244,7 +254,7 @@ export function useMissionLiveLocations(
       opened.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, (payload: unknown) => {
         if (active()) onCancellation(payload, "rescuer");
       });
-      opened.updateToken(token.value);
+      opened.updateToken(currentBearer);
       opened.connect();
       if (opened.socket.connected) subscribe();
     } catch {
@@ -280,6 +290,7 @@ export function useMissionLiveLocations(
   }
   function startSharing(): void {
     if (sharing.value || !connected.value || !mission.value || !userId.value ||
+      !matchesOwner(token.value, userId.value) ||
       (mission.value.requesterId !== userId.value && mission.value.rescuerId !== userId.value &&
         !isAdmin(token.value))) return;
     const owner = userId.value;
@@ -311,7 +322,10 @@ export function useMissionLiveLocations(
       error.value = "مکان‌یابی در این دستگاه در دسترس نیست.";
     }
   }
-  watch(() => [mission.value?.id, userId.value] as const, () => { void start(); }, { immediate: true });
+  // Account, mission and JWT-session changes are privacy boundaries: stop GPS and
+  // clear previous participants before Vue's deferred render or a same-tick relogin.
+  watch(() => [mission.value?.id, userId.value] as const, () => { void start(); },
+    { immediate: true, flush: "sync" });
   watch(token, (next, previous) => {
     if (!next) { stop(); return; }
     if (!sessionIdentity(next) || sessionIdentity(next) !== sessionIdentity(previous)) {
@@ -321,7 +335,7 @@ export function useMissionLiveLocations(
       return;
     }
     client?.updateToken(next);
-  });
+  }, { flush: "sync" });
   onScopeDispose(stop);
   return { locations, participantStatus, connected, sharing, error, now, start, stop,
     startSharing, stopSharing, handleEvent };

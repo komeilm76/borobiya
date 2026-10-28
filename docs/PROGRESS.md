@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Live mission marker and GPS session boundary (T3.5.7 follow-up)
+
+- The mission live panel's deferred watchers retained another mission/account's private coordinates and an active consented GPS watch until the next Vue tick after logout, mission switch or session replacement. A null token followed by a new login in that tick could coalesce the logout boundary; a new JWT subject could also open a room while the cached profile still belonged to the old account. Mission/owner/token transitions now clear the marker/watch and close the socket synchronously, and a bearer with a different subject waits for its matching profile before connecting. Same-session bearer rotation keeps consent. Pure composable regressions reproduced the immediate stale-marker cases before the fix and cover direct same-account session replacement and delayed profile change. No Vue SFC mount or browser/VM acceptance performed.
+
 ### 2026-10-28 — Socket location post-commit acknowledgement (T2.1.5 follow-up)
 
 - Socket `location:update` persisted an accepted fix before refreshing optional session presence and emitting to rooms. If either step threw, its outer handler reported `SERVICE_UNAVAILABLE` for a committed write, encouraging duplicate retries; a failed presence touch or one room's emit also blocked the remaining notifications. Post-persistence failures now log warnings, continue independent room deliveries, and acknowledge the committed fix. Regressions reproduced both failures before the change; a real `applyUpdate` failure still produces the existing unavailable ack with no emission. Focused and full server tests/typechecks passed; live socket/VM acceptance (P2-A1/P2-A2) remains open.
