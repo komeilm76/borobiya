@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Mission presence account/session boundary fix (T4.3.3 follow-up)
+
+- A mounted mission panel could show the previous mission/account's private online badge until Vue's deferred watcher ran; it also polled under a JWT subject that did not match the displayed owner and restarted its poll on a same-session bearer renewal. The presence model now synchronously clears/aborts on mission, account, token-loss or JWT session changes, refuses a mismatched bearer and retains its snapshot/poll timer on ordinary renewal. Injected-read regressions failed before the fix and now cover immediate cleanup, late replies, subject gating, session switches and same-session rotation. Server authorization is unchanged, and these are not rendered browser/VM acceptance tests.
+
 ### 2026-10-28 — Admin user search stale-results feedback (T4.4.2 partial)
 
 - Editing the admin user search left the previous query's rows and status switches actionable until a debounced read began, and a pending old response could arrive during that interval. Search now synchronously clears/invalidates old rows and counts, shows loading through the 300 ms debounce, and skips an immediate read when resetting pagination. Inputs remain editable, while status changes are guarded during loading. Source-pinned regressions failed before the fix and pass afterward; no Vue components were mounted and no rendered browser/device acceptance is claimed. T4.4.2 remains open.
