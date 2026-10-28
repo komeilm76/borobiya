@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin user search stale-results feedback (T4.4.2 partial)
+
+- Editing the admin user search left the previous query's rows and status switches actionable until a debounced read began, and a pending old response could arrive during that interval. Search now synchronously clears/invalidates old rows and counts, shows loading through the 300 ms debounce, and skips an immediate read when resetting pagination. Inputs remain editable, while status changes are guarded during loading. Source-pinned regressions failed before the fix and pass afterward; no Vue components were mounted and no rendered browser/device acceptance is claimed. T4.4.2 remains open.
+
 ### 2026-10-28 — Rescuer mission desk account-boundary fix (T3.6.3 follow-up)
 
 - The mounted mission desk kept private mission rows and cancellation state when its token disappeared while the profile remained loaded; a changed owner could see old rows until Vue's next tick. The desk now synchronously clears its state and invalidates in-flight reads/cancellations when the owner, token availability, or JWT session changes. The view stops routes and only reloads after the bearer subject/session matches the displayed account; same-session bearer renewal preserves the panel. Deferred client regressions failed before the fix and now cover late replies, token loss, owner switch, session renewal and mismatch. These unit and source-pinned view tests do not establish browser/device behavior or server authorization (which remains authoritative).

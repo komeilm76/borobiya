@@ -37,7 +37,6 @@
           counter="30"
           clearable
           hide-details
-          :disabled="loading && !users.length"
           @update:model-value="updateSearch"
         />
         <v-select
@@ -51,7 +50,6 @@
           rounded="lg"
           density="comfortable"
           hide-details
-          :disabled="loading && !users.length"
           @update:model-value="updateStatusFilter"
         />
         <v-select
@@ -65,7 +63,6 @@
           rounded="lg"
           density="comfortable"
           hide-details
-          :disabled="loading && !users.length"
           @update:model-value="updateCategoryFilter"
         />
       </div>
@@ -342,6 +339,8 @@ let activeListController: AbortController | null = null;
 let listRequestVersion = 0;
 
 const resultsLabel = computed(() => {
+  if (loading.value) return "در حال دریافت فهرست کاربران…";
+  if (listError.value) return "تعداد حساب‌ها در دسترس نیست";
   if (total.value === 0) return "۰ حساب";
   const first = (page.value - 1) * PAGE_SIZE + 1;
   const last = Math.min(page.value * PAGE_SIZE, total.value);
@@ -448,6 +447,22 @@ function updateSearch(value: unknown): void {
   const next = typeof value === "string" ? value.slice(0, 30) : "";
   if (search.value === next) return;
   search.value = next;
+  clearSearchTimer();
+  // The previous query's rows must not remain actionable during debounce.
+  // Also invalidate a list request still waiting for ensureSession().
+  ++listRequestVersion;
+  activeListController?.abort();
+  activeListController = null;
+  users.value = [];
+  total.value = 0;
+  totalPages.value = 0;
+  listError.value = "";
+  loading.value = true;
+  if (page.value !== 1) page.value = 1;
+  searchTimer = setTimeout(() => {
+    searchTimer = null;
+    void loadUsers();
+  }, 300);
 }
 
 function updateStatusFilter(value: unknown): void {
@@ -475,7 +490,7 @@ function updatePage(value: unknown): void {
 }
 
 function requestStatusChange(user: UserProfile, value: unknown): void {
-  if (typeof value !== "boolean" || value === user.isActive || statusSavingUserId.value !== null || isCurrentAdmin(user)) return;
+  if (loading.value || typeof value !== "boolean" || value === user.isActive || statusSavingUserId.value !== null || isCurrentAdmin(user)) return;
   statusError.value = "";
   statusChange.value = { user, nextIsActive: value };
 }
@@ -519,20 +534,9 @@ async function confirmStatusChange(): Promise<void> {
   }
 }
 
-watch(search, () => {
-  clearSearchTimer();
-  if (page.value !== 1) {
-    page.value = 1;
-    return;
-  }
-  searchTimer = setTimeout(() => {
-    searchTimer = null;
-    void loadUsers();
-  }, 300);
-});
-
 watch(page, () => {
-  clearSearchTimer();
+  // updateSearch already scheduled the query; resetting page must not bypass debounce.
+  if (searchTimer !== null) return;
   void loadUsers();
 });
 
