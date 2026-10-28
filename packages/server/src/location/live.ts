@@ -162,7 +162,13 @@ export async function registerLocationUpdateRoute(
       });
     }
 
-    dependencies.broadcast?.(result.peers, { userId: user.userId, ...result.fix });
+    // The fix has already committed. Socket adapter failure must not turn this into a
+    // retryable 500 that causes the client to append the same history point again.
+    try {
+      dependencies.broadcast?.(result.peers, { userId: user.userId, ...result.fix });
+    } catch (error) {
+      request.log.warn({ err: error, userId: user.userId }, "Location update fan-out failed after persistence");
+    }
     return reply.code(200).header("cache-control", "no-store").send();
   });
 }

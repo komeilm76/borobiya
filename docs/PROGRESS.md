@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — REST location fallback post-commit fan-out (T2.1.5 follow-up)
+
+- The deprecated `POST /_user/location/update` persisted a fix, then allowed a throwing Socket.IO fan-out adapter to turn the response into a 500. A client retry could append the same history point despite the first write succeeding. The route now logs fan-out failure after persistence and acknowledges the committed fix; persistence failure still returns 500 and emits nothing. A Fastify route regression reproduced the 500-after-write before the fix and tests both boundaries. Live socket/VM acceptance (P2-A1/P2-A2) remains open.
+
 ### 2026-10-28 — Cached profile isolation on cookie restore (T1.2.7 follow-up)
 
 - On a cold tab restore, `sessionStorage` could supply account A's cached profile before the HttpOnly refresh cookie returned a bearer for account B. With no previous bearer to compare, the existing session-change fence left A visible next to B's token; a temporary `/_user/me` failure kept that mismatch indefinitely. Cookie restoration now checks a JWT's subject/session claims against the cached profile and clears mismatched/unverifiable cached identity before installing the bearer. A matching cached owner remains available during a transient same-account profile outage. Pure auth-store regressions reproduced the mismatch before the fix; no live two-tab/browser acceptance performed.

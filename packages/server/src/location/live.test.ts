@@ -268,6 +268,40 @@ describe("POST /_user/location/update (REST fallback)", () => {
     });
   });
 
+  it("acknowledges an already-persisted fix even when realtime fan-out throws", async () => {
+    const peer = randomUUID();
+    const { service, recorded } = makeService({
+      shares: [{ targetUserId: peer, priorityDeviceId: null }]
+    });
+    const broadcast = vi.fn(() => { throw new Error("Socket adapter unavailable"); });
+    const app = await makeRouteApp({ service, broadcast });
+
+    const response = await app.inject({
+      method: "POST", url: "/_user/location/update",
+      headers: { authorization: "Bearer test-token" }, payload: payload()
+    });
+
+    expect(recorded).toHaveLength(1); // the write committed before fan-out
+    expect(broadcast).toHaveBeenCalledOnce();
+    expect(response.statusCode).toBe(200); // a retryable 500 would append the same fix again
+    expect(response.body).toBe("");
+  });
+
+  it("still reports a failed persistence instead of acknowledging an unwritten fix", async () => {
+    const { service } = makeService({
+      shares: [{ targetUserId: randomUUID(), priorityDeviceId: null }],
+      recordFix: async () => { throw new Error("Database unavailable"); }
+    });
+    const broadcast = vi.fn();
+    const app = await makeRouteApp({ service, broadcast });
+    const response = await app.inject({
+      method: "POST", url: "/_user/location/update",
+      headers: { authorization: "Bearer test-token" }, payload: payload()
+    });
+    expect(response.statusCode).toBe(500);
+    expect(broadcast).not.toHaveBeenCalled();
+  });
+
   it("maps rejections onto documented REST status codes", async () => {
     const cases: [string, Record<string, unknown>, number, string][] = [
       ["out-of-range coordinates", { lat: 95 }, 400, "VALIDATION_ERROR"],
