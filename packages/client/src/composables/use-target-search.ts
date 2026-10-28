@@ -142,15 +142,16 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
   }
 
   watch(term, () => {
-    // Invalidate at the keystroke, not after the 300 ms debounce. Otherwise an
-    // older response can resolve during that window and offer the wrong recipient.
+    // Invalidate synchronously at the keystroke. A deferred watcher can leave an
+    // old recipient selectable until nextTick, or cancel an Enter-triggered read
+    // and start the same query a second time after its debounce.
     cancelPending();
     if (!shouldSearch(term.value)) return;
     timer = setTimeout(() => {
       timer = null;
       void run();
     }, SEARCH_DEBOUNCE_MS);
-  });
+  }, { flush: "sync" });
 
   // Narrowing controls are not debounced: they are clicked, not typed, and a stale list under a
   // newly-set filter is worse than the half-second it takes to refetch.
@@ -161,7 +162,8 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
       options.minRating?.value,
       options.online?.value
     ],
-    () => searchNow()
+    () => searchNow(),
+    { flush: "sync" }
   );
 
   onScopeDispose(cancelPending);

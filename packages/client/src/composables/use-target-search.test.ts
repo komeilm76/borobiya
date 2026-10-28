@@ -171,6 +171,43 @@ describe("useTargetSearch", () => {
     scope.stop();
   });
 
+  it("invalidates selectable recipients in the same tick as a term or filter change", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(page([row("old_recipient", "3")])));
+    vi.stubGlobal("fetch", fetchMock);
+    const minRating = ref<number | undefined>(undefined);
+    const { search, scope } = mountComposable({ minRating });
+    try {
+      search.term.value = "ha";
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(search.results.value).toHaveLength(1);
+
+      search.term.value = "ham";
+      expect(search.results.value).toEqual([]); // cannot select an old candidate before nextTick
+      expect(search.total.value).toBe(0);
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(search.results.value).toHaveLength(1);
+
+      minRating.value = 4;
+      expect(search.results.value).toEqual([]); // clicked filter cannot retain old candidates either
+      expect(search.total.value).toBe(0);
+    } finally { scope.stop(); }
+  });
+
+  it("pressing Enter right after typing runs exactly one immediate search", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(page([row("hamlet", "2")])));
+    vi.stubGlobal("fetch", fetchMock);
+    const { search, scope } = mountComposable();
+    try {
+      search.term.value = "ham";
+      search.searchNow();
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS * 2);
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(search.results.value.map((item) => item.username)).toEqual(["hamlet"]);
+    } finally { scope.stop(); }
+  });
+
   it("never shows a prior term's recipients while the new valid term is still debouncing", async () => {
     const older = deferred<Response>();
     const fetchMock = vi.fn(async () => older.promise);

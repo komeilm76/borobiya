@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Recipient-picker same-tick search invalidation (T2.1.7 follow-up)
+
+- The recipient search invalidated old candidates with Vue's deferred watchers: directly after changing the term/filter, the old list was still selectable until the next tick. Pressing Enter in that gap started a read which the term watcher then cancelled and repeated after 300 ms, wasting a request and delaying the requested result. Term and filter watchers now invalidate synchronously, while ordinary typing still debounces. Pure composable regressions reproduced both defects before the fix; no Vue SFC was mounted or browser/VM interaction acceptance performed.
+
 ### 2026-10-28 — Live companion share-list retry failure (T2.1.8 follow-up)
 
 - After a share-list 401 refreshed the bearer, a second failed read was silently discarded: the retry had superseded the original read's generation, so the map never showed its retry/error state even though no share list was verified. The receiver now reports that failure only if the retried bearer and read still belong to the current account; a newer successful read cannot be overwritten by an older failed retry. Focused pure composable tests reproduced the missing error before the fix and cover the superseding-read race. No Vue SFC was mounted or live two-browser/VM acceptance performed; P2-A1 remains open.
