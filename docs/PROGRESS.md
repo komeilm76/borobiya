@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-28 — Admin category member removal feedback (T4.4.2 partial)
+
+- A confirmed member removal followed by a failed list refresh still showed the removed person in the category and members dialog while announcing success, allowing a second DELETE. After server acknowledgement, the page now removes only that member from both known snapshots before its best-effort re-read; a failed DELETE leaves them unchanged, and a failed re-read still gets its own error. A source-pinned ordering regression failed before the fix and a pure transform test covers preserved members/other categories; no Vue component was mounted and no browser/device or site-wide T4.4.2 acceptance is claimed.
+
 ### 2026-10-28 — SOS incident catalog retry race (T3.2.4 follow-up)
 
 - When the incident-type catalog loader was called again before an earlier read settled, an older reply could replace the latest picker list or show an error after a newer successful read. The loader now applies success, failure and loading completion only for its latest request. Deferred-response tests reproduced both composable races before the fix and verify that an older reply cannot mark a newer pending read as finished. The current sheet normally hides Retry while loading; these tests do not establish a reproduced browser double-click. The public catalog API and live/browser SOS acceptance are unchanged.

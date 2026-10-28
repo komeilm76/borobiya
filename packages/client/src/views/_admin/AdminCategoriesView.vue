@@ -281,6 +281,7 @@ import {
   type CategoryFormDraft
 } from "../../admin/catalog-form";
 import { catalogListPresentation } from "../../admin/catalog-list-presentation";
+import { withoutConfirmedMember } from "../../admin/category-members";
 import { useCategoryMemberSearch } from "../../admin/use-category-member-search";
 import { useAuthStore } from "../../stores/auth";
 
@@ -512,6 +513,12 @@ async function removeMember(member: CategoryMember): Promise<void> {
       return;
     }
     await removeCategoryUser(category.id, member.id, accessToken);
+    // DELETE has committed. If the subsequent list read fails, do not keep a removed member
+    // visible or offer a second DELETE; the failed refresh still gets its own warning.
+    categories.value = categories.value.map((row) => withoutConfirmedMember(row, category.id, member.id));
+    if (membersFor.value?.id === category.id) {
+      membersFor.value = withoutConfirmedMember(membersFor.value, category.id, member.id);
+    }
     await load();
     successMessage.value = `${member.username} از ${category.name} حذف شد.`;
     successVisible.value = true;

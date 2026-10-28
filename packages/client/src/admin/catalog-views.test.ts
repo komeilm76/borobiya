@@ -56,6 +56,18 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(categories).toContain('  resetSearch();');
   });
 
+  it("removes a confirmed member locally before reloading the list", () => {
+    const removal = categories.slice(categories.indexOf("async function removeMember("), categories.indexOf("onMounted(() => {"));
+    const acknowledged = removal.indexOf("await removeCategoryUser(category.id, member.id, accessToken)");
+    const updatedList = removal.indexOf("categories.value = categories.value.map((row) => withoutConfirmedMember(row, category.id, member.id))");
+    const updatedDialog = removal.indexOf("membersFor.value = withoutConfirmedMember(membersFor.value, category.id, member.id)");
+    const refreshed = removal.indexOf("await load()");
+    expect(acknowledged).toBeGreaterThan(-1);
+    expect(updatedList).toBeGreaterThan(acknowledged);
+    expect(updatedDialog).toBeGreaterThan(updatedList);
+    expect(refreshed).toBeGreaterThan(updatedDialog);
+  });
+
   it("names a refused user rather than the index the server pointed at", () => {
     // `unknown_target` issues carry `path: ["userIds", 2]`; the screen turns that back into the username
     // it offered, which is the only entity name the admin has ever seen.
