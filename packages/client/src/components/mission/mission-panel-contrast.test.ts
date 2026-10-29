@@ -6,6 +6,7 @@ import { palettes } from "@/styles/tokens";
 const live = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
 const rating = readFileSync(new URL("./MissionRatingPanel.vue", import.meta.url), "utf8");
 const timeline = readFileSync(new URL("./MissionTimelinePanel.vue", import.meta.url), "utf8");
+const missionView = readFileSync(new URL("../../views/_user/UserMissionView.vue", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
   const channel = (i: number) => {
@@ -35,6 +36,21 @@ describe("mission member and rating controls contrast", () => {
       expect(contrast(palettes[mode].primary, palettes[mode].surface)).toBeGreaterThanOrEqual(4.5);
     }
     expect(timeline).toMatch(/\.timeline__eyebrow\s*\{[^}]*color:\s*rgb\(var\(--v-theme-primary\)\)/);
+  });
+
+  it("does not fade future mission-stage text below 4.5:1 on light cards", () => {
+    const blend = (hex: string, base: string, alpha: number) => "#" + [1, 3, 5].map((i) =>
+      Math.round(parseInt(hex.slice(i, i + 2), 16) * alpha + parseInt(base.slice(i, i + 2), 16) * (1 - alpha))
+        .toString(16).padStart(2, "0")).join("");
+    const oldTint = blend("#6f8a82", palettes.light.surface, 0.09);
+    expect(contrast(blend(palettes.light.text, oldTint, 0.6), oldTint)).toBeLessThan(4.5);
+    for (const theme of ["light", "dark"] as const) {
+      const tint = blend("#6f8a82", palettes[theme].surface, 0.09);
+      expect(contrast(palettes[theme].text, tint)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(missionView).toMatch(/\.mission-steps__item \{[^}]*color: rgb\(var\(--v-theme-on-surface\)\);[^}]*\}/);
+    expect(missionView).not.toMatch(/\.mission-steps__item \{[^}]*opacity: \.6;/);
+    expect(missionView).toContain(".mission-steps__item--reached { background:");
   });
 
   it("keeps star controls, saved stars and their borders distinguishable in both themes", () => {

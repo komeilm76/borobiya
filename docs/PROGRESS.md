@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Preserve contrast of future mission stages (T4.4.3 partial)
+
+- The rescuer’s future-stage labels were dimmed to 60% opacity, producing under-4.5:1 small text on light tinted cards. They now retain full theme foreground ink; reached stages still have their own background/primary ink and the current stage is marked semantically. Contrast/source tests failed before the fix; rendered/screen-reader/site-wide WCAG AA acceptance remains open.
+
 ### 2026-10-29 — Expose mission timeline live-transport outages (T4.4.2 partial)
 
 - When both Socket.IO and the authenticated timeline event stream failed, a successful earlier HTTP read made the timeline look live even though future status changes would no longer arrive automatically. A scoped warning now offers manual refresh, clears on validated live delivery/socket recovery, and cannot survive a mission/session teardown. Tests cover the failure and recovery path without a browser; VM/proxy and rendered feedback remain unverified.
