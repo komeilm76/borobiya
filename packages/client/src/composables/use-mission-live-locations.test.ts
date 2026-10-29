@@ -1,6 +1,7 @@
 import { effectScope, nextTick, ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import type { RealtimeClient } from "@/services/socket";
+import type { UserSyncResponse } from "@shared/index";
 import { MISSION_LOCATION_EVENT, MISSION_LOCATION_PUBLISH_EVENT, MISSION_SUBSCRIBE_EVENT } from "@/services/socket-events";
 import { useMissionLiveLocations } from "./use-mission-live-locations";
 
@@ -19,8 +20,9 @@ function fakeSocket() {
     } }))
   };
   const close = vi.fn();
-  const client = { socket, close, connect: vi.fn(), updateToken: vi.fn() } as unknown as RealtimeClient;
-  return { client, listeners, emitted, close, socket };
+  const connect = vi.fn();
+  const client = { socket, close, connect, updateToken: vi.fn() } as unknown as RealtimeClient;
+  return { client, listeners, emitted, close, connect, socket };
 }
 
 async function settle() { await Promise.resolve(); await Promise.resolve(); await nextTick(); }
@@ -384,6 +386,149 @@ describe("mission live positions (T3.5.7)", () => {
     expect(failed.sharing.value).toBe(false);
     expect(failed.error.value).toContain("همگام‌سازی");
     scope2.stop();
+  });
+
+  it("blocks fresh GPS consent until a reconnect verifies the mission, then honors a terminal result", async () => {
+    const session = fakeSocket();
+    let finish!: (value: UserSyncResponse) => void;
+    const readSync = vi.fn(() => new Promise<UserSyncResponse>((resolve) => { finish = resolve; }));
+    const watchPosition = vi.fn(() => vi.fn());
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, watchPosition, readSync }))!;
+    try {
+      await settle();
+      session.socket.connected = false;
+      session.listeners.get("disconnect")?.("transport close");
+      session.socket.connected = true;
+      session.listeners.get("connect")?.();
+      await settle();
+      expect(live.connected.value).toBe(true); // subscribe ack is not a mission-status check
+      expect(live.recoveryPending.value).toBe(true);
+      live.startSharing();
+      expect(watchPosition).not.toHaveBeenCalled();
+      finish({ events: [], missions: [{ ...mission, sosRequestId: mission.id, status: "completed",
+        cancelledBy: null, cancellationReasonId: null, cancellationCustomText: null, cancelledAt: null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
+        missionsTruncated: false, nextCursor: null, location: null });
+      await settle();
+      expect(live.connected.value).toBe(false);
+      expect(live.sharing.value).toBe(false);
+      expect(live.error.value).toContain("پایان");
+    } finally { scope.stop(); }
+  });
+
+  it("keeps reconnect verification mandatory after a failed read and manual retry", async () => {
+    const first = fakeSocket();
+    const second = fakeSocket(); // already connected before its handlers are attached
+    let finishRetry!: (value: UserSyncResponse) => void;
+    const readSync = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockImplementationOnce(() => new Promise<UserSyncResponse>((resolve) => { finishRetry = resolve; }));
+    const watchPosition = vi.fn(() => vi.fn());
+    const scope = effectScope();
+    let opens = 0;
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => ++opens === 1 ? first.client : second.client,
+        watchPosition, readSync }))!;
+    try {
+      await settle();
+      first.socket.connected = false;
+      first.listeners.get("disconnect")?.("transport close");
+      first.socket.connected = true;
+      first.listeners.get("connect")?.();
+      await settle();
+      expect(live.error.value).toContain("همگام‌سازی");
+      expect(live.recoveryPending.value).toBe(true);
+      await live.start(); // retry the same mission/session; never erase the need to verify
+      await settle(); // an already-connected socket must also run reconciliation
+      expect(readSync).toHaveBeenCalledTimes(2);
+      expect(live.recoveryPending.value).toBe(true);
+      live.startSharing();
+      expect(watchPosition).not.toHaveBeenCalled();
+      finishRetry({ events: [], missions: [{ ...mission, sosRequestId: mission.id, status: "in_progress",
+        cancelledBy: null, cancellationReasonId: null, cancellationCustomText: null, cancelledAt: null,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
+        missionsTruncated: false, nextCursor: null, location: null });
+      await settle();
+      expect(live.recoveryPending.value).toBe(false);
+      live.startSharing();
+      expect(watchPosition).toHaveBeenCalledOnce();
+    } finally { scope.stop(); }
+  });
+
+  it("does not subscribe twice if connect emits synchronously during startup", async () => {
+    const session = fakeSocket();
+    session.connect.mockImplementation(() => { session.listeners.get("connect")?.(); });
+    const scope = effectScope();
+    scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client }));
+    try {
+      await settle();
+      expect(session.emitted.filter(({ event }) => event === MISSION_SUBSCRIBE_EVENT)).toHaveLength(1);
+    } finally { scope.stop(); }
+  });
+
+  it("retains the missed-status check even if the retry socket itself fails to open", async () => {
+    const first = fakeSocket();
+    const third = fakeSocket();
+    const watchPosition = vi.fn(() => vi.fn());
+    let attempts = 0;
+    const openSocket = vi.fn(async () => {
+      attempts++;
+      if (attempts === 2) throw new Error("socket offline");
+      return attempts === 1 ? first.client : third.client;
+    });
+    const readSync = vi.fn().mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ events: [], missions: [{ id: mission.id, status: "in_progress" }],
+        missionsTruncated: false, nextCursor: null, location: null });
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), ref(token), ref(mission.rescuerId),
+      async () => {}, { openSocket, readSync, watchPosition }))!;
+    try {
+      await settle();
+      first.socket.connected = false;
+      first.listeners.get("disconnect")?.("transport close");
+      first.socket.connected = true;
+      first.listeners.get("connect")?.();
+      await settle();
+      expect(live.recoveryPending.value).toBe(true);
+      await live.start();
+      expect(live.error.value).toContain("اتصال");
+      expect(live.recoveryPending.value).toBe(true);
+      await live.start();
+      await settle();
+      expect(readSync).toHaveBeenCalledTimes(2);
+      expect(live.recoveryPending.value).toBe(false);
+      live.startSharing();
+      expect(watchPosition).toHaveBeenCalledOnce();
+    } finally { scope.stop(); }
+  });
+
+  it("drops the pending recovery boundary on logout without accepting a late old-session result", async () => {
+    const session = fakeSocket();
+    let finish!: (value: { events: []; missions: []; missionsTruncated: false; nextCursor: null; location: null }) => void;
+    const readSync = vi.fn(() => new Promise<Parameters<typeof finish>[0]>((resolve) => { finish = resolve; }));
+    const bearer = ref<string | null>(token);
+    const scope = effectScope();
+    const live = scope.run(() => useMissionLiveLocations(ref(mission), bearer, ref(mission.rescuerId),
+      async () => {}, { openSocket: async () => session.client, readSync }))!;
+    try {
+      await settle();
+      session.socket.connected = false;
+      session.listeners.get("disconnect")?.("transport close");
+      session.socket.connected = true;
+      session.listeners.get("connect")?.();
+      await settle();
+      expect(live.recoveryPending.value).toBe(true);
+      bearer.value = null;
+      expect(live.recoveryPending.value).toBe(false);
+      expect(live.connected.value).toBe(false);
+      finish({ events: [], missions: [], missionsTruncated: false, nextCursor: null, location: null });
+      await settle();
+      expect(live.recoveryPending.value).toBe(false);
+      expect(live.locations.value).toEqual({});
+      expect(session.close).toHaveBeenCalledOnce();
+    } finally { scope.stop(); }
   });
 
   it("uses the scoped mission detail, not the user sync stream, for admin reconnect", async () => {

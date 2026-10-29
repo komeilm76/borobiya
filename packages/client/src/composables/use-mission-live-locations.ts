@@ -55,6 +55,9 @@ export function useMissionLiveLocations(
   const locations = ref<Partial<Record<MissionLocationEvent["role"], MissionLocationEvent>>>({});
   const connected = ref(false);
   const sharing = ref(false);
+  // A room subscription confirms access, not that the mission remained active during an outage.
+  // Keep explicit GPS consent disabled until the missed-status HTTP read has succeeded.
+  const recoveryPending = ref(false);
   const error = ref<string | null>(null);
   const now = ref((runtime.now ?? Date.now)());
   const currentTime = runtime.now ?? Date.now;
@@ -66,6 +69,9 @@ export function useMissionLiveLocations(
   let generation = 0;
   let shareGeneration = 0;
   let lastDisconnectAt: string | null = null;
+  let recoveryMissionId: string | null = null;
+  let recoveryOwner: string | null = null;
+  let recoveryIdentity: string | null = null;
   let syncAbort: AbortController | null = null;
   let refreshingAuth = false;
 
@@ -91,6 +97,10 @@ export function useMissionLiveLocations(
     syncAbort?.abort();
     syncAbort = null;
     lastDisconnectAt = null;
+    recoveryMissionId = null;
+    recoveryOwner = null;
+    recoveryIdentity = null;
+    recoveryPending.value = false;
     stopSharing();
     if (clockTicker) clearInterval(clockTicker);
     clockTicker = null;
@@ -191,19 +201,40 @@ export function useMissionLiveLocations(
       // A socket event delivered while the HTTP snapshot was in flight can be newer than the
       // snapshot. Neither this reconciliation nor reconnect starts GPS sharing by itself.
       lastDisconnectAt = null;
+      recoveryMissionId = null;
+      recoveryOwner = null;
+      recoveryIdentity = null;
+      recoveryPending.value = false;
       if (connected.value) error.value = null;
     } catch {
       if (valid()) {
         stopSharing();
-        error.value = "همگام‌سازی پس از اتصال دوباره ممکن نشد؛ وضعیت مأموریت را تازه‌سازی کنید.";
+        error.value = "همگام‌سازی پس از اتصال دوباره ممکن نشد؛ برای بررسی وضعیت مأموریت دوباره تلاش کنید.";
       }
     } finally {
       if (syncAbort === abort) syncAbort = null;
     }
   }
 
+  function pendingRecoveryFor(id: string | null, owner: string | null): string | null {
+    return id && owner && lastDisconnectAt && recoveryMissionId === id && recoveryOwner === owner &&
+      recoveryIdentity !== null && recoveryIdentity === sessionIdentity(token.value)
+      ? lastDisconnectAt : null;
+  }
+  function restoreRecovery(since: string | null, id: string | null, owner: string | null): void {
+    if (!since) return;
+    lastDisconnectAt = since;
+    recoveryMissionId = id;
+    recoveryOwner = owner;
+    recoveryIdentity = sessionIdentity(token.value);
+    recoveryPending.value = true;
+  }
   async function start(): Promise<void> {
+    // Manual Retry must retain an unverified outage across a new socket or a failed
+    // opener, but only within the same mission, owner and JWT session.
+    const missedSince = pendingRecoveryFor(mission.value?.id ?? null, userId.value);
     stop();
+    restoreRecovery(missedSince, mission.value?.id ?? null, userId.value);
     const current = mission.value;
     const owner = userId.value;
     if (!current || !owner || !token.value || !matchesOwner(token.value, owner)) return;
@@ -232,16 +263,23 @@ export function useMissionLiveLocations(
       const active = () => gen === generation && client === opened &&
         socketIdentity === sessionIdentity(token.value) && matchesOwner(token.value, owner) &&
         mission.value?.id === current.id && userId.value === owner;
-      opened.socket.on("connect", () => {
+      let connectedDuringSetup = false;
+      const onConnect = () => {
         if (!active()) return;
+        connectedDuringSetup = true;
         subscribe();
         void reconcile(current, owner, opened, gen);
-      });
+      };
+      opened.socket.on("connect", onConnect);
       opened.socket.on("disconnect", (reason) => {
         if (!active()) return;
         connected.value = false;
         syncAbort?.abort();
         lastDisconnectAt ??= new Date(currentTime()).toISOString();
+        recoveryMissionId = current.id;
+        recoveryOwner = owner;
+        recoveryIdentity = socketIdentity;
+        recoveryPending.value = true;
         stopSharing();
         if (reason === "io server disconnect") void recoverAuth(opened, gen);
       });
@@ -256,10 +294,15 @@ export function useMissionLiveLocations(
       });
       opened.updateToken(currentBearer);
       opened.connect();
-      if (opened.socket.connected) subscribe();
+      // An injected/native socket can already be connected before handlers are attached.
+      // The room subscribe and missed-status read are both required, but do not double
+      // subscribe if connect() synchronously emitted the event while we were setting up.
+      if (opened.socket.connected && !connectedDuringSetup) onConnect();
     } catch {
       if (gen === generation) {
+        const retrySince = pendingRecoveryFor(current.id, owner);
         stop();
+        restoreRecovery(retrySince, current.id, owner);
         error.value = "اتصال زندهٔ مأموریت برقرار نشد؛ دوباره تلاش کنید.";
       }
     }
@@ -289,7 +332,7 @@ export function useMissionLiveLocations(
     });
   }
   function startSharing(): void {
-    if (sharing.value || !connected.value || !mission.value || !userId.value ||
+    if (sharing.value || !connected.value || recoveryPending.value || !mission.value || !userId.value ||
       !matchesOwner(token.value, userId.value) ||
       (mission.value.requesterId !== userId.value && mission.value.rescuerId !== userId.value &&
         !isAdmin(token.value))) return;
@@ -337,6 +380,6 @@ export function useMissionLiveLocations(
     client?.updateToken(next);
   }, { flush: "sync" });
   onScopeDispose(stop);
-  return { locations, participantStatus, connected, sharing, error, now, start, stop,
+  return { locations, participantStatus, connected, sharing, recoveryPending, error, now, start, stop,
     startSharing, stopSharing, handleEvent };
 }

@@ -34,6 +34,15 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(panel).toContain('markerConstructor = null');
   });
 
+  it("keeps the publish action disabled and shows verification feedback while reconnect status is unknown", () => {
+    const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
+    expect(panel).toContain('live.recoveryPending.value ? \'وضعیت مأموریت تأیید نشده\'');
+    expect(panel).toContain('v-if="live.recoveryPending.value && !live.error.value"');
+    expect(panel).toContain('role="status"');
+    expect(panel).toContain(':disabled="!live.connected.value || live.recoveryPending.value"');
+    expect(panel).toContain('@click="live.start()"'); // retry must recheck, not just dismiss the warning
+  });
+
   it("keeps explicit sharing consent, three markers, last-seen text and an accessible stale badge", () => {
     const panel = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
     expect(panel).toContain('aria-label="نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر"');

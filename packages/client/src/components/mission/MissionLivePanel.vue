@@ -7,8 +7,8 @@
         <p>فقط موقعیت‌های تازه‌ای که هر عضو آگاهانه به اشتراک می‌گذارد نمایش داده می‌شود.</p>
       </div>
       <div class="d-flex flex-wrap align-center ga-2">
-        <v-chip :color="live.connected.value ? 'success' : 'warning'" variant="tonal" size="small">
-          {{ live.connected.value ? 'اتصال زنده' : 'در حال اتصال / آفلاین' }}
+        <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
+          {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
         </v-chip>
         <v-btn v-if="hasMarkers" variant="tonal" size="small" color="primary" rounded="lg"
           prepend-icon="mdi-fit-to-screen" @click="focusMembers">نمایش همهٔ اعضا</v-btn>
@@ -45,8 +45,11 @@
         </div>
         <p class="live-panel__note">این نشانگر فقط تازگی موقعیت داوطلبانه را نمایش می‌دهد. وضعیت اتصال واقعی در بخش «اتصال درخواست‌کننده/امدادگر» نشان داده شده است.</p>
         <template v-if="canPublish">
+          <p v-if="live.recoveryPending.value && !live.error.value" class="live-panel__note" role="status">
+            پس از بازگشت اتصال، وضعیت مأموریت در حال بررسی است. تا تأیید سرور اشتراک موقعیت فعال نمی‌شود.
+          </p>
           <v-btn v-if="!live.sharing.value" color="primary" variant="flat" rounded="lg" block
-            :disabled="!live.connected.value" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
+            :disabled="!live.connected.value || live.recoveryPending.value" prepend-icon="mdi-crosshairs-gps" @click="live.startSharing()">
             اشتراک موقعیت من با اعضا و مدیر
           </v-btn>
           <v-btn v-else color="error" variant="tonal" rounded="lg" block prepend-icon="mdi-stop-circle-outline"

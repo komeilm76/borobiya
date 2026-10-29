@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Verify mission status before re-enabling GPS after reconnect (T4.4.2 partial)
+
+- A room-subscription acknowledgement alone did not confirm whether the mission ended while offline. The mission live panel now marks the recovered room unverified and disables the voluntary share action until the participant-scoped HTTP sync (admin: scoped detail) succeeds. A failed read retains the warning and verification requirement through manual Retry and even a failed socket opener; an already-connected replacement socket performs the same read without double-subscribing if `connect` fires synchronously. A terminal result stops the room, and logout clears private state and pending recovery before late results. Deferred reactive regressions failed before implementation, and the panel wiring is source-pinned without mounting Vue. Rendered/device reconnect acceptance and the wider feedback audit remain open.
+
 ### 2026-10-29 — Stop live companion map data churn on age-only ticks (T4.4.4 partial)
 
 - The receiver’s five-second clock updated on-screen ages but also generated new GeoJSON (including unused `ageSeconds`) and re-issued MapLibre source/paint writes even when no dot changed. The map snapshot now retains its identity across age-only ticks, while moving/renamed/stale/revoked dots still change and the status panel continues aging. Removed a second peer-count watcher that duplicated a genuine peer arrival/removal write. Pure reactive and source-pinned regressions failed before the fix and pass afterward. This is a bounded work-reduction claim, not measured FPS, map paint under 2s or GPS under 500ms; target-device acceptance remains open.
