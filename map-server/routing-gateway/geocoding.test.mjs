@@ -90,18 +90,34 @@ test("geocode and reverse reject malformed/unknown query parameters before upstr
   assert.equal(calls, 0);
 });
 
-test("returns 503 when the local Photon service is unavailable, and logs why for the operator", async () => {
+test("geocode transport failures identify Photon without logging the user's search or exception URL", async () => {
   const lines = [];
-  const response = await handleGeocodeRequest(get("/geocode?q=Tehran"), {
-    fetchImpl: async () => { throw new Error("connection refused"); },
+  const response = await handleGeocodeRequest(get("/geocode?q=Private%20Home%20Address"), {
+    fetchImpl: async (url) => {
+      throw Object.assign(new Error(`request failed: ${url}`), { cause: { code: "PRIVATE_HOME_ADDRESS" } });
+    },
     log: (line) => lines.push(line)
   });
   assert.equal(response.status, 503);
-  // The client-visible 503 body is a fixed shape on purpose; the reason belongs in the container log.
   assert.deepEqual(await response.json(), { error: "geocoding_unavailable" });
   assert.equal(lines.length, 1);
-  assert.match(lines[0], /no HTTP answer from http:\/\/photon:2322\/api\?q=Tehran/);
-  assert.match(lines[0], /Error: connection refused/);
+  assert.match(lines[0], /geocoding: no HTTP answer from photon:2322\/api \(Error\)/);
+  assert.doesNotMatch(lines[0], /private|home|address|q=|request failed/i);
+});
+
+test("reverse transport failures log a safe socket code but not private coordinates", async () => {
+  const lines = [];
+  const response = await handleGeocodeRequest(get("/reverse?lat=35.712345&lon=51.412345"), {
+    fetchImpl: async (url) => {
+      throw Object.assign(new Error(`get ${url} failed`), { cause: { code: "ECONNREFUSED" } });
+    },
+    log: (line) => lines.push(line)
+  });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: "geocoding_unavailable" });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /photon:2322\/reverse \(Error: ECONNREFUSED\)/);
+  assert.doesNotMatch(lines[0], /35\.712345|51\.412345|lat=|lon=|get http/);
 });
 
 test("returns 502 when Photon returns malformed JSON GeoJSON, naming the upstream answer", async () => {
@@ -117,7 +133,7 @@ test("returns 502 when Photon returns malformed JSON GeoJSON, naming the upstrea
   assert.match(body.message, /FeatureCollection/);
 });
 
-test("keeps Photon's own error message out of neither the log nor the client body's query text", async () => {
+test("preserves a Photon error for the caller without logging the search text", async () => {
   const lines = [];
   const response = await handleGeocodeRequest(get("/geocode?q=Azadi%20Square"), {
     fetchImpl: async () => new Response('{"code":"InternalServerError","message":"db is busy"}', {
@@ -135,6 +151,27 @@ test("keeps Photon's own error message out of neither the log nor the client bod
   const text = JSON.stringify(body) + lines.join("\n");
   assert.doesNotMatch(text, /Azadi/);
   assert.match(body.upstream, /^photon:2322\/api$/);
+});
+
+test("Photon error bodies cannot inject private search text or reverse coordinates into diagnostics", async () => {
+  for (const [path, reply, forbidden] of [
+    ["/geocode?q=Private%20Home%20Address", new Response(
+      '{"code":"InternalServerError","message":"failed q=Private Home Address"}', { status: 500 }),
+    /Private|Home|Address|q=/],
+    ["/reverse?lat=35.712345&lon=51.412345", new Response(
+      '<html>upstream failed for /reverse?lat=35.712345&lon=51.412345</html>', { status: 502 }),
+    /35\.712345|51\.412345|lat=|lon=/]
+  ]) {
+    const lines = [];
+    const response = await handleGeocodeRequest(get(path), {
+      fetchImpl: async () => reply,
+      log: (line) => lines.push(line)
+    });
+    assert.equal(response.status, 502);
+    assert.equal(lines.length, 1);
+    assert.match(lines[0], /geocoding: upstream photon:2322\/(?:api|reverse) answered HTTP 5\d\d/);
+    assert.doesNotMatch(lines[0], forbidden);
+  }
 });
 
 test("uses fixed offline Photon upstreams by default", () => {

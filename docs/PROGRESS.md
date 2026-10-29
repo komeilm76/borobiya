@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Photon geocoding transport log privacy (T4.1.2/T4.1.3 follow-up)
+
+- The local Map Server logged the full Photon GET URL and fetch exception message on `/geocode` or `/reverse` transport failure, exposing place-search text or exact reverse-geocode coordinates to operator logs. Even an upstream HTTP error body could echo those private inputs back into diagnostics. Failure logs now contain only the query-free Photon service/path, HTTP status or safe timeout/socket code, and unreadable-body status; the caller's existing 503/502 responses are unchanged. Node regressions reproduced both the URL/exception leak and the upstream-body echo before the fix, then passed. This covers gateway-generated failure diagnostics, not external proxy/Photon access logs or VM/browser acceptance.
+
 ### 2026-10-29 — Recheck location recipients after persistence (T2.1.5 follow-up)
 
 - Live location used the share list fetched *before* `recordFix` to choose Socket.IO and REST recipients. A revocation, suspension, expiry, or priority-device change committed while the database write was in flight could still receive the newly committed fix. The service now intersects the original recipient set with a fresh active-share/device check immediately after persistence, without including grants created mid-update. If that post-write read fails, it logs the failure, sends to no peers, and acknowledges the committed fix rather than inviting a duplicate write; actual persistence failures still reject. Deferred-write service regressions reproduced the stale recipient before the fix; a Fastify route regression covers the shared REST fan-out path. This narrows the write-window race, but is not an atomic guarantee against a revocation *after* the recheck; live socket/VM acceptance (P2-A1/P2-A2) remains open.

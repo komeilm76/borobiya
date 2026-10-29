@@ -88,4 +88,4 @@ function formatUpstreamLog(prefix, { status, endpoint, message, fields }) {
   return parts.join(" ");
 }
 
-export { describeUpstream, formatUpstreamLog, readUpstreamBody };
+export { describeUpstream, formatUpstreamLog, readUpstreamBody, upstreamName };

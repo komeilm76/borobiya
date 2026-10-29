@@ -1,4 +1,4 @@
-import { describeUpstream, formatUpstreamLog, readUpstreamBody } from "./upstream.mjs";
+import { describeUpstream, readUpstreamBody, upstreamName } from "./upstream.mjs";
 
 const DEFAULT_PHOTON_UPSTREAMS = Object.freeze({
   geocode: "http://photon:2322/api",
@@ -7,6 +7,9 @@ const DEFAULT_PHOTON_UPSTREAMS = Object.freeze({
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" };
 const DECIMAL_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const SAFE_NETWORK_CODES = new Set([
+  "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH"
+]);
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -52,15 +55,23 @@ async function proxyPhotonRequest(target, { fetchImpl, timeoutMs, log = console.
       signal: AbortSignal.timeout(timeoutMs)
     });
   } catch (error) {
-    const reason = `${error?.name ?? "Error"}: ${String(error?.message ?? "unknown").slice(0, 200)}`;
-    log(`geocoding: no HTTP answer from ${target} (${reason})`);
+    // Photon uses GET: both the target URL and fetch's exception message can contain
+    // a private search term or reverse-geocoded GPS coordinates. Log only a safe
+    // endpoint name, timeout classification and bounded socket code.
+    const code = error?.cause?.code;
+    const reason = `${error?.name === "TimeoutError" ? "TimeoutError" : "Error"}${
+      SAFE_NETWORK_CODES.has(code) ? `: ${code}` : ""}`;
+    log(`geocoding: no HTTP answer from ${upstreamName(target)} (${reason})`);
     return json({ error: "geocoding_unavailable" }, 503);
   }
 
   const { text, parsed: body, readFailed } = await readUpstreamBody(response);
   const upstream = describeUpstream({ endpoint: target, status: response.status, text, parsed: body, readFailed });
   const report = (error, fallback) => {
-    log(formatUpstreamLog("geocoding", { status: response.status, endpoint: target, ...upstream }));
+    // Photon error bodies are untrusted and may echo its GET query. Keep diagnostic
+    // status/service (and unreadable-body state), never raw code/message/body in logs.
+    log(`geocoding: upstream ${upstreamName(target)} answered HTTP ${response.status}${
+      readFailed ? " (body unreadable)" : ""}`);
     return json({ error, message: upstream.message ?? fallback, ...upstream.fields }, 502);
   };
 
