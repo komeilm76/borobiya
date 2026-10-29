@@ -494,7 +494,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view {
   position: relative;
   width: 100%;
-  height: calc(100dvh - 132px);
+  height: calc(100dvh - 120px);
   min-height: 28rem;
   overflow: hidden;
   background: #e8efec;
@@ -654,7 +654,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     flex-direction: column;
     gap: 0.65rem;
     height: auto;
-    min-height: calc(100dvh - 132px);
+    min-height: calc(100dvh - 120px);
     padding: 0.65rem;
     overflow: visible;
   }

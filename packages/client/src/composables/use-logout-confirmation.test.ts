@@ -76,9 +76,11 @@ describe("logout confirmation", () => {
     scope.stop();
   });
 
-  it("wires the header button and accessible dialog without mounting a Vue component", () => {
+  it("wires the profile action and accessible dialog without mounting a Vue component", () => {
     const view = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
-    expect(view).toContain('@click="logoutConfirmation.request()"');
+    const menu = readFileSync(new URL("../components/shell/AccountProfileMenu.vue", import.meta.url), "utf8");
+    expect(view).toContain('@request-logout="logoutConfirmation.request()"');
+    expect(menu).toContain("emit('request-logout')");
     expect(view).toContain(':model-value="logoutConfirmation.open.value"');
     expect(view).toContain(':persistent="logoutConfirmation.submitting.value"');
     expect(view).toContain('aria-labelledby="logout-confirm-title"');

@@ -158,7 +158,7 @@ function onSharesChanged(): void {
 <style scoped>
 .user-dashboard {
   width: min(100%, 78rem);
-  min-height: calc(100vh - 132px);
+  min-height: calc(100vh - 120px);
   margin-inline: auto;
   padding: clamp(1.25rem, 3vw, 2.5rem) clamp(1rem, 4vw, 3rem) 3rem;
 }

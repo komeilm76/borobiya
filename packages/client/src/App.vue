@@ -1,6 +1,6 @@
 <template>
   <v-app :class="{ 'app-shell--map': isMapRoute }">
-    <v-app-bar class="app-topbar px-sm-6" flat height="76">
+    <v-app-bar class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
@@ -14,31 +14,6 @@
       <v-spacer />
 
       <nav class="top-nav" aria-label="پیمایش اصلی">
-        <v-menu location="bottom end">
-          <template #activator="{ props: activatorProps }">
-            <v-btn
-              v-bind="activatorProps"
-              class="theme-toggle"
-              icon
-              variant="text"
-              :aria-label="themeMenuLabel"
-              :title="themeMenuLabel"
-            >
-              <v-icon :icon="appTheme.isDark ? 'mdi-weather-night' : 'mdi-white-balance-sunny'" />
-            </v-btn>
-          </template>
-          <v-list density="compact" min-width="200" aria-label="انتخاب پوسته">
-            <v-list-subheader>پوستهٔ برنامه</v-list-subheader>
-            <v-list-item
-              v-for="option in themeOptions"
-              :key="option.value"
-              :active="appTheme.preference === option.value"
-              :prepend-icon="option.icon"
-              :title="option.title"
-              @click="appTheme.setPreference(option.value)"
-            />
-          </v-list>
-        </v-menu>
         <v-menu v-if="auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions" location="bottom end">
           <template #activator="{ props: inboxProps }">
             <v-btn v-bind="inboxProps" icon variant="text" aria-label="پیشنهادهای مأموریت" @click="proposalInbox.refresh()">
@@ -64,14 +39,12 @@
             <v-list-item title="مشاهدهٔ همهٔ پیشنهادها" prepend-icon="mdi-arrow-left" to="/_user/proposals" />
           </v-list>
         </v-menu>
-        <v-btn class="nav-button d-none d-sm-flex" to="/_public/landing" variant="text" rounded="lg">
-          خانه
-        </v-btn>
         <v-btn
           v-for="item in navItems"
           :key="item.to"
-class="nav-button d-none d-xxl-flex"
+          class="nav-button d-none d-xxl-flex"
           :to="item.to"
+          :active="route.path === item.to"
           variant="text"
           rounded="lg"
         >
@@ -90,7 +63,7 @@ class="nav-button d-none d-xxl-flex"
               <v-icon icon="mdi-menu" />
             </v-btn>
           </template>
-          <v-list density="compact" min-width="210" aria-label="بخش‌های برنامه">
+          <v-list class="top-nav__sections" density="compact" min-width="210" aria-label="بخش‌های برنامه">
             <v-list-item prepend-icon="mdi-home-outline" title="خانه" to="/_public/landing" />
             <v-list-item
               v-for="item in navItems"
@@ -98,16 +71,22 @@ class="nav-button d-none d-xxl-flex"
               :prepend-icon="item.icon"
               :title="item.label"
               :to="item.to"
+              :active="route.path === item.to"
             />
           </v-list>
         </v-menu>
         <v-btn v-if="!auth.isAuthenticated" class="login-button" to="/_auth/login" color="primary" variant="flat" rounded="lg">
-          <v-icon class="me-1" icon="mdi-account-outline" />
           ورود
         </v-btn>
-        <v-btn v-else class="login-button" color="primary" variant="tonal" rounded="lg" @click="logoutConfirmation.request()">
-          خروج
-        </v-btn>
+        <AccountProfileMenu
+          :authenticated="auth.isAuthenticated"
+          :user="auth.user"
+          :categories="auth.userCategories"
+          :preference="appTheme.preference"
+          :is-dark="appTheme.isDark"
+          @change-theme="appTheme.setPreference"
+          @request-logout="logoutConfirmation.request()"
+        />
       </nav>
     </v-app-bar>
 
@@ -208,6 +187,7 @@ class="nav-button d-none d-xxl-flex"
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
@@ -217,7 +197,6 @@ import { useProposalInboxStore } from "./stores/proposal-inbox";
 import { useAuthStore } from "./stores/auth";
 import { useSosSheetStore } from "./stores/sos-sheet";
 import { useThemeStore } from "./stores/theme";
-import type { ThemePreference } from "./theme/theme-preference";
 
 const auth = useAuthStore(pinia);
 const adminSos = useAdminSosStore(pinia);
@@ -231,12 +210,6 @@ const showSosButton = computed(
 watch(showSosButton, (visible) => {
   if (!visible) sosSheet.closeSheet();
 });
-const themeMenuLabel = computed(() => `انتخاب پوسته؛ پوستهٔ فعلی: ${appTheme.isDark ? "تیره" : "روشن"}`);
-const themeOptions: { value: ThemePreference; title: string; icon: string }[] = [
-  { value: "system", title: "پیروی از دستگاه", icon: "mdi-theme-light-dark" },
-  { value: "light", title: "روشن", icon: "mdi-white-balance-sunny" },
-  { value: "dark", title: "تیره", icon: "mdi-weather-night" }
-];
 const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   if (!auth.isAuthenticated) return [];
   if (auth.mustCompleteSecurityQuestions) {

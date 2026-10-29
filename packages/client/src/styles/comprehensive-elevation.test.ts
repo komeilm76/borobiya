@@ -85,10 +85,11 @@ describe("all page and component elevation roles", () => {
     expect(auth).toMatch(/\.v-btn\.auth-submit:disabled\s*\{\s*box-shadow: none;/);
   });
 
-  it("elevates only the flat login action, not the tonal sign-out action", () => {
+  it("elevates only the flat guest login action, not the profile menu or its sign-out", () => {
     const css = source("./tailwind.css");
     expect(css).toMatch(/\.login-button\.v-btn--variant-flat\s*\{\s*box-shadow:/);
     expect(css).not.toMatch(/\.login-button\s*\{[^}]*box-shadow:/);
-    expect(source("../App.vue")).toContain('class="login-button" color="primary" variant="tonal"');
+    expect(source("../App.vue")).toContain('class="login-button" to="/_auth/login" color="primary" variant="flat"');
+    expect(source("../App.vue")).not.toContain('class="login-button" color="primary" variant="tonal"');
   });
 });

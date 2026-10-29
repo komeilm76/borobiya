@@ -6,12 +6,16 @@ const app = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
 const shell = readFileSync(new URL("./tailwind.css", import.meta.url), "utf8");
 
 describe("global shell at narrow widths", () => {
-  it("keeps theme, proposal inbox, sections and logout reachable while collapsing the redundant brand text", () => {
+  it("keeps profile/appearance, proposal inbox and sections reachable while collapsing the redundant brand text", () => {
     expect(app).toContain('class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا"');
-    expect(app).toContain('class="theme-toggle"');
+    expect(app).toContain('<v-app-bar class="app-topbar px-sm-6" flat height="64">');
+    expect(app).toContain('<AccountProfileMenu');
+    expect(app).toContain('@change-theme="appTheme.setPreference"');
+    expect(shell).toContain('.top-nav__sections { max-height: min(70dvh, 30rem); overflow-y: auto;');
+    expect(app).toContain('@request-logout="logoutConfirmation.request()"');
     expect(app).toContain('aria-label="پیشنهادهای مأموریت"');
     expect(app).toContain('aria-label="باز کردن فهرست بخش‌ها"');
-    expect(app).toContain('class="login-button" color="primary" variant="tonal"');
+    expect(app).toContain('class="login-button" to="/_auth/login" color="primary" variant="flat"');
     const phone = shell.split("@media (max-width: 420px) {")[1]?.split("\n}")[0];
     expect(phone).toBeDefined();
     expect(phone).toContain(".brand-copy { display: none; }");

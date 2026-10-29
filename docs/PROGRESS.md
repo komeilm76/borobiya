@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Consolidate account and appearance controls in a profile menu (T4.4.1 partial)
+
+- The shared 76px header's separate theme icon and top-level sign-out button are replaced by an avatar-led account menu; the non-map header is now 64px and the full-screen phone map keeps its 56px override. Authenticated users see their username, actual role (user/admin), and available responder groups above the appearance choices and confirmed logout action. The guest menu preserves theme controls and a login link while the header keeps a clear primary guest-login action. System/light/dark buttons show the current choice and resolved appearance without closing the menu; logout still uses the existing guarded confirmation. Removed the redundant header Home action (brand and section menu still link home), marked the active section, and bounded the section menu on short screens. A browser review with mocked session/map data exercised user/admin/guest menus at 320–1440px, theme changes, the logout prompt and keyboard Escape/focus return; actual authenticated backend, device/screen-reader and site-wide visual acceptance remain open.
+
 ### 2026-10-30 — Keep opened phone map widgets wholly on screen (T4.4.1 follow-up)
 
 - A real 360px-wide RTL browser run exposed history and companion panels extending beyond the physical left edge: desktop `inset-inline-start` survived the phone override's `left: 50%`, so the browser honored the conflicting right inset. On phones, all four panels now reset **both** logical horizontal insets and center with auto margins. Own/live panels also clear their inherited bottom inset rather than stretching into an empty card, and height-capped flex panels no longer shrink and silently clip their child cards; the outer panel scrolls instead. Focused source/compiled-style tests and a mocked-auth, headless Chromium geometry/scroll check at 320×568, 360×640 and 568×320 verified bounds and that the expanded history's last status remains reachable. Real authenticated device, keyboard, safe-area and map-data acceptance remains open.

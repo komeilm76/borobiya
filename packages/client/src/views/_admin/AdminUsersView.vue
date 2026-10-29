@@ -555,7 +555,7 @@ onUnmounted(() => {
 <style scoped>
 .admin-users-page {
   display: grid;
-  min-height: calc(100vh - 132px);
+  min-height: calc(100vh - 120px);
   align-content: start;
   gap: 1.35rem;
 }

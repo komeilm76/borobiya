@@ -87,6 +87,9 @@ a {
   gap: 0.3rem;
 }
 
+/* Keep the entire section menu reachable on short phones instead of running off-screen. */
+.top-nav__sections { max-height: min(70dvh, 30rem); overflow-y: auto; overscroll-behavior: contain; }
+
 .nav-button {
   color: #527071 !important;
   font-weight: 600;
@@ -97,13 +100,13 @@ a {
   padding-inline: 1.1rem !important;
 }
 
-/* Sign-in is a primary action; the tonal sign-out control remains flat. */
+/* The guest sign-in is the primary action; authenticated actions live inside the profile menu. */
 .login-button.v-btn--variant-flat {
   box-shadow: var(--bb-shadow-item-hover);
 }
 
 .app-main {
-  min-height: calc(100vh - 132px);
+  min-height: calc(100vh - 120px);
   background:
     radial-gradient(ellipse at 8% 7%, rgba(233, 179, 90, 0.12), transparent 30%),
     radial-gradient(ellipse at 92% 72%, rgba(14, 102, 102, 0.08), transparent 34%),
@@ -127,7 +130,7 @@ a {
 }
 
 .page-shell {
-  min-height: calc(100vh - 132px);
+  min-height: calc(100vh - 120px);
   display: flex;
   flex-direction: column;
   justify-content: center;
