@@ -89,6 +89,23 @@ describe("UserMapView live overlay", () => {
     expect(body("selectPlace")).toContain("zoom: Math.min(16, instance.getMaxZoom())");
   });
 
+  it("pins the selected POI on the map and removes it when selection/search ends", () => {
+    const marker = body("syncSelectedPlaceMarker");
+    expect(marker).toContain("placeSearch.selectedPlaceId.value");
+    expect(marker).toContain("placeSearch.results.value.find(");
+    expect(marker).toContain("selectedPlaceMarker?.remove()");
+    expect(marker).toContain("new markerConstructor(");
+    expect(marker).toContain("setLngLat([place.lon, place.lat]).addTo(instance)");
+    expect(marker).toContain("else selectedPlaceMarker.setLngLat([place.lon, place.lat])");
+    expect(marker).toContain('setAttribute("aria-label",');
+    expect(marker).toContain('setAttribute("title", place.name)');
+    expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value, syncSelectedPlaceMarker, { flush: "sync" })');
+    expect(body("selectPlace")).toContain("placeSearch.select(place)");
+    expect(body("onMapReady")).toContain("syncSelectedPlaceMarker()");
+    expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain("selectedPlaceMarker?.remove()");
+    expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
+  });
+
   it("renders search results and an explicit return-to-track action without mounting the map", () => {
     const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
     expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />');

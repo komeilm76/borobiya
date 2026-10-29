@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Mark the selected place on the map (T4.1.4 follow-up)
+
+- Choosing a search result previously only flew the camera to its coordinates; there was no map symbol showing which POI was chosen. The map view now displays one purple, named MapLibre pin, moves it when a different result is selected, and removes it on query/scope invalidation or unmount. The marker constructor is supplied by the lazily loaded map canvas; it is not imported by the route. A failing-before-fix source-pinned lifecycle regression and composable selection tests cover the wiring without mounting a Vue SFC. A real map/browser visual and keyboard/screen-reader check remains open.
+
 ### 2026-10-29 — Keep place-search results and offer a visible-map scope (T4.1.4 follow-up)
 
 - Selecting one place no longer clears the query/results: the selected row is highlighted and other hits remain usable. PlaceSearchPanel adopts LiveBroadcastBar's compact indicator, status copy, action layout and light/dark card treatment; its button toggles all installed map coverage versus the current visible rectangle, not a Vuetify switch. Scope changes abort pending searches and rerun the same term. Bbox and result filtering share one camera snapshot, clipped to installed coverage; unavailable bounds cannot accidentally issue a global request. Failing-before-fix composable tests, pure bbox tests and source/compiled-style pins cover the code without mounting Vue. Real Photon/browser, small-screen visual and keyboard acceptance remain open.

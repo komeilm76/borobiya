@@ -139,6 +139,26 @@ const placeSearch = usePlaceSearch({
 });
 let fittedFor: string | null = null;
 const userPickedPlace = ref(false);
+let selectedPlaceMarker: Marker | null = null;
+
+function syncSelectedPlaceMarker(): void {
+  const instance = map.value;
+  const place = placeSearch.results.value.find((result) => result.placeId === placeSearch.selectedPlaceId.value);
+  if (!instance || !markerConstructor || !place) {
+    selectedPlaceMarker?.remove();
+    selectedPlaceMarker = null;
+    return;
+  }
+  // Keep one distinct pin for the currently selected POI, not a pin for every search hit.
+  // Marker is supplied by MapCanvas after its lazy MapLibre import; no eager map chunk here.
+  if (!selectedPlaceMarker) {
+    selectedPlaceMarker = new markerConstructor({ color: "#7c3aed" })
+      .setLngLat([place.lon, place.lat]).addTo(instance);
+  } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
+  selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}`);
+  selectedPlaceMarker.getElement().setAttribute("title", place.name);
+}
+watch(() => placeSearch.selectedPlaceId.value, syncSelectedPlaceMarker, { flush: "sync" });
 
 function selectPlace(place: GeocodeResult): void {
   const instance = map.value;
@@ -280,6 +300,7 @@ function onMapLongPress(event: MapMouseEvent): void {
 }
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
+  if (map.value !== instance) { selectedPlaceMarker?.remove(); selectedPlaceMarker = null; }
   markerConstructor = MarkerClass;
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
@@ -293,6 +314,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   paintLive();
   paintPlayback();
   syncOwnMarker();
+  syncSelectedPlaceMarker();
   frameCamera();
   focusOwnIfRequested();
 }
@@ -336,6 +358,8 @@ onBeforeUnmount(() => {
   own.stop();
   ownMarker?.remove();
   ownMarker = null;
+  selectedPlaceMarker?.remove();
+  selectedPlaceMarker = null;
   if (instance) {
     instance.off("styledata", repaintOverlays);
     instance.off("idle", repaintOverlays);
