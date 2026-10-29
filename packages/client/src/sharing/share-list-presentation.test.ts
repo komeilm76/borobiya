@@ -43,7 +43,7 @@ describe("privacy-sensitive share list feedback", () => {
     expect(source).toContain("live.status === \"rejected\"");
     expect(source).toContain("if (version !== readVersion) return;");
     expect(source).toContain("if (version === readVersion)");
-    const noSession = source.match(/if \(!token\) \{([\s\S]*?)return;\s*\}/)?.[1];
+    const noSession = source.match(/if \(!token \|\| !sessionKey\.value\) \{([\s\S]*?)return;\s*\}/)?.[1];
     for (const rows of ["owned", "received", "ownedHistory", "receivedHistory"]) {
       expect(noSession).toContain(`${rows}.value = [];`);
     }

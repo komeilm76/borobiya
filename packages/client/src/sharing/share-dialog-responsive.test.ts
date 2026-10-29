@@ -33,6 +33,14 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
     expect(source).toContain('flush: "sync"');
   });
 
+  it("clears recipients and pending search when a new JWT login replaces the same account", () => {
+    expect(source).toContain('import { createShareSubmissionFence, shareSessionKey }');
+    expect(source).toContain('const next = shareSessionKey(owner ?? null, token);');
+    expect(source).toContain('const previous = shareSessionKey(previousOwner ?? null, previousToken);');
+    expect(source).toContain('if (next === previous && owner === previousOwner) return;');
+    expect(source).toMatch(/invalidateSubmission\(\);\s*recipients\.value = \[\];\s*searchTerm\.value = "";\s*cancelPending\(\);/);
+  });
+
   it("keeps the multi-device chooser scrollable with reachable actions on short phones", () => {
     const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
     expect(chooser).toBeDefined();

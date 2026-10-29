@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Bind share forms and lists to the JWT login (T2.1.7 follow-up)
+
+- Replacing a JWT with a different login to the same account previously left the share dialog's recipients/search and ShareLists' rows in place. An old in-flight share submission or revocation could also report success in the new login, while the old share-list read could refill rows. The shared submission fence now checks account + JWT session, and the dialog/list watchers synchronously invalidate and clear their session-bound state. ShareLists only opens its event socket and reads private grants when bearer and profile agree; a matching new login re-reads. Same-session bearer renewal and cold same-owner recovery are preserved. Deferred fence tests reproduced old-session acceptance before the fix; source-pinned tests cover component wiring without mounting `.vue` files. Real browser/two-session behavior is not established (P2-A1).
+
 ### 2026-10-29 — Make pending broadcast Start cancellable (T2.1.5 follow-up)
 
 - The broadcast bar stayed in Start state while a priority-device read was pending; tapping again began a second read instead of cancelling, and direct Stop left the first Start free to wake GPS later. A same-tick logout/login with the same bearer could also preserve the pending intent. The app-scoped store now exposes a connecting/Stop state before the read, invalidates the attempt on Stop or synchronous account/session loss, and keeps a same-session token renewal from superseding the awaited read. Focused Pinia regressions reproduced these failures before the fix; no mounted `.vue` or real GPS/browser acceptance is claimed (P2-A1).

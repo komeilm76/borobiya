@@ -5,6 +5,8 @@ import { SHARE_ENDED_EVENT } from "../services/socket-events";
 import { createShareSubmissionFence } from "./share-submission-fence";
 
 const source = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
+const bearer = (sessionId: string, nonce = 0) =>
+  `e30.${btoa(JSON.stringify({ sub: "owner-a", sessionId, nonce }))}.sig`;
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -123,6 +125,32 @@ describe("share-list session boundaries", () => {
     expect(publish).not.toHaveBeenCalled();
   });
 
+  it("does not publish an old revocation's feedback after a same-account JWT session switch", async () => {
+    let token: string | null = bearer("session-a");
+    const fence = createShareSubmissionFence({
+      ownerId: () => "owner-a", accessToken: () => token, isOpen: () => true
+    });
+    const ticket = fence.begin();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const publish = vi.fn();
+    const oldWrite = pending.then(() => { if (fence.isCurrent(ticket)) publish(); });
+    token = bearer("session-a", 1);
+    expect(fence.isCurrent(ticket)).toBe(true);
+    token = bearer("session-b");
+    release();
+    await oldWrite;
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("clears private share rows and re-reads when a new JWT session replaces the same account", () => {
+    expect(source).toContain('shareSessionKey(auth.user?.id ?? null, auth.accessToken)');
+    expect(source).toContain('watch(sessionKey, (next, previous) => {');
+    expect(source).toMatch(/if \(previous \|\| loaded\.value\) resetShareRows\(\);/);
+    expect(source).toMatch(/if \(next && \(previous \|\| loaded\.value\)\) void refresh\(\);/);
+    expect(source).toContain('if (!token || !sessionKey.value) {');
+  });
+
   it("does not let a late revocation from the old session change the new account's rows or feedback", () => {
     expect(source).toContain('const revocation = revocationFence.begin();');
     expect(source).toMatch(/await auth\.ensureSession\(\);\s*if \(!revocationFence\.isActive\(revocation\)\) return;/);
@@ -136,21 +164,21 @@ describe("share-list session boundaries", () => {
     expect(source).toContain('pendingRevocation.value = null;');
     expect(source).toContain('if (revoking.value) return;');
     expect(source).toContain(':disabled="revoking"');
-    expect(source).toMatch(/if \(!token && previousToken\) resetShareRows\(\);\s*},\s*\{ immediate: true, flush: "sync" \}/);
-    expect(source).toMatch(/if \(nextId && auth\.accessToken && \(previousId \|\| loaded\.value\)\) void refresh\(\);\s*}, \{ flush: "sync" \}/);
+    expect(source).toContain('void shareSync.setToken(sessionKey.value ? token : null);');
+    expect(source).toContain('if (previous || loaded.value) resetShareRows();');
+    expect(source).toContain('if (next && (previous || loaded.value)) void refresh();');
   });
 
   it("invalidates in-flight reads and clears four private lists on sign-out and account switch", () => {
     expect(source).toContain("createShareEndedSubscription(");
-    expect(source).toContain("void shareSync.setToken(token)");
-    expect(source).toContain("if (!token && previousToken) resetShareRows();");
-    expect(source).toContain("watch(() => auth.user?.id, (nextId, previousId) => {");
-    expect(source).toContain("if (nextId === previousId) return;");
+    expect(source).toContain("void shareSync.setToken(sessionKey.value ? token : null)");
+    expect(source).toContain("watch(sessionKey, (next, previous) => {");
+    expect(source).toContain("if (next === previous) return;");
     expect(source).toContain("readVersion += 1;");
     for (const rows of ["owned", "received", "ownedHistory", "receivedHistory"]) {
       expect(source).toContain(`${rows}.value = [];`);
     }
-    expect(source).toContain("if (nextId && auth.accessToken && (previousId || loaded.value)) void refresh();");
+    expect(source).toContain("if (next && (previous || loaded.value)) void refresh();");
     expect(source).toContain("shareSync.close();");
   });
 });

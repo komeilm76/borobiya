@@ -345,7 +345,7 @@ import { createLocationHistoryShare, createLocationShare } from "@/api/location"
 import { isoToLocalInput, localInputToIso } from "@/history/playback";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
-import { createShareSubmissionFence } from "@/sharing/share-submission-fence";
+import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-submission-fence";
 import {
   addRecipient,
   buildHistorySharePayload,
@@ -683,14 +683,17 @@ watch(
 
 watch(
   () => [auth.user?.id, auth.accessToken] as const,
-  ([owner, token], [previousOwner]) => {
-    if (owner === previousOwner && token) return; // same-session bearer rotation
+  ([owner, token], [previousOwner, previousToken]) => {
+    const next = shareSessionKey(owner ?? null, token);
+    const previous = shareSessionKey(previousOwner ?? null, previousToken);
+    if (next === previous && owner === previousOwner) return;
+    // A cold token restore for this same profile may complete an in-progress submit;
+    // logout already cleared its old recipients when the bearer became null.
+    if (!previousToken && next && owner === previousOwner) return;
     invalidateSubmission();
-    if (owner !== previousOwner) {
-      recipients.value = [];
-      searchTerm.value = "";
-      cancelPending();
-    }
+    recipients.value = [];
+    searchTerm.value = "";
+    cancelPending();
   },
   { flush: "sync" }
 );

@@ -202,7 +202,7 @@ import {
 } from "@/sharing/share-form";
 import { shareSectionPresentation } from "@/sharing/share-list-presentation";
 import { createShareEndedSubscription } from "@/sharing/share-list-session";
-import { createShareSubmissionFence } from "@/sharing/share-submission-fence";
+import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-submission-fence";
 
 /**
  * "My Shares" / "Shared With Me" (spec §7.2, tracker T2.1.7), plus the history grants that share
@@ -239,6 +239,7 @@ interface ReceivedView extends LiveRowView {
 }
 
 const auth = useAuthStore();
+const sessionKey = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
 const loading = ref(true);
 const loaded = ref(false);
@@ -364,15 +365,17 @@ async function refresh(): Promise<void> {
     await auth.ensureSession();
     if (version !== readVersion) return;
     const token = auth.accessToken;
-    if (!token) {
-      // A prior account's private rows must not linger when this session is no longer available.
+    if (!token || !sessionKey.value) {
+      // A prior login's private rows must not linger when the bearer and profile disagree.
       owned.value = [];
       received.value = [];
       ownedHistory.value = [];
       receivedHistory.value = [];
       liveFresh.value = false;
       historyFresh.value = false;
-      loadError.value = "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
+      loadError.value = token
+        ? "نشست و حساب هنوز هماهنگ نیستند؛ دوباره تلاش کنید."
+        : "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
       return;
     }
     // Both lists in parallel, but a failure of either one must not discard the other's successful
@@ -513,7 +516,7 @@ async function confirmRevoke(): Promise<void> {
 }
 
 function resetShareRows(): void {
-  // A logout/account switch must invalidate both pending reads and privacy writes before
+  // A logout, account change, or new JWT login must invalidate reads and privacy writes before
   // an old bearer can update this session's rows or announce a false success.
   readVersion += 1;
   revocationFence.invalidate();
@@ -527,7 +530,9 @@ function resetShareRows(): void {
   historyFresh.value = false;
   loaded.value = true;
   loading.value = false;
-  loadError.value = auth.accessToken ? null : "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
+  loadError.value = sessionKey.value ? null : auth.accessToken
+    ? "نشست و حساب هنوز هماهنگ نیستند؛ دوباره تلاش کنید."
+    : "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
   confirmOpen.value = false;
   pendingRow.value = null;
 }
@@ -553,18 +558,22 @@ const shareSync = createShareEndedSubscription(async (token) => {
 watch(
   () => auth.accessToken,
   (token, previousToken) => {
-    void shareSync.setToken(token);
-    if (!token && previousToken) resetShareRows();
+    // Identity changes are handled by the session watcher below. Let only same-session
+    // renewals re-handshake here, so a new login does not open its socket twice.
+    const previousKey = shareSessionKey(auth.user?.id ?? null, previousToken ?? null);
+    if (previousToken === undefined || sessionKey.value === previousKey) {
+      void shareSync.setToken(sessionKey.value ? token : null);
+    }
   },
   { immediate: true, flush: "sync" }
 );
 
-watch(() => auth.user?.id, (nextId, previousId) => {
-  if (nextId === previousId) return;
-  if (previousId) resetShareRows();
-  // The initial onMounted read already handles a restored session. On an in-place account switch,
-  // reload only the new owner's grants; do not revive results from the old in-flight request.
-  if (nextId && auth.accessToken && (previousId || loaded.value)) void refresh();
+watch(sessionKey, (next, previous) => {
+  if (next === previous) return; // Same-session bearer renewal only re-handshakes the socket.
+  void shareSync.setToken(next ? auth.accessToken : null);
+  if (previous || loaded.value) resetShareRows();
+  // A cold mount's onMounted read owns its recovery. A later account/login switch needs a new read.
+  if (next && (previous || loaded.value)) void refresh();
 }, { flush: "sync" });
 
 onBeforeUnmount(() => {
