@@ -11,6 +11,10 @@
     </header>
     <v-alert v-if="timeline.error.value" type="warning" variant="tonal" rounded="lg" role="alert" class="mb-3">
       {{ timeline.error.value }}
+      <p v-if="timeline.error.value && timeline.entries.value.length">
+        مراحل زیر از آخرین خواندن موفق هستند و ممکن است وضعیت فعلی را نشان ندهند.
+        <v-btn size="small" variant="text" :loading="timeline.loading.value" @click="timeline.load()">تلاش دوباره</v-btn>
+      </p>
     </v-alert>
     <v-progress-linear v-if="timeline.loading.value && !timeline.entries.value.length" indeterminate
       color="primary" aria-label="دریافت مراحل مأموریت" />

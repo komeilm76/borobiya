@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Clarify stale mission timeline after refresh failure (T4.4.2 partial)
+
+- The timeline intentionally retained last-known steps on a failed re-read, but its warning did not say the displayed steps might be stale. The panel now labels them as the last successful read and offers an in-place retry. A source-pinned regression failed before implementation; no rendered browser acceptance or site-wide feedback sign-off is claimed.
+
 ### 2026-10-29 — Cache mission elevation charts by route/profile (T4.4.4 partial)
 
 - Route card rendering rebuilt each 96-point chart up to five times per option for its SVG/text fields, including on unrelated reactive repaints. A computed snapshot now builds at most once per route/profile change; tests exercise cache invalidation and unchanged reads. This is a bounded render-work fix, not proof of the open map-load/GPS targets or virtual-scroll/browser acceptance.
