@@ -47,12 +47,14 @@ const rating = useMissionRating(toRef(props, "mission"), computed(() => auth.acc
 
 <style scoped>
 .rating { border: 1px solid rgba(28,112,95,.22); background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); padding: clamp(18px,3vw,28px); margin-block: 20px; }
-.rating__header { display: flex; align-items: start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }.rating__header h3 { margin: 5px 0 15px; font-size: 1.15rem; }.rating__eyebrow { color: #16826c; font-weight: 700; font-size: .8rem; }
-.rating p { font-size: .85rem; line-height: 1.8; }.rating__saved span { display: block; color: #ad6800; font-size: 1.65rem; letter-spacing: 3px; }
+.rating__header { display: flex; align-items: start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }.rating__header h3 { margin: 5px 0 15px; font-size: 1.15rem; }.rating__eyebrow { color: rgb(var(--v-theme-primary)); font-weight: 700; font-size: .8rem; }
+.rating p { font-size: .85rem; line-height: 1.8; }.rating__saved span { display: block; color: #915800; font-size: 1.65rem; letter-spacing: 3px; }
 .rating__fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
 .rating__legend { font-size: .85rem; line-height: 1.8; }
 .rating__choices { display: flex; flex-wrap: wrap; gap: 7px; margin: 12px 0 22px; }
-.rating__choice { display: grid; place-items: center; border: 1px solid rgba(98,146,137,.4); border-radius: 12px; background: transparent; color: #ad6800; font-size: 2rem; cursor: pointer; flex: 0 0 48px; width: 48px; height: 48px; line-height: 1; }
+.rating__choice { display: grid; place-items: center; border: 1px solid var(--bb-color-muted); border-radius: 12px; background: transparent; color: #915800; font-size: 2rem; cursor: pointer; flex: 0 0 48px; width: 48px; height: 48px; line-height: 1; }
 .rating__choice:focus-within { outline: 3px solid #26977b; outline-offset: 2px; }
 .rating__fieldset:disabled .rating__choice { opacity: .5; cursor: wait; }
+:global(:root.dark) .rating__choice,
+:global(:root.dark) .rating__saved span { color: var(--bb-color-secondary); }
 </style>

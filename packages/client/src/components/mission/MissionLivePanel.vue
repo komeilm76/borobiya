@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
 .live-panel__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
 .live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
-.live-panel__eyebrow { font-size: .78rem; color: #16826c; font-weight: 750; }
+.live-panel__eyebrow { font-size: .78rem; color: rgb(var(--v-theme-primary)); font-weight: 750; }
 .live-panel__grid { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(230px,.9fr); gap: 18px; }
 .live-panel__map { min-height: 20rem; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; }
 .live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }

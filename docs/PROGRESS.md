@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Improve mission panels' light/dark contrast (T4.4.3 partial)
+
+- The live-member and rating eyebrows used a green that fell to 3.18:1 on dark cards; rating stars and star-input borders were also weak in one or both themes. Small labels now use theme-primary ink, stars use light/dark amber, and radio boundaries use theme-muted ink. Contrast measurements and source-pinned regressions failed before the fix and now pass without mounting Vue components. The native keyboard focus/radio behavior is unchanged; no browser/screen-reader or site-wide WCAG AA sign-off is claimed.
+
 ### 2026-10-29 — Audit all pages and components for elevation (T4.4.5 follow-up)
 
 - Inventoried all 37 Vue files, both style sheets, Tailwind classes and Vuetify elevations in [UI_ELEVATION_AUDIT.md](UI_ELEVATION_AUDIT.md). Map cards now have a light/dark floating tier above tiles that softens when panels stack in flow; the selected admin SOS card follows its earlier 1279px breakpoint. Gradient heroes and featured auth/welcome cards use theme-aware depth tokens. The flat sign-in button has an action shadow, while tonal sign-out and disabled auth submit stay flat. Intentional SOS/dispatch pulses, peer-dot/focus rings, outlined admin cards and dialogs keep their own treatment. Regressions failed before the edits. No rendered browser/device visual sign-off is claimed.
