@@ -514,7 +514,8 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-steps__number { display: inline-grid; flex-shrink: 0; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid currentColor; font-size: .8rem; }
 .mission-desk__progress { display: grid; justify-items: start; gap: 12px; margin-bottom: 20px; }
 .mission-desk__progress p { margin: 0; font-size: .88rem; color: rgb(var(--v-theme-on-surface)); }
-.mission-desk__progress :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; text-align: center; }
+.mission-desk__progress :deep(.v-btn) { min-height: 44px; height: auto; max-width: 100%; min-width: 0; white-space: normal; text-align: center; }
+.mission-desk__progress :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .mission-desk__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(98,146,137,.2); padding-top: 18px; }
 .mission-desk__foot p { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .82rem; opacity: .76; }
 .mission-desk__empty { text-align: center; padding: 58px 24px; }

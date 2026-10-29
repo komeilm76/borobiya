@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Bound rescuer status action on narrow screens (T4.4.1 partial)
+
+- The new mission status button’s Vuetify content could remain non-wrapping even though its outer action allowed wraps, risking overflow on narrow/zoomed screens. Both button and content now wrap within the panel with a 44px minimum target. A source-pinned regression failed before the edit; actual phone/zoom pixel acceptance is still open.
+
 ### 2026-10-29 — Correct small mission-timeline label contrast (T4.4.3 partial)
 
 - The timeline eyebrow’s fixed `#167f69` failed 4.5:1 on dark surfaces. Theme-primary ink now passes measured contrast against both card surfaces in a failing-before-fix regression; the label’s typography/semantics are unchanged. Browser/screen-reader and site-wide WCAG AA acceptance remain open.
