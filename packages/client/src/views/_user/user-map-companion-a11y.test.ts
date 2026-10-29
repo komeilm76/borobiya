@@ -52,14 +52,14 @@ describe("map toolbar and live companions accessibility (T4.4.3 partial)", () =>
 
   it("retains 4.5:1 dark labels over a white tile beneath the translucent panels", () => {
     const darkBackground = blend(palettes.dark.surface, "#ffffff", 0.94);
-    expect(rule(map, ":global(:root.dark) .user-map-view__toolbar-card"))
+    expect(rule(map, ":global(:root.dark .user-map-view__toolbar-card)"))
       .toContain("background: rgba(27, 41, 42, 0.94);");
-    expect(rule(companion, ":global(:root.dark) .live-companions"))
+    expect(rule(companion, ":global(:root.dark .live-companions)"))
       .toContain("background: rgba(27, 41, 42, 0.94);");
     for (const [source, selector] of [
-      [map, ":global(:root.dark) .user-map-view__title-block p"],
-      [companion, ":global(:root.dark) .live-companions__title-block p"],
-      [companion, ":global(:root.dark) .live-companions__age"]
+      [map, ":global(:root.dark .user-map-view__title-block p)"],
+      [companion, ":global(:root.dark .live-companions__title-block p)"],
+      [companion, ":global(:root.dark .live-companions__age)"]
     ]) {
       expect(contrast(color(source, selector), darkBackground), selector).toBeGreaterThanOrEqual(4.5);
     }

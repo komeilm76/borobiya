@@ -51,7 +51,7 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
   it("keeps map controls visible above dark tiles without changing their button semantics", () => {
     const canvas = source("../components/map/MapCanvas.vue");
     expect(rule(canvas, ":deep(.maplibregl-ctrl-group:not(:empty))")).toContain("box-shadow: var(--bb-shadow-item-hover);");
-    expect(rule(canvas, ":global(:root.dark) :deep(.maplibregl-ctrl-group)")).toContain("border-color:");
+    expect(rule(canvas, ":global(:root.dark .map-canvas .maplibregl-ctrl-group)")).toContain("border-color:");
     expect(canvas).toContain("@media (forced-colors: active)");
     expect(canvas).toContain("box-shadow: 0 0 0 2px ButtonText;");
     expect(canvas).not.toContain(":deep(.maplibregl-ctrl button)");

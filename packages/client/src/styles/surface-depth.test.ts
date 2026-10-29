@@ -36,7 +36,7 @@ describe("surface depth across light and dark UI", () => {
   it("makes dashboard and device surfaces visible despite Vuetify elevation-0", () => {
     const dashboard = source("../views/_user/UserDashboardView.vue");
     expect(dashboard).toMatch(/\.user-dashboard__note-card\s*\{[^}]*box-shadow:\s*var\(--bb-shadow-surface\)\s*!important;/);
-    expect(dashboard).not.toMatch(/:global\(:root.dark\) \.user-dashboard__feature-card\s*\{[^}]*box-shadow:/);
+    expect(dashboard).not.toMatch(/:global\(:root\.dark \.user-dashboard__feature-card\)\s*\{[^}]*box-shadow:/);
     const devices = source("../components/settings/DevicePriorityPanel.vue");
     expect(devices).toMatch(/\.device-priority__card\s*\{[^}]*box-shadow:\s*var\(--bb-shadow-surface\)\s*!important;/);
   });

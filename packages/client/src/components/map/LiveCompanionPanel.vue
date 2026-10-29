@@ -175,26 +175,26 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
   align-self: flex-start;
 }
 
-:global(:root.dark) .live-companions {
+:global(:root.dark .live-companions) {
   background: rgba(27, 41, 42, 0.94);
 }
 
-:global(:root.dark) .live-companions__title-block h2,
-:global(:root.dark) .live-companions__name {
+:global(:root.dark .live-companions__title-block h2),
+:global(:root.dark .live-companions__name) {
   color: #edf5f2;
 }
 
-:global(:root.dark) .live-companions__status,
-:global(:root.dark) .live-companions__title-block p,
-:global(:root.dark) .live-companions__age {
+:global(:root.dark .live-companions__status),
+:global(:root.dark .live-companions__title-block p),
+:global(:root.dark .live-companions__age) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .live-companions__signal {
+:global(:root.dark .live-companions__signal) {
   color: #71c7be;
 }
 
-:global(:root.dark) .live-companions__dot {
+:global(:root.dark .live-companions__dot) {
   box-shadow: 0 0 0 2px rgba(7, 27, 28, 0.7);
 }
 </style>

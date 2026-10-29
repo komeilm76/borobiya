@@ -20,7 +20,7 @@ function contrast(first: string, second: string): number {
 }
 
 function lightColor(source: string, selector: string): string {
-  const lightStyles = source.split(":global(:root.dark)")[0]!;
+  const lightStyles = source.split(":global(:root.dark ")[0]!;
   for (const block of lightStyles.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (!block[1]!.split(",").map((part) => part.trim()).includes(selector)) continue;
     const color = block[2]!.match(/(?:^|;)\s*color:\s*(#[0-9a-f]{6});/i)?.[1];
@@ -45,9 +45,9 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
     for (const selector of [
       ".device-priority__kicker", ".device-priority__table th", ".device-priority__muted", ".device-priority__share-now"
     ]) {
-      expect(panel).toContain(`:global(:root.dark) ${selector}`);
+      expect(panel).toContain(`:global(:root.dark ${selector})`);
     }
-    expect(view).toContain(":global(:root.dark) .user-devices__title-block p");
+    expect(view).toContain(":global(:root.dark .user-devices__title-block p)");
     for (const background of [palettes.dark.surface, palettes.dark.background]) {
       expect(contrast("#a0b6b2", background)).toBeGreaterThanOrEqual(4.5);
     }

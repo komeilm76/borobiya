@@ -51,7 +51,7 @@ describe("share privacy flow small text contrast (T4.4.3 partial)", () => {
     expect(colorOf(dialog, ".share-dialog__chip--on")).toBe("#ffffff");
     expect(contrast("#a8560e", palettes.light.surface)).toBeGreaterThanOrEqual(4.5);
     expect(colorOf(dialog, ".share-dialog__warn")).toBe("#a8560e");
-    expect(colorOf(dialog, ":global(:root.dark) .share-dialog__warn")).toBe("var(--bb-color-secondary)");
+    expect(colorOf(dialog, ":global(:root.dark .share-dialog__warn)")).toBe("var(--bb-color-secondary)");
     expect(contrast(palettes.dark.secondary, palettes.dark.surface)).toBeGreaterThanOrEqual(4.5);
   });
 });

@@ -366,54 +366,54 @@ function onSharesChanged(): void {
   line-height: 1.7;
 }
 
-:global(:root.dark) .user-dashboard__eyebrow,
-:global(:root.dark) .user-dashboard__card-kicker {
+:global(:root.dark .user-dashboard__eyebrow),
+:global(:root.dark .user-dashboard__card-kicker) {
   color: #9fc4bc;
 }
 
-:global(:root.dark) .user-dashboard h1,
-:global(:root.dark) .user-dashboard__card-header h2,
-:global(:root.dark) .user-dashboard__feature-card h2,
-:global(:root.dark) .user-dashboard__note-card h2 {
+:global(:root.dark .user-dashboard h1),
+:global(:root.dark .user-dashboard__card-header h2),
+:global(:root.dark .user-dashboard__feature-card h2),
+:global(:root.dark .user-dashboard__note-card h2) {
   color: #edf5f2;
 }
 
-:global(:root.dark) .user-dashboard__welcome,
-:global(:root.dark) .user-dashboard__card-header p,
-:global(:root.dark) .user-dashboard__feature-card > p,
-:global(:root.dark) .user-dashboard__map-caption,
-:global(:root.dark) .user-dashboard__note-card p {
+:global(:root.dark .user-dashboard__welcome),
+:global(:root.dark .user-dashboard__card-header p),
+:global(:root.dark .user-dashboard__feature-card > p),
+:global(:root.dark .user-dashboard__map-caption),
+:global(:root.dark .user-dashboard__note-card p) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .user-dashboard__username {
+:global(:root.dark .user-dashboard__username) {
   color: #71c7be;
 }
 
-:global(:root.dark) .user-dashboard__map-card,
-:global(:root.dark) .user-dashboard__feature-card {
+:global(:root.dark .user-dashboard__map-card),
+:global(:root.dark .user-dashboard__feature-card) {
   border-color: rgba(190, 221, 213, 0.11);
 }
 
-:global(:root.dark) .user-dashboard__feature-icon {
+:global(:root.dark .user-dashboard__feature-icon) {
   color: #71c7be;
   background: rgba(113, 199, 190, 0.11);
 }
 
-:global(:root.dark) .user-dashboard__feature-list {
+:global(:root.dark .user-dashboard__feature-list) {
   border-top-color: rgba(190, 221, 213, 0.12);
 }
 
-:global(:root.dark) .user-dashboard__feature-list > div {
+:global(:root.dark .user-dashboard__feature-list > div) {
   color: #c1d2cd;
 }
 
-:global(:root.dark) .user-dashboard__note-card {
+:global(:root.dark .user-dashboard__note-card) {
   color: #6bbe93;
   background: rgba(107, 190, 147, 0.1);
 }
 
-:global(:root.dark) .user-dashboard__note-card p {
+:global(:root.dark .user-dashboard__note-card p) {
   color: #a0b6b2;
 }
 

@@ -755,7 +755,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   font-weight: 700;
 }
 
-:global(:root.dark) .share-dialog__warn {
+:global(:root.dark .share-dialog__warn) {
   color: var(--bb-color-secondary);
 }
 

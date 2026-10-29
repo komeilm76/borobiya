@@ -481,15 +481,15 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   gap: 0.5rem;
 }
 
-:global(:root.dark) .user-map-view__toolbar-card {
+:global(:root.dark .user-map-view__toolbar-card) {
   background: rgba(27, 41, 42, 0.94);
 }
 
-:global(:root.dark) .user-map-view__title-block p {
+:global(:root.dark .user-map-view__title-block p) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .user-map-view__title-block h1 {
+:global(:root.dark .user-map-view__title-block h1) {
   color: #edf5f2;
 }
 
@@ -541,5 +541,5 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   .user-map-view__title-block h1 { font-size: 0.92rem; }
 }
 
-:global(:root.dark) .user-map-view { background: var(--bb-color-background); }
+:global(:root.dark .user-map-view) { background: var(--bb-color-background); }
 </style>

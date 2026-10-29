@@ -38,7 +38,7 @@ describe("admin users table theme", () => {
   });
 
   it("keeps badge labels readable in both themes, including the dark admin badge", () => {
-    expect(rule(":global(:root.dark) .admin-role-pill.is-admin")).toContain("color: #f3ca7f;");
+    expect(rule(":global(:root.dark .admin-role-pill.is-admin)")).toContain("color: #f3ca7f;");
     for (const palette of [palettes.light, palettes.dark]) {
       expect(contrast(palette.success, palette.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(palette.error, palette.surface)).toBeGreaterThanOrEqual(4.5);

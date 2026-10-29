@@ -55,6 +55,6 @@ const rating = useMissionRating(toRef(props, "mission"), computed(() => auth.acc
 .rating__choice { display: grid; place-items: center; border: 1px solid var(--bb-color-muted); border-radius: 12px; background: transparent; color: #915800; font-size: 2rem; cursor: pointer; flex: 0 0 48px; width: 48px; height: 48px; line-height: 1; }
 .rating__choice:focus-within { outline: 3px solid #26977b; outline-offset: 2px; }
 .rating__fieldset:disabled .rating__choice { opacity: .5; cursor: wait; }
-:global(:root.dark) .rating__choice,
-:global(:root.dark) .rating__saved span { color: var(--bb-color-secondary); }
+:global(:root.dark .rating__choice),
+:global(:root.dark .rating__saved span) { color: var(--bb-color-secondary); }
 </style>

@@ -65,5 +65,5 @@ defineEmits<{ select: [place: GeocodeResult] }>();
 .place-search__result:hover, .place-search__result:focus-visible { background: rgba(var(--v-theme-primary), 0.12); outline-offset: -2px; }
 .place-search__result strong, .place-search__result small { display: block; }
 .place-search__result small { opacity: 0.7; font-size: 0.75rem; overflow-wrap: anywhere; }
-:global(:root.dark) .place-search { background: rgba(27, 41, 42, 0.94); }
+:global(:root.dark .place-search) { background: rgba(27, 41, 42, 0.94); }
 </style>

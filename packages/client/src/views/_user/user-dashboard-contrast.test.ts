@@ -71,10 +71,10 @@ describe("dashboard small text contrast (T4.4.3 partial)", () => {
   });
 
   it("retains readable light text on the dark card and tinted background", () => {
-    expect(styles).toContain(":global(:root.dark) .user-dashboard__welcome,");
-    expect(rule(":global(:root.dark) .user-dashboard__note-card p")).toContain("color: #a0b6b2;");
-    expect(styles).toContain(":global(:root.dark) .user-dashboard__eyebrow,");
-    expect(rule(":global(:root.dark) .user-dashboard__card-kicker")).toContain("color: #9fc4bc;");
+    expect(styles).toContain(":global(:root.dark .user-dashboard__welcome),");
+    expect(rule(":global(:root.dark .user-dashboard__note-card p)")).toContain("color: #a0b6b2;");
+    expect(styles).toContain(":global(:root.dark .user-dashboard__eyebrow),");
+    expect(rule(":global(:root.dark .user-dashboard__card-kicker)")).toContain("color: #9fc4bc;");
     expect(contrast("#a0b6b2", rgb(palettes.dark.surface))).toBeGreaterThanOrEqual(4.5);
     expect(contrast("#a0b6b2", overlay("#6bbe93", palettes.dark.background, 0.1))).toBeGreaterThanOrEqual(4.5);
     expect(contrast("#9fc4bc", rgb(palettes.dark.background))).toBeGreaterThanOrEqual(4.5);

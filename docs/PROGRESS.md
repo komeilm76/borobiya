@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Make scoped dark-mode contrast rules actually apply (T4.4.3 partial)
+
+- Investigated the reported low-contrast dashboard headings, broadcast status and map history/companion labels. Their intended light-on-dark overrides existed but Vue's scoped CSS compiler reduced `:global(:root.dark) .label` to `:root.dark`, silently dropping the label selector. Rewrote all 64 affected selectors across 14 Vue components so the full dark descendant remains in `:global(...)`; map-control borders stay limited to the map canvas. A new compiler-level regression verifies the generated selectors and checks the listed text colors at 4.5:1 or better against dark surfaces and the lightest translucent map-card backdrop. Earlier source-only dark contrast assertions did not verify this compiled behavior. Full browser/phone visual and site-wide WCAG AA acceptance remain open.
+
 ### 2026-10-29 — Diff mission live markers instead of rebuilding every clock tick (T4.4.4 partial)
 
 - The three-role mission map previously reacted to every one-second age-clock tick by removing/recreating all MapLibre DOM markers, even with no new fix. A pure, lazy-import-safe planner now distinguishes no-op, coordinate move, freshness/scale replacement and removal per role. The panel watches stable location/freshness sources and clears private markers synchronously when the composable discards a mission/account. Map replacement and unmount also clear snapshots; moving fixes reuse marker nodes while stale transitions retain their scale and accessible label changes. Pure reactive and source-pinned tests failed before the fix, then passed without mounting Vue. No browser/device FPS, <2s paint or <500ms GPS target is claimed.

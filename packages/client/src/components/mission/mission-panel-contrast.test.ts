@@ -62,7 +62,7 @@ describe("mission member and rating controls contrast", () => {
     }
     expect(rating).toMatch(/\.rating__choice\s*\{[^}]*border: 1px solid var\(--bb-color-muted\);[^}]*color: #915800;/);
     expect(rating).toMatch(/\.rating__saved span\s*\{[^}]*color: #915800;/);
-    expect(rating).toMatch(/:global\(:root\.dark\) \.rating__choice,[\s\S]*?:global\(:root\.dark\) \.rating__saved span\s*\{\s*color: var\(--bb-color-secondary\);/);
+    expect(rating).toMatch(/:global\(:root\.dark \.rating__choice\),[\s\S]*?:global\(:root\.dark \.rating__saved span\)\s*\{\s*color: var\(--bb-color-secondary\);/);
     expect(rating).toContain(".rating__choice:focus-within { outline: 3px solid #26977b;");
     expect(rating).toContain(".rating__fieldset:disabled .rating__choice { opacity: .5;");
   });

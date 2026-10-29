@@ -104,7 +104,7 @@ function onSharesChanged(): void {
   gap: 1rem;
 }
 
-:global(:root.dark) .user-shares-page__header h1 {
+:global(:root.dark .user-shares-page__header h1) {
   color: #edf5f2;
 }
 </style>

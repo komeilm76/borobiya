@@ -270,7 +270,7 @@ defineExpose({ map, setStyle: updateStyle });
   box-shadow: var(--bb-shadow-item-hover);
 }
 
-:global(:root.dark) :deep(.maplibregl-ctrl-group) {
+:global(:root.dark .map-canvas .maplibregl-ctrl-group) {
   border-color: rgba(190, 221, 213, 0.25);
 }
 

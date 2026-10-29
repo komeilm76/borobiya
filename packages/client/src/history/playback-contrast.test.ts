@@ -56,12 +56,12 @@ describe("map history playback small-text contrast (T4.4.3 partial)", () => {
   it("retains readable muted labels on the translucent dark map card", () => {
     // A white tile beneath the 94% opaque dark panel is the least favorable dark backdrop.
     const lightestCard = blend(palettes.dark.surface, "#ffffff", 0.94);
-    expect(rule(":global(:root.dark) .history-playback")).toContain("background: rgba(27, 41, 42, 0.94);");
+    expect(rule(":global(:root.dark .history-playback)")).toContain("background: rgba(27, 41, 42, 0.94);");
     for (const selector of [".history-playback__title-block p", ".history-playback__field", ".history-playback__hint"]) {
-      expect(color(`:global(:root.dark) ${selector}`), selector).toBe("#a0b6b2");
+      expect(color(`:global(:root.dark ${selector})`), selector).toBe("#a0b6b2");
       expect(contrast("#a0b6b2", lightestCard), selector).toBeGreaterThanOrEqual(4.5);
     }
-    expect(rule(":global(:root.dark) .history-playback__field input"))
+    expect(rule(":global(:root.dark .history-playback__field input)"))
       .toContain("border-color: var(--bb-color-muted);");
     expect(contrast(palettes.dark.muted, lightestCard)).toBeGreaterThanOrEqual(3);
     expect(contrast(palettes.dark.primary, lightestCard)).toBeGreaterThanOrEqual(3);

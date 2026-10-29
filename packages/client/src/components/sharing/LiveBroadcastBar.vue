@@ -144,15 +144,15 @@ onMounted(() => {
   .broadcast-bar__actions :deep(.v-btn__content) { white-space: normal; overflow-wrap: anywhere; text-align: center; }
 }
 
-:global(:root.dark) .broadcast-bar {
+:global(:root.dark .broadcast-bar) {
   background: rgba(27, 41, 42, 0.95);
 }
 
-:global(:root.dark) .broadcast-bar__headline {
+:global(:root.dark .broadcast-bar__headline) {
   color: #edf5f2;
 }
 
-:global(:root.dark) .broadcast-bar__detail {
+:global(:root.dark .broadcast-bar__detail) {
   color: #a0b6b2;
 }
 </style>

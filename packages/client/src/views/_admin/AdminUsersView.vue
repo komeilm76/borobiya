@@ -784,7 +784,7 @@ onUnmounted(() => {
   background: rgba(var(--v-theme-error), 0.12);
 }
 
-:global(:root.dark) .admin-role-pill.is-admin {
+:global(:root.dark .admin-role-pill.is-admin) {
   color: #f3ca7f;
 }
 
@@ -887,7 +887,7 @@ onUnmounted(() => {
   font-size: 0.78rem;
 }
 
-:global(:root.dark) .admin-deactivation-note {
+:global(:root.dark .admin-deactivation-note) {
   color: #f3ca7f;
 }
 

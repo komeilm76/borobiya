@@ -76,7 +76,7 @@ describe("T4.4.5 design primitives", () => {
     for (const name of ["UserSosHistoryView", "UserRescuerHistoryView", "UserMissionView", "UserProposalsView"]) {
       expect(views(`_user/${name}`)).toContain("color: rgb(var(--v-theme-primary));");
     }
-    expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark) .history__stars { color: var(--bb-color-secondary); }");
+    expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark .history__stars) { color: var(--bb-color-secondary); }");
   });
 
   it("installs one style element and updates it idempotently", () => {

@@ -502,19 +502,19 @@ function scrub(value: number | readonly number[]): void {
   font-variant-numeric: tabular-nums;
 }
 
-:global(:root.dark) .history-playback {
+:global(:root.dark .history-playback) {
   background: rgba(27, 41, 42, 0.94);
   color: #edf5f2;
 }
 
-:global(:root.dark) .history-playback__title-block p,
-:global(:root.dark) .history-playback__status,
-:global(:root.dark) .history-playback__hint,
-:global(:root.dark) .history-playback__field {
+:global(:root.dark .history-playback__title-block p),
+:global(:root.dark .history-playback__status),
+:global(:root.dark .history-playback__hint),
+:global(:root.dark .history-playback__field) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .history-playback__field input {
+:global(:root.dark .history-playback__field input) {
   border-color: var(--bb-color-muted);
 }
 

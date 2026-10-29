@@ -384,34 +384,34 @@ function applyToAll(): void {
   color: #b3261e;
 }
 
-:global(:root.dark) .device-priority__card {
+:global(:root.dark .device-priority__card) {
   border-color: rgba(226, 240, 238, 0.12);
   background: rgb(27, 41, 42);
 }
 
-:global(:root.dark) .device-priority__header h2 {
+:global(:root.dark .device-priority__header h2) {
   color: #edf5f2;
 }
 
-:global(:root.dark) .device-priority__kicker,
-:global(:root.dark) .device-priority__table th,
-:global(:root.dark) .device-priority__muted,
-:global(:root.dark) .device-priority__hint,
-:global(:root.dark) .device-priority__status,
-:global(:root.dark) .device-priority__share-now {
+:global(:root.dark .device-priority__kicker),
+:global(:root.dark .device-priority__table th),
+:global(:root.dark .device-priority__muted),
+:global(:root.dark .device-priority__hint),
+:global(:root.dark .device-priority__status),
+:global(:root.dark .device-priority__share-now) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .device-priority__hint--error,
-:global(:root.dark) .device-priority__status--error {
+:global(:root.dark .device-priority__hint--error),
+:global(:root.dark .device-priority__status--error) {
   color: #ffb4ab;
 }
 
-:global(:root.dark) .device-priority__status--ok {
+:global(:root.dark .device-priority__status--ok) {
   color: #7fdcb2;
 }
 
-:global(:root.dark) .device-priority__share {
+:global(:root.dark .device-priority__share) {
   border-color: rgba(226, 240, 238, 0.14);
 }
 

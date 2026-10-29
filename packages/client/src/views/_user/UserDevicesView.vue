@@ -106,12 +106,12 @@ onMounted(() => {
   line-height: 1.85;
 }
 
-:global(:root.dark) .user-devices__title-block p,
-:global(:root.dark) .user-devices__intro {
+:global(:root.dark .user-devices__title-block p),
+:global(:root.dark .user-devices__intro) {
   color: #a0b6b2;
 }
 
-:global(:root.dark) .user-devices__title-block h1 {
+:global(:root.dark .user-devices__title-block h1) {
   color: #edf5f2;
 }
 </style>
