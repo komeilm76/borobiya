@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Clear companion-map state on a new JWT login (T2.1.8 follow-up)
+
+- The live companion receiver already cleared coordinates on logout or an account switch, but a new JWT session for the *same account* kept its prior peer positions and old Socket.IO room. It now invalidates pending reads, clears coordinates/count synchronously and closes that room when the JWT session ID changes, then re-reads grants and opens a new room. Same-session bearer renewal keeps the existing view. Focused regressions reproduced the stale coordinates before the fix and cover delayed reads and A→B→A in one tick; real Socket.IO/two-browser acceptance remains P2-A1.
+
 ### 2026-10-29 — Bind share forms and lists to the JWT login (T2.1.7 follow-up)
 
 - Replacing a JWT with a different login to the same account previously left the share dialog's recipients/search and ShareLists' rows in place. An old in-flight share submission or revocation could also report success in the new login, while the old share-list read could refill rows. The shared submission fence now checks account + JWT session, and the dialog/list watchers synchronously invalidate and clear their session-bound state. ShareLists only opens its event socket and reads private grants when bearer and profile agree; a matching new login re-reads. Same-session bearer renewal and cold same-owner recovery are preserved. Deferred fence tests reproduced old-session acceptance before the fix; source-pinned tests cover component wiring without mounting `.vue` files. Real browser/two-session behavior is not established (P2-A1).

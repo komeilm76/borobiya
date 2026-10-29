@@ -3,6 +3,7 @@ import type { LocationSharesResponse } from "@shared/index";
 import { PEER_UPDATE_EVENT, SHARE_ENDED_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { listLocationShares } from "@/api/location";
+import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import {
   DISCARD_AFTER_MS,
   applyPeerUpdate,
@@ -30,18 +31,17 @@ export const SHARE_VERIFY_MS = 60_000;
 
 function bearerBelongsToOwner(token: string, owner: string): boolean {
   // This is only a conservative display gate, never authentication: the server
-  // verifies the signature and share scope. The production bearer is a JWT with
-  // `sub`; refuse a recognisable JWT for a different/missing subject while the
-  // auth store is still loading its profile (e.g. another tab changed accounts).
-  const parts = token.split(".");
-  if (parts.length !== 3) return true; // opaque bearers remain subject to server authorization
-  try {
-    const encoded = parts[1]!.replace(/-/g, "+").replace(/_/g, "/");
-    const payload = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "="))) as { sub?: unknown };
-    return payload.sub === owner;
-  } catch {
-    return false;
-  }
+  // verifies the signature and share scope. Refuse a JWT for a different subject
+  // while the auth store is still loading its profile; opaque test tokens remain
+  // subject to server authorization.
+  return token.split(".").length !== 3 || decodeAccessTokenClaims(token)?.sub === owner;
+}
+
+function loginKey(token: string | null, owner: string | null): string | null {
+  if (!token || !owner || !bearerBelongsToOwner(token, owner)) return null;
+  const claims = decodeAccessTokenClaims(token);
+  // Production JWTs carry a sessionId. Opaque/legacy fixtures keep the account boundary.
+  return JSON.stringify([owner, typeof claims?.sessionId === "string" ? claims.sessionId : null]);
 }
 
 export interface UseLiveCompanionsOptions {
@@ -381,10 +381,14 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     clearPrivateState();
     queueRestart();
   }, { flush: "sync" });
-  watch(options.accessToken, (token) => {
+  watch(options.accessToken, (token, previousToken) => {
     const owner = options.ownUserId.value;
-    if (!token || !owner || !bearerBelongsToOwner(token, owner)) clearPrivateState();
-    else queueRestart();
+    const next = loginKey(token, owner);
+    const previous = loginKey(previousToken, owner);
+    // Replacing a JWT login under the same account must not inherit the old room,
+    // coordinates or pending reads. Flush synchronously even for an A→B→A same-tick change.
+    if (!next || (previous !== null && next !== previous)) clearPrivateState();
+    if (next) queueRestart();
   }, { flush: "sync" });
 
   onScopeDispose(() => {

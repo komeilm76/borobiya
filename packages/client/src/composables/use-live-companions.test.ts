@@ -155,8 +155,8 @@ async function settle(): Promise<void> {
 }
 
 const SHARE_OWNER = { id: ALICE, username: "مریم", lastLocation: { lat: 35.7, lon: 51.4 } };
-const bearerFor = (owner: string, nonce = "initial") =>
-  `e30.${Buffer.from(JSON.stringify({ sub: owner, nonce })).toString("base64url")}.sig`;
+const bearerFor = (owner: string, nonce = "initial", sessionId?: string) =>
+  `e30.${Buffer.from(JSON.stringify({ sub: owner, nonce, ...(sessionId ? { sessionId } : {}) })).toString("base64url")}.sig`;
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -461,10 +461,59 @@ describe("useLiveCompanions", () => {
     harness.scope.stop();
   });
 
-  it("re-authenticates the open socket when the token rotates for the same owner", async () => {
-    const harness = mount({ token: bearerFor(ME), ownUserId: ME });
+  it("clears old coordinates and reopens the receiver socket on a new JWT login for the same account", async () => {
+    const harness = mount({ token: bearerFor(ME, "initial", "session-a"), ownUserId: ME });
     await settle();
-    harness.token.value = bearerFor(ME, "renewed");
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+    harness.setShares([{ id: BOB, username: "new session peer", lastLocation: { lat: 36, lon: 50 } }]);
+    harness.token.value = bearerFor(ME, "new-login", "session-b");
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.shareCount.value).toBe(0);
+    expect(harness.closeCalls()).toBe(1);
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([BOB]);
+    expect(harness.connectCalls()).toBe(2);
+    expect(harness.updateTokenCalls()).toBe(0); // New handshake, not the former session's room.
+    harness.scope.stop();
+  });
+
+  it("rejects an old same-account JWT session's delayed share list after the new login reads", async () => {
+    const harness = mount({ token: bearerFor(ME, "initial", "session-a"), ownUserId: ME,
+      blockReads: true, captureReadSnapshot: true });
+    harness.resolveRead();
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+    const oldRead = harness.api.refresh();
+    await settle();
+    harness.setShares([{ id: BOB, username: "new session peer", lastLocation: { lat: 36, lon: 50 } }]);
+    harness.token.value = bearerFor(ME, "new-login", "session-b");
+    expect(harness.peers()).toEqual([]);
+    await settle();
+    harness.resolveRead();
+    await oldRead;
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([BOB]);
+    harness.scope.stop();
+  });
+
+  it("does not restore old coordinates on a same-tick A to B to A session change", async () => {
+    const first = bearerFor(ME, "initial", "session-a");
+    const harness = mount({ token: first, ownUserId: ME });
+    await settle();
+    expect(harness.peers().map((peer) => peer.userId)).toEqual([ALICE]);
+    harness.token.value = bearerFor(ME, "new-login", "session-b");
+    harness.token.value = first;
+    expect(harness.peers()).toEqual([]);
+    expect(harness.closeCalls()).toBe(1);
+    await settle();
+    expect(harness.connectCalls()).toBe(2);
+    harness.scope.stop();
+  });
+
+  it("re-authenticates the open socket when the token rotates for the same owner", async () => {
+    const harness = mount({ token: bearerFor(ME, "initial", "session-a"), ownUserId: ME });
+    await settle();
+    harness.token.value = bearerFor(ME, "renewed", "session-a");
     await settle();
     expect(harness.updateTokenCalls()).toBe(1);
     expect(harness.connectCalls()).toBe(1);
