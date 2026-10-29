@@ -99,7 +99,7 @@
                 <span class="auth-eyebrow">برای امنیت و بازیابی حساب</span>
                 <h3>پنج پرسش امنیتی</h3>
               </div>
-              <v-chip color="primary" variant="tonal" size="small">{{ selectedCount }} از ۵</v-chip>
+              <v-chip color="primary" variant="tonal" size="small">{{ faNumber(selectedCount) }} از ۵</v-chip>
             </div>
             <v-progress-linear v-if="loadingQuestions" class="question-loading" color="primary" indeterminate rounded />
             <div v-else class="question-list">

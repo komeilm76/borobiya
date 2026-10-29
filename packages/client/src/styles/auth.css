@@ -360,6 +360,11 @@
   text-align: center;
 }
 
+/* Registration has no divider after its submit button, unlike login. */
+.auth-card-register .auth-form + .auth-switch-copy {
+  margin-top: 1.5rem;
+}
+
 .auth-switch-copy .text-link {
   margin-inline-start: 0.25rem;
 }
