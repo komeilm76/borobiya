@@ -405,6 +405,13 @@ a {
   }
 }
 
+@media (max-width: 420px) {
+  /* Keep the labeled brand icon and every session control in the phone toolbar. */
+  .brand-copy { display: none; }
+  .login-button { margin-inline-start: 0; padding-inline: 0.6rem !important; }
+  .app-topbar .v-toolbar__content { padding-inline: 0.5rem !important; }
+}
+
 :root.dark {
   color-scheme: dark;
 }

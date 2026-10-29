@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Compact global header and reachable logout confirmation (T4.4.1 partial)
+
+- On narrow phones the global brand label competed with theme, inbox, section-menu and logout controls for a single toolbar row. At 420px and below, only the brand mark is shown (its home-link accessible name stays intact), the toolbar gutters and logout padding shrink, and the functional controls remain in place. The logout confirmation now scrolls on short viewports, while its phone actions stack as full-width wrapping targets of at least 44px without changing submission locks. Source-pinned regressions failed on the original layout and now pass; they do not establish rendered widths, high zoom, physical keyboard use or site-wide responsive acceptance. T4.4.1 remains open.
+
 ### 2026-10-29 — Retry map cache registration after a transient failure (T1.5.4 follow-up)
 
 - Service-worker registration failures were swallowed into a permanently memoized fulfilled promise: a later map mount would not retry after connectivity or permission recovered. Registration now clears the failed attempt while still swallowing its rejection so map startup and the app's fire-and-forget call remain non-blocking; concurrent callers share one attempt, and success stays memoized. A synchronous `register()` throw is also handled, and the 1.5-second readiness timer is cleared if readiness settles early. Regression tests reproduced the retry and timer issues before the fix and pass afterward. Browser/offline recovery and P1-A1 outage acceptance remain unverified.

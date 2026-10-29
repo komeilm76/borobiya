@@ -113,6 +113,7 @@ class="nav-button d-none d-xxl-flex"
 
     <v-dialog
       :model-value="logoutConfirmation.open.value"
+      scrollable
       :persistent="logoutConfirmation.submitting.value"
       max-width="420"
       aria-labelledby="logout-confirm-title"
@@ -124,7 +125,7 @@ class="nav-button d-none d-xxl-flex"
         <v-card-text id="logout-confirm-description">
           آیا مطمئن هستید که می‌خواهید از حساب خود خارج شوید؟
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="logout-confirm-actions">
           <v-btn variant="text" rounded="lg" :disabled="logoutConfirmation.submitting.value" @click="logoutConfirmation.cancel()">
             انصراف
           </v-btn>
@@ -299,5 +300,11 @@ onMounted(async () => {
 <style scoped>
 .replacement-signal { animation: urgent-outline 1.1s ease-in-out 2; }
 @keyframes urgent-outline { 50% { outline: 3px solid currentColor; outline-offset: 4px; } }
+@media (max-width: 599px) {
+  .logout-confirm-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+  .logout-confirm-actions :deep(.v-spacer) { display: none; }
+  .logout-confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }
+  .logout-confirm-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+}
 @media (prefers-reduced-motion: reduce) { .replacement-signal { animation: none; } }
 </style>
