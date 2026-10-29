@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Tune remaining interactive elevation and nested cards (T4.4.5 follow-up)
+
+- A broader scan found no Tailwind `shadow-*` classes in templates; the remaining work was CSS and Vuetify elevation. History/proposal list rows used light-only shadows (or none), selected rings could be overridden by a higher-specificity hover shadow, and narrow scroll regions clipped the blur. Item/hover shadows now have light/dark tiers, selected rows keep their rings, and disabled/reduced-motion states and scroll gutters are respected. The broadcast bar is flat only when nested in the dashboard card; map controls use a themed shadow and retain a forced-colors outline. Pure/source-pinned regressions failed before the changes. Rendered visual and high-contrast/device acceptance remains open.
+
 ### 2026-10-29 — Make top-level UI surface shadows consistent (T4.4.5 follow-up)
 
 - Audited light/dark surface styles across dashboard, devices, sharing, admin catalogs and mission/history panels. Dashboard/device cards had ineffective custom shadows because Vuetify's `elevation-0` wins with `!important`; admin catalogs and share lists were flat. Added a theme-aware top-level shadow token and explicit surface opt-in, aligning those areas and other main content panels without applying a global shadow to dialogs, nested rows or selection states. Source-level regressions failed before the change; rendered device/browser visual acceptance is still open.

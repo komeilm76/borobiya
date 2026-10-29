@@ -22,7 +22,7 @@ describe("requester SOS history on narrow screens (source-pinned; no Vue mount)"
     expect(history).toContain('.history__list,.history__items { display: grid; gap: 10px; min-width: 0; }');
     expect(history).toContain('@media(max-width:880px)');
     const phone = history.split('@media(max-width:780px) {')[1]!.split('@media(max-width:530px)')[0]!;
-    expect(phone).toContain('.history__items { grid-template-columns: 1fr; max-height: min(42vh, 22rem); max-height: min(42dvh, 22rem); overflow-y: auto; padding: 3px 4px 6px; }');
+    expect(phone).toContain('.history__items { grid-template-columns: 1fr; max-height: min(42vh, 22rem); max-height: min(42dvh, 22rem); overflow-y: auto; padding: 8px 10px 12px; }');
     expect(phone).toContain('.history__items:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
     expect(phone).toContain('.history__toolbar { flex-wrap: wrap; }');
     expect(phone).not.toContain('history__panel { max-height');

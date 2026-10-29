@@ -2,7 +2,7 @@
   <v-card
     class="broadcast-bar"
     :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset }]"
-    elevation="2"
+    :elevation="inset ? 0 : 2"
     rounded="xl"
   >
     <div class="broadcast-bar__body">

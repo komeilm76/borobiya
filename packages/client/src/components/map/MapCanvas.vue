@@ -264,10 +264,20 @@ defineExpose({ map, setStyle: updateStyle });
   min-height: inherit;
 }
 
-:deep(.maplibregl-ctrl-group) {
+:deep(.maplibregl-ctrl-group:not(:empty)) {
   border: 1px solid rgba(25, 53, 54, 0.12);
   border-radius: 0.8rem;
-  box-shadow: 0 0.35rem 1rem rgba(25, 53, 54, 0.12);
+  box-shadow: var(--bb-shadow-item-hover);
+}
+
+:global(:root.dark) :deep(.maplibregl-ctrl-group) {
+  border-color: rgba(190, 221, 213, 0.25);
+}
+
+@media (forced-colors: active) {
+  :deep(.maplibregl-ctrl-group:not(:empty)) {
+    box-shadow: 0 0 0 2px ButtonText;
+  }
 }
 
 :deep(.maplibregl-ctrl-attrib) {

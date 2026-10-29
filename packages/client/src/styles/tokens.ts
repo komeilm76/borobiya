@@ -40,10 +40,18 @@ export const palettes = {
   }
 } as const;
 
-// Quiet depth for top-level surfaces only; dialogs, inset cards and selectable rows keep their own tiers.
+// Separate depth tiers: content panels, selectable rows and their active/hover state.
 export const shadows = {
-  light: { surface: "0 12px 32px rgba(25, 53, 54, 0.10), 0 2px 8px rgba(25, 53, 54, 0.04)" },
-  dark: { surface: "0 16px 38px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.16)" }
+  light: {
+    surface: "0 12px 32px rgba(25, 53, 54, 0.10), 0 2px 8px rgba(25, 53, 54, 0.04)",
+    item: "0 4px 14px rgba(25, 53, 54, 0.09)",
+    itemHover: "0 10px 24px rgba(25, 53, 54, 0.17)"
+  },
+  dark: {
+    surface: "0 16px 38px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.16)",
+    item: "0 4px 14px rgba(0, 0, 0, 0.26)",
+    itemHover: "0 10px 24px rgba(0, 0, 0, 0.40)"
+  }
 } as const;
 
 export type DesignTheme = keyof typeof palettes;
@@ -66,7 +74,9 @@ export function designTokenStylesheet(): string {
   ];
   const colors = (theme: DesignTheme) => [
     ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
-    `--bb-shadow-surface: ${shadows[theme].surface}`
+    `--bb-shadow-surface: ${shadows[theme].surface}`,
+    `--bb-shadow-item: ${shadows[theme].item}`,
+    `--bb-shadow-item-hover: ${shadows[theme].itemHover}`
   ];
   return `:root { ${[...shared, ...colors("light")].join("; ")} }\n:root.dark { ${colors("dark").join("; ")} }`;
 }
