@@ -34,6 +34,24 @@ export async function prepareMapRuntime<T>(register: () => Promise<void>, load: 
   return maplibre;
 }
 
+/** Coalesce a canvas's in-flight startup, but allow an explicit retry after a failure. */
+export function createMapStartupAttempt<T>(
+  load: () => Promise<T>,
+  initialize: (runtime: T) => void,
+  onFailure: (error: unknown) => void,
+  isActive: () => boolean
+): () => void {
+  let pending = false;
+  return () => {
+    if (pending || !isActive()) return;
+    pending = true;
+    void Promise.resolve().then(load)
+      .then((runtime) => { if (isActive()) initialize(runtime); })
+      .catch((error: unknown) => { if (isActive()) onFailure(error); })
+      .finally(() => { pending = false; });
+  };
+}
+
 /** Register and activate the map-only cache worker when possible. */
 export function registerMapCacheWorker(): Promise<void> {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {

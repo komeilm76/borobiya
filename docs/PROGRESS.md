@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Map warning Retry now retries failed startup and config (T4.4.2 partial)
+
+- MapCanvas showed a Retry action after a lazy MapLibre import or constructor failure, but the handler immediately returned when the map instance did not exist. After `/map-config` failure, Retry only reloaded the style, leaving the runtime bounds/zoom request untried. Retry now starts a new, coalesced initialization attempt if needed, re-fetches failed config on an existing map, and resets notice throttling so a quick second failure remains visible. Failed control setup removes the partial instance; late startup or config responses cannot restore an unmounted map. Pure deferred retry tests and source-pinned wiring tests failed on the prior startup behavior and now pass; they do not substitute for real browser/offline map verification or site-wide T4.4.2 sign-off.
+
 ### 2026-10-29 — Scrollable admin catalog dialogs (T4.4.1 partial)
 
 - The incident-type form, rescuer-category form, and category-membership dialog were persistent but not scrollable. On short viewports, a long form or many incident types/members could push Save/Add/Close out of reach. All three now let the card body scroll independently of the title and action footer using Vuetify's scrollable dialog behavior. Existing phone action stacking, handlers and save locks stay intact. A no-SFC-mount source-pinned regression failed before the change and passes after it; real phone/keyboard/browser acceptance and the remaining site-wide responsive audit are still open.

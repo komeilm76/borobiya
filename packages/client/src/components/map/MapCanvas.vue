@@ -22,7 +22,7 @@ import { onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { getMapConfig } from "@/api/map-config";
-import { prepareMapRuntime, registerMapCacheWorker } from "@/services/map-cache";
+import { createMapStartupAttempt, prepareMapRuntime, registerMapCacheWorker } from "@/services/map-cache";
 import {
   DEFAULT_MAP_STYLE,
   DEFAULT_MAP_ZOOM,
@@ -62,6 +62,9 @@ const map = shallowRef<MapLibreMap | null>(null);
 const showMapNotice = ref(false);
 const mapNoticeMessage = ref("");
 let configRequest: AbortController | null = null;
+let configPending = false;
+let configFailed = false;
+let startMap: (() => void) | null = null;
 let activeStyleUrl: string | null = null;
 let pendingStyleUrl: string | null = null;
 let lastNoticeAt = Number.NEGATIVE_INFINITY;
@@ -113,8 +116,16 @@ function updateStyle(styleUrl: string): void {
 
 function retryMap(): void {
   const instance = map.value;
-  if (!instance) return;
+  if (!instance && !startMap) return;
+  // An explicit retry is not a repeated background error: let a quick failure show again.
+  showMapNotice.value = false;
+  lastNoticeAt = Number.NEGATIVE_INFINITY;
+  if (!instance) {
+    startMap?.(); // The lazy library or Map constructor may have failed before a map existed.
+    return;
+  }
 
+  if (configFailed && configRequest) fetchRuntimeConfig(configRequest);
   try {
     // A full style reload retries failed style, sprite, glyph, and tile requests without
     // replacing the map instance or its camera.
@@ -135,6 +146,30 @@ function handleServiceWorkerMessage(event: MessageEvent): void {
 
 watch(() => props.styleUrl, updateStyle);
 
+function fetchRuntimeConfig(controller: AbortController): void {
+  const instance = map.value;
+  if (!instance || controller.signal.aborted || configPending) return;
+  configPending = true;
+  void getMapConfig(controller.signal).then((config) => {
+    if (controller.signal.aborted || map.value !== instance) return;
+    configFailed = false;
+    instance.setMinZoom(config.minZoom);
+    instance.setMaxZoom(config.maxZoom);
+    if (props.constrainBounds) instance.setMaxBounds(config.bbox);
+    // The map starts on fallback bounds. Move once if the configured library is elsewhere.
+    if (!props.center && props.constrainBounds) {
+      const current = instance.getCenter();
+      if (!lngLatInBbox([current.lng, current.lat], config.bbox)) {
+        instance.jumpTo({ center: bboxCenter(config.bbox) });
+      }
+    }
+  }).catch((error: unknown) => {
+    if (controller.signal.aborted || map.value !== instance) return;
+    configFailed = true;
+    reportConfigError(error);
+  }).finally(() => { configPending = false; });
+}
+
 function initializeMap(controller: AbortController, maplibre: typeof import("maplibre-gl")): void {
   if (controller.signal.aborted || !container.value) return;
   const { Map: MapLibre, Marker, NavigationControl, ScaleControl, setWorkerUrl } = maplibre;
@@ -153,44 +188,29 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
       constrainBounds: props.constrainBounds
     })
   });
-  map.value = instance;
-  activeStyleUrl = resolveMapStyleUrl(initialStyleUrl);
-  pendingStyleUrl = null;
+  try {
+    instance.addControl(new NavigationControl({
+      showCompass: true,
+      showZoom: true,
+      visualizePitch: true
+    }), "top-right");
+    instance.addControl(new ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
+    instance.getCanvas().setAttribute("aria-label", props.ariaLabel);
+    instance.getCanvas().setAttribute("role", "application");
 
-  instance.addControl(new NavigationControl({
-    showCompass: true,
-    showZoom: true,
-    visualizePitch: true
-  }), "top-right");
-  instance.addControl(new ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");
-  instance.getCanvas().setAttribute("aria-label", props.ariaLabel);
-  instance.getCanvas().setAttribute("role", "application");
-
-  instance.on("load", () => emit("ready", instance, Marker));
-  instance.on("error", (event) => reportMapError(event.error));
-
-  void getMapConfig(controller.signal).then((config) => {
-    if (controller.signal.aborted || !map.value) return;
-    map.value.setMinZoom(config.minZoom);
-    map.value.setMaxZoom(config.maxZoom);
-    if (props.constrainBounds) {
-      map.value.setMaxBounds(config.bbox);
-    }
-    // The map starts on the built-in fallback bounds until this config
-    // arrives. When the deployment serves different areas (see
-    // MAP_REGION_IDS) and the caller did not request an explicit center,
-    // move once to the configured bounds instead of stranding the camera
-    // outside them.
-    if (!props.center && props.constrainBounds) {
-      const current = map.value.getCenter();
-      if (!lngLatInBbox([current.lng, current.lat], config.bbox)) {
-        map.value.jumpTo({ center: bboxCenter(config.bbox) });
-      }
-    }
-  }).catch((error: unknown) => {
-    if (controller.signal.aborted) return;
-    reportConfigError(error);
-  });
+    instance.on("load", () => emit("ready", instance, Marker));
+    instance.on("error", (event) => reportMapError(event.error));
+    map.value = instance;
+    activeStyleUrl = resolveMapStyleUrl(initialStyleUrl);
+    pendingStyleUrl = null;
+    fetchRuntimeConfig(controller);
+  } catch (error) {
+    // A failed constructor/control setup must not leave a half-created map that Retry can only restyle.
+    map.value = null;
+    activeStyleUrl = null;
+    try { instance.remove(); } catch { /* Preserve the original startup error. */ }
+    throw error;
+  }
 }
 
 onMounted(() => {
@@ -200,15 +220,15 @@ onMounted(() => {
 
   const controller = new AbortController();
   configRequest = controller;
-  // Start the lazy MapLibre download at mount time in parallel with the cache worker's 200ms head
-  // start. Neither must make the other wait to *start*, but both settle before map construction.
-  void prepareMapRuntime(registerMapCacheWorker, () => import("maplibre-gl")).then((maplibre) => {
-    if (controller.signal.aborted) return;
-    return initializeMap(controller, maplibre);
-  }).catch((error: unknown) => {
-    if (controller.signal.aborted) return;
-    reportMapError(error);
-  });
+  // Start lazy MapLibre and cache-worker registration together, once per attempt. A failed import or
+  // constructor can be retried without duplicating an in-flight startup or reviving an unmounted map.
+  startMap = createMapStartupAttempt(
+    () => prepareMapRuntime(registerMapCacheWorker, () => import("maplibre-gl")),
+    (maplibre) => initializeMap(controller, maplibre),
+    reportMapError,
+    () => !controller.signal.aborted && !!container.value && !map.value
+  );
+  startMap();
 });
 
 onBeforeUnmount(() => {
@@ -217,6 +237,7 @@ onBeforeUnmount(() => {
   }
   configRequest?.abort();
   configRequest = null;
+  startMap = null;
   map.value?.remove();
   map.value = null;
   activeStyleUrl = null;
