@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Cache mission elevation charts by route/profile (T4.4.4 partial)
+
+- Route card rendering rebuilt each 96-point chart up to five times per option for its SVG/text fields, including on unrelated reactive repaints. A computed snapshot now builds at most once per route/profile change; tests exercise cache invalidation and unchanged reads. This is a bounded render-work fix, not proof of the open map-load/GPS targets or virtual-scroll/browser acceptance.
+
 ### 2026-10-29 — Respect embedded mission-panel width (T4.4.1 partial)
 
 - The live mission panel used viewport media queries even when embedded in a narrow history or admin column of a wide desktop viewport; its two-column map/member grid could overflow that column. Its stacking and compact actions now respond to the panel container width instead. A source-pinned regression failed before the edit; tests/typecheck/build do not replace browser/phone visual acceptance.

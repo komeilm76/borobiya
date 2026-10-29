@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
+const charts = readFileSync(new URL("../../sos/route-elevation-charts.ts", import.meta.url), "utf8");
 const credits = readFileSync(new URL("../../../public/terrain-attribution.html", import.meta.url), "utf8");
 
 describe("mission map style restoration", () => {
@@ -32,11 +33,11 @@ describe("mission map style restoration", () => {
     expect(view).toContain('v-for="(choice, index) in routing.routes.value"');
     expect(view).toContain("formatRouteDistance(choice.distance_m)");
     expect(view).toContain("formatRouteDuration(choice.duration_s)");
-    expect(view).toContain('routing.profile.value === "car" ? null');
-    expect(view).toContain('v-if="chartForRoute(choice)"');
+    expect(charts).toContain('profile.value === "car"');
+    expect(view).toContain('v-if="elevationCharts[index]"');
     expect(view).toContain('aria-hidden="true"');
-    expect(view).toContain('<span class="sr-only">{{ chartForRoute(choice)?.description }}</span>');
-    expect(view).toContain("buildElevationChart(choice.elevation?.profile)");
+    expect(view).toContain('<span class="sr-only">{{ elevationCharts[index]?.description }}</span>');
+    expect(charts).toContain("build(choice.elevation?.profile)");
     expect(view).toContain("routing.routes.value.length === 1");
   });
   it("does not call GeoJSON setData on every map idle when the route layer is already present", () => {

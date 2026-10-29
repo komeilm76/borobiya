@@ -173,13 +173,13 @@
               <span>{{ formatRouteDistance(choice.distance_m) }} · {{ formatRouteDuration(choice.duration_s) }}</span>
               <small v-if="choice.elevation">صعود تخمینی: {{ Math.round(choice.elevation.gain_m).toLocaleString('fa-IR') }} متر · نزول تخمینی: {{ Math.round(choice.elevation.loss_m).toLocaleString('fa-IR') }} متر</small>
               <small v-else>ارتفاع: دادهٔ آفلاین برای تمام این مسیر موجود نیست.</small>
-              <span v-if="chartForRoute(choice)" class="mission-route__elevation-chart">
+              <span v-if="elevationCharts[index]" class="mission-route__elevation-chart">
                 <svg viewBox="0 0 240 80" preserveAspectRatio="none" aria-hidden="true">
-                  <path :d="chartForRoute(choice)?.area" class="mission-route__elevation-area" />
-                  <path :d="chartForRoute(choice)?.line" class="mission-route__elevation-line" />
+                  <path :d="elevationCharts[index]?.area" class="mission-route__elevation-area" />
+                  <path :d="elevationCharts[index]?.line" class="mission-route__elevation-line" />
                 </svg>
-                <small>{{ chartForRoute(choice)?.range }} · چپ: شروع، راست: مقصد</small>
-                <span class="sr-only">{{ chartForRoute(choice)?.description }}</span>
+                <small>{{ elevationCharts[index]?.range }} · چپ: شروع، راست: مقصد</small>
+                <span class="sr-only">{{ elevationCharts[index]?.description }}</span>
               </span>
             </button>
           </div>
@@ -259,7 +259,7 @@ import { useThemeStore } from "@/stores/theme";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { missionMapCamera } from "@/sos/mission-map";
 import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
-import { buildElevationChart } from "@/sos/elevation-chart";
+import { useRouteElevationCharts } from "@/sos/route-elevation-charts";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { useMissionDesk } from "@/composables/use-mission-desk";
@@ -328,9 +328,7 @@ const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
 function onProfileChange(value: unknown): void {
   if (value === "car" || value === "bicycle" || value === "foot") routing.selectProfile(value as TransportProfile);
 }
-function chartForRoute(choice: RouteChoice) {
-  return routing.profile.value === "car" ? null : buildElevationChart(choice.elevation?.profile);
-}
+const elevationCharts = useRouteElevationCharts(routing.routes, routing.profile);
 const ROUTE_SOURCE = "rescuer-route-preview";
 const ROUTE_LAYER = "rescuer-route-preview-line";
 let routeMap: MapLibreMap | null = null;
