@@ -41,7 +41,7 @@ function maplibreWorkerPlugin(): Plugin {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ command, mode, isPreview }) => {
   // Only the proxy process reads service targets; browser code uses same-origin /api, /map, /map-config, /route, /geocode, /reverse, and Martin resource paths.
   const env = loadEnv(mode, repositoryRoot, "");
   // Validate the same public MAP_* settings that the routing gateway exposes at /map-config.
@@ -73,10 +73,17 @@ export default defineConfig(({ mode }) => {
     ])
   );
 
+  // DevTools injects an inspector/overlay and editor endpoints into the dev server.
+  // Never load it for production builds, previews, or Vitest's serve-based runner.
+  const devtools =
+    command === "serve" && !isPreview && !process.env.VITEST
+      ? (await import("vite-plugin-vue-devtools")).default()
+      : undefined;
+
   return {
     root: packageRoot,
     envDir: repositoryRoot,
-    plugins: [vue(), vuetify({ autoImport: true }), tailwindcss(), maplibreWorkerPlugin()],
+    plugins: [vue(), vuetify({ autoImport: true }), tailwindcss(), maplibreWorkerPlugin(), devtools],
     resolve: {
       alias: {
         "@": resolve(packageRoot, "src"),
