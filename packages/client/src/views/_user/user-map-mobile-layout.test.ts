@@ -70,6 +70,15 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(4\.75rem/);
     expect(phoneMap).toContain(".user-map-view__dock");
     expect(phoneMap).toContain(".user-map-view__panel");
+    // All four panels inherit different desktop logical insets. In RTL a physical
+    // left:50% cannot override inset-inline-start/right; history/live go offscreen.
+    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-inline: 0;[^}]*margin-inline: auto;/);
+    expect(phoneMap).not.toMatch(/\.user-map-view__panel\s*\{[^}]*left: 50%/);
+    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-block-end: auto;/); // Own/live inherited bottom insets otherwise stretch an empty panel.
+    // Live uses flex columns: a height-capped aside otherwise shrinks both cards
+    // and clips their contents *without any scroll overflow*.
+    expect(phoneMap).toContain(".user-map-view__panel > :not(.user-map-view__panel-head)");
+    expect(phoneMap).toContain("flex-shrink: 0;");
     expect(phoneMap).toContain("overscroll-behavior: contain");
     expect(phoneMap).toContain("min-height: 44px");
     expect(css(view, "UserMapView.vue")).toContain(".user-map-view__panel[data-v-map-mobile]");

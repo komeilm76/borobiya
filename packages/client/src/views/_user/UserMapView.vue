@@ -799,7 +799,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     position: absolute;
     z-index: 4;
     top: calc(7.25rem + env(safe-area-inset-top, 0px));
-    left: 50%;
+    /* Reset both logical insets inherited from the four desktop placements.
+     * left:50% alone is over-constrained with inset-inline-start in RTL and
+     * sends history/live partly beyond the physical left edge. */
+    inset-inline: 0;
+    inset-block-end: auto;
+    margin-inline: auto;
     width: min(26rem, calc(100% - 1.5rem));
     max-height: min(60dvh, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto;
@@ -809,13 +814,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     background: rgba(var(--v-theme-surface), 0.97);
     box-shadow: var(--bb-shadow-overlay);
     backdrop-filter: blur(12px);
-    transform: translateX(-50%);
   }
+  /* Flex containers must overflow the aside, not squeeze card contents into
+   * their own hidden overflow (which leaves the bottom actions unreachable). */
+  .user-map-view__panel > :not(.user-map-view__panel-head) { flex-shrink: 0; }
   .user-map-view__panel:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
   .user-map-view__panel-head {
     position: sticky;
     top: 0;
     z-index: 2;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;

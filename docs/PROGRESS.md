@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Keep opened phone map widgets wholly on screen (T4.4.1 follow-up)
+
+- A real 360px-wide RTL browser run exposed history and companion panels extending beyond the physical left edge: desktop `inset-inline-start` survived the phone override's `left: 50%`, so the browser honored the conflicting right inset. On phones, all four panels now reset **both** logical horizontal insets and center with auto margins. Own/live panels also clear their inherited bottom inset rather than stretching into an empty card, and height-capped flex panels no longer shrink and silently clip their child cards; the outer panel scrolls instead. Focused source/compiled-style tests and a mocked-auth, headless Chromium geometry/scroll check at 320×568, 360×640 and 568×320 verified bounds and that the expanded history's last status remains reachable. Real authenticated device, keyboard, safe-area and map-data acceptance remains open.
+
 ### 2026-10-30 — Full-screen phone companion map (T4.4.1 partial)
 
 - On `/_user/map` below 600px, the MapLibre canvas now fills the viewport behind a 56px route-specific app bar. The footer and page-flow reservation are removed only on this route. A four-action dock opens one scrollable overlay at a time for complete, **unshrunk** search, history playback, own GPS and live/share controls; they stay mounted while closed so playback, location and socket state persist. Escape/Close return keyboard focus to the launcher. Selecting a place, centering GPS or returning to the track closes its tool to reveal the map while preserving search results; camera padding clears the phone chrome. SOS remains available above the dock and its style override outranks scoped component CSS; MapLibre logo/attribution clear the controls. Tablet (600–1023px) and desktop layouts remain in their original modes. Source/compiled-style and camera-padding tests do not replace authenticated phone/browser checks of safe areas, short screens, zoom, map gestures, keyboard and screen-reader use; T4.4.1 remains open.
