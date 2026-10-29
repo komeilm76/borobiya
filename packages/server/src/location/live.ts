@@ -32,6 +32,8 @@ export interface LiveLocationServiceDependencies {
   historyStore: Pick<LocationHistoryStore, "recordFix">;
   /** Injectable clock for tests. */
   now?: () => Date;
+  /** Report a failed post-write permission recheck without failing an already committed fix. */
+  logger?: { warn(payload: Record<string, unknown>, message: string): void };
 }
 
 export interface LiveLocationService {
@@ -112,9 +114,29 @@ export function createLiveLocationService(
         timestamp: observedAt
       });
 
+      // A revocation, expiry, suspension, or priority-device switch can commit while
+      // recordFix is in flight. Recheck immediately before fan-out and intersect with
+      // the original recipients: a newly granted recipient must not get this older fix.
+      // If the post-write check fails, fail closed for peers but still acknowledge the
+      // committed history row to avoid a duplicate. A revocation that races *after*
+      // this recheck still requires transport-level ordering to prevent all deliveries.
+      const authorizedBefore = new Set(accepted.map((share) => share.targetUserId));
+      let peers: string[] = [];
+      if (authorizedBefore.size > 0) {
+        try {
+          const activeNow = await dependencies.shareStore.listActiveOutgoingShares(userId);
+          peers = [...new Set(activeNow.filter((share) =>
+            authorizedBefore.has(share.targetUserId) &&
+            (share.priorityDeviceId === null || share.priorityDeviceId === deviceId)
+          ).map((share) => share.targetUserId))];
+        } catch (err) {
+          dependencies.logger?.warn({ err, userId }, "Location share recheck failed after persistence");
+        }
+      }
+
       return {
         status: "accepted",
-        peers: [...new Set(accepted.map((share) => share.targetUserId))],
+        peers,
         fix: { lat, lon, accuracy: accuracy ?? null, timestamp: observedAt.toISOString() }
       };
     }

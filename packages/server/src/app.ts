@@ -190,7 +190,8 @@ export async function createFastifyApp(
   const photoStorage = dependencies.photoStorage ?? createPhotoStorage(config.uploadDir);
   const liveLocationService = createLiveLocationService({
     shareStore: locationShareStore,
-    historyStore: locationHistoryStore
+    historyStore: locationHistoryStore,
+    logger: app.log
   });
   const realtime = attachRealtime(app.server, {
     jwtSecret: config.jwtSecret,

@@ -75,6 +75,80 @@ describe("live location service", () => {
     }]);
   });
 
+  it("does not deliver a persisted fix to a share revoked while the write was in flight", async () => {
+    const revokedPeer = randomUUID();
+    const remainingPeer = randomUUID();
+    const shares: ActiveOutgoingShare[] = [
+      { targetUserId: revokedPeer, priorityDeviceId: null },
+      { targetUserId: remainingPeer, priorityDeviceId: null }
+    ];
+    const listActiveOutgoingShares = vi.fn(async () => [...shares]);
+    let beginWrite!: () => void;
+    let commitWrite!: () => void;
+    const writing = new Promise<void>((resolve) => { beginWrite = resolve; });
+    const committed = new Promise<void>((resolve) => { commitWrite = resolve; });
+    const recordFix = vi.fn(async () => { beginWrite(); await committed; });
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares } as unknown as LocationShareStore,
+      historyStore: { recordFix } as unknown as LocationHistoryStore,
+      now: () => now
+    });
+
+    const pending = service.applyUpdate({ userId, deviceId, payload: payload() });
+    await writing;
+    shares.splice(0, 1); // The share was revoked and committed in a second request.
+    commitWrite();
+    const result = await pending;
+
+    expect(recordFix).toHaveBeenCalledOnce();
+    expect(listActiveOutgoingShares).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ status: "accepted", peers: [remainingPeer] });
+  });
+
+  it("honors a priority-device switch and does not send an older fix to a newly granted peer", async () => {
+    const pinnedPeer = randomUUID();
+    const newPeer = randomUUID();
+    const listActiveOutgoingShares = vi.fn()
+      .mockResolvedValueOnce([{ targetUserId: pinnedPeer, priorityDeviceId: null }])
+      .mockResolvedValueOnce([
+        { targetUserId: pinnedPeer, priorityDeviceId: "another-device" },
+        { targetUserId: newPeer, priorityDeviceId: null }
+      ]);
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares } as unknown as LocationShareStore,
+      historyStore: { recordFix: async () => {} } as unknown as LocationHistoryStore,
+      now: () => now
+    });
+
+    const result = await service.applyUpdate({ userId, deviceId, payload: payload() });
+
+    expect(listActiveOutgoingShares).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ status: "accepted", peers: [] });
+  });
+
+  it("acknowledges a committed fix without notifying any peer if the post-write share check fails", async () => {
+    const peer = randomUUID();
+    const listActiveOutgoingShares = vi.fn()
+      .mockResolvedValueOnce([{ targetUserId: peer, priorityDeviceId: null }])
+      .mockRejectedValueOnce(new Error("Share database unavailable"));
+    const recordFix = vi.fn(async () => {});
+    const warn = vi.fn();
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares } as unknown as LocationShareStore,
+      historyStore: { recordFix } as unknown as LocationHistoryStore,
+      now: () => now,
+      logger: { warn }
+    });
+
+    const result = await service.applyUpdate({ userId, deviceId, payload: payload() });
+
+    expect(recordFix).toHaveBeenCalledOnce();
+    expect(listActiveOutgoingShares).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ status: "accepted", peers: [] });
+    expect(warn).toHaveBeenCalledWith({ err: expect.any(Error), userId },
+      "Location share recheck failed after persistence");
+  });
+
   it("deduplicates peers when one recipient holds several shares", async () => {
     const target = randomUUID();
     const { service } = makeService({
@@ -268,6 +342,28 @@ describe("POST /_user/location/update (REST fallback)", () => {
     });
   });
 
+  it("does not fan a fix out through a REST fallback after its share was revoked during persistence", async () => {
+    const peer = randomUUID();
+    let grants: ActiveOutgoingShare[] = [{ targetUserId: peer, priorityDeviceId: null }];
+    const listActiveOutgoingShares = vi.fn(async () => grants);
+    const recordFix = vi.fn(async () => { grants = []; });
+    const service = createLiveLocationService({
+      shareStore: { listActiveOutgoingShares } as unknown as LocationShareStore,
+      historyStore: { recordFix } as unknown as LocationHistoryStore,
+      now: () => now
+    });
+    const broadcast = vi.fn();
+    const app = await makeRouteApp({ service, broadcast });
+
+    const response = await app.inject({ method: "POST", url: "/_user/location/update",
+      headers: { authorization: "Bearer test-token" }, payload: payload() });
+
+    expect(recordFix).toHaveBeenCalledOnce();
+    expect(response.statusCode).toBe(200);
+    expect(broadcast).toHaveBeenCalledWith([], expect.objectContaining({ userId }));
+    expect(broadcast.mock.calls[0]?.[0]).not.toContain(peer);
+  });
+
   it("acknowledges an already-persisted fix even when realtime fan-out throws", async () => {
     const peer = randomUUID();
     const { service, recorded } = makeService({
@@ -288,7 +384,7 @@ describe("POST /_user/location/update (REST fallback)", () => {
   });
 
   it("still reports a failed persistence instead of acknowledging an unwritten fix", async () => {
-    const { service } = makeService({
+    const { service, listActiveOutgoingShares } = makeService({
       shares: [{ targetUserId: randomUUID(), priorityDeviceId: null }],
       recordFix: async () => { throw new Error("Database unavailable"); }
     });
@@ -299,6 +395,7 @@ describe("POST /_user/location/update (REST fallback)", () => {
       headers: { authorization: "Bearer test-token" }, payload: payload()
     });
     expect(response.statusCode).toBe(500);
+    expect(listActiveOutgoingShares).toHaveBeenCalledOnce(); // no post-commit read on failed write
     expect(broadcast).not.toHaveBeenCalled();
   });
 

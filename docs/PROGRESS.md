@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Recheck location recipients after persistence (T2.1.5 follow-up)
+
+- Live location used the share list fetched *before* `recordFix` to choose Socket.IO and REST recipients. A revocation, suspension, expiry, or priority-device change committed while the database write was in flight could still receive the newly committed fix. The service now intersects the original recipient set with a fresh active-share/device check immediately after persistence, without including grants created mid-update. If that post-write read fails, it logs the failure, sends to no peers, and acknowledges the committed fix rather than inviting a duplicate write; actual persistence failures still reject. Deferred-write service regressions reproduced the stale recipient before the fix; a Fastify route regression covers the shared REST fan-out path. This narrows the write-window race, but is not an atomic guarantee against a revocation *after* the recheck; live socket/VM acceptance (P2-A1/P2-A2) remains open.
+
 ### 2026-10-28 — Live mission marker and GPS session boundary (T3.5.7 follow-up)
 
 - The mission live panel's deferred watchers retained another mission/account's private coordinates and an active consented GPS watch until the next Vue tick after logout, mission switch or session replacement. A null token followed by a new login in that tick could coalesce the logout boundary; a new JWT subject could also open a room while the cached profile still belonged to the old account. Mission/owner/token transitions now clear the marker/watch and close the socket synchronously, and a bearer with a different subject waits for its matching profile before connecting. Same-session bearer rotation keeps consent. Pure composable regressions reproduced the immediate stale-marker cases before the fix and cover direct same-account session replacement and delayed profile change. No Vue SFC mount or browser/VM acceptance performed.
