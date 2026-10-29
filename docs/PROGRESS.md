@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Announce rescuer mission progress semantically (T4.4.3 partial)
+
+- The active stage was indicated only by CSS. Added `aria-current="step"` to the active list item and a polite atomic live status for the server-confirmed status chip, without announcing uncommitted steps. A source-pinned test failed before the fix; screen-reader/browser and site-wide WCAG sign-off remain open.
+
 ### 2026-10-29 — Preserve requester rating draft during status refresh (T4.4.2 partial)
 
 - Explicitly refreshing the saved-rating check wiped an unsent score/comment, even if the read failed. The draft now survives same-mission refresh and retry while submit stays disabled until the server verifies eligibility; account/session/mission changes still clear it synchronously. A failing-before-fix composable regression covers the path. T4.4.2 remains open for other screen feedback and rendered acceptance.

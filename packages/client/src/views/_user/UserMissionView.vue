@@ -35,13 +35,15 @@
             <h3>مأموریت امدادی شما</h3>
             <p>شناسهٔ پیگیری: <bdi dir="ltr">{{ desk.activeMission.value.id }}</bdi></p>
           </div>
-          <v-chip color="primary" variant="tonal" size="large" prepend-icon="mdi-timeline-clock-outline">
+          <v-chip color="primary" variant="tonal" size="large" prepend-icon="mdi-timeline-clock-outline"
+            role="status" aria-live="polite" aria-atomic="true">
             {{ currentStatusLabel }}
           </v-chip>
         </div>
         <div class="mission-steps" role="list" aria-label="مراحل مأموریت">
           <div v-for="(step, index) in steps" :key="step.status" class="mission-steps__item"
-            :class="{ 'mission-steps__item--reached': index <= activeStep }" role="listitem">
+            :class="{ 'mission-steps__item--reached': index <= activeStep }"
+            :aria-current="index === activeStep ? 'step' : undefined" role="listitem">
             <span class="mission-steps__number" aria-hidden="true">{{ (index + 1).toLocaleString('fa-IR') }}</span>
             <span>{{ step.label }}</span>
             <v-icon v-if="index < activeStep" icon="mdi-check" size="16" aria-label="انجام شده" />
