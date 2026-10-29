@@ -1,4 +1,4 @@
-import { ref, nextTick } from "vue";
+import { effectScope, ref, nextTick } from "vue";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { useRouteNavigation, type NavigationRuntime } from "./use-route-navigation";
@@ -154,6 +154,38 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(clear).toHaveBeenCalledOnce();
     expect(nav.active.value).toBe(false);
     expect(nav.fix.value).toBeNull();
+  });
+
+  it("clears the private fix and restores the camera even when a native GPS disposer throws", () => {
+    const clear = vi.fn(() => { throw new Error("clearWatch bridge failed"); });
+    const reset = vi.fn();
+    let onFix!: (point: { lat: number; lon: number }) => void;
+    const camera = vi.fn();
+    const nav = useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), camera, {
+      subscribe: (fix) => { onFix = fix; return clear; }, now: () => 1000
+    }, reset);
+    expect(nav.start()).toBe(true);
+    onFix({ lat: 38.5, lon: -120.2 });
+    expect(nav.fix.value).not.toBeNull();
+    expect(() => nav.stop()).not.toThrow();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(nav.active.value).toBe(false);
+    expect(nav.fix.value).toBeNull();
+    expect(reset).toHaveBeenCalledOnce();
+    onFix({ lat: 38.6, lon: -120.3 });
+    expect(camera).toHaveBeenCalledOnce();
+  });
+
+  it("stops the GPS watch when the composable scope is disposed", () => {
+    const clear = vi.fn();
+    const scope = effectScope();
+    const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
+      subscribe: () => clear, now: () => 1000
+    }))!;
+    expect(nav.start()).toBe(true);
+    scope.stop();
+    expect(clear).toHaveBeenCalledOnce();
+    expect(nav.active.value).toBe(false);
   });
 
   it("clears the GPS watch when subscription reports denial synchronously", () => {

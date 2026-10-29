@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Navigation GPS cleanup on disposer failure and scope exit (T3.5.6 follow-up)
+
+- A native/test GPS disposer could throw during navigation `stop()`, leaving the last private fix visible and preventing the north-up camera reset and route teardown. The composable also relied on its current view to stop the watch before unmount, rather than cleaning up its own scope. Stop now fences callbacks and clears the fix before best-effort watch disposal, and scoped use automatically stops the watch; a throwing disposer no longer interrupts camera reset. Pure tests reproduced both failures before the edit and pass after it. A faulty bridge may still keep the underlying hardware watch alive if its disposer fails; live device GPS behavior remains unverified.
+
 ### 2026-10-29 — Compact global header and reachable logout confirmation (T4.4.1 partial)
 
 - On narrow phones the global brand label competed with theme, inbox, section-menu and logout controls for a single toolbar row. At 420px and below, only the brand mark is shown (its home-link accessible name stays intact), the toolbar gutters and logout padding shrink, and the functional controls remain in place. The logout confirmation now scrolls on short viewports, while its phone actions stack as full-width wrapping targets of at least 44px without changing submission locks. Source-pinned regressions failed on the original layout and now pass; they do not establish rendered widths, high zoom, physical keyboard use or site-wide responsive acceptance. T4.4.1 remains open.

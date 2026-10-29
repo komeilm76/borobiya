@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from "vue";
+import { getCurrentScope, onScopeDispose, ref, watch, type Ref } from "vue";
 import { coordinatesSchema } from "@shared/index";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { decodeRoutePolyline } from "@/sos/route-preview";
@@ -42,9 +42,11 @@ export function useRouteNavigation(
     const wasActive = active.value;
     unsubscribe = null;
     active.value = false;
-    cleanup?.();
     fix.value = null;
     lastCameraAt = Number.NEGATIVE_INFINITY;
+    // A native bridge may fail to clearWatch; do not let that preserve the private fix,
+    // block route teardown, or prevent the camera from returning to overview.
+    try { cleanup?.(); } catch { /* Watch callbacks are already invalidated by generation. */ }
     // Stop (manual, permission loss, mission/account change or closing the route)
     // always returns the map to a level, north-up overview. Starting a fresh
     // watch calls stop() first, but must not reset a camera that was never following.
@@ -106,5 +108,6 @@ export function useRouteNavigation(
   // Logout or a route/mission switch revokes this GPS consent at the ref change,
   // not at Vue's next tick (which could coalesce a logout and new login).
   watch([owner, missionId, selectedRoute, profile], () => { if (active.value) stop(); }, { flush: "sync" });
+  if (getCurrentScope()) onScopeDispose(stop);
   return { active, fix, error, start, stop };
 }
