@@ -59,15 +59,24 @@ export function registerMapCacheWorker(): Promise<void> {
   }
 
   if (!mapCacheWorkerReady) {
-    mapCacheWorkerReady = navigator.serviceWorker
-      .register("/map-cache-worker.js", { scope: "/" })
-      .then(() => Promise.race([
-        navigator.serviceWorker.ready,
-        new Promise<void>((resolve) => setTimeout(resolve, 1_500))
-      ]))
-      .then(() => undefined)
+    const worker = navigator.serviceWorker;
+    mapCacheWorkerReady = Promise.resolve()
+      .then(() => worker.register("/map-cache-worker.js", { scope: "/" }))
+      .then(async () => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          await Promise.race([
+            worker.ready,
+            new Promise<void>((resolve) => { timer = setTimeout(resolve, 1_500); })
+          ]);
+        } finally {
+          if (timer !== undefined) clearTimeout(timer);
+        }
+      })
       .catch(() => {
-        // The map still has MapLibre's in-memory tile cache on unsupported/insecure origins.
+        // Keep the map usable without SW, but allow a later mount/explicit retry to register again
+        // after a transient offline/permission failure. Do not leave a rejected promise unhandled.
+        mapCacheWorkerReady = undefined;
       });
   }
 

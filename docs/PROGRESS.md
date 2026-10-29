@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Retry map cache registration after a transient failure (T1.5.4 follow-up)
+
+- Service-worker registration failures were swallowed into a permanently memoized fulfilled promise: a later map mount would not retry after connectivity or permission recovered. Registration now clears the failed attempt while still swallowing its rejection so map startup and the app's fire-and-forget call remain non-blocking; concurrent callers share one attempt, and success stays memoized. A synchronous `register()` throw is also handled, and the 1.5-second readiness timer is cleared if readiness settles early. Regression tests reproduced the retry and timer issues before the fix and pass afterward. Browser/offline recovery and P1-A1 outage acceptance remain unverified.
+
 ### 2026-10-29 — Map companion label contrast and keyboard scroll (T4.4.3 partial)
 
 - The map toolbar's small location heading and the live-companion panel's heading/peer-age labels used `#718584` on translucent light cards, falling near 3.4–3.5:1 against a black underlying tile. The light foreground is now `#536d6c` (at least 4.8:1 on those composited cards); the existing dark-mode foregrounds remain. The companion list is capped at 11rem but had no focus target for keyboard-only scrolling. It now has a named, focusable `<ul>` with an explicit list role (to retain semantics despite `list-style: none`) and an inset 2px theme-primary focus outline. A no-SFC-mount regression reproduces both failures and checks light/dark text and focus contrast; no browser-rendered map, physical keyboard or screen-reader acceptance is claimed, and T4.4.3 remains open.
