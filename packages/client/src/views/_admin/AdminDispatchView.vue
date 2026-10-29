@@ -323,7 +323,7 @@
               v-if="adminSos.selectedRequest"
               class="map-selected-alert-card"
               elevation="4"
-              rounded="lg"
+              rounded="xl"
             >
               <v-card-text class="pa-3">
                 <div class="d-flex flex-wrap align-center justify-space-between ga-2 mb-1">
@@ -388,7 +388,7 @@
         </v-alert>
         <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
           role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
-        <div v-else-if="requestMissions.length" class="mb-3 pa-3 rounded-lg border">
+        <div v-else-if="requestMissions.length" class="mb-3 pa-3 border dispatch-mission-timeline">
           <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
           <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
             <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
@@ -914,6 +914,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.dispatch-mission-timeline { border-radius: var(--bb-radius-nested, 16px); }
 .dispatch-map-wrapper {
   position: relative;
   height: min(68vh, 560px);

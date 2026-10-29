@@ -331,7 +331,7 @@ function applyToAll(): void {
   gap: 0.3rem;
   padding: 0.7rem 0.8rem;
   border: 1px solid rgba(25, 53, 54, 0.1);
-  border-radius: 0.9rem;
+  border-radius: var(--bb-radius-nested, 16px);
 }
 
 .device-priority__share-head {

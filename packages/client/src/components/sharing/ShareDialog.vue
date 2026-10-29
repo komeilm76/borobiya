@@ -759,7 +759,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__results {
   margin-top: 0.5rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
-  border-radius: 14px;
+  border-radius: var(--bb-radius-nested, 16px);
   max-height: 15rem;
   overflow-y: auto;
 }

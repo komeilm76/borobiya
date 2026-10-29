@@ -602,7 +602,7 @@ onBeforeUnmount(() => {
   gap: 0.2rem;
   padding: 0.7rem 0.8rem;
   border: 1.5px solid rgba(120, 140, 140, 0.28);
-  border-radius: 0.85rem;
+  border-radius: var(--bb-radius-nested, 16px);
   background: transparent;
   text-align: start;
   cursor: pointer;

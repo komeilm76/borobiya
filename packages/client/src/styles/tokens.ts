@@ -14,6 +14,10 @@ export const spacing = {
   eight: 64
 } as const;
 
+// Vuetify's `rounded="xl"` is 24px; card-like plain CSS uses that same radius.
+// Inset cards and selectable rows have a smaller, consistent 16px corner.
+export const radii = { card: 24, nested: 16 } as const;
+
 export const typography = {
   fontFamily: '"Vazirmatn", "Segoe UI", Tahoma, sans-serif',
   sizes: { caption: "0.75rem", body: "1rem", title: "1.25rem", heading: "2rem" },
@@ -48,6 +52,7 @@ export function designTokenStylesheet(): string {
   const shared = [
     `--bb-grid-unit: ${gridUnit}px`,
     ...Object.entries(spacing).map(([key, value]) => `--bb-space-${key}: ${value}px`),
+    ...Object.entries(radii).map(([key, value]) => `--bb-radius-${key}: ${value}px`),
     `--bb-font-family: ${typography.fontFamily}`,
     ...Object.entries(typography.sizes).map(([key, value]) => `--bb-font-${key}: ${value}`),
     ...Object.entries(typography.weights).map(([key, value]) => `--bb-weight-${key}: ${value}`),

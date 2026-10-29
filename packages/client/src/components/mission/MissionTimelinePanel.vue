@@ -46,7 +46,7 @@ const timeline = useMissionTimeline(computed(() => props.mission.id), props.audi
 </script>
 
 <style scoped>
-.timeline { margin-block: 20px; padding: clamp(18px,3vw,28px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(28,112,95,.22); border-radius: 22px; box-shadow: 0 12px 30px rgba(20,62,58,.05); }
+.timeline { margin-block: 20px; padding: clamp(18px,3vw,28px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(28,112,95,.22); border-radius: var(--bb-radius-card, 24px); box-shadow: 0 12px 30px rgba(20,62,58,.05); }
 .timeline__header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: start; }
 .timeline__eyebrow { color: #167f69; font-size: .78rem; font-weight: 750; }
 .timeline h3 { font-size: 1.15rem; margin: 8px 0 4px; }.timeline__header p { font-size: .8rem; opacity: .72; line-height: 1.7; }

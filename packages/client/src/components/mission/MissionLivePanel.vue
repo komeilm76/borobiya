@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.live-panel { margin-block: 22px; border: 1px solid rgba(31,121,102,.25); border-radius: 22px; background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: 0 12px 28px rgba(13,70,63,.055); }
+.live-panel { margin-block: 22px; border: 1px solid rgba(31,121,102,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: 0 12px 28px rgba(13,70,63,.055); }
 .live-panel__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
 .live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
@@ -132,7 +132,7 @@ onBeforeUnmount(() => {
 .live-panel__map { min-height: 20rem; border-radius: 14px; overflow: hidden; }
 .live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }
 .live-panel__members { display: grid; gap: 12px; align-content: start; }
-.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: 12px; background: rgba(31,121,102,.06); }
+.live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: var(--bb-radius-nested, 16px); background: rgba(31,121,102,.06); }
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: .71rem; opacity: .78; }
 .live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }

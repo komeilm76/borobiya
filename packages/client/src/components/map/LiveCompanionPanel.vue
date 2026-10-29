@@ -1,5 +1,5 @@
 <template>
-  <v-card class="live-companions" elevation="2" rounded="lg">
+  <v-card class="live-companions" elevation="2" rounded="xl">
     <header class="live-companions__header">
       <div class="live-companions__title-block">
         <p>موقعیت زنده</p>

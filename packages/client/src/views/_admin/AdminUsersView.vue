@@ -682,7 +682,7 @@ onUnmounted(() => {
 .admin-users-table-wrap {
   overflow-x: auto;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
-  border-radius: 17px;
+  border-radius: var(--bb-radius-nested, 16px);
 }
 
 .admin-users-table {
@@ -905,7 +905,7 @@ onUnmounted(() => {
 @media (max-width: 850px) {
   .admin-users-table-wrap { display: none; }
   .admin-users-mobile { display: grid; gap: 0.75rem; margin: 0; padding: 0; list-style: none; min-width: 0; }
-  .admin-mobile-card { min-width: 0; padding: 1rem; border: 1px solid rgba(var(--v-theme-on-surface), 0.14); border-radius: 17px; background: rgb(var(--v-theme-surface)); }
+  .admin-mobile-card { min-width: 0; padding: 1rem; border: 1px solid rgba(var(--v-theme-on-surface), 0.14); border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); }
   .admin-mobile-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.6rem; }
   .admin-mobile-header .admin-user-cell { min-width: 0; flex: 1 1 12rem; }
   .admin-mobile-header .admin-user-copy { min-width: 0; }

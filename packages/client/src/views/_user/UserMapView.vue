@@ -43,7 +43,7 @@
     </aside>
 
     <aside class="user-map-view__own" aria-label="موقعیت من">
-      <v-card class="user-map-view__own-card" elevation="2" rounded="lg">
+      <v-card class="user-map-view__own-card" elevation="2" rounded="xl">
         <strong>موقعیت من</strong>
         <p role="status" aria-live="polite">
           {{ ownPositionLabel(own.position.value, own.active.value, own.error.value) }}

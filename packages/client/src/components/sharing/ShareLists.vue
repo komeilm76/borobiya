@@ -651,7 +651,7 @@ defineExpose({ refresh });
   gap: 0.6rem;
   padding: 0.55rem 0.65rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.08);
-  border-radius: 14px;
+  border-radius: var(--bb-radius-nested, 16px);
 }
 
 .share-lists__row-main {

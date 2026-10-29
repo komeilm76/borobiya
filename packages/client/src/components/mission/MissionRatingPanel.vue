@@ -46,7 +46,7 @@ const rating = useMissionRating(toRef(props, "mission"), computed(() => auth.acc
 </script>
 
 <style scoped>
-.rating { border: 1px solid rgba(28,112,95,.22); background: rgb(var(--v-theme-surface)); border-radius: 22px; padding: clamp(18px,3vw,28px); margin-block: 20px; }
+.rating { border: 1px solid rgba(28,112,95,.22); background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); padding: clamp(18px,3vw,28px); margin-block: 20px; }
 .rating__header { display: flex; align-items: start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }.rating__header h3 { margin: 5px 0 15px; font-size: 1.15rem; }.rating__eyebrow { color: #16826c; font-weight: 700; font-size: .8rem; }
 .rating p { font-size: .85rem; line-height: 1.8; }.rating__saved span { display: block; color: #ad6800; font-size: 1.65rem; letter-spacing: 3px; }
 .rating__fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }

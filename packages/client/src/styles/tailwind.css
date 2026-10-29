@@ -274,7 +274,7 @@ a {
   margin-block: 1rem 2rem;
   padding: 1rem 1.2rem;
   border: 1px solid rgba(34, 75, 75, 0.08);
-  border-radius: 18px;
+  border-radius: var(--bb-radius-nested, 16px);
   background: rgba(255, 255, 255, 0.64);
 }
 
