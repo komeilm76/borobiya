@@ -6,6 +6,7 @@ export interface JsonRequestOptions {
   body?: unknown;
   accessToken?: string | null;
   signal?: AbortSignal;
+  cache?: RequestCache;
   /** Disables automatic 401 refresh retry for internal session-hydration calls inside `refreshFromCookie`. */
   skipAuthRefresh?: boolean;
 }
@@ -67,6 +68,7 @@ function buildJsonInit(options: JsonRequestOptions, token: string | null): Reque
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     credentials: "same-origin",
+    cache: options.cache,
     signal: options.signal
   };
 }

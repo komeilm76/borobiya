@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Restore rescuer mission status progression (T3.5.2 follow-up)
+
+- Investigated the reported accepted-mission blocker: the ordered rescuer-only PATCH route and transactionally persisted status history existed, but the mission desk had no advance control. Added a manual next-step button from accepted → on the way → arrived → in progress → completed; the persisted response drives the label and completion confirmation. While saving, duplicate progression/cancellation is disabled. A stale list/old login acknowledgement cannot overwrite a committed step; a failed or ambiguous write (including 409) requires a successful server refresh before advancing again. Admin-role accounts cannot use the rescuer route even if their ID matches an assignment. Regression tests cover the API, desk lifecycle, view wiring and Fastify route; rendered two-user/browser and VM acceptance remain open.
+
 ### 2026-10-29 — Improve mission panels' light/dark contrast (T4.4.3 partial)
 
 - The live-member and rating eyebrows used a green that fell to 3.18:1 on dark cards; rating stars and star-input borders were also weak in one or both themes. Small labels now use theme-primary ink, stars use light/dark amber, and radio boundaries use theme-muted ink. Contrast measurements and source-pinned regressions failed before the fix and now pass without mounting Vue components. The native keyboard focus/radio behavior is unchanged; no browser/screen-reader or site-wide WCAG AA sign-off is claimed.

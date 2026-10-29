@@ -3,11 +3,11 @@ import { ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CancellationReason, Mission } from "@shared/index";
 import { ApiError } from "../api/http";
-import { cancelRescuerMission, listRescuerCancellationReasons, listRescuerMissions } from "../api/mission";
+import { advanceRescuerMission, cancelRescuerMission, listRescuerCancellationReasons, listRescuerMissions } from "../api/mission";
 import { isActiveMission, useMissionDesk } from "./use-mission-desk";
 
 vi.mock("../api/mission", () => ({
-  cancelRescuerMission: vi.fn(), listRescuerCancellationReasons: vi.fn(), listRescuerMissions: vi.fn()
+  advanceRescuerMission: vi.fn(), cancelRescuerMission: vi.fn(), listRescuerCancellationReasons: vi.fn(), listRescuerMissions: vi.fn()
 }));
 const requesterId = "a0000000-0000-4000-8000-000000000001";
 const rescuerId = "a0000000-0000-4000-8000-000000000002";
@@ -35,6 +35,7 @@ beforeEach(() => {
   vi.mocked(listRescuerMissions).mockResolvedValue({ items: [mission], total: 1, totalPages: 1 });
   vi.mocked(listRescuerCancellationReasons).mockResolvedValue(reasons);
   vi.mocked(cancelRescuerMission).mockResolvedValue();
+  vi.mocked(advanceRescuerMission).mockResolvedValue(mission);
 });
 
 describe("mission desk cancellation", () => {
@@ -337,5 +338,147 @@ describe("mission desk cancellation", () => {
     pending.resolve({ items: [mission], total: 1, totalPages: 1 });
     await fetching;
     expect(desk.missions.value).toEqual([]);
+  });
+});
+
+describe("rescuer mission progression", () => {
+  it("exposes an explicit accessible next-step control and error/refresh state without mounting the view", () => {
+    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    expect(view).toContain('desk.nextStatus.value');
+    expect(view).toContain('desk.advanceStatus()');
+    expect(view).toContain(':loading="desk.progressing.value"');
+    expect(view).toContain(':disabled="!desk.canAdvance.value"');
+    expect(view).toContain('desk.progressError.value');
+    expect(view).toContain('role="alert"');
+  });
+
+  it("advances each server-confirmed step in order, exactly once per pending write, and completes the mission", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [{ ...mission, status: "pending" }], total: 1, totalPages: 1 });
+    await desk.load();
+    const expected = ["on_the_way", "arrived", "in_progress", "completed"] as const;
+    for (const status of expected) {
+      expect(desk.nextStatus.value).toBe(status);
+      const pending = deferred<Mission>();
+      vi.mocked(advanceRescuerMission).mockReturnValueOnce(pending.promise);
+      const saving = desk.advanceStatus();
+      expect(desk.progressing.value).toBe(true);
+      expect(desk.canAdvance.value).toBe(false);
+      await desk.advanceStatus();
+      await desk.load(); // a stale read must not overwrite the committed response
+      expect(advanceRescuerMission).toHaveBeenCalledTimes(expected.indexOf(status) + 1);
+      expect(advanceRescuerMission).toHaveBeenLastCalledWith("token", missionId, status);
+      pending.resolve({ ...mission, status });
+      await saving;
+      expect(desk.progressing.value).toBe(false);
+      expect(desk.missions.value.find((item) => item.id === missionId)?.status).toBe(status);
+    }
+    expect(desk.activeMission.value).toBeNull();
+    expect(desk.nextStatus.value).toBeNull();
+    await desk.advanceStatus();
+    expect(advanceRescuerMission).toHaveBeenCalledTimes(4);
+  });
+
+  it("blocks uncertain or conflicting writes until a fresh server read verifies the mission", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    vi.mocked(advanceRescuerMission).mockRejectedValueOnce(new ApiError(409, "INVALID_MISSION_TRANSITION", "Changed"));
+    await desk.advanceStatus();
+    expect(desk.activeMission.value?.status).toBe("on_the_way");
+    expect(desk.canAdvance.value).toBe(false);
+    expect(desk.progressError.value).toContain("تازه");
+    await desk.advanceStatus();
+    expect(advanceRescuerMission).toHaveBeenCalledTimes(1);
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [{ ...mission, status: "arrived" }], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.progressError.value).toBeNull();
+    expect(desk.nextStatus.value).toBe("in_progress");
+    expect(desk.canAdvance.value).toBe(true);
+  });
+
+  it("discards a pre-mutation list and a late acknowledgement after a new session or unmount reset", async () => {
+    const token = ref<string | null>(bearer(rescuerId, "session-a"));
+    const desk = useMissionDesk(token, ref(rescuerId));
+    await desk.load();
+    const slowList = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(slowList.promise);
+    const reading = desk.load();
+    const slowWrite = deferred<Mission>();
+    vi.mocked(advanceRescuerMission).mockReturnValueOnce(slowWrite.promise);
+    const saving = desk.advanceStatus();
+    slowWrite.resolve({ ...mission, status: "arrived" });
+    await saving;
+    slowList.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await reading;
+    expect(desk.activeMission.value?.status).toBe("arrived");
+    const deferredWrite = deferred<Mission>();
+    vi.mocked(advanceRescuerMission).mockReturnValueOnce(deferredWrite.promise);
+    const late = desk.advanceStatus();
+    token.value = bearer(rescuerId, "session-b");
+    expect(desk.missions.value).toEqual([]);
+    deferredWrite.resolve({ ...mission, status: "in_progress" });
+    await late;
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.progressing.value).toBe(false);
+  });
+
+  it("does not advance while cancellation is open, or open cancellation during a progression write", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    expect(desk.canAdvance.value).toBe(false);
+    await desk.advanceStatus();
+    expect(advanceRescuerMission).not.toHaveBeenCalled();
+    desk.dismissCancellation();
+    const pending = deferred<Mission>();
+    vi.mocked(advanceRescuerMission).mockReturnValueOnce(pending.promise);
+    const saving = desk.advanceStatus();
+    await desk.showCancellation();
+    expect(desk.cancellationOpen.value).toBe(false);
+    pending.resolve({ ...mission, status: "arrived" });
+    await saving;
+  });
+});
+
+describe("mission progression uncertainty", () => {
+  it("keeps a possibly committed network failure blocked through a failed refresh and clears it only after a verified read", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    vi.mocked(advanceRescuerMission).mockRejectedValueOnce(new TypeError("Network unavailable"));
+    await desk.advanceStatus();
+    expect(desk.canAdvance.value).toBe(false);
+    expect(desk.progressError.value).toContain("تازه");
+    vi.mocked(listRescuerMissions).mockRejectedValueOnce(new Error("Offline"));
+    await desk.load();
+    expect(desk.canAdvance.value).toBe(false);
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [{ ...mission, status: "completed" }], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.progressError.value).toBeNull();
+    expect(desk.canAdvance.value).toBe(false);
+    expect(desk.activeMission.value).toBeNull();
+  });
+
+  it("keeps completion visible until a verified new assignment and discards a late response after reset", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    vi.mocked(advanceRescuerMission).mockResolvedValueOnce({ ...mission, status: "arrived" });
+    await desk.advanceStatus();
+    vi.mocked(advanceRescuerMission).mockResolvedValueOnce({ ...mission, status: "in_progress" });
+    await desk.advanceStatus();
+    vi.mocked(advanceRescuerMission).mockResolvedValueOnce({ ...mission, status: "completed" });
+    await desk.advanceStatus();
+    expect(desk.completedMissionId.value).toBe(missionId);
+    const other = { ...mission, id: "a0000000-0000-4000-8000-000000000006", status: "pending" as const };
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [other], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.completedMissionId.value).toBeNull();
+    const pending = deferred<Mission>();
+    vi.mocked(advanceRescuerMission).mockReturnValueOnce(pending.promise);
+    const saving = desk.advanceStatus();
+    desk.reset();
+    pending.resolve({ ...other, status: "on_the_way" });
+    await saving;
+    expect(desk.missions.value).toEqual([]);
+    expect(desk.completedMissionId.value).toBeNull();
   });
 });

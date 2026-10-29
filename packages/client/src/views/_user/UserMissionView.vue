@@ -11,6 +11,9 @@
       <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="lg" class="mt-6" role="status">
         مأموریت لغو شد. مرکز امداد برای جایگزینی امدادگر مطلع شده است.
       </v-alert>
+      <v-alert v-if="desk.completedMissionId.value" type="success" variant="tonal" rounded="lg" class="mt-6" role="status">
+        امدادرسانی پایان یافت و وضعیت مأموریت در سرور ثبت شد.
+      </v-alert>
       <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mt-6" role="alert">
         {{ desk.error.value }}
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
@@ -18,7 +21,7 @@
       <div class="mission-desk__toolbar">
         <div>
           <h2>مأموریت فعال</h2>
-          <p>اطلاعات از سرور خوانده می‌شود؛ بعد از تغییر وضعیت، فهرست را تازه کنید.</p>
+          <p>وضعیت مأموریت از سرور خوانده می‌شود و پس از تأیید هر مرحله به‌روز خواهد شد.</p>
         </div>
         <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :loading="desk.loading.value"
           @click="desk.load()">تازه‌سازی</v-btn>
@@ -44,6 +47,16 @@
             <v-icon v-if="index < activeStep" icon="mdi-check" size="16" aria-label="انجام شده" />
           </div>
         </div>
+        <div class="mission-desk__progress" aria-label="به‌روزرسانی وضعیت مأموریت">
+          <p>تغییر مرحله دستی است؛ موقعیت‌یابی یا باز کردن مسیر، وضعیت مأموریت را تغییر نمی‌دهد.</p>
+          <v-btn v-if="desk.nextStatus.value" color="primary" variant="flat" rounded="lg"
+            :loading="desk.progressing.value" :disabled="!desk.canAdvance.value"
+            @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
+          <v-alert v-if="desk.progressError.value" type="error" variant="tonal" rounded="lg" role="alert">
+            {{ desk.progressError.value }}
+            <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
+          </v-alert>
+        </div>
         <div class="mission-desk__foot">
           <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
             @click="routing.open()">رفتن به محل حادثه</v-btn>
@@ -51,10 +64,10 @@
           <v-menu location="bottom end">
             <template #activator="{ props }">
               <v-btn v-bind="props" variant="text" color="error" rounded="lg" prepend-icon="mdi-dots-horizontal"
-                aria-label="گزینه‌های بیشتر مأموریت">بیشتر</v-btn>
+                aria-label="گزینه‌های بیشتر مأموریت" :disabled="desk.progressing.value">بیشتر</v-btn>
             </template>
             <v-list density="comfortable" rounded="lg">
-              <v-list-item prepend-icon="mdi-alert-outline" title="قادر به ادامه نیستم" subtitle="ثبت دلیل و آگاه‌سازی مرکز امداد"
+              <v-list-item prepend-icon="mdi-alert-outline" title="قادر به ادامه نیستم" subtitle="ثبت دلیل و آگاه‌سازی مرکز امداد" :disabled="desk.progressing.value"
                 @click="desk.showCancellation()" />
             </v-list>
           </v-menu>
@@ -428,6 +441,12 @@ const steps = [
   { status: "in_progress", label: "در حال امدادرسانی" },
   { status: "completed", label: "پایان یافته" }
 ];
+const nextStatusLabel = computed(() => desk.nextStatus.value ? ({
+  on_the_way: "شروع حرکت؛ در راه هستم",
+  arrived: "به محل حادثه رسیده‌ام",
+  in_progress: "امدادرسانی را آغاز کردم",
+  completed: "امدادرسانی پایان یافت"
+})[desk.nextStatus.value] : "");
 const activeStep = computed(() => steps.findIndex((step) => step.status === desk.activeMission.value?.status));
 const currentStatusLabel = computed(() => steps[activeStep.value]?.label ?? "در حال بررسی");
 const missionSession = computed(() => {
@@ -488,6 +507,9 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-steps__item { display: flex; align-items: center; gap: 9px; min-height: 60px; padding: 11px; border-radius: var(--bb-radius-nested, 16px); background: rgba(111,138,130,.09); color: rgb(var(--v-theme-on-surface)); opacity: .6; font-size: .81rem; font-weight: 700; }
 .mission-steps__item--reached { background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); opacity: 1; }
 .mission-steps__number { display: inline-grid; flex-shrink: 0; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid currentColor; font-size: .8rem; }
+.mission-desk__progress { display: grid; justify-items: start; gap: 12px; margin-bottom: 20px; }
+.mission-desk__progress p { margin: 0; font-size: .88rem; color: rgb(var(--v-theme-on-surface)); }
+.mission-desk__progress :deep(.v-btn) { min-height: 44px; height: auto; white-space: normal; text-align: center; }
 .mission-desk__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(98,146,137,.2); padding-top: 18px; }
 .mission-desk__foot p { display: flex; align-items: center; gap: 8px; margin: 0; font-size: .82rem; opacity: .76; }
 .mission-desk__empty { text-align: center; padding: 58px 24px; }

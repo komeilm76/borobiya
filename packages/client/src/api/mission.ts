@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiRoutes } from "@shared/api";
-import { cancellationReasonSchema, cancellationSchema, missionSchema, missionDetailSchema, missionTimelineSchema, missionPresenceSchema, paginatedResponseSchema, missionRatingSchema,
+import { cancellationReasonSchema, cancellationSchema, missionStatusUpdateSchema, missionSchema, missionDetailSchema, missionTimelineSchema, missionPresenceSchema, paginatedResponseSchema, missionRatingSchema,
   type CancellationReason, type Mission, type MissionDetail, type MissionRatingInput, type MissionTimeline, type MissionPresence } from "@shared/index";
 import { requestJson } from "./http";
 
@@ -8,7 +8,7 @@ export async function listRescuerMissions(token: string, page = 1): Promise<{ it
   const query = apiRoutes.sos.listMissions.schema.query.parse({ role: "rescuer", page, limit: 20 });
   const params = new URLSearchParams({ role: "rescuer", page: String(query.page), limit: String(query.limit) });
   return paginatedResponseSchema(missionSchema).parse(await requestJson<unknown>(
-    `${apiRoutes.sos.listMissions.url}?${params}`, { accessToken: token }
+    `${apiRoutes.sos.listMissions.url}?${params}`, { accessToken: token, cache: "no-store" }
   ));
 }
 
@@ -48,6 +48,18 @@ export async function getMissionPresence(token: string, missionId: string, signa
 export async function getMission(token: string, id: string): Promise<MissionDetail> {
   return missionDetailSchema.parse(await requestJson<unknown>(apiRoutes.sos.getMission.url.replace(":id", encodeURIComponent(id)),
     { accessToken: token }));
+}
+
+/** Only the assigned rescuer may request the next ordered step; the response is the persisted mission. */
+export async function advanceRescuerMission(token: string, id: string, status: Mission["status"]): Promise<Mission> {
+  const route = apiRoutes.sos.updateMissionStatus;
+  const missionId = route.schema.params.parse({ id }).id;
+  const body = missionStatusUpdateSchema.parse({ status });
+  const result = missionSchema.parse(await requestJson<unknown>(route.url.replace(":id", encodeURIComponent(missionId)), {
+    method: "PATCH", accessToken: token, body
+  }));
+  if (result.id !== missionId || result.status !== status) throw new Error("Mission status response did not match the requested step.");
+  return result;
 }
 
 export async function listRescuerCancellationReasons(token: string): Promise<CancellationReason[]> {

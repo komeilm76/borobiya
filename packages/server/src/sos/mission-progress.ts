@@ -17,7 +17,7 @@ export async function registerMissionProgressRoutes(
       error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: []
     });
     const params = route.schema.params.safeParse(request.params);
-    if (!params.success) return response.code(404).send({
+    if (!params.success || user.role !== "user") return response.code(404).send({
       error: true, code: "MISSION_NOT_FOUND", message: "Mission not found.", issues: []
     });
     const body = route.schema.body.safeParse(request.body);
@@ -74,6 +74,7 @@ export async function registerMissionProgressRoutes(
 
   const listRoute = apiRoutes.sos.listMissions;
   app.get(listRoute.url, async (request, reply) => {
+    reply.header("cache-control", "no-store"); // Status refreshes must not reuse an earlier mission snapshot.
     const user = request.authenticatedUser;
     if (!user) return reply.code(401).send({ error: true, code: "UNAUTHORIZED", message: "Authentication required.", issues: [] });
     const query = listRoute.schema.query.safeParse(request.query);

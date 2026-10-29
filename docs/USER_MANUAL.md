@@ -288,16 +288,16 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 The authenticated rescuer advances an active mission through ordered status controls. A GPS fix does **not** automatically change the mission step. The requester and admin can view the server-timestamped status timeline; foreign mission histories are not visible.
 
-Rescuer updates step-by-step (button in mission bar):
+Rescuer opens **مأموریت من** (`/_user/mission`) and taps the next-stage button below the five-step progress row. Only the assigned rescuer can update the mission; each button becomes available after the server confirms the preceding step. The route button and GPS navigation do not advance the status:
 
 | Step | Status | When |
 |------|--------|------|
-| 1 | **On the way** — `در حال رفتن به محل حادثه` | After beginning the journey (manual confirmation) |
-| 2 | **Arrived** — `به محل حادثه رسیدم` | On reaching the incident (manual confirmation, not GPS-triggered) |
-| 3 | **In Progress** — `در حال رسیدگی` | Assessing scene |
-| 4 | **Completed** | Done |
+| 1 | **On the way** — `در راه` | Tap **شروع حرکت؛ در راه هستم** after beginning the journey |
+| 2 | **Arrived** — `رسیده به محل` | Tap **به محل حادثه رسیده‌ام** after arriving (not GPS-triggered) |
+| 3 | **In Progress** — `در حال امدادرسانی` | Tap **امدادرسانی را آغاز کردم** |
+| 4 | **Completed** — `پایان یافته` | Tap **امدادرسانی پایان یافت** when done |
 
-Each committed update appears as a timeline to the requester and admin. If the mission timeline’s Socket.IO connection fails, an authenticated read-only event stream checks for changes roughly every 15 seconds and asks the page to reload its authorized timeline. It may be delayed; it does not share GPS or replace the mission-location socket. Reopen or retry the timeline if both transports are unavailable.
+If an update fails or its result is uncertain (including an HTTP 409 conflict), use **تازه‌سازی وضعیت** to read the server before trying the next button; the prior step is not optimistically marked complete. Completion displays a confirmation and removes the active mission. Each committed update appears as a timeline to the requester and admin. If the mission timeline’s Socket.IO connection fails, an authenticated read-only event stream checks for changes roughly every 15 seconds and asks the page to reload its authorized timeline. It may be delayed; it does not share GPS or replace the mission-location socket. Reopen or retry the timeline if both transports are unavailable.
 
 [Screenshot: Mission timeline with 4 steps]
 

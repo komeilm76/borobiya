@@ -16,13 +16,13 @@ const mission = {
   cancellationCustomText: null, cancelledAt: null, createdAt: now, updatedAt: now
 };
 
-async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceStatus"]>>, signedIn = true, io?: RoomEmitter, rating: MissionRatingResult = "rated") {
+async function appFor(result: Awaited<ReturnType<MissionProgressStore["advanceStatus"]>>, signedIn = true, io?: RoomEmitter, rating: MissionRatingResult = "rated", role: "user" | "admin" = "user") {
   const app = Fastify({ logger: false });
   const advanceStatus = vi.fn(async () => result);
   const rateMission = vi.fn(async () => rating);
   app.addHook("onRequest", async (request) => {
     request.authenticatedUser = signedIn ? {
-      userId: rescuerId, role: "user", sessionId: randomUUID(), deviceId: randomUUID(),
+      userId: rescuerId, role, sessionId: randomUUID(), deviceId: randomUUID(),
       username: "rescuer", isActive: true, isSuspended: false,
       mustCompleteSecurityQuestions: false, avgRating: null, createdAt: new Date()
     } : null;
@@ -98,6 +98,25 @@ describe("PATCH /_user/missions/:id/status", () => {
       role = "admin";
       expect((await app.inject({ method: "GET", url })).statusCode).toBe(404);
       expect(findNavigationTarget).toHaveBeenCalledTimes(2);
+    } finally { await app.close(); }
+  });
+
+  it("refuses an admin even if that account ID is still assigned as the rescuer", async () => {
+    const { app, advanceStatus } = await appFor({ status: "updated", mission }, true, undefined, "rated", "admin");
+    try {
+      const result = await app.inject({ method: "PATCH", url: `/_user/missions/${missionId}/status`, payload: { status: "on_the_way" } });
+      expect(result.statusCode).toBe(404);
+      expect(result.json().code).toBe("MISSION_NOT_FOUND");
+      expect(advanceStatus).not.toHaveBeenCalled();
+    } finally { await app.close(); }
+  });
+
+  it("never caches a mission list used to verify an uncertain status update", async () => {
+    const { app } = await appFor({ status: "not_found" });
+    try {
+      const result = await app.inject({ method: "GET", url: "/_user/sos/missions?role=rescuer&page=1&limit=20" });
+      expect(result.statusCode).toBe(200);
+      expect(result.headers["cache-control"]).toBe("no-store");
     } finally { await app.close(); }
   });
 
