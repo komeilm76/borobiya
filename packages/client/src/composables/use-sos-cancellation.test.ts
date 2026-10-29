@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { ref } from "vue";
+import { effectScope, ref } from "vue";
 import type { CancellationReason } from "@shared/index";
 import { useSosCancellation } from "./use-sos-cancellation";
 import { cancelSosRequest, listSosCancellationReasons } from "../api/sos";
@@ -113,6 +113,96 @@ describe("requester SOS cancellation confirmation", () => {
     pending.resolve();
     await saving;
     expect(cancel.cancelled.value).toBe(false);
+  });
+
+  it("invalidates a confirmation when its SOS changes, even across a same-tick ID round trip", async () => {
+    const id = ref<string | null>(requesterId);
+    const replacementId = "c0000000-0000-4000-8000-000000000006";
+    const cancel = useSosCancellation(ref("token"), id, ref("owner"));
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    expect(cancel.canConfirm.value).toBe(true);
+    id.value = replacementId;
+    expect(cancel.canConfirm.value).toBe(false);
+    expect(cancel.open.value).toBe(false);
+    await cancel.confirm();
+    expect(cancelSosRequest).not.toHaveBeenCalled();
+    id.value = requesterId;
+    expect(cancel.open.value).toBe(false); // A->B->A cannot reuse the prior consent.
+    expect(cancel.canConfirm.value).toBe(false);
+    id.value = replacementId;
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    await cancel.confirm();
+    expect(cancelSosRequest).toHaveBeenCalledOnce();
+    expect(cancelSosRequest).toHaveBeenCalledWith(replacementId, "token", reasons[0]!.id, undefined);
+  });
+
+  it("cannot submit a dismissed confirmation or reuse it after the account signs out", async () => {
+    const token = ref<string | null>("token");
+    const cancel = useSosCancellation(token, ref(requesterId), ref("owner"));
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    cancel.dismiss();
+    expect(cancel.canConfirm.value).toBe(false);
+    await cancel.confirm();
+    expect(cancelSosRequest).not.toHaveBeenCalled();
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    token.value = null;
+    expect(cancel.open.value).toBe(false);
+    expect(cancel.reasons.value).toEqual([]);
+    expect(cancel.canConfirm.value).toBe(false);
+  });
+
+  it("keeps same-session bearer renewal but revokes confirmation on direct session replacement", async () => {
+    const owner = "owner";
+    const bearer = (sessionId: string, nonce = 0) =>
+      `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: owner, sessionId, nonce }))}.signature`;
+    const token = ref<string | null>(bearer("session-a"));
+    const cancel = useSosCancellation(token, ref(requesterId), ref(owner));
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    token.value = bearer("session-a", 1);
+    expect(cancel.open.value).toBe(true);
+    expect(cancel.canConfirm.value).toBe(true);
+    token.value = bearer("session-b");
+    expect(cancel.open.value).toBe(false);
+    expect(cancel.reasons.value).toEqual([]);
+    expect(cancel.canConfirm.value).toBe(false);
+    await cancel.confirm();
+    expect(cancelSosRequest).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late reason list after the request ID changes during loading", async () => {
+    const id = ref<string | null>(requesterId);
+    const cancel = useSosCancellation(ref("token"), id, ref("owner"));
+    const pending = deferred<CancellationReason[]>();
+    vi.mocked(listSosCancellationReasons).mockReturnValueOnce(pending.promise);
+    const loading = cancel.show();
+    id.value = "c0000000-0000-4000-8000-000000000006";
+    pending.resolve(reasons);
+    await loading;
+    expect(cancel.open.value).toBe(false);
+    expect(cancel.reasons.value).toEqual([]);
+    expect(cancel.loading.value).toBe(false);
+  });
+
+  it("clears an in-flight cancellation when the sheet scope is disposed", async () => {
+    const scope = effectScope();
+    const cancel = scope.run(() => useSosCancellation(ref("token"), ref(requesterId), ref("owner")))!;
+    await cancel.show();
+    cancel.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelSosRequest).mockReturnValueOnce(pending.promise);
+    const saving = cancel.confirm();
+    scope.stop();
+    expect(cancel.open.value).toBe(false);
+    expect(cancel.reasons.value).toEqual([]);
+    pending.resolve();
+    await saving;
+    expect(cancel.cancelled.value).toBe(false);
+    expect(cancel.submitting.value).toBe(false);
   });
 
   it("drops a pending cancellation on reset even if the same account reopens the dialog", async () => {

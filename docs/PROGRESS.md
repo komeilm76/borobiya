@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Bind requester cancellation to its original SOS (T3.6.2 follow-up)
+
+- A cancellation dialog could remain open while its `requestId` changed; its Confirm handler then read the *new* ID and could cancel an SOS the requester had not confirmed. Dismissed dialogs also retained a callable confirmation path, and disposal did not invalidate a pending cancellation. The dialog now binds its choice to the opening request and account/JWT session, revokes the prompt synchronously on request/session changes (even an A→B→A same-tick transition), disables confirmation after dismissal, and clears pending state on scope disposal. Same-session bearer renewal stays valid. Focused regressions reproduced changed-ID, dismissed-confirm and unmount failures before the fix; no real-browser or server-concurrency acceptance is claimed.
+
 ### 2026-10-29 — Reset abandoned SOS forms on close (T3.2.4 follow-up)
 
 - A user-reported Cancel/close bug came from two paths: the sheet only reset on close after a completed/cancelled request, and the reset routine never restored the default incident type. Unsubmitted drafts now clear on Cancel, X and sheet dismissal; reset returns severity, incident type, description, location/coordinates and photo to initial values and invalidates a late GPS fix. Closing after a confirmed request with a failed photo upload still preserves its request ID and photo-retry path, avoiding a duplicate emergency on reopen. Regression tests failed before the change and now cover the pure close decision, reset state and source-pinned sheet wiring; rendered browser/device acceptance remains unverified.

@@ -1,8 +1,9 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, getCurrentScope, onScopeDispose, ref, watch, type Ref } from "vue";
 import type { CancellationReason } from "@shared/index";
 import { cancelSosRequest, listSosCancellationReasons } from "../api/sos";
 import { sosApiErrorMessage } from "../sos/sos-form";
 import { ApiError } from "../api/http";
+import { decodeAccessTokenClaims } from "./device-identity";
 
 /** The cancellation dialog never sends a request before the user has selected and confirmed a reason. */
 export function useSosCancellation(token: Ref<string | null>, requestId: Ref<string | null>,
@@ -17,14 +18,29 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
   const cancelled = ref(false);
   const blocked = ref(false);
   let generation = 0;
+  let openedRequestId: string | null = null;
+  let openedSession: string | null = null;
+  // A token renewal in the same session keeps the prompt; logout, account switch and
+  // a different JWT session revoke consent before a new request can reuse it.
+  const sessionKey = computed(() => {
+    const owner = userId.value;
+    const bearer = token.value;
+    if (!owner || !bearer) return null;
+    const claims = decodeAccessTokenClaims(bearer);
+    if (bearer.includes(".") && (claims?.sub !== owner || typeof claims.sessionId !== "string")) return null;
+    return JSON.stringify([owner, claims?.sessionId ?? null]);
+  });
   const selected = computed(() => reasons.value.find((reason) => reason.id === reasonId.value));
-  const canConfirm = computed(() => !!requestId.value && !!token.value && !!userId.value && !blocked.value && !loading.value && !submitting.value && !!selected.value &&
+  const canConfirm = computed(() => open.value && !!requestId.value && requestId.value === openedRequestId &&
+    !!sessionKey.value && sessionKey.value === openedSession && !blocked.value && !loading.value && !submitting.value && !!selected.value &&
     (!selected.value.requiresCustomText || (customReason.value.trim().length >= 10 && customReason.value.trim().length <= 200)));
 
   async function show(): Promise<void> {
-    if (!requestId.value || !token.value || !userId.value || submitting.value || cancelled.value || blocked.value) return;
+    if (!requestId.value || !token.value || !sessionKey.value || submitting.value || cancelled.value || blocked.value) return;
     const owner = userId.value;
     const current = ++generation;
+    openedRequestId = requestId.value;
+    openedSession = sessionKey.value;
     open.value = true;
     reasonId.value = "";
     customReason.value = "";
@@ -48,8 +64,13 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     if (submitting.value) return;
     ++generation;
     open.value = false;
+    openedRequestId = null;
+    openedSession = null;
     loading.value = false;
     error.value = null;
+    reasons.value = [];
+    reasonId.value = "";
+    customReason.value = "";
   }
 
   async function confirm(): Promise<void> {
@@ -86,6 +107,8 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     // finally block unlock a later confirmation in the reopened panel.
     ++generation;
     open.value = false;
+    openedRequestId = null;
+    openedSession = null;
     loading.value = false;
     submitting.value = false;
     error.value = null;
@@ -95,6 +118,12 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     reasonId.value = "";
     customReason.value = "";
   }
+
+  // Synchronous invalidation also catches A -> B -> A within a single Vue tick.
+  watch([requestId, sessionKey], ([id, session], [previousId, previousSession]) => {
+    if (id !== previousId || session !== previousSession) reset();
+  }, { flush: "sync" });
+  if (getCurrentScope()) onScopeDispose(reset);
 
   return { open, loading, submitting, reasons, reasonId, customReason, selected, error, cancelled, blocked,
     canConfirm, show, dismiss, confirm, reset };
