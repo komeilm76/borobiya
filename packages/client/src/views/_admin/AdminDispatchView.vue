@@ -133,7 +133,7 @@
     <!-- Triage queue is first in DOM and visual order, including when the columns stack. -->
     <v-row>
       <v-col cols="12" lg="5" class="admin-dispatch__queue">
-        <v-card class="mb-4" rounded="xl" variant="outlined">
+        <v-card class="admin-dispatch__surface bb-surface-card mb-4" elevation="0" rounded="xl">
           <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
             <span>صف درخواست‌های اضطراری</span>
             <v-chip v-if="adminSos.queueVerified" color="error" size="small" variant="flat">
@@ -220,7 +220,7 @@
           </v-list>
         </v-card>
 
-        <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
+        <v-card v-if="adminSos.selectedRequest" class="admin-dispatch__surface bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="d-flex align-center justify-space-between text-subtitle-1 font-weight-bold">
             <span>جزئیات درخواست انتخاب‌شده</span>
             <v-chip
@@ -309,7 +309,7 @@
         </v-card>
       </v-col>
       <v-col cols="12" lg="7" class="admin-dispatch__map-and-actions">
-        <v-card class="overflow-hidden mb-4" rounded="xl" variant="outlined">
+        <v-card class="admin-dispatch__surface bb-surface-card overflow-hidden mb-4" elevation="0" rounded="xl">
           <div class="dispatch-map-wrapper">
             <MapCanvas
               aria-label="نقشهٔ زندهٔ درخواست‌های اضطراری SOS"
@@ -388,7 +388,7 @@
         </v-alert>
         <v-skeleton-loader v-if="adminSos.selectedRequest && missionLoading" type="article" class="mb-3"
           role="status" aria-label="در حال دریافت مأموریت‌های این درخواست" />
-        <div v-else-if="requestMissions.length" class="mb-3 pa-3 border dispatch-mission-timeline">
+        <div v-else-if="requestMissions.length" class="mb-3 pa-3 dispatch-mission-timeline">
           <label for="dispatch-mission-timeline" class="d-block text-caption font-weight-bold mb-2">خط زمانی مأموریت</label>
           <select id="dispatch-mission-timeline" v-model="timelineMissionId" class="mission-timeline-select">
             <option v-for="mission in requestMissions" :key="mission.id" :value="mission.id">
@@ -409,7 +409,7 @@
         </v-btn>
         <MissionLivePanel v-for="mission in activeMissions" :key="mission.id" :mission="mission"
           :center="adminSos.selectedRequest ? [adminSos.selectedRequest.location.lon, adminSos.selectedRequest.location.lat] : undefined" />
-        <v-card v-if="adminSos.selectedRequest" rounded="xl" variant="outlined">
+        <v-card v-if="adminSos.selectedRequest" class="admin-dispatch__surface bb-surface-card" elevation="0" rounded="xl">
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
               <v-icon color="primary" icon="mdi-account-group-outline" />
@@ -914,7 +914,49 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.dispatch-mission-timeline { border-radius: var(--bb-radius-nested, 16px); }
+.admin-dispatch {
+  font-family: var(--bb-font-family);
+}
+
+/* Vuetify's text utilities force Roboto even when the page inherits Persian-first type. */
+.admin-dispatch :deep(.text-h5),
+.admin-dispatch :deep(.text-subtitle-1),
+.admin-dispatch :deep(.text-subtitle-2),
+.admin-dispatch :deep(.text-body-2),
+.admin-dispatch :deep(.text-caption) {
+  font-family: var(--bb-font-family) !important;
+  letter-spacing: normal !important;
+}
+
+.admin-dispatch :deep(.text-caption) {
+  font-size: 0.8rem !important;
+  line-height: 1.55;
+}
+
+.admin-dispatch :deep(.text-body-2) {
+  line-height: 1.7;
+}
+
+/* One tier for the four primary cards, matching the other admin screens. */
+.admin-dispatch__surface {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  background: rgb(var(--v-theme-surface));
+}
+
+.admin-dispatch__surface :deep(.v-card-title) {
+  font-size: 1.08rem !important;
+  font-weight: 800 !important;
+  line-height: 1.55;
+  white-space: normal;
+}
+
+/* The timeline sits between other cards; give it a boundary, not another shadow. */
+.dispatch-mission-timeline {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: var(--bb-radius-nested, 16px);
+  background: rgb(var(--v-theme-surface));
+}
+
 .dispatch-map-wrapper {
   position: relative;
   height: min(68vh, 560px);
@@ -927,6 +969,8 @@ onBeforeUnmount(() => {
   inset-inline-start: 12px;
   z-index: 2;
   width: min(360px, calc(100% - 24px));
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  background: rgba(var(--v-theme-surface), 0.96);
   backdrop-filter: blur(8px);
 }
 
@@ -1050,5 +1094,19 @@ onBeforeUnmount(() => {
     box-shadow: 0 0 0 0 transparent;
   }
 }
-.mission-timeline-select { width: 100%; padding: 11px; border: 1px solid rgba(98,146,137,.4); border-radius: 10px; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface)); }
+.mission-timeline-select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.2);
+  border-radius: var(--bb-radius-nested, 16px);
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+  font: inherit;
+  font-size: 0.875rem;
+}
+
+.mission-timeline-select:focus-visible {
+  outline: 2px solid var(--bb-color-primary);
+  outline-offset: 2px;
+}
 </style>

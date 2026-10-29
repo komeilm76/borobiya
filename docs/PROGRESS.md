@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Align admin dispatch cards and typography with the UI tokens (T4.4.5 follow-up)
+
+- The SOS dispatch console's four main panels were outline-only while adjacent admin screens used themed surface depth. The queue, selected request, map frame and responder picker now use the shared light/dark surface shadow, 24px corners and a semantic border. The map alert remains a floating overlay (surface depth when stacked), and the mission timeline is inset rather than doubly raised. Scoped typography brings the page's Vuetify utility headings, body labels and captions into the existing Persian-first font stack, with slightly larger metadata and readable heading/body leading; the native mission selector now inherits the same type and has a focus outline. Source/compiled-style checks, typecheck, tests and production build cover code behavior; no authenticated desktop/phone visual approval is claimed.
+
 ### 2026-10-29 — Make scoped dark-mode contrast rules actually apply (T4.4.3 partial)
 
 - Investigated the reported low-contrast dashboard headings, broadcast status and map history/companion labels. Their intended light-on-dark overrides existed but Vue's scoped CSS compiler reduced `:global(:root.dark) .label` to `:root.dark`, silently dropping the label selector. Rewrote all 64 affected selectors across 14 Vue components so the full dark descendant remains in `:global(...)`; map-control borders stay limited to the map canvas. A new compiler-level regression verifies the generated selectors and checks the listed text colors at 4.5:1 or better against dark surfaces and the lightest translucent map-card backdrop. Earlier source-only dark contrast assertions did not verify this compiled behavior. Full browser/phone visual and site-wide WCAG AA acceptance remain open.
