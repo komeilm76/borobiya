@@ -61,6 +61,7 @@ onMounted(() => {
 
 <style scoped>
 .broadcast-bar {
+  container-type: inline-size;
   padding: 0.75rem 1rem;
   border: 1px solid rgba(25, 53, 54, 0.09);
   background: rgba(var(--v-theme-surface), 0.95);
@@ -129,6 +130,18 @@ onMounted(() => {
   align-items: center;
   gap: 0.35rem;
   margin-inline-start: auto;
+}
+
+/* Compact map overlays and dashboard inset cards can be narrow even on desktop.
+ * At text zoom the 12rem copy minimum and two unwrapped buttons otherwise overflow
+ * the card; size from the host, not from the viewport. */
+@container (max-width: 380px) {
+  .broadcast-bar__body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .broadcast-bar__indicator { margin-top: 0.35rem; }
+  .broadcast-bar__copy { min-width: 0; overflow-wrap: anywhere; }
+  .broadcast-bar__actions { grid-column: 1 / -1; width: 100%; min-width: 0; margin-inline-start: 0; flex-wrap: wrap; }
+  .broadcast-bar__actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%; min-width: 0; min-height: 44px; height: auto; white-space: normal; }
+  .broadcast-bar__actions :deep(.v-btn__content) { white-space: normal; overflow-wrap: anywhere; text-align: center; }
 }
 
 :global(:root.dark) .broadcast-bar {

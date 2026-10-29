@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Keep live-broadcast actions reachable in narrow hosts (T4.4.1 partial)
+
+- The outgoing location bar’s fixed 12rem status minimum and non-wrapping Devices/Start/Stop/Retry actions could overflow a compact map panel, dashboard inset or highly zoomed viewport. It now uses a host-width container query to place the status beside its indicator and stack two full-width, wrapping, 44px-minimum actions when the card is narrow. No broadcast, device-priority, disabled or consent logic changed. Source-pinned regression failed before implementation; rendered 200% zoom, phone/desktop-nested width and keyboard acceptance remain open.
+
 ### 2026-10-29 — Keep visually unbulleted lists navigable as lists (T4.4.3 partial)
 
 - Restored explicit list roles for the ordered mission timeline, place results, admin mobile user/catalog cards and owned/received/history location shares. Some screen-reader/browser combinations can flatten lists when CSS removes markers. Mobile catalog failure/empty messages now sit outside the actual record list, leaving retained rows available after a failed refresh; the existing loading skeleton stays hidden from assistive technology. Source-pinned regressions failed before implementation and focused client checks cover structure without mounting Vue. No Safari/VoiceOver, keyboard-device or site-wide WCAG AA sign-off is claimed.
