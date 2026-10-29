@@ -6,44 +6,55 @@
     rounded="xl"
   >
     <header class="history-playback__header">
+      <span
+        class="history-playback__indicator"
+        :class="{
+          'history-playback__indicator--playing': api.playing.value,
+          'history-playback__indicator--loading': api.loading.value && !api.playing.value,
+          'history-playback__indicator--ready': api.canPlay.value && !api.playing.value && !api.loading.value
+        }"
+        aria-hidden="true"
+      />
       <div class="history-playback__title-block">
         <h2>تاریخچهٔ مسیر</h2>
-        <p v-if="isOpen">پخش حرکت</p>
+        <p v-if="isOpen">بازه، سرعت و پیمایش مسیر</p>
         <p v-else class="history-playback__preview" role="status">{{ statusLine }}</p>
       </div>
-      <v-chip
-        v-if="api.hasTrack.value && !isOpen"
-        class="history-playback__points-chip"
-        size="small"
-        variant="tonal"
-        color="primary"
-      >
-        {{ pointCount }}
-      </v-chip>
-      <v-btn v-if="!isOpen && api.canPlay.value" class="history-playback__quick-play"
-        variant="tonal" color="primary" icon size="small"
-        :aria-label="api.playing.value ? 'توقف پخش مسیر' : 'پخش مسیر'"
-        @click="api.toggle()">
-        <v-icon :icon="api.playing.value ? 'mdi-pause' : 'mdi-play'" />
-      </v-btn>
-      <v-btn
-        class="history-playback__toggle"
-        variant="tonal"
-        color="primary"
-        size="small"
-        :prepend-icon="isOpen ? 'mdi-chevron-up' : 'mdi-tune-variant'"
-        :aria-label="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
-        :aria-expanded="isOpen"
-        aria-controls="history-playback-controls"
-        :title="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
-        @click="isOpen = !isOpen"
-      >
-        {{ isOpen ? 'بستن' : 'جزئیات' }}
-      </v-btn>
+      <div class="history-playback__actions">
+        <v-btn
+          v-if="!isOpen && api.canPlay.value"
+          class="history-playback__quick-play"
+          :variant="api.playing.value ? 'tonal' : 'flat'"
+          :color="api.playing.value ? 'error' : 'primary'"
+          size="small"
+          rounded="lg"
+          :prepend-icon="api.playing.value ? 'mdi-pause' : 'mdi-play'"
+          :aria-label="api.playing.value ? 'توقف پخش مسیر' : 'پخش مسیر'"
+          @click="api.toggle()"
+        >
+          {{ api.playing.value ? 'توقف' : 'پخش' }}
+        </v-btn>
+        <v-btn
+          class="history-playback__toggle"
+          variant="tonal"
+          color="primary"
+          size="small"
+          rounded="lg"
+          :prepend-icon="isOpen ? 'mdi-chevron-up' : 'mdi-tune-variant'"
+          :aria-label="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
+          :aria-expanded="isOpen"
+          aria-controls="history-playback-controls"
+          :title="isOpen ? 'بستن پنل تاریخچه' : 'باز کردن پنل تاریخچه'"
+          @click="isOpen = !isOpen"
+        >
+          {{ isOpen ? 'بستن' : 'جزئیات' }}
+        </v-btn>
+      </div>
     </header>
 
     <div id="history-playback-controls" v-show="isOpen" class="history-playback__body">
       <div class="history-playback__source" role="group" aria-label="منبع مسیر">
+        <span class="history-playback__hint" aria-hidden="true">منبع مسیر</span>
         <v-btn-toggle
           :model-value="api.sourceKind.value"
           density="compact"
@@ -102,6 +113,7 @@
       </div>
 
       <div v-else class="history-playback__range">
+        <span class="history-playback__hint">بازهٔ مسیر</span>
         <div class="history-playback__chips" role="group" aria-label="بازه‌های آماده">
           <v-chip
             v-for="preset in presets"
@@ -356,7 +368,9 @@ function scrub(value: number | readonly number[]): void {
   width: min(24rem, 100%);
   max-height: calc(100% - 2rem);
   flex-direction: column;
-  padding: 0.6rem 0.75rem;
+  container-type: inline-size;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
   color: #193536;
   background: rgba(var(--v-theme-surface), 0.95);
   backdrop-filter: blur(12px);
@@ -367,8 +381,24 @@ function scrub(value: number | readonly number[]): void {
 .history-playback__header {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.65rem;
 }
+
+.history-playback__indicator {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #7d9291;
+}
+
+.history-playback__indicator--playing {
+  background: #1f8a5b;
+  box-shadow: 0 0 0 4px rgba(31, 138, 91, 0.18);
+}
+
+.history-playback__indicator--loading { background: #c57b14; }
+.history-playback__indicator--ready { background: var(--bb-color-primary); }
 
 .history-playback__title-block {
   min-width: 0;
@@ -376,36 +406,57 @@ function scrub(value: number | readonly number[]): void {
 }
 
 .history-playback__title-block p {
-  margin: 0;
+  margin: 0.12rem 0 0;
   color: #536d6c;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: 0.75rem;
+  line-height: 1.55;
 }
 
 .history-playback__title-block h2 {
-  margin: 0.1rem 0 0;
+  margin: 0;
   font-size: 0.95rem;
   font-weight: 800;
   line-height: 1.4;
 }
 
-.history-playback__points-chip,
-.history-playback__toggle,
-.history-playback__quick-play {
+.history-playback__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   flex: 0 0 auto;
+  margin-inline-start: auto;
 }
 
 .history-playback__preview {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .history-playback__body {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  margin-top: 0.6rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+
+.history-playback__source,
+.history-playback__grants,
+.history-playback__range,
+.history-playback__transport {
+  padding: 0.6rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-on-surface), 0.035);
+}
+
+.history-playback__source,
+.history-playback__grants,
+.history-playback__range {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
 }
 
 .history-playback__source :deep(.v-btn-toggle) {
@@ -429,14 +480,15 @@ function scrub(value: number | readonly number[]): void {
 
 .history-playback__fields {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: 0.4rem;
 }
 
 .history-playback__field {
   display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
+  min-width: min(10rem, 100%);
+  flex: 1 1 10rem;
   flex-direction: column;
   gap: 0.15rem;
   color: #536d6c;
@@ -467,11 +519,13 @@ function scrub(value: number | readonly number[]): void {
 
 .history-playback__transport {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
 
 .history-playback__clock {
+  min-width: 4.5rem;
   flex: 1 1 auto;
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
@@ -499,7 +553,21 @@ function scrub(value: number | readonly number[]): void {
 }
 
 .history-playback__status {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-primary), 0.08);
+  font-size: 0.75rem;
+  line-height: 1.6;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.history-playback__toggle:focus-visible,
+.history-playback__quick-play:focus-visible,
+.history-playback__chip:focus-visible {
+  outline: 2px solid var(--bb-color-primary);
+  outline-offset: 2px;
 }
 
 :global(:root.dark .history-playback) {
@@ -522,7 +590,7 @@ function scrub(value: number | readonly number[]): void {
   .history-playback {
     width: 100%;
     max-height: min(56dvh, 26rem);
-    padding: 0.5rem 0.75rem;
+    padding: 0.6rem 0.75rem;
     overscroll-behavior: contain;
   }
 
@@ -536,11 +604,41 @@ function scrub(value: number | readonly number[]): void {
     top: 0;
     z-index: 1;
     min-height: 2.75rem;
-    background: rgb(var(--v-theme-surface));
+    background: rgba(var(--v-theme-surface), 0.98);
   }
 
-  .history-playback__title-block p { margin-top: 0.15rem; }
-  .history-playback__points-chip { display: none; }
-  .history-playback__fields { flex-wrap: wrap; }
+  :global(:root.dark .history-playback__header) {
+    background: rgba(27, 41, 42, 0.98);
+  }
+}
+
+/* Zoom, side panels and narrow phones are sized by the card, not by the viewport. */
+@container (max-width: 320px) {
+  .history-playback__header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+  }
+  .history-playback__indicator { margin-top: 0.35rem; }
+  .history-playback__actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+    margin-inline-start: 0;
+  }
+  .history-playback__actions :deep(.v-btn) {
+    min-width: 0;
+    min-height: 44px;
+    height: auto;
+    flex: 1 1 auto;
+  }
+  .history-playback__actions :deep(.v-btn__content),
+  .history-playback__source :deep(.v-btn__content) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .history-playback__source :deep(.v-btn) { min-height: 44px; height: auto; }
+  .history-playback__field { flex: 1 1 100%; }
+  .history-playback__apply { flex: 1 1 100%; min-height: 44px; }
 }
 </style>

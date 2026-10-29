@@ -66,4 +66,14 @@ describe("map history playback small-text contrast (T4.4.3 partial)", () => {
     expect(contrast(palettes.dark.muted, lightestCard)).toBeGreaterThanOrEqual(3);
     expect(contrast(palettes.dark.primary, lightestCard)).toBeGreaterThanOrEqual(3);
   });
+
+  it("keeps the sticky header and inset sections readable on a narrow dark map", () => {
+    expect(rule(":global(:root.dark .history-playback__header)"))
+      .toContain("background: rgba(27, 41, 42, 0.98);");
+    const lightestHeader = blend("#1b292a", "#ffffff", 0.98);
+    expect(contrast("#a0b6b2", lightestHeader)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#edf5f2", lightestHeader)).toBeGreaterThanOrEqual(4.5);
+    expect(rule(".history-playback__source")).toContain("background: rgba(var(--v-theme-on-surface), 0.035);");
+    expect(rule(".history-playback__range")).toContain("background: rgba(var(--v-theme-on-surface), 0.035);");
+  });
 });

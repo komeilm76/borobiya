@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { compileStyle, parse } from "vue/compiler-sfc";
 import { historyPanelInitiallyOpen } from "./playback-panel";
 
 const panel = readFileSync(new URL("../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
@@ -15,6 +16,41 @@ describe("history panel entry state", () => {
     expect(historyPanelInitiallyOpen(true, "a-share-id")).toBe(true);
     expect(historyPanelInitiallyOpen(true, ["a-share-id", "another"])).toBe(true);
     expect(historyPanelInitiallyOpen(true, [null])).toBe(false);
+  });
+
+  it("keeps the playback actions while giving the compact panel a readable status and host-aware layout", () => {
+    expect(panel).toContain('class="history-playback__indicator"');
+    expect(panel).toContain('class="history-playback__actions"');
+    expect(panel).toContain("api.playing.value ? 'توقف' : 'پخش'");
+    expect(panel).toContain('class="history-playback__transport" role="group" aria-label="کنترل پخش"');
+    expect(panel).toContain('aria-label="جابه‌جایی در مسیر"');
+    expect(panel).toContain('aria-label="سرعت پخش"');
+    expect(panel).toContain('role="status" aria-live="polite">{{ statusLine }}');
+    expect(panel).toMatch(/\.history-playback \{[^}]*container-type: inline-size;/);
+    expect(panel).toMatch(/\.history-playback__preview \{[^}]*white-space: normal;/);
+    expect(panel).toMatch(/@container \(max-width: 320px\) \{[\s\S]*?\.history-playback__actions \{[^}]*grid-column: 1 \/ -1;/);
+    expect(panel).toMatch(/\.history-playback__transport \{[^}]*flex-wrap: wrap;/);
+    expect(panel).toMatch(/\.history-playback__fields \{[^}]*flex-wrap: wrap;/);
+    expect(panel).toMatch(/\.history-playback__field \{[^}]*min-width: min\(10rem, 100%\);/);
+  });
+
+  it("keeps the distinct history controls wired to the same playback API", () => {
+    for (const action of [
+      '@update:model-value="chooseSource"', '@update:model-value="chooseGrant"',
+      '@click="api.selectPreset(preset.days)"', '@click="applyManualRange"',
+      '@click="api.stepPrevious()"', '@click="api.stepNext()"',
+      '@update:model-value="chooseSpeed"', '@update:model-value="scrub"'
+    ]) expect(panel).toContain(action);
+    expect(panel.match(/@click="api\.toggle\(\)"/g)).toHaveLength(2);
+    expect(panel).toContain(':disabled="!api.canPlay.value"');
+  });
+
+  it("compiles the dark sticky header and narrow-card actions as reachable CSS", () => {
+    const { descriptor } = parse(panel);
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "HistoryPlaybackPanel.vue", id: "data-v-test", scoped: true });
+    expect(css.errors).toEqual([]);
+    expect(css.code).toMatch(/@container \(max-width: 320px\)[\s\S]*?\.history-playback__actions\[data-v-test\]/);
+    expect(css.code).toContain(":root.dark .history-playback__header");
   });
 
   it("renders a compact narrow-screen preview with accessible controls and a bounded expansion", () => {

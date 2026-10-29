@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Give map history playback a clearer broadcast-bar-style surface (T4.4.1 partial)
+
+- Refreshed the `/_user/map` history panel with a state indicator, readable title/status, labeled play/stop and details actions, and inset source/range/transport sections. The compact status now wraps instead of hiding long errors, while the already-present point count remains in that line. Card-width layout rules make actions and date fields reachable at narrow widths/zoom, with a dark sticky-header color matched to the dark card. All existing playback API wiring, deep-link opening and phone scroll cap remain; source and compiled-style regressions cover those contracts without mounting Vue. Browser/device visual and keyboard acceptance are still open.
+
 ### 2026-10-29 — Localize Persian duration and companion-age numerals (T4.4.5 bug review)
 
 - Found that history playback mixed Persian point counts with ASCII day/hour/minute counts, and live-companion labels switched from ASCII seconds to ASCII duration text even though their surrounding copy is Persian. The shared formatter now uses `fa-IR` digits with its default Persian units, while custom English units retain ASCII (or can explicitly request a numeral locale). The sub-minute peer-age path uses Persian digits too. Pure tests first reproduced both mixed-script outputs and cover zero, remainders, whole weeks, duration presets and custom English units; the history panel still uses the shared formatter. No browser screenshot or site-wide localization audit is claimed.
