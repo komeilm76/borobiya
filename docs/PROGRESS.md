@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Remove stale SOS cancellation reasons before reload (T3.6.2 follow-up)
+
+- A reopened requester cancellation dialog kept its previous reason list while reading the current one. If the read failed, the old reasons remained selectable and the Retry button stayed hidden because it only appears with an empty list. The dialog now clears reasons before each fetch; a failed fetch leaves a visible error and Retry without enabling confirmation of an unverified reason. A pure composable test reproduced the stale list before the change and passes after it. The server remains authoritative for reason validity, and no live browser/device acceptance is claimed.
+
 ### 2026-10-29 — Refresh the SOS incident picker on reopen (T3.2.4 follow-up)
 
 - The SOS sheet reused a cached incident catalog indefinitely on reopen. Even after a successful manual reload removed the chosen incident type, the hidden old ID stayed in the draft and the enabled submit action could send it. Each open now rechecks the public catalog; a successful refresh keeps an available selection or clears a removed one so the requester explicitly chooses another type. An empty catalog leaves submission disabled, and first load still defaults to the first available type. Two pure composable regressions reproduced the stale selection and missing reopen refresh before the fix. Server-side type validation remains authoritative if a submit races the refresh; real browser/device acceptance remains unverified.

@@ -28,6 +28,9 @@ export function useSosCancellation(token: Ref<string | null>, requestId: Ref<str
     open.value = true;
     reasonId.value = "";
     customReason.value = "";
+    // A reopened dialog must not offer an earlier reason list if this read fails;
+    // the dialog's Retry action is shown only when the current list is empty.
+    reasons.value = [];
     error.value = null;
     loading.value = true;
     try {

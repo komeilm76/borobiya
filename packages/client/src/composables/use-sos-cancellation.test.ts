@@ -169,6 +169,27 @@ describe("requester SOS cancellation confirmation", () => {
     expect(cancelSosRequest).toHaveBeenCalledTimes(1);
   });
 
+  it("does not offer cached cancellation reasons when a reopened dialog cannot verify them", async () => {
+    const cancel = useSosCancellation(ref("token"), ref(requesterId), ref("owner"));
+    await cancel.show();
+    expect(cancel.reasons.value).toEqual(reasons);
+    cancel.dismiss();
+    vi.mocked(listSosCancellationReasons).mockRejectedValueOnce(new Error("offline"));
+    const failedRead = cancel.show();
+    expect(cancel.reasons.value).toEqual([]); // Hide the previous list before a new read settles.
+    await failedRead;
+    expect(cancel.error.value).toBeTruthy();
+    expect(cancel.reasons.value).toEqual([]); // The dialog's Retry button is only shown with no reasons.
+    cancel.reasonId.value = reasons[0]!.id;
+    expect(cancel.canConfirm.value).toBe(false);
+    await cancel.confirm();
+    expect(cancelSosRequest).not.toHaveBeenCalled();
+
+    await cancel.show();
+    expect(cancel.error.value).toBeNull();
+    expect(cancel.reasons.value).toEqual(reasons);
+  });
+
   it("drops a late catalog response when the dialog has closed and requires a fresh token", async () => {
     const token = ref<string | null>("token");
     const cancel = useSosCancellation(token, ref(requesterId), ref("owner"));
