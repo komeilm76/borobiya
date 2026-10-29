@@ -406,7 +406,7 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
 
 .user-map-view__title-block p {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.72rem;
   font-weight: 700;
 }

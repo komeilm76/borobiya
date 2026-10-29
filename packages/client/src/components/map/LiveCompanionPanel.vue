@@ -19,7 +19,7 @@
 
     <p class="live-companions__status" role="status" aria-live="polite">{{ api.status.value.line }}</p>
 
-    <ul v-if="api.peers.value.length" class="live-companions__peers">
+    <ul v-if="api.peers.value.length" class="live-companions__peers" role="list" tabindex="0" aria-label="فهرست همراهان روی نقشه">
       <li v-for="peer in api.peers.value" :key="peer.userId" class="live-companions__peer">
         <span
           class="live-companions__dot"
@@ -92,7 +92,7 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 
 .live-companions__title-block p {
   margin: 0;
-  color: #718584;
+  color: #536d6c;
   font-size: 0.68rem;
   font-weight: 700;
 }
@@ -132,6 +132,11 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
   overflow-y: auto;
 }
 
+.live-companions__peers:focus-visible {
+  outline: 2px solid var(--bb-color-primary);
+  outline-offset: -2px;
+}
+
 .live-companions__peer {
   display: flex;
   align-items: center;
@@ -157,7 +162,7 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 }
 
 .live-companions__age {
-  color: #718584;
+  color: #536d6c;
   font-size: 0.7rem;
 }
 

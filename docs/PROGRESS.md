@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Map companion label contrast and keyboard scroll (T4.4.3 partial)
+
+- The map toolbar's small location heading and the live-companion panel's heading/peer-age labels used `#718584` on translucent light cards, falling near 3.4–3.5:1 against a black underlying tile. The light foreground is now `#536d6c` (at least 4.8:1 on those composited cards); the existing dark-mode foregrounds remain. The companion list is capped at 11rem but had no focus target for keyboard-only scrolling. It now has a named, focusable `<ul>` with an explicit list role (to retain semantics despite `list-style: none`) and an inset 2px theme-primary focus outline. A no-SFC-mount regression reproduces both failures and checks light/dark text and focus contrast; no browser-rendered map, physical keyboard or screen-reader acceptance is claimed, and T4.4.3 remains open.
+
 ### 2026-10-29 — Map warning Retry now retries failed startup and config (T4.4.2 partial)
 
 - MapCanvas showed a Retry action after a lazy MapLibre import or constructor failure, but the handler immediately returned when the map instance did not exist. After `/map-config` failure, Retry only reloaded the style, leaving the runtime bounds/zoom request untried. Retry now starts a new, coalesced initialization attempt if needed, re-fetches failed config on an existing map, and resets notice throttling so a quick second failure remains visible. Failed control setup removes the partial instance; late startup or config responses cannot restore an unmounted map. Pure deferred retry tests and source-pinned wiring tests failed on the prior startup behavior and now pass; they do not substitute for real browser/offline map verification or site-wide T4.4.2 sign-off.
