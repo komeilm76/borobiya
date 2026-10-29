@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Preserve map history through a JWT renewal (T2.2.6 follow-up)
+
+- The map view independently watched the raw access token and reselected default own-history on every JWT refresh, undoing the playback composable's same-session continuity and discarding a selected grant/cursor. It now watches the account/JWT-session boundary instead: a new login triggers default history, sign-out or a subject mismatch clears the overlay synchronously, and an already-signed-in first visit still loads history. A failing-before-fix source-pinned regression and existing composable session tests cover the logic without mounting Vue; live browser renewal and two-session acceptance remain open.
+
 ### 2026-10-29 — Make private map position a broadcast-style component (T4.4.1 partial)
 
 - Moved the `موقعیت من` map card to `OwnPositionBar.vue`. It now follows `LiveBroadcastBar`'s indicator, headline/status, action hierarchy, themed surface and compact-width button layout while retaining its separate private-GPS semantics: only the map view starts the watch/recenters the camera, and no position is broadcast. The bar handles active, waiting and error states and explains why Start is unavailable before the map loads. Fixed a stale feedback bug where pressing Stop after a transient GPS outage left the error visible rather than returning to the off state. Pure reactive/source and compiled-CSS contrast tests cover the changes; browser/phone visual and keyboard acceptance remain open.

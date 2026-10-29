@@ -26,6 +26,17 @@ describe("UserMapView live overlay", () => {
   it("passes the authenticated profile to private history playback without mounting Vue", () => {
     expect(view).toMatch(/useHistoryPlayback\(\{[\s\S]*?ownerId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
   });
+
+  it("does not restart history or lose the selected grant/cursor on same-session bearer renewal", () => {
+    expect(view).toContain('shareSessionKey(auth.user?.id ?? null, auth.accessToken)');
+    expect(view).toMatch(/watch\(\s*mapPlaybackSession,\s*\(next, previous\) => \{/);
+    expect(view).toContain('if (next === previous) return;');
+    expect(view).toContain('if (!next) playback.points.value = [];');
+    expect(view).toContain('else void playback.selectPreset(playback.presetDays.value || 7);');
+    expect(view).toContain('{ flush: "sync" }');
+    expect(view).toContain('if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.value);');
+    expect(view).not.toContain('watch(\n  () => auth.accessToken,');
+  });
   it("keeps the large MapLibre chunk lazy until MapCanvas mounts while retaining own-position markers", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.

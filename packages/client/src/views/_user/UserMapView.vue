@@ -67,6 +67,7 @@ import { usePlaceSearch } from "@/composables/use-place-search";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
 import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
+import { shareSessionKey } from "@/sharing/share-submission-fence";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
 import { historyCameraPadding } from "@/history/camera-padding";
@@ -82,6 +83,7 @@ import { useThemeStore } from "@/stores/theme";
 const theme = useThemeStore();
 const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
+const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
 /**
  * History playback, wired to the map.
@@ -310,15 +312,18 @@ watch(
     frameCamera();
   }
 );
+// A fresh login needs a fresh own-history read, but a bearer rotated within the *same* JWT
+// session must not reset a selected grant, playback cursor or timer. Follow the account/session
+// boundary instead of the raw token; clear the old overlay synchronously on logout/mismatch.
 watch(
-  () => auth.accessToken,
-  (token) => {
-    // Signing out must not leave somebody else's track on the screen; signing in offers the last 7 days
-    // without the user having to press anything, which is the shortcut this panel exists for.
+  mapPlaybackSession,
+  (next, previous) => {
+    if (next === previous) return;
     fittedFor = null;
-    if (!token) playback.points.value = [];
+    if (!next) playback.points.value = [];
     else void playback.selectPreset(playback.presetDays.value || 7);
-  }
+  },
+  { flush: "sync" }
 );
 
 onBeforeUnmount(() => {
@@ -341,8 +346,8 @@ onBeforeUnmount(() => {
   }
 });
 
-// The first paint for a signed-in visitor: without this the map is empty until they touch a chip.
-if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
+// The first paint for a verified login: without this the map is empty until they touch a chip.
+if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.value);
 </script>
 
 <style scoped>
