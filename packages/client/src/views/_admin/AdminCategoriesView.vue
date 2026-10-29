@@ -90,7 +90,7 @@
           </tr>
         </tbody>
       </v-table>
-      <ul class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading">
+      <ul v-if="categories.length || listState === 'loading'" class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading" role="list">
         <li v-if="listState === 'loading'" class="admin-categories-mobile__card" aria-hidden="true">
           <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" />
         </li>
@@ -118,12 +118,12 @@
             <v-btn variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(category)">ویرایش</v-btn>
           </div>
         </li>
-        <li v-if="listState === 'error'" class="admin-categories-mobile__card">
-          دریافت گروه‌ها انجام نشد.
-          <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
-        </li>
-        <li v-if="listState === 'empty'" class="admin-categories-mobile__card">هنوز گروهی ساخته نشده است.</li>
       </ul>
+      <div v-if="listState === 'error'" class="admin-categories-mobile admin-categories-mobile__card">
+        دریافت گروه‌ها انجام نشد.
+        <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
+      </div>
+      <p v-if="listState === 'empty'" class="admin-categories-mobile admin-categories-mobile__card" role="status">هنوز گروهی ساخته نشده است.</p>
     </v-card>
 
     <v-dialog v-model="formOpen" max-width="640" scrollable persistent>

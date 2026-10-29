@@ -42,7 +42,7 @@
           اشتراک‌های من
           <v-chip v-if="liveFresh && !loading" size="x-small" variant="tonal">{{ ownedRows.length }}</v-chip>
         </h3>
-        <ul v-if="ownedRows.length" class="share-lists__rows">
+        <ul v-if="ownedRows.length" class="share-lists__rows" role="list">
           <li v-for="row in ownedRows" :key="row.id" class="share-lists__row">
             <v-icon :icon="row.kind === 'expired' ? 'mdi-map-marker-off-outline' : 'mdi-map-marker-outline'" size="20" />
             <div class="share-lists__row-main">
@@ -79,7 +79,7 @@
             {{ receivedRows.length + receivedHistoryRows.length }}
           </v-chip>
         </h3>
-        <ul v-if="receivedRows.length || receivedHistoryRows.length" class="share-lists__rows">
+        <ul v-if="receivedRows.length || receivedHistoryRows.length" class="share-lists__rows" role="list">
           <li v-for="row in receivedRows" :key="row.id" class="share-lists__row">
             <v-icon icon="mdi-account-eye-outline" size="20" />
             <div class="share-lists__row-main">
@@ -124,7 +124,7 @@
           بازه‌های تاریخچه
           <v-chip v-if="historyFresh && !loading" size="x-small" variant="tonal">{{ historyRows.length }}</v-chip>
         </h3>
-        <ul class="share-lists__rows">
+        <ul class="share-lists__rows" role="list">
           <li v-for="row in historyRows" :key="row.id" class="share-lists__row">
             <v-icon :icon="row.isOpen ? 'mdi-clock-check-outline' : 'mdi-clock-check'" size="20" />
             <div class="share-lists__row-main">

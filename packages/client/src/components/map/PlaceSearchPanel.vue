@@ -35,7 +35,7 @@
         <v-btn size="small" variant="tonal" @click="api.run()">تلاش دوباره</v-btn>
       </div>
       <p v-else-if="api.searched.value && !api.results.value.length">مکانی پیدا نشد.</p>
-      <ul v-else-if="api.results.value.length" aria-label="نتایج جست‌وجوی مکان">
+      <ul v-else-if="api.results.value.length" aria-label="نتایج جست‌وجوی مکان" role="list">
         <li v-for="place in api.results.value" :key="place.placeId">
           <button type="button" class="place-search__result" @click="$emit('select', place)">
             <strong>{{ place.name }}</strong>

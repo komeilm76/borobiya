@@ -22,7 +22,7 @@
     </v-alert>
     <v-progress-linear v-if="timeline.loading.value && !timeline.entries.value.length" indeterminate
       color="primary" aria-label="دریافت مراحل مأموریت" />
-    <ol v-if="timeline.entries.value.length" class="timeline__list" aria-live="polite">
+    <ol v-if="timeline.entries.value.length" class="timeline__list" role="list" aria-live="polite">
       <li v-for="step in timeline.entries.value" :key="step.id" class="timeline__step">
         <span class="timeline__dot" :class="{ 'timeline__dot--terminal': isTerminal(step.toStatus) }" aria-hidden="true" />
         <div class="timeline__content">

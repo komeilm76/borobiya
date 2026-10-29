@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Keep visually unbulleted lists navigable as lists (T4.4.3 partial)
+
+- Restored explicit list roles for the ordered mission timeline, place results, admin mobile user/catalog cards and owned/received/history location shares. Some screen-reader/browser combinations can flatten lists when CSS removes markers. Mobile catalog failure/empty messages now sit outside the actual record list, leaving retained rows available after a failed refresh; the existing loading skeleton stays hidden from assistive technology. Source-pinned regressions failed before implementation and focused client checks cover structure without mounting Vue. No Safari/VoiceOver, keyboard-device or site-wide WCAG AA sign-off is claimed.
+
 ### 2026-10-29 — Verify mission status before re-enabling GPS after reconnect (T4.4.2 partial)
 
 - A room-subscription acknowledgement alone did not confirm whether the mission ended while offline. The mission live panel now marks the recovered room unverified and disables the voluntary share action until the participant-scoped HTTP sync (admin: scoped detail) succeeds. A failed read retains the warning and verification requirement through manual Retry and even a failed socket opener; an already-connected replacement socket performs the same read without double-subscribing if `connect` fires synchronously. A terminal result stops the room, and logout clears private state and pending recovery before late results. Deferred reactive regressions failed before implementation, and the panel wiring is source-pinned without mounting Vue. Rendered/device reconnect acceptance and the wider feedback audit remain open.

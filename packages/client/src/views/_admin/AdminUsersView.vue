@@ -174,7 +174,7 @@
             </v-table>
           </div>
 
-          <ul class="admin-users-mobile" aria-label="کاربران">
+          <ul class="admin-users-mobile" aria-label="کاربران" role="list">
             <li v-for="user in users" :key="user.id" class="admin-mobile-card">
               <div class="admin-mobile-header">
                 <div class="admin-user-cell">

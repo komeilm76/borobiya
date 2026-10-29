@@ -8,7 +8,7 @@ describe("admin user management at narrow widths", () => {
   it("offers the same paged users and status-change handler in a mobile card layout", () => {
     expect(source).toContain('<div v-else class="admin-users-results">');
     expect(source).toContain('<v-table class="admin-users-table">');
-    expect(source).toContain('<ul class="admin-users-mobile" aria-label="کاربران">');
+    expect(source).toContain('<ul class="admin-users-mobile" aria-label="کاربران" role="list">');
     expect(source).toContain('<li v-for="user in users" :key="user.id" class="admin-mobile-card">');
     expect(source.match(/@update:model-value="requestStatusChange\(user, \$event\)"/g)).toHaveLength(2);
     expect(source.match(/:aria-label="statusSwitchLabel\(user\)"/g)).toHaveLength(2);

@@ -71,7 +71,7 @@
           </tr>
         </tbody>
       </v-table>
-      <ul class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading">
+      <ul v-if="types.length || listState === 'loading'" class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">
         <li v-if="listState === 'loading'" class="admin-incidents-mobile__card" aria-hidden="true">
           <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" />
         </li>
@@ -91,12 +91,12 @@
             <div><dt>توضیح</dt><dd>{{ type.description || "—" }}</dd></div>
           </dl>
         </li>
-        <li v-if="listState === 'error'" class="admin-incidents-mobile__card">
-          دریافت نوع رویدادها انجام نشد.
-          <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
-        </li>
-        <li v-if="listState === 'empty'" class="admin-incidents-mobile__card">موردی برای نمایش نیست.</li>
       </ul>
+      <div v-if="listState === 'error'" class="admin-incidents-mobile admin-incidents-mobile__card">
+        دریافت نوع رویدادها انجام نشد.
+        <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
+      </div>
+      <p v-if="listState === 'empty'" class="admin-incidents-mobile admin-incidents-mobile__card" role="status">موردی برای نمایش نیست.</p>
     </v-card>
 
     <v-dialog v-model="formOpen" max-width="640" scrollable persistent>

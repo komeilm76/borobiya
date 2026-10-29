@@ -8,8 +8,8 @@ const categories = readFileSync(new URL("./AdminCategoriesView.vue", import.meta
 describe("admin catalog lists on narrow screens", () => {
   it("keeps incident details and editing reachable without scrolling a wide table", () => {
     expect(incidents).toContain('<v-table class="admin-incidents-table"');
-    expect(incidents).toContain('<ul class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading">');
-    const cards = incidents.split('<ul class="admin-incidents-mobile"')[1]?.split("</ul>")[0];
+    expect(incidents).toContain('<ul v-if="types.length || listState === \'loading\'" class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">');
+    const cards = incidents.split('<ul v-if="types.length || listState === \'loading\'" class="admin-incidents-mobile"')[1]?.split("</ul>")[0];
     expect(cards).toContain('v-for="type in types"');
     expect(cards).toContain("{{ type.name }}");
     expect(cards).toContain("{{ type.slug }}");
@@ -18,10 +18,11 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain('v-if="type.icon"');
     expect(cards).toContain('@click="openEdit(type)"');
     expect(incidents.match(/@click="openEdit\(type\)"/g)).toHaveLength(2); // desktop + mobile, one handler
-    for (const state of ["loading", "error", "empty"]) {
-      expect(cards).toContain(`v-if="listState === '${state}'"`);
-    }
-    expect(cards).toContain('@click="load"');
+    expect(cards).toContain('v-if="listState === \'loading\'"');
+    expect(cards).not.toContain('listState === \'empty\'');
+    expect(cards).not.toContain('listState === \'error\'');
+    expect(incidents).toContain('class="admin-incidents-mobile admin-incidents-mobile__card"');
+    expect(incidents).toContain('@click="load"');
     const narrow = incidents.split("@media (max-width: 850px) {")[1]?.split("\n}")[0];
     expect(narrow).toContain(".admin-incidents-table { display: none; }");
     expect(narrow).toContain(".admin-incidents-mobile { display: grid;");
@@ -29,8 +30,8 @@ describe("admin catalog lists on narrow screens", () => {
 
   it("preserves category assignments and both actions in a single-column mobile list", () => {
     expect(categories).toContain('<v-table class="admin-categories-table"');
-    expect(categories).toContain('<ul class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading">');
-    const cards = categories.split('<ul class="admin-categories-mobile"')[1]?.split("</ul>")[0];
+    expect(categories).toContain('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile" aria-label="گروه‌های امدادگر" :aria-busy="loading" role="list">');
+    const cards = categories.split('<ul v-if="categories.length || listState === \'loading\'" class="admin-categories-mobile"')[1]?.split("</ul>")[0];
     expect(cards).toContain('v-for="category in categories"');
     expect(cards).toContain("{{ category.name }}");
     expect(cards).toContain("{{ category.description || \"—\" }}");
@@ -40,10 +41,11 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain('@click="openEdit(category)"');
     expect(categories.match(/@click="openMembers\(category\)"/g)).toHaveLength(2);
     expect(categories.match(/@click="openEdit\(category\)"/g)).toHaveLength(2);
-    for (const state of ["loading", "error", "empty"]) {
-      expect(cards).toContain(`v-if="listState === '${state}'"`);
-    }
-    expect(cards).toContain('@click="load"');
+    expect(cards).toContain('v-if="listState === \'loading\'"');
+    expect(cards).not.toContain('listState === \'empty\'');
+    expect(cards).not.toContain('listState === \'error\'');
+    expect(categories).toContain('class="admin-categories-mobile admin-categories-mobile__card"');
+    expect(categories).toContain('@click="load"');
     const narrow = categories.split("@media (max-width: 850px) {")[1]?.split("\n}")[0];
     expect(narrow).toContain(".admin-categories-table { display: none; }");
     expect(narrow).toContain(".admin-categories-mobile { display: grid;");
