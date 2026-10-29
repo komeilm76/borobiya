@@ -376,6 +376,37 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   border-radius: 0;
 }
 
+/* This page is RTL: MapLibre's physical top-right rail sits directly behind the history card.
+ * Dock only this map's native navigation controls in the gap between the two top overlays;
+ * other MapCanvas users keep their own edge controls and MapLibre button behavior. */
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+  top: 1rem;
+  left: 50%;
+  right: auto;
+  width: 132px;
+  transform: translateX(-50%);
+}
+
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) {
+  margin: 0;
+}
+
+/* A short horizontal rail stays within the existing top camera padding, rather than
+ * running down the middle of the map. MapLibre still owns click, keyboard and compass logic. */
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) {
+  display: flex;
+}
+
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
+  border-top: 0;
+  border-inline-start: 1px solid #627a7a;
+}
+
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 .user-map-view__toolbar {
   position: absolute;
   z-index: 2;
@@ -513,6 +544,25 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
     height: clamp(20rem, 55dvh, 32rem);
     min-height: 20rem;
     border-radius: var(--bb-radius-nested, 16px);
+  }
+
+  /* In flow there are no cards over the canvas; return navigation to its familiar edge. */
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: 0;
+    right: 0;
+    left: auto;
+    width: auto;
+    transform: none;
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) {
+    margin: 10px 10px 0 0;
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) {
+    display: block;
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
+    border-top: 1px solid #627a7a;
+    border-inline-start: 0;
   }
 
   .user-map-view__toolbar,

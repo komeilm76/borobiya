@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Expose the companion map's navigation controls (T4.4.1 partial)
+
+- On the RTL companion map, MapLibre's physical top-right zoom-in, zoom-out and compass rail sat beneath the right-side history playback card on desktop. Only this map now docks its native controls in the clear gap between the top cards as a horizontal, 44px-target rail within the existing camera top padding; on narrow screens, where the panels move outside the map, it returns to the familiar vertical top-right edge. Zoom/compass handlers, map camera, history panel and other MapCanvas users remain unchanged. Source and compiled-CSS checks cover the positioning and breakpoint; a real browser/phone/zoom visual and keyboard pass remains open.
+
 ### 2026-10-29 — Avoid false-empty recipient search feedback (T4.4.2 partial)
 
 - A review of the share dialog found that it displayed “no account found” before its debounced lookup even started, and still displayed that message alongside the search-failed/retry hint after an outage. Only a successful response for the current term and filters can now verify an empty result; edits, filters, retries, close and failures clear that verification immediately. Short-query guidance and error retry remain available. Pure reactive and source-pinned tests failed before the fix and pass after it; no component mount or browser verification is claimed.
