@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, parse } from "vue/compiler-sfc";
-import { historyPanelInitiallyOpen } from "./playback-panel";
+import { historyPanelInitiallyOpen, playbackSpeedLabel } from "./playback-panel";
 
 const panel = readFileSync(new URL("../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
 
@@ -16,6 +16,22 @@ describe("history panel entry state", () => {
     expect(historyPanelInitiallyOpen(true, "a-share-id")).toBe(true);
     expect(historyPanelInitiallyOpen(true, ["a-share-id", "another"])).toBe(true);
     expect(historyPanelInitiallyOpen(true, [null])).toBe(false);
+  });
+
+  it("formats speed labels in Persian without changing the numeric playback rates", () => {
+    expect([1, 4, 16, 60].map(playbackSpeedLabel)).toEqual(["۱×", "۴×", "۱۶×", "۶۰×"]);
+    expect(panel).toContain("label: playbackSpeedLabel(value)");
+    expect(panel).toContain("const speedOptions = PLAYBACK_SPEEDS.map((value) => ({ value,");
+  });
+
+  it("does not offer stale-track controls during a pending range or grant read", () => {
+    const quickPlay = panel.match(/<v-btn\s+v-if="[^"]+"\s+class="history-playback__quick-play"/)?.[0];
+    expect(quickPlay).toContain("!api.loading.value");
+    const transport = panel.split('class="history-playback__transport" role="group" aria-label="کنترل پخش"')[1]!
+      .split("</div>")[0]!;
+    expect(transport.match(/:disabled="!api.canPlay.value \|\| api.loading.value"/g)).toHaveLength(4);
+    const slider = panel.match(/<v-slider[\s\S]*?\/>/)?.[0];
+    expect(slider).toContain(':disabled="!api.canPlay.value || api.loading.value"');
   });
 
   it("keeps the playback actions while giving the compact panel a readable status and host-aware layout", () => {
@@ -42,7 +58,7 @@ describe("history panel entry state", () => {
       '@update:model-value="chooseSpeed"', '@update:model-value="scrub"'
     ]) expect(panel).toContain(action);
     expect(panel.match(/@click="api\.toggle\(\)"/g)).toHaveLength(2);
-    expect(panel).toContain(':disabled="!api.canPlay.value"');
+    expect(panel).toContain(':disabled="!api.canPlay.value || api.loading.value"');
   });
 
   it("compiles the dark sticky header and narrow-card actions as reachable CSS", () => {

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — History playback bug review (T4.4.1 follow-up)
+
+- Found two panel bugs: a pending history read retained its old track with `canPlay=true`, so Play/step/speed/scrub remained usable despite the “reading history” status and could start playback of a different range mid-request; and speed choices showed ASCII digits among Persian labels. The panel now hides quick play and disables transport/scrub during reads (including a single-fix track whose slider cannot move), while the numeric speed values are unchanged and their labels use Persian digits. Pure formatter and source-pinned regressions failed before the fix; no Vue component was mounted or browser/device interaction claimed.
+
 ### 2026-10-29 — Give map history playback a clearer broadcast-bar-style surface (T4.4.1 partial)
 
 - Refreshed the `/_user/map` history panel with a state indicator, readable title/status, labeled play/stop and details actions, and inset source/range/transport sections. The compact status now wraps instead of hiding long errors, while the already-present point count remains in that line. Card-width layout rules make actions and date fields reachable at narrow widths/zoom, with a dark sticky-header color matched to the dark card. All existing playback API wiring, deep-link opening and phone scroll cap remain; source and compiled-style regressions cover those contracts without mounting Vue. Browser/device visual and keyboard acceptance are still open.

@@ -22,7 +22,7 @@
       </div>
       <div class="history-playback__actions">
         <v-btn
-          v-if="!isOpen && api.canPlay.value"
+          v-if="!isOpen && api.canPlay.value && !api.loading.value"
           class="history-playback__quick-play"
           :variant="api.playing.value ? 'tonal' : 'flat'"
           :color="api.playing.value ? 'error' : 'primary'"
@@ -156,7 +156,7 @@
           icon
           variant="text"
           size="small"
-          :disabled="!api.canPlay.value"
+          :disabled="!api.canPlay.value || api.loading.value"
           aria-label="بازگشت به موقعیت ثبت‌شدهٔ قبل"
           title="بازگشت به موقعیت ثبت‌شدهٔ قبل"
           @click="api.stepPrevious()"
@@ -168,7 +168,7 @@
           icon
           variant="flat"
           color="primary"
-          :disabled="!api.canPlay.value"
+          :disabled="!api.canPlay.value || api.loading.value"
           :aria-label="api.playing.value ? 'توقف پخش' : 'پخش مسیر'"
           :title="api.playing.value ? 'توقف پخش' : 'پخش مسیر'"
           @click="api.toggle()"
@@ -179,7 +179,7 @@
           icon
           variant="text"
           size="small"
-          :disabled="!api.canPlay.value"
+          :disabled="!api.canPlay.value || api.loading.value"
           aria-label="رفتن به موقعیت ثبت‌شدهٔ بعد"
           title="رفتن به موقعیت ثبت‌شدهٔ بعد"
           @click="api.stepNext()"
@@ -199,7 +199,7 @@
           variant="outlined"
           hide-details
           aria-label="سرعت پخش"
-          :disabled="!api.canPlay.value"
+          :disabled="!api.canPlay.value || api.loading.value"
           @update:model-value="chooseSpeed"
         />
       </div>
@@ -213,7 +213,7 @@
         thumb-size="14"
         color="primary"
         hide-details
-        :disabled="!api.hasTrack.value"
+        :disabled="!api.canPlay.value || api.loading.value"
         aria-label="جابه‌جایی در مسیر"
         @update:model-value="scrub"
       />
@@ -227,7 +227,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { formatDuration } from "@/sharing/share-form";
-import { historyPanelInitiallyOpen } from "@/history/playback-panel";
+import { historyPanelInitiallyOpen, playbackSpeedLabel } from "@/history/playback-panel";
 import {
   formatLocalTime,
   playbackIssueText,
@@ -268,7 +268,7 @@ watch(
 );
 
 const presets = rangePresets();
-const speedOptions = PLAYBACK_SPEEDS.map((value) => ({ value, label: `${value}×` }));
+const speedOptions = PLAYBACK_SPEEDS.map((value) => ({ value, label: playbackSpeedLabel(value) }));
 
 // The composable owns the committed range; these fields are the *draft* the user edits, and "نمایش"
 // hands it back. One direction only, so a preset press refills the inputs while typing never fires a

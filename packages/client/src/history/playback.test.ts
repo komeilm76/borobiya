@@ -345,11 +345,11 @@ describe("the panel and the view", () => {
     expect(panel).not.toMatch(/span\s*}\s*·\s*دقیقه/);
   });
 
-  it("disables the transport that cannot do anything yet", () => {
-    // A play button for a one-point track, or a slider for a track nobody has loaded, is the failure
-    // this pins: `canPlay` and `hasTrack` exist so the template can say so.
-    expect(panel.match(/:disabled="!api\.canPlay\.value"/g)?.length).toBe(4);
-    expect(panel).toContain(':disabled="!api.hasTrack.value"');
+  it("disables transport and scrub when there is no movable timeline or a new read is pending", () => {
+    // A single fix has no interval to scrub. While a new read is pending, the old track still
+    // has canPlay=true; the panel must not offer actions on it under the loading status.
+    expect(panel.match(/:disabled="!api\.canPlay\.value \|\| api\.loading\.value"/g)?.length).toBe(5);
+    expect(panel).toContain('v-if="!isOpen && api.canPlay.value && !api.loading.value"');
   });
 
   it("keeps the map instance out of the panel", () => {
