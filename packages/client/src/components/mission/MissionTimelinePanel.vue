@@ -52,7 +52,7 @@ const timeline = useMissionTimeline(computed(() => props.mission.id), props.audi
 <style scoped>
 .timeline { margin-block: 20px; padding: clamp(18px,3vw,28px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(28,112,95,.22); border-radius: var(--bb-radius-card, 24px); box-shadow: var(--bb-shadow-surface); }
 .timeline__header { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; align-items: start; }
-.timeline__eyebrow { color: #167f69; font-size: .78rem; font-weight: 750; }
+.timeline__eyebrow { color: rgb(var(--v-theme-primary)); font-size: .78rem; font-weight: 750; }
 .timeline h3 { font-size: 1.15rem; margin: 8px 0 4px; }.timeline__header p { font-size: .8rem; opacity: .72; line-height: 1.7; }
 .timeline__list { list-style: none; padding: 4px 8px 0 0; margin: 12px 0 0; }
 .timeline__step { display: flex; gap: 15px; position: relative; min-height: 78px; }

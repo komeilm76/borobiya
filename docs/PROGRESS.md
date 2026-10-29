@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Correct small mission-timeline label contrast (T4.4.3 partial)
+
+- The timeline eyebrow’s fixed `#167f69` failed 4.5:1 on dark surfaces. Theme-primary ink now passes measured contrast against both card surfaces in a failing-before-fix regression; the label’s typography/semantics are unchanged. Browser/screen-reader and site-wide WCAG AA acceptance remain open.
+
 ### 2026-10-29 — Clarify stale mission timeline after refresh failure (T4.4.2 partial)
 
 - The timeline intentionally retained last-known steps on a failed re-read, but its warning did not say the displayed steps might be stale. The panel now labels them as the last successful read and offers an in-place retry. A source-pinned regression failed before implementation; no rendered browser acceptance or site-wide feedback sign-off is claimed.

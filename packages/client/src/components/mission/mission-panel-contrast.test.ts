@@ -5,6 +5,7 @@ import { palettes } from "@/styles/tokens";
 // CSS/contrast at the unit seam; .vue components are deliberately not mounted in this workspace.
 const live = readFileSync(new URL("./MissionLivePanel.vue", import.meta.url), "utf8");
 const rating = readFileSync(new URL("./MissionRatingPanel.vue", import.meta.url), "utf8");
+const timeline = readFileSync(new URL("./MissionTimelinePanel.vue", import.meta.url), "utf8");
 
 function luminance(hex: string): number {
   const channel = (i: number) => {
@@ -26,6 +27,14 @@ describe("mission member and rating controls contrast", () => {
     }
     expect(live).toMatch(/\.live-panel__eyebrow\s*\{[^}]*color:\s*rgb\(var\(--v-theme-primary\)\)/);
     expect(rating).toMatch(/\.rating__eyebrow\s*\{[^}]*color:\s*rgb\(var\(--v-theme-primary\)\)/);
+  });
+
+  it("uses theme ink for the small status-timeline eyebrow in light and dark cards", () => {
+    expect(contrast("#167f69", palettes.dark.surface)).toBeLessThan(4.5);
+    for (const mode of ["light", "dark"] as const) {
+      expect(contrast(palettes[mode].primary, palettes[mode].surface)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(timeline).toMatch(/\.timeline__eyebrow\s*\{[^}]*color:\s*rgb\(var\(--v-theme-primary\)\)/);
   });
 
   it("keeps star controls, saved stars and their borders distinguishable in both themes", () => {
