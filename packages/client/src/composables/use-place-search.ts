@@ -4,14 +4,23 @@ import { searchPlaces } from "@/api/geocoding";
 
 const DEBOUNCE_MS = 300;
 
+export type PlaceSearchScope = "library" | "viewport";
+
+/** A single search snapshot: the filter must use the same bounds as the gateway request. */
+export interface PlaceSearchArea {
+  bbox: string;
+  contains: (place: GeocodeResult) => boolean;
+}
+
 /** Search decisions live here, not in the map component: old results must not be selectable. */
 export function usePlaceSearch(options: {
-  bbox?: () => string | undefined;
-  withinBounds?: (place: GeocodeResult) => boolean;
+  area: (scope: PlaceSearchScope) => PlaceSearchArea | null;
   search?: typeof searchPlaces;
-} = {}) {
+}) {
   const term = ref("");
+  const scope = ref<PlaceSearchScope>("library");
   const results = ref<GeocodeResponse>([]);
+  const selectedPlaceId = ref<string | null>(null);
   const loading = ref(false);
   const failed = ref(false);
   const searched = ref(false);
@@ -27,6 +36,7 @@ export function usePlaceSearch(options: {
     controller?.abort();
     controller = null;
     results.value = [];
+    selectedPlaceId.value = null;
     loading.value = false;
     failed.value = false;
     searched.value = false;
@@ -44,16 +54,18 @@ export function usePlaceSearch(options: {
     invalidate();
     const q = term.value.trim();
     if (q.length < 2) return;
+    const area = options.area(scope.value);
+    // No map bounds means no safe local search. Never silently turn this into a global query.
+    if (!area) { failed.value = true; return; }
     const current = generation;
     controller = new AbortController();
     loading.value = true;
     try {
-      const bbox = options.bbox?.();
       const places = await (options.search ?? searchPlaces)(
-        { q, limit: 5, ...(bbox ? { bbox } : {}) }, controller.signal
+        { q, limit: 5, bbox: area.bbox }, controller.signal
       );
       if (disposed || current !== generation) return;
-      results.value = options.withinBounds ? places.filter(options.withinBounds) : places;
+      results.value = places.filter(area.contains);
       searched.value = true;
     } catch (error) {
       if (disposed || current !== generation) return;
@@ -74,6 +86,21 @@ export function usePlaceSearch(options: {
     timer = setTimeout(() => { timer = null; void run(); }, DEBOUNCE_MS);
   }
 
+  /** The choice changes the request, so discard old results immediately and search again. */
+  async function setScope(next: PlaceSearchScope): Promise<void> {
+    if (disposed || scope.value === next) return;
+    invalidate();
+    scope.value = next;
+    if (term.value.trim().length >= 2) await run();
+  }
+
+  /** Selection is not a new query; keep the list so another hit remains reachable. */
+  function select(place: GeocodeResult): boolean {
+    if (disposed || !results.value.some((result) => result.placeId === place.placeId)) return false;
+    selectedPlaceId.value = place.placeId;
+    return true;
+  }
+
   onScopeDispose(() => { disposed = true; invalidate(); });
-  return { term, results, loading, failed, searched, run, update, clear };
+  return { term, scope, results, selectedPlaceId, loading, failed, searched, run, update, clear, setScope, select };
 }

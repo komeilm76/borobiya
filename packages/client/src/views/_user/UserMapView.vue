@@ -64,6 +64,7 @@ import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
 import { useReversePlace } from "@/composables/use-reverse-place";
 import type { GeocodeResult } from "@shared/index";
 import { usePlaceSearch } from "@/composables/use-place-search";
+import { placeSearchArea } from "@/map/place-search-area";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
 import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
@@ -131,10 +132,10 @@ watch(() => own.position.value, () => { syncOwnMarker(); focusOwnIfRequested(); 
 watch(() => own.active.value, (active) => { if (!active) focusOnNextFix = false; });
 const reverse = useReversePlace();
 const placeSearch = usePlaceSearch({
-  // Search the loaded library's coverage, not just the currently visible few streets. MapCanvas
-  // updates these bounds after /map-config arrives; the gateway keeps the query local to Photon.
-  bbox: () => map.value?.getMaxBounds()?.toArray().flat().join(","),
-  withinBounds: (place) => map.value?.getMaxBounds()?.contains([place.lon, place.lat]) ?? true
+  area: (scope) => {
+    const library = map.value?.getMaxBounds() ?? null;
+    return placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library);
+  }
 });
 let fittedFor: string | null = null;
 const userPickedPlace = ref(false);
@@ -145,8 +146,8 @@ function selectPlace(place: GeocodeResult): void {
   // A map restricted to an installed region would silently clamp a hit outside that region.
   const bounds = instance.getMaxBounds();
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
+  if (!placeSearch.select(place)) return;
   userPickedPlace.value = true;
-  placeSearch.clear();
   instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
 }
 

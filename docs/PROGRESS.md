@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Keep place-search results and offer a visible-map scope (T4.1.4 follow-up)
+
+- Selecting one place no longer clears the query/results: the selected row is highlighted and other hits remain usable. PlaceSearchPanel adopts LiveBroadcastBar's compact indicator, status copy, action layout and light/dark card treatment; its button toggles all installed map coverage versus the current visible rectangle, not a Vuetify switch. Scope changes abort pending searches and rerun the same term. Bbox and result filtering share one camera snapshot, clipped to installed coverage; unavailable bounds cannot accidentally issue a global request. Failing-before-fix composable tests, pure bbox tests and source/compiled-style pins cover the code without mounting Vue. Real Photon/browser, small-screen visual and keyboard acceptance remain open.
+
 ### 2026-10-29 — Preserve map history through a JWT renewal (T2.2.6 follow-up)
 
 - The map view independently watched the raw access token and reselected default own-history on every JWT refresh, undoing the playback composable's same-session continuity and discarding a selected grant/cursor. It now watches the account/JWT-session boundary instead: a new login triggers default history, sign-out or a subject mismatch clears the overlay synchronously, and an already-signed-in first visit still loads history. A failing-before-fix source-pinned regression and existing composable session tests cover the logic without mounting Vue; live browser renewal and two-session acceptance remain open.

@@ -83,7 +83,8 @@ describe("UserMapView live overlay", () => {
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
     expect(body("selectPlace")).toContain("placeSearch.results.value.some");
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
-    expect(body("selectPlace")).toContain("placeSearch.clear()");
+    expect(body("selectPlace")).not.toContain("placeSearch.clear()");
+    expect(body("selectPlace")).toContain("placeSearch.select(place)");
     expect(body("selectPlace")).toContain("instance.flyTo(");
     expect(body("selectPlace")).toContain("zoom: Math.min(16, instance.getMaxZoom())");
   });
@@ -92,13 +93,37 @@ describe("UserMapView live overlay", () => {
     const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
     expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />');
     expect(view).toContain('usePlaceSearch({');
-    expect(view).toContain('getMaxBounds()?.toArray().flat().join(",")');
+    expect(view).toContain('const library = map.value?.getMaxBounds() ?? null');
+    expect(view).toContain('placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library)');
     expect(view).toContain('بازگشت به مسیر');
+    expect(search).toContain('api.setScope(api.scope.value === \'viewport\' ? \'library\' : \'viewport\')');
+    expect(search).toContain(':aria-pressed="api.scope.value === \'viewport\'"');
+    expect(search).toContain(':aria-pressed="api.selectedPlaceId.value === place.placeId"');
+    expect(search).not.toContain('<v-switch');
     expect(search).toContain('v-for="place in api.results.value"');
     expect(search).toContain("$emit('select', place)");
     expect(search).toContain("api.failed.value");
     expect(search).toContain("api.searched.value");
     expect(search).toContain("api.run()");
+  });
+
+  it("styles place search as a compact broadcast card with distinct selected and focus states", () => {
+    const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
+    const broadcast = readFileSync(new URL("../../components/sharing/LiveBroadcastBar.vue", import.meta.url), "utf8");
+    for (const part of ["__indicator", "__copy", "__headline", "__detail", "__actions"]) {
+      expect(search).toContain(`place-search${part}`);
+      expect(broadcast).toContain(`broadcast-bar${part}`);
+    }
+    const { descriptor } = parse(search);
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "PlaceSearchPanel.vue",
+      id: "data-v-place-test", scoped: true });
+    expect(css.errors).toEqual([]);
+    expect(css.code).toContain("container-type: inline-size");
+    expect(css.code).toContain("min-height: 44px");
+    expect(css.code).toContain("place-search__result--selected");
+    expect(css.code).toContain(".place-search__result[data-v-place-test]:focus-visible");
+    expect(css.code).toContain(":root.dark .place-search");
+    expect(css.code).toContain("forced-colors: active");
   });
 
   it("fits tracks without reserving overlay space for panels outside the narrow map", () => {

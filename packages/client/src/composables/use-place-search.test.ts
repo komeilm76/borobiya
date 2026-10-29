@@ -2,6 +2,7 @@ import { effectScope } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeocodeResponse } from "@shared/index";
 import { usePlaceSearch } from "./use-place-search";
+import type { PlaceSearchScope } from "./use-place-search";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -12,7 +13,10 @@ const hit = (name: string): GeocodeResponse => [{ placeId: name, name, address: 
 function mount(search: NonNullable<Parameters<typeof usePlaceSearch>[0]>["search"],
   withinBounds?: (place: GeocodeResponse[number]) => boolean) {
   const scope = effectScope();
-  const api = scope.run(() => usePlaceSearch({ search, bbox: () => "50,34,52,36", withinBounds }))!;
+  const api = scope.run(() => usePlaceSearch({ search, area: (searchScope: PlaceSearchScope) => ({
+    bbox: searchScope === "viewport" ? "50.5,34.5,51.5,35.5" : "50,34,52,36",
+    contains: withinBounds ?? (() => true)
+  }) }))!;
   return { api, scope };
 }
 
@@ -63,6 +67,76 @@ describe("place search UI decisions", () => {
     api.update("city");
     await vi.advanceTimersByTimeAsync(300);
     expect(api.results.value).toEqual(hit("inside"));
+    scope.stop();
+  });
+
+  it("retains results and term while switching between multiple selected places", async () => {
+    const places = [...hit("first"), ...hit("second")];
+    const { api, scope } = mount(async () => places);
+    api.update("square");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(api.select(places[0]!)).toBe(true);
+    expect(api.selectedPlaceId.value).toBe("first");
+    expect(api.select(places[1]!)).toBe(true);
+    expect(api.selectedPlaceId.value).toBe("second");
+    expect(api.term.value).toBe("square");
+    expect(api.results.value).toEqual(places);
+    expect(api.select(hit("unlisted")[0]!)).toBe(false);
+    api.update("street");
+    expect(api.selectedPlaceId.value).toBeNull();
+    expect(api.results.value).toEqual([]);
+    scope.stop();
+  });
+
+  it("switches between all installed map coverage and the visible bbox, aborting stale replies", async () => {
+    const old = deferred<GeocodeResponse>();
+    const search = vi.fn().mockImplementationOnce(() => old.promise).mockResolvedValueOnce(hit("visible"))
+      .mockResolvedValueOnce(hit("library"));
+    const { api, scope } = mount(search);
+    expect(api.scope.value).toBe("library");
+    api.update("park");
+    await vi.advanceTimersByTimeAsync(300);
+    const signal = search.mock.calls[0]?.[1] as AbortSignal;
+    await api.setScope("viewport");
+    expect(signal.aborted).toBe(true);
+    expect(search.mock.calls[1]?.[0]).toEqual({ q: "park", limit: 5, bbox: "50.5,34.5,51.5,35.5" });
+    old.resolve(hit("stale"));
+    await Promise.resolve();
+    expect(api.results.value).toEqual(hit("visible"));
+    await api.setScope("library");
+    expect(search.mock.calls[2]?.[0]).toEqual({ q: "park", limit: 5, bbox: "50,34,52,36" });
+    expect(api.results.value).toEqual(hit("library"));
+    scope.stop();
+  });
+
+  it("filters against the request's bbox snapshot even if the viewport changes while loading", async () => {
+    const pending = deferred<GeocodeResponse>();
+    let current = "old";
+    const search = vi.fn(() => pending.promise);
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => {
+      const snapshot = current;
+      return { bbox: "50,34,52,36", contains: (place) => place.name === snapshot };
+    } }))!;
+    api.update("park");
+    await vi.advanceTimersByTimeAsync(300);
+    current = "new";
+    pending.resolve([...hit("old"), ...hit("new")]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.results.value).toEqual(hit("old"));
+    scope.stop();
+  });
+
+  it("fails closed if map bounds are not available, instead of searching the whole world", async () => {
+    const search = vi.fn(async () => hit("outside"));
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => null }))!;
+    api.update("place");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(search).not.toHaveBeenCalled();
+    expect(api.failed.value).toBe(true);
+    expect(api.results.value).toEqual([]);
     scope.stop();
   });
 
