@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { effectScope, nextTick, ref } from "vue";
+import { effectScope, nextTick, ref, type Ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationHistoryPoint } from "@shared/index";
 import {
@@ -105,20 +105,141 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function mount() {
+function mount(initialToken: string | null = "access-token", ownerId?: Ref<string | null>) {
   const scope = effectScope();
-  const token = ref<string | null>("access-token");
+  const token = ref<string | null>(initialToken);
   let api!: ReturnType<typeof useHistoryPlayback>;
   scope.run(() => {
-    api = useHistoryPlayback({ accessToken: token });
+    api = useHistoryPlayback({ accessToken: token, ...(ownerId ? { ownerId } : {}) });
   });
   return { scope, token, api };
+}
+
+function bearer(owner: string, sessionId: string, nonce = 0): string {
+  return `e30.${btoa(JSON.stringify({ sub: owner, sessionId, nonce }))}.sig`;
 }
 
 async function settle(): Promise<void> {
   for (let index = 0; index < 4; index += 1) await Promise.resolve();
   await nextTick();
 }
+
+describe("JWT login boundary", () => {
+  const track = () => historyBody([
+    point(35.7, 51.4, new Date(NOW - 2 * HOUR).toISOString()),
+    point(35.8, 51.5, new Date(NOW - HOUR).toISOString())
+  ]);
+  const answer = (url: string) => url.includes("history/shares")
+    ? { owned: [], sharedWithMe: [grantRow("c")] } : track();
+
+  it("clears private tracks, grants and playback immediately on a new login for the same account", async () => {
+    const owner = ref<string | null>("owner-a");
+    const { scope, token, api } = mount(bearer("owner-a", "session-a"), owner);
+    try {
+      autoRespond = answer;
+      await api.loadShares();
+      await api.selectPreset(7);
+      api.play();
+      expect(api.points.value).toHaveLength(2);
+      expect(api.grants.value).toHaveLength(1);
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+      token.value = bearer("owner-a", "session-b");
+      expect(vi.getTimerCount()).toBe(0);
+      expect(api.points.value).toEqual([]);
+      expect(api.grants.value).toEqual([]);
+      expect(api.playing.value).toBe(false);
+      expect(api.grantsLoaded.value).toBe(false);
+      expect(api.loading.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
+  it("rejects a late track and grant response from a replaced JWT session", async () => {
+    const owner = ref<string | null>("owner-a");
+    const { scope, token, api } = mount(bearer("owner-a", "session-a"), owner);
+    try {
+      const oldTrack = api.selectPreset(7);
+      const oldGrants = api.loadShares();
+      await settle();
+      expect(calls).toHaveLength(2);
+      token.value = bearer("owner-a", "session-b");
+      calls[0]!.resolve(track());
+      calls[1]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
+      await Promise.all([oldTrack, oldGrants]);
+      expect(api.points.value).toEqual([]);
+      expect(api.grants.value).toEqual([]);
+      expect(api.loading.value).toBe(false);
+      expect(api.grantsLoading.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
+  it("does not revive the original private track on A→B→A in one tick", async () => {
+    const owner = ref<string | null>("owner-a");
+    const { scope, token, api } = mount(bearer("owner-a", "session-a"), owner);
+    try {
+      autoRespond = answer;
+      await api.selectPreset(7);
+      expect(api.points.value).toHaveLength(2);
+      token.value = bearer("owner-a", "session-b");
+      token.value = bearer("owner-a", "session-a");
+      expect(api.points.value).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("allows a cold session recovery to finish its first history read", async () => {
+    const owner = ref<string | null>(null);
+    const token = ref<string | null>(null);
+    const scope = effectScope();
+    let api!: ReturnType<typeof useHistoryPlayback>;
+    scope.run(() => { api = useHistoryPlayback({
+      accessToken: token,
+      ownerId: owner,
+      ensureSession: async () => {
+        token.value = bearer("owner-a", "session-a");
+        owner.value = "owner-a";
+      }
+    }); });
+    try {
+      autoRespond = answer;
+      await api.selectPreset(7);
+      expect(api.points.value).toHaveLength(2);
+      expect(calls).toHaveLength(1);
+    } finally { scope.stop(); }
+  });
+
+  it("preserves the track and timer on a same-session JWT renewal", async () => {
+    const owner = ref<string | null>("owner-a");
+    const { scope, token, api } = mount(bearer("owner-a", "session-a"), owner);
+    try {
+      autoRespond = answer;
+      await api.loadShares();
+      await api.selectPreset(7);
+      api.play();
+      const before = calls.length;
+      token.value = bearer("owner-a", "session-a", 1);
+      expect(api.points.value).toHaveLength(2);
+      expect(api.grants.value).toHaveLength(1);
+      expect(api.playing.value).toBe(true);
+      expect(calls).toHaveLength(before);
+    } finally { scope.stop(); }
+  });
+
+  it("does not read a JWT while its subject disagrees with the displayed profile", async () => {
+    const owner = ref<string | null>("owner-a");
+    const { scope, token, api } = mount(bearer("owner-a", "session-a"), owner);
+    try {
+      autoRespond = answer;
+      await api.selectPreset(7);
+      calls = [];
+      token.value = bearer("owner-b", "session-b");
+      expect(api.points.value).toEqual([]);
+      await api.selectPreset(7);
+      expect(calls).toHaveLength(0);
+      owner.value = "owner-b";
+      await api.selectPreset(7);
+      expect(api.points.value).toHaveLength(2);
+    } finally { scope.stop(); }
+  });
+});
 
 describe("range controls", () => {
   it("opens on the last 7 days, the shortcut the tracker names", () => {

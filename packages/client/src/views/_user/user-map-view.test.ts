@@ -22,6 +22,9 @@ function body(name: string): string {
 }
 
 describe("UserMapView live overlay", () => {
+  it("passes the authenticated profile to private history playback without mounting Vue", () => {
+    expect(view).toMatch(/useHistoryPlayback\(\{[\s\S]*?ownerId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
+  });
   it("keeps the large MapLibre chunk lazy until MapCanvas mounts while retaining own-position markers", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.

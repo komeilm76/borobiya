@@ -102,6 +102,7 @@ const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
  */
 const playback = useHistoryPlayback({
   accessToken: computed(() => auth.accessToken),
+  ownerId: computed(() => auth.user?.id ?? null),
   ensureSession: () => auth.ensureSession(),
   refreshSession: () => auth.refreshSession()
 });

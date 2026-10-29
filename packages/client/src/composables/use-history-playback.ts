@@ -1,6 +1,7 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationHistoryPoint, ReceivedLocationHistoryShare } from "@shared/index";
 import { ApiError } from "@/api/http";
+import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import { fetchMyLocationHistory, fetchSharedLocationHistory, listLocationHistoryShares } from "@/api/location";
 import {
   advanceCursor,
@@ -56,6 +57,8 @@ export type HistoryPlayback = ReturnType<typeof useHistoryPlayback>;
 
 export interface UseHistoryPlaybackOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
+  /** Displayed account, paired with the JWT session to scope private tracks and grants. */
+  ownerId?: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<void>;
   refreshSession?: () => Promise<boolean>;
 }
@@ -65,6 +68,16 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   // fake timers, which patch `Date.now`, and a captured reference would have to be injected for no
   // benefit the component actually uses.
   const now = () => Date.now();
+
+  const sessionKey = computed(() => {
+    const token = options.accessToken.value;
+    const owner = options.ownerId?.value;
+    if (!token || (options.ownerId && !owner)) return null;
+    const claims = decodeAccessTokenClaims(token);
+    if (token.includes(".") && (typeof claims?.sub !== "string" || typeof claims.sessionId !== "string" ||
+      (owner && claims.sub !== owner))) return null;
+    return JSON.stringify([owner ?? claims?.sub ?? null, claims?.sessionId ?? null]);
+  });
 
   const sourceKind = ref<PlaybackSourceKind>("own");
   const grantId = ref("");
@@ -151,7 +164,10 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       if (options.ensureSession) await options.ensureSession();
       if (requestIdForThisLoad !== grantsRequestId) return;
       const accessToken = options.accessToken.value;
-      if (!accessToken) return;
+      if (!accessToken || !sessionKey.value) {
+        if (accessToken) grantsFailed.value = true; // Token/profile mismatch is not a verified empty list.
+        return;
+      }
       let response;
       try {
         response = await listLocationHistoryShares(accessToken);
@@ -214,8 +230,8 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     }
     if (requestIdForThisLoad !== requestId) return;
     const accessToken = options.accessToken.value;
-    if (!accessToken) {
-      loadIssue.value = "no_token";
+    if (!accessToken || !sessionKey.value) {
+      loadIssue.value = accessToken ? "request_failed" : "no_token";
       failed.value = true;
       clearTrack();
       loading.value = false;
@@ -374,10 +390,10 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     void load();
   }
 
-  // Sign-out must synchronously invalidate both reads: otherwise a response that was already in
-  // flight can repopulate a previous account's private track or share list after auth is cleared.
-  watch(options.accessToken, (token) => {
-    if (token) return;
+  // Fence private reads and the playback timer synchronously on login replacement, not just sign-out.
+  // A null-to-valid transition is cold session recovery; don't cancel its in-flight read.
+  watch(sessionKey, (next, previous) => {
+    if (next === previous || (previous === null && next !== null)) return;
     ++requestId;
     ++grantsRequestId;
     stopTimer();

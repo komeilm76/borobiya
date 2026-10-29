@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Scope history playback to its JWT login (T2.2.6 follow-up)
+
+- A direct JWT replacement, including a new session for the same account, previously retained private track coordinates, grants and the playback timer; late reads could refill them. The playback composable now invalidates both reads and clears state synchronously when its account/JWT-session key changes, and will not send a private read while the bearer subject and displayed profile disagree. Same-session bearer renewal and cold recovery keep their read and playback continuity. Failing-before-fix composable regressions and source-pinned view wiring cover the change; browser and two-session acceptance remain open.
+
 ### 2026-10-29 — Clear companion-map state on a new JWT login (T2.1.8 follow-up)
 
 - The live companion receiver already cleared coordinates on logout or an account switch, but a new JWT session for the *same account* kept its prior peer positions and old Socket.IO room. It now invalidates pending reads, clears coordinates/count synchronously and closes that room when the JWT session ID changes, then re-reads grants and opens a new room. Same-session bearer renewal keeps the existing view. Focused regressions reproduced the stale coordinates before the fix and cover delayed reads and A→B→A in one tick; real Socket.IO/two-browser acceptance remains P2-A1.
