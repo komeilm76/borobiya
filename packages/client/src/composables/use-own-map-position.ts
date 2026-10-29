@@ -31,6 +31,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
     generation++;
     active.value = false;
     position.value = null;
+    error.value = null;
     const dispose = cleanup;
     cleanup = null;
     try { dispose?.(); } catch { /* Already invalidated. Do not retain a private fix on a failed clearWatch. */ }
@@ -69,7 +70,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
     }
   }
 
-  watch(owner, () => { stop(); error.value = null; }, { flush: "sync" });
+  watch(owner, stop, { flush: "sync" });
   onScopeDispose(stop);
   return { active, position, error, start, stop };
 }

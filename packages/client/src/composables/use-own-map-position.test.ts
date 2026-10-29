@@ -55,6 +55,21 @@ describe("private on-map GPS display", () => {
     expect(own.position.value).toBeNull();
   });
 
+  it("clears a transient GPS error when the user explicitly stops watching", () => {
+    let fail!: (denied: boolean) => void;
+    const scope = effectScope();
+    const own = scope.run(() => useOwnMapPosition(ref("user-1"), {
+      subscribe: (_fix, onError) => { fail = onError; return () => {}; }
+    }))!;
+    own.start();
+    fail(false);
+    expect(own.error.value).toContain("GPS");
+    own.stop();
+    expect(own.active.value).toBe(false);
+    expect(own.error.value).toBeNull();
+    scope.stop();
+  });
+
   it("clears a stale fix on transient failure and stops entirely on permission denial", () => {
     let fix!: (fix: { lat: number; lon: number }) => void;
     let fail!: (denied: boolean) => void;

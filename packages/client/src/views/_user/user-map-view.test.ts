@@ -140,9 +140,8 @@ describe("UserMapView live overlay", () => {
 
   it("offers private own-position watching independently of peer sharing and clears its marker", () => {
     expect(view).toContain('useOwnMapPosition(computed(() => auth.user?.id ?? null))');
-    expect(view).toContain('ownPositionLabel(own.position.value, own.active.value, own.error.value)');
-    expect(view).toContain('نمایش زندهٔ موقعیت من');
-    expect(view).toContain('نمایش موقعیت، اشتراک‌گذاری را فعال نمی‌کند');
+    expect(view).toContain('<OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />');
+    expect(view).not.toContain('class="user-map-view__own-card');
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
     expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
     expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation()');

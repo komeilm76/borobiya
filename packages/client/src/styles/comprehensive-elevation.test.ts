@@ -39,13 +39,14 @@ describe("all page and component elevation roles", () => {
   it("uses floating depth only on map overlays, not their parent canvas or modal dialogs", () => {
     for (const path of [
       "../components/map/PlaceSearchPanel.vue", "../components/map/HistoryPlaybackPanel.vue",
-      "../components/map/LiveCompanionPanel.vue"
+      "../components/map/LiveCompanionPanel.vue", "../components/map/OwnPositionBar.vue"
     ]) {
       expect(source(path)).toContain("bb-floating-card");
     }
     const userMap = source("../views/_user/UserMapView.vue");
     expect(userMap).toMatch(/class="user-map-view__toolbar-card bb-floating-card" elevation="3"/);
-    expect(userMap).toMatch(/class="user-map-view__own-card bb-floating-card" elevation="2"/);
+    expect(userMap).toContain('<OwnPositionBar :api="own"');
+    expect(source("../components/map/OwnPositionBar.vue")).toContain('class="own-position bb-floating-card" :class="`own-position--${tone}`" elevation="2"');
     const dispatch = source("../views/_admin/AdminDispatchView.vue");
     expect(dispatch).toContain('class="map-selected-alert-card bb-floating-card"');
     expect(dispatch).toMatch(/@media \(max-width: 1279px\)[\s\S]*?\.map-selected-alert-card\.bb-floating-card\s*\{\s*box-shadow: var\(--bb-shadow-surface\) !important;/);

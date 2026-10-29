@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Make private map position a broadcast-style component (T4.4.1 partial)
+
+- Moved the `موقعیت من` map card to `OwnPositionBar.vue`. It now follows `LiveBroadcastBar`'s indicator, headline/status, action hierarchy, themed surface and compact-width button layout while retaining its separate private-GPS semantics: only the map view starts the watch/recenters the camera, and no position is broadcast. The bar handles active, waiting and error states and explains why Start is unavailable before the map loads. Fixed a stale feedback bug where pressing Stop after a transient GPS outage left the error visible rather than returning to the off state. Pure reactive/source and compiled-CSS contrast tests cover the changes; browser/phone visual and keyboard acceptance remain open.
+
 ### 2026-10-29 — Expose the companion map's navigation controls (T4.4.1 partial)
 
 - On the RTL companion map, MapLibre's physical top-right zoom-in, zoom-out and compass rail sat beneath the right-side history playback card on desktop. Only this map now docks its native controls in the clear gap between the top cards as a horizontal, 44px-target rail within the existing camera top padding; on narrow screens, where the panels move outside the map, it returns to the familiar vertical top-right edge. Zoom/compass handlers, map camera, history panel and other MapCanvas users remain unchanged. Source and compiled-CSS checks cover the positioning and breakpoint; a real browser/phone/zoom visual and keyboard pass remains open.

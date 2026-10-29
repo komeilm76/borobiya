@@ -43,18 +43,7 @@
     </aside>
 
     <aside class="user-map-view__own" aria-label="موقعیت من">
-      <v-card class="user-map-view__own-card bb-floating-card" elevation="2" rounded="xl">
-        <strong>موقعیت من</strong>
-        <p role="status" aria-live="polite">
-          {{ ownPositionLabel(own.position.value, own.active.value, own.error.value) }}
-        </p>
-        <div class="user-map-view__own-actions">
-          <v-btn v-if="!own.active.value" size="small" color="primary" :disabled="!map" @click="startOwnLocation">نمایش زندهٔ موقعیت من</v-btn>
-          <v-btn v-else size="small" color="primary" variant="tonal" @click="own.stop()">توقف نمایش</v-btn>
-          <v-btn v-if="own.position.value" size="small" variant="text" color="primary" @click="centerOnOwnLocation">مرکز روی من</v-btn>
-        </div>
-        <small>فقط روی این دستگاه؛ نمایش موقعیت، اشتراک‌گذاری را فعال نمی‌کند.</small>
-      </v-card>
+      <OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />
     </aside>
 
     <aside class="user-map-view__live">
@@ -69,6 +58,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
+import OwnPositionBar from "@/components/map/OwnPositionBar.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
 import { useReversePlace } from "@/composables/use-reverse-place";
@@ -86,7 +76,6 @@ import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overl
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
 import { useOwnMapPosition } from "@/composables/use-own-map-position";
-import { ownPositionLabel } from "@/map/own-position";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -488,18 +477,6 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
   inset-inline-end: 1rem;
   width: min(22rem, calc(100% - 2rem));
 }
-
-.user-map-view__own-card {
-  display: grid;
-  gap: 0.4rem;
-  padding: 0.7rem 0.85rem;
-  background: rgba(var(--v-theme-surface), 0.94);
-  color: rgb(var(--v-theme-on-surface));
-}
-
-.user-map-view__own-card p { margin: 0; font-size: 0.8rem; direction: rtl; }
-.user-map-view__own-card small { opacity: 0.8; }
-.user-map-view__own-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
 
 .user-map-view__live {
   position: absolute;
