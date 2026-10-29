@@ -49,6 +49,21 @@ describe("admin catalog lists on narrow screens", () => {
     expect(narrow).toContain(".admin-categories-mobile { display: grid;");
   });
 
+  it("keeps all three persistent catalog dialogs' actions outside a scrollable body", () => {
+    for (const [source, count] of [[incidents, 1], [categories, 2]] as const) {
+      const dialogs = [...source.matchAll(/<v-dialog\b[^>]*>[\s\S]*?<\/v-dialog>/g)];
+      expect(dialogs).toHaveLength(count);
+      for (const [dialog] of dialogs) {
+        const opening = dialog.slice(0, dialog.indexOf(">") + 1);
+        expect(opening).toMatch(/\bscrollable\b/);
+        expect(opening).toMatch(/\bpersistent\b/);
+        expect(dialog).toMatch(/<v-card-text\b/);
+        expect(dialog).toMatch(/<v-card-actions class="admin-catalog-dialog-actions">/);
+        expect(dialog.indexOf("</v-card-text>")).toBeLessThan(dialog.indexOf("<v-card-actions"));
+      }
+    }
+  });
+
   it("stacks catalog dialog actions into full-width touch targets on phones", () => {
     for (const source of [incidents, categories]) {
       expect(source).toContain('class="admin-catalog-dialog-actions"');

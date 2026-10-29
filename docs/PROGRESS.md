@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Scrollable admin catalog dialogs (T4.4.1 partial)
+
+- The incident-type form, rescuer-category form, and category-membership dialog were persistent but not scrollable. On short viewports, a long form or many incident types/members could push Save/Add/Close out of reach. All three now let the card body scroll independently of the title and action footer using Vuetify's scrollable dialog behavior. Existing phone action stacking, handlers and save locks stay intact. A no-SFC-mount source-pinned regression failed before the change and passes after it; real phone/keyboard/browser acceptance and the remaining site-wide responsive audit are still open.
+
 ### 2026-10-29 — Short-viewport reverse-address sheet (T4.4.1 partial)
 
 - Took the first locally actionable open UI task while VM/browser-dependent acceptance remains blocked. The map's reverse-address bottom sheet had an unbounded card and vertically resizable address field; on a short phone viewport, long addresses or large text could push the copy/retry content and close control out of reach. The sheet now caps its height to the dynamic viewport (with a legacy `vh` fallback and safe-area allowance), keeps the 44px close target outside a scrolling body, bounds the address field, and gives copy/retry controls 44px touch height. A source-pinned test failed before the layout change and now passes; typecheck/build and client unit checks cover structure, **not** rendered pixels, mobile keyboard behavior, or full responsive sign-off. T4.4.1 remains open for other screens and actual phone/tablet/browser acceptance.

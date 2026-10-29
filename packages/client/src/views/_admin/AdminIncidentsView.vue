@@ -99,7 +99,7 @@
       </ul>
     </v-card>
 
-    <v-dialog v-model="formOpen" max-width="640" persistent>
+    <v-dialog v-model="formOpen" max-width="640" scrollable persistent>
       <v-card rounded="xl" :title="editing ? `ویرایش ${editing.name}` : 'نوع رویداد جدید'">
         <v-card-text>
           <v-form class="grid gap-4" @submit.prevent="submit">

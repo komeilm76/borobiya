@@ -126,7 +126,7 @@
       </ul>
     </v-card>
 
-    <v-dialog v-model="formOpen" max-width="640" persistent>
+    <v-dialog v-model="formOpen" max-width="640" scrollable persistent>
       <v-card rounded="xl" :title="editing ? `ویرایش ${editing.name}` : 'گروه امدادگر جدید'">
         <v-card-text>
           <div class="grid gap-4">
@@ -178,7 +178,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="membersOpen" max-width="640" persistent>
+    <v-dialog v-model="membersOpen" max-width="640" scrollable persistent>
       <v-card rounded="xl" :title="`مدیریت اعضا — ${membersFor?.name ?? ''}`">
         <v-card-text>
           <div class="mb-4" data-test="current-members">
