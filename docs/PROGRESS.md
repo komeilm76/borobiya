@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Let proposal-card footers wrap at zoomed widths (T4.4.1 partial)
+
+- Proposal inbox cards previously forced localized time and detail-prompt text into one flex row inside a clipped card. The footer now wraps and allows long text to break at narrow/zoomed widths; a source-pinned regression failed before the change. Device/200%-zoom visual acceptance remains open.
+
 ### 2026-10-29 — Preserve contrast of future mission stages (T4.4.3 partial)
 
 - The rescuer’s future-stage labels were dimmed to 60% opacity, producing under-4.5:1 small text on light tinted cards. They now retain full theme foreground ink; reached stages still have their own background/primary ink and the current stage is marked semantically. Contrast/source tests failed before the fix; rendered/screen-reader/site-wide WCAG AA acceptance remains open.

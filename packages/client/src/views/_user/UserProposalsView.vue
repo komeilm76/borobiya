@@ -368,7 +368,9 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: .78rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
 .offer-card__severity--urgent { background: #ffe7e4; color: #a2241e; }.offer-card__severity--important { background: #fff0d4; color: #875000; }.offer-card__severity--standard { background: #d9f4ed; color: #066b57; }
 .offer-card__description { font-size: .83rem; opacity: .77; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.offer-card__foot { justify-content: space-between; font-size: .72rem; color: rgb(var(--v-theme-primary)); }.offer-card__foot span:first-child { opacity: .9; }
+.offer-card__foot { justify-content: space-between; flex-wrap: wrap; font-size: .72rem; color: rgb(var(--v-theme-primary)); }
+.offer-card__foot span { min-width: 0; overflow-wrap: anywhere; }
+.offer-card__foot span:first-child { opacity: .9; }
 .offers__pages { display: flex; justify-content: center; gap: 8px; align-items: center; font-size: .8rem; }
 .offer-detail { background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); border: 1px solid rgba(128,155,151,.25); box-shadow: var(--bb-shadow-surface); overflow: hidden; }
 .offer-detail__top { padding: 28px clamp(22px, 3vw, 36px); border-bottom: 1px solid rgba(128,155,151,.18); background: linear-gradient(105deg, rgba(42,137,114,.1), transparent 80%); }
