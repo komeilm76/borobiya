@@ -469,7 +469,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-route__elevation-area { fill: rgb(var(--v-theme-primary)); opacity: .13; }
 .mission-route__elevation-line { fill: none; stroke: rgb(var(--v-theme-primary)); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
 .mission-desk__shell { max-width: 1120px; margin-inline: auto; }
-.mission-hero { position: relative; overflow: hidden; border-radius: var(--bb-radius-card, 24px); background: linear-gradient(115deg, #103b40, #206b67); color: white; padding: clamp(27px, 5vw, 56px); box-shadow: 0 22px 60px rgba(11,67,65,.18); }
+.mission-hero { position: relative; overflow: hidden; border-radius: var(--bb-radius-card, 24px); background: linear-gradient(115deg, #103b40, #206b67); color: white; padding: clamp(27px, 5vw, 56px); box-shadow: var(--bb-shadow-hero); }
 .mission-hero__eyebrow { display: inline-flex; align-items: center; gap: 9px; color: #a4e7d5; font-weight: 700; font-size: .84rem; }
 .mission-hero h1 { position: relative; z-index: 1; font-size: clamp(1.9rem, 4vw, 3rem); font-weight: 850; line-height: 1.25; margin: 18px 0 10px; }
 .mission-hero p { position: relative; z-index: 1; max-width: 590px; color: #daf2e9; line-height: 1.9; margin: 0; }

@@ -321,7 +321,7 @@
 
             <v-card
               v-if="adminSos.selectedRequest"
-              class="map-selected-alert-card"
+              class="map-selected-alert-card bb-floating-card"
               elevation="4"
               rounded="xl"
             >
@@ -995,6 +995,9 @@ onBeforeUnmount(() => {
     margin-inline: 0.75rem;
     backdrop-filter: none;
     overflow-wrap: anywhere;
+  }
+  .map-selected-alert-card.bb-floating-card {
+    box-shadow: var(--bb-shadow-surface) !important;
   }
   .severity-legend {
     position: static;

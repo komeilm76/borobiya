@@ -1,5 +1,5 @@
 <template>
-  <v-card class="place-search" elevation="3" rounded="xl" aria-label="جست‌وجوی مکان">
+  <v-card class="place-search bb-floating-card" elevation="3" rounded="xl" aria-label="جست‌وجوی مکان">
     <form class="place-search__form" role="search" @submit.prevent="api.run()">
       <v-text-field
         :model-value="api.term.value"

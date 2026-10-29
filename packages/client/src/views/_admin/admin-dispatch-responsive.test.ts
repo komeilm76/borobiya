@@ -29,7 +29,7 @@ describe("dispatch console responsive triage (source-pinned; no Vue mount)", () 
     for (const element of ["map-selected-alert-card", "severity-legend"]) {
       expect(stacked).toMatch(new RegExp(`\\.${element} \\{[^}]*position: static;`));
     }
-    expect(source.indexOf('class="map-selected-alert-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
+    expect(source.indexOf('class="map-selected-alert-card bb-floating-card"')).toBeGreaterThan(source.indexOf('<MapCanvas'));
     expect(source).toContain('@click="focusRequest(adminSos.selectedRequest)"');
     expect(source).toContain('@click="focusRequest(item)"');
   });

@@ -215,7 +215,7 @@ onBeforeUnmount(() => { ++missionGeneration; clearPhoto(); history.reset(); });
 <style scoped>
 .history { min-height: calc(100vh - 130px); padding: clamp(18px,4vw,52px) 18px 100px; background: radial-gradient(ellipse at 80% 0%,rgba(44,132,113,.1),transparent 52%),rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }
 .history__shell { max-width: 1210px; margin-inline: auto; }
-.history__hero { border-radius: var(--bb-radius-card, 24px); padding: clamp(24px,4vw,44px); background: linear-gradient(120deg,#143d42,#226e6a); color: white; box-shadow: 0 20px 50px rgba(14,70,66,.15); }
+.history__hero { border-radius: var(--bb-radius-card, 24px); padding: clamp(24px,4vw,44px); background: linear-gradient(120deg,#143d42,#226e6a); color: white; box-shadow: var(--bb-shadow-hero); }
 .history__eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: .83rem; font-weight: 750; color: #ace7d6; }
 .history__hero h1 { font-size: clamp(1.7rem,3.5vw,2.8rem); font-weight: 850; line-height: 1.25; margin: 16px 0 10px; }
 .history__hero p { max-width: 610px; color: #dcf3e9; line-height: 1.9; margin: 0; }

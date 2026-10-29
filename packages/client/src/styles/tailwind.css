@@ -95,7 +95,11 @@ a {
 .login-button {
   margin-inline-start: 0.45rem;
   padding-inline: 1.1rem !important;
-  box-shadow: 0 7px 16px rgba(14, 102, 102, 0.17);
+}
+
+/* Sign-in is a primary action; the tonal sign-out control remains flat. */
+.login-button.v-btn--variant-flat {
+  box-shadow: var(--bb-shadow-item-hover);
 }
 
 .app-main {
@@ -109,6 +113,17 @@ a {
 /* Opt in only top-level surfaces. Vuetify elevation-0 is !important; don't flatten dialogs or rows. */
 .v-card.bb-surface-card {
   box-shadow: var(--bb-shadow-surface) !important;
+}
+
+/* Map overlays need more separation from tiles, but become ordinary surfaces when stacked in flow. */
+.v-card.bb-floating-card {
+  box-shadow: var(--bb-shadow-overlay) !important;
+}
+
+@media (max-width: 1023px) {
+  .v-card.bb-floating-card {
+    box-shadow: var(--bb-shadow-surface) !important;
+  }
 }
 
 .page-shell {
@@ -185,7 +200,7 @@ a {
   background:
     radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.14), transparent 37%),
     rgba(255, 255, 255, 0.94) !important;
-  box-shadow: 0 24px 70px rgba(31, 67, 66, 0.09) !important;
+  box-shadow: var(--bb-shadow-feature) !important;
 }
 
 .welcome-card-content {
@@ -472,7 +487,6 @@ a {
   background:
     radial-gradient(circle at 80% 2%, rgba(233, 179, 90, 0.08), transparent 37%),
     rgba(27, 41, 42, 0.96) !important;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24) !important;
 }
 
 :root.dark .welcome-symbol {

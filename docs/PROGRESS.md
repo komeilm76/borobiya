@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Audit all pages and components for elevation (T4.4.5 follow-up)
+
+- Inventoried all 37 Vue files, both style sheets, Tailwind classes and Vuetify elevations in [UI_ELEVATION_AUDIT.md](UI_ELEVATION_AUDIT.md). Map cards now have a light/dark floating tier above tiles that softens when panels stack in flow; the selected admin SOS card follows its earlier 1279px breakpoint. Gradient heroes and featured auth/welcome cards use theme-aware depth tokens. The flat sign-in button has an action shadow, while tonal sign-out and disabled auth submit stay flat. Intentional SOS/dispatch pulses, peer-dot/focus rings, outlined admin cards and dialogs keep their own treatment. Regressions failed before the edits. No rendered browser/device visual sign-off is claimed.
+
 ### 2026-10-29 — Tune remaining interactive elevation and nested cards (T4.4.5 follow-up)
 
 - A broader scan found no Tailwind `shadow-*` classes in templates; the remaining work was CSS and Vuetify elevation. History/proposal list rows used light-only shadows (or none), selected rings could be overridden by a higher-specificity hover shadow, and narrow scroll regions clipped the blur. Item/hover shadows now have light/dark tiers, selected rows keep their rings, and disabled/reduced-motion states and scroll gutters are respected. The broadcast bar is flat only when nested in the dashboard card; map controls use a themed shadow and retain a forced-colors outline. Pure/source-pinned regressions failed before the changes. Rendered visual and high-contrast/device acceptance remains open.

@@ -333,7 +333,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 <style scoped>
 .offers { min-height: calc(100vh - 140px); padding: clamp(18px, 4vw, 52px) 18px 100px; background: radial-gradient(ellipse at 80% 0%, rgba(48, 117, 106, .11), transparent 48%), rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }
 .offers__shell { max-width: 1260px; margin-inline: auto; }
-.offers__hero { display: flex; gap: 24px; align-items: center; justify-content: space-between; padding: clamp(24px, 4vw, 42px); border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: 0 18px 42px rgba(13, 67, 65, .15); overflow: hidden; position: relative; }
+.offers__hero { display: flex; gap: 24px; align-items: center; justify-content: space-between; padding: clamp(24px, 4vw, 42px); border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: var(--bb-shadow-hero); overflow: hidden; position: relative; }
 .offers__hero::after { content: "✳"; position: absolute; inset-inline-end: -24px; top: -95px; color: rgba(255,255,255,.055); font-size: 320px; line-height: 1; pointer-events: none; }
 .offers__intro { position: relative; z-index: 1; max-width: 680px; }
 .offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: .8rem; font-weight: 700; letter-spacing: .02em; }

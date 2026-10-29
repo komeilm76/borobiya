@@ -1,6 +1,6 @@
 <template>
   <v-card
-    class="history-playback"
+    class="history-playback bb-floating-card"
     :class="{ 'history-playback--open': isOpen }"
     elevation="3"
     rounded="xl"

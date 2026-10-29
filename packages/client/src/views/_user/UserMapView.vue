@@ -8,7 +8,7 @@
     />
 
     <header class="user-map-view__toolbar">
-      <v-card class="user-map-view__toolbar-card" elevation="3" rounded="xl">
+      <v-card class="user-map-view__toolbar-card bb-floating-card" elevation="3" rounded="xl">
         <v-btn
           class="user-map-view__dashboard-button"
           to="/_user/dashboard"
@@ -43,7 +43,7 @@
     </aside>
 
     <aside class="user-map-view__own" aria-label="موقعیت من">
-      <v-card class="user-map-view__own-card" elevation="2" rounded="xl">
+      <v-card class="user-map-view__own-card bb-floating-card" elevation="2" rounded="xl">
         <strong>موقعیت من</strong>
         <p role="status" aria-live="polite">
           {{ ownPositionLabel(own.position.value, own.active.value, own.error.value) }}

@@ -44,11 +44,17 @@ export const palettes = {
 export const shadows = {
   light: {
     surface: "0 12px 32px rgba(25, 53, 54, 0.10), 0 2px 8px rgba(25, 53, 54, 0.04)",
+    overlay: "0 14px 34px rgba(16, 43, 44, 0.24), 0 3px 10px rgba(16, 43, 44, 0.10)",
+    hero: "0 20px 50px rgba(14, 70, 66, 0.16)",
+    feature: "0 24px 70px rgba(31, 67, 66, 0.09)",
     item: "0 4px 14px rgba(25, 53, 54, 0.09)",
     itemHover: "0 10px 24px rgba(25, 53, 54, 0.17)"
   },
   dark: {
     surface: "0 16px 38px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.16)",
+    overlay: "0 16px 40px rgba(0, 0, 0, 0.46), 0 3px 12px rgba(0, 0, 0, 0.22)",
+    hero: "0 20px 50px rgba(0, 0, 0, 0.34)",
+    feature: "0 24px 70px rgba(0, 0, 0, 0.25)",
     item: "0 4px 14px rgba(0, 0, 0, 0.26)",
     itemHover: "0 10px 24px rgba(0, 0, 0, 0.40)"
   }
@@ -75,6 +81,9 @@ export function designTokenStylesheet(): string {
   const colors = (theme: DesignTheme) => [
     ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
     `--bb-shadow-surface: ${shadows[theme].surface}`,
+    `--bb-shadow-overlay: ${shadows[theme].overlay}`,
+    `--bb-shadow-hero: ${shadows[theme].hero}`,
+    `--bb-shadow-feature: ${shadows[theme].feature}`,
     `--bb-shadow-item: ${shadows[theme].item}`,
     `--bb-shadow-item-hover: ${shadows[theme].itemHover}`
   ];

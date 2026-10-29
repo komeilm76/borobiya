@@ -1,7 +1,7 @@
 <template>
   <v-card
     class="broadcast-bar"
-    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset }]"
+    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset, 'bb-floating-card': compact }]"
     :elevation="inset ? 0 : 2"
     rounded="xl"
   >
