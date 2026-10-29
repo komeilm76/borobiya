@@ -32,7 +32,7 @@ describe("requester SOS history on narrow screens (source-pinned; no Vue mount)"
     expect(rating).toContain('.rating__choices { display: flex; flex-wrap: wrap;');
     expect(rating).toContain('flex: 0 0 48px; width: 48px; height: 48px;');
     expect(live).toContain('.live-panel__map { min-height: 20rem;');
-    expect(live).toContain('@media(max-width:599px)');
+    expect(live).toContain('@container (max-width: 599px) {');
     expect(live).toContain('.live-panel__member { flex-wrap: wrap; }');
     expect(live).toContain('.live-panel__member > .v-chip { max-width: 100%; }');
     expect(live).toContain('.live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }');

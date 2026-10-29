@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.live-panel { margin-block: 22px; border: 1px solid rgba(31,121,102,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: var(--bb-shadow-surface); }
+.live-panel { margin-block: 22px; container-type: inline-size; border: 1px solid rgba(31,121,102,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: var(--bb-shadow-surface); }
 .live-panel__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
 .live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
@@ -136,8 +136,8 @@ onBeforeUnmount(() => {
 .live-panel__member > div { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .live-panel__member strong { font-size: .85rem; }.live-panel__member small { font-size: .71rem; opacity: .78; }
 .live-panel__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }.live-panel__dot.requester { background: #dc593b; }.live-panel__dot.rescuer { background: #16826c; }.live-panel__dot.admin { background: #5555ae; }
-@media(max-width:720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }
-@media(max-width:599px) {
+@container (max-width: 720px) { .live-panel__grid { grid-template-columns: minmax(0,1fr); } }
+@container (max-width: 599px) {
   .live-panel__member { flex-wrap: wrap; }
   .live-panel__member > .v-chip { max-width: 100%; }
   .live-panel__members :deep(.v-btn) { height: auto; min-height: 44px; white-space: normal; }

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Respect embedded mission-panel width (T4.4.1 partial)
+
+- The live mission panel used viewport media queries even when embedded in a narrow history or admin column of a wide desktop viewport; its two-column map/member grid could overflow that column. Its stacking and compact actions now respond to the panel container width instead. A source-pinned regression failed before the edit; tests/typecheck/build do not replace browser/phone visual acceptance.
+
 ### 2026-10-29 — Announce rescuer mission progress semantically (T4.4.3 partial)
 
 - The active stage was indicated only by CSS. Added `aria-current="step"` to the active list item and a polite atomic live status for the server-confirmed status chip, without announcing uncommitted steps. A source-pinned test failed before the fix; screen-reader/browser and site-wide WCAG sign-off remain open.
