@@ -258,7 +258,8 @@ import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-
 import { useThemeStore } from "@/stores/theme";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { missionMapCamera } from "@/sos/mission-map";
-import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
+import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
+import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
 import { useRouteElevationCharts } from "@/sos/route-elevation-charts";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
@@ -338,19 +339,7 @@ let incidentMarker: Marker | null = null;
 let rescuerMarker: Marker | null = null;
 let waypointMarkers: Marker[] = [];
 let detachRouteMap: (() => void) | null = null;
-type RouteLineData = {
-  type: "FeatureCollection";
-  features: Array<{
-    type: "Feature";
-    properties: Record<string, never>;
-    geometry: { type: "LineString"; coordinates: [number, number][] };
-  }>;
-};
-function routeGeometry(): RouteLineData {
-  const line = routing.selectedRoute.value;
-  return { type: "FeatureCollection", features: line ? [{ type: "Feature", properties: {},
-    geometry: { type: "LineString", coordinates: decodeRoutePolyline(line.polyline) } }] : [] };
-}
+const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);
 function syncRouteMap(): void {
   const map = routeMap;
   const MarkerClass = markerConstructor;
@@ -371,10 +360,7 @@ function syncRouteMap(): void {
   rescuerMarker?.getElement().setAttribute("aria-label", "موقعیت من");
   const line = routing.selectedRoute.value;
   if (line) {
-    const points = decodeRoutePolyline(line.polyline);
-    const lon = points.map(([x]) => x);
-    const lat = points.map(([, y]) => y);
-    map.fitBounds([[Math.min(...lon), Math.min(...lat)], [Math.max(...lon), Math.max(...lat)]],
+    map.fitBounds(routeSnapshot.value.bounds!,
       { padding: 60, maxZoom: 15, duration: 450 });
   } else {
     const camera = missionMapCamera(incident, routing.from.value);
@@ -388,8 +374,8 @@ function applyRouteLayer(): void {
   if (!map || !map.isStyleLoaded()) return;
   try {
     const source = map.getSource(ROUTE_SOURCE) as GeoJSONSource | undefined;
-    if (source) source.setData(routeGeometry());
-    else map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeGeometry() });
+    if (source) source.setData(routeSnapshot.value.data);
+    else map.addSource(ROUTE_SOURCE, { type: "geojson", data: routeSnapshot.value.data });
     if (!map.getLayer(ROUTE_LAYER)) map.addLayer({ id: ROUTE_LAYER, type: "line", source: ROUTE_SOURCE,
       paint: { "line-color": "#176e62", "line-width": 6, "line-opacity": 0.9 } });
   } catch { /* Style swaps re-apply at idle. */ }

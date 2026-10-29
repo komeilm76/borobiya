@@ -40,6 +40,12 @@ describe("mission map style restoration", () => {
     expect(charts).toContain("build(choice.elevation?.profile)");
     expect(view).toContain("routing.routes.value.length === 1");
   });
+  it("shares a decoded geometry snapshot between camera and style restoration", () => {
+    expect(view).toContain('const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);');
+    expect(view).toContain('map.fitBounds(routeSnapshot.value.bounds!');
+    expect(view).toContain('source.setData(routeSnapshot.value.data)');
+    expect(view).not.toContain('decodeRoutePolyline(');
+  });
   it("does not call GeoJSON setData on every map idle when the route layer is already present", () => {
     expect(view).toContain('map.on("idle", onStyleReady)');
     expect(view).toContain("function restoreRouteLayer()");

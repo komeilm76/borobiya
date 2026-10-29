@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Reuse mission route geometry (T4.4.4 partial)
+
+- Map camera fitting and route GeoJSON setup decoded the selected polyline separately, repeating work on style restoration. A computed snapshot now supplies both camera bounds and GeoJSON from a single decode/bounds pass per selected route. Pure tests cover reuse and invalidation; this does not establish device FPS, map-load or GPS timing.
+
 ### 2026-10-29 — Bound rescuer status action on narrow screens (T4.4.1 partial)
 
 - The new mission status button’s Vuetify content could remain non-wrapping even though its outer action allowed wraps, risking overflow on narrow/zoomed screens. Both button and content now wrap within the panel with a 44px minimum target. A source-pinned regression failed before the edit; actual phone/zoom pixel acceptance is still open.
