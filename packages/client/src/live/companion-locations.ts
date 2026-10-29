@@ -331,14 +331,27 @@ export function countAwaiting(registry: CompanionRegistry): number {
   return Object.values(registry).filter((peer) => peer.fix === null).length;
 }
 
-/** One `FeatureCollection` of every peer, `stale` as 0/1 so a single layer can paint both states. */
-export function peersOverlay(registry: CompanionRegistry, nowMs: number): OverlayCollection {
-  return pointsOverlay(
+/** One `FeatureCollection` of every peer. Only map-visible properties belong in GeoJSON:
+ * the status panel reads age from `peersOf`, but no map layer reads seconds. Reuse the previous
+ * immutable collection when the clock advances without changing a dot; otherwise MapLibre's
+ * setData would reparse/repaint identical geometry at every 5-second status tick. Compare in
+ * display order too: a reordered peer with identical coordinates may have a different name.
+ */
+export function peersOverlay(registry: CompanionRegistry, nowMs: number, previous?: OverlayCollection): OverlayCollection {
+  const next = pointsOverlay(
     peersOf(registry, nowMs).map((peer) => ({
       position: peer.position,
-      properties: { name: peer.name, stale: peer.stale ? 1 : 0, ageSeconds: peer.ageMs === null ? null : Math.floor(peer.ageMs / 1000) }
+      properties: { name: peer.name, stale: peer.stale ? 1 : 0 }
     }))
   );
+  if (previous?.features.length === next.features.length && next.features.every((feature, index) => {
+    const before = previous.features[index];
+    return before?.geometry.type === "Point" && feature.geometry.type === "Point" &&
+      before.geometry.coordinates[0] === feature.geometry.coordinates[0] &&
+      before.geometry.coordinates[1] === feature.geometry.coordinates[1] &&
+      before.properties.name === feature.properties.name && before.properties.stale === feature.properties.stale;
+  })) return previous;
+  return next;
 }
 
 /**

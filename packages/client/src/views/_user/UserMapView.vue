@@ -311,9 +311,9 @@ watch(() => playbackStyle.value, () => {
   paintPlayback();
 });
 watch(() => live.overlay.value, paintLive);
-// A peer arriving or ageing must never move the camera: the user chose where to look, and a dot that
-// yanks the viewport every few seconds makes the map unusable. Playback frames the camera once per track.
-watch(() => live.peers.value.length, paintLive);
+// The overlay already changes when peers arrive or leave; a second peer-count watcher would
+// duplicate MapLibre setData on those updates. An age-only tick updates the status panel, not
+// map GeoJSON. Peers never move the camera: the user chose where to look.
 watch(
   () => playback.frames.value,
   () => {

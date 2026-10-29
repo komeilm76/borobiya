@@ -1,5 +1,6 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationSharesResponse } from "@shared/index";
+import type { OverlayCollection } from "@/map/overlay-sync";
 import { PEER_UPDATE_EVENT, SHARE_ENDED_EVENT } from "@/services/socket-events";
 import type { RealtimeClient } from "@/services/socket";
 import { listLocationShares } from "@/api/location";
@@ -131,7 +132,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   }
 
   const peers = computed(() => peersOf(registry.value, nowMs.value));
-  const overlay = computed(() => peersOverlay(registry.value, nowMs.value));
+  // Vue 3.5 computed(previous) suppresses the view's MapLibre setData watcher when only
+  // the age/status text changed. Permission loss, moved dots and stale transitions still repaint.
+  const overlay = computed((previous: OverlayCollection | undefined) => peersOverlay(registry.value, nowMs.value, previous));
   const status = computed(() =>
     liveStatus(registry.value, {
       connected: connected.value,

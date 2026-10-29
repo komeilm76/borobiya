@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { effectScope, nextTick, ref, type Ref } from "vue";
+import { effectScope, nextTick, ref, watch, type Ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationSharesResponse } from "@shared/index";
 import type { RealtimeClient } from "@/services/socket";
@@ -324,6 +324,37 @@ describe("useLiveCompanions", () => {
     await vi.advanceTimersByTimeAsync(2 * SHARE_VERIFY_MS);
     expect(harness.reads()).toBe(initialReads + 1);
     expect(harness.peers()).toEqual([]);
+    harness.scope.stop();
+  });
+
+  it("keeps map GeoJSON stable across age-only ticks but updates it on fixes, staleness, and logout", async () => {
+    const harness = mount();
+    await settle();
+    const paints = vi.fn();
+    const ages = vi.fn();
+    harness.scope.run(() => {
+      watch(harness.api.overlay, paints, { flush: "sync" });
+      watch(harness.api.peers, ages, { flush: "sync" });
+    });
+    const seeded = harness.api.overlay.value;
+    await vi.advanceTimersByTimeAsync(PEER_TICK_MS * 2);
+    expect(ages).toHaveBeenCalled(); // status-panel age still advances
+    expect(harness.api.overlay.value).toBe(seeded);
+    expect(paints).not.toHaveBeenCalled(); // do not reparse the same GeoJSON in MapLibre
+
+    harness.socket.dispatch("location:peer-update", { userId: ALICE, lat: 35.75, lon: 51.42, timestamp: Date.now() });
+    expect(harness.api.overlay.value).not.toBe(seeded);
+    expect(paints).toHaveBeenCalledTimes(1);
+    const live = harness.api.overlay.value;
+    await vi.advanceTimersByTimeAsync(PEER_TICK_MS * 2);
+    expect(harness.api.overlay.value).toBe(live);
+    expect(paints).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(STALE_AFTER_MS);
+    expect(harness.api.overlay.value.features[0]?.properties.stale).toBe(1);
+    expect(paints).toHaveBeenCalledTimes(2);
+    harness.token.value = null;
+    expect(harness.api.overlay.value.features).toEqual([]);
+    expect(paints).toHaveBeenCalledTimes(3);
     harness.scope.stop();
   });
 

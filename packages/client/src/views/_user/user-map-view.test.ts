@@ -130,6 +130,11 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('own.stop();');
   });
 
+  it("paints a peer change once, not again via a redundant peer-count watcher", () => {
+    expect(view).toContain('watch(() => live.overlay.value, paintLive)');
+    expect(view).not.toMatch(/watch\(\(\) => live\.peers\.value\.length, paintLive\)/);
+  });
+
   it("renders the live panel and no longer claims that live positions are missing", () => {
     expect(view).toContain('<LiveCompanionPanel :api="live" />');
     expect(view).not.toContain("هنوز روی این نقشه نمی‌آید");

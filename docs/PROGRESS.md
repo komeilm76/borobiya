@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Stop live companion map data churn on age-only ticks (T4.4.4 partial)
+
+- The receiver’s five-second clock updated on-screen ages but also generated new GeoJSON (including unused `ageSeconds`) and re-issued MapLibre source/paint writes even when no dot changed. The map snapshot now retains its identity across age-only ticks, while moving/renamed/stale/revoked dots still change and the status panel continues aging. Removed a second peer-count watcher that duplicated a genuine peer arrival/removal write. Pure reactive and source-pinned regressions failed before the fix and pass afterward. This is a bounded work-reduction claim, not measured FPS, map paint under 2s or GPS under 500ms; target-device acceptance remains open.
+
 ### 2026-10-29 — Let proposal-card footers wrap at zoomed widths (T4.4.1 partial)
 
 - Proposal inbox cards previously forced localized time and detail-prompt text into one flex row inside a clipped card. The footer now wraps and allows long text to break at narrow/zoomed widths; a source-pinned regression failed before the change. Device/200%-zoom visual acceptance remains open.

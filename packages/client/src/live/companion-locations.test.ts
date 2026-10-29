@@ -271,6 +271,27 @@ describe("peersOverlay", () => {
     ]);
   });
 
+  it("keeps clock-only age out of the map source, where no layer consumes it", () => {
+    const feature = peersOverlay(registryWith({ userId: ALICE }), NOW).features[0];
+    expect(feature?.properties).toEqual({ name: "سمیرا", stale: 0 });
+  });
+
+  it("reuses only identical visible dots, including names and ordering, while age labels keep advancing", () => {
+    const first = registryWith({ userId: ALICE, observedAtMs: NOW - 1000 });
+    const snapshot = peersOverlay(first, NOW);
+    expect(peersOverlay(first, NOW + 5000, snapshot)).toBe(snapshot);
+    expect(peersOf(first, NOW + 5000)[0]?.ageMs).toBe(6000);
+    expect(peersOverlay(registryWith({ userId: ALICE, name: "نام تازه", observedAtMs: NOW - 1000 }),
+      NOW + 5000, snapshot)).not.toBe(snapshot);
+    expect(peersOverlay(registryWith({ userId: ALICE, lon: 52, observedAtMs: NOW - 1000 }),
+      NOW + 5000, snapshot)).not.toBe(snapshot);
+    expect(peersOverlay(first, NOW + STALE_AFTER_MS + 1, snapshot).features[0]?.properties.stale).toBe(1);
+    const cleared = peersOverlay(emptyRegistry, NOW, snapshot);
+    expect(cleared.features).toEqual([]);
+    expect(cleared).not.toBe(snapshot);
+    expect(peersOverlay(emptyRegistry, NOW + 5000, cleared)).toBe(cleared);
+  });
+
   it("carries the stale flag as 0/1 so one layer can paint both states", () => {
     const registry = {
       ...registryWith({ userId: ALICE, observedAtMs: NOW - 1_000 }),
