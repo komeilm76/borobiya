@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Bind Active Devices to its JWT login (T2.3.5 follow-up)
+
+- A direct JWT replacement under the same account could retain the previous login's `isCurrentDevice` row and target a stale device for “apply this device to all”; pending reads and bulk posts also survived the change. The screen now fences work by account + JWT session, clears the prior snapshot synchronously and reads again when the new session matches the account. It refuses private reads while the token subject and displayed profile disagree, but preserves rows on same-session bearer renewal and supports cold session recovery. Focused regressions reproduced stale rows and continuing bulk posts before the fix; tests also cover late reads and writes, JWT renewal, subject mismatch and cold recovery. Source-level tests do not establish browser or multi-device acceptance (P2-A1).
+
 ### 2026-10-29 — Stop disposed Active Devices work (T2.3.5 follow-up)
 
 - Leaving the settings screen used to stop only its age clock. A late device read could still refill private rows, and an in-progress bulk priority edit could send additional share changes after navigation away. Scope disposal now clears the rows and invalidates pending reads and writes; the first already-started POST may commit, so the next visit reads the server state anew. Two deferred-response regressions failed before the fix, and the existing age-clock test now checks cleared state. Live browser/multi-device acceptance remains open (P2-A1).

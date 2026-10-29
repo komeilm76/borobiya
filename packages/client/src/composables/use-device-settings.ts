@@ -3,7 +3,7 @@ import type { CreateLocationShareInput, LocationShare, OwnedLocationShare, UserD
 import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { createLocationShare, listLocationShares } from "@/api/location";
-import { ownDeviceId } from "@/composables/device-identity";
+import { decodeAccessTokenClaims, ownDeviceId } from "@/composables/device-identity";
 import { describeLiveShareRow, rejectionText, shareRejections } from "@/sharing/share-form";
 import {
   describeDeviceRows,
@@ -39,7 +39,7 @@ export type DeviceSettings = ReturnType<typeof useDeviceSettings>;
 
 export interface UseDeviceSettingsOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
-  /** Distinguishes account switches from routine access-token rotation. */
+  /** The displayed account, paired with JWT session ID to distinguish login switches from bearer renewal. */
   accountId?: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<void>;
 }
@@ -58,6 +58,17 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const busyShareId = ref<string | null>(null);
   const bulkRunning = ref(false);
   const status = ref<DeviceSettingsStatus | null>(null);
+  // Bearer renewal within one session preserves the snapshot; a different login for the same
+  // account must not keep the previous session's `isCurrentDevice` or its pending writes.
+  const sessionKey = computed(() => {
+    const bearer = options.accessToken.value;
+    const account = options.accountId?.value;
+    if (!bearer || (options.accountId && !account)) return null;
+    const claims = decodeAccessTokenClaims(bearer);
+    if (bearer.includes(".") && (typeof claims?.sub !== "string" || typeof claims.sessionId !== "string" ||
+      (account && claims.sub !== account))) return null;
+    return JSON.stringify([account ?? claims?.sub ?? null, claims?.sessionId ?? null]);
+  });
 
   // A `computed` that read `Date.now()` directly would freeze the ages at its first evaluation — the
   // bug the share lists already had to fix. This ref is the reactive clock the row describers take, and
@@ -68,8 +79,9 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     nowMs.value = Date.now();
   }, DEVICE_CLOCK_INTERVAL_MS);
 
-  const currentDeviceId = computed(
-    () => devices.value.find((device) => device.isCurrentDevice)?.deviceId ?? ownDeviceId(options.accessToken.value)
+  const currentDeviceId = computed(() => sessionKey.value
+    ? devices.value.find((device) => device.isCurrentDevice)?.deviceId ?? ownDeviceId(options.accessToken.value)
+    : null
   );
   const deviceRows = computed(() => describeDeviceRows(devices.value, liveShares.value, new Date(nowMs.value)));
   const shareRows = computed(() =>
@@ -90,16 +102,19 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   }
 
   async function currentAccessToken(): Promise<string | null> {
+    // Session recovery must still run on a cold mount before either token/profile exists.
     if (options.ensureSession) await options.ensureSession();
-    return options.accessToken.value;
+    return sessionKey.value ? options.accessToken.value : null;
   }
 
   const READ_FAILED_STALE = "خواندن فهرست دستگاه‌ها ناموفق بود؛ آخرین خوانده‌شده نمایش داده می‌شود.";
   const READ_FAILED_FIRST = "خواندن فهرست دستگاه‌ها ناموفق بود؛ دوباره تلاش کنید.";
   const SIGN_IN_REQUIRED = "برای دیدن دستگاه‌ها وارد حساب شوید.";
+  const SESSION_PENDING = "نشست و حساب هنوز هماهنگ نیستند؛ دوباره تلاش کنید.";
+  const unavailableStatus = () => options.accessToken.value ? SESSION_PENDING : SIGN_IN_REQUIRED;
 
   function resetPrivateState(): void {
-    // A pending read/write belongs to the former account even if no manual refresh follows.
+    // A pending read/write belongs to the former account or login even if no manual refresh follows.
     readVersion += 1;
     sessionGeneration += 1;
     devices.value = [];
@@ -120,24 +135,18 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     resetPrivateState();
   });
 
-  watch(options.accessToken, (token, previousToken) => {
-    if (!token && previousToken) {
-      resetPrivateState();
+  watch(sessionKey, (next, previous) => {
+    if (next === previous) return;
+    // Synchronous invalidation also fences reads and multi-post writes when auth replaces the
+    // bearer before its profile, or replaces a session under an unchanged account ID.
+    resetPrivateState();
+    if (!next) {
       failed.value = true;
-      setStatus("warn", SIGN_IN_REQUIRED);
+      setStatus("warn", unavailableStatus());
+      return;
     }
-  }, { flush: "sync" });
-
-  if (options.accountId) watch(options.accountId, (nextId, previousId) => {
-    if (nextId === previousId) return;
-    if (previousId || loaded.value) resetPrivateState();
-    if (!nextId && !options.accessToken.value) {
-      failed.value = true;
-      setStatus("warn", SIGN_IN_REQUIRED);
-    }
-    // Bootstrap's onMounted refresh already owns its pending read. A later login/account switch
-    // must explicitly load the new owner's rows rather than leaving the empty reset on screen.
-    if (nextId && options.accessToken.value && !loading.value) void refresh();
+    // The mount-time read handles cold restore; subsequent identity changes re-read on their own.
+    void refresh();
   }, { flush: "sync" });
 
   async function refresh(): Promise<void> {
@@ -152,7 +161,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
         liveShares.value = [];
         loaded.value = false;
         failed.value = true;
-        setStatus("warn", SIGN_IN_REQUIRED);
+        setStatus("warn", unavailableStatus());
         return;
       }
       const [deviceList, shares] = await Promise.all([fetchUserDevices(accessToken), listLocationShares(accessToken)]);
@@ -164,7 +173,7 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
       liveShares.value = shares.owned;
       loaded.value = true;
       failed.value = false;
-      if ([READ_FAILED_STALE, READ_FAILED_FIRST, SIGN_IN_REQUIRED].includes(status.value?.text ?? "")) status.value = null;
+      if ([READ_FAILED_STALE, READ_FAILED_FIRST, SIGN_IN_REQUIRED, SESSION_PENDING].includes(status.value?.text ?? "")) status.value = null;
       nowMs.value = Date.now();
     } catch {
       if (version !== readVersion) return;

@@ -118,9 +118,13 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function mount(ensureSession?: () => Promise<void>) {
+function bearer(sessionId: string, deviceId: string, sub = "owner-a", nonce = 0): string {
+  return `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, sessionId, deviceId, nonce }))}.signature`;
+}
+
+function mount(ensureSession?: () => Promise<void>, initialToken: string | null = "access-token") {
   const scope = effectScope();
-  const token = ref<string | null>("access-token");
+  const token = ref<string | null>(initialToken);
   const accountId = ref<string | null>("owner-a");
   let api!: ReturnType<typeof useDeviceSettings>;
   scope.run(() => {
@@ -252,6 +256,93 @@ describe("reading the two lists", () => {
     expect(api.deviceRows.value).toHaveLength(2);
     expect(api.shareRows.value).toHaveLength(2);
     expect(calls).toEqual([]);
+  });
+
+  it("rebinds the current device when a different JWT session takes over the same account", async () => {
+    const { api, token } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    expect(api.currentDeviceId.value).toBe(PHONE);
+    calls = [];
+    responder = (url, method) => url.endsWith("/_user/devices")
+      ? { status: 200, body: [deviceRow(PHONE, { isCurrentDevice: false }), deviceRow(LAPTOP, { isCurrentDevice: true })] }
+      : defaultResponder(url, method);
+    token.value = bearer("session-laptop", LAPTOP);
+    expect(api.devices.value).toEqual([]);
+    expect(api.loaded.value).toBe(false);
+    expect(api.currentDeviceId.value).toBe(LAPTOP);
+    await vi.waitFor(() => expect(api.deviceRows.value.find((row) => row.isCurrent)?.deviceId).toBe(LAPTOP));
+    expect(deviceReads()).toHaveLength(1);
+    await api.assignCurrentDevice();
+    expect(posts()).toHaveLength(2);
+    expect(posts().every((call) => (call.body as { priorityDeviceId: string }).priorityDeviceId === LAPTOP)).toBe(true);
+  });
+
+  it("still recovers a cold session before requiring a matching token and profile", async () => {
+    const { api, token } = mount(async () => {
+      token.value = bearer("session-phone", PHONE);
+    }, null);
+    const initialRead = api.refresh();
+    await initialRead;
+    await vi.waitFor(() => expect(api.deviceRows.value[0]?.deviceId).toBe(PHONE));
+    expect(api.loaded.value).toBe(true);
+  });
+
+  it("does not reset or re-read for a JWT renewal within the same session", async () => {
+    const { api, token } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    calls = [];
+    token.value = bearer("session-phone", PHONE, "owner-a", 1);
+    await settle();
+    expect(api.currentDeviceId.value).toBe(PHONE);
+    expect(api.devices.value).toHaveLength(2);
+    expect(api.loaded.value).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it("does not read with a JWT whose subject disagrees with the still-visible account", async () => {
+    const { api, token, accountId } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    calls = [];
+    token.value = bearer("session-laptop", LAPTOP, "owner-b");
+    expect(api.devices.value).toEqual([]);
+    await settle();
+    expect(deviceReads()).toHaveLength(0);
+    await api.refresh();
+    expect(deviceReads()).toHaveLength(0);
+    expect(api.status.value?.text).toContain("هماهنگ");
+    responder = (url, method) => url.endsWith("/_user/devices")
+      ? { status: 200, body: [deviceRow(LAPTOP, { isCurrentDevice: true })] }
+      : defaultResponder(url, method);
+    accountId.value = "owner-b";
+    await vi.waitFor(() => expect(api.deviceRows.value[0]?.deviceId).toBe(LAPTOP));
+  });
+
+  it("rejects a late read from the previous JWT session after the replacement read completes", async () => {
+    const { api, token } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const delayed = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let interceptNext = true;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/_user/devices") && interceptNext) {
+        interceptNext = false;
+        return delayed;
+      }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const oldRead = api.refresh();
+    await settle();
+    responder = (url, method) => url.endsWith("/_user/devices")
+      ? { status: 200, body: [deviceRow(LAPTOP, { isCurrentDevice: true })] }
+      : defaultResponder(url, method);
+    token.value = bearer("session-laptop", LAPTOP);
+    expect(api.devices.value).toEqual([]);
+    await vi.waitFor(() => expect(api.deviceRows.value[0]?.deviceId).toBe(LAPTOP));
+    release(jsonResponse([deviceRow(PHONE)], 200));
+    await oldRead;
+    expect(api.currentDeviceId.value).toBe(LAPTOP);
+    expect(api.devices.value.map((device) => device.deviceId)).toEqual([LAPTOP]);
   });
 
   it("joins the shares onto the sessions they pin", async () => {
@@ -428,6 +519,24 @@ describe("serializing priority changes", () => {
 });
 
 describe("changing one share", () => {
+  it("does not report a delayed write from a replaced JWT session as this login's success", async () => {
+    const { api, token } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      init?.method === "POST" ? pendingPost : originalFetch(input, init)
+    ) as typeof fetch;
+    const oldWrite = api.assign(SHARE_ONE, LAPTOP);
+    await settle();
+    token.value = bearer("session-laptop", LAPTOP);
+    expect(api.busyShareId.value).toBeNull();
+    release(jsonResponse(defaultResponder("/_user/location/shares", "POST").body, 200));
+    expect(await oldWrite).toBe(false);
+    expect(api.status.value?.tone).not.toBe("ok");
+  });
+
   it("does not report an old account's delayed write as a new session's success", async () => {
     const { api, token, accountId } = mount();
     await api.refresh();
@@ -515,6 +624,27 @@ describe("changing one share", () => {
 });
 
 describe("applying one device to everything", () => {
+  it("stops remaining priority posts when a new JWT session takes over the same account", async () => {
+    const { api, token } = mount(undefined, bearer("session-phone", PHONE));
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let postsStarted = 0;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") { postsStarted++; return pendingPost; }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const oldSweep = api.assignEverywhere(LAPTOP);
+    await settle();
+    expect(postsStarted).toBe(1);
+    token.value = bearer("session-laptop", LAPTOP);
+    release(jsonResponse(defaultResponder("/_user/location/shares", "POST").body, 200));
+    await oldSweep;
+    expect(postsStarted).toBe(1);
+    expect(api.lastBulkSummary.value).toBeNull();
+  });
+
   it("stops the remaining posts on logout instead of mutating more shares with the old bearer", async () => {
     const { api, token, accountId } = mount();
     await api.refresh();
