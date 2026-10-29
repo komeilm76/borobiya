@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Put return-to-track in the history panel (T2.2.6 follow-up)
+
+- «بازگشت به مسیر» was a detached button below the place search panel despite controlling the history camera. It now sits with the history panel's header actions, matching their primary/tonal styling, icon, corner scale and keyboard focus, and remains available when the panel is collapsed. The map still owns the camera movement; the panel emits a typed event. The action is disabled while a new track read is pending, and its header gains a wrapping action row only when the return control is present so narrow cards and text zoom do not squeeze the title. Failing-before-fix source/compiled-style regressions cover the wiring without mounting Vue; actual browser and keyboard visual acceptance remains open.
+
 ### 2026-10-29 — Refresh visible-bbox search after map movement (T4.1.4 follow-up)
 
 - In «فقط محدودهٔ دید», the camera could move while the search list still showed results for the previous bbox. `moveend` now re-queries the current term only when the clipped visible bbox changes, canceling obsolete requests; pending text debounce, repeated move events and library-wide mode do not cause extra reads. MapLibre event data excludes the fly-to caused by choosing a result, retaining the other results for comparison until an actual subsequent movement. A source-wiring regression and deferred-request tests failed before the fix; live MapLibre/Photon and device gestures remain to be verified.

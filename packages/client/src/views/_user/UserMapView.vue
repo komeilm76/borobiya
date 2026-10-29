@@ -32,14 +32,16 @@
 
     <aside class="user-map-view__search">
       <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
-      <v-btn v-if="userPickedPlace && playback.frames.value.length" size="small" color="primary"
-        variant="tonal" @click="showTrack">بازگشت به مسیر</v-btn>
     </aside>
 
     <ReverseAddressSheet :api="reverse" />
 
     <aside class="user-map-view__playback">
-      <HistoryPlaybackPanel :api="playback" />
+      <HistoryPlaybackPanel
+        :api="playback"
+        :show-return-to-track="userPickedPlace && playback.frames.value.length > 0"
+        @return-to-track="showTrack"
+      />
     </aside>
 
     <aside class="user-map-view__own" aria-label="موقعیت من">

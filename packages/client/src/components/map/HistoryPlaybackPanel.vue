@@ -1,7 +1,7 @@
 <template>
   <v-card
     class="history-playback bb-floating-card"
-    :class="{ 'history-playback--open': isOpen }"
+    :class="{ 'history-playback--open': isOpen, 'history-playback--away': showReturnToTrack }"
     elevation="3"
     rounded="xl"
   >
@@ -21,6 +21,19 @@
         <p v-else class="history-playback__preview" role="status">{{ statusLine }}</p>
       </div>
       <div class="history-playback__actions">
+        <v-btn
+          v-if="showReturnToTrack"
+          class="history-playback__return"
+          variant="tonal"
+          color="primary"
+          size="small"
+          rounded="lg"
+          prepend-icon="mdi-map-marker-path"
+          :disabled="api.loading.value"
+          @click="emit('return-to-track')"
+        >
+          بازگشت به مسیر
+        </v-btn>
         <v-btn
           v-if="!isOpen && api.canPlay.value && !api.loading.value"
           class="history-playback__quick-play"
@@ -245,7 +258,8 @@ import type { HistoryPlayback } from "@/composables/use-history-playback";
  * in a template could not be pinned. The one judgement here is which *copy* a state produces — and each
  * copy names what the user can do about it (whose share, which field), not just that something failed.
  */
-const props = defineProps<{ api: HistoryPlayback }>();
+const props = defineProps<{ api: HistoryPlayback; showReturnToTrack: boolean }>();
+const emit = defineEmits<{ "return-to-track": [] }>();
 const route = useRoute();
 
 const isNarrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
@@ -427,6 +441,26 @@ function scrub(value: number | readonly number[]): void {
   margin-inline-start: auto;
 }
 
+/* When away from the track, keep its return action with the history controls. The card is
+ * at most 24rem wide: give the actions their own row instead of squeezing the title or
+ * overflowing onto the map, even when the panel is collapsed on a phone. */
+.history-playback--away .history-playback__header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+}
+
+.history-playback--away .history-playback__indicator { margin-top: 0.35rem; }
+
+.history-playback--away .history-playback__actions {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-width: 0;
+  margin-inline-start: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .history-playback__preview {
   white-space: normal;
   overflow-wrap: anywhere;
@@ -565,6 +599,7 @@ function scrub(value: number | readonly number[]): void {
 
 .history-playback__toggle:focus-visible,
 .history-playback__quick-play:focus-visible,
+.history-playback__return:focus-visible,
 .history-playback__chip:focus-visible {
   outline: 2px solid var(--bb-color-primary);
   outline-offset: 2px;

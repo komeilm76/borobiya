@@ -34,6 +34,25 @@ describe("history panel entry state", () => {
     expect(slider).toContain(':disabled="!api.canPlay.value || api.loading.value"');
   });
 
+  it("owns the return-to-track action beside playback controls, not under place search", () => {
+    const view = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
+    expect(view).toContain(':show-return-to-track="userPickedPlace && playback.frames.value.length > 0"');
+    expect(view).toContain('@return-to-track="showTrack"');
+    const searchArea = view.split('<aside class="user-map-view__search">')[1]?.split("</aside>")[0];
+    expect(searchArea).not.toContain("بازگشت به مسیر");
+    expect(panel).toContain("'history-playback--away': showReturnToTrack");
+    expect(panel).toContain('v-if="showReturnToTrack"');
+    expect(panel).toContain('class="history-playback__return"');
+    expect(panel).toContain('prepend-icon="mdi-map-marker-path"');
+    expect(panel).toContain('@click="emit(\'return-to-track\')"');
+    expect(panel).toContain('بازگشت به مسیر');
+    const { descriptor } = parse(panel);
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "HistoryPlaybackPanel.vue", id: "data-v-test", scoped: true });
+    expect(css.errors).toEqual([]);
+    expect(css.code).toMatch(/\.history-playback--away \.history-playback__header\[data-v-test\]/);
+    expect(css.code).toMatch(/\.history-playback__return\[data-v-test\]:focus-visible/);
+  });
+
   it("keeps the playback actions while giving the compact panel a readable status and host-aware layout", () => {
     expect(panel).toContain('class="history-playback__indicator"');
     expect(panel).toContain('class="history-playback__actions"');

@@ -112,7 +112,7 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('usePlaceSearch({');
     expect(view).toContain('const library = map.value?.getMaxBounds() ?? null');
     expect(view).toContain('placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library)');
-    expect(view).toContain('بازگشت به مسیر');
+    expect(view).toContain('@return-to-track="showTrack"');
     expect(search).toContain('api.setScope(api.scope.value === \'viewport\' ? \'library\' : \'viewport\')');
     expect(search).toContain(':aria-pressed="api.scope.value === \'viewport\'"');
     expect(search).toContain(':aria-pressed="api.selectedPlaceId.value === place.placeId"');
