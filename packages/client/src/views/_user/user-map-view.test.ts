@@ -41,7 +41,7 @@ describe("UserMapView live overlay", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.
     expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl"');
+    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(body("onMapReady")).toContain("markerConstructor = MarkerClass");
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
@@ -122,6 +122,15 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.failed.value");
     expect(search).toContain("api.searched.value");
     expect(search).toContain("api.run()");
+  });
+
+  it("updates visible-bbox results on map moveend but preserves the list after selecting a POI", () => {
+    expect(body("onMapReady")).toContain('instance.on("moveend", onMapMoveEnd)');
+    expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("moveend", onMapMoveEnd)');
+    expect(body("onMapMoveEnd")).toContain('event.placeSearchSelection === true');
+    expect(body("onMapMoveEnd")).toContain('placeSearch.refreshForViewport()');
+    expect(body("selectPlace")).toContain('{ placeSearchSelection: true }');
+    expect(body("selectPlace")).not.toContain('placeSearch.clear()');
   });
 
   it("styles place search as a compact broadcast card with distinct selected and focus states", () => {

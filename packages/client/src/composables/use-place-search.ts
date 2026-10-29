@@ -28,6 +28,7 @@ export function usePlaceSearch(options: {
   let controller: AbortController | null = null;
   let generation = 0;
   let disposed = false;
+  let lastRequestBbox: string | null = null;
 
   function invalidate(): void {
     generation++;
@@ -55,6 +56,7 @@ export function usePlaceSearch(options: {
     const q = term.value.trim();
     if (q.length < 2) return;
     const area = options.area(scope.value);
+    lastRequestBbox = area?.bbox ?? null;
     // No map bounds means no safe local search. Never silently turn this into a global query.
     if (!area) { failed.value = true; return; }
     const current = generation;
@@ -94,6 +96,16 @@ export function usePlaceSearch(options: {
     if (term.value.trim().length >= 2) await run();
   }
 
+  /** After a camera move, fetch only when the visible search bbox actually changed.
+   * A pending term debounce already reads the latest bounds, so don't bypass it here.
+   */
+  function refreshForViewport(): void {
+    if (disposed || scope.value !== "viewport" || term.value.trim().length < 2 || timer !== null) return;
+    const bbox = options.area("viewport")?.bbox ?? null;
+    if (bbox === lastRequestBbox) return;
+    void run(); // Invalidates the old request/results and uses one fresh bbox/filter snapshot.
+  }
+
   /** Selection is not a new query; keep the list so another hit remains reachable. */
   function select(place: GeocodeResult): boolean {
     if (disposed || !results.value.some((result) => result.placeId === place.placeId)) return false;
@@ -102,5 +114,5 @@ export function usePlaceSearch(options: {
   }
 
   onScopeDispose(() => { disposed = true; invalidate(); });
-  return { term, scope, results, selectedPlaceId, loading, failed, searched, run, update, clear, setScope, select };
+  return { term, scope, results, selectedPlaceId, loading, failed, searched, run, update, clear, setScope, refreshForViewport, select };
 }

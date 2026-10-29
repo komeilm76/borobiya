@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Refresh visible-bbox search after map movement (T4.1.4 follow-up)
+
+- In «فقط محدودهٔ دید», the camera could move while the search list still showed results for the previous bbox. `moveend` now re-queries the current term only when the clipped visible bbox changes, canceling obsolete requests; pending text debounce, repeated move events and library-wide mode do not cause extra reads. MapLibre event data excludes the fly-to caused by choosing a result, retaining the other results for comparison until an actual subsequent movement. A source-wiring regression and deferred-request tests failed before the fix; live MapLibre/Photon and device gestures remain to be verified.
+
 ### 2026-10-29 — Mark the selected place on the map (T4.1.4 follow-up)
 
 - Choosing a search result previously only flew the camera to its coordinates; there was no map symbol showing which POI was chosen. The map view now displays one purple, named MapLibre pin, moves it when a different result is selected, and removes it on query/scope invalidation or unmount. The marker constructor is supplied by the lazily loaded map canvas; it is not imported by the route. A failing-before-fix source-pinned lifecycle regression and composable selection tests cover the wiring without mounting a Vue SFC. A real map/browser visual and keyboard/screen-reader check remains open.

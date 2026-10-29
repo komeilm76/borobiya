@@ -109,6 +109,62 @@ describe("place search UI decisions", () => {
     scope.stop();
   });
 
+  it("refreshes a visible-area search when the map bbox changes, without clearing results on selection", async () => {
+    const old = deferred<GeocodeResponse>();
+    const search = vi.fn().mockResolvedValueOnce(hit("first")).mockImplementationOnce(() => old.promise)
+      .mockResolvedValueOnce(hit("current"));
+    let bbox = "50,34,51,35";
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: (kind) => ({
+      bbox: kind === "viewport" ? bbox : "50,34,52,36", contains: () => true
+    }) }))!;
+    api.update("park");
+    await api.setScope("viewport");
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(api.select(hit("first")[0]!)).toBe(true);
+    api.refreshForViewport(); // A selected-result fly-to is filtered at the map event source.
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(api.selectedPlaceId.value).toBe("first");
+    expect(api.results.value).toEqual(hit("first"));
+
+    bbox = "50.5,34.5,51.5,35.5";
+    api.refreshForViewport();
+    expect(search.mock.calls[1]?.[0]).toEqual({ q: "park", limit: 5, bbox });
+    expect(api.results.value).toEqual([]);
+    expect(api.selectedPlaceId.value).toBeNull();
+    const signal = search.mock.calls[1]?.[1] as AbortSignal;
+    bbox = "51,35,52,36";
+    api.refreshForViewport();
+    expect(signal.aborted).toBe(true);
+    expect(search.mock.calls[2]?.[0]).toEqual({ q: "park", limit: 5, bbox });
+    old.resolve(hit("stale"));
+    await Promise.resolve();
+    expect(api.results.value).toEqual(hit("current"));
+    api.refreshForViewport();
+    expect(search).toHaveBeenCalledTimes(3);
+    await api.setScope("library");
+    bbox = "50,34,51,35";
+    api.refreshForViewport();
+    expect(search).toHaveBeenCalledTimes(4);
+    scope.stop();
+  });
+
+  it("lets a pending term debounce search the latest viewport without an extra request", async () => {
+    let bbox = "50,34,51,35";
+    const search = vi.fn(async (_input: unknown, _signal?: AbortSignal) => hit("latest"));
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => ({ bbox, contains: () => true }) }))!;
+    await api.setScope("viewport");
+    api.update("park");
+    bbox = "51,35,52,36";
+    api.refreshForViewport();
+    expect(search).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(300);
+    expect(search).toHaveBeenCalledOnce();
+    expect(search.mock.calls[0]?.[0]).toEqual({ q: "park", limit: 5, bbox });
+    scope.stop();
+  });
+
   it("filters against the request's bbox snapshot even if the viewport changes while loading", async () => {
     const pending = deferred<GeocodeResponse>();
     let current = "old";

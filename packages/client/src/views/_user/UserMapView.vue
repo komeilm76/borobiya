@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
-import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
+import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import OwnPositionBar from "@/components/map/OwnPositionBar.vue";
@@ -168,7 +168,10 @@ function selectPlace(place: GeocodeResult): void {
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
   if (!placeSearch.select(place)) return;
   userPickedPlace.value = true;
-  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
+  // MapLibre forwards eventData to moveend. This camera flight must keep the other search
+  // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
+  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 },
+    { placeSearchSelection: true });
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
@@ -299,6 +302,13 @@ function onMapLongPress(event: MapMouseEvent): void {
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 
+function onMapMoveEnd(event: MapMovementEvent): void {
+  // Ignore only the camera flight caused by choosing a result. All other movements, including
+  // keyboard, zoom buttons and GPS centering, can change the visible search rectangle.
+  if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
+  placeSearch.refreshForViewport();
+}
+
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) { selectedPlaceMarker?.remove(); selectedPlaceMarker = null; }
   markerConstructor = MarkerClass;
@@ -310,6 +320,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   instance.on("idle", repaintOverlays);
   instance.on("click", onMapClick);
   instance.on("contextmenu", onMapLongPress);
+  instance.on("moveend", onMapMoveEnd);
   instance.on("resize", frameCamera);
   paintLive();
   paintPlayback();
@@ -365,6 +376,7 @@ onBeforeUnmount(() => {
     instance.off("idle", repaintOverlays);
     instance.off("click", onMapClick);
     instance.off("contextmenu", onMapLongPress);
+    instance.off("moveend", onMapMoveEnd);
     instance.off("resize", frameCamera);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
