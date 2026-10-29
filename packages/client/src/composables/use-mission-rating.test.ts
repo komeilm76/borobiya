@@ -171,6 +171,25 @@ describe("requester rating composable", () => {
     } finally { scope.stop(); }
   });
 
+  it("keeps an unsent rating draft through refresh failure and retry for the same mission", async () => {
+    const scope = effectScope();
+    const state = scope.run(() => useMissionRating(ref(mission), ref("token"), ref(requesterId)))!;
+    try {
+      await flush();
+      state.score.value = 4;
+      state.comment.value = "Thank you for helping.";
+      vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
+      await state.load();
+      expect(state.score.value).toBe(4);
+      expect(state.comment.value).toBe("Thank you for helping.");
+      expect(state.canSubmit.value).toBe(false); // cannot submit without a verified rating read
+      await state.load();
+      expect(state.score.value).toBe(4);
+      expect(state.comment.value).toBe("Thank you for helping.");
+      expect(state.canSubmit.value).toBe(true);
+    } finally { scope.stop(); }
+  });
+
   it("does not offer an unrated form when the existing-rating read failed", async () => {
     vi.mocked(getMission).mockRejectedValueOnce(new ApiError(503, "UNAVAILABLE", "Offline"));
     const scope = effectScope();

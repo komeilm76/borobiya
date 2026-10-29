@@ -31,12 +31,16 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
   const canSubmit = computed(() => eligible.value && loaded.value && rating.value === null && !loading.value && !submitting.value &&
     Number.isInteger(score.value) && score.value >= 1 && score.value <= 5 && comment.value.trim().length <= 500);
 
-  async function load(): Promise<void> {
+  async function load(resetDraft = false): Promise<void> {
     const current = ++generation;
     rating.value = null;
     loaded.value = false;
-    score.value = 0;
-    comment.value = "";
+    // An explicit status refresh is not consent to discard unsent feedback.
+    // A changed mission/account/login (or lost eligibility) must clear it immediately.
+    if (resetDraft || !eligible.value) {
+      score.value = 0;
+      comment.value = "";
+    }
     error.value = null;
     loading.value = false;
     submitting.value = false;
@@ -88,7 +92,7 @@ export function useMissionRating(mission: Ref<Mission | null>, token: Ref<string
   // Invalidate a prior mission's score/draft before the next render or an async
   // reply, without resetting the form on a same-session bearer renewal.
   watch([() => mission.value?.id, () => mission.value?.status, sessionKey],
-    () => { void load(); }, { immediate: true, flush: "sync" });
+    () => { void load(true); }, { immediate: true, flush: "sync" });
   onScopeDispose(() => { ++generation; });
   return { rating, score, comment, loading, loaded, submitting, error, eligible, canSubmit, load, submit };
 }

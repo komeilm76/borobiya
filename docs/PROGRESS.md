@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Preserve requester rating draft during status refresh (T4.4.2 partial)
+
+- Explicitly refreshing the saved-rating check wiped an unsent score/comment, even if the read failed. The draft now survives same-mission refresh and retry while submit stays disabled until the server verifies eligibility; account/session/mission changes still clear it synchronously. A failing-before-fix composable regression covers the path. T4.4.2 remains open for other screen feedback and rendered acceptance.
+
 ### 2026-10-29 — Make rescuer cancellation conflicts recoverable (T3.6.3 follow-up)
 
 - Reviewing the new progress/cancellation interaction exposed a stuck 409 path: the cancellation dialog told the rescuer to refresh the mission, but its modal hid the list refresh button, and a successful read did not clear the disabled Confirm latch. Reopening the dialog instead bypassed the latch without reading the server. Added an in-dialog refresh and guarded conflict recovery against failed, pre-write and overlapping reads. Only a successful post-write read permits retry for the original active mission; a replacement still needs a new confirmation. Deferred unit regressions failed before the fix, and the Vue wiring is source-pinned without mounting an SFC. Browser/VM multi-user behavior is unverified.
