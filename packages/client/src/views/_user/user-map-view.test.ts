@@ -164,6 +164,17 @@ describe("Map reverse-address sheet", () => {
     expect(sheet).toContain("api.load()");
     expect(sheet).toContain("api.close()");
   });
+
+  it("keeps long addresses scrollable below a reachable close control on short mobile viewports", () => {
+    const sheet = readFileSync(new URL("../../components/map/ReverseAddressSheet.vue", import.meta.url), "utf8");
+    expect(sheet).toContain('<v-card-text class="reverse-address__body">');
+    expect(sheet).toContain('class="reverse-address__close"');
+    expect(sheet).toMatch(/\.reverse-address \{[^}]*max-height: calc\(100dvh - 1rem - env\(safe-area-inset-bottom, 0px\)\);[^}]*overflow: hidden;/);
+    expect(sheet).toMatch(/\.reverse-address__body \{[^}]*min-height: 0;[^}]*overflow-y: auto;/);
+    expect(sheet).toMatch(/\.reverse-address__text \{[^}]*max-height: min\(11rem, 32dvh\);[^}]*overflow-wrap: anywhere;/);
+    expect(sheet).toContain('.reverse-address__close { min-width: 44px; min-height: 44px; flex-shrink: 0; }');
+    expect(sheet).toContain('.reverse-address__body :deep(.v-btn) { min-height: 44px; height: auto; }');
+  });
 });
 
 describe("LiveCompanionPanel", () => {

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Short-viewport reverse-address sheet (T4.4.1 partial)
+
+- Took the first locally actionable open UI task while VM/browser-dependent acceptance remains blocked. The map's reverse-address bottom sheet had an unbounded card and vertically resizable address field; on a short phone viewport, long addresses or large text could push the copy/retry content and close control out of reach. The sheet now caps its height to the dynamic viewport (with a legacy `vh` fallback and safe-area allowance), keeps the 44px close target outside a scrolling body, bounds the address field, and gives copy/retry controls 44px touch height. A source-pinned test failed before the layout change and now passes; typecheck/build and client unit checks cover structure, **not** rendered pixels, mobile keyboard behavior, or full responsive sign-off. T4.4.1 remains open for other screens and actual phone/tablet/browser acceptance.
+
 ### 2026-10-29 — Expired-share notification failure isolation and receiver recovery (T2.1.6/T2.1.8 follow-up)
 
 - After the minute sweep committed timed-share expiries, a throwing Socket.IO room emit aborted notices to every later recipient *and* skipped priority-device pin repair. Retrying the sweep could not replay the missed events because the rows were already revoked; a connected map with no reconnect could keep an expired peer marker until its 30-minute silence cutoff. The sweep now attempts each notification independently, aggregates delivery failures into a warning and still runs pin repair in the same pass. While a map has active grants, the receiver also rechecks `sharedWithMe` at most once per minute (after any pending read), removing grants missed by a socket event; immediate `share-ended` handling remains unchanged. Focused regressions reproduced both the blocked repair and the stuck map before the fix. These are best-effort notifications and bounded read-side reconciliation, **not** a durable event outbox; live two-browser/VM P2-A1 acceptance remains open.
