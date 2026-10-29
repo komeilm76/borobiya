@@ -242,7 +242,7 @@ function applyToAll(): void {
 .device-priority__card {
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
-  box-shadow: 0 12px 34px rgba(25, 53, 54, 0.055);
+  box-shadow: var(--bb-shadow-surface) !important;
 }
 
 .device-priority__header {

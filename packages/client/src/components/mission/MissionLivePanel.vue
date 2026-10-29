@@ -123,7 +123,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.live-panel { margin-block: 22px; border: 1px solid rgba(31,121,102,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: 0 12px 28px rgba(13,70,63,.055); }
+.live-panel { margin-block: 22px; border: 1px solid rgba(31,121,102,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); padding: clamp(16px,3vw,26px); box-shadow: var(--bb-shadow-surface); }
 .live-panel__heading { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
 .live-panel__heading h3 { font-size: 1.15rem; margin: 6px 0 2px; }
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }

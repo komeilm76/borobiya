@@ -218,7 +218,7 @@ function onSharesChanged(): void {
 .user-dashboard__note-card {
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
-  box-shadow: 0 12px 34px rgba(25, 53, 54, 0.055);
+  box-shadow: var(--bb-shadow-surface) !important;
 }
 
 .user-dashboard__card-header {
@@ -393,7 +393,6 @@ function onSharesChanged(): void {
 :global(:root.dark) .user-dashboard__map-card,
 :global(:root.dark) .user-dashboard__feature-card {
   border-color: rgba(190, 221, 213, 0.11);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.14);
 }
 
 :global(:root.dark) .user-dashboard__feature-icon {

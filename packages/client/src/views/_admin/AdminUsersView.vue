@@ -604,7 +604,7 @@ onUnmounted(() => {
   overflow: hidden;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   background: rgb(var(--v-theme-surface)) !important;
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: var(--bb-shadow-surface) !important;
 }
 
 .admin-users-toolbar {

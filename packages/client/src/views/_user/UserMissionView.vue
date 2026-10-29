@@ -447,7 +447,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 
 <style scoped>
 .mission-desk { min-height: calc(100vh - 130px); padding: clamp(18px, 4vw, 52px) 18px 100px; color: rgb(var(--v-theme-on-background)); background: radial-gradient(ellipse at 86% 4%, rgba(33,130,113,.10), transparent 52%), rgb(var(--v-theme-background)); }
-.mission-route { margin-top: 24px; padding: clamp(18px, 4vw, 34px); border: 1px solid rgba(35,135,108,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); box-shadow: 0 12px 40px rgba(20,62,58,.07); }
+.mission-route { margin-top: 24px; padding: clamp(18px, 4vw, 34px); border: 1px solid rgba(35,135,108,.25); border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-surface); }
 .mission-route__header, .mission-route__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
 .mission-route__header h2 { font-size: 1.3rem; font-weight: 800; }
 .mission-route__header p { font-size: .86rem; opacity: .78; }
@@ -477,7 +477,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-desk__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 34px 0 18px; }
 .mission-desk__toolbar h2 { font-size: 1.27rem; font-weight: 800; margin: 0; }
 .mission-desk__toolbar p { font-size: .85rem; opacity: .72; margin: 4px 0 0; }
-.mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.25); box-shadow: 0 16px 48px rgba(15,74,65,.07); }
+.mission-desk__card, .mission-desk__empty { border-radius: var(--bb-radius-card, 24px); background: rgb(var(--v-theme-surface)); border: 1px solid rgba(98,146,137,.25); box-shadow: var(--bb-shadow-surface); }
 .mission-desk__card { padding: clamp(22px, 4vw, 38px); }
 .mission-desk__card-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 18px; }
 .mission-desk__kicker { display: inline-flex; align-items: center; gap: 8px; color: rgb(var(--v-theme-primary)); font-weight: 800; font-size: .84rem; }

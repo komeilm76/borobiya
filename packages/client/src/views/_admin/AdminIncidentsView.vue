@@ -27,7 +27,7 @@
       هنوز هیچ نوع رویدادی تعریف نشده است. برای اولین نوع، «نوع رویداد جدید» را بزنید.
     </v-alert>
 
-    <v-card elevation="0" rounded="xl" class="overflow-hidden">
+    <v-card elevation="0" rounded="xl" class="overflow-hidden bb-surface-card">
       <p v-if="listState === 'loading'" class="sr-only" role="status" aria-live="polite">در حال بارگذاری نوع رویدادها…</p>
       <v-progress-linear v-if="listState === 'refreshing'" indeterminate color="primary" aria-label="در حال تازه‌سازی نوع رویدادها" />
       <v-table class="admin-incidents-table" :aria-busy="loading">

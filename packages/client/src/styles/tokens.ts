@@ -40,6 +40,12 @@ export const palettes = {
   }
 } as const;
 
+// Quiet depth for top-level surfaces only; dialogs, inset cards and selectable rows keep their own tiers.
+export const shadows = {
+  light: { surface: "0 12px 32px rgba(25, 53, 54, 0.10), 0 2px 8px rgba(25, 53, 54, 0.04)" },
+  dark: { surface: "0 16px 38px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.16)" }
+} as const;
+
 export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
@@ -58,8 +64,10 @@ export function designTokenStylesheet(): string {
     ...Object.entries(typography.weights).map(([key, value]) => `--bb-weight-${key}: ${value}`),
     ...Object.entries(typography.lineHeights).map(([key, value]) => `--bb-leading-${key}: ${value}`)
   ];
-  const colors = (theme: DesignTheme) => Object.entries(palettes[theme])
-    .map(([key, value]) => `--bb-color-${key}: ${value}`);
+  const colors = (theme: DesignTheme) => [
+    ...Object.entries(palettes[theme]).map(([key, value]) => `--bb-color-${key}: ${value}`),
+    `--bb-shadow-surface: ${shadows[theme].surface}`
+  ];
   return `:root { ${[...shared, ...colors("light")].join("; ")} }\n:root.dark { ${colors("dark").join("; ")} }`;
 }
 

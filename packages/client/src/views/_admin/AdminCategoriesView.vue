@@ -28,7 +28,7 @@
       هیچ امدادگری به رویدادی وصل نمی‌شود.
     </v-alert>
 
-    <v-card elevation="0" rounded="xl" class="overflow-hidden">
+    <v-card elevation="0" rounded="xl" class="overflow-hidden bb-surface-card">
       <p v-if="listState === 'loading'" class="sr-only" role="status" aria-live="polite">در حال بارگذاری گروه‌ها…</p>
       <v-progress-linear v-if="listState === 'refreshing'" indeterminate color="primary" aria-label="در حال تازه‌سازی گروه‌ها" />
       <v-table class="admin-categories-table" :aria-busy="loading">

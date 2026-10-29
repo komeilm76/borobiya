@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Make top-level UI surface shadows consistent (T4.4.5 follow-up)
+
+- Audited light/dark surface styles across dashboard, devices, sharing, admin catalogs and mission/history panels. Dashboard/device cards had ineffective custom shadows because Vuetify's `elevation-0` wins with `!important`; admin catalogs and share lists were flat. Added a theme-aware top-level shadow token and explicit surface opt-in, aligning those areas and other main content panels without applying a global shadow to dialogs, nested rows or selection states. Source-level regressions failed before the change; rendered device/browser visual acceptance is still open.
+
 ### 2026-10-29 — Scope history playback to its JWT login (T2.2.6 follow-up)
 
 - A direct JWT replacement, including a new session for the same account, previously retained private track coordinates, grants and the playback timer; late reads could refill them. The playback composable now invalidates both reads and clears state synchronously when its account/JWT-session key changes, and will not send a private read while the bearer subject and displayed profile disagree. Same-session bearer renewal and cold recovery keep their read and playback continuity. Failing-before-fix composable regressions and source-pinned view wiring cover the change; browser and two-session acceptance remain open.

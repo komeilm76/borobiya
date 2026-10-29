@@ -1,5 +1,5 @@
 <template>
-  <v-card class="share-lists" elevation="0" rounded="xl">
+  <v-card class="share-lists bb-surface-card" elevation="0" rounded="xl">
     <div class="share-lists__header">
       <div>
         <p class="share-lists__kicker">حریم خصوصی</p>
