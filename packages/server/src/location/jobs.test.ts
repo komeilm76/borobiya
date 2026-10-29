@@ -174,6 +174,30 @@ describe("runLocationJobs", () => {
     expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 
+  it("continues expiry notifications and repairs pins when one post-commit room emit throws", async () => {
+    const expired = retiredShares(3);
+    const expireOverdueShares = vi.fn<LocationShareStore["expireOverdueShares"]>(async () => expired);
+    const repairStaleSharePins = vi.fn<LocationShareStore["repairStaleSharePins"]>(async () => 2);
+    const logger = makeLogger();
+    const { io, emitted } = makeEmitter();
+    const roomEmitter = io.to;
+    io.to = (room: string) => room === userRoom(expired[0]!.targetUserId)
+      ? { emit: () => { throw new Error("Adapter unavailable for this room"); } }
+      : roomEmitter(room);
+
+    const outcome = await runLocationJobs({
+      ...makeStores({ expireOverdueShares, repairStaleSharePins }),
+      now: () => NOW, retentionDays: 90, io, logger
+    });
+
+    // The rows are already retired; re-running the sweep cannot reissue their events.
+    expect(outcome).toMatchObject({ expiredShares: 3, repairedPins: 2, failures: [] });
+    expect(repairStaleSharePins).toHaveBeenCalledOnce();
+    expect(emitted.map(({ room }) => room)).toEqual(expired.slice(1).map((share) => userRoom(share.targetUserId)));
+    expect(logger.warn).toHaveBeenCalledWith({ err: expect.any(Error), failedNotifications: 1 },
+      "location share expiry notifications failed after persistence");
+  });
+
   it("keeps batching until the batch is not full and stops at the cap", async () => {
     const pruneOlderThan = vi.fn<LocationHistoryStore["pruneOlderThan"]>(async () => HISTORY_PRUNE_BATCH_ROWS);
 

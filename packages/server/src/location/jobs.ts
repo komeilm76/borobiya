@@ -72,10 +72,22 @@ export async function runLocationJobs(
     if (selection.expiry) {
       const retired = await dependencies.shareStore.expireOverdueShares({ now });
       expiredShares = retired.length;
-      // Notify receivers before pin repair runs so a subsequent repair error cannot silence an
-      // expiry that has already committed in the database.
+      // The expiry has already committed. One adapter failure must not stop notices to
+      // other recipients or prevent the independent pin repair below. Re-sweeping cannot
+      // replay these notices because the retired rows are no longer active.
+      let failedNotifications = 0;
+      let firstNotificationError: unknown;
       for (const share of retired) {
-        emitShareEnded(dependencies.io, share, "expired");
+        try {
+          emitShareEnded(dependencies.io, share, "expired");
+        } catch (error) {
+          if (failedNotifications === 0) firstNotificationError = error;
+          failedNotifications++;
+        }
+      }
+      if (failedNotifications > 0) {
+        logger?.warn({ err: firstNotificationError, failedNotifications },
+          "location share expiry notifications failed after persistence");
       }
       // Same cadence and the same table: a share pinned to a device that just logged out would
       // otherwise reject every incoming fix (T2.3.4) until the owner noticed the frozen marker.

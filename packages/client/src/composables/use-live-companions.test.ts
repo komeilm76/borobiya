@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationSharesResponse } from "@shared/index";
 import type { RealtimeClient } from "@/services/socket";
 import { DISCARD_AFTER_MS, STALE_AFTER_MS } from "@/live/companion-locations";
-import { PEER_TICK_MS, useLiveCompanions } from "./use-live-companions";
+import { PEER_TICK_MS, SHARE_VERIFY_MS, useLiveCompanions } from "./use-live-companions";
 
 /**
  * The receiver's wiring: what a share read does to the map, what a socket event does, and what a
@@ -290,6 +290,39 @@ describe("useLiveCompanions", () => {
     harness.setShares([]);
     await harness.api.refresh();
     await settle();
+    expect(harness.peers()).toEqual([]);
+    harness.scope.stop();
+  });
+
+  it("rechecks grants if an expiry notification is lost while the socket stays connected", async () => {
+    const harness = mount();
+    await settle();
+    harness.socket.dispatch("connect");
+    await settle();
+    harness.socket.dispatch("location:peer-update", { userId: ALICE, lat: 35.75, lon: 51.42, timestamp: Date.now() });
+    const readsBefore = harness.reads();
+    harness.setShares([]); // Expired in the database, but the Socket.IO adapter lost share-ended.
+    await vi.advanceTimersByTimeAsync(SHARE_VERIFY_MS + PEER_TICK_MS);
+
+    expect(harness.reads()).toBeGreaterThan(readsBefore);
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.shareCount.value).toBe(0);
+    harness.scope.stop();
+  });
+
+  it("bounds grant verification to a minute and stops it after logout", async () => {
+    const harness = mount();
+    await settle();
+    const initialReads = harness.reads();
+    await vi.advanceTimersByTimeAsync(SHARE_VERIFY_MS - PEER_TICK_MS);
+    expect(harness.reads()).toBe(initialReads);
+    await vi.advanceTimersByTimeAsync(PEER_TICK_MS);
+    expect(harness.reads()).toBe(initialReads + 1);
+    await vi.advanceTimersByTimeAsync(SHARE_VERIFY_MS - PEER_TICK_MS);
+    expect(harness.reads()).toBe(initialReads + 1);
+    harness.token.value = null;
+    await vi.advanceTimersByTimeAsync(2 * SHARE_VERIFY_MS);
+    expect(harness.reads()).toBe(initialReads + 1);
     expect(harness.peers()).toEqual([]);
     harness.scope.stop();
   });

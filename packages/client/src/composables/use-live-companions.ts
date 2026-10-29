@@ -25,6 +25,8 @@ import {
  * point of the stale state, and it must keep being true when no updates arrive.
  */
 export const PEER_TICK_MS = 5_000;
+/** Bound stale grants if a share-ended notification is lost without a socket disconnect. */
+export const SHARE_VERIFY_MS = 60_000;
 
 function bearerBelongsToOwner(token: string, owner: string): boolean {
   // This is only a conservative display gate, never authentication: the server
@@ -98,6 +100,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   const shareCount = ref(0);
   const readFailed = ref(false);
   const nowMs = ref(clock());
+  let lastShareVerifyAt = nowMs.value;
 
   let client: RealtimeClient | null = null;
   let requestId = 0;
@@ -360,6 +363,16 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     nowMs.value = clock();
     const pruned = pruneRegistry(registry.value, nowMs.value, DISCARD_AFTER_MS);
     if (pruned.changed) registry.value = pruned.registry;
+    // A room emit may fail after the expiry/revocation committed. An uninterrupted
+    // socket does not reconnect to trigger a read, so verify existing grants at most
+    // once a minute. A pending read delays (rather than replaces) this verification.
+    if (shareCount.value > 0 && !refreshing &&
+      nowMs.value - lastShareVerifyAt >= SHARE_VERIFY_MS &&
+      options.accessToken.value && options.ownUserId.value &&
+      bearerBelongsToOwner(options.accessToken.value, options.ownUserId.value)) {
+      lastShareVerifyAt = nowMs.value;
+      void refresh();
+    }
   }, tickMs);
 
   watch(options.ownUserId, () => {

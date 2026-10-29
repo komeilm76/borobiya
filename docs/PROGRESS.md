@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Expired-share notification failure isolation and receiver recovery (T2.1.6/T2.1.8 follow-up)
+
+- After the minute sweep committed timed-share expiries, a throwing Socket.IO room emit aborted notices to every later recipient *and* skipped priority-device pin repair. Retrying the sweep could not replay the missed events because the rows were already revoked; a connected map with no reconnect could keep an expired peer marker until its 30-minute silence cutoff. The sweep now attempts each notification independently, aggregates delivery failures into a warning and still runs pin repair in the same pass. While a map has active grants, the receiver also rechecks `sharedWithMe` at most once per minute (after any pending read), removing grants missed by a socket event; immediate `share-ended` handling remains unchanged. Focused regressions reproduced both the blocked repair and the stuck map before the fix. These are best-effort notifications and bounded read-side reconciliation, **not** a durable event outbox; live two-browser/VM P2-A1 acceptance remains open.
+
 ### 2026-10-29 — Photon geocoding transport log privacy (T4.1.2/T4.1.3 follow-up)
 
 - The local Map Server logged the full Photon GET URL and fetch exception message on `/geocode` or `/reverse` transport failure, exposing place-search text or exact reverse-geocode coordinates to operator logs. Even an upstream HTTP error body could echo those private inputs back into diagnostics. Failure logs now contain only the query-free Photon service/path, HTTP status or safe timeout/socket code, and unreadable-body status; the caller's existing 503/502 responses are unchanged. Node regressions reproduced both the URL/exception leak and the upstream-body echo before the fix, then passed. This covers gateway-generated failure diagnostics, not external proxy/Photon access logs or VM/browser acceptance.
