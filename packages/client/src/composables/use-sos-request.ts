@@ -366,6 +366,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
     submitting.value = false;
     locating.value = false;
     severity.value = "high";
+    incidentTypeId.value = incidentTypes.value[0]?.id ?? "";
     description.value = "";
     location.value = null;
     latInput.value = "";

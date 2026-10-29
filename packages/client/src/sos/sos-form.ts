@@ -13,6 +13,15 @@ import { friendlyErrorMessage } from "../api/error-message";
 export const SOS_DESCRIPTION_MIN_LENGTH = 10;
 export const SOS_DESCRIPTION_MAX_LENGTH = 500;
 
+/** Discard an abandoned draft, but never lose the only photo-retry path for an already-created SOS. */
+export function shouldResetSosOnClose(state: {
+  createdRequestId: string | null;
+  isCompleted: boolean;
+  cancelled: boolean;
+}): boolean {
+  return state.cancelled || state.isCompleted || !state.createdRequestId;
+}
+
 export interface SosSeverityOption {
   value: Severity;
   label: string;

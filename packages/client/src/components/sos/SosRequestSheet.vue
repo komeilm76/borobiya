@@ -375,7 +375,7 @@ import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useSosRequest } from "@/composables/use-sos-request";
 import { useSosCancellation } from "@/composables/use-sos-cancellation";
 import SosCancellationDialog from "@/components/sos/SosCancellationDialog.vue";
-import { SOS_DESCRIPTION_MAX_LENGTH, SOS_SEVERITY_OPTIONS } from "@/sos/sos-form";
+import { SOS_DESCRIPTION_MAX_LENGTH, SOS_SEVERITY_OPTIONS, shouldResetSosOnClose } from "@/sos/sos-form";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -498,7 +498,11 @@ watch(
     pinMarker.value = null;
     mapInstance.value = null;
     markerConstructor = null;
-    if (sos.isCompleted.value || cancellation.cancelled.value) {
+    if (shouldResetSosOnClose({
+      createdRequestId: sos.createdRequestId.value,
+      isCompleted: sos.isCompleted.value,
+      cancelled: cancellation.cancelled.value
+    })) {
       sos.reset();
       cancellation.reset();
     }

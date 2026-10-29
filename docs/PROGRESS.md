@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Reset abandoned SOS forms on close (T3.2.4 follow-up)
+
+- A user-reported Cancel/close bug came from two paths: the sheet only reset on close after a completed/cancelled request, and the reset routine never restored the default incident type. Unsubmitted drafts now clear on Cancel, X and sheet dismissal; reset returns severity, incident type, description, location/coordinates and photo to initial values and invalidates a late GPS fix. Closing after a confirmed request with a failed photo upload still preserves its request ID and photo-retry path, avoiding a duplicate emergency on reopen. Regression tests failed before the change and now cover the pure close decision, reset state and source-pinned sheet wiring; rendered browser/device acceptance remains unverified.
+
 ### 2026-10-29 — Bind rescuer cancellation to the confirmed mission (T3.6.3 follow-up)
 
 - The rescuer dialog reused its previous reason list after a failed reopen, hiding Retry. More seriously, a mission refresh could replace the active mission while the dialog remained open; Confirm then used the *new* mission ID instead of the one for which the rescuer opened the dialog. Reason choices now clear before reloading; the dialog binds to its opening mission, warns on a change, hides stale controls and cannot confirm a replacement until closed and reopened. Late acknowledgement of an old cancellation cannot claim success on the new mission; a verified replacement also clears the old success banner. New regressions failed on all four prior behaviors and pass afterward. This is composable/source-level coverage, not a live browser or concurrent-dispatch acceptance result.

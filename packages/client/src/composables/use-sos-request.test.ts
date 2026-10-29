@@ -124,6 +124,34 @@ describe("useSosRequest composable", () => {
     expect(sos.incidentTypeId.value).toBe(""); // An obsolete choice needs explicit replacement.
   });
 
+  it("resets every draft field to its opening defaults, including the incident type", async () => {
+    vi.spyOn(sosApi, "listSosIncidentTypes").mockResolvedValue([catalogRow(INCIDENT_A), catalogRow(INCIDENT_B)]);
+    let lateGps!: Parameters<GeolocationProvider["getCurrentPosition"]>[0];
+    const sos = useSosRequest({
+      ownerId: ref("owner"), accessToken: ref("token-ok"),
+      geolocation: () => ({ getCurrentPosition: (success) => { lateGps = success; } })
+    });
+    await sos.loadCatalog();
+    sos.severity.value = "medium";
+    sos.incidentTypeId.value = INCIDENT_B;
+    sos.description.value = "Draft that was abandoned before sending.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    sos.requestGpsLocation();
+    sos.reset();
+    expect(sos.severity.value).toBe("high");
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_A);
+    expect(sos.description.value).toBe("");
+    expect(sos.location.value).toBeNull();
+    expect(sos.latInput.value).toBe("");
+    expect(sos.lonInput.value).toBe("");
+    expect(sos.photoFile.value).toBeNull();
+    expect(sos.locating.value).toBe(false);
+    expect(sos.canSubmit.value).toBe(false);
+    lateGps({ coords: { latitude: 35.8, longitude: 51.5 } });
+    expect(sos.location.value).toBeNull();
+  });
+
   it("recovers from synchronous GPS setup failures and still accepts manual incident coordinates", () => {
     for (const geolocation of [
       () => { throw new Error("Geolocation policy blocked access"); },
