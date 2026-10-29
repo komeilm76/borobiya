@@ -199,17 +199,20 @@
           <v-alert type="warning" variant="tonal" rounded="lg" class="mb-5">
             این اقدام را فقط در شرایط ضروری انجام دهید. پس از ثبت، مأموریت به مرکز امداد ارجاع می‌شود تا امدادگر جایگزین پیدا شود.
           </v-alert>
-          <v-progress-linear v-if="desk.reasonLoading.value" indeterminate color="primary" aria-label="دریافت دلایل لغو" class="mb-4" />
-          <v-alert v-if="desk.cancellationError.value" type="error" variant="tonal" role="alert" class="mb-4">
+          <v-alert v-if="desk.missionChanged.value" type="warning" variant="tonal" role="alert" class="mb-4">
+            مأموریت فعال تغییر کرده است. این تأیید برای مأموریت قبلی بود؛ فرم را ببندید و مأموریت فعلی را دوباره بررسی کنید.
+          </v-alert>
+          <v-progress-linear v-if="desk.reasonLoading.value && !desk.missionChanged.value" indeterminate color="primary" aria-label="دریافت دلایل لغو" class="mb-4" />
+          <v-alert v-if="desk.cancellationError.value && !desk.missionChanged.value" type="error" variant="tonal" role="alert" class="mb-4">
             {{ desk.cancellationError.value }}
           </v-alert>
-          <v-btn v-if="desk.cancellationError.value && !desk.reasons.value.length" variant="tonal" color="primary"
+          <v-btn v-if="desk.cancellationError.value && !desk.reasons.value.length && !desk.missionChanged.value" variant="tonal" color="primary"
             :disabled="desk.reasonLoading.value" @click="desk.showCancellation()">دریافت دوبارهٔ دلایل</v-btn>
-          <v-radio-group v-if="desk.reasons.value.length" v-model="desk.reasonId.value" label="دلیل ناتوانی در ادامه"
+          <v-radio-group v-if="desk.reasons.value.length && !desk.missionChanged.value" v-model="desk.reasonId.value" label="دلیل ناتوانی در ادامه"
             :disabled="desk.cancelling.value" hide-details>
             <v-radio v-for="reason in desk.reasons.value" :key="reason.id" :label="reason.labelFa || reason.label" :value="reason.id" />
           </v-radio-group>
-          <v-textarea v-if="desk.selectedReason.value?.requiresCustomText" v-model="desk.customReason.value"
+          <v-textarea v-if="!desk.missionChanged.value && desk.selectedReason.value?.requiresCustomText" v-model="desk.customReason.value"
             label="توضیح (۱۰ تا ۲۰۰ نویسه)" hint="دلیل «سایر» برای بررسی مدیر علامت‌گذاری می‌شود."
             persistent-hint counter="200" maxlength="200" variant="outlined" rows="2" :disabled="desk.cancelling.value" />
           <p class="mission-desk__limit">حداکثر ۳ لغو در هر ساعت؛ از استفادهٔ غیرضروری خودداری کنید.</p>

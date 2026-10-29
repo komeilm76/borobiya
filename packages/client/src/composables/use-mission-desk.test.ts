@@ -42,10 +42,12 @@ describe("mission desk cancellation", () => {
     const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
     expect(view).toContain("<v-menu location=\"bottom end\">");
     expect(view).toContain("قادر به ادامه نیستم");
-    expect(view).toContain('v-radio-group v-if="desk.reasons.value.length"');
+    expect(view).toContain('v-radio-group v-if="desk.reasons.value.length && !desk.missionChanged.value"');
     expect(view).toContain('desk.selectedReason.value?.requiresCustomText');
     expect(view).toContain(':disabled="!desk.canCancel.value"');
     expect(view).toContain('desk.cancellationError.value');
+    expect(view).toContain('v-if="desk.missionChanged.value"');
+    expect(view).toContain('v-if="desk.reasons.value.length && !desk.missionChanged.value"');
   });
 
   it("only reloads the mission view for a matching JWT owner and session, with synchronous cleanup", () => {
@@ -96,6 +98,81 @@ describe("mission desk cancellation", () => {
     expect(desk.activeMission.value?.status).toBe("on_the_way");
     expect(desk.canCancel.value).toBe(false);
     expect(desk.cancellationError.value).toContain("هیچ لغوی ثبت نشد");
+  });
+
+  it("does not offer stale rescuer reasons or hide Retry after a reopened picker fails", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    expect(desk.reasons.value).toEqual(reasons);
+    desk.dismissCancellation();
+    vi.mocked(listRescuerCancellationReasons).mockRejectedValueOnce(new Error("offline"));
+    const refresh = desk.showCancellation();
+    expect(desk.reasons.value).toEqual([]);
+    await refresh;
+    expect(desk.cancellationError.value).toBeTruthy();
+    expect(desk.reasons.value).toEqual([]); // View shows Retry only when reasons are empty.
+    desk.reasonId.value = reasons[0]!.id;
+    expect(desk.canCancel.value).toBe(false);
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).not.toHaveBeenCalled();
+    await desk.showCancellation();
+    expect(desk.reasons.value).toEqual(reasons);
+  });
+
+  it("cannot confirm a different mission that became active after opening the cancellation dialog", async () => {
+    const nextMission = { ...mission, id: "a0000000-0000-4000-8000-000000000006" };
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    expect(desk.canCancel.value).toBe(true);
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [nextMission], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.activeMission.value?.id).toBe(nextMission.id);
+    expect(desk.missionChanged.value).toBe(true);
+    expect(desk.canCancel.value).toBe(false);
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).not.toHaveBeenCalled();
+    desk.dismissCancellation();
+    await desk.showCancellation(); // New explicit decision for the new mission.
+    desk.reasonId.value = reasons[0]!.id;
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).toHaveBeenCalledOnce();
+    expect(cancelRescuerMission).toHaveBeenCalledWith("token", nextMission.id, reasons[0]!.id, undefined);
+  });
+
+  it("does not let a late cancellation acknowledgement claim the replacement mission was cancelled", async () => {
+    const nextMission = { ...mission, id: "a0000000-0000-4000-8000-000000000006" };
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const pending = deferred<void>();
+    vi.mocked(cancelRescuerMission).mockReturnValueOnce(pending.promise);
+    const saving = desk.confirmCancellation();
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [nextMission], total: 1, totalPages: 1 });
+    await desk.load();
+    pending.resolve();
+    await saving;
+    expect(desk.activeMission.value?.id).toBe(nextMission.id);
+    expect(desk.cancelledMissionId.value).toBeNull();
+    expect(desk.missionChanged.value).toBe(true);
+    expect(desk.cancellationOpen.value).toBe(true);
+  });
+
+  it("does not keep the prior cancellation banner above a verified replacement mission", async () => {
+    const nextMission = { ...mission, id: "a0000000-0000-4000-8000-000000000006" };
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    await desk.confirmCancellation();
+    expect(desk.cancelledMissionId.value).toBe(missionId);
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [nextMission], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.activeMission.value?.id).toBe(nextMission.id);
+    expect(desk.cancelledMissionId.value).toBeNull();
   });
 
   it("does not strand the list spinner when the cancellation dialog opens during a refresh", async () => {

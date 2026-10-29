@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Bind rescuer cancellation to the confirmed mission (T3.6.3 follow-up)
+
+- The rescuer dialog reused its previous reason list after a failed reopen, hiding Retry. More seriously, a mission refresh could replace the active mission while the dialog remained open; Confirm then used the *new* mission ID instead of the one for which the rescuer opened the dialog. Reason choices now clear before reloading; the dialog binds to its opening mission, warns on a change, hides stale controls and cannot confirm a replacement until closed and reopened. Late acknowledgement of an old cancellation cannot claim success on the new mission; a verified replacement also clears the old success banner. New regressions failed on all four prior behaviors and pass afterward. This is composable/source-level coverage, not a live browser or concurrent-dispatch acceptance result.
+
 ### 2026-10-29 — Remove stale SOS cancellation reasons before reload (T3.6.2 follow-up)
 
 - A reopened requester cancellation dialog kept its previous reason list while reading the current one. If the read failed, the old reasons remained selectable and the Retry button stayed hidden because it only appears with an empty list. The dialog now clears reasons before each fetch; a failed fetch leaves a visible error and Retry without enabling confirmation of an unverified reason. A pure composable test reproduced the stale list before the change and passes after it. The server remains authoritative for reason validity, and no live browser/device acceptance is claimed.
