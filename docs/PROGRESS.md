@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Full-screen phone companion map (T4.4.1 partial)
+
+- On `/_user/map` below 600px, the MapLibre canvas now fills the viewport behind a 56px route-specific app bar. The footer and page-flow reservation are removed only on this route. A four-action dock opens one scrollable overlay at a time for complete, **unshrunk** search, history playback, own GPS and live/share controls; they stay mounted while closed so playback, location and socket state persist. Escape/Close return keyboard focus to the launcher. Selecting a place, centering GPS or returning to the track closes its tool to reveal the map while preserving search results; camera padding clears the phone chrome. SOS remains available above the dock and its style override outranks scoped component CSS; MapLibre logo/attribution clear the controls. Tablet (600–1023px) and desktop layouts remain in their original modes. Source/compiled-style and camera-padding tests do not replace authenticated phone/browser checks of safe areas, short screens, zoom, map gestures, keyboard and screen-reader use; T4.4.1 remains open.
+
 ### 2026-10-29 — Reveal return-to-track after manual map movement (T2.2.6 follow-up)
 
 - The return action only appeared after choosing a place or pressing «مرکز روی من»: dragging, wheel zoom, keyboard navigation and map zoom controls did not set the map's user-camera override. MapLibre passes the originating DOM event on those movement events; the map now marks user control on `movestart` (and `moveend` as a fallback), preserving a manual viewport through a late history read and revealing the return button when history exists. Programmatic track fitting is not mistaken for a gesture. Returning to the route stops ongoing gesture inertia before clearing that override and reframing. The visible-bbox search still updates at `moveend` and POI selection still retains the result list. A source-pinned regression failed before the change; focused/full tests, typecheck and build pass, but real browser/device gesture acceptance is open.

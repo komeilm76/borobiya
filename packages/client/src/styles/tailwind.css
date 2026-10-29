@@ -432,6 +432,21 @@ a {
   .app-topbar .v-toolbar__content { padding-inline: 0.5rem !important; }
 }
 
+/* Only the companion map uses an immersive phone shell. Keep the app's navigation, inbox,
+ * theme and sign-out available in a slim glass rail over the tiles; never reserve page flow
+ * or hide the safety-critical SOS action. All other routes retain the ordinary shell. */
+@media (max-width: 599px) {
+  .app-shell--map { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+  .app-shell--map .app-topbar { height: 56px !important; min-height: 56px !important; }
+  .app-shell--map .app-topbar .v-toolbar__content { height: 56px !important; padding-inline: 0.5rem !important; }
+  .app-shell--map .brand-copy { display: none; }
+  .app-shell--map .login-button { margin-inline-start: 0; padding-inline: 0.55rem !important; }
+  .app-shell--map .app-main { min-height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; }
+  .app-shell--map .app-footer { display: none; }
+  /* Outrank SosTriggerButton's scoped .sos-fab[data-v-*] regardless of style injection order. */
+  .app-shell--map .sos-fab.sos-fab { inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px)); inset-inline-start: 0.75rem; }
+}
+
 :root.dark {
   color-scheme: dark;
 }

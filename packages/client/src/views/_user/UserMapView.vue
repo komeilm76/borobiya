@@ -30,13 +30,43 @@
       </v-card>
     </header>
 
-    <aside class="user-map-view__search">
+    <nav v-if="isPhone" class="user-map-view__dock" aria-label="ابزارهای نقشه">
+      <v-btn
+        v-for="tool in mapTools"
+        :id="`map-tool-${tool.id}`"
+        :key="tool.id"
+        icon
+        :color="activeTool === tool.id ? 'primary' : undefined"
+        :variant="activeTool === tool.id ? 'flat' : 'tonal'"
+        :aria-label="tool.label"
+        :title="tool.label"
+        :aria-expanded="activeTool === tool.id"
+        :aria-controls="`map-${tool.id}-panel`"
+        @click="toggleTool(tool.id)"
+      >
+        <v-icon :icon="tool.icon" />
+      </v-btn>
+    </nav>
+
+    <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
+      class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
+      :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+      <div v-if="isPhone" class="user-map-view__panel-head">
+        <strong>جست‌وجوی مکان</strong>
+        <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
+      </div>
       <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
     </aside>
 
     <ReverseAddressSheet :api="reverse" />
 
-    <aside class="user-map-view__playback">
+    <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
+      class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
+      :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+      <div v-if="isPhone" class="user-map-view__panel-head">
+        <strong>تاریخچهٔ مسیر</strong>
+        <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
+      </div>
       <HistoryPlaybackPanel
         :api="playback"
         :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
@@ -44,11 +74,23 @@
       />
     </aside>
 
-    <aside class="user-map-view__own" aria-label="موقعیت من">
+    <aside id="map-own-panel" v-show="!isPhone || activeTool === 'own'"
+      class="user-map-view__own user-map-view__panel" :role="isPhone ? 'region' : undefined"
+      :aria-label="isPhone ? 'موقعیت من' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+      <div v-if="isPhone" class="user-map-view__panel-head">
+        <strong>موقعیت من</strong>
+        <v-btn icon="mdi-close" variant="text" aria-label="بستن موقعیت من" @click="closeTool()" />
+      </div>
       <OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />
     </aside>
 
-    <aside class="user-map-view__live">
+    <aside id="map-live-panel" v-show="!isPhone || activeTool === 'live'"
+      class="user-map-view__live user-map-view__panel" :role="isPhone ? 'region' : undefined"
+      :aria-label="isPhone ? 'اشتراک و همراهان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+      <div v-if="isPhone" class="user-map-view__panel-head">
+        <strong>اشتراک و همراهان</strong>
+        <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
+      </div>
       <LiveBroadcastBar compact />
       <LiveCompanionPanel :api="live" />
     </aside>
@@ -56,7 +98,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
 import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -87,6 +130,45 @@ const theme = useThemeStore();
 const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
+
+// Only phones replace the full cards with a dock. v-show keeps every composable, GPS watch,
+// socket and playback timer mounted while a tool is closed; the desktop/tablet layout is unchanged.
+type MapTool = "search" | "history" | "own" | "live";
+const mapTools: { id: MapTool; label: string; icon: string }[] = [
+  { id: "search", label: "جست‌وجوی مکان", icon: "mdi-magnify" },
+  { id: "history", label: "تاریخچهٔ مسیر", icon: "mdi-map-clock-outline" },
+  { id: "own", label: "موقعیت من", icon: "mdi-crosshairs-gps" },
+  { id: "live", label: "اشتراک و همراهان", icon: "mdi-account-group-outline" }
+];
+const isPhone = useMediaQuery("(max-width: 599px)");
+const activeTool = ref<MapTool | null>(null);
+
+async function toggleTool(tool: MapTool): Promise<void> {
+  const next = activeTool.value === tool ? null : tool;
+  activeTool.value = next;
+  await nextTick();
+  if (next) document.getElementById(`map-${next}-panel`)?.focus();
+  else document.getElementById(`map-tool-${tool}`)?.focus();
+}
+
+function closeTool(): void {
+  const tool = activeTool.value;
+  if (!tool) return;
+  activeTool.value = null;
+  void nextTick(() => document.getElementById(`map-tool-${tool}`)?.focus());
+}
+
+function onPanelEscape(event: KeyboardEvent): void {
+  if (!isPhone.value) return;
+  event.stopPropagation();
+  closeTool();
+}
+
+watch(isPhone, (phone) => {
+  if (!phone) activeTool.value = null;
+  fittedFor = null;
+  frameCamera(); // A phone/tablet switch changes both the canvas and its reserved camera edges.
+});
 
 /**
  * History playback, wired to the map.
@@ -121,6 +203,7 @@ function centerOnOwnLocation(): void {
   if (!instance || !fix) return;
   userControlledCamera.value = true; // A late history fetch must not pan away from the GPS fix.
   instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
+  if (isPhone.value && activeTool.value === "own") closeTool();
 }
 function startOwnLocation(): void {
   focusOnNextFix = own.start();
@@ -174,6 +257,9 @@ function selectPlace(place: GeocodeResult): void {
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
   instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 },
     { placeSearchSelection: true });
+  // Reveal the pin rather than flying beneath the phone panel. Results remain mounted for
+  // picking another hit when the search tool is opened again.
+  if (isPhone.value && activeTool.value === "search") closeTool();
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
@@ -260,13 +346,14 @@ function frameCamera(): void {
   const track = playback.frames.value;
   if (!instance || track.length === 0 || userControlledCamera.value) return;
   const compact = window.matchMedia("(max-width: 1023px)").matches;
-  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}`;
+  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}:${isPhone.value}`;
   if (fittedFor === key) return;
   fittedFor = key;
   const bounds = playback.boundsForMap.value;
   if (bounds) {
-    // In the narrow layout controls sit outside the map, so they need no reserved viewport space.
-    instance.fitBounds(bounds, { padding: historyCameraPadding(compact), maxZoom: 15, duration: 700 });
+    // Tablet controls are in flow; phone chrome and SOS sit over the full-screen canvas.
+    const padding = historyCameraPadding(compact, isPhone.value ? window.innerHeight : undefined);
+    instance.fitBounds(bounds, { padding, maxZoom: 15, duration: 700 });
     return;
   }
   const only = track[0]!;
@@ -280,6 +367,7 @@ function showTrack(): void {
   userControlledCamera.value = false;
   fittedFor = null;
   frameCamera();
+  if (isPhone.value && activeTool.value === "history") closeTool();
 }
 
 function repaintOverlays(): void {
@@ -623,6 +711,135 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 
   .user-map-view__title-block h1 { font-size: 0.92rem; }
+}
+
+/* Phone map: an edge-to-edge viewport behind the slim app rail, not a map squeezed between
+ * stacked cards. The four complete tools remain mounted, but one scrollable surface opens over
+ * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
+@media (max-width: 599px) {
+  .user-map-view {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: block;
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .user-map-view > .user-map-view__canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    border-radius: 0;
+  }
+
+  /* Keep map zoom and compass beside, not under, the compact back-to-dashboard control. */
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: calc(4rem + env(safe-area-inset-top, 0px));
+    right: 0.75rem;
+    left: auto;
+    width: 132px;
+    transform: none;
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) { margin: 0; }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) { display: flex; }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
+    border-top: 0;
+    border-inline-start: 1px solid #627a7a;
+  }
+  /* SOS is at inline-start (physical right in this RTL view). Attribution at
+   * physical right must clear it; the logo at physical left only clears the dock. */
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .user-map-view__toolbar {
+    position: absolute;
+    inset-block-start: calc(4rem + env(safe-area-inset-top, 0px));
+    inset-inline-end: 0.75rem;
+    width: 44px;
+    pointer-events: auto;
+  }
+  .user-map-view__toolbar-card { width: 44px; min-height: 44px; padding: 0; border-radius: 14px !important; }
+  .user-map-view__dashboard-button { width: 44px; min-width: 44px; height: 44px; }
+  .user-map-view__title-block { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .user-map-view__map-chip { display: none; }
+
+  .user-map-view__dock {
+    position: absolute;
+    z-index: 5;
+    inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    width: min(15rem, calc(100% - 2rem));
+    min-height: 3.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    padding: 0.25rem;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
+    border-radius: 999px;
+    background: rgba(var(--v-theme-surface), 0.97);
+    box-shadow: var(--bb-shadow-overlay);
+    backdrop-filter: blur(12px);
+    transform: translateX(-50%);
+  }
+  .user-map-view__dock :deep(.v-btn) { flex: 1 1 0; min-width: 44px; min-height: 44px; height: 44px; }
+  .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+
+  .user-map-view__panel {
+    position: absolute;
+    z-index: 4;
+    top: calc(7.25rem + env(safe-area-inset-top, 0px));
+    left: 50%;
+    width: min(26rem, calc(100% - 1.5rem));
+    max-height: min(60dvh, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+    border-radius: var(--bb-radius-card, 24px);
+    background: rgba(var(--v-theme-surface), 0.97);
+    box-shadow: var(--bb-shadow-overlay);
+    backdrop-filter: blur(12px);
+    transform: translateX(-50%);
+  }
+  .user-map-view__panel:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+  .user-map-view__panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 44px;
+    padding-inline: 0.75rem 0.25rem;
+    color: rgb(var(--v-theme-on-surface));
+    background: rgb(var(--v-theme-surface));
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  }
+  .user-map-view__panel-head :deep(.v-btn) { min-width: 44px; min-height: 44px; }
+  .user-map-view__search, .user-map-view__playback, .user-map-view__own, .user-map-view__live {
+    pointer-events: auto;
+  }
+  .user-map-view__playback :deep(.history-playback) { width: 100%; max-height: none; overflow: visible; }
+}
+
+/* Landscape/keyboard-short viewports: let a tool use the space above the launcher
+ * instead of collapsing to a header-only strip. SOS stays above the panel at its
+ * fixed viewport position, and the panel still scrolls at its original content size. */
+@media (max-width: 599px) and (max-height: 480px) {
+  .user-map-view__panel {
+    top: calc(3.75rem + env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 8.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
 }
 
 :global(:root.dark .user-map-view) { background: var(--bb-color-background); }

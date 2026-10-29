@@ -1,5 +1,5 @@
 <template>
-  <v-app>
+  <v-app :class="{ 'app-shell--map': isMapRoute }">
     <v-app-bar class="app-topbar px-sm-6" flat height="76">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
@@ -207,7 +207,7 @@ class="nav-button d-none d-xxl-flex"
 
 <script setup lang="ts">
 import { computed, onMounted, watch } from "vue";
-import { RouterLink, RouterView, useRouter } from "vue-router";
+import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
@@ -266,6 +266,8 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
   ];
 });
 const router = useRouter();
+const route = useRoute();
+const isMapRoute = computed(() => route.name === "user-map");
 const logoutConfirmation = useLogoutConfirmation({
   isAuthenticated: computed(() => auth.isAuthenticated),
   logout: () => auth.logout(),

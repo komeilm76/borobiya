@@ -38,7 +38,8 @@ describe("history panel entry state", () => {
     const view = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
     expect(view).toContain(':show-return-to-track="userControlledCamera && playback.frames.value.length > 0"');
     expect(view).toContain('@return-to-track="showTrack"');
-    const searchArea = view.split('<aside class="user-map-view__search">')[1]?.split("</aside>")[0];
+    const searchArea = view.match(/<aside id="map-search-panel"[\s\S]*?<\/aside>/)?.[0];
+    expect(searchArea).toBeDefined();
     expect(searchArea).not.toContain("بازگشت به مسیر");
     expect(panel).toContain("'history-playback--away': showReturnToTrack");
     expect(panel).toContain('v-if="showReturnToTrack"');

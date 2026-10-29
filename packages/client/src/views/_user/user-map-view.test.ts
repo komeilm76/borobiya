@@ -173,7 +173,7 @@ describe("UserMapView live overlay", () => {
   it("fits tracks without reserving overlay space for panels outside the narrow map", () => {
     const camera = body("frameCamera");
     expect(camera).toContain('window.matchMedia("(max-width: 1023px)").matches');
-    expect(camera).toContain("historyCameraPadding(compact)");
+    expect(camera).toContain("historyCameraPadding(compact, isPhone.value ? window.innerHeight : undefined)");
     expect(body("onMapReady")).toContain('instance.on("resize", frameCamera)');
     const teardown = view.slice(view.indexOf("onBeforeUnmount("));
     expect(teardown).toContain('instance.off("resize", frameCamera)');
@@ -207,7 +207,8 @@ describe("UserMapView live overlay", () => {
     expect(25 * 16 + 24 * 16 + 2 * 16).toBe(816);
     const start = view.indexOf("@media (max-width: 1023px)");
     expect(start).toBeGreaterThan(-1);
-    const phone = view.slice(start);
+    // The tablet band retains flow; phones have a separate immersive override below it.
+    const phone = view.slice(start, view.indexOf("@media (max-width: 599px)", start));
     expect(phone).toContain("height: auto;");
     expect(phone).toContain("overflow: visible;");
     expect(phone).toContain("height: clamp(20rem, 55dvh, 32rem);");
