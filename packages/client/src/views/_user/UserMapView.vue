@@ -39,7 +39,7 @@
     <aside class="user-map-view__playback">
       <HistoryPlaybackPanel
         :api="playback"
-        :show-return-to-track="userPickedPlace && playback.frames.value.length > 0"
+        :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
         @return-to-track="showTrack"
       />
     </aside>
@@ -119,7 +119,7 @@ function centerOnOwnLocation(): void {
   const instance = map.value;
   const fix = own.position.value;
   if (!instance || !fix) return;
-  userPickedPlace.value = true; // A late history fetch must not pan away from the GPS fix.
+  userControlledCamera.value = true; // A late history fetch must not pan away from the GPS fix.
   instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
 }
 function startOwnLocation(): void {
@@ -140,7 +140,7 @@ const placeSearch = usePlaceSearch({
   }
 });
 let fittedFor: string | null = null;
-const userPickedPlace = ref(false);
+const userControlledCamera = ref(false);
 let selectedPlaceMarker: Marker | null = null;
 
 function syncSelectedPlaceMarker(): void {
@@ -169,7 +169,7 @@ function selectPlace(place: GeocodeResult): void {
   const bounds = instance.getMaxBounds();
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
   if (!placeSearch.select(place)) return;
-  userPickedPlace.value = true;
+  userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
   instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 },
@@ -258,7 +258,7 @@ function paintPlayback(): void {
 function frameCamera(): void {
   const instance = map.value;
   const track = playback.frames.value;
-  if (!instance || track.length === 0 || userPickedPlace.value) return;
+  if (!instance || track.length === 0 || userControlledCamera.value) return;
   const compact = window.matchMedia("(max-width: 1023px)").matches;
   const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}`;
   if (fittedFor === key) return;
@@ -274,7 +274,10 @@ function frameCamera(): void {
 }
 
 function showTrack(): void {
-  userPickedPlace.value = false;
+  // Stop any in-flight gesture/inertia first: its moveend still carries the original DOM event.
+  // Otherwise it can immediately mark the just-restored track as user-controlled again.
+  map.value?.stop();
+  userControlledCamera.value = false;
   fittedFor = null;
   frameCamera();
 }
@@ -304,9 +307,17 @@ function onMapLongPress(event: MapMouseEvent): void {
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 
+function markUserCameraMove(event: MapMovementEvent): void {
+  // MapLibre forwards originalEvent from drag/wheel/keyboard gestures and its zoom controls,
+  // but not from our fitBounds/easeTo. Mark intent at movestart so a history read that finishes
+  // while the user is still dragging cannot snap the camera back to the track.
+  if (event.originalEvent) userControlledCamera.value = true;
+}
+
 function onMapMoveEnd(event: MapMovementEvent): void {
-  // Ignore only the camera flight caused by choosing a result. All other movements, including
-  // keyboard, zoom buttons and GPS centering, can change the visible search rectangle.
+  markUserCameraMove(event); // Also cover gestures whose start preceded this listener.
+  // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
+  // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
   placeSearch.refreshForViewport();
 }
@@ -322,6 +333,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   instance.on("idle", repaintOverlays);
   instance.on("click", onMapClick);
   instance.on("contextmenu", onMapLongPress);
+  instance.on("movestart", markUserCameraMove);
   instance.on("moveend", onMapMoveEnd);
   instance.on("resize", frameCamera);
   paintLive();
@@ -378,6 +390,7 @@ onBeforeUnmount(() => {
     instance.off("idle", repaintOverlays);
     instance.off("click", onMapClick);
     instance.off("contextmenu", onMapLongPress);
+    instance.off("movestart", markUserCameraMove);
     instance.off("moveend", onMapMoveEnd);
     instance.off("resize", frameCamera);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);

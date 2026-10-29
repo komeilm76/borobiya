@@ -79,7 +79,7 @@ describe("UserMapView live overlay", () => {
   it("never moves the camera for a peer; only track framing and explicit place selection move it", () => {
     expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(4);
     expect(body("frameCamera")).toContain("fitBounds");
-    expect(body("frameCamera")).toContain("userPickedPlace.value");
+    expect(body("frameCamera")).toContain("userControlledCamera.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
     expect(body("selectPlace")).toContain("placeSearch.results.value.some");
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
@@ -122,6 +122,24 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("api.failed.value");
     expect(search).toContain("api.searched.value");
     expect(search).toContain("api.run()");
+  });
+
+  it("offers return-to-track after a real map drag, wheel, keyboard move or zoom-control press", () => {
+    const move = body("onMapMoveEnd");
+    expect(body("markUserCameraMove")).toContain("if (event.originalEvent) userControlledCamera.value = true;");
+    expect(body("onMapReady")).toContain('instance.on("movestart", markUserCameraMove)');
+    expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("movestart", markUserCameraMove)');
+    expect(move).toContain("markUserCameraMove(event)");
+    expect(move).toContain("placeSearch.refreshForViewport()");
+    expect(move.indexOf("markUserCameraMove(event)")).toBeLessThan(move.indexOf("placeSearch.refreshForViewport()"));
+    expect(body("frameCamera")).toContain("track.length === 0 || userControlledCamera.value");
+    expect(body("showTrack")).toContain("map.value?.stop()");
+    expect(body("showTrack")).toContain("userControlledCamera.value = false");
+    expect(body("showTrack").indexOf("map.value?.stop()")).toBeLessThan(
+      body("showTrack").indexOf("userControlledCamera.value = false")
+    );
+    expect(body("showTrack")).toContain("frameCamera()");
+    expect(view).toContain(':show-return-to-track="userControlledCamera && playback.frames.value.length > 0"');
   });
 
   it("updates visible-bbox results on map moveend but preserves the list after selecting a POI", () => {
@@ -207,7 +225,7 @@ describe("UserMapView live overlay", () => {
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
     expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
     expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation()');
-    expect(body("centerOnOwnLocation")).toContain('userPickedPlace.value = true');
+    expect(body("centerOnOwnLocation")).toContain('userControlledCamera.value = true');
     expect(view).toContain('ownMarker?.remove();');
     expect(view).toContain('own.stop();');
   });

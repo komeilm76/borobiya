@@ -36,7 +36,7 @@ describe("history panel entry state", () => {
 
   it("owns the return-to-track action beside playback controls, not under place search", () => {
     const view = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
-    expect(view).toContain(':show-return-to-track="userPickedPlace && playback.frames.value.length > 0"');
+    expect(view).toContain(':show-return-to-track="userControlledCamera && playback.frames.value.length > 0"');
     expect(view).toContain('@return-to-track="showTrack"');
     const searchArea = view.split('<aside class="user-map-view__search">')[1]?.split("</aside>")[0];
     expect(searchArea).not.toContain("بازگشت به مسیر");

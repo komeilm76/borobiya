@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Reveal return-to-track after manual map movement (T2.2.6 follow-up)
+
+- The return action only appeared after choosing a place or pressing «مرکز روی من»: dragging, wheel zoom, keyboard navigation and map zoom controls did not set the map's user-camera override. MapLibre passes the originating DOM event on those movement events; the map now marks user control on `movestart` (and `moveend` as a fallback), preserving a manual viewport through a late history read and revealing the return button when history exists. Programmatic track fitting is not mistaken for a gesture. Returning to the route stops ongoing gesture inertia before clearing that override and reframing. The visible-bbox search still updates at `moveend` and POI selection still retains the result list. A source-pinned regression failed before the change; focused/full tests, typecheck and build pass, but real browser/device gesture acceptance is open.
+
 ### 2026-10-29 — Put return-to-track in the history panel (T2.2.6 follow-up)
 
 - «بازگشت به مسیر» was a detached button below the place search panel despite controlling the history camera. It now sits with the history panel's header actions, matching their primary/tonal styling, icon, corner scale and keyboard focus, and remains available when the panel is collapsed. The map still owns the camera movement; the panel emits a typed event. The action is disabled while a new track read is pending, and its header gains a wrapping action row only when the return control is present so narrow cards and text zoom do not squeeze the title. Failing-before-fix source/compiled-style regressions cover the wiring without mounting Vue; actual browser and keyboard visual acceptance remains open.
