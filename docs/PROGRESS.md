@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Expose mission timeline live-transport outages (T4.4.2 partial)
+
+- When both Socket.IO and the authenticated timeline event stream failed, a successful earlier HTTP read made the timeline look live even though future status changes would no longer arrive automatically. A scoped warning now offers manual refresh, clears on validated live delivery/socket recovery, and cannot survive a mission/session teardown. Tests cover the failure and recovery path without a browser; VM/proxy and rendered feedback remain unverified.
+
 ### 2026-10-29 — Reuse mission route geometry (T4.4.4 partial)
 
 - Map camera fitting and route GeoJSON setup decoded the selected polyline separately, repeating work on style restoration. A computed snapshot now supplies both camera bounds and GeoJSON from a single decode/bounds pass per selected route. Pure tests cover reuse and invalidation; this does not establish device FPS, map-load or GPS timing.

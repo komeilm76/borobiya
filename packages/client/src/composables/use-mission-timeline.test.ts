@@ -238,6 +238,29 @@ describe("timeline transport fallback", () => {
     expect(fake.close).toHaveBeenCalledTimes(2); // old mission and active mission
   });
 
+  it("reports loss of both live transports but keeps manual timeline reads usable", async () => {
+    const fake = fakeSocket();
+    const read = vi.fn(async () => [row]);
+    const followEvents = vi.fn(async () => { throw new Error("stream unavailable"); });
+    const scope = effectScope();
+    const timeline = scope.run(() => useMissionTimeline(ref(ID), "user", ref("bearer"), ref(OWNER),
+      undefined, { read, openSocket: async () => fake.client, followEvents }))!;
+    try {
+      await settle();
+      expect(timeline.entries.value).toEqual([row]);
+      fake.listeners.get("connect_error")?.(new Error("socket unavailable"));
+      await settle();
+      expect(timeline.liveError.value).toBeTruthy();
+      expect(timeline.entries.value).toEqual([row]);
+      await timeline.load();
+      expect(read).toHaveBeenCalledTimes(2);
+      expect(timeline.liveError.value).toBeTruthy(); // HTTP read is not live delivery
+      fake.listeners.get("connect")?.(undefined);
+      await settle();
+      expect(timeline.liveError.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
   it("refreshes the bearer on SSE retry, stops streams on logout, and handles socket opener failure", async () => {
     const token = ref<string | null>("first");
     const fake = fakeSocket();

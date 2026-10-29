@@ -16,6 +16,10 @@
         <v-btn size="small" variant="text" :loading="timeline.loading.value" @click="timeline.load()">تلاش دوباره</v-btn>
       </p>
     </v-alert>
+    <v-alert v-if="timeline.liveError.value" type="warning" variant="tonal" rounded="lg" role="alert" class="mb-3">
+      {{ timeline.liveError.value }}
+      <v-btn size="small" variant="text" :loading="timeline.loading.value" @click="timeline.load()">بررسی وضعیت فعلی</v-btn>
+    </v-alert>
     <v-progress-linear v-if="timeline.loading.value && !timeline.entries.value.length" indeterminate
       color="primary" aria-label="دریافت مراحل مأموریت" />
     <ol v-if="timeline.entries.value.length" class="timeline__list" aria-live="polite">

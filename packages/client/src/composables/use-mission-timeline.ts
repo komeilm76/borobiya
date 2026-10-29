@@ -21,6 +21,7 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
   const entries = ref<MissionTimeline>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const liveError = ref<string | null>(null);
   let generation = 0;
   let readId = 0;
   let controller: AbortController | null = null;
@@ -57,10 +58,11 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
             !sessionKey.value || !token.value || client?.socket.connected) return;
         await (runtime.followEvents ?? followMissionTimelineEvents)(token.value, id, controller.signal, () => {
           if (!controller.signal.aborted && gen === generation && missionId.value === id && owner.value === account &&
-              !client?.socket.connected) void load();
+              !client?.socket.connected) { liveError.value = null; void load(); }
         });
       } catch {
-        // The timeline stays readable through normal authenticated HTTP with an explicit retry.
+        if (!controller.signal.aborted && gen === generation && missionId.value === id && owner.value === account)
+          liveError.value = "اتصال زندهٔ خط زمانی در دسترس نیست؛ برای بررسی وضعیت فعلی، به‌روزرسانی را بزنید.";
       } finally {
         if (fallback === controller) {
           fallback = null;
@@ -82,6 +84,7 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
     entries.value = [];
     loading.value = false;
     error.value = null;
+    liveError.value = null;
   }
   async function load() {
     const id = missionId.value;
@@ -127,7 +130,7 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
       if (gen !== generation || missionId.value !== id || owner.value !== account) { opened.close(); return; }
       client = opened;
       const active = () => gen === generation && client === opened && missionId.value === id && owner.value === account;
-      opened.socket.on("connect", () => { if (active()) { stopFallback(); void load(); } });
+      opened.socket.on("connect", () => { if (active()) { stopFallback(); liveError.value = null; void load(); } });
       opened.socket.on("disconnect", () => { if (active()) startFallback(); });
       opened.socket.on("connect_error", () => { if (active()) startFallback(); });
       opened.socket.on(MISSION_STATUS_UPDATED_EVENT, (value: unknown) => {
@@ -170,5 +173,5 @@ export function useMissionTimeline(missionId: Ref<string | null>, audience: "use
     }
   }, { immediate: true, flush: "sync" });
   onScopeDispose(stop);
-  return { entries, loading, error, load, stop };
+  return { entries, loading, error, liveError, load, stop };
 }
