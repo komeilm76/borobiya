@@ -4,6 +4,15 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
 
 describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
+  it("does not call a debouncing or failed recipient search verified empty", () => {
+    const hint = source.split('id="share-recipient-hint"')[1]?.split("</p>")[0];
+    const empty = source.split('<v-alert\n            v-else-if="')[1]?.split('class="mt-2"')[0];
+    expect(hint).toContain('v-else-if="searchFailed"');
+    expect(empty).toContain("!searchFailed && !searching");
+    expect(empty).toContain("(termTooShort || searchVerified)");
+    expect(source).toContain("verified: searchVerified");
+  });
+
   it("keeps the form body scrollable while the live status and actions fit a narrow fullscreen footer", () => {
     expect(source).toContain(':fullscreen="$vuetify.display.smAndDown"');
     expect(source).toContain("    scrollable\n");

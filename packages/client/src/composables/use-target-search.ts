@@ -32,6 +32,8 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
   const total = ref(0);
   const loading = ref(false);
   const failed = ref(false);
+  // An empty array during debounce, refresh or failure is not a verified "no accounts" result.
+  const verified = ref(false);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
   let controller: AbortController | null = null;
@@ -52,6 +54,7 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     results.value = [];
     total.value = 0;
     failed.value = false;
+    verified.value = false;
     loading.value = false;
   }
 
@@ -61,6 +64,7 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
       results.value = [];
       total.value = 0;
       failed.value = false;
+      verified.value = false;
       loading.value = false;
       return;
     }
@@ -74,6 +78,7 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
     // the new request waits for a token, network, or server response.
     results.value = [];
     total.value = 0;
+    verified.value = false;
     // The previous term's failure is not this term's failure: leaving `failed` set until the new
     // response arrives shows "search failed" above a list that is still loading, and offers a retry
     // button for a request that has not been made yet.
@@ -122,6 +127,7 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
       if (!isLatestSearch(requestIdForThisRun, requestId)) return;
       results.value = page.items;
       total.value = page.total;
+      verified.value = true;
       failed.value = false;
     } catch (error) {
       if (!isLatestSearch(requestIdForThisRun, requestId) || isAbortError(error)) return;
@@ -168,5 +174,5 @@ export function useTargetSearch(options: UseTargetSearchOptions) {
 
   onScopeDispose(cancelPending);
 
-  return { term, results, total, loading, failed, hasResults, searchNow, cancelPending };
+  return { term, results, total, loading, failed, verified, hasResults, searchNow, cancelPending };
 }

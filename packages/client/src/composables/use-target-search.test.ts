@@ -91,6 +91,34 @@ afterEach(() => {
 });
 
 describe("useTargetSearch", () => {
+  it("only verifies an empty search after a successful response for the current term", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(page([])))
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce(jsonResponse(page([])));
+    vi.stubGlobal("fetch", fetchMock);
+    const { search, scope } = mountComposable();
+    try {
+      search.term.value = "ham";
+      expect(search.verified.value).toBe(false); // Debounce is not an empty result.
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(search.verified.value).toBe(true);
+      expect(search.results.value).toEqual([]);
+
+      search.term.value = "hamr";
+      expect(search.verified.value).toBe(false); // Old empty result belongs to another term.
+      await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
+      expect(search.failed.value).toBe(true);
+      expect(search.verified.value).toBe(false); // Failure is not verified empty.
+
+      search.searchNow();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(search.verified.value).toBe(true);
+      search.cancelPending();
+      expect(search.verified.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
   it("waits for the pause before asking, then sends the trimmed term once", async () => {
     const fetchMock = vi.fn(async (_input: unknown, _init?: RequestInit) => jsonResponse(page([])));
     vi.stubGlobal("fetch", fetchMock);
@@ -303,13 +331,16 @@ describe("useTargetSearch", () => {
       await vi.advanceTimersByTimeAsync(SEARCH_DEBOUNCE_MS);
       await vi.advanceTimersByTimeAsync(0);
       expect(search.results.value).toHaveLength(1);
+      expect(search.verified.value).toBe(true);
       minRating.value = 4;
+      expect(search.verified.value).toBe(false);
       await nextTick();
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(search.results.value).toEqual([]);
       expect(search.total.value).toBe(0);
       filtered.resolve(jsonResponse(page([])));
       await vi.advanceTimersByTimeAsync(0);
+      expect(search.verified.value).toBe(true);
     } finally { scope.stop(); }
   });
 

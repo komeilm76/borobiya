@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Avoid false-empty recipient search feedback (T4.4.2 partial)
+
+- A review of the share dialog found that it displayed “no account found” before its debounced lookup even started, and still displayed that message alongside the search-failed/retry hint after an outage. Only a successful response for the current term and filters can now verify an empty result; edits, filters, retries, close and failures clear that verification immediately. Short-query guidance and error retry remain available. Pure reactive and source-pinned tests failed before the fix and pass after it; no component mount or browser verification is claimed.
+
 ### 2026-10-29 — History playback bug review (T4.4.1 follow-up)
 
 - Found two panel bugs: a pending history read retained its old track with `canPlay=true`, so Play/step/speed/scrub remained usable despite the “reading history” status and could start playback of a different range mid-request; and speed choices showed ASCII digits among Persian labels. The panel now hides quick play and disables transport/scrub during reads (including a single-fix track whose slider cannot move), while the numeric speed values are unchanged and their labels use Persian digits. Pure formatter and source-pinned regressions failed before the fix; no Vue component was mounted or browser/device interaction claimed.

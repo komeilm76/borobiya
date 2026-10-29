@@ -123,7 +123,7 @@
           <v-alert
             v-else-if="
               (hasTerm || incidentTypeChoice !== null || minRatingChoice !== null || onlineFilter === 'online') &&
-              !searching
+              !searchFailed && !searching && (termTooShort || searchVerified)
             "
             class="mt-2"
             type="info"
@@ -398,6 +398,7 @@ const {
   total: resultTotal,
   loading: searching,
   failed: searchFailed,
+  verified: searchVerified,
   hasResults,
   searchNow,
   cancelPending
