@@ -8,10 +8,10 @@
         <div class="mission-hero__glow" aria-hidden="true" />
       </header>
 
-      <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="xl" class="mt-6" role="status">
+      <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="lg" class="mt-6" role="status">
         مأموریت لغو شد. مرکز امداد برای جایگزینی امدادگر مطلع شده است.
       </v-alert>
-      <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="xl" class="mt-6" role="alert">
+      <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mt-6" role="alert">
         {{ desk.error.value }}
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
@@ -482,7 +482,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-desk__card h3 { font-size: clamp(1.35rem, 3vw, 1.85rem); margin: 9px 0 5px; }
 .mission-desk__card-header p { opacity: .65; font-size: .79rem; overflow-wrap: anywhere; }
 .mission-steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 34px 0; }
-.mission-steps__item { display: flex; align-items: center; gap: 9px; min-height: 60px; padding: 11px; border-radius: 13px; background: rgba(111,138,130,.09); color: rgb(var(--v-theme-on-surface)); opacity: .6; font-size: .81rem; font-weight: 700; }
+.mission-steps__item { display: flex; align-items: center; gap: 9px; min-height: 60px; padding: 11px; border-radius: var(--bb-radius-nested, 16px); background: rgba(111,138,130,.09); color: rgb(var(--v-theme-on-surface)); opacity: .6; font-size: .81rem; font-weight: 700; }
 .mission-steps__item--reached { background: rgba(34,145,116,.13); color: rgb(var(--v-theme-primary)); opacity: 1; }
 .mission-steps__number { display: inline-grid; flex-shrink: 0; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid currentColor; font-size: .8rem; }
 .mission-desk__foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid rgba(98,146,137,.2); padding-top: 18px; }

@@ -129,7 +129,7 @@ onBeforeUnmount(() => {
 .live-panel__heading p,.live-panel__note { font-size: .8rem; opacity: .75; line-height: 1.7; }
 .live-panel__eyebrow { font-size: .78rem; color: #16826c; font-weight: 750; }
 .live-panel__grid { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(230px,.9fr); gap: 18px; }
-.live-panel__map { min-height: 20rem; border-radius: 14px; overflow: hidden; }
+.live-panel__map { min-height: 20rem; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; }
 .live-panel__map :deep(.map-canvas) { height: 100%; min-height: 20rem; }
 .live-panel__members { display: grid; gap: 12px; align-content: start; }
 .live-panel__member { display: flex; align-items: center; gap: 9px; padding: 12px; border-radius: var(--bb-radius-nested, 16px); background: rgba(31,121,102,.06); }

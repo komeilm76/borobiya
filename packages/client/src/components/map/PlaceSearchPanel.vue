@@ -61,7 +61,7 @@ defineEmits<{ select: [place: GeocodeResult] }>();
 .place-search__results { margin-top: 0.5rem; max-height: min(17rem, 40dvh); overflow-y: auto; }
 .place-search__results p, .place-search__hint { margin: 0.5rem; font-size: 0.82rem; line-height: 1.5; }
 .place-search__results ul { margin: 0; padding: 0; list-style: none; }
-.place-search__result { display: block; width: 100%; border: 0; border-radius: 0.6rem; padding: 0.5rem; text-align: start; color: inherit; background: transparent; cursor: pointer; }
+.place-search__result { display: block; width: 100%; border: 0; border-radius: var(--bb-radius-nested, 16px); padding: 0.5rem; text-align: start; color: inherit; background: transparent; cursor: pointer; }
 .place-search__result:hover, .place-search__result:focus-visible { background: rgba(var(--v-theme-primary), 0.12); outline-offset: -2px; }
 .place-search__result strong, .place-search__result small { display: block; }
 .place-search__result small { opacity: 0.7; font-size: 0.75rem; overflow-wrap: anywhere; }

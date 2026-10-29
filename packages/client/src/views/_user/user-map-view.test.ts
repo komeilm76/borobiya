@@ -137,7 +137,7 @@ describe("UserMapView live overlay", () => {
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
     expect(view).toContain("ensureSession: () => auth.ensureSession()");
     expect(view).toContain("<LiveBroadcastBar compact />");
-    expect(dashboard).toContain("<LiveBroadcastBar />");
+    expect(dashboard).toContain("<LiveBroadcastBar inset />");
     expect(dashboard).not.toContain("نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند");
   });
 });

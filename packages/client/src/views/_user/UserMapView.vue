@@ -511,7 +511,7 @@ if (auth.accessToken) void playback.selectPreset(playback.presetDays.value);
     flex: 0 0 auto;
     height: clamp(20rem, 55dvh, 32rem);
     min-height: 20rem;
-    border-radius: 0.85rem;
+    border-radius: var(--bb-radius-nested, 16px);
   }
 
   .user-map-view__toolbar,

@@ -641,7 +641,7 @@ onBeforeUnmount(() => {
 
 .sos-sheet__map-wrap {
   height: 15.5rem;
-  border-radius: 0.9rem;
+  border-radius: var(--bb-radius-nested, 16px);
   overflow: hidden;
   border: 1px solid rgba(120, 140, 140, 0.25);
 }

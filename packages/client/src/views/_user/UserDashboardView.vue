@@ -63,7 +63,7 @@
         </div>
 
         <div class="user-dashboard__broadcast">
-          <LiveBroadcastBar />
+          <LiveBroadcastBar inset />
         </div>
       </v-card>
 
@@ -261,7 +261,7 @@ function onSharesChanged(): void {
   height: clamp(18rem, 38vw, 27rem);
   margin-inline: 1rem;
   overflow: hidden;
-  border-radius: 0.9rem;
+  border-radius: var(--bb-radius-nested, 16px);
   background: #e8efec;
 }
 

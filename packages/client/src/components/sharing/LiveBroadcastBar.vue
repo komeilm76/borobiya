@@ -1,7 +1,7 @@
 <template>
   <v-card
     class="broadcast-bar"
-    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact }]"
+    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset }]"
     elevation="2"
     rounded="xl"
   >
@@ -49,7 +49,7 @@ import { useBroadcastStore } from "@/stores/broadcast";
  * Pure renderer for the user's outgoing live-location broadcast (`T2.1.5`) and multi-device
  * priority state (`T2.3.6`). Every sentence and tone is derived in `@/live/broadcast-status`.
  */
-withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
+withDefaults(defineProps<{ compact?: boolean; inset?: boolean }>(), { compact: false, inset: false });
 
 const broadcast = useBroadcastStore();
 const state = computed(() => broadcast.view);
@@ -69,6 +69,11 @@ onMounted(() => {
 
 .broadcast-bar--compact {
   padding: 0.6rem 0.85rem;
+}
+
+/* The dashboard places this card inside another card; standalone bars keep xl corners. */
+.broadcast-bar--inset {
+  border-radius: var(--bb-radius-nested, 16px) !important;
 }
 
 .broadcast-bar__body {
