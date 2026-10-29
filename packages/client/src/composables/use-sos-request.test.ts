@@ -82,6 +82,48 @@ describe("useSosRequest composable", () => {
     expect(sos.incidentTypeId.value).toBe(INCIDENT_B);
   });
 
+  it("keeps a selected incident type only while it exists in the refreshed catalog", async () => {
+    vi.spyOn(sosApi, "listSosIncidentTypes")
+      .mockResolvedValueOnce([catalogRow(INCIDENT_A), catalogRow(INCIDENT_B)])
+      .mockResolvedValueOnce([catalogRow(INCIDENT_B), catalogRow(INCIDENT_A)])
+      .mockResolvedValueOnce([catalogRow(INCIDENT_A)])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([catalogRow(INCIDENT_B)]);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok") });
+    await sos.loadCatalog();
+    sos.incidentTypeId.value = INCIDENT_B;
+    sos.description.value = "An emergency needs an available incident category.";
+    sos.setManualLocation(35.7, 51.4);
+    expect(sos.canSubmit.value).toBe(true);
+
+    await sos.loadCatalog();
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_B); // Preserve an available explicit choice.
+    await sos.loadCatalog();
+    expect(sos.incidentTypeId.value).toBe(""); // Do not silently change the type of an emergency.
+    expect(sos.canSubmit.value).toBe(false);
+    sos.incidentTypeId.value = INCIDENT_A; // The requester explicitly picks the remaining type.
+    expect(sos.canSubmit.value).toBe(true);
+    await sos.loadCatalog();
+    expect(sos.incidentTypeId.value).toBe("");
+    expect(sos.canSubmit.value).toBe(false); // The empty-catalog message must match the draft.
+    await sos.loadCatalog();
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_B); // Recover when the catalog was empty.
+  });
+
+  it("refreshes a cached incident catalog when the SOS sheet opens again", async () => {
+    const read = vi.spyOn(sosApi, "listSosIncidentTypes")
+      .mockResolvedValueOnce([catalogRow(INCIDENT_A)])
+      .mockResolvedValueOnce([catalogRow(INCIDENT_B)]);
+    const sos = useSosRequest({ ownerId: ref("owner"), accessToken: ref("token-ok"), geolocation: () => null });
+    sos.prepareForOpen();
+    await vi.waitFor(() => expect(sos.loadingCatalog.value).toBe(false));
+    expect(sos.incidentTypeId.value).toBe(INCIDENT_A);
+    sos.prepareForOpen();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() => expect(sos.incidentTypes.value.map((type) => type.id)).toEqual([INCIDENT_B]));
+    expect(sos.incidentTypeId.value).toBe(""); // An obsolete choice needs explicit replacement.
+  });
+
   it("recovers from synchronous GPS setup failures and still accepts manual incident coordinates", () => {
     for (const geolocation of [
       () => { throw new Error("Geolocation policy blocked access"); },

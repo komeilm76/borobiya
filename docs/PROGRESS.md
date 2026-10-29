@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Refresh the SOS incident picker on reopen (T3.2.4 follow-up)
+
+- The SOS sheet reused a cached incident catalog indefinitely on reopen. Even after a successful manual reload removed the chosen incident type, the hidden old ID stayed in the draft and the enabled submit action could send it. Each open now rechecks the public catalog; a successful refresh keeps an available selection or clears a removed one so the requester explicitly chooses another type. An empty catalog leaves submission disabled, and first load still defaults to the first available type. Two pure composable regressions reproduced the stale selection and missing reopen refresh before the fix. Server-side type validation remains authoritative if a submit races the refresh; real browser/device acceptance remains unverified.
+
 ### 2026-10-29 — Navigation GPS cleanup on disposer failure and scope exit (T3.5.6 follow-up)
 
 - A native/test GPS disposer could throw during navigation `stop()`, leaving the last private fix visible and preventing the north-up camera reset and route teardown. The composable also relied on its current view to stop the watch before unmount, rather than cleaning up its own scope. Stop now fences callbacks and clears the fix before best-effort watch disposal, and scoped use automatically stops the watch; a throwing disposer no longer interrupts camera reset. Pure tests reproduced both failures before the edit and pass after it. A faulty bridge may still keep the underlying hardware watch alive if its disposer fails; live device GPS behavior remains unverified.

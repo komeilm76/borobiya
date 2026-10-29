@@ -106,10 +106,15 @@ export function useSosRequest(options: UseSosRequestOptions) {
     try {
       const types = await listSosIncidentTypes();
       if (version !== catalogVersion) return;
-      incidentTypes.value = types;
-      if (!incidentTypeId.value && types.length > 0) {
-        incidentTypeId.value = types[0]!.id;
+      // A previously selected type may have been removed while the sheet was closed.
+      // Do not silently switch the emergency to a different category: require a new
+      // choice instead. Only the initial/previously empty catalog gets a default.
+      if (incidentTypeId.value && !types.some((type) => type.id === incidentTypeId.value)) {
+        incidentTypeId.value = "";
+      } else if (!incidentTypeId.value && incidentTypes.value.length === 0) {
+        incidentTypeId.value = types[0]?.id ?? "";
       }
+      incidentTypes.value = types;
     } catch (error) {
       if (version !== catalogVersion) return;
       catalogError.value = sosApiErrorMessage(
@@ -375,7 +380,9 @@ export function useSosRequest(options: UseSosRequestOptions) {
   }
 
   function prepareForOpen(): void {
-    if (incidentTypes.value.length === 0 && !loadingCatalog.value) {
+    // The catalog is public but mutable. Recheck on each open instead of indefinitely
+    // trusting an earlier selection after an admin changes available incident types.
+    if (!loadingCatalog.value) {
       void loadCatalog();
     }
     if (!location.value && !locating.value) {
