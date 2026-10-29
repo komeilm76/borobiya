@@ -67,7 +67,6 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const clock = setInterval(() => {
     nowMs.value = Date.now();
   }, DEVICE_CLOCK_INTERVAL_MS);
-  onScopeDispose(() => clearInterval(clock));
 
   const currentDeviceId = computed(
     () => devices.value.find((device) => device.isCurrentDevice)?.deviceId ?? ownDeviceId(options.accessToken.value)
@@ -113,6 +112,13 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
     lastBulkSummary.value = null;
     status.value = null;
   }
+
+  onScopeDispose(() => {
+    clearInterval(clock);
+    // A disposed screen must not apply a late read or continue a multi-share write.
+    // The already-started request may commit; reopening the screen re-reads the server.
+    resetPrivateState();
+  });
 
   watch(options.accessToken, (token, previousToken) => {
     if (!token && previousToken) {

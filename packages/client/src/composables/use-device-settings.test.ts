@@ -620,14 +620,56 @@ describe("applying one device to everything", () => {
 });
 
 describe("leaving the screen", () => {
+  it("stops remaining bulk priority posts after the screen is disposed", async () => {
+    const { scope, api } = mount();
+    await api.refresh();
+    let release!: (response: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    let postsStarted = 0;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === "POST") { postsStarted++; return pendingPost; }
+      return originalFetch(input, init);
+    }) as typeof fetch;
+    const sweep = api.assignEverywhere(LAPTOP);
+    await settle();
+    expect(postsStarted).toBe(1);
+    scope.stop();
+    release(jsonResponse(defaultResponder("/_user/location/shares", "POST").body, 200));
+    await sweep;
+    expect(postsStarted).toBe(1); // The first POST may commit; do not send the next one.
+    expect(api.bulkRunning.value).toBe(false);
+    expect(api.liveShares.value).toEqual([]);
+    expect(api.lastBulkSummary.value).toBeNull();
+  });
+
+  it("ignores a late private read after the screen is disposed", async () => {
+    const { scope, api } = mount();
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => { release = resolve; });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).endsWith("/_user/devices") ? pending : originalFetch(input, init)
+    ) as typeof fetch;
+    const read = api.refresh();
+    await settle();
+    scope.stop();
+    release(jsonResponse([deviceRow(PHONE)], 200));
+    await read;
+    expect(api.devices.value).toEqual([]);
+    expect(api.loaded.value).toBe(false);
+    expect(api.loading.value).toBe(false);
+  });
+
   it("stops the clock with the scope", async () => {
     const { scope, api } = mount();
     await api.refresh();
     await settle();
     scope.stop();
-    const before = api.deviceRows.value[0]!.minutesSinceActive;
+    const before = api.nowMs.value;
     await vi.advanceTimersByTimeAsync(DEVICE_CLOCK_INTERVAL_MS * 5);
-    expect(api.deviceRows.value[0]!.minutesSinceActive).toBe(before);
+    expect(api.nowMs.value).toBe(before);
+    expect(api.deviceRows.value).toEqual([]);
   });
 
   it("preserves targetUsername on shareRows and assigns the current device without needing a row draft", async () => {

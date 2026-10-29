@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Stop disposed Active Devices work (T2.3.5 follow-up)
+
+- Leaving the settings screen used to stop only its age clock. A late device read could still refill private rows, and an in-progress bulk priority edit could send additional share changes after navigation away. Scope disposal now clears the rows and invalidates pending reads and writes; the first already-started POST may commit, so the next visit reads the server state anew. Two deferred-response regressions failed before the fix, and the existing age-clock test now checks cleared state. Live browser/multi-device acceptance remains open (P2-A1).
+
 ### 2026-10-29 — Bind requester cancellation to its original SOS (T3.6.2 follow-up)
 
 - A cancellation dialog could remain open while its `requestId` changed; its Confirm handler then read the *new* ID and could cancel an SOS the requester had not confirmed. Dismissed dialogs also retained a callable confirmation path, and disposal did not invalidate a pending cancellation. The dialog now binds its choice to the opening request and account/JWT session, revokes the prompt synchronously on request/session changes (even an A→B→A same-tick transition), disables confirmation after dismissal, and clears pending state on scope disposal. Same-session bearer renewal stays valid. Focused regressions reproduced changed-ID, dismissed-confirm and unmount failures before the fix; no real-browser or server-concurrency acceptance is claimed.
