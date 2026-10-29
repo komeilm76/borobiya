@@ -49,7 +49,7 @@ describe("broadcast start consent across the priority-device read", () => {
 
   it("does not transfer account A's tap to B when the priority read settles late", async () => {
     let finish!: () => void;
-    refresh.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
     const auth = useAuthStore();
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
@@ -65,7 +65,7 @@ describe("broadcast start consent across the priority-device read", () => {
 
   it("does not reuse a tap after logout and login as the same user with a new session", async () => {
     let finish!: () => void;
-    refresh.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
     const auth = useAuthStore();
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
@@ -80,15 +80,65 @@ describe("broadcast start consent across the priority-device read", () => {
     expect(start).not.toHaveBeenCalled();
   });
 
+  it("shows Stop during the priority read and lets a second tap cancel GPS start", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const auth = useAuthStore();
+    auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt(A, session);
+    const broadcast = useBroadcastStore();
+    const starting = broadcast.toggle();
+    expect(broadcast.view.isActive).toBe(true);
+    expect(broadcast.view.actionLabel).toContain("توقف");
+    await broadcast.toggle();
+    expect(broadcast.view.isActive).toBe(false);
+    finish();
+    await starting;
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("cancels an outstanding priority read when Stop is called directly", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const auth = useAuthStore();
+    auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = jwt(A, session);
+    const broadcast = useBroadcastStore();
+    const starting = broadcast.toggle();
+    broadcast.stop();
+    finish();
+    await starting;
+    expect(start).not.toHaveBeenCalled();
+  });
+
+  it("revokes a pending Start on a same-tick logout and login before the read settles", async () => {
+    let finish!: () => void;
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const auth = useAuthStore();
+    const bearer = jwt(A, session);
+    auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = bearer;
+    const broadcast = useBroadcastStore();
+    const starting = broadcast.toggle();
+    auth.accessToken = null;
+    auth.accessToken = bearer;
+    finish();
+    await starting;
+    expect(start).not.toHaveBeenCalled();
+  });
+
   it("still starts after normal token rotation within the same session", async () => {
     let finish!: () => void;
-    refresh.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
     const auth = useAuthStore();
     auth.user = { id: A, username: "a", role: "user", mustCompleteSecurityQuestions: false };
     auth.accessToken = jwt(A, session);
     const broadcast = useBroadcastStore();
     const starting = broadcast.toggle();
     auth.accessToken = jwt(A, session, 1);
+    // Renewal must not replace the very read this Start tap is waiting on.
+    expect(refresh).toHaveBeenCalledOnce();
     finish();
     await starting;
     expect(start).toHaveBeenCalledOnce();

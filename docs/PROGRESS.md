@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Make pending broadcast Start cancellable (T2.1.5 follow-up)
+
+- The broadcast bar stayed in Start state while a priority-device read was pending; tapping again began a second read instead of cancelling, and direct Stop left the first Start free to wake GPS later. A same-tick logout/login with the same bearer could also preserve the pending intent. The app-scoped store now exposes a connecting/Stop state before the read, invalidates the attempt on Stop or synchronous account/session loss, and keeps a same-session token renewal from superseding the awaited read. Focused Pinia regressions reproduced these failures before the fix; no mounted `.vue` or real GPS/browser acceptance is claimed (P2-A1).
+
 ### 2026-10-29 — Revoke live GPS consent on a new JWT login (T2.1.5 follow-up)
 
 - The outgoing live broadcaster compared a replacement bearer to the account, not its JWT session. A new login to the same account could therefore keep the previous session's GPS watcher and socket room broadcasting without a new Start tap; even after Stop, the old session's reusable socket could remain connected. The broadcaster now binds active consent to the login session, pauses GPS and closes the socket synchronously on replacement, fences late socket opens, and preserves consent for a same-session token renewal. Tests reproduced active streaming and the retained stopped socket before the fix; A→B→A, in-flight opening, and same-session renewal are also covered. Real GPS/socket and two-browser acceptance remain unverified (P2-A1).
