@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Make rescuer cancellation conflicts recoverable (T3.6.3 follow-up)
+
+- Reviewing the new progress/cancellation interaction exposed a stuck 409 path: the cancellation dialog told the rescuer to refresh the mission, but its modal hid the list refresh button, and a successful read did not clear the disabled Confirm latch. Reopening the dialog instead bypassed the latch without reading the server. Added an in-dialog refresh and guarded conflict recovery against failed, pre-write and overlapping reads. Only a successful post-write read permits retry for the original active mission; a replacement still needs a new confirmation. Deferred unit regressions failed before the fix, and the Vue wiring is source-pinned without mounting an SFC. Browser/VM multi-user behavior is unverified.
+
 ### 2026-10-29 — Restore rescuer mission status progression (T3.5.2 follow-up)
 
 - Investigated the reported accepted-mission blocker: the ordered rescuer-only PATCH route and transactionally persisted status history existed, but the mission desk had no advance control. Added a manual next-step button from accepted → on the way → arrived → in progress → completed; the persisted response drives the label and completion confirmation. While saving, duplicate progression/cancellation is disabled. A stale list/old login acknowledgement cannot overwrite a committed step; a failed or ambiguous write (including 409) requires a successful server refresh before advancing again. Admin-role accounts cannot use the rescuer route even if their ID matches an assignment. Regression tests cover the API, desk lifecycle, view wiring and Fastify route; rendered two-user/browser and VM acceptance remain open.

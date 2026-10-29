@@ -330,6 +330,7 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
    - Other → (requires custom text, **needs admin approval** if “other”)
 3. Read the warning and **confirm** → your mission stops, you become eligible for another offer, and the server sends an urgent event to the admin room. The dispatcher sees an urgent admin-only alert; this does **not** re-dispatch by itself.
    - Do this rarely: max 3 requests/hour; the third cancellation in a UTC day is flagged for review. “Other” additionally needs admin approval of the reason.
+   - If the server reports a status conflict, Confirm stays disabled. Use **تازه‌سازی وضعیت** inside the dialog; only a successful read of the still-active mission permits another attempt. If the mission changed, close the dialog and review the new mission before confirming anything.
 
 [Screenshot: Cancel with reason picker — requester vs rescuer]
 

@@ -27,8 +27,9 @@ function bearer(sub: string, sessionId: string, nonce = 0): string {
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => { resolve = r; });
-  return { promise, resolve };
+  let reject!: (cause: unknown) => void;
+  const promise = new Promise<T>((r, j) => { resolve = r; reject = j; });
+  return { promise, resolve, reject };
 }
 beforeEach(() => {
   vi.resetAllMocks();
@@ -99,6 +100,72 @@ describe("mission desk cancellation", () => {
     expect(desk.activeMission.value?.status).toBe("on_the_way");
     expect(desk.canCancel.value).toBe(false);
     expect(desk.cancellationError.value).toContain("هیچ لغوی ثبت نشد");
+  });
+
+  it("unblocks a conflicted cancellation only after a successful same-mission refresh", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    vi.mocked(cancelRescuerMission).mockRejectedValueOnce(new ApiError(409, "MISSION_NOT_ACTIVE", "Changed"));
+    await desk.confirmCancellation();
+    expect(desk.canCancel.value).toBe(false);
+    vi.mocked(listRescuerMissions).mockRejectedValueOnce(new TypeError("offline"));
+    await desk.load();
+    expect(desk.canCancel.value).toBe(false);
+    expect(desk.cancellationError.value).toContain("تازه");
+    await desk.load(); // server confirms the same mission remains active
+    expect(desk.activeMission.value?.id).toBe(missionId);
+    expect(desk.cancellationError.value).toBeNull();
+    expect(desk.canCancel.value).toBe(true);
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).toHaveBeenCalledTimes(2);
+    expect(desk.cancelledMissionId.value).toBe(missionId);
+  });
+
+  it("offers refresh inside a conflicted modal and does not bypass verification by reopening it", async () => {
+    const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
+    expect(view).toContain('desk.cancellationNeedsRefresh.value');
+    expect(view).toMatch(/desk\.cancellationNeedsRefresh\.value[\s\S]*?@click="desk\.load\(\)"/);
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    vi.mocked(cancelRescuerMission).mockRejectedValueOnce(new ApiError(409, "MISSION_NOT_ACTIVE", "Changed"));
+    await desk.confirmCancellation();
+    desk.dismissCancellation();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    expect(desk.cancellationNeedsRefresh.value).toBe(true);
+    expect(desk.canCancel.value).toBe(false);
+    await desk.load();
+    expect(desk.cancellationNeedsRefresh.value).toBe(false);
+    expect(desk.canCancel.value).toBe(true);
+  });
+
+  it("does not treat a list started before or during cancellation as post-conflict verification", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    const before = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(before.promise);
+    const earlyRead = desk.load();
+    const write = deferred<void>();
+    vi.mocked(cancelRescuerMission).mockReturnValueOnce(write.promise);
+    const saving = desk.confirmCancellation();
+    const during = deferred<{ items: Mission[]; total: number; totalPages: number }>();
+    vi.mocked(listRescuerMissions).mockReturnValueOnce(during.promise);
+    const overlappingRead = desk.load();
+    write.reject(new ApiError(409, "MISSION_NOT_ACTIVE", "Changed"));
+    await saving;
+    before.resolve({ items: [mission], total: 1, totalPages: 1 });
+    during.resolve({ items: [mission], total: 1, totalPages: 1 });
+    await Promise.all([earlyRead, overlappingRead]);
+    expect(desk.canCancel.value).toBe(false);
+    expect(desk.cancellationError.value).toContain("تازه");
+    await desk.load();
+    expect(desk.canCancel.value).toBe(true);
   });
 
   it("does not offer stale rescuer reasons or hide Retry after a reopened picker fails", async () => {

@@ -219,6 +219,11 @@
           <v-alert v-if="desk.cancellationError.value && !desk.missionChanged.value" type="error" variant="tonal" role="alert" class="mb-4">
             {{ desk.cancellationError.value }}
           </v-alert>
+          <v-alert v-if="desk.cancellationNeedsRefresh.value && !desk.missionChanged.value" type="warning" variant="tonal" role="alert" class="mb-4">
+            پیش از ثبت دوبارهٔ لغو، وضعیت مأموریت را از سرور بررسی کنید.
+            <span v-if="desk.error.value">{{ desk.error.value }}</span>
+            <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
+          </v-alert>
           <v-btn v-if="desk.cancellationError.value && !desk.reasons.value.length && !desk.missionChanged.value" variant="tonal" color="primary"
             :disabled="desk.reasonLoading.value" @click="desk.showCancellation()">دریافت دوبارهٔ دلایل</v-btn>
           <v-radio-group v-if="desk.reasons.value.length && !desk.missionChanged.value" v-model="desk.reasonId.value" label="دلیل ناتوانی در ادامه"

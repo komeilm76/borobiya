@@ -32,6 +32,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   const reasonId = ref("");
   const customReason = ref("");
   const blocked = ref(false);
+  const cancellationNeedsRefresh = computed(() => blocked.value);
   // List reads, reason reads and panel sessions have different lifetimes. Opening a
   // dialog must not invalidate a list read without clearing its loading indicator.
   let listGeneration = 0;
@@ -65,6 +66,8 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
 
   async function load(): Promise<void> {
     if (progressing.value) return; // Never read an uncommitted step and overwrite its acknowledgement.
+    // A read made while cancellation is pending cannot verify a later 409 conflict.
+    const verifiesCancellation = !cancelling.value;
     const current = ++listGeneration;
     const owner = userId.value;
     if (!owner || !sessionKey.value) {
@@ -87,6 +90,10 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
         }
         progressBlocked.value = false;
         progressError.value = null;
+        if (blocked.value && verifiesCancellation) {
+          blocked.value = false;
+          cancellationError.value = null;
+        }
         // A verified new active mission supersedes the prior cancellation banner.
         // Do not imply the new mission was cancelled, or clear it on a failed read.
         if (cancelledMissionId.value && page.items.some((item) => isActiveMission(item.status) && item.id !== cancelledMissionId.value)) {
@@ -147,7 +154,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     customReason.value = "";
     reasons.value = []; // A failed reload must expose Retry, not selectable cached reasons.
     cancellationError.value = null;
-    blocked.value = false;
+    // Reopening the picker must not bypass a conflict that needs a server read.
     reasonLoading.value = true;
     try {
       const result = await listRescuerCancellationReasons(bearer);
@@ -177,6 +184,9 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     const bearer = token.value!;
     const owner = userId.value;
     const session = sessionGeneration;
+    // A list started before this cancellation is not a post-conflict verification.
+    ++listGeneration;
+    loading.value = false;
     cancelling.value = true;
     cancellationError.value = null;
     try {
@@ -231,6 +241,6 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   }
 
   return { missions, activeMission, nextStatus, canAdvance, progressing, progressError, advanceStatus, loading, error, cancellationOpen, reasonLoading, cancelling,
-    cancellationError, cancelledMissionId, completedMissionId, missionChanged, reasons, reasonId, customReason, selectedReason,
+    cancellationError, cancellationNeedsRefresh, cancelledMissionId, completedMissionId, missionChanged, reasons, reasonId, customReason, selectedReason,
     canCancel, load, showCancellation, dismissCancellation, confirmCancellation, reset };
 }
