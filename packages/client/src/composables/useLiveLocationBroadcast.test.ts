@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { RealtimeClient } from "@/services/socket";
 import { useLiveLocationBroadcast } from "./useLiveLocationBroadcast";
 
-function makeJwt(deviceId: string, expSeconds = 9999999999, owner = "user-1"): string {
+function makeJwt(deviceId: string, expSeconds = 9999999999, owner = "user-1", sessionId?: string): string {
   const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(
-    JSON.stringify({ sub: owner, deviceId, role: "user", exp: expSeconds })
+    JSON.stringify({ sub: owner, deviceId, role: "user", exp: expSeconds, ...(sessionId ? { sessionId } : {}) })
   ).toString("base64url");
   return `${header}.${payload}.sig`;
 }
@@ -275,9 +275,77 @@ describe("useLiveLocationBroadcast", () => {
     } finally { scope.stop(); }
   });
 
-  it("keeps explicit GPS consent through a same-owner access-token renewal", async () => {
+  it("stops GPS and closes the old room when the same account switches JWT sessions", async () => {
     const ownerId = ref<string | null>("user-1");
-    const token = ref<string | null>(makeJwt("device-alpha"));
+    const token = ref<string | null>(makeJwt("device-alpha", 9999999999, "user-1", "session-a"));
+    const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords, isSupported: ref(true), pause }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      expect(api.status.value).toBe("broadcasting");
+      const sentBefore = transport.emitted.length;
+      // Re-login on the same physical device still needs a fresh Start tap.
+      token.value = makeJwt("device-alpha", 9999999999, "user-1", "session-b");
+      expect(api.status.value).not.toBe("broadcasting");
+      expect(pause).toHaveBeenCalled();
+      expect(transport.closeCalls).toBe(1);
+      coords.value = { latitude: 35.8, longitude: 51.5, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(sentBefore);
+    } finally { scope.stop(); }
+  });
+
+  it("closes a stopped session's retained socket when the same account logs in again", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha", 9999999999, "user-1", "session-a"));
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), pause: vi.fn() }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      api.stop();
+      expect(transport.closeCalls).toBe(0); // Manual stop retains the reusable transport.
+      token.value = makeJwt("device-beta", 9999999999, "user-1", "session-b");
+      expect(transport.closeCalls).toBe(1);
+      expect(api.status.value).toBe("idle");
+    } finally { scope.stop(); }
+  });
+
+  it("closes an old session's socket if it finishes opening after the session changes", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha", 9999999999, "user-1", "session-a"));
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    let finishOpen!: (value: RealtimeClient) => void;
+    const opening = new Promise<RealtimeClient>((resolve) => { finishOpen = resolve; });
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket: () => opening
+    }))!;
+    try {
+      const starting = api.start();
+      await flush();
+      token.value = makeJwt("device-beta", 9999999999, "user-1", "session-b");
+      finishOpen(transport.client);
+      await starting;
+      expect(pause).toHaveBeenCalled();
+      expect(transport.closeCalls).toBe(1);
+      expect(api.status.value).toBe("idle");
+    } finally { finishOpen(transport.client); scope.stop(); }
+  });
+
+  it("does not revive old GPS consent after an A to B to A session change in one tick", async () => {
+    const ownerId = ref<string | null>("user-1");
+    const first = makeJwt("device-alpha", 9999999999, "user-1", "session-a");
+    const token = ref<string | null>(first);
     const pause = vi.fn();
     const transport = makeFakeSocket();
     const scope = effectScope();
@@ -287,7 +355,27 @@ describe("useLiveLocationBroadcast", () => {
     }))!;
     try {
       await api.start();
-      token.value = makeJwt("device-alpha", 9999999998);
+      token.value = makeJwt("device-beta", 9999999999, "user-1", "session-b");
+      token.value = first;
+      expect(api.status.value).not.toBe("broadcasting");
+      expect(pause).toHaveBeenCalled();
+      expect(transport.closeCalls).toBe(1);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps explicit GPS consent through a same-owner access-token renewal", async () => {
+    const ownerId = ref<string | null>("user-1");
+    const token = ref<string | null>(makeJwt("device-alpha", 9999999999, "user-1", "session-a"));
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId,
+      geolocation: { coords: ref(null), isSupported: ref(true), pause }, openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      token.value = makeJwt("device-alpha", 9999999998, "user-1", "session-a");
       expect(api.status.value).toBe("broadcasting");
       expect(transport.closeCalls).toBe(0);
       expect(pause).not.toHaveBeenCalled();

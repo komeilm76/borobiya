@@ -80,6 +80,9 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   // An ack may arrive after Stop, logout or a new broadcast attempt with the same socket.
   let broadcastAttempt = 0;
   let refreshingAuth = false;
+  // Consent belongs to one JWT login, not merely to an account: a new session for
+  // the same user must not inherit the old session's GPS watcher and socket room.
+  let consentSession: string | null = null;
 
   function requireToken(): string | null {
     return accessToken.value;
@@ -89,6 +92,13 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     // Only suppress broadcasting on inconsistent local state. The server still
     // verifies the JWT, session, device priority, and each share's permissions.
     return !!token && !!owner && decodeAccessTokenClaims(token)?.sub === owner;
+  }
+
+  function loginKey(token: string | null, owner: string | null): string | null {
+    if (!belongsToOwner(token, owner)) return null;
+    const claims = decodeAccessTokenClaims(token);
+    // Production tokens have a sessionId; older/test JWTs retain the account-only boundary.
+    return JSON.stringify([owner, typeof claims?.sessionId === "string" ? claims.sessionId : null]);
   }
 
   function clearTicker(): void {
@@ -271,6 +281,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       lastErrorCode.value = "UNAUTHORIZED";
       return;
     }
+    consentSession = loginKey(token, owner);
 
     hasLiveFix = geolocation.coords.value !== null && Number.isFinite(geolocation.coords.value.latitude);
     if (hasLiveFix && sampledAt.value === null) sampledAt.value = clock();
@@ -310,6 +321,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   function stop(): void {
     broadcastAttempt++;
     generation++; // a socket opened for a cancelled start must not attach later
+    consentSession = null;
     clearTicker();
     hasLiveFix = false;
     geolocation.pause?.();
@@ -336,8 +348,13 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     // Consent and GPS coordinates from the previous owner must not follow it.
     clearSessionBroadcast();
   }, { flush: "sync" });
-  watch(accessToken, (token) => {
-    if (!belongsToOwner(token, options.ownerId.value)) {
+  watch(accessToken, (token, previousToken) => {
+    const key = loginKey(token, options.ownerId.value);
+    const previousKey = loginKey(previousToken, options.ownerId.value);
+    if (!key || (previousKey !== null && key !== previousKey) ||
+      (consentSession !== null && key !== consentSession)) {
+      // Flush synchronously: A→B→A in one tick still revokes A's prior consent.
+      // A stopped broadcaster may still own a connected, reusable socket: close it too.
       clearSessionBroadcast();
       return;
     }

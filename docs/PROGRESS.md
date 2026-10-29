@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Revoke live GPS consent on a new JWT login (T2.1.5 follow-up)
+
+- The outgoing live broadcaster compared a replacement bearer to the account, not its JWT session. A new login to the same account could therefore keep the previous session's GPS watcher and socket room broadcasting without a new Start tap; even after Stop, the old session's reusable socket could remain connected. The broadcaster now binds active consent to the login session, pauses GPS and closes the socket synchronously on replacement, fences late socket opens, and preserves consent for a same-session token renewal. Tests reproduced active streaming and the retained stopped socket before the fix; A→B→A, in-flight opening, and same-session renewal are also covered. Real GPS/socket and two-browser acceptance remain unverified (P2-A1).
+
 ### 2026-10-29 — Bind Active Devices to its JWT login (T2.3.5 follow-up)
 
 - A direct JWT replacement under the same account could retain the previous login's `isCurrentDevice` row and target a stale device for “apply this device to all”; pending reads and bulk posts also survived the change. The screen now fences work by account + JWT session, clears the prior snapshot synchronously and reads again when the new session matches the account. It refuses private reads while the token subject and displayed profile disagree, but preserves rows on same-session bearer renewal and supports cold session recovery. Focused regressions reproduced stale rows and continuing bulk posts before the fix; tests also cover late reads and writes, JWT renewal, subject mismatch and cold recovery. Source-level tests do not establish browser or multi-device acceptance (P2-A1).
