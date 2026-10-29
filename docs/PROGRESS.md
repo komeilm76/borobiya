@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Diff mission live markers instead of rebuilding every clock tick (T4.4.4 partial)
+
+- The three-role mission map previously reacted to every one-second age-clock tick by removing/recreating all MapLibre DOM markers, even with no new fix. A pure, lazy-import-safe planner now distinguishes no-op, coordinate move, freshness/scale replacement and removal per role. The panel watches stable location/freshness sources and clears private markers synchronously when the composable discards a mission/account. Map replacement and unmount also clear snapshots; moving fixes reuse marker nodes while stale transitions retain their scale and accessible label changes. Pure reactive and source-pinned tests failed before the fix, then passed without mounting Vue. No browser/device FPS, <2s paint or <500ms GPS target is claimed.
+
 ### 2026-10-29 — Keep live-broadcast actions reachable in narrow hosts (T4.4.1 partial)
 
 - The outgoing location bar’s fixed 12rem status minimum and non-wrapping Devices/Start/Stop/Retry actions could overflow a compact map panel, dashboard inset or highly zoomed viewport. It now uses a host-width container query to place the status beside its indicator and stack two full-width, wrapping, 44px-minimum actions when the card is narrow. No broadcast, device-priority, disabled or consent logic changed. Source-pinned regression failed before implementation; rendered 200% zoom, phone/desktop-nested width and keyboard acceptance remain open.

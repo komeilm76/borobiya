@@ -67,6 +67,7 @@ import type { Map as MapLibreMap, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
 import { missionLiveCamera } from "@/mission/live-camera";
+import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/live-marker-sync";
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
 import { useMissionPresence } from "@/composables/use-mission-presence";
 import { missionPresenceLabel } from "@/mission/presence";
@@ -90,17 +91,38 @@ const map = shallowRef<MapLibreMap | null>(null);
 let markerConstructor: typeof Marker | null = null;
 const hasMarkers = computed(() => Object.values(live.locations.value).some(Boolean));
 const presentRoles = computed(() => Object.keys(live.locations.value).sort().join(","));
-const markers: Partial<Record<"requester" | "rescuer" | "admin", Marker>> = {};
-function syncMarkers() {
-  for (const member of live.participantStatus.value) {
-    markers[member.role]?.remove();
-    delete markers[member.role];
-    if (!map.value || !markerConstructor || !member.entry) continue;
-    const marker = new markerConstructor({ color: member.role === "rescuer" ? "#16826c" : member.role === "admin" ? "#5555ae" : "#dc593b", scale: member.fresh ? 1 : 0.8 })
-      .setLngLat([member.entry.lon, member.entry.lat]).addTo(map.value);
-    marker.getElement().setAttribute("aria-label", `${member.role === "rescuer" ? "امدادگر" : member.role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${member.fresh ? "موقعیت تازه" : "موقعیت قدیمی"}`);
-    marker.getElement().style.opacity = member.fresh ? "1" : "0.55";
-    markers[member.role] = marker;
+type Role = "requester" | "rescuer" | "admin";
+const markers: Partial<Record<Role, Marker>> = {};
+const paintedMarkers: Partial<Record<Role, MissionMarkerSnapshot>> = {};
+function clearMarkers(): void {
+  for (const role of ["requester", "rescuer", "admin"] as const) {
+    markers[role]?.remove();
+    delete markers[role];
+    delete paintedMarkers[role];
+  }
+}
+function syncMarkers(): void {
+  const instance = map.value;
+  const MarkerClass = markerConstructor;
+  if (!instance || !MarkerClass) return;
+  for (const op of planMissionMarkerSync(paintedMarkers, live.participantStatus.value)) {
+    const { role } = op;
+    if (op.kind === "move") {
+      markers[role]?.setLngLat([op.next.lon, op.next.lat]);
+      paintedMarkers[role] = op.next;
+      continue;
+    }
+    markers[role]?.remove();
+    delete markers[role];
+    delete paintedMarkers[role];
+    if (op.kind === "remove") continue;
+    // A freshness transition changes both marker scale and accessible label.
+    const marker = new MarkerClass({ color: role === "rescuer" ? "#16826c" : role === "admin" ? "#5555ae" : "#dc593b",
+      scale: op.next.fresh ? 1 : 0.8 }).setLngLat([op.next.lon, op.next.lat]).addTo(instance);
+    marker.getElement().setAttribute("aria-label", `${role === "rescuer" ? "امدادگر" : role === "admin" ? "مدیر مرکز" : "درخواست‌کننده"}، ${op.next.fresh ? "موقعیت تازه" : "موقعیت قدیمی"}`);
+    marker.getElement().style.opacity = op.next.fresh ? "1" : "0.55";
+    markers[role] = marker;
+    paintedMarkers[role] = op.next;
   }
 }
 function focusMembers() {
@@ -111,15 +133,20 @@ function focusMembers() {
   else map.value.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 350 });
 }
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker) {
+  if (map.value !== instance) clearMarkers();
   markerConstructor = MarkerClass;
   map.value = instance;
   syncMarkers();
   focusMembers();
 }
 watch(presentRoles, (next, previous) => { if (next !== previous) focusMembers(); });
-watch(() => [live.locations.value, ...live.participantStatus.value.map((member) => member.fresh)], syncMarkers);
+// The age clock ticks every second; a new array literal would rebuild three DOM-backed
+// markers per tick even when no fix or stale state changed. Sync-flush clears private
+// markers on the same call stack as a mission/account/logout boundary.
+watch([() => live.locations.value, () => live.participantStatus.value.map((member) => member.fresh).join(",")],
+  syncMarkers, { flush: "sync" });
 onBeforeUnmount(() => {
-  for (const marker of Object.values(markers)) marker?.remove();
+  clearMarkers();
   map.value = null;
   markerConstructor = null;
 });

@@ -29,8 +29,9 @@ describe("three-role mission live UI (T3.5.7)", () => {
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(panel).toContain('function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker)');
     expect(panel).toContain('markerConstructor = MarkerClass');
-    expect(panel).toContain('new markerConstructor(');
-    expect(panel).toContain('markers[member.role]?.remove()');
+    expect(panel).toContain('new MarkerClass(');
+    expect(panel).toContain('markers[role]?.remove()');
+    expect(panel).toContain('markers[role]?.setLngLat([op.next.lon, op.next.lat])');
     expect(panel).toContain('markerConstructor = null');
   });
 
