@@ -290,39 +290,45 @@ describe("duration wording", () => {
   // Units are injected, so these assertions read as rules rather than as Persian text.
   const en: DurationUnits = { minute: "min", hour: "h", day: "d", week: "wk", separator: " " };
 
+  it("uses Persian digits for default duration labels and ASCII for English units", () => {
+    expect(formatDuration(2255)).toBe("۱ روز و ۱۳ ساعت و ۳۵ دقیقه");
+    expect(formatDuration(0)).toBe("۰ دقیقه");
+    expect(formatDuration(2255, en)).toBe("1 d 13 h 35 min");
+  });
+
   it("says minutes only below an hour", () => {
-    expect(formatDuration(1)).toBe("1 دقیقه");
-    expect(formatDuration(15)).toBe("15 دقیقه");
-    expect(formatDuration(59)).toBe("59 دقیقه");
+    expect(formatDuration(1)).toBe("۱ دقیقه");
+    expect(formatDuration(15)).toBe("۱۵ دقیقه");
+    expect(formatDuration(59)).toBe("۵۹ دقیقه");
   });
 
   it("switches to hours at an hour and keeps only a real remainder", () => {
-    expect(formatDuration(60)).toBe("1 ساعت");
-    expect(formatDuration(360)).toBe("6 ساعت");
-    expect(formatDuration(390)).toBe("6 ساعت و 30 دقیقه");
-    expect(formatDuration(12 * 60)).toBe("12 ساعت");
+    expect(formatDuration(60)).toBe("۱ ساعت");
+    expect(formatDuration(360)).toBe("۶ ساعت");
+    expect(formatDuration(390)).toBe("۶ ساعت و ۳۰ دقیقه");
+    expect(formatDuration(12 * 60)).toBe("۱۲ ساعت");
   });
 
   it("switches to days at a day and names the leftover hours and minutes", () => {
-    expect(formatDuration(1440)).toBe("1 روز");
-    expect(formatDuration(3 * 1440)).toBe("3 روز");
-    expect(formatDuration(1505)).toBe("1 روز و 1 ساعت و 5 دقیقه");
-    expect(formatDuration(1445)).toBe("1 روز و 5 دقیقه");
-    expect(formatDuration(MAX_LOCATION_SHARE_MINUTES)).toBe("30 روز");
+    expect(formatDuration(1440)).toBe("۱ روز");
+    expect(formatDuration(3 * 1440)).toBe("۳ روز");
+    expect(formatDuration(1505)).toBe("۱ روز و ۱ ساعت و ۵ دقیقه");
+    expect(formatDuration(1445)).toBe("۱ روز و ۵ دقیقه");
+    expect(formatDuration(MAX_LOCATION_SHARE_MINUTES)).toBe("۳۰ روز");
   });
 
   it("prefers weeks for whole weeks", () => {
-    expect(formatDuration(7 * 1440)).toBe("1 هفته");
-    expect(formatDuration(14 * 1440)).toBe("2 هفته");
-    expect(formatDuration(10081)).toBe("7 روز و 1 دقیقه");
+    expect(formatDuration(7 * 1440)).toBe("۱ هفته");
+    expect(formatDuration(14 * 1440)).toBe("۲ هفته");
+    expect(formatDuration(10081)).toBe("۷ روز و ۱ دقیقه");
   });
 
   it("clamps nonsense instead of printing it", () => {
-    expect(formatDuration(0)).toBe("0 دقیقه");
-    expect(formatDuration(-10)).toBe("0 دقیقه");
-    expect(formatDuration(Number.NaN)).toBe("0 دقیقه");
-    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("0 دقیقه");
-    expect(formatDuration(90.7)).toBe("1 ساعت و 30 دقیقه");
+    expect(formatDuration(0)).toBe("۰ دقیقه");
+    expect(formatDuration(-10)).toBe("۰ دقیقه");
+    expect(formatDuration(Number.NaN)).toBe("۰ دقیقه");
+    expect(formatDuration(Number.POSITIVE_INFINITY)).toBe("۰ دقیقه");
+    expect(formatDuration(90.7)).toBe("۱ ساعت و ۳۰ دقیقه");
     expect(splitDuration(Number.NaN)).toEqual({ days: 0, hours: 0, minutes: 0 });
   });
 
@@ -330,6 +336,7 @@ describe("duration wording", () => {
     expect(formatDuration(1440, en)).toBe("1 d");
     expect(formatDuration(390, en)).toBe("6 h 30 min");
     expect(formatDuration(10080, en)).toBe("1 wk");
+    expect(formatDuration(390, { ...en, numberLocale: "fa-IR" })).toBe("۶ h ۳۰ min");
   });
 
   it("labels every preset chip by the rule rather than as a raw minute count", () => {
@@ -344,10 +351,10 @@ describe("duration wording", () => {
       const label = formatDuration(minutes);
       if (minutes < MINUTES_PER_HOUR) {
         // Below an hour a minute count is the clearest wording there is.
-        expect(label).toBe(`${minutes} دقیقه`);
+        expect(label).toBe(`${minutes.toLocaleString("fa-IR")} دقیقه`);
         continue;
       }
-      expect(label).not.toBe(`${minutes} دقیقه`);
+      expect(label).not.toBe(`${minutes.toLocaleString("fa-IR")} دقیقه`);
       expect(label).toMatch(/ساعت|روز|هفته/);
     }
   });

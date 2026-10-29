@@ -335,25 +335,28 @@ export interface DurationUnits {
   week: string;
   /** Joiner between parts, e.g. "6 hours **and** 30 minutes". */
   separator: string;
+  /** Optional numeral locale for counts; omitted keeps ASCII digits for custom units. */
+  numberLocale?: string;
 }
 
-/** The UI renders Persian, so the default labels are Persian. */
+/** The UI renders Persian words and digits by default. */
 export const PERSIAN_DURATION_UNITS: DurationUnits = {
   minute: "دقیقه",
   hour: "ساعت",
   day: "روز",
   week: "هفته",
-  separator: " و "
+  separator: " و ",
+  numberLocale: "fa-IR"
 };
 
 /**
  * Turns a minute count into the words a person can compare at a glance.
  *
  * The rules the interface is held to (and every one of them is tested):
- * - under an hour: minutes only — `15` → "15 دقیقه";
- * - an hour or more: hours, plus minutes when there is a remainder — `390` → "6 ساعت و 30 دقیقه",
- *   and `360` → "6 ساعت" rather than "360 دقیقه";
- * - a day or more: days with the leftover hours and minutes — `1505` → "1 روز و 1 ساعت و 5 دقیقه";
+ * - under an hour: minutes only — `15` → "۱۵ دقیقه";
+ * - an hour or more: hours, plus minutes when there is a remainder — `390` → "۶ ساعت و ۳۰ دقیقه",
+ *   and `360` → "۶ ساعت" rather than "۳۶۰ دقیقه";
+ * - a day or more: days with the leftover hours and minutes — `1505` → "۱ روز و ۱ ساعت و ۵ دقیقه";
  * - an exact number of whole weeks: weeks, because `10080` is a week long before it is 7 days long.
  *
  * Zero parts are dropped ("1 day and 0 hours" is noise), and a duration of zero says zero minutes
@@ -372,19 +375,20 @@ export function splitDuration(totalMinutes: number): DurationParts {
 
 export function formatDuration(totalMinutes: number, units: DurationUnits = PERSIAN_DURATION_UNITS): string {
   const minutes = Number.isFinite(totalMinutes) ? Math.max(0, Math.trunc(totalMinutes)) : 0;
-  if (minutes === 0) return `0 ${units.minute}`;
+  const number = (value: number) => units.numberLocale ? value.toLocaleString(units.numberLocale) : String(value);
+  if (minutes === 0) return `${number(0)} ${units.minute}`;
   if (minutes >= MINUTES_PER_WEEK && minutes % MINUTES_PER_WEEK === 0) {
-    return `${minutes / MINUTES_PER_WEEK} ${units.week}`;
+    return `${number(minutes / MINUTES_PER_WEEK)} ${units.week}`;
   }
 
   const { days, hours, minutes: remainder } = splitDuration(minutes);
   const parts: string[] = [];
-  if (days > 0) parts.push(`${days} ${units.day}`);
-  if (hours > 0) parts.push(`${hours} ${units.hour}`);
+  if (days > 0) parts.push(`${number(days)} ${units.day}`);
+  if (hours > 0) parts.push(`${number(hours)} ${units.hour}`);
   // Under an hour the count *is* the minutes; above it only a leftover is worth naming, so
   // "6 hours" never renders as "6 hours and 0 minutes".
   const leftover = days > 0 || hours > 0 ? remainder : minutes;
-  if (leftover > 0) parts.push(`${leftover} ${units.minute}`);
+  if (leftover > 0) parts.push(`${number(leftover)} ${units.minute}`);
 
   return parts.join(units.separator);
 }

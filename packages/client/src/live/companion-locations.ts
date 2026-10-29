@@ -455,7 +455,7 @@ export function ageWords(ageMs: number | null): string {
   if (ageMs === null) return "نامشخص";
   if (ageMs <= MOMENT_MS) return "همین حالا";
   const minutes = Math.floor(ageMs / 60_000);
-  if (minutes < 1) return `${Math.floor(ageMs / 1000)} ثانیه پیش`;
+  if (minutes < 1) return `${Math.floor(ageMs / 1000).toLocaleString("fa-IR")} ثانیه پیش`;
   return `${formatDuration(minutes)} پیش`;
 }
 

@@ -157,7 +157,7 @@ describe("the device table", () => {
     const rows = describeDeviceRows([device({ lastActiveAt: new Date(NOW.getTime() + 600_000).toISOString() })], [], NOW);
     expect(rows[0]!.minutesSinceActive).toBe(0);
     // Human units, as everywhere else in the app.
-    expect(formatDuration(rows[0]!.minutesSinceActive)).toBe("0 دقیقه");
+    expect(formatDuration(rows[0]!.minutesSinceActive)).toBe("۰ دقیقه");
   });
 
   it("offers offline devices as disabled rather than hiding them, and names the current one", () => {

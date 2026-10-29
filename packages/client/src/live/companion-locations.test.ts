@@ -410,18 +410,18 @@ describe("ages in words", () => {
   it("says now for a fix that arrived this moment, not 0 seconds ago", () => {
     expect(ageWords(0)).toBe("همین حالا");
     expect(ageWords(14_000)).toBe("همین حالا");
-    expect(ageWords(20_000)).toBe("20 ثانیه پیش");
+    expect(ageWords(20_000)).toBe("۲۰ ثانیه پیش");
   });
 
   it("switches to minutes and keeps the human units the rest of the interface uses", () => {
-    expect(ageWords(59_000)).toBe("59 ثانیه پیش");
-    expect(ageWords(90_000)).toBe("1 دقیقه پیش");
-    expect(ageWords(90 * 60_000)).toBe("1 ساعت و 30 دقیقه پیش");
+    expect(ageWords(59_000)).toBe("۵۹ ثانیه پیش");
+    expect(ageWords(90_000)).toBe("۱ دقیقه پیش");
+    expect(ageWords(90 * 60_000)).toBe("۱ ساعت و ۳۰ دقیقه پیش");
   });
 
   it("labels a peer with the name the share carried and the age of the fix", () => {
     const peer = peersOf(registryWith({ userId: ALICE, name: "مریم", observedAtMs: NOW - 120_000 }), NOW)[0]!;
-    expect(peerLabel(peer, NOW)).toBe("مریم · 2 دقیقه پیش");
+    expect(peerLabel(peer, NOW)).toBe("مریم · ۲ دقیقه پیش");
   });
 
   it("ignores stale location:share-ended events when openShareIds proves another share is active", () => {

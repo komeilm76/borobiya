@@ -339,6 +339,7 @@ describe("the panel and the view", () => {
 
   it("labels a range with the same duration words as the rest of the app", () => {
     expect(panel).toContain("formatDuration(days * 1440)");
+    expect(panel).toContain("${pointCount.value} · ${formatDuration(span)}");
     expect(panel).toContain("formatLocalTime(");
     // No raw minute count in a template again, which is the mistake the share dialog already fixed.
     expect(panel).not.toMatch(/span\s*}\s*·\s*دقیقه/);

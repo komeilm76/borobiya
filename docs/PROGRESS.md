@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-29 — Localize Persian duration and companion-age numerals (T4.4.5 bug review)
+
+- Found that history playback mixed Persian point counts with ASCII day/hour/minute counts, and live-companion labels switched from ASCII seconds to ASCII duration text even though their surrounding copy is Persian. The shared formatter now uses `fa-IR` digits with its default Persian units, while custom English units retain ASCII (or can explicitly request a numeral locale). The sub-minute peer-age path uses Persian digits too. Pure tests first reproduced both mixed-script outputs and cover zero, remainders, whole weeks, duration presets and custom English units; the history panel still uses the shared formatter. No browser screenshot or site-wide localization audit is claimed.
+
 ### 2026-10-29 — Align admin dispatch cards and typography with the UI tokens (T4.4.5 follow-up)
 
 - The SOS dispatch console's four main panels were outline-only while adjacent admin screens used themed surface depth. The queue, selected request, map frame and responder picker now use the shared light/dark surface shadow, 24px corners and a semantic border. The map alert remains a floating overlay (surface depth when stacked), and the mission timeline is inset rather than doubly raised. Scoped typography brings the page's Vuetify utility headings, body labels and captions into the existing Persian-first font stack, with slightly larger metadata and readable heading/body leading; the native mission selector now inherits the same type and has a focus outline. Source/compiled-style checks, typecheck, tests and production build cover code behavior; no authenticated desktop/phone visual approval is claimed.
