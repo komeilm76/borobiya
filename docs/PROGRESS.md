@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Full-screen phone History and map chrome follow-up (T4.4.1)
+
+- Renamed the companions dialog, dock control and dialog/region accessible names to «همراهان» after removing its duplicate sharing button; outgoing sharing remains on the map. History now uses a full-screen, scrollable phone dialog rather than an offset bottom sheet: the complete range, transport and scrub controls expand on open, the 56dvh/26rem card limit is lifted, and a dedicated Close/Escape/Back path restores focus. Desktop/tablet keep their original panels and playback controls. The phone map bar now reserves top/side safe areas, bounds long titles and keeps 44px inbox/menu/profile targets; the bottom dock also respects side cutouts without shrinking its three launchers below 44px. Source/compiled-style tests and builds cover these contracts; real phone, landscape cutout, screen-reader and browser acceptance remain open.
+
 ### 2026-10-31 — Remove duplicate sharing button from companions modal (T4.4.1 follow-up)
 
 - The «اشتراک و همراهان» modal now shows companions without a second outgoing-location toggle; the icon-only map control remains the opt-in Start/Stop action. Warn/error status stays visible inside the modal, and the map refreshes multi-device priority on mount even without the old broadcast card. Dashboard and dedicated sharing screens retain their broadcast controls. Source-contract tests cover separation; real phone/keyboard acceptance remains open.

@@ -6,7 +6,7 @@ import { historyPanelInitiallyOpen, playbackSpeedLabel } from "./playback-panel"
 const panel = readFileSync(new URL("../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
 
 describe("history panel entry state", () => {
-  it("starts compact on a phone and open on a larger map", () => {
+  it("starts compact on narrow in-flow panels; the full-screen phone dialog expands it on open", () => {
     expect(historyPanelInitiallyOpen(true, undefined)).toBe(false);
     expect(historyPanelInitiallyOpen(true, "  ")).toBe(false);
     expect(historyPanelInitiallyOpen(false, undefined)).toBe(true);

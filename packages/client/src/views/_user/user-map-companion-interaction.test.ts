@@ -14,7 +14,7 @@ function functionBody(name: string): string {
 
 describe("map companions tool", () => {
   it("opens a real fullscreen, scrollable, dismissible Vuetify dialog on phones instead of a bottom sheet", () => {
-    expect(view).toContain('import { VBottomSheet, VDialog } from "vuetify/components"');
+    expect(view).toContain('import { VDialog } from "vuetify/components"');
     expect(view).toContain(`:is="isPhone ? VDialog : 'div'"`);
     expect(view).toContain('class="user-map-view__live-dialog"');
     expect(view).toContain('fullscreen: true');
@@ -22,10 +22,12 @@ describe("map companions tool", () => {
     expect(view).toContain('modelValue: activeTool.value === "live"');
     expect(view).toContain('modelValue: activeTool.value === "search"');
     expect(view).toContain('modelValue: activeTool.value === "history"');
-    expect(view).toContain('aria-label="اشتراک و همراهان"');
+    expect(view).toContain('<span>همراهان</span>');
+    expect(view).toContain('aria-label="همراهان"');
+    expect(view).not.toContain('اشتراک و همراهان');
     expect(view).toContain('id="map-live-panel"');
     expect(view).toContain('aria-label="بستن همراهان"');
-    expect(view).toContain('.user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
+    expect(view).toContain('.user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
     // Vuetify's Back hook and the map's route-leave guard must not both move history.
     expect(view.slice(view.indexOf('const phoneLiveDialogProps'), view.indexOf('// Keep Vuetify\'s models')))
       .toContain('closeOnBack: false');

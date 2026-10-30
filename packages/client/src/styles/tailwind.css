@@ -450,9 +450,26 @@ a {
  * or hide the safety-critical SOS action. All other routes retain the ordinary shell. */
 @media (max-width: 599px) {
   .app-shell--map { height: 100dvh; min-height: 100dvh; overflow: hidden; }
-  .app-shell--map .app-topbar { height: 56px !important; min-height: 56px !important; }
-  .app-shell--map .app-topbar .v-toolbar__content { height: 56px !important; padding-inline: 0.5rem !important; }
-  .app-shell--map .app-map-title { font-size: 0.95rem; }
+  /* On cutout/PWA displays the toolbar starts below the top safe area. Keep
+   * three real 44px actions visible even when the profile name is long. */
+  .app-shell--map .app-topbar {
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+  }
+  .app-shell--map .app-topbar .v-toolbar__content {
+    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-left: max(0.5rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.5rem, env(safe-area-inset-right, 0px)) !important;
+  }
+  .app-shell--map .app-map-title {
+    min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;
+    font-size: 0.95rem;
+  }
+  .app-shell--map .top-nav { flex: 0 0 auto; gap: 0.125rem; }
+  .app-shell--map .top-nav .v-btn--icon { min-width: 44px; min-height: 44px; }
+  /* AccountProfileMenu already collapses its name/chevron to a 44px avatar
+   * below 1024px; do not duplicate that component's responsive rule here. */
   .app-shell--map .login-button { margin-inline-start: 0; padding-inline: 0.55rem !important; }
   .app-shell--map .app-main { min-height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; }
   .app-shell--map .app-footer { display: none; }
@@ -460,7 +477,7 @@ a {
    * the dock; do not enlarge or hide it on the map. */
   .app-shell--map .sos-fab.sos-fab {
     inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-    inset-inline-start: 0.75rem;
+    inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
 }
 

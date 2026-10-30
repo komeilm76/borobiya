@@ -121,29 +121,29 @@
     <PlaceDetailSheet :place="placeDetailOpen ? selectedSearchPlace : null"
       @close="closePlaceDetail" @after-leave="onPlaceDetailAfterLeave" />
 
-    <!-- History alone uses the compact, click-through phone sheet. On larger
-         screens it stays in page flow beside the map. -->
-    <component
-      :is="isPhone ? VBottomSheet : 'div'"
-      class="user-map-view__tool-host"
-      :class="isPhone ? 'user-map-view__tool-sheet' : undefined"
-      v-bind="isPhone ? phoneSheetProps : {}"
-      @update:model-value="onSheetVisibilityChange"
-    >
-      <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
-        class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
-        :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-        <div v-if="isPhone" class="user-map-view__panel-head">
-          <strong>تاریخچهٔ مسیر</strong>
+    <!-- History needs the full phone viewport for range, transport and scrub controls.
+         Tablet/desktop keep the existing in-flow/side playback panel. -->
+    <component :is="isPhone ? VDialog : 'div'" class="user-map-view__history-dialog"
+      v-bind="isPhone ? phoneHistoryDialogProps : {}"
+      @update:model-value="onHistoryDialogVisibilityChange">
+      <v-card class="user-map-view__history-surface" rounded="xl">
+        <v-card-title v-if="isPhone" class="user-map-view__history-title">
+          <span>تاریخچهٔ مسیر</span>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
-        </div>
-        <HistoryPlaybackPanel
-          :api="playback"
-          :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
-          @return-to-track="showTrack"
-        />
-      </aside>
-
+        </v-card-title>
+        <v-card-text class="user-map-view__history-body">
+          <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
+            class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
+            :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+            <HistoryPlaybackPanel
+              :api="playback"
+              :expanded="isPhone && activeTool === 'history'"
+              :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
+              @return-to-track="showTrack"
+            />
+          </aside>
+        </v-card-text>
+      </v-card>
     </component>
 
     <!-- A phone's companions tool is a true fullscreen dialog, not another cramped
@@ -156,12 +156,12 @@
     >
       <v-card class="user-map-view__live-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
-          <span>اشتراک و همراهان</span>
+          <span>همراهان</span>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__live-body">
           <aside id="map-live-panel" class="user-map-view__live user-map-view__panel"
-            :role="isPhone ? 'region' : undefined" aria-label="اشتراک و همراهان"
+            :role="isPhone ? 'region' : undefined" aria-label="همراهان"
             tabindex="-1" @keydown.esc="onPanelEscape">
             <p v-if="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error'"
               class="user-map-view__broadcast-status" role="status" aria-live="polite">
@@ -181,7 +181,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
-import { VBottomSheet, VDialog } from "vuetify/components";
+import { VDialog } from "vuetify/components";
 import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -225,7 +225,7 @@ type MapTool = "search" | "history" | "live";
 const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
   { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
   { id: "history", label: "تاریخچهٔ مسیر", shortLabel: "تاریخچه", icon: "mdi-map-clock-outline" },
-  { id: "live", label: "اشتراک و همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
+  { id: "live", label: "همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
@@ -254,22 +254,14 @@ onBeforeRouteLeave(() => {
 });
 
 // The desktop hosts are boxless divs; only phones register Vuetify overlays.
-const phoneSheetProps = computed(() => ({
+const phoneHistoryDialogProps = computed(() => ({
   modelValue: activeTool.value === "history",
-  scrim: false,
-  // The map (including its dock and controls) is part of the activator, so a
-  // dock switch isn't an outside click. Let Vuetify handle Back and outside clicks.
-  activator: ".user-map-view",
-  activatorProps: { "aria-haspopup": undefined },
-  openOnClick: false,
-  persistent: false,
-  closeOnBack: true,
-  retainFocus: false,
-  captureFocus: false,
-  scrollStrategy: "none" as const,
+  fullscreen: true,
+  scrollable: true,
   eager: true,
-  "aria-modal": "false",
-  "aria-hidden": activeTool.value !== "history" ? "true" : undefined,
+  // The route-leave guard consumes the first Back; a second Vuetify handler
+  // would leave the map altogether rather than close History.
+  closeOnBack: false,
   "aria-label": "تاریخچهٔ مسیر"
 }));
 
@@ -306,11 +298,11 @@ const phoneLiveDialogProps = computed(() => ({
   // The route-leave guard dismisses the phone modal on Back. Enabling Vuetify's
   // own Back handler too makes both handlers traverse history (skipping the map).
   closeOnBack: false,
-  "aria-label": "اشتراک و همراهان"
+  "aria-label": "همراهان"
 }));
 
 // Keep Vuetify's models and the dock selection in sync on other close paths.
-function onSheetVisibilityChange(visible: boolean): void {
+function onHistoryDialogVisibilityChange(visible: boolean): void {
   if (!visible && activeTool.value === "history") closeTool();
 }
 function onSearchDialogVisibilityChange(visible: boolean): void {
@@ -392,7 +384,7 @@ function centerOnOwnLocation(initiatedByUser = true): void {
   const instance = map.value;
   if (!instance) return;
   // An explicit recenter should reveal the marker instead of leaving it hidden
-  // under a phone tool sheet. A delayed automatic fix must not close the sheet.
+  // under a phone dialog. A delayed automatic fix must not close the dialog.
   if (initiatedByUser && isPhone.value && activeTool.value) closeTool(false);
   const fix = own.position.value;
   if (!fix) {
@@ -1082,8 +1074,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
-.user-map-view__tool-host, .user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
+.user-map-view__search-dialog:not(.v-overlay), .user-map-view__history-dialog:not(.v-overlay),
+.user-map-view__live-dialog:not(.v-overlay) { display: contents; }
 .user-map-view__search-surface, .user-map-view__search-body,
+.user-map-view__history-surface, .user-map-view__history-body,
 .user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
 .user-map-view__broadcast-status { margin: 0; color: rgb(var(--v-theme-on-surface)); }
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
@@ -1272,15 +1266,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 /* Phone map: an edge-to-edge viewport behind the slim app rail, not a map squeezed between
- * stacked cards. The three complete tools remain mounted, but one scrollable surface opens over
- * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
+ * stacked cards. Fullscreen tools keep their own scrolling content and clear close actions. */
 @media (max-width: 599px) {
   /* Left of native zoom; below the route app bar and expanded attribution. */
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;
-    top: calc(8rem + env(safe-area-inset-top, 0px)); left: 0.75rem;
+    top: calc(8rem + env(safe-area-inset-top, 0px)); left: calc(0.75rem + env(safe-area-inset-left, 0px));
     display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;
-    max-width: min(9.75rem, calc(100vw - 11rem)); pointer-events: auto;
+    max-width: min(9.75rem, calc(100vw - 11rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); pointer-events: auto;
   }
   .user-map-view__search-map-actions :deep(.v-btn) {
     min-height: 44px; height: auto; max-width: 100%; padding-inline: 0.55rem;
@@ -1319,6 +1312,33 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     flex: 0 0 auto; background: transparent; box-shadow: none !important; border: 0;
   }
   :global(.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }
+  :global(.user-map-view__history-dialog.v-dialog > .v-overlay__content) {
+    margin: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
+  }
+  :global(.user-map-view__history-dialog .user-map-view__history-surface) {
+    display: flex !important; flex-direction: column; height: 100%; min-height: 0;
+    background: rgb(var(--v-theme-surface)); border-radius: 0 !important;
+  }
+  :global(.user-map-view__history-dialog .user-map-view__history-title) {
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    min-height: 56px;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  }
+  :global(.user-map-view__history-dialog .user-map-view__history-title .v-btn) { min-width: 44px; min-height: 44px; }
+  :global(.user-map-view__history-dialog .user-map-view__history-body) {
+    display: block !important; flex: 1 1 auto; min-height: 0;
+    padding: 0.75rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  :global(.user-map-view__history-dialog .user-map-view__playback) {
+    position: static; width: 100%; max-height: none; overflow: visible; pointer-events: auto;
+  }
+  /* The dialog body is the sole scroll container; don't cap the complete
+   * history card at the former tablet 26rem/56dvh limit. */
+  :global(.user-map-view__history-dialog .history-playback) {
+    width: 100%; max-height: none !important; overflow: visible; box-shadow: none !important;
+  }
   :global(.user-map-view__live-dialog.v-dialog > .v-overlay__content) {
     margin: 0;
     width: 100vw;
@@ -1385,7 +1405,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   /* Keep native zoom and compass together at the top edge, clear of the app bar. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     top: calc(4rem + env(safe-area-inset-top, 0px));
-    right: 0.75rem;
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
     left: auto;
     width: 132px;
     transform: none;
@@ -1404,7 +1424,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
     top: calc(4rem + env(safe-area-inset-top, 0px));
     bottom: auto;
-    left: 0.25rem;
+    left: calc(0.25rem + env(safe-area-inset-left, 0px));
     right: auto;
   }
   /* The map's real OSM/OpenMapTiles credit is much wider than a compact phone.
@@ -1412,11 +1432,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
    * (not over) the native zoom rail and remains fully readable. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib) {
     box-sizing: border-box;
-    max-width: calc(100vw - 9.5rem);
+    max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
     margin: 0;
   }
 
-  .user-map-view__recenter, .user-map-view__share { inset-inline-start: 0.75rem; }
+  .user-map-view__recenter, .user-map-view__share {
+    inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
+  }
   .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
@@ -1426,11 +1448,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     position: absolute;
     z-index: 5;
     inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-    left: 50%;
-    width: min(19rem, calc(100% - 1.5rem));
+    left: calc(0.75rem + env(safe-area-inset-left, 0px));
+    right: calc(0.75rem + env(safe-area-inset-right, 0px));
+    width: auto;
+    max-width: 19rem;
     height: 4rem;
     flex: none;
-    transform: translateX(-50%);
+    margin-inline: auto; /* Center within the safe region, even if only one side has a cutout. */
   }
   .user-map-view__dock-layout { width: 100%; height: 100%; }
   .user-map-view__dock {
@@ -1459,33 +1483,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__dock-label { font-size: 0.75rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
   .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
 
-  /* Vuetify owns the sheet transition and portal; place its interactive content
-   * above SOS + dock, leaving the rest of the overlay click-through. The long
-   * widgets scroll here (not inside a shrunken flex child). */
-  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
-    inset-block-start: auto;
-    inset-inline: 0;
-    inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
-    margin: 0 auto;
-    width: min(26rem, calc(100% - 1.5rem));
-    max-height: min(60dvh, calc(100dvh - 24.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
-    border-radius: var(--bb-radius-card, 24px);
-    background: rgba(var(--v-theme-surface), 0.97);
-    box-shadow: var(--bb-shadow-overlay);
-    backdrop-filter: blur(12px);
-  }
-  /* Vuetify slides a bottom sheet by its entire height. Here the sheet sits
-   * ABOVE SOS + dock: that slide would sweep through and intercept both controls
-   * until the animation finishes (even an 8px shift hits the landscape dock).
-   * Fade in place so a quick second tap always reaches the navigation. */
-  :global(.user-map-view__tool-sheet .bottom-sheet-transition-enter-from),
-  :global(.user-map-view__tool-sheet .bottom-sheet-transition-leave-to) {
-    transform: none;
-    opacity: 0;
-  }
   .user-map-view__panel {
     position: static;
     width: 100%;
@@ -1494,74 +1491,19 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     /* The Vuetify content is the scrollable/card surface, not each aside. */
     pointer-events: auto;
   }
-  /* Flex containers must overflow the aside, not squeeze card contents into
-   * their own hidden overflow (which leaves the bottom actions unreachable). */
-  .user-map-view__panel > :not(.user-map-view__panel-head) { flex-shrink: 0; }
   .user-map-view__panel:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
-  .user-map-view__panel-head {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 44px;
-    padding-inline: 0.75rem 0.25rem;
-    color: rgb(var(--v-theme-on-surface));
-    background: rgb(var(--v-theme-surface));
-    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  }
-  .user-map-view__panel-head :deep(.v-btn) { min-width: 44px; min-height: 44px; }
   .user-map-view__search, .user-map-view__playback, .user-map-view__live {
     pointer-events: auto;
   }
-  .user-map-view__playback :deep(.history-playback) { width: 100%; max-height: none; overflow: visible; }
 }
 
-/* Landscape/keyboard-short viewports: scroll the full-sized tool above the dock.
- * Leave room for attribution at the top; SOS remains above the sheet in z-order. */
-@media (max-width: 599px) and (max-height: 480px) {
-  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
-    top: calc(7rem + env(safe-area-inset-top, 0px));
-    inset-block-end: auto;
-    max-height: calc(100dvh - 11.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* Tiny portrait cannot fit three buttons below a useful panel. Both optional
- * controls yield while a sheet is open; the full panels keep their old geometry. */
-@media (max-width: 479px) and (max-height: 480px) {
-  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
-    top: calc(8.25rem + env(safe-area-inset-top, 0px));
-    max-height: calc(100dvh - 17.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-  }
-}
-
-/* Mid-height portrait also yields both optional buttons while a sheet is open,
- * retaining the previous sheet clearance instead of squeezing it to ~85px. */
-@media (max-width: 479px) and (min-height: 481px) and (max-height: 560px) {
-  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
-    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
-    max-height: min(60dvh, calc(100dvh - 21.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
-  }
-}
-
-/* In short landscape, a left-aligned sheet leaves a separate lane for SOS and
- * the native zoom rail. Put the noninteractive scale beside, not under, the dock. */
+/* In short landscape, recenter sits beside sharing without covering native zoom. */
 @media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
   /* The zoom rail lives on the right at the top. Put recenter beside, not
    * above, sharing in the clear right lane; SOS remains directly below. */
   .user-map-view__recenter {
     inset-inline-start: calc(0.75rem + 3.5rem);
     inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
-  }
-  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
-    inset-inline: auto;
-    left: 0.75rem;
-    right: auto;
-    margin-inline: 0;
-    width: min(23rem, calc(100% - 11.5rem));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));

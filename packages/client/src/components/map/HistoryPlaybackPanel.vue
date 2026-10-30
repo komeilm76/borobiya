@@ -48,6 +48,7 @@
           {{ api.playing.value ? 'توقف' : 'پخش' }}
         </v-btn>
         <v-btn
+          v-if="!expanded"
           class="history-playback__toggle"
           variant="tonal"
           color="primary"
@@ -258,13 +259,16 @@ import type { HistoryPlayback } from "@/composables/use-history-playback";
  * in a template could not be pinned. The one judgement here is which *copy* a state produces — and each
  * copy names what the user can do about it (whose share, which field), not just that something failed.
  */
-const props = defineProps<{ api: HistoryPlayback; showReturnToTrack: boolean }>();
+const props = defineProps<{ api: HistoryPlayback; showReturnToTrack: boolean; expanded?: boolean }>();
 const emit = defineEmits<{ "return-to-track": [] }>();
 const route = useRoute();
 
 const isNarrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
   && window.matchMedia("(max-width: 1023px)").matches;
 const isOpen = ref(historyPanelInitiallyOpen(isNarrow, route.query.historyShare));
+// A full-screen phone dialog must show the complete controls on every open, not
+// the old sheet's compact preview. Wider in-flow panels keep their own toggle.
+watch(() => props.expanded, (expanded) => { if (expanded) isOpen.value = true; }, { immediate: true });
 const fromField = ref("");
 const toField = ref("");
 

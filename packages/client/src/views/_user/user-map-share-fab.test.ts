@@ -40,9 +40,9 @@ describe("map sharing quick action", () => {
     expect(view).toContain('v-show="!(isShortPhone && activeTool)"');
     expect(view).toContain('inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))');
     expect(view).toContain('inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))');
-    expect(view).toContain('inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px))');
-    expect(view).toContain('100dvh - 24.75rem');
-    expect(view).toContain('@media (max-width: 479px) and (min-height: 481px) and (max-height: 560px)');
+    expect(view).toContain('class="user-map-view__history-dialog"');
+    expect(view).toContain('class="user-map-view__history-body"');
+    expect(view).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(view).toContain('inset-inline-start: calc(0.75rem + 3.5rem)'); // Clear zoom in landscape.
     expect(shell).toContain('inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
