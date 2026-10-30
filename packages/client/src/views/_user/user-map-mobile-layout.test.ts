@@ -137,8 +137,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).not.toContain('VBottomSheet');
     expect(playbackPanel).toContain('watch(() => props.expanded, (expanded) => { if (expanded) isOpen.value = true; }, { immediate: true });');
     expect(playbackPanel).toContain('v-if="!expanded"'); // No "collapse" inside the full-screen modal.
-    expect(view).toContain('max-height: none !important; overflow: visible; box-shadow: none !important;');
-    expect(view).toContain('padding: 0.75rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));');
+    expect(view).toContain('.user-map-view__history-dialog .history-playback) { max-height: none !important; overflow: visible; }');
+    expect(view).toContain('padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));');
     expect(view).toContain('overflow-y: auto; overscroll-behavior: contain;');
     expect(view).toContain('closeOnBack: false');
   });
@@ -182,8 +182,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("min-width: 44px"); // Keep the three targets accessible at 320px.
     expect(view).toContain('class="user-map-view__dock-label"');
     expect(phoneMap).toContain(".user-map-view__dock-label");
-    expect(phoneMap).toContain(".user-map-view__history-dialog.v-dialog > .v-overlay__content");
-    expect(phoneMap).toContain(".user-map-view__history-body");
+    expect(phoneMap).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");
+    expect(phoneMap).toContain(".v-dialog > .v-overlay__content > .v-card > .v-card-text");
     expect(phoneMap).toContain("max-height: none !important;"); // Remove the old 56dvh/26rem card cap.
     expect(view).toContain('v-show="!(isShortPhone && activeTool)"');
     expect(phoneMap).toContain(".user-map-view__recenter");
@@ -196,6 +196,6 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));");
     expect(phoneMap).not.toContain(".user-map-view__tool-sheet");
     expect(css(view, "UserMapView.vue")).toContain(".user-map-view__panel[data-v-map-mobile]");
-    expect(css(view, "UserMapView.vue")).toContain(".user-map-view__history-dialog.v-dialog > .v-overlay__content");
+    expect(css(view, "UserMapView.vue")).toContain(":is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content");
   });
 });

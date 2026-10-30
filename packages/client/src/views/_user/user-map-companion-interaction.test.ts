@@ -22,7 +22,7 @@ describe("map companions tool", () => {
     expect(view).toContain('modelValue: activeTool.value === "live"');
     expect(view).toContain('modelValue: activeTool.value === "search"');
     expect(view).toContain('modelValue: activeTool.value === "history"');
-    expect(view).toContain('<span>همراهان</span>');
+    expect(view).toContain('<h2>همراهان</h2>');
     expect(view).toContain('aria-label="همراهان"');
     expect(view).not.toContain('اشتراک و همراهان');
     expect(view).toContain('id="map-live-panel"');

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Simplify all three phone map dialogs (T4.4.1 follow-up)
+
+- Audited Search, History and Companions as a set. Vuetify's more-specific dialog CSS had been retaining a 24px `v-card-text` gutter and an outer card scrollbar even where the map view requested a smaller inset. All three fullscreen dialogs now explicitly override that DOM structure with one safe-area-aware 16px content gutter and one scrolling body, rather than stacking the dialog padding with a reusable map card's padding, border, background and shadow. The phone-only surface rules flatten those inner cards (including History's ornamental source/range/transport boxes), while selectable search hits, companion controls, playback actions, status/error text, and tablet/desktop standalone cards keep their behavior. Duplicate inner headings are hidden only inside each dialog; its visible title is now a semantic heading. Search results and the companion list no longer create extra scroll regions inside the dialog. The shared CSS replaces repeated modal layout rules; source/compiled-style tests cover all three without mounting Vue. Rendered light/dark, landscape/keyboard and real-device acceptance remain open.
+
 ### 2026-10-31 — Full-screen phone History and map chrome follow-up (T4.4.1)
 
 - Renamed the companions dialog, dock control and dialog/region accessible names to «همراهان» after removing its duplicate sharing button; outgoing sharing remains on the map. History now uses a full-screen, scrollable phone dialog rather than an offset bottom sheet: the complete range, transport and scrub controls expand on open, the 56dvh/26rem card limit is lifted, and a dedicated Close/Escape/Back path restores focus. Desktop/tablet keep their original panels and playback controls. The phone map bar now reserves top/side safe areas, bounds long titles and keeps 44px inbox/menu/profile targets; the bottom dock also respects side cutouts without shrinking its three launchers below 44px. Source/compiled-style tests and builds cover these contracts; real phone, landscape cutout, screen-reader and browser acceptance remain open.

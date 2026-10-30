@@ -105,7 +105,7 @@
       @update:model-value="onSearchDialogVisibilityChange">
       <v-card class="user-map-view__search-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__search-title">
-          <span>جست‌وجوی مکان</span>
+          <h2>جست‌وجوی مکان</h2>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__search-body">
@@ -128,7 +128,7 @@
       @update:model-value="onHistoryDialogVisibilityChange">
       <v-card class="user-map-view__history-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__history-title">
-          <span>تاریخچهٔ مسیر</span>
+          <h2>تاریخچهٔ مسیر</h2>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__history-body">
@@ -156,7 +156,7 @@
     >
       <v-card class="user-map-view__live-surface" rounded="xl">
         <v-card-title v-if="isPhone" class="user-map-view__live-title">
-          <span>همراهان</span>
+          <h2>همراهان</h2>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
         </v-card-title>
         <v-card-text class="user-map-view__live-body">
@@ -1286,100 +1286,69 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
     font-size: 0.7rem; line-height: 1.35;
   }
-  :global(.user-map-view__search-dialog.v-dialog > .v-overlay__content) {
+  /* These are three independent dialogs but share one phone layout. VCard is
+   * required by Vuetify; the reusable map-side widgets are flattened *only*
+   * inside the dialogs so there is one padded surface and one scrollbar. */
+  :global(:is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content) {
     margin: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
   }
-  :global(.user-map-view__search-dialog .user-map-view__search-surface) {
+  :global(:is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content > .v-card) {
     display: flex !important; flex-direction: column; height: 100%; min-height: 0;
-    background: rgb(var(--v-theme-surface)); border-radius: 0 !important;
+    overflow: hidden; background: rgb(var(--v-theme-surface)); border-radius: 0 !important;
   }
-  :global(.user-map-view__search-dialog .user-map-view__search-title) {
+  /* Vuetify's dialog > overlay > card rules normally apply 24px of padding
+   * and make the outer card scroll. Match that structure to override it rather
+   * than relying on CSS import order or shrinking any child controls. */
+  :global(:is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content > .v-card > .v-card-title) {
     display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
     min-height: 56px;
-    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px))
+      calc(1rem + env(safe-area-inset-right, 0px)) 0.5rem
+      calc(1rem + env(safe-area-inset-left, 0px));
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   }
-  :global(.user-map-view__search-dialog .user-map-view__search-title .v-btn) { min-width: 44px; min-height: 44px; }
-  :global(.user-map-view__search-dialog .user-map-view__search-body) {
+  :global(:is(.user-map-view__search-title h2, .user-map-view__history-title h2, .user-map-view__live-title h2)) {
+    min-width: 0; margin: 0; font-size: 1rem; font-weight: 800; line-height: 1.4;
+  }
+  :global(:is(.user-map-view__search-title .v-btn, .user-map-view__history-title .v-btn,
+    .user-map-view__live-title .v-btn)) { min-width: 44px; min-height: 44px; }
+  :global(:is(.user-map-view__search-dialog, .user-map-view__history-dialog, .user-map-view__live-dialog).v-dialog > .v-overlay__content > .v-card > .v-card-text) {
     display: block !important; flex: 1 1 auto; min-height: 0;
-    padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(1rem + env(safe-area-inset-left, 0px));
+    padding-right: calc(1rem + env(safe-area-inset-right, 0px));
     overflow-y: auto; overscroll-behavior: contain;
   }
   :global(.user-map-view__search-dialog .user-map-view__search) {
     position: static; width: 100%; max-height: none; display: flex; flex-direction: column;
   }
-  :global(.user-map-view__search-dialog .place-search) {
-    flex: 0 0 auto; background: transparent; box-shadow: none !important; border: 0;
-  }
-  :global(.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }
-  :global(.user-map-view__history-dialog.v-dialog > .v-overlay__content) {
-    margin: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
-  }
-  :global(.user-map-view__history-dialog .user-map-view__history-surface) {
-    display: flex !important; flex-direction: column; height: 100%; min-height: 0;
-    background: rgb(var(--v-theme-surface)); border-radius: 0 !important;
-  }
-  :global(.user-map-view__history-dialog .user-map-view__history-title) {
-    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-    min-height: 56px;
-    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
-    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  }
-  :global(.user-map-view__history-dialog .user-map-view__history-title .v-btn) { min-width: 44px; min-height: 44px; }
-  :global(.user-map-view__history-dialog .user-map-view__history-body) {
-    display: block !important; flex: 1 1 auto; min-height: 0;
-    padding: 0.75rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
-    overflow-y: auto; overscroll-behavior: contain;
-  }
   :global(.user-map-view__history-dialog .user-map-view__playback) {
     position: static; width: 100%; max-height: none; overflow: visible; pointer-events: auto;
   }
-  /* The dialog body is the sole scroll container; don't cap the complete
-   * history card at the former tablet 26rem/56dvh limit. */
-  :global(.user-map-view__history-dialog .history-playback) {
-    width: 100%; max-height: none !important; overflow: visible; box-shadow: none !important;
-  }
-  :global(.user-map-view__live-dialog.v-dialog > .v-overlay__content) {
-    margin: 0;
-    width: 100vw;
-    max-width: 100vw;
-    height: 100dvh;
-    max-height: 100dvh;
-  }
-  :global(.user-map-view__live-dialog .user-map-view__live-surface) {
-    display: flex !important;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    background: rgb(var(--v-theme-surface));
-    border-radius: 0 !important; /* Fullscreen; other cards keep the shared xl radius. */
-  }
-  :global(.user-map-view__live-dialog .user-map-view__live-title) {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-    min-height: 56px;
-    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
-    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
-  }
-  :global(.user-map-view__live-dialog .user-map-view__live-title .v-btn) { min-width: 44px; min-height: 44px; }
-  :global(.user-map-view__live-dialog .user-map-view__live-body) {
-    display: block !important;
-    flex: 1 1 auto;
-    min-height: 0;
-    padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
-    overflow-y: auto;
-    overscroll-behavior: contain;
-  }
   :global(.user-map-view__live-dialog .user-map-view__live) {
-    position: static;
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    position: static; width: 100%; display: flex; flex-direction: column; gap: 0.75rem;
   }
-  :global(.user-map-view__live-dialog .live-companions__peers) { max-height: none; }
+  :global(:is(.user-map-view__search-dialog .place-search.v-card,
+    .user-map-view__history-dialog .history-playback.v-card,
+    .user-map-view__live-dialog .live-companions.v-card)) {
+    width: 100%; padding: 0; border: 0; border-radius: 0 !important;
+    overflow: visible; background: transparent; backdrop-filter: none; box-shadow: none !important;
+  }
+  /* Preserve the stand-alone map cards at >=600px, but not their duplicate
+   * headings/shadows/padding inside the phone's already-titled modal surface. */
+  :global(:is(.user-map-view__search-dialog .place-search__headline,
+    .user-map-view__history-dialog .history-playback__title-block h2,
+    .user-map-view__live-dialog .live-companions__title-block h2)) { display: none; }
+  :global(.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }
+  :global(.user-map-view__history-dialog .history-playback) { max-height: none !important; overflow: visible; }
+  :global(.user-map-view__history-dialog .history-playback .history-playback__body) {
+    margin-top: 0.75rem; padding-top: 0; border-top: 0; gap: 0.75rem;
+  }
+  :global(.user-map-view__history-dialog .history-playback :is(.history-playback__source,
+    .history-playback__grants, .history-playback__range, .history-playback__transport)) {
+    padding: 0; border: 0; border-radius: 0; background: transparent;
+  }
+  :global(.user-map-view__live-dialog .live-companions .live-companions__peers) { max-height: none; overflow: visible; }
 
   .user-map-view {
     position: fixed;
