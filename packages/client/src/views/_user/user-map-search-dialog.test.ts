@@ -23,7 +23,7 @@ describe("map place search handoff", () => {
     expect(view).toContain('scrollable: true');
     expect(view).toContain('aria-label="بستن جست‌وجو"');
     expect(view).toContain('id="map-search-panel"');
-    expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />');
+    expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />');
     expect(view).toContain('modelValue: activeTool.value === "history"');
     expect(view).toContain('class="user-map-view__tool-host"');
     expect(view).toContain('class="user-map-view__live-dialog"');

@@ -77,7 +77,8 @@ describe("UserMapView live overlay", () => {
   });
 
   it("never moves the camera for a peer; only explicit peer/place selection and track framing move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(5);
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(6);
+    expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userControlledCamera.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
@@ -111,7 +112,7 @@ describe("UserMapView live overlay", () => {
 
   it("renders search results and an explicit return-to-track action without mounting the map", () => {
     const search = readFileSync(new URL("../../components/map/PlaceSearchPanel.vue", import.meta.url), "utf8");
-    expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />');
+    expect(view).toContain('<PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />');
     expect(view).toContain('usePlaceSearch({');
     expect(view).toContain('const library = map.value?.getMaxBounds() ?? null');
     expect(view).toContain('placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library)');

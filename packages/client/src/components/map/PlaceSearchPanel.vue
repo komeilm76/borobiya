@@ -60,6 +60,18 @@
           />
         </template>
       </v-text-field>
+      <v-btn
+        class="place-search__show-all"
+        type="button"
+        color="primary"
+        variant="flat"
+        rounded="lg"
+        prepend-icon="mdi-map-marker-multiple"
+        aria-label="نمایش همهٔ نتایج روی نقشه"
+        title="نمایش همهٔ نتایج روی نقشه"
+        :disabled="!ready || api.loading.value || !api.results.value.length"
+        @click="$emit('show-all')"
+      ><span class="place-search__show-all-label">نقشه ({{ api.results.value.length.toLocaleString('fa-IR') }})</span></v-btn>
     </form>
     <div v-if="api.term.value.trim().length >= 2" class="place-search__results">
       <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
@@ -71,7 +83,7 @@
         مکانی در این محدوده پیدا نشد.
       </p>
       <template v-else-if="api.results.value.length">
-        <p class="place-search__feedback" role="status">نتایج را می‌توانید یکی‌یکی روی نقشه ببینید.</p>
+        <p class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>
         <ul aria-label="نتایج جست‌وجوی مکان" role="list">
           <li v-for="place in api.results.value" :key="place.placeId">
             <button
@@ -99,7 +111,7 @@ import type { GeocodeResult } from "@shared/index";
 import type { usePlaceSearch } from "@/composables/use-place-search";
 
 defineProps<{ api: ReturnType<typeof usePlaceSearch>; ready: boolean }>();
-defineEmits<{ select: [place: GeocodeResult] }>();
+defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 </script>
 
 <style scoped>
@@ -120,7 +132,9 @@ defineEmits<{ select: [place: GeocodeResult] }>();
 .place-search__headline { margin: 0; color: #173b3c; font-size: 0.86rem; font-weight: 800; line-height: 1.4; }
 .place-search__detail { margin: 0.12rem 0 0; color: #536d6c; font-size: 0.75rem; line-height: 1.55; overflow-wrap: anywhere; }
 .place-search__actions { display: flex; align-items: center; margin-inline-start: auto; }
-.place-search__form { margin-top: 0.75rem; }
+.place-search__form { display: flex; align-items: start; gap: 0.5rem; margin-top: 0.75rem; }
+.place-search__form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
+.place-search__show-all { flex: 0 0 auto; min-width: 44px; min-height: 44px; height: 44px; white-space: nowrap; }
 .place-search__results { margin-top: 0.5rem; max-height: min(17rem, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
 .place-search__feedback { margin: 0.35rem 0.25rem 0.5rem; color: #536d6c; font-size: 0.75rem; line-height: 1.6; }
 .place-search__feedback p { margin: 0 0 0.5rem; }
@@ -141,6 +155,9 @@ defineEmits<{ select: [place: GeocodeResult] }>();
 .place-search__address { display: block; color: #536d6c; font-size: 0.75rem; line-height: 1.55; }
 
 @container (max-width: 380px) {
+  .place-search__show-all { width: 44px; padding-inline: 0; }
+  .place-search__show-all-label { display: none; }
+  .place-search__show-all :deep(.v-btn__prepend) { margin-inline-end: 0; }
   .place-search__body { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; }
   .place-search__indicator { margin-top: 0.35rem; }
   .place-search__actions { grid-column: 1 / -1; width: 100%; min-width: 0; margin-inline-start: 0; }

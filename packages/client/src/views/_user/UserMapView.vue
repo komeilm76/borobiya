@@ -94,7 +94,7 @@
           <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
             class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
             :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-            <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
+            <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />
           </aside>
         </v-card-text>
       </v-card>
@@ -165,6 +165,7 @@ import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
+import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
 import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
 import PlaceDetailSheet from "@/components/map/PlaceDetailSheet.vue";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
@@ -421,6 +422,74 @@ const placeSearch = usePlaceSearch({
 let fittedFor: string | null = null;
 const userControlledCamera = ref(false);
 let selectedPlaceMarker: Marker | null = null;
+const resultMarkers = new Map<string, Marker>();
+const showAllResultsOnMap = ref(false);
+function clearResultMarkers(): void {
+  for (const marker of resultMarkers.values()) marker.remove();
+  resultMarkers.clear();
+}
+function syncResultMarkers(): void {
+  const instance = map.value;
+  const places = showAllResultsOnMap.value && instance && markerConstructor && auth.user?.id
+    ? placeSearch.results.value : [];
+  const current = new Set(places.filter(place => place.placeId !== placeSearch.selectedPlaceId.value)
+    .map(place => place.placeId));
+  for (const [id, marker] of resultMarkers) {
+    if (!current.has(id)) { marker.remove(); resultMarkers.delete(id); }
+  }
+  if (!instance || !markerConstructor) return;
+  const offsets = resultMarkerOffsets(places);
+  for (const [index, place] of places.entries()) {
+    if (place.placeId === placeSearch.selectedPlaceId.value) continue; // The selected POI has its own purple pin.
+    let marker = resultMarkers.get(place.placeId);
+    if (!marker) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "user-map-view__result-marker";
+      button.setAttribute("aria-haspopup", "dialog");
+      button.setAttribute("aria-controls", "map-place-detail-sheet");
+      const number = document.createElement("span");
+      number.setAttribute("aria-hidden", "true");
+      button.append(number);
+      button.addEventListener("click", (event) => {
+        event.stopPropagation(); // Do not reverse-geocode a POI tap as an arbitrary map click.
+        // Read the current result, never the captured response: a new query may have invalidated it.
+        const currentPlace = placeSearch.results.value.find(hit => hit.placeId === place.placeId);
+        if (showAllResultsOnMap.value && currentPlace) selectPlace(currentPlace);
+      });
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") event.stopPropagation();
+      }); // Native button keyboard activation fires click once; Tab must still move focus.
+      marker = new markerConstructor({ element: button, anchor: "center", offset: offsets.get(place.placeId) })
+        .setLngLat([place.lon, place.lat]).addTo(instance);
+      resultMarkers.set(place.placeId, marker);
+    } else marker.setLngLat([place.lon, place.lat]).setOffset(offsets.get(place.placeId) ?? [0, 0]);
+    const button = marker.getElement();
+    button.setAttribute("aria-label", `نتیجهٔ ${(index + 1).toLocaleString("fa-IR")} از ${places.length.toLocaleString("fa-IR")}: ${place.name}، ${place.address}`);
+    button.setAttribute("title", place.name);
+    const number = button.firstElementChild;
+    if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
+  }
+}
+function showAllSearchResults(): void {
+  const instance = map.value;
+  const places = placeSearch.results.value;
+  if (!instance || !markerConstructor || !auth.user?.id || placeSearch.loading.value || !places.length) return;
+  const bounds = instance.getMaxBounds();
+  if (bounds && places.some(place => !bounds.contains([place.lon, place.lat]))) return;
+  const extent = resultExtent(places);
+  if (!extent) return;
+  closePlaceDetail(false);
+  showAllResultsOnMap.value = true;
+  syncResultMarkers();
+  userControlledCamera.value = true;
+  const container = instance.getContainer();
+  instance.fitBounds(extent, {
+    padding: resultCameraPadding(container.clientWidth, container.clientHeight, isPhone.value),
+    maxZoom: 15, duration: 700
+  }, { placeSearchSelection: true }); // A viewport search must retain this validated result snapshot.
+  if (isPhone.value && activeTool.value === "search") closeTool(false);
+}
 const placeDetailOpen = ref(false);
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   (result) => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
@@ -452,7 +521,7 @@ function syncSelectedPlaceMarker(): void {
     selectedPlaceMarker = null;
     return;
   }
-  // Keep one distinct pin for the currently selected POI, not a pin for every search hit.
+  // Selected POI stays distinct from the optional set of numbered result markers.
   // Marker is supplied by MapCanvas after its lazy MapLibre import; no eager map chunk here.
   if (!selectedPlaceMarker) {
     selectedPlaceMarker = new markerConstructor({ color: "#7c3aed" })
@@ -472,9 +541,14 @@ function syncSelectedPlaceMarker(): void {
 }
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
+  syncResultMarkers();
   if (!selectedSearchPlace.value) closePlaceDetail(false);
 }, { flush: "sync" });
-watch(() => placeSearch.results.value, () => { if (!selectedSearchPlace.value) closePlaceDetail(false); }, { flush: "sync" });
+watch(() => placeSearch.results.value, () => {
+  showAllResultsOnMap.value = false;
+  clearResultMarkers();
+  if (!selectedSearchPlace.value) closePlaceDetail(false);
+}, { flush: "sync" });
 
 function selectPlace(place: GeocodeResult): void {
   const instance = map.value;
@@ -811,12 +885,14 @@ let lastLongPressAt = 0;
 function onMapClick(event: MapMouseEvent): void {
   // Some touch browsers synthesize a click after a long-press contextmenu event.
   if (Date.now() - lastLongPressAt < 700 ||
-    (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".user-map-view__peer-avatar"))) return;
+    (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".user-map-view__peer-avatar, .user-map-view__result-marker"))) return;
   if (isPhone.value && activeTool.value) closeTool(false);
   closePlaceDetail(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 function onMapLongPress(event: MapMouseEvent): void {
+  if (event.originalEvent?.target instanceof Element &&
+    event.originalEvent.target.closest(".user-map-view__result-marker")) return;
   event.preventDefault();
   lastLongPressAt = Date.now();
   if (isPhone.value && activeTool.value) closeTool(false);
@@ -843,6 +919,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) {
     ownMarker?.remove(); ownMarker = null;
     selectedPlaceMarker?.remove(); selectedPlaceMarker = null;
+    clearResultMarkers();
   }
   if (map.value !== instance) {
     for (const marker of peerMarkers.values()) marker.remove();
@@ -865,6 +942,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   paintPlayback();
   syncOwnMarker();
   syncSelectedPlaceMarker();
+  syncResultMarkers();
   syncPeerAvatars();
   frameCamera();
   focusOwnIfRequested();
@@ -915,6 +993,7 @@ onBeforeUnmount(() => {
   ownMarker = null;
   selectedPlaceMarker?.remove();
   selectedPlaceMarker = null;
+  clearResultMarkers();
   if (instance) {
     instance.off("styledata", repaintOverlays);
     instance.off("idle", repaintOverlays);
@@ -941,6 +1020,18 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   overflow: hidden;
   background: #e8efec;
   isolation: isolate;
+}
+
+/* Numbered search pins are a separate keyboard/touch layer from purple selection,
+   teal companion avatars and the blue private GPS icon. */
+:global(.user-map-view .user-map-view__result-marker) {
+  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
+  border: 3px solid rgb(var(--v-theme-surface)); border-radius: 50%;
+  color: #fff; background: #a95010; box-shadow: 0 2px 8px rgba(3, 29, 31, 0.38);
+  cursor: pointer; font-size: 0.92rem; font-weight: 800;
+}
+:global(.user-map-view .user-map-view__result-marker:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
