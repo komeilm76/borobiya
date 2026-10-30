@@ -44,7 +44,7 @@ describe("all page and component elevation roles", () => {
       expect(source(path)).toContain("bb-floating-card");
     }
     const userMap = source("../views/_user/UserMapView.vue");
-    expect(userMap).toMatch(/class="user-map-view__toolbar-card bb-floating-card" elevation="3"/);
+    expect(userMap).not.toContain('user-map-view__toolbar-card');
     expect(userMap).toContain('<OwnPositionBar :api="own"');
     expect(source("../components/map/OwnPositionBar.vue")).toContain('class="own-position bb-floating-card" :class="`own-position--${tone}`" elevation="2"');
     const dispatch = source("../views/_admin/AdminDispatchView.vue");

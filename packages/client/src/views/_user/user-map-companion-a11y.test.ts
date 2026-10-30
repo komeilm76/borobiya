@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import { palettes } from "../../styles/tokens";
 
 // CSS/markup regression only: unit tests do not mount Vue SFCs in this repository.
-const map = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const companion = readFileSync(new URL("../../components/map/LiveCompanionPanel.vue", import.meta.url), "utf8");
 
 function rgb(hex: string): number[] {
@@ -38,13 +37,10 @@ function color(source: string, selector: string): string {
   return match![1]!;
 }
 
-describe("map toolbar and live companions accessibility (T4.4.3 partial)", () => {
+describe("map live companions accessibility (T4.4.3 partial)", () => {
   it("keeps small light labels legible over even a black tile beneath translucent cards", () => {
-    const toolbarBackground = blend(palettes.light.surface, "#000000", 0.95);
     const companionBackground = blend(palettes.light.surface, "#000000", 0.94);
-    expect(rule(map, ".user-map-view__toolbar-card")).toContain("background: rgba(var(--v-theme-surface), 0.95);");
     expect(rule(companion, ".live-companions")).toContain("background: rgba(var(--v-theme-surface), 0.94);");
-    expect(contrast(color(map, ".user-map-view__title-block p"), toolbarBackground)).toBeGreaterThanOrEqual(4.5);
     for (const selector of [".live-companions__title-block p", ".live-companions__age"]) {
       expect(contrast(color(companion, selector), companionBackground), selector).toBeGreaterThanOrEqual(4.5);
     }
@@ -52,16 +48,10 @@ describe("map toolbar and live companions accessibility (T4.4.3 partial)", () =>
 
   it("retains 4.5:1 dark labels over a white tile beneath the translucent panels", () => {
     const darkBackground = blend(palettes.dark.surface, "#ffffff", 0.94);
-    expect(rule(map, ":global(:root.dark .user-map-view__toolbar-card)"))
-      .toContain("background: rgba(27, 41, 42, 0.94);");
     expect(rule(companion, ":global(:root.dark .live-companions)"))
       .toContain("background: rgba(27, 41, 42, 0.94);");
-    for (const [source, selector] of [
-      [map, ":global(:root.dark .user-map-view__title-block p)"],
-      [companion, ":global(:root.dark .live-companions__title-block p)"],
-      [companion, ":global(:root.dark .live-companions__age)"]
-    ]) {
-      expect(contrast(color(source, selector), darkBackground), selector).toBeGreaterThanOrEqual(4.5);
+    for (const selector of [":global(:root.dark .live-companions__title-block p)", ":global(:root.dark .live-companions__age)"]) {
+      expect(contrast(color(companion, selector), darkBackground), selector).toBeGreaterThanOrEqual(4.5);
     }
   });
 

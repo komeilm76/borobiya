@@ -94,8 +94,7 @@ describe("dark selectors in scoped Vue styles", () => {
       ["components/map/HistoryPlaybackPanel.vue", ".history-playback", mapCard],
       ["components/map/HistoryPlaybackPanel.vue", ".history-playback__title-block p", mapCard],
       ["components/map/LiveCompanionPanel.vue", ".live-companions__title-block h2", mapCard],
-      ["components/map/LiveCompanionPanel.vue", ".live-companions__status", mapCard],
-      ["views/_user/UserMapView.vue", ".user-map-view__title-block h1", mapCard]
+      ["components/map/LiveCompanionPanel.vue", ".live-companions__status", mapCard]
     ]) {
       const foreground = darkTextColor(compiledStyles(file!), selector!);
       expect(contrast(foreground, background!), `${file}: ${selector}`).toBeGreaterThanOrEqual(4.5);

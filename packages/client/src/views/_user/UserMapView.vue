@@ -7,29 +7,6 @@
       @ready="onMapReady"
     />
 
-    <header class="user-map-view__toolbar">
-      <v-card class="user-map-view__toolbar-card bb-floating-card" elevation="3" rounded="xl">
-        <v-btn
-          class="user-map-view__dashboard-button"
-          to="/_user/dashboard"
-          variant="tonal"
-          color="primary"
-          icon
-          aria-label="بازگشت به پیشخوان"
-          title="بازگشت به پیشخوان"
-        >
-          <v-icon icon="mdi-view-dashboard-outline" />
-        </v-btn>
-        <div class="user-map-view__title-block">
-          <p>نقشهٔ محلی</p>
-          <h1>نقشهٔ همراهان</h1>
-        </div>
-        <v-chip class="user-map-view__map-chip" color="primary" variant="tonal" size="small">
-          تهران
-        </v-chip>
-      </v-card>
-    </header>
-
     <nav v-if="isPhone" class="user-map-view__dock" aria-label="ابزارهای نقشه">
       <v-btn
         v-for="tool in mapTools"
@@ -44,7 +21,8 @@
         :aria-controls="`map-${tool.id}-panel`"
         @click="toggleTool(tool.id)"
       >
-        <v-icon :icon="tool.icon" />
+        <v-icon :icon="tool.icon" size="20" aria-hidden="true" />
+        <span class="user-map-view__dock-label">{{ tool.shortLabel }}</span>
       </v-btn>
     </nav>
 
@@ -134,11 +112,11 @@ const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null,
 // Only phones replace the full cards with a dock. v-show keeps every composable, GPS watch,
 // socket and playback timer mounted while a tool is closed; the desktop/tablet layout is unchanged.
 type MapTool = "search" | "history" | "own" | "live";
-const mapTools: { id: MapTool; label: string; icon: string }[] = [
-  { id: "search", label: "جست‌وجوی مکان", icon: "mdi-magnify" },
-  { id: "history", label: "تاریخچهٔ مسیر", icon: "mdi-map-clock-outline" },
-  { id: "own", label: "موقعیت من", icon: "mdi-crosshairs-gps" },
-  { id: "live", label: "اشتراک و همراهان", icon: "mdi-account-group-outline" }
+const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
+  { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
+  { id: "history", label: "تاریخچهٔ مسیر", shortLabel: "تاریخچه", icon: "mdi-map-clock-outline" },
+  { id: "own", label: "موقعیت من", shortLabel: "موقعیت", icon: "mdi-crosshairs-gps" },
+  { id: "live", label: "اشتراک و همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
 const activeTool = ref<MapTool | null>(null);
@@ -511,7 +489,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 /* This page is RTL: MapLibre's physical top-right rail sits directly behind the history card.
- * Dock only this map's native navigation controls in the gap between the two top overlays;
+ * Dock only this map's native navigation controls in the gap between history and search;
  * other MapCanvas users keep their own edge controls and MapLibre button behavior. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
   top: 1rem;
@@ -541,58 +519,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   min-height: 44px;
 }
 
-.user-map-view__toolbar {
-  position: absolute;
-  z-index: 2;
-  inset-block-start: 1rem;
-  inset-inline-end: 1rem;
-  width: min(25rem, calc(100% - 2rem));
-  pointer-events: none;
-}
-
-.user-map-view__toolbar-card {
-  display: flex;
-  min-height: 4.6rem;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 0.85rem;
-  background: rgba(var(--v-theme-surface), 0.95);
-  backdrop-filter: blur(12px);
-  pointer-events: auto;
-}
-
-.user-map-view__dashboard-button {
-  flex: 0 0 auto;
-}
-
-.user-map-view__title-block {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.user-map-view__title-block p {
-  margin: 0;
-  color: #536d6c;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.user-map-view__title-block h1 {
-  margin: 0.15rem 0 0;
-  color: #193536;
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.45;
-}
-
-.user-map-view__map-chip {
-  flex: 0 0 auto;
-}
-
 .user-map-view__search {
   position: absolute;
   z-index: 3;
-  inset-block-start: 6rem;
+  inset-block-start: 1rem;
   inset-inline-end: 1rem;
   width: min(25rem, calc(100% - 2rem));
   display: flex;
@@ -632,18 +562,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-:global(:root.dark .user-map-view__toolbar-card) {
-  background: rgba(27, 41, 42, 0.94);
-}
-
-:global(:root.dark .user-map-view__title-block p) {
-  color: #a0b6b2;
-}
-
-:global(:root.dark .user-map-view__title-block h1) {
-  color: #edf5f2;
 }
 
 /* At narrow/tablet widths, side panels would overlap each other and cover the map.
@@ -687,7 +605,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-inline-start: 0;
   }
 
-  .user-map-view__toolbar,
   .user-map-view__search,
   .user-map-view__playback,
   .user-map-view__own,
@@ -699,18 +616,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     pointer-events: auto;
   }
 
-  .user-map-view__toolbar { order: 0; }
   .user-map-view__search { order: 1; }
   .user-map-view__playback { order: 3; }
   .user-map-view__own { order: 4; }
   .user-map-view__live { order: 5; }
-
-  .user-map-view__toolbar-card {
-    gap: 0.5rem;
-    padding: 0.55rem 0.65rem;
-  }
-
-  .user-map-view__title-block h1 { font-size: 0.92rem; }
 }
 
 /* Phone map: an edge-to-edge viewport behind the slim app rail, not a map squeezed between
@@ -738,7 +647,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* Keep map zoom and compass beside, not under, the compact back-to-dashboard control. */
+  /* Keep native zoom and compass together at the top edge, clear of the app bar. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     top: calc(4rem + env(safe-area-inset-top, 0px));
     right: 0.75rem;
@@ -752,61 +661,64 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-top: 0;
     border-inline-start: 1px solid #627a7a;
   }
-  /* SOS is at inline-start (physical right in this RTL view). Attribution at
-   * physical right must clear it; the logo at physical left only clears the dock. */
+  /* Attribution stays visible between the app bar and the bottom sheet, never
+   * buried beneath an open tool or the SOS pill. Preserve MapLibre's own control. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
-    bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
-    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    top: calc(4rem + env(safe-area-inset-top, 0px));
+    bottom: auto;
+    left: 0.25rem;
+    right: auto;
   }
-
-  .user-map-view__toolbar {
-    position: absolute;
-    inset-block-start: calc(4rem + env(safe-area-inset-top, 0px));
-    inset-inline-end: 0.75rem;
-    width: 44px;
-    pointer-events: auto;
+  /* The map's real OSM/OpenMapTiles credit is much wider than a compact phone.
+   * Include its built-in padding in the cap, so its expanded text wraps beside
+   * (not over) the native zoom rail and remains fully readable. */
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib) {
+    box-sizing: border-box;
+    max-width: calc(100vw - 9.5rem);
+    margin: 0;
   }
-  .user-map-view__toolbar-card { width: 44px; min-height: 44px; padding: 0; border-radius: 14px !important; }
-  .user-map-view__dashboard-button { width: 44px; min-width: 44px; height: 44px; }
-  .user-map-view__title-block { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .user-map-view__map-chip { display: none; }
 
   .user-map-view__dock {
     position: absolute;
     z-index: 5;
     inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px));
     left: 50%;
-    width: min(15rem, calc(100% - 2rem));
-    min-height: 3.25rem;
+    width: min(19rem, calc(100% - 1.5rem));
+    min-height: 4rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.25rem;
     padding: 0.25rem;
     border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
-    border-radius: 999px;
+    border-radius: 1.25rem;
     background: rgba(var(--v-theme-surface), 0.97);
     box-shadow: var(--bb-shadow-overlay);
     backdrop-filter: blur(12px);
     transform: translateX(-50%);
   }
-  .user-map-view__dock :deep(.v-btn) { flex: 1 1 0; min-width: 44px; min-height: 44px; height: 44px; }
+  .user-map-view__dock :deep(.v-btn) { flex: 1 1 0; min-width: 44px; min-height: 56px; height: 56px; border-radius: 1rem; }
+  .user-map-view__dock :deep(.v-btn__content) { display: flex; flex-direction: column; gap: 0.1rem; }
+  .user-map-view__dock-label { font-size: 0.75rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
   .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 
   .user-map-view__panel {
     position: absolute;
     z-index: 4;
-    top: calc(7.25rem + env(safe-area-inset-top, 0px));
+    /* A nonmodal bottom sheet keeps the map usable above it. It ends just above
+     * the separate SOS action; the labelled dock remains in thumb reach below. */
+    top: auto;
     /* Reset both logical insets inherited from the four desktop placements.
      * left:50% alone is over-constrained with inset-inline-start in RTL and
      * sends history/live partly beyond the physical left edge. */
     inset-inline: 0;
-    inset-block-end: auto;
+    inset-block-end: calc(9.75rem + env(safe-area-inset-bottom, 0px));
     margin-inline: auto;
     width: min(26rem, calc(100% - 1.5rem));
-    max-height: min(60dvh, calc(100dvh - 17rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(60dvh, calc(100dvh - 18.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
@@ -840,13 +752,37 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__playback :deep(.history-playback) { width: 100%; max-height: none; overflow: visible; }
 }
 
-/* Landscape/keyboard-short viewports: let a tool use the space above the launcher
- * instead of collapsing to a header-only strip. SOS stays above the panel at its
- * fixed viewport position, and the panel still scrolls at its original content size. */
+/* Landscape/keyboard-short viewports: scroll the full-sized tool above the dock.
+ * Leave room for attribution at the top; SOS remains above the sheet in z-order. */
 @media (max-width: 599px) and (max-height: 480px) {
   .user-map-view__panel {
-    top: calc(3.75rem + env(safe-area-inset-top, 0px));
-    max-height: calc(100dvh - 8.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    top: calc(7rem + env(safe-area-inset-top, 0px));
+    inset-block-end: auto;
+    max-height: calc(100dvh - 11.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Very short portrait widths cannot fit a side lane. Cap the sheet before the
+ * SOS button instead, while its original content remains scrollable. */
+@media (max-width: 479px) and (max-height: 480px) {
+  .user-map-view__panel {
+    top: calc(8.25rem + env(safe-area-inset-top, 0px));
+    max-height: calc(100dvh - 17.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* In short landscape, a left-aligned sheet leaves a separate lane for SOS and
+ * the native zoom rail. Put the noninteractive scale beside, not under, the dock. */
+@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
+  .user-map-view__panel {
+    inset-inline: auto;
+    left: 0.75rem;
+    right: auto;
+    margin-inline: 0;
+    width: min(23rem, calc(100% - 11.5rem));
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
   }
 }
 

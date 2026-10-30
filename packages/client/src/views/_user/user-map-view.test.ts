@@ -200,8 +200,8 @@ describe("UserMapView live overlay", () => {
   });
 
   it("moves narrow map controls into a scrollable, non-occluding flow", () => {
-    // 25rem toolbar + 24rem history + two 1rem edges = 816px at the default root size.
-    // The previous 750px cutoff left a real overlap from 751px through at least 815px.
+    // 25rem search + 24rem history + two 1rem edges = 816px at the default root size.
+    // Panels are stacked before their top corners can overlap.
     expect(view).toContain('width: min(25rem, calc(100% - 2rem));');
     expect(view).toContain('width: min(24rem, calc(100% - 2rem));');
     expect(25 * 16 + 24 * 16 + 2 * 16).toBe(816);

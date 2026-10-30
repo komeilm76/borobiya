@@ -15,6 +15,15 @@ function css(source: string, filename: string): string {
 }
 
 describe("mobile map viewport and overlay tools", () => {
+  it("uses a route title instead of the app logo or a second dashboard shortcut on the map", () => {
+    expect(app).toContain('v-if="!isMapRoute" class="brand-link"');
+    expect(app).toContain('<h1 v-else class="app-map-title">نقشهٔ همراهان</h1>');
+    expect(view).not.toContain('to="/_user/dashboard"');
+    expect(view).not.toContain('user-map-view__toolbar');
+    expect(view).not.toContain('user-map-view__map-chip'); // No hard-coded Tehran label for other regions.
+    expect(app).toContain('title="فهرست بخش‌ها"');
+  });
+
   it("uses a full-height map on phones with shell navigation over the tiles, not flow panels and footer", () => {
     expect(app).toContain("'app-shell--map': isMapRoute");
     expect(app).toContain('route.name === "user-map"');
@@ -66,21 +75,30 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("safe-area-inset-bottom");
     expect(phoneMap).toContain(".maplibregl-ctrl-top-right");
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right");
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{\s*bottom: calc\(9\.5rem/); // RTL SOS is physical right.
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(4\.75rem/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4rem[^}]*bottom: auto;/);
+    expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
+    expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem);"); // Real OSM/OpenMapTiles credit must not cover zoom.
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(5\.5rem/);
     expect(phoneMap).toContain(".user-map-view__dock");
+    expect(view).toContain('class="user-map-view__dock-label"');
+    expect(phoneMap).toContain(".user-map-view__dock-label");
     expect(phoneMap).toContain(".user-map-view__panel");
+    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-block-end: calc\(9\.75rem \+ env\(safe-area-inset-bottom/);
+    expect(phoneMap).toContain("100dvh - 18.5rem"); // Space for expanded attribution above the sheet.
     // All four panels inherit different desktop logical insets. In RTL a physical
     // left:50% cannot override inset-inline-start/right; history/live go offscreen.
     expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-inline: 0;[^}]*margin-inline: auto;/);
     expect(phoneMap).not.toMatch(/\.user-map-view__panel\s*\{[^}]*left: 50%/);
-    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-block-end: auto;/); // Own/live inherited bottom insets otherwise stretch an empty panel.
+    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*top: auto;[^}]*inset-block-end: calc\(9\.75rem/); // Own/live inherited desktop insets must not stretch the sheet.
     // Live uses flex columns: a height-capped aside otherwise shrinks both cards
     // and clips their contents *without any scroll overflow*.
     expect(phoneMap).toContain(".user-map-view__panel > :not(.user-map-view__panel-head)");
     expect(phoneMap).toContain("flex-shrink: 0;");
     expect(phoneMap).toContain("overscroll-behavior: contain");
     expect(phoneMap).toContain("min-height: 44px");
+    expect(phoneMap).toContain("@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px)");
+    expect(phoneMap).toContain("width: min(23rem, calc(100% - 11.5rem));");
+    expect(phoneMap).toContain("bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));");
     expect(css(view, "UserMapView.vue")).toContain(".user-map-view__panel[data-v-map-mobile]");
   });
 });

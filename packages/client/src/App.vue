@@ -1,7 +1,7 @@
 <template>
   <v-app :class="{ 'app-shell--map': isMapRoute }">
     <v-app-bar class="app-topbar px-sm-6" flat height="64">
-      <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
+      <RouterLink v-if="!isMapRoute" class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
         </span>
@@ -10,6 +10,7 @@
           <span class="brand-tagline">شبکهٔ امداد و همراهی</span>
         </span>
       </RouterLink>
+      <h1 v-else class="app-map-title">نقشهٔ همراهان</h1>
 
       <v-spacer />
 
