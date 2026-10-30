@@ -214,21 +214,34 @@ describe("UserMapView live overlay", () => {
     expect(phone).toContain("height: clamp(20rem, 55dvh, 32rem);");
     expect(phone).toContain(".user-map-view__search { order: 1; }");
     expect(phone).toContain(".user-map-view__playback { order: 3; }");
-    expect(phone).toContain(".user-map-view__live { order: 5; }");
+    expect(phone).toContain(".user-map-view__live { order: 4; }");
+    expect(phone).not.toContain(".user-map-view__own { order:");
     expect(phone).not.toContain("inset-block-");
     expect(phone).not.toContain("position: absolute;");
   });
 
-  it("offers private own-position watching independently of peer sharing and clears its marker", () => {
+  it("starts private foreground GPS once when map and owner are ready, and keeps a recenter/retry action", () => {
     expect(view).toContain('useOwnMapPosition(computed(() => auth.user?.id ?? null))');
-    expect(view).toContain('<OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />');
-    expect(view).not.toContain('class="user-map-view__own-card');
+    expect(view).not.toContain('OwnPositionBar');
+    expect(view).not.toContain('id="map-own-panel"');
+    expect(view).toContain('watch([map, () => auth.user?.id ?? null]');
+    expect(view).toContain('if (!instance || !ownerId || own.active.value || own.error.value) return;');
+    expect(view).toContain('startOwnLocation(true)');
+    expect(view).toContain('class="user-map-view__recenter"');
+    expect(view).toContain('@click="centerOnOwnLocation"');
+    expect(view).toContain('aria-live="polite"');
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
     expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
-    expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation()');
+    expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation(false)');
+    expect(body("centerOnOwnLocation")).toContain('if (!fix)');
     expect(body("centerOnOwnLocation")).toContain('userControlledCamera.value = true');
+    expect(body("centerOnOwnLocation")).toContain('closeTool(false)');
+    expect(body("centerOnOwnLocation")).toContain('getMaxBounds()');
+    expect(body("centerOnOwnLocation")).toContain('bounds.contains([fix.lon, fix.lat])');
+    expect(body("focusOwnIfRequested")).toContain('if (automaticFocus && userControlledCamera.value)');
     expect(view).toContain('ownMarker?.remove();');
     expect(view).toContain('own.stop();');
+    expect(view).not.toContain('broadcast.toggle()'); // A map GPS watch never starts sharing.
   });
 
   it("paints a peer change once, not again via a redundant peer-count watcher", () => {

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Show private location automatically on the user map (T4.4.1 follow-up)
+
+- Removed the `موقعیت` panel/dock tool from `/_user/map`; the authenticated, map-ready view now starts its own foreground GPS watch automatically without starting live broadcasting. The first fix adds a private marker and recenters unless a map gesture or another camera selection occurred; subsequent fixes move the marker without hijacking the camera. An accessible 48px recenter/retry icon sits 8px above SOS, closes an open phone tool sheet when explicitly pressed, and reports GPS errors or an out-of-offline-region fix rather than pretending it centered. Ordinary portrait sheets end above the new control; on very short portraits only, the control yields while a sheet is open so all panel contents remain scrollable. Source-pinned regressions failed before implementation. Mocked Chromium verified one automatic watch, own marker, button/SOS clearance, sheet geometry, and no browser exceptions at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800. Physical-device permission, accuracy and safe-area checks remain open.
+
 ### 2026-10-30 — Close phone-map sheet when its active dock tool is deselected (T4.4.1 bug follow-up)
 
 - Vuetify's non-mandatory `v-bottom-navigation` emits `undefined` rather than `null` when the selected button is tapped again. Passing that value into `activeTool` hid all four panels but kept the sheet open (`undefined !== null`), leaving a blank interactive overlay; the per-panel Close button did not have this problem because it explicitly set `null`. The selection handler now normalizes `undefined` to `null` before updating the dock, sheet visibility and focus. A source-pinned regression failed before the fix. Mocked Chromium reproduced the blank open sheet before the fix and verified the closed/ARIA-hidden sheet and launcher focus afterward, including rapid switching and deselection across all four tools. Live-backend and device acceptance remain open.

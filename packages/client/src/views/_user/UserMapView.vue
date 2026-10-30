@@ -41,9 +41,26 @@
       </v-layout>
     </div>
 
+    <!-- Keep location a map feature, not a fourth panel. This is a private GPS
+         watcher; opening the map never starts outgoing location sharing. -->
+    <v-btn
+      class="user-map-view__recenter"
+      v-show="!(isShortPhone && activeTool)"
+      :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
+      :color="own.error.value || recenterError ? 'warning' : 'primary'"
+      :aria-label="recenterLabel"
+      :title="recenterLabel"
+      :disabled="!map || !auth.user"
+      variant="flat"
+      @click="centerOnOwnLocation"
+    />
+    <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
+      {{ recenterError ?? own.error.value }}
+    </span>
+
     <ReverseAddressSheet :api="reverse" />
 
-    <!-- One eager Vuetify sheet for all four panels. On tablet/desktop the host is a
+    <!-- One eager Vuetify sheet for the three remaining tools. On tablet/desktop the host is a
          boxless div, so the original panels keep their normal positions and order. -->
     <component
       :is="isPhone ? VBottomSheet : 'div'"
@@ -76,16 +93,6 @@
         />
       </aside>
 
-      <aside id="map-own-panel" v-show="!isPhone || activeTool === 'own'"
-        class="user-map-view__own user-map-view__panel" :role="isPhone ? 'region' : undefined"
-        :aria-label="isPhone ? 'موقعیت من' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-        <div v-if="isPhone" class="user-map-view__panel-head">
-          <strong>موقعیت من</strong>
-          <v-btn icon="mdi-close" variant="text" aria-label="بستن موقعیت من" @click="closeTool()" />
-        </div>
-        <OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />
-      </aside>
-
       <aside id="map-live-panel" v-show="!isPhone || activeTool === 'live'"
         class="user-map-view__live user-map-view__panel" :role="isPhone ? 'region' : undefined"
         :aria-label="isPhone ? 'اشتراک و همراهان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
@@ -108,7 +115,6 @@ import { VBottomSheet } from "vuetify/components";
 import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
-import OwnPositionBar from "@/components/map/OwnPositionBar.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
 import { useReversePlace } from "@/composables/use-reverse-place";
@@ -136,16 +142,16 @@ const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
-// Only phones replace the full cards with a dock and an eager bottom sheet. v-show keeps
-// every panel mounted (GPS, socket and playback included) while the sheet is closed.
-type MapTool = "search" | "history" | "own" | "live";
+// Only phones put the three supplementary tools in a dock and eager bottom sheet.
+// v-show preserves playback and socket state while a panel is closed.
+type MapTool = "search" | "history" | "live";
 const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
   { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
   { id: "history", label: "تاریخچهٔ مسیر", shortLabel: "تاریخچه", icon: "mdi-map-clock-outline" },
-  { id: "own", label: "موقعیت من", shortLabel: "موقعیت", icon: "mdi-crosshairs-gps" },
   { id: "live", label: "اشتراک و همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
+const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 480px)");
 const activeTool = ref<MapTool | null>(null);
 // A popstate changes Vue Router's history position before route-leave guards run.
 // Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
@@ -242,6 +248,14 @@ const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
 let ownMarker: Marker | null = null;
 let markerConstructor: typeof Marker | null = null;
 let focusOnNextFix = false;
+let automaticFocus = false;
+const recenterError = ref<string | null>(null);
+const recenterLabel = computed(() => {
+  if (recenterError.value) return recenterError.value;
+  if (own.error.value) return `${own.error.value} برای تلاش دوباره روی موقعیت من بزنید.`;
+  if (!own.position.value) return "نمایش موقعیت من؛ پس از دریافت GPS نقشه روی من مرکز می‌شود";
+  return "مرکز کردن نقشه روی موقعیت من";
+});
 
 function syncOwnMarker(): void {
   const instance = map.value;
@@ -252,24 +266,53 @@ function syncOwnMarker(): void {
     ownMarker.getElement().setAttribute("aria-label", "موقعیت زندهٔ من");
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
 }
-function centerOnOwnLocation(): void {
+function centerOnOwnLocation(initiatedByUser = true): void {
   const instance = map.value;
+  if (!instance) return;
+  // An explicit recenter should reveal the marker instead of leaving it hidden
+  // under a phone tool sheet. A delayed automatic fix must not close the sheet.
+  if (initiatedByUser && isPhone.value && activeTool.value) closeTool(false);
   const fix = own.position.value;
-  if (!instance || !fix) return;
+  if (!fix) {
+    // The button is also a retry after a denied/unavailable fix and a request to
+    // center on the next fix when the watcher is still waiting.
+    if (own.active.value) { focusOnNextFix = true; automaticFocus = false; }
+    else startOwnLocation(false);
+    return;
+  }
+  const bounds = instance.getMaxBounds();
+  if (bounds && !bounds.contains([fix.lon, fix.lat])) {
+    // Tiles are installed only for the configured local region. Never claim to
+    // center on a point the bounded offline map cannot actually show.
+    recenterError.value = "موقعیت من خارج از محدودهٔ نقشهٔ آفلاین است.";
+    return;
+  }
+  recenterError.value = null;
   userControlledCamera.value = true; // A late history fetch must not pan away from the GPS fix.
   instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
-  if (isPhone.value && activeTool.value === "own") closeTool();
 }
-function startOwnLocation(): void {
-  focusOnNextFix = own.start();
+function startOwnLocation(auto: boolean): void {
+  focusOnNextFix = true;
+  automaticFocus = auto;
+  if (!own.start()) { focusOnNextFix = false; automaticFocus = false; }
+  else focusOwnIfRequested(); // A native bridge may deliver the first fix synchronously.
 }
 function focusOwnIfRequested(): void {
   if (!focusOnNextFix || !own.position.value || !map.value) return;
   focusOnNextFix = false;
-  centerOnOwnLocation(); // Recenter only on the first fix or an explicit press, not on every update.
+  // A slow first GPS fix must not undo a search hit or a manual map gesture.
+  if (automaticFocus && userControlledCamera.value) { automaticFocus = false; return; }
+  automaticFocus = false;
+  centerOnOwnLocation(false); // Recenter once, not on every update.
 }
-watch(() => own.position.value, () => { syncOwnMarker(); focusOwnIfRequested(); });
-watch(() => own.active.value, (active) => { if (!active) focusOnNextFix = false; });
+watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(); focusOwnIfRequested(); });
+watch(() => own.active.value, (active) => { if (!active) { focusOnNextFix = false; automaticFocus = false; } });
+// Start only after the authenticated map is ready. Watch owner as well: the map
+// can finish loading before session restoration. A denial is not auto-retried.
+watch([map, () => auth.user?.id ?? null], ([instance, ownerId]) => {
+  if (!instance || !ownerId || own.active.value || own.error.value) return;
+  startOwnLocation(true);
+}, { immediate: true });
 const reverse = useReversePlace();
 const placeSearch = usePlaceSearch({
   area: (scope) => {
@@ -622,19 +665,22 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   pointer-events: none;
 }
 
-/*
- * The live panel replaces the placeholder notice that used to sit here. It is interactive (a retry
- * button) so unlike the playback column it does not set `pointer-events: none` — a card that swallows
- * drags is the price of a button that works, and the panel is small enough to live at the edge.
- */
-.user-map-view__own {
-  position: absolute;
-  z-index: 2;
-  inset-block-end: 1rem;
-  inset-inline-end: 1rem;
-  width: min(22rem, calc(100% - 2rem));
+/* Align the private recenter action with the shared SOS button on every map size. */
+.user-map-view__recenter {
+  position: fixed;
+  z-index: 6;
+  inset-inline-start: 1.25rem;
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 3.5rem);
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+  border-radius: 50%;
+  box-shadow: var(--bb-shadow-overlay);
 }
+.user-map-view__recenter:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
 
+/* The live card remains interactive; unlike the playback column it must accept clicks. */
 .user-map-view__live {
   position: absolute;
   z-index: 2;
@@ -689,7 +735,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
   .user-map-view__search,
   .user-map-view__playback,
-  .user-map-view__own,
   .user-map-view__live {
     position: static;
     width: 100%;
@@ -700,12 +745,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
   .user-map-view__search { order: 1; }
   .user-map-view__playback { order: 3; }
-  .user-map-view__own { order: 4; }
-  .user-map-view__live { order: 5; }
+  .user-map-view__live { order: 4; }
 }
 
 /* Phone map: an edge-to-edge viewport behind the slim app rail, not a map squeezed between
- * stacked cards. The four complete tools remain mounted, but one scrollable surface opens over
+ * stacked cards. The three complete tools remain mounted, but one scrollable surface opens over
  * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
 @media (max-width: 599px) {
   .user-map-view {
@@ -763,6 +807,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     margin: 0;
   }
 
+  .user-map-view__recenter {
+    inset-inline-start: 0.75rem;
+    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
+  }
+
   /* A nested Vuetify layout keeps bottom-navigation from reserving space in
    * the app shell. The frame positions the dock; Vuetify owns its selection. */
   .user-map-view__dock-frame {
@@ -808,10 +857,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     inset-block-start: auto;
     inset-inline: 0;
-    inset-block-end: calc(9.75rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
     margin: 0 auto;
     width: min(26rem, calc(100% - 1.5rem));
-    max-height: min(60dvh, calc(100dvh - 18.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(60dvh, calc(100dvh - 21.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
@@ -856,7 +905,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   }
   .user-map-view__panel-head :deep(.v-btn) { min-width: 44px; min-height: 44px; }
-  .user-map-view__search, .user-map-view__playback, .user-map-view__own, .user-map-view__live {
+  .user-map-view__search, .user-map-view__playback, .user-map-view__live {
     pointer-events: auto;
   }
   .user-map-view__playback :deep(.history-playback) { width: 100%; max-height: none; overflow: visible; }
@@ -872,8 +921,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
-/* Very short portrait widths cannot fit a side lane. Cap the sheet before the
- * SOS button instead, while its original content remains scrollable. */
+/* Short portrait cannot fit the recenter action and a usable panel above SOS.
+ * Hide only the recenter action while a tool is open, preserving the full scroll
+ * surface and leaving SOS accessible. */
 @media (max-width: 479px) and (max-height: 480px) {
   :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     top: calc(8.25rem + env(safe-area-inset-top, 0px));

@@ -53,7 +53,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(sosTrigger).toContain('@click="$emit(\'trigger\')"');
   });
 
-  it("keeps full-size controls mounted and offers four accessible launchers with one scrollable panel", () => {
+  it("keeps full-size controls mounted and offers three accessible launchers with one scrollable panel", () => {
     expect(view).toContain('useMediaQuery("(max-width: 599px)")');
     expect(view).toContain('<div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
     expect(view).toContain('<v-layout class="user-map-view__dock-layout">');
@@ -67,7 +67,9 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain(':height="64"');
     expect(view).toMatch(/grow\s+absolute/);
     expect(view).toContain(':value="tool.id"');
-    for (const tool of ["search", "history", "own", "live"]) {
+    expect(view).not.toContain('id: "own"');
+    expect(view).not.toContain('map-own-panel');
+    for (const tool of ["search", "history", "live"]) {
       expect(view).toContain(`id: "${tool}"`);
       expect(view).toContain(`id="map-${tool}-panel"`);
       expect(view).toContain(`activeTool === '${tool}'`);
@@ -120,7 +122,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('document.getElementById(`map-tool-${previous}`)?.focus()');
     expect(view).toContain('document.getElementById(`map-tool-${tool}`)?.focus()');
     // Camera actions reveal their destination; opening the tool again retains the full content.
-    for (const tool of ["search", "history", "own"]) {
+    for (const tool of ["search", "history"]) {
       expect(view).toContain(`if (isPhone.value && activeTool.value === "${tool}") closeTool()`);
     }
   });
@@ -139,18 +141,21 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain(".user-map-view__dock-layout");
     expect(phoneMap).toContain(".user-map-view__dock");
     expect(phoneMap).toContain(".v-bottom-navigation__content > .v-btn");
-    expect(phoneMap).toContain("min-width: 44px"); // Vuetify's 80px minimum would clip four tools at 320px.
+    expect(phoneMap).toContain("min-width: 44px"); // Keep the three targets accessible at 320px.
     expect(view).toContain('class="user-map-view__dock-label"');
     expect(phoneMap).toContain(".user-map-view__dock-label");
     expect(phoneMap).toContain(".user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content");
+    expect(view).toContain('v-show="!(isShortPhone && activeTool)"'); // On very short portrait, keep full panels usable.
+    expect(phoneMap).toContain(".user-map-view__recenter");
+    expect(phoneMap).toContain("inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))");
     // Vuetify's default translateY(100%) sweeps the open sheet across SOS and
     // the dock during animation, swallowing a quick second tool press.
     expect(phoneMap).toContain(".bottom-sheet-transition-enter-from");
     expect(phoneMap).toContain(".bottom-sheet-transition-leave-to");
     expect(phoneMap).toContain("transform: none;");
     expect(phoneMap).toContain("opacity: 0;");
-    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(9\.75rem \+ env\(safe-area-inset-bottom/);
-    expect(phoneMap).toContain("100dvh - 18.5rem"); // Space for expanded attribution above the sheet.
+    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(12\.5rem \+ env\(safe-area-inset-bottom/);
+    expect(phoneMap).toContain("100dvh - 21.25rem"); // Space for expanded attribution above the sheet.
     expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-inline: 0;[^}]*margin: 0 auto;/);
     expect(phoneMap).toContain("overflow-y: auto;"); // Sheet scrolls; full-size cards do not shrink.
     expect(phoneMap).toContain(".user-map-view__panel");

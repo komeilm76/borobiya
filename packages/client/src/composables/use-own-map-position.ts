@@ -19,7 +19,8 @@ const browserRuntime: OwnMapPositionRuntime = {
   }
 };
 
-/** Explicit, private, foreground-only GPS display. Viewing yourself never publishes a fix or starts a share. */
+/** Private, foreground-only GPS display. The authenticated map starts this watch on entry;
+ * viewing yourself never publishes a fix or starts a share. */
 export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPositionRuntime = browserRuntime) {
   const active = ref(false);
   const position = ref<OwnMapFix | null>(null);
