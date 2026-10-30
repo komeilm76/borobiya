@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Clear stale map search POIs during movement (T4.4.1 follow-up)
+
+- The earlier bbox refresh pruned only on MapLibre `moveend`: Karaj hits could persist throughout a drag or zoom, and an in-flight response could paint the old bbox before the camera settled in Tehran. Search now prunes the list, numbered pins and out-of-bounds detail selection as camera bounds change, aborts an obsolete read immediately, and starts exactly one 30-result bounded read on `moveend`. Even an explicitly library-wide search switches to viewport results on a real camera gesture, so moving the map never keeps old off-screen list items. Returning to the original bbox after pruning also refetches its results. The final selection flight also prunes outside hits without triggering another search; programmatic fit keeps its no-search behavior. Deferred tests cover mid-drag stale reads and a zoomed-in selection; real MapLibre, Photon and phone acceptance remain open.
+
 ### 2026-10-30 — Correct map search to current bbox's top 30 (T4.4.1 follow-up)
 
 - The prior accumulated-pin behavior was incorrect: map search now defaults to the visible bbox and requests up to 30 top hits per bbox (client, shared query and Photon gateway limits agree). On moving the camera, old list items and markers outside the new bbox are removed before the new request resolves. The latest answer replaces the snapshot; an empty answer removes old pins, and a failed/pending read retains only still-in-bbox hits with retry. An out-of-bbox selected place closes. Abort, stale reply protection and map-fit/selection flights remain intact. Pure tests and contract checks cover bounds, capacity, movement and retry; live Photon and real device/browser acceptance remain open.

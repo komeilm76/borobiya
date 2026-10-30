@@ -134,8 +134,8 @@ describe("UserMapView live overlay", () => {
     expect(body("onMapReady")).toContain('instance.on("movestart", markUserCameraMove)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("movestart", markUserCameraMove)');
     expect(move).toContain("markUserCameraMove(event)");
-    expect(move).toContain("placeSearch.refreshForViewport(showAllResultsOnMap.value)");
-    expect(move.indexOf("markUserCameraMove(event)")).toBeLessThan(move.indexOf("placeSearch.refreshForViewport(showAllResultsOnMap.value)"));
+    expect(move).toContain("placeSearch.refreshForViewport(followViewport)");
+    expect(move.indexOf("markUserCameraMove(event)")).toBeLessThan(move.indexOf("placeSearch.refreshForViewport(followViewport)"));
     expect(body("frameCamera")).toContain("track.length === 0 || userControlledCamera.value");
     expect(body("showTrack")).toContain("map.value?.stop()");
     expect(body("showTrack")).toContain("userControlledCamera.value = false");
@@ -149,8 +149,13 @@ describe("UserMapView live overlay", () => {
   it("updates visible-bbox results on map moveend but preserves the list after selecting a POI", () => {
     expect(body("onMapReady")).toContain('instance.on("moveend", onMapMoveEnd)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("moveend", onMapMoveEnd)');
-    expect(body("onMapMoveEnd")).toContain('event.placeSearchSelection === true');
-    expect(body("onMapMoveEnd")).toContain('placeSearch.refreshForViewport(showAllResultsOnMap.value)');
+    const moveEnd = body("onMapMoveEnd");
+    expect(moveEnd).toContain('event.placeSearchSelection === true');
+    expect(moveEnd).toContain('placeSearch.pruneForViewport(showAllResultsOnMap.value, false)');
+    expect(moveEnd).toContain('placeSearch.pruneForViewport(followViewport)');
+    expect(moveEnd).toContain('placeSearch.refreshForViewport(followViewport)');
+    expect(moveEnd.indexOf('placeSearch.pruneForViewport(followViewport)')).toBeLessThan(
+      moveEnd.indexOf('placeSearch.refreshForViewport(followViewport)'));
     expect(body("selectPlace")).toContain('{ placeSearchSelection: true }');
     expect(body("selectPlace")).not.toContain('placeSearch.clear()');
   });

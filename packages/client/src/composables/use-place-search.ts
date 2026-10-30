@@ -33,9 +33,14 @@ export function usePlaceSearch(options: {
   let generation = 0;
   let disposed = false;
   let lastRequestBbox: string | null = null;
+  let lastPrunedBbox: string | null = null;
+  let needsRefresh = false;
 
   function invalidate(): void {
     generation++;
+    lastRequestBbox = null;
+    lastPrunedBbox = null;
+    needsRefresh = false;
     if (timer !== null) clearTimeout(timer);
     timer = null;
     controller?.abort();
@@ -79,6 +84,8 @@ export function usePlaceSearch(options: {
     if (q.length < 2) return;
     const area = options.area(scope.value);
     lastRequestBbox = area?.bbox ?? null;
+    lastPrunedBbox = lastRequestBbox;
+    needsRefresh = false;
     if (preserve && scope.value === "viewport") {
       // As soon as the camera enters another bbox, drop out-of-area hits even while
       // Photon is pending/offline. Keep only still-visible pins until the new answer.
@@ -130,15 +137,49 @@ export function usePlaceSearch(options: {
     if (term.value.trim().length >= 2) await run();
   }
 
+  /** Remove out-of-bbox hits during a gesture rather than waiting for moveend.
+   * Stop a previous bbox's in-flight read now: it must not repaint old pins mid-drag.
+   * The caller starts just one new read when the camera settles.
+   */
+  function pruneForViewport(followMap = false, awaitRefresh = true): void {
+    if (disposed || term.value.trim().length < 2 || timer !== null) return;
+    if (followMap) scope.value = "viewport";
+    if (scope.value !== "viewport") return;
+    const area = options.area("viewport");
+    const bbox = area?.bbox ?? null;
+    if (bbox === lastPrunedBbox) return;
+    lastPrunedBbox = bbox;
+    // Even returning to the starting bbox needs a read: intermediate pruning
+    // already removed hits that cannot be reconstructed from the old snapshot.
+    needsRefresh = true;
+    if (bbox !== lastRequestBbox) {
+      if (controller) {
+        generation++;
+        controller.abort();
+        controller = null;
+      }
+      failed.value = false;
+      loading.value = awaitRefresh; // A selection flight prunes but never requests.
+    }
+    const visibleResults = area ? results.value.filter(area.contains) : [];
+    if (visibleResults.length !== results.value.length) results.value = visibleResults;
+    if (mapActive.value) {
+      const visibleMapResults = area ? mapResults.value.filter(area.contains) : [];
+      if (visibleMapResults.length !== mapResults.value.length) mapResults.value = visibleMapResults;
+    }
+    if (selectedPlaceId.value && !results.value.some(place => place.placeId === selectedPlaceId.value) &&
+        !mapResults.value.some(place => place.placeId === selectedPlaceId.value)) selectedPlaceId.value = null;
+  }
+
   /** Pan/zoom after Show All follows the viewport. Prune outside the new bbox
    * immediately, then replace the snapshot from one abortable request.
    */
   function refreshForViewport(followMap = false, force = false): void {
     if (disposed || term.value.trim().length < 2 || timer !== null) return;
-    if (followMap && mapActive.value) scope.value = "viewport";
+    if (followMap) scope.value = "viewport";
     if (scope.value !== "viewport") return;
     const bbox = options.area("viewport")?.bbox ?? null;
-    if (!force && bbox === lastRequestBbox) return;
+    if (!force && !needsRefresh && bbox === lastRequestBbox) return;
     void run(true);
   }
 
@@ -159,5 +200,5 @@ export function usePlaceSearch(options: {
 
   onScopeDispose(() => { disposed = true; invalidate(); });
   return { term, scope, results, mapResults, mapActive, selectedPlaceId, loading, failed, searched,
-    run, update, clear, setScope, refreshForViewport, retry, showOnMap, select };
+    run, update, clear, setScope, pruneForViewport, refreshForViewport, retry, showOnMap, select };
 }

@@ -66,7 +66,10 @@ describe("show all current POIs on the map", () => {
     expect(css.errors).toEqual([]);
     expect(css.code).toContain(".user-map-view__result-marker");
     expect(css.code).toContain(".user-map-view__search-map-actions");
-    expect(view).toContain("placeSearch.refreshForViewport(showAllResultsOnMap.value)");
+    expect(view).toContain("placeSearch.pruneForViewport(!!event.originalEvent || showAllResultsOnMap.value)");
+    expect(view).toContain('instance.on("move", onMapMoving)');
+    expect(view).toContain('instance.off("move", onMapMoving)');
+    expect(view).toContain("placeSearch.refreshForViewport(followViewport)");
     expect(view).toContain('aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"');
     expect(view).toContain('aria-label="تلاش دوباره برای نتایج این محدوده"');
     expect(view).toContain('placeSearch.retry()');

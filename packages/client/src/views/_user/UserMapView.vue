@@ -933,12 +933,24 @@ function markUserCameraMove(event: MapMovementEvent): void {
   if (event.originalEvent) userControlledCamera.value = true;
 }
 
+function onMapMoving(event: MapMovementEvent): void {
+  if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
+  placeSearch.pruneForViewport(!!event.originalEvent || showAllResultsOnMap.value);
+}
+
 function onMapMoveEnd(event: MapMovementEvent): void {
   markUserCameraMove(event); // Also cover gestures whose start preceded this listener.
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
   // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.
-  if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
-  placeSearch.refreshForViewport(showAllResultsOnMap.value);
+  if ("placeSearchSelection" in event && event.placeSearchSelection === true) {
+    // The flight must not search again, but a zoomed-in camera must not retain
+    // unrelated out-of-bbox POIs in the list or on the map.
+    placeSearch.pruneForViewport(showAllResultsOnMap.value, false);
+    return;
+  }
+  const followViewport = !!event.originalEvent || showAllResultsOnMap.value;
+  placeSearch.pruneForViewport(followViewport);
+  placeSearch.refreshForViewport(followViewport);
 }
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
@@ -962,6 +974,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   instance.on("click", onMapClick);
   instance.on("contextmenu", onMapLongPress);
   instance.on("movestart", markUserCameraMove);
+  instance.on("move", onMapMoving);
   instance.on("moveend", onMapMoveEnd);
   instance.on("resize", frameCamera);
   paintLive();
@@ -1026,6 +1039,7 @@ onBeforeUnmount(() => {
     instance.off("click", onMapClick);
     instance.off("contextmenu", onMapLongPress);
     instance.off("movestart", markUserCameraMove);
+    instance.off("move", onMapMoving);
     instance.off("moveend", onMapMoveEnd);
     instance.off("resize", frameCamera);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
