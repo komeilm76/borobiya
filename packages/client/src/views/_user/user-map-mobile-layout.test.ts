@@ -55,7 +55,18 @@ describe("mobile map viewport and overlay tools", () => {
 
   it("keeps full-size controls mounted and offers four accessible launchers with one scrollable panel", () => {
     expect(view).toContain('useMediaQuery("(max-width: 599px)")');
+    expect(view).toContain('<div v-if="isPhone" class="user-map-view__dock-frame">');
+    expect(view).toContain('<v-layout class="user-map-view__dock-layout">');
+    expect(view).toContain('<v-bottom-navigation');
     expect(view).toContain('class="user-map-view__dock"');
+    expect(view).toContain('tag="nav"');
+    expect(view).toContain('aria-label="ابزارهای نقشه"');
+    expect(view).toContain(':model-value="activeTool"');
+    expect(view).toContain('@update:model-value="selectTool"');
+    expect(view).toContain(':mandatory="false"'); // Tapping the selected tool closes it.
+    expect(view).toContain(':height="64"');
+    expect(view).toMatch(/grow\s+absolute/);
+    expect(view).toContain(':value="tool.id"');
     for (const tool of ["search", "history", "own", "live"]) {
       expect(view).toContain(`id: "${tool}"`);
       expect(view).toContain(`id="map-${tool}-panel"`);
@@ -72,8 +83,11 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('max-height:');
     expect(view).toContain('overflow-y: auto;');
     expect(view).not.toContain('v-if="activeTool ==='); // Do not unmount playback, GPS or socket state.
-    expect(view).toContain('const next = activeTool.value === tool ? null : tool');
+    expect(view).toContain('async function selectTool(next: MapTool | null)');
+    expect(view).toContain('const previous = activeTool.value;');
+    expect(view).toContain('activeTool.value = next;');
     expect(view).toContain('document.getElementById(`map-${next}-panel`)?.focus()');
+    expect(view).toContain('document.getElementById(`map-tool-${previous}`)?.focus()');
     expect(view).toContain('document.getElementById(`map-tool-${tool}`)?.focus()');
     // Camera actions reveal their destination; opening the tool again retains the full content.
     for (const tool of ["search", "history", "own"]) {
@@ -91,7 +105,11 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
     expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem);"); // Real OSM/OpenMapTiles credit must not cover zoom.
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(5\.5rem/);
+    expect(phoneMap).toContain(".user-map-view__dock-frame");
+    expect(phoneMap).toContain(".user-map-view__dock-layout");
     expect(phoneMap).toContain(".user-map-view__dock");
+    expect(phoneMap).toContain(".v-bottom-navigation__content > .v-btn");
+    expect(phoneMap).toContain("min-width: 44px"); // Vuetify's 80px minimum would clip four tools at 320px.
     expect(view).toContain('class="user-map-view__dock-label"');
     expect(phoneMap).toContain(".user-map-view__dock-label");
     expect(phoneMap).toContain(".user-map-view__panel");

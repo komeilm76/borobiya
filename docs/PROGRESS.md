@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Use Vuetify bottom navigation for phone map tools (T4.4.1 follow-up)
+
+- Replaced the hand-built four-button `/_user/map` phone dock with `v-bottom-navigation` inside a nested `v-layout`, so Vuetify owns the active selection without reserving space in the application shell or shrinking the full-screen map. The navigation remains a named `nav` with visible labels, accessible 44px-plus targets, a theme-aware selected state, safe-area positioning and one optional selection: tapping an active tool again closes its panel. All four full-content panels remain mounted and scrollable, with Escape/close and selection returning keyboard focus appropriately. Overrode Vuetify's 80px button minimum (which clipped four actions at 320px) without changing SOS, MapLibre controls or attribution. A source-pinned regression failed before the change; mocked-data Chromium checks at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800 exercised all tool toggles, panel bounds, SOS clearance and keyboard Enter/Escape focus. Live backend/device safe-area acceptance remains open.
+
 ### 2026-10-30 — Use a compact icon-only SOS trigger (T4.4.1 follow-up)
 
 - Removed the visible text from the shared `SosTriggerButton` and centered its existing emergency-beacon icon in a 48×48px red circular control on every route. The accessible Persian name/hover tooltip now clarify that the icon opens a form rather than immediately sending a request; its dialog affordance, keyboard focus outline, reduced-motion handling, visible emergency styling and existing sheet action remain; on the phone map, only its safe-area-aware position is overridden so it clears the dock. Source-pinned regressions failed before the change. Mocked-data Chromium checks at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800 confirmed placement; clicking the icon at 320×568 opened and closed the SOS sheet. Live-backend and physical-device acceptance remain open.

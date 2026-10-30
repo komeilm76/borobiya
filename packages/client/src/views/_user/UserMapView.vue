@@ -7,24 +7,39 @@
       @ready="onMapReady"
     />
 
-    <nav v-if="isPhone" class="user-map-view__dock" aria-label="ابزارهای نقشه">
-      <v-btn
-        v-for="tool in mapTools"
-        :id="`map-tool-${tool.id}`"
-        :key="tool.id"
-        icon
-        :color="activeTool === tool.id ? 'primary' : undefined"
-        :variant="activeTool === tool.id ? 'flat' : 'tonal'"
-        :aria-label="tool.label"
-        :title="tool.label"
-        :aria-expanded="activeTool === tool.id"
-        :aria-controls="`map-${tool.id}-panel`"
-        @click="toggleTool(tool.id)"
-      >
-        <v-icon :icon="tool.icon" size="20" aria-hidden="true" />
-        <span class="user-map-view__dock-label">{{ tool.shortLabel }}</span>
-      </v-btn>
-    </nav>
+    <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
+    <div v-if="isPhone" class="user-map-view__dock-frame">
+      <v-layout class="user-map-view__dock-layout">
+        <v-bottom-navigation
+          class="user-map-view__dock"
+          name="map-tools"
+          tag="nav"
+          aria-label="ابزارهای نقشه"
+          :model-value="activeTool"
+          :height="64"
+          :mandatory="false"
+          grow
+          absolute
+          @update:model-value="selectTool"
+        >
+          <v-btn
+            v-for="tool in mapTools"
+            :id="`map-tool-${tool.id}`"
+            :key="tool.id"
+            :value="tool.id"
+            :color="activeTool === tool.id ? 'primary' : undefined"
+            variant="text"
+            :aria-label="tool.label"
+            :title="tool.label"
+            :aria-expanded="activeTool === tool.id"
+            :aria-controls="`map-${tool.id}-panel`"
+          >
+            <v-icon :icon="tool.icon" size="20" aria-hidden="true" />
+            <span class="user-map-view__dock-label">{{ tool.shortLabel }}</span>
+          </v-btn>
+        </v-bottom-navigation>
+      </v-layout>
+    </div>
 
     <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
       class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
@@ -121,12 +136,15 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 const isPhone = useMediaQuery("(max-width: 599px)");
 const activeTool = ref<MapTool | null>(null);
 
-async function toggleTool(tool: MapTool): Promise<void> {
-  const next = activeTool.value === tool ? null : tool;
+// Vuetify's non-mandatory selection lets tapping the active tool close it again.
+// Keep selection and panel visibility on the same state, then move keyboard focus.
+async function selectTool(next: MapTool | null): Promise<void> {
+  const previous = activeTool.value;
+  if (next === previous) return;
   activeTool.value = next;
   await nextTick();
   if (next) document.getElementById(`map-${next}-panel`)?.focus();
-  else document.getElementById(`map-tool-${tool}`)?.focus();
+  else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
 }
 
 function closeTool(): void {
@@ -681,29 +699,44 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     margin: 0;
   }
 
-  .user-map-view__dock {
+  /* A nested Vuetify layout keeps bottom-navigation from reserving space in
+   * the app shell. The frame positions the dock; Vuetify owns its selection. */
+  .user-map-view__dock-frame {
     position: absolute;
     z-index: 5;
     inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px));
     left: 50%;
     width: min(19rem, calc(100% - 1.5rem));
-    min-height: 4rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.25rem;
-    padding: 0.25rem;
+    height: 4rem;
+    flex: none;
+    transform: translateX(-50%);
+  }
+  .user-map-view__dock-layout { width: 100%; height: 100%; }
+  .user-map-view__dock {
     border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
     border-radius: 1.25rem;
     background: rgba(var(--v-theme-surface), 0.97);
     box-shadow: var(--bb-shadow-overlay);
     backdrop-filter: blur(12px);
-    transform: translateX(-50%);
   }
-  .user-map-view__dock :deep(.v-btn) { flex: 1 1 0; min-width: 44px; min-height: 56px; height: 56px; border-radius: 1rem; }
-  .user-map-view__dock :deep(.v-btn__content) { display: flex; flex-direction: column; gap: 0.1rem; }
+  .user-map-view__dock :deep(.v-bottom-navigation__content) {
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem;
+  }
+  /* Vuetify's 80px minimum would clip four tools on a 320px-wide phone. */
+  .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn) {
+    flex: 1 1 0;
+    min-width: 44px;
+    max-width: none;
+    height: 56px;
+    border-radius: 1rem;
+  }
+  .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn.v-btn--selected) {
+    background: rgba(var(--v-theme-primary), 0.14);
+  }
   .user-map-view__dock-label { font-size: 0.75rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
-  .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+  .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
 
   .user-map-view__panel {
     position: absolute;
