@@ -50,7 +50,6 @@
       class="user-map-view__tool-host"
       :class="isPhone ? 'user-map-view__tool-sheet' : undefined"
       v-bind="isPhone ? phoneSheetProps : {}"
-      @click:outside="onSheetOutside"
       @update:model-value="onSheetVisibilityChange"
     >
       <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
@@ -102,7 +101,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { onBeforeRouteLeave } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
 import { VBottomSheet } from "vuetify/components";
 import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
@@ -147,13 +147,35 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
 const activeTool = ref<MapTool | null>(null);
+// A popstate changes Vue Router's history position before route-leave guards run.
+// Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
+// keep the map visible on the first Back and dismiss just the open tool. Ordinary
+// menu/link navigation (a push) must still leave immediately.
+let mapEntryPosition: number | undefined;
+onMounted(() => {
+  const position: unknown = window.history.state?.position;
+  mapEntryPosition = typeof position === "number" ? position : undefined;
+});
+onBeforeRouteLeave(() => {
+  const position: unknown = window.history.state?.position;
+  if (isPhone.value && activeTool.value && typeof position === "number" &&
+    mapEntryPosition !== undefined && position < mapEntryPosition) {
+    closeTool();
+    return false;
+  }
+});
+
 // The desktop host is a boxless div; do not put dialog/overlay attributes on it.
 const phoneSheetProps = computed(() => ({
   modelValue: activeTool.value !== null,
   scrim: false,
-  persistent: true, // Keep Vuetify's delayed outside-click from undoing a dock switch.
-  closeOnBack: false,
-  noClickAnimation: true,
+  // The map (including its dock and controls) is part of the activator, so a
+  // dock switch isn't an outside click. Let Vuetify handle Back and outside clicks.
+  activator: ".user-map-view",
+  activatorProps: { "aria-haspopup": undefined },
+  openOnClick: false,
+  persistent: false,
+  closeOnBack: true,
   retainFocus: false,
   captureFocus: false,
   scrollStrategy: "none" as const,
@@ -174,24 +196,18 @@ async function selectTool(next: MapTool | null): Promise<void> {
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
 }
 
-// A dock press is an outside click from Vuetify's teleported sheet. Its delayed
-// click-outside callback would close a *newly selected* tool after the press.
-// Let other outside clicks dismiss the sheet, without intercepting SOS or map controls.
-function onSheetOutside(event: MouseEvent): void {
-  if ((event.target as Element).closest(".user-map-view__dock-frame, .sos-fab, .maplibregl-ctrl")) return;
-  closeTool();
-}
-
 // Keep Vuetify's model and the dock selection in sync on all other close paths.
 function onSheetVisibilityChange(visible: boolean): void {
   if (!visible && activeTool.value) closeTool();
 }
 
-function closeTool(): void {
+function closeTool(restoreFocus = true): void {
   const tool = activeTool.value;
   if (!tool) return;
   activeTool.value = null;
-  void nextTick(() => document.getElementById(`map-tool-${tool}`)?.focus());
+  // A map tap may open the *modal* reverse-address sheet immediately afterwards.
+  // Do not move focus behind that dialog when dismissing the nonmodal tool.
+  if (restoreFocus) void nextTick(() => document.getElementById(`map-tool-${tool}`)?.focus());
 }
 
 function onPanelEscape(event: KeyboardEvent): void {
@@ -423,11 +439,13 @@ let lastLongPressAt = 0;
 function onMapClick(event: MapMouseEvent): void {
   // Some touch browsers synthesize a click after a long-press contextmenu event.
   if (Date.now() - lastLongPressAt < 700) return;
+  if (isPhone.value && activeTool.value) closeTool(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 function onMapLongPress(event: MapMouseEvent): void {
   event.preventDefault();
   lastLongPressAt = Date.now();
+  if (isPhone.value && activeTool.value) closeTool(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 
@@ -798,6 +816,15 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     background: rgba(var(--v-theme-surface), 0.97);
     box-shadow: var(--bb-shadow-overlay);
     backdrop-filter: blur(12px);
+  }
+  /* Vuetify slides a bottom sheet by its entire height. Here the sheet sits
+   * ABOVE SOS + dock: that slide would sweep through and intercept both controls
+   * until the animation finishes (even an 8px shift hits the landscape dock).
+   * Fade in place so a quick second tap always reaches the navigation. */
+  :global(.user-map-view__tool-sheet .bottom-sheet-transition-enter-from),
+  :global(.user-map-view__tool-sheet .bottom-sheet-transition-leave-to) {
+    transform: none;
+    opacity: 0;
   }
   .user-map-view__panel {
     position: static;

@@ -84,9 +84,19 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('@update:model-value="onSheetVisibilityChange"');
     expect(view).toContain('if (!visible && activeTool.value) closeTool()');
     expect(view).toContain("eager: true");
-    expect(view).toContain("persistent: true");
-    expect(view).toContain('@click:outside="onSheetOutside"');
-    expect(view).toContain('if ((event.target as Element).closest(".user-map-view__dock-frame, .sos-fab, .maplibregl-ctrl")) return;');
+    expect(view).toContain('persistent: false');
+    expect(view).toContain('closeOnBack: true');
+    // Vuetify's Back hook may not run when the Vue Router guard navigates first.
+    expect(view).toContain('onBeforeRouteLeave(() => {');
+    expect(view).toContain('window.history.state?.position');
+    expect(view).toContain('position < mapEntryPosition');
+    expect(view).toContain('return false;'); // Cancel the backward route change, keep the map.
+
+    expect(view).toContain('activator: ".user-map-view"'); // Dock/map controls are not outside clicks.
+    expect(view).toContain('openOnClick: false'); // Activator must not toggle the sheet on map gestures.
+    expect(view).not.toContain('@click:outside="onSheetOutside"');
+    expect(view).toContain('closeTool(false);'); // Map tap/long press opens reverse address; don't steal modal focus.
+
     expect(view).toContain('@keydown.esc.stop="closeTool()"');
     // Map controls, dock and SOS must remain interactive, not hidden behind a modal scrim.
     for (const prop of ['scrim: false', 'retainFocus: false', 'captureFocus: false',
@@ -130,6 +140,12 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('class="user-map-view__dock-label"');
     expect(phoneMap).toContain(".user-map-view__dock-label");
     expect(phoneMap).toContain(".user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content");
+    // Vuetify's default translateY(100%) sweeps the open sheet across SOS and
+    // the dock during animation, swallowing a quick second tool press.
+    expect(phoneMap).toContain(".bottom-sheet-transition-enter-from");
+    expect(phoneMap).toContain(".bottom-sheet-transition-leave-to");
+    expect(phoneMap).toContain("transform: none;");
+    expect(phoneMap).toContain("opacity: 0;");
     expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(9\.75rem \+ env\(safe-area-inset-bottom/);
     expect(phoneMap).toContain("100dvh - 18.5rem"); // Space for expanded attribution above the sheet.
     expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-inline: 0;[^}]*margin: 0 auto;/);
