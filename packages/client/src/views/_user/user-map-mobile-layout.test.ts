@@ -55,7 +55,7 @@ describe("mobile map viewport and overlay tools", () => {
 
   it("keeps full-size controls mounted and offers four accessible launchers with one scrollable panel", () => {
     expect(view).toContain('useMediaQuery("(max-width: 599px)")');
-    expect(view).toContain('<div v-if="isPhone" class="user-map-view__dock-frame">');
+    expect(view).toContain('<div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
     expect(view).toContain('<v-layout class="user-map-view__dock-layout">');
     expect(view).toContain('<v-bottom-navigation');
     expect(view).toContain('class="user-map-view__dock"');
@@ -76,6 +76,23 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain(':aria-expanded="activeTool === tool.id"');
     expect(view).toContain(':aria-controls="`map-${tool.id}-panel`"');
     expect(view).toContain('v-show="!isPhone || activeTool ===');
+    expect(view).toContain(`:is="isPhone ? VBottomSheet : 'div'"`);
+    expect(view).toContain('class="user-map-view__tool-host"');
+    expect(view).toContain(`:class="isPhone ? 'user-map-view__tool-sheet' : undefined"`);
+    expect(view).toContain('v-bind="isPhone ? phoneSheetProps : {}"');
+    expect(view).toContain('modelValue: activeTool.value !== null');
+    expect(view).toContain('@update:model-value="onSheetVisibilityChange"');
+    expect(view).toContain('if (!visible && activeTool.value) closeTool()');
+    expect(view).toContain("eager: true");
+    expect(view).toContain("persistent: true");
+    expect(view).toContain('@click:outside="onSheetOutside"');
+    expect(view).toContain('if ((event.target as Element).closest(".user-map-view__dock-frame, .sos-fab, .maplibregl-ctrl")) return;');
+    expect(view).toContain('@keydown.esc.stop="closeTool()"');
+    // Map controls, dock and SOS must remain interactive, not hidden behind a modal scrim.
+    for (const prop of ['scrim: false', 'retainFocus: false', 'captureFocus: false',
+      'scrollStrategy: "none"', '"aria-modal": "false"',
+      '"aria-hidden": activeTool.value === null ? "true" : undefined']) expect(view).toContain(prop);
+    expect(view).toContain('.user-map-view__tool-host { display: contents; }');
     expect(view).toContain('@keydown.esc="onPanelEscape"');
     expect(view).toContain("if (!isPhone.value) return;");
     expect(view).toContain("event.stopPropagation()");
@@ -112,16 +129,12 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("min-width: 44px"); // Vuetify's 80px minimum would clip four tools at 320px.
     expect(view).toContain('class="user-map-view__dock-label"');
     expect(phoneMap).toContain(".user-map-view__dock-label");
-    expect(phoneMap).toContain(".user-map-view__panel");
-    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-block-end: calc\(9\.75rem \+ env\(safe-area-inset-bottom/);
+    expect(phoneMap).toContain(".user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content");
+    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(9\.75rem \+ env\(safe-area-inset-bottom/);
     expect(phoneMap).toContain("100dvh - 18.5rem"); // Space for expanded attribution above the sheet.
-    // All four panels inherit different desktop logical insets. In RTL a physical
-    // left:50% cannot override inset-inline-start/right; history/live go offscreen.
-    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*inset-inline: 0;[^}]*margin-inline: auto;/);
-    expect(phoneMap).not.toMatch(/\.user-map-view__panel\s*\{[^}]*left: 50%/);
-    expect(phoneMap).toMatch(/\.user-map-view__panel\s*\{[^}]*top: auto;[^}]*inset-block-end: calc\(9\.75rem/); // Own/live inherited desktop insets must not stretch the sheet.
-    // Live uses flex columns: a height-capped aside otherwise shrinks both cards
-    // and clips their contents *without any scroll overflow*.
+    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-inline: 0;[^}]*margin: 0 auto;/);
+    expect(phoneMap).toContain("overflow-y: auto;"); // Sheet scrolls; full-size cards do not shrink.
+    expect(phoneMap).toContain(".user-map-view__panel");
     expect(phoneMap).toContain(".user-map-view__panel > :not(.user-map-view__panel-head)");
     expect(phoneMap).toContain("flex-shrink: 0;");
     expect(phoneMap).toContain("overscroll-behavior: contain");
@@ -130,5 +143,6 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("width: min(23rem, calc(100% - 11.5rem));");
     expect(phoneMap).toContain("bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));");
     expect(css(view, "UserMapView.vue")).toContain(".user-map-view__panel[data-v-map-mobile]");
+    expect(css(view, "UserMapView.vue")).toContain(".user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content");
   });
 });

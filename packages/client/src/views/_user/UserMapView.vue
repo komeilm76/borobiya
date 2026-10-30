@@ -8,7 +8,7 @@
     />
 
     <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
-    <div v-if="isPhone" class="user-map-view__dock-frame">
+    <div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
       <v-layout class="user-map-view__dock-layout">
         <v-bottom-navigation
           class="user-map-view__dock"
@@ -41,58 +41,70 @@
       </v-layout>
     </div>
 
-    <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
-      class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
-      :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-      <div v-if="isPhone" class="user-map-view__panel-head">
-        <strong>جست‌وجوی مکان</strong>
-        <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
-      </div>
-      <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
-    </aside>
-
     <ReverseAddressSheet :api="reverse" />
 
-    <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
-      class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
-      :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-      <div v-if="isPhone" class="user-map-view__panel-head">
-        <strong>تاریخچهٔ مسیر</strong>
-        <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
-      </div>
-      <HistoryPlaybackPanel
-        :api="playback"
-        :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
-        @return-to-track="showTrack"
-      />
-    </aside>
+    <!-- One eager Vuetify sheet for all four panels. On tablet/desktop the host is a
+         boxless div, so the original panels keep their normal positions and order. -->
+    <component
+      :is="isPhone ? VBottomSheet : 'div'"
+      class="user-map-view__tool-host"
+      :class="isPhone ? 'user-map-view__tool-sheet' : undefined"
+      v-bind="isPhone ? phoneSheetProps : {}"
+      @click:outside="onSheetOutside"
+      @update:model-value="onSheetVisibilityChange"
+    >
+      <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
+        class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
+        :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+        <div v-if="isPhone" class="user-map-view__panel-head">
+          <strong>جست‌وجوی مکان</strong>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
+        </div>
+        <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
+      </aside>
 
-    <aside id="map-own-panel" v-show="!isPhone || activeTool === 'own'"
-      class="user-map-view__own user-map-view__panel" :role="isPhone ? 'region' : undefined"
-      :aria-label="isPhone ? 'موقعیت من' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-      <div v-if="isPhone" class="user-map-view__panel-head">
-        <strong>موقعیت من</strong>
-        <v-btn icon="mdi-close" variant="text" aria-label="بستن موقعیت من" @click="closeTool()" />
-      </div>
-      <OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />
-    </aside>
+      <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
+        class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
+        :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+        <div v-if="isPhone" class="user-map-view__panel-head">
+          <strong>تاریخچهٔ مسیر</strong>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن تاریخچه" @click="closeTool()" />
+        </div>
+        <HistoryPlaybackPanel
+          :api="playback"
+          :show-return-to-track="userControlledCamera && playback.frames.value.length > 0"
+          @return-to-track="showTrack"
+        />
+      </aside>
 
-    <aside id="map-live-panel" v-show="!isPhone || activeTool === 'live'"
-      class="user-map-view__live user-map-view__panel" :role="isPhone ? 'region' : undefined"
-      :aria-label="isPhone ? 'اشتراک و همراهان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-      <div v-if="isPhone" class="user-map-view__panel-head">
-        <strong>اشتراک و همراهان</strong>
-        <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
-      </div>
-      <LiveBroadcastBar compact />
-      <LiveCompanionPanel :api="live" />
-    </aside>
+      <aside id="map-own-panel" v-show="!isPhone || activeTool === 'own'"
+        class="user-map-view__own user-map-view__panel" :role="isPhone ? 'region' : undefined"
+        :aria-label="isPhone ? 'موقعیت من' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+        <div v-if="isPhone" class="user-map-view__panel-head">
+          <strong>موقعیت من</strong>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن موقعیت من" @click="closeTool()" />
+        </div>
+        <OwnPositionBar :api="own" :ready="!!map" @start="startOwnLocation" @center="centerOnOwnLocation" />
+      </aside>
+
+      <aside id="map-live-panel" v-show="!isPhone || activeTool === 'live'"
+        class="user-map-view__live user-map-view__panel" :role="isPhone ? 'region' : undefined"
+        :aria-label="isPhone ? 'اشتراک و همراهان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+        <div v-if="isPhone" class="user-map-view__panel-head">
+          <strong>اشتراک و همراهان</strong>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
+        </div>
+        <LiveBroadcastBar compact />
+        <LiveCompanionPanel :api="live" />
+      </aside>
+    </component>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
+import { VBottomSheet } from "vuetify/components";
 import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -124,8 +136,8 @@ const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
-// Only phones replace the full cards with a dock. v-show keeps every composable, GPS watch,
-// socket and playback timer mounted while a tool is closed; the desktop/tablet layout is unchanged.
+// Only phones replace the full cards with a dock and an eager bottom sheet. v-show keeps
+// every panel mounted (GPS, socket and playback included) while the sheet is closed.
 type MapTool = "search" | "history" | "own" | "live";
 const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
   { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
@@ -135,6 +147,21 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
 const activeTool = ref<MapTool | null>(null);
+// The desktop host is a boxless div; do not put dialog/overlay attributes on it.
+const phoneSheetProps = computed(() => ({
+  modelValue: activeTool.value !== null,
+  scrim: false,
+  persistent: true, // Keep Vuetify's delayed outside-click from undoing a dock switch.
+  closeOnBack: false,
+  noClickAnimation: true,
+  retainFocus: false,
+  captureFocus: false,
+  scrollStrategy: "none" as const,
+  eager: true,
+  "aria-modal": "false",
+  "aria-hidden": activeTool.value === null ? "true" : undefined,
+  "aria-label": mapTools.find(tool => tool.id === activeTool.value)?.label
+}));
 
 // Vuetify's non-mandatory selection lets tapping the active tool close it again.
 // Keep selection and panel visibility on the same state, then move keyboard focus.
@@ -145,6 +172,19 @@ async function selectTool(next: MapTool | null): Promise<void> {
   await nextTick();
   if (next) document.getElementById(`map-${next}-panel`)?.focus();
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
+}
+
+// A dock press is an outside click from Vuetify's teleported sheet. Its delayed
+// click-outside callback would close a *newly selected* tool after the press.
+// Let other outside clicks dismiss the sheet, without intercepting SOS or map controls.
+function onSheetOutside(event: MouseEvent): void {
+  if ((event.target as Element).closest(".user-map-view__dock-frame, .sos-fab, .maplibregl-ctrl")) return;
+  closeTool();
+}
+
+// Keep Vuetify's model and the dock selection in sync on all other close paths.
+function onSheetVisibilityChange(visible: boolean): void {
+  if (!visible && activeTool.value) closeTool();
 }
 
 function closeTool(): void {
@@ -497,6 +537,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   isolation: isolate;
 }
 
+/* Without a box, desktop absolute offsets and tablet flex order stay unchanged. */
+.user-map-view__tool-host { display: contents; }
+
 .user-map-view__canvas {
   position: absolute;
   inset: 0;
@@ -738,18 +781,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__dock-label { font-size: 0.75rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
   .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
 
-  .user-map-view__panel {
-    position: absolute;
-    z-index: 4;
-    /* A nonmodal bottom sheet keeps the map usable above it. It ends just above
-     * the separate SOS action; the labelled dock remains in thumb reach below. */
-    top: auto;
-    /* Reset both logical insets inherited from the four desktop placements.
-     * left:50% alone is over-constrained with inset-inline-start in RTL and
-     * sends history/live partly beyond the physical left edge. */
+  /* Vuetify owns the sheet transition and portal; place its interactive content
+   * above SOS + dock, leaving the rest of the overlay click-through. The long
+   * widgets scroll here (not inside a shrunken flex child). */
+  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
+    inset-block-start: auto;
     inset-inline: 0;
     inset-block-end: calc(9.75rem + env(safe-area-inset-bottom, 0px));
-    margin-inline: auto;
+    margin: 0 auto;
     width: min(26rem, calc(100% - 1.5rem));
     max-height: min(60dvh, calc(100dvh - 18.5rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto;
@@ -759,6 +798,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     background: rgba(var(--v-theme-surface), 0.97);
     box-shadow: var(--bb-shadow-overlay);
     backdrop-filter: blur(12px);
+  }
+  .user-map-view__panel {
+    position: static;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    /* The Vuetify content is the scrollable/card surface, not each aside. */
+    pointer-events: auto;
   }
   /* Flex containers must overflow the aside, not squeeze card contents into
    * their own hidden overflow (which leaves the bottom actions unreachable). */
@@ -788,7 +835,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Landscape/keyboard-short viewports: scroll the full-sized tool above the dock.
  * Leave room for attribution at the top; SOS remains above the sheet in z-order. */
 @media (max-width: 599px) and (max-height: 480px) {
-  .user-map-view__panel {
+  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     top: calc(7rem + env(safe-area-inset-top, 0px));
     inset-block-end: auto;
     max-height: calc(100dvh - 11.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
@@ -798,7 +845,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Very short portrait widths cannot fit a side lane. Cap the sheet before the
  * SOS button instead, while its original content remains scrollable. */
 @media (max-width: 479px) and (max-height: 480px) {
-  .user-map-view__panel {
+  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     top: calc(8.25rem + env(safe-area-inset-top, 0px));
     max-height: calc(100dvh - 17.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
@@ -807,7 +854,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* In short landscape, a left-aligned sheet leaves a separate lane for SOS and
  * the native zoom rail. Put the noninteractive scale beside, not under, the dock. */
 @media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
-  .user-map-view__panel {
+  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     inset-inline: auto;
     left: 0.75rem;
     right: auto;
