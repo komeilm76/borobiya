@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Close phone-map sheet when its active dock tool is deselected (T4.4.1 bug follow-up)
+
+- Vuetify's non-mandatory `v-bottom-navigation` emits `undefined` rather than `null` when the selected button is tapped again. Passing that value into `activeTool` hid all four panels but kept the sheet open (`undefined !== null`), leaving a blank interactive overlay; the per-panel Close button did not have this problem because it explicitly set `null`. The selection handler now normalizes `undefined` to `null` before updating the dock, sheet visibility and focus. A source-pinned regression failed before the fix. Mocked Chromium reproduced the blank open sheet before the fix and verified the closed/ARIA-hidden sheet and launcher focus afterward, including rapid switching and deselection across all four tools. Live-backend and device acceptance remain open.
+
 ### 2026-10-30 — Repair phone-map sheet Back and fast switching (T4.4.1 bug follow-up)
 
 - A mocked Chromium SPA journey exposed that browser Back navigated away from `/_user/map` while its tool sheet was open. The persistent Vuetify sheet also needed a delayed outside-click workaround. The nonmodal sheet now treats the map (including dock and native controls) as a non-click-activated Vuetify activator, allowing normal outside-click/Back handling; a route-leave guard uses Vue Router's decreasing history position to dismiss the sheet on Back without cancelling deliberate menu navigation. Map taps/long-presses still open the reverse-address modal, but dismiss the tool first without stealing its focus. A second browser regression showed Vuetify's default full-height entrance sweep temporarily covered SOS and dock, swallowing an immediate tool switch; the offset sheet now fades in place. Source-pinned tests failed before each fix. Mocked Chromium confirmed immediate tool switching, keyboard Escape, SOS, MapLibre zoom, map/reverse-address interactions, first/second SPA Back and sheet geometry at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800. Live backend and physical-device Back/IME/safe-area checks remain open.

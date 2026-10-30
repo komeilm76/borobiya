@@ -110,10 +110,13 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('max-height:');
     expect(view).toContain('overflow-y: auto;');
     expect(view).not.toContain('v-if="activeTool ==='); // Do not unmount playback, GPS or socket state.
-    expect(view).toContain('async function selectTool(next: MapTool | null)');
+    // A non-mandatory Vuetify group emits undefined (not null) on deselection.
+    // Leaving that value in activeTool keeps modelValue !== null true and creates a blank open sheet.
+    expect(view).toContain('async function selectTool(next: MapTool | null | undefined)');
+    expect(view).toContain('const selected = next ?? null;');
     expect(view).toContain('const previous = activeTool.value;');
-    expect(view).toContain('activeTool.value = next;');
-    expect(view).toContain('document.getElementById(`map-${next}-panel`)?.focus()');
+    expect(view).toContain('activeTool.value = selected;');
+    expect(view).toContain('document.getElementById(`map-${selected}-panel`)?.focus()');
     expect(view).toContain('document.getElementById(`map-tool-${previous}`)?.focus()');
     expect(view).toContain('document.getElementById(`map-tool-${tool}`)?.focus()');
     // Camera actions reveal their destination; opening the tool again retains the full content.

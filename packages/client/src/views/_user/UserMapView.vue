@@ -185,14 +185,17 @@ const phoneSheetProps = computed(() => ({
   "aria-label": mapTools.find(tool => tool.id === activeTool.value)?.label
 }));
 
-// Vuetify's non-mandatory selection lets tapping the active tool close it again.
+// Vuetify's non-mandatory group emits undefined when the selected button is tapped
+// again. Normalize it to null: otherwise the sheet's `activeTool !== null` stays
+// true while all four panels are hidden, leaving an empty interactive overlay.
 // Keep selection and panel visibility on the same state, then move keyboard focus.
-async function selectTool(next: MapTool | null): Promise<void> {
+async function selectTool(next: MapTool | null | undefined): Promise<void> {
+  const selected = next ?? null;
   const previous = activeTool.value;
-  if (next === previous) return;
-  activeTool.value = next;
+  if (selected === previous) return;
+  activeTool.value = selected;
   await nextTick();
-  if (next) document.getElementById(`map-${next}-panel`)?.focus();
+  if (selected) document.getElementById(`map-${selected}-panel`)?.focus();
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
 }
 
