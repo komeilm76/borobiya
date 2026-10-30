@@ -319,8 +319,20 @@ function syncOwnMarker(): void {
   const fix = own.position.value;
   if (!instance || !fix || !markerConstructor) { ownMarker?.remove(); ownMarker = null; return; }
   if (!ownMarker) {
-    ownMarker = new markerConstructor({ color: "#2563eb" }).setLngLat([fix.lon, fix.lat]).addTo(instance);
-    ownMarker.getElement().setAttribute("aria-label", "موقعیت زندهٔ من");
+    // An explicit private-GPS target, not MapLibre's default destination pin.
+    // Never confuse seeing one's location with opting into outgoing sharing.
+    const element = document.createElement("div");
+    element.className = "user-map-view__own-marker";
+    element.setAttribute("role", "img");
+    element.setAttribute("aria-label", "موقعیت زندهٔ من");
+    element.setAttribute("title", "موقعیت من (فقط روی این دستگاه)");
+    const icon = document.createElement("span");
+    icon.className = "mdi mdi-crosshairs-gps user-map-view__own-marker-icon";
+    icon.setAttribute("aria-hidden", "true");
+    element.append(icon);
+    element.addEventListener("click", (event) => event.stopPropagation());
+    ownMarker = new markerConstructor({ element, anchor: "center" })
+      .setLngLat([fix.lon, fix.lat]).addTo(instance);
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
 }
 function centerOnOwnLocation(initiatedByUser = true): void {
@@ -566,6 +578,10 @@ function syncPeerAvatars(): void {
       button.setAttribute("aria-controls", "companion-detail-sheet");
       button.className = "user-map-view__peer-avatar";
       button.dataset.userId = peer.userId;
+      const avatar = document.createElement("span");
+      avatar.className = "user-map-view__peer-avatar-face";
+      avatar.setAttribute("aria-hidden", "true");
+      button.append(avatar);
       button.addEventListener("click", (event) => {
         event.stopPropagation(); // Don't reverse-geocode a companion tap as a map click.
         selectCompanion(peer.userId, false);
@@ -575,7 +591,8 @@ function syncPeerAvatars(): void {
       peerMarkers.set(peer.userId, marker);
     }
     const button = marker.getElement();
-    button.textContent = avatarInitial(peer.name);
+    const face = button.firstElementChild;
+    if (face) face.textContent = avatarInitial(peer.name);
     button.setAttribute("aria-label", `اطلاعات همراه ${peer.name}؛ ${peer.stale ? "موقعیت قدیمی" : "موقعیت تازه"}`);
     button.setAttribute("title", peer.name);
     button.setAttribute("aria-pressed", String(selectedCompanionId.value === peer.userId));
@@ -750,7 +767,10 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 }
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
-  if (map.value !== instance) { selectedPlaceMarker?.remove(); selectedPlaceMarker = null; }
+  if (map.value !== instance) {
+    ownMarker?.remove(); ownMarker = null;
+    selectedPlaceMarker?.remove(); selectedPlaceMarker = null;
+  }
   if (map.value !== instance) {
     for (const marker of peerMarkers.values()) marker.remove();
     peerMarkers.clear();
@@ -855,14 +875,38 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
 :global(.user-map-view .user-map-view__peer-avatar) {
   display: grid; place-items: center; width: 44px; height: 44px;
-  padding: 0; border: 4px solid rgb(var(--v-theme-surface)); border-radius: 50%;
-  color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
-  box-shadow: 0 2px 9px rgba(3, 29, 31, 0.4); cursor: pointer;
-  font-size: 1rem; font-weight: 800; line-height: 1; text-transform: none;
+  padding: 0; border: 0; border-radius: 50%; background: transparent;
+  appearance: none; cursor: pointer;
 }
-:global(.user-map-view .user-map-view__peer-avatar--stale) { background: #526b6b; color: #fff; }
-:global(.user-map-view .user-map-view__peer-avatar--selected) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-:global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 3px; }
+:global(.user-map-view .user-map-view__peer-avatar-face) {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: 3px solid rgb(var(--v-theme-surface)); border-radius: 50%;
+  color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
+  box-shadow: 0 2px 7px rgba(3, 29, 31, 0.4);
+  font-size: 0.75rem; font-weight: 800; line-height: 1; text-transform: none;
+}
+:global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face) { background: #526b6b; color: #fff; }
+:global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; }
+:global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
+
+/* Blue private-GPS target with a decorative halo (not a GPS accuracy radius); unlike the purple search
+ * pin or a route endpoint, it remains upright and moves with each fresh fix. */
+:global(.user-map-view .user-map-view__own-marker) {
+  display: grid; place-items: center; width: 48px; height: 48px;
+  border-radius: 50%; background: rgba(37, 99, 235, 0.18);
+  cursor: default;
+}
+:global(.user-map-view .user-map-view__own-marker-icon) {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border: 3px solid #fff; border-radius: 50%;
+  color: #fff; background: #2563eb;
+  box-shadow: 0 2px 8px rgba(13, 48, 106, 0.45); font-size: 18px;
+}
+:global(:root.dark .user-map-view .user-map-view__own-marker) { background: rgba(96, 165, 250, 0.26); }
+@media (forced-colors: active) {
+  :global(.user-map-view .user-map-view__own-marker-icon) { border-color: CanvasText; background: Highlight; color: HighlightText; }
+  :global(.user-map-view .user-map-view__peer-avatar-face) { border-color: CanvasText; background: Highlight; color: HighlightText; }
+}
 
 
 .user-map-view__canvas {
