@@ -52,6 +52,64 @@ describe("local Photon place search", () => {
     expect(new PlaceSearchError("NETWORK_ERROR").message).not.toContain("کافه");
   });
 
+  it("safely probes limit five with the SAME bbox when limit thirty is rejected", async () => {
+    const fetcher = vi.fn(async (url: RequestInfo | URL) => {
+      const params = new URL(String(url), "http://local").searchParams;
+      return params.get("limit") === "30"
+        ? Response.json({ error: "invalid_geocode_query" }, { status: 400 })
+        : Response.json(collection([]));
+    });
+    vi.stubGlobal("fetch", fetcher);
+    await expect(searchPlaces({ q: "کافه", limit: 30, bbox: "50.8,35.7,51,35.9" }))
+      .rejects.toMatchObject({ code: "HTTP_ERROR", status: 400, gatewayCode: "invalid_geocode_query",
+        probe: "LIMIT_5_ACCEPTED" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const main = new URL(String(fetcher.mock.calls[0]?.[0]), "http://local").searchParams;
+    const probe = new URL(String(fetcher.mock.calls[1]?.[0]), "http://local").searchParams;
+    expect(probe.get("q")).toBe(main.get("q"));
+    expect(probe.get("bbox")).toBe(main.get("bbox"));
+    expect(probe.get("limit")).toBe("5");
+  });
+
+  it("does not misdiagnose an invalid bbox or unavailable probe as a version mismatch", async () => {
+    const request = { q: "کافه", limit: 30, bbox: "50.8,35.7,51,35.9" };
+    const fetcher = vi.fn(async () => Response.json({ error: "invalid_geocode_query" }, { status: 400 }));
+    vi.stubGlobal("fetch", fetcher);
+    await expect(searchPlaces(request)).rejects.toMatchObject({ probe: "LIMIT_5_REJECTED" });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    fetcher.mockImplementationOnce(async () => Response.json({ error: "invalid_geocode_query" }, { status: 400 }))
+      .mockImplementationOnce(async () => { throw new TypeError("private URL"); });
+    await expect(searchPlaces(request)).rejects.toMatchObject({ probe: "LIMIT_5_UNAVAILABLE" });
+    expect(fetcher).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not probe other HTTP failures or leak an aborted probe", async () => {
+    const controller = new AbortController();
+    let rejectProbe!: (reason: Error) => void;
+    let probeStarted!: () => void;
+    const enteredProbe = new Promise<void>((resolve) => { probeStarted = resolve; });
+    const fetcher = vi.fn().mockResolvedValueOnce(Response.json({ error: "invalid_geocode_query" }, { status: 400 }))
+      .mockImplementationOnce(() => new Promise<Response>((_, reject) => {
+        rejectProbe = reject;
+        probeStarted();
+      }));
+    vi.stubGlobal("fetch", fetcher);
+    const pending = searchPlaces({ q: "کافه", limit: 30, bbox: "50.8,35.7,51,35.9" }, controller.signal);
+    const aborted = expect(pending).rejects.toMatchObject({ name: "AbortError" });
+    await enteredProbe;
+    controller.abort();
+    rejectProbe(new DOMException("aborted", "AbortError"));
+    await aborted;
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "geocoding_unavailable" }, { status: 503 })));
+    await expect(searchPlaces({ q: "کافه", limit: 30 })).rejects.toMatchObject({ probe: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "invalid_geocode_query" }, { status: 400 })));
+    await expect(searchPlaces({ q: "کافه", limit: 5, bbox: "50.8,35.7,51,35.9" }))
+      .rejects.toMatchObject({ probe: null });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("drops malformed, duplicate, unnamed, non-point and out-of-bounds features, then caps valid results", () => {
     const places = photonPlaces(collection([
       { type: "Feature", geometry: { type: "LineString", coordinates: [[51, 35]] }, properties: { name: "line" } },

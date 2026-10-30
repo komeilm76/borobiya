@@ -110,7 +110,9 @@
     </div>
     <div v-if="api.failed.value && api.diagnostic.value && api.term.value.trim().length >= 2"
       class="place-search__diagnostic" role="group" aria-label="گزارش خطای جست‌وجو">
-      <p v-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
+      <p v-if="api.diagnostic.value.includes('LIMIT_5_ACCEPTED')">درگاه همین جست‌وجو را با ۵ نتیجه می‌پذیرد اما درخواست ۳۰ نتیجه را رد می‌کند؛ نسخهٔ درگاه نقشه را با برنامه به‌روزرسانی کنید. نتیجهٔ ناقص نمایش داده نمی‌شود.</p>
+      <p v-else-if="api.diagnostic.value.includes('LIMIT_5_REJECTED')">درگاه جست‌وجو هر دو درخواست ۵ و ۳۰ نتیجه را رد کرد؛ محدوده یا پارامترهای درگاه باید بررسی شوند.</p>
+      <p v-else-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
       <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">فتون یا اتصال درگاه نقشه در دسترس نیست؛ وضعیت سرویس را بررسی کنید.</p>
       <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">محدودهٔ نقشه هنوز آماده نیست؛ بارگذاری نقشه را بررسی کنید.</p>
       <p>گزارش امن خطا (بدون متن جست‌وجو یا مختصات):</p>

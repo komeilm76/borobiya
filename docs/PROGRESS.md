@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Isolate deployed geocode HTTP 400 (T4.4.1 follow-up)
+
+- A phone reported `GET /geocode · HTTP_ERROR · HTTP 400 · invalid_geocode_query`. The client requests 30; an older gateway rejected limits above 20, but the same 400 can also mean a bad bbox. After this specific failure, one same-origin diagnostic probe reuses the exact term and bbox with limit 5, reports only ACCEPTED/REJECTED/UNAVAILABLE without displaying incomplete results or leaking coordinates, and does not probe on other errors or after cancellation. The VM geocoding verifier now tests both limits, and the main-only production deployment probes the new local gateway/Photon with limit 30 before swapping the static bundle; its existing rollback stays active if the contract fails. Mocked legacy/current gateway and abort cases test classification; actual VM version and bbox remain unverified until the new report or operator checks arrive.
+
 ### 2026-10-30 — Mobile-safe place-search failure diagnostics (T4.4.1 follow-up)
 
 - A phone search failure previously reduced a missing map bbox, a disconnected proxy, a 400/502/503 and malformed HTTP 200 to the same Retry prompt. The panel now shows and can copy a query-free diagnostic (`GET /geocode`, fixed error class, HTTP status and allowlisted gateway code); an HTTP LAN clipboard failure leaves the text selectable by long-press. The adapter never includes the search term, bbox, bearer, raw upstream message or arbitrary response body in the report. Added a Persian 30-result bbox request through the actual local gateway with a synthetic Photon fixture; this checks the routing path, not the deployed VM or its offline index. Live Photon/device diagnosis still needs the safe line from the phone or an operator's verification output. The mobile guide also includes a no-computer Chrome smoke test comparing 5 and 30 results, useful for detecting an older gateway (max 20) without claiming that the VM was tested here.

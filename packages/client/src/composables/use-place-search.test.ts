@@ -515,6 +515,8 @@ describe("place search UI decisions", () => {
     expect(placeSearchDiagnostic(new Error("private café 51.4,35.7"))).toBe("GET /geocode · UNKNOWN_ERROR");
     expect(placeSearchDiagnostic(new PlaceSearchError("HTTP_ERROR", 502, "private café")))
       .toBe("GET /geocode · HTTP_ERROR · HTTP 502");
+    expect(placeSearchDiagnostic(new PlaceSearchError("HTTP_ERROR", 400, "invalid_geocode_query", "LIMIT_5_ACCEPTED")))
+      .toBe("GET /geocode · HTTP_ERROR · HTTP 400 · invalid_geocode_query · LIMIT_5_ACCEPTED");
     api.retry(); await Promise.resolve(); await Promise.resolve();
     expect(api.failed.value).toBe(false);
     expect(api.diagnostic.value).toBeNull();

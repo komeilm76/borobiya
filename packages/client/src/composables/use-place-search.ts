@@ -13,7 +13,9 @@ export function placeSearchDiagnostic(error: unknown): string {
   const gateway = error.gatewayCode && ["invalid_geocode_query", "geocoding_unavailable",
     "geocoding_failed", "invalid_geocoder_response", "not_found", "internal_error", "method_not_allowed"]
     .includes(error.gatewayCode) ? ` · ${error.gatewayCode}` : "";
-  return `GET /geocode · ${error.code}${status}${gateway}`;
+  const probe = error.probe && ["LIMIT_5_ACCEPTED", "LIMIT_5_REJECTED", "LIMIT_5_UNAVAILABLE"]
+    .includes(error.probe) ? ` · ${error.probe}` : "";
+  return `GET /geocode · ${error.code}${status}${gateway}${probe}`;
 }
 
 export type PlaceSearchScope = "library" | "viewport";

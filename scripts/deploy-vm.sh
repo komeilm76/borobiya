@@ -76,6 +76,25 @@ rollback() {
 trap rollback ERR
 # Never recreate Postgres, map tiles or volumes as a side effect of a code deploy.
 "${compose[@]}" up -d --no-deps --wait --wait-timeout 120 --no-build --pull never api routing-gateway photon
+# Do not switch the browser to a 30-result client while an older gateway
+# (max 20) or a broken Photon instance still answers every search with Retry.
+# Query only the same local gateway + installed bounds; never log the URL/query.
+"${compose[@]}" exec -T routing-gateway bun -e '
+  const params = new URLSearchParams({ q: "probe", limit: "30", bbox: process.env.MAP_BBOX });
+  try {
+    const response = await fetch(`http://127.0.0.1:3000/geocode?${params}`, {
+      signal: AbortSignal.timeout(18000)
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || body?.type !== "FeatureCollection" || !Array.isArray(body.features) || body.features.length > 30) {
+      console.error(`Place-search contract failed: GET /geocode HTTP ${response.status}`);
+      process.exit(1);
+    }
+  } catch {
+    console.error("Place-search contract failed: no valid local gateway answer");
+    process.exit(1);
+  }
+'
 mv packages/client/dist "$old_dist"
 mv "$release" packages/client/dist
 # Recreate *only* Nginx to rebind the atomically exchanged static directory.

@@ -37,6 +37,13 @@ class DeployWorkflowTests(unittest.TestCase):
         self.assertIn("--no-deps --wait --wait-timeout", script)
         self.assertIn("--force-recreate --no-build --pull never nginx", script)
         self.assertIn("trap rollback ERR", script)
+        self.assertIn('limit: "30", bbox: process.env.MAP_BBOX', script)
+        self.assertIn('Place-search contract failed:', script)
+        self.assertLess(script.index('limit: "30", bbox: process.env.MAP_BBOX'),
+                        script.index('mv packages/client/dist "$old_dist"'))
+        verify = (ROOT / "map-server/scripts/verify-geocoding.sh").read_text(encoding="utf-8")
+        self.assertIn("--data-urlencode 'limit=30'", verify)
+        self.assertLess(verify.index("--data-urlencode 'limit=5'"), verify.index("--data-urlencode 'limit=30'"))
         for forbidden in ("docker system prune", "down -v", "compose down", "db:migrate", "db:reset",
                           "rm -rf", "StrictHostKeyChecking=no", "ENV_FILE"):
             self.assertNotIn(forbidden, script)

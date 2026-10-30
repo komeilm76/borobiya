@@ -55,6 +55,24 @@ name = first.get("properties", {}).get("name", "unnamed place")
 print(f"OK: GET /geocode returned {len(features)} feature(s); first result: {name}")
 PY
 
+# The map search UI requests thirty. A five-hit smoke test alone can pass
+# against a stale gateway that still rejects limit=30 with HTTP 400.
+status="$(curl --retry 5 --retry-connrefused --retry-delay 2 -sS -G \
+  --data-urlencode "q=$GEOCODE_QUERY" \
+  --data-urlencode 'limit=30' \
+  --data-urlencode "bbox=$AREA_BBOX" \
+  -o "$geocode_body" -w '%{http_code}' "$GEOCODE_URL")" || \
+  fail "thirty-result geocoding request failed: $GEOCODE_URL"
+[[ "$status" == '200' ]] || fail "GET /geocode limit=30 returned HTTP $status; check that the routing gateway and Photon are current/ready"
+python3 - "$geocode_body" <<'PYCODE' || fail 'GET /geocode limit=30 did not return a Photon FeatureCollection'
+import json, sys
+body = json.load(open(sys.argv[1], encoding="utf-8"))
+features = body.get("features") if body.get("type") == "FeatureCollection" else None
+if not isinstance(features, list) or len(features) > 30:
+    raise SystemExit("invalid thirty-result response")
+print("OK: GET /geocode accepts limit=30")
+PYCODE
+
 status="$(curl --retry 5 --retry-connrefused --retry-delay 2 -sS -G \
   --data-urlencode "lat=$REVERSE_LAT" \
   --data-urlencode "lon=$REVERSE_LON" \

@@ -55,6 +55,7 @@ export function photonPlaces(payload: unknown, limit: number): GeocodeResponse {
  * bbox, response text or arbitrary upstream messages in this error.
  */
 export type PlaceSearchErrorCode = "INVALID_QUERY" | "NETWORK_ERROR" | "HTTP_ERROR" | "INVALID_RESPONSE";
+export type PlaceSearchLimitProbe = "LIMIT_5_ACCEPTED" | "LIMIT_5_REJECTED" | "LIMIT_5_UNAVAILABLE";
 const GATEWAY_CODES = new Set([
   "invalid_geocode_query", "geocoding_unavailable", "geocoding_failed", "invalid_geocoder_response",
   "not_found", "internal_error", "method_not_allowed"
@@ -62,9 +63,30 @@ const GATEWAY_CODES = new Set([
 
 export class PlaceSearchError extends Error {
   constructor(public readonly code: PlaceSearchErrorCode, public readonly status: number | null = null,
-    public readonly gatewayCode: string | null = null) {
+    public readonly gatewayCode: string | null = null, public readonly probe: PlaceSearchLimitProbe | null = null) {
     super("PLACE_SEARCH_UNAVAILABLE");
     this.name = "PlaceSearchError";
+  }
+}
+
+/** Diagnose a 400 for limit=30 without falling back to five displayed hits.
+ * Same-origin, same query and bbox: only limit changes. Do not retain or expose
+ * the response (which may include private place information).
+ */
+async function probeFiveResultLimit(query: { q: string; bbox?: string }, signal?: AbortSignal): Promise<PlaceSearchLimitProbe> {
+  const params = new URLSearchParams({ q: query.q, limit: "5" });
+  if (query.bbox) params.set("bbox", query.bbox);
+  try {
+    const response = await fetch(`/geocode?${params}`, {
+      method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
+    });
+    if (response.status === 400) return "LIMIT_5_REJECTED";
+    if (!response.ok) return "LIMIT_5_UNAVAILABLE";
+    const parsed = collectionSchema.safeParse(await response.json());
+    return parsed.success && parsed.data.features.length <= 5 ? "LIMIT_5_ACCEPTED" : "LIMIT_5_UNAVAILABLE";
+  } catch (error) {
+    if ((error as { name?: unknown } | null)?.name === "AbortError") throw error;
+    return "LIMIT_5_UNAVAILABLE";
   }
 }
 
@@ -93,7 +115,9 @@ export async function searchPlaces(input: GeocodeQueryInput, signal?: AbortSigna
         gatewayCode = body.error;
       }
     } catch { /* A reverse proxy may answer HTML. The HTTP status remains useful. */ }
-    throw new PlaceSearchError("HTTP_ERROR", response.status, gatewayCode);
+    const probe = response.status === 400 && gatewayCode === "invalid_geocode_query" && query.limit === 30
+      ? await probeFiveResultLimit(query, signal) : null;
+    throw new PlaceSearchError("HTTP_ERROR", response.status, gatewayCode, probe);
   }
   try {
     return photonPlaces(await response.json(), query.limit);
