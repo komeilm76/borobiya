@@ -7,6 +7,24 @@
       @ready="onMapReady"
     />
 
+    <!-- On phones Search is modal; this map-side action makes other POIs reachable
+         again after zooming into one without reopening the full-screen dialog. -->
+    <div v-if="isPhone && showAllResultsOnMap" v-show="!activeTool && !placeDetailOpen"
+      class="user-map-view__search-map-actions">
+      <v-btn color="primary" variant="flat" prepend-icon="mdi-map-marker-multiple" size="small"
+        :disabled="!placeSearch.mapResults.value.length" aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"
+        @click="showAllSearchResults">
+        همهٔ نتایج ({{ placeSearch.mapResults.value.length.toLocaleString('fa-IR') }})
+      </v-btn>
+      <span v-if="placeSearch.loading.value" role="status">در حال به‌روزرسانی نتایج…</span>
+      <template v-else-if="placeSearch.failed.value">
+        <span role="alert">به‌روزرسانی ناموفق؛ نتایج قبلی.</span>
+        <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-refresh"
+          aria-label="تلاش دوباره برای نتایج این محدوده" @click="placeSearch.retry()">تلاش دوباره</v-btn>
+      </template>
+      <span v-else-if="!placeSearch.results.value.length" role="status">در این محدوده نتیجهٔ جدیدی نیست.</span>
+    </div>
+
     <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
     <div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
       <v-layout class="user-map-view__dock-layout">
@@ -423,7 +441,7 @@ let fittedFor: string | null = null;
 const userControlledCamera = ref(false);
 let selectedPlaceMarker: Marker | null = null;
 const resultMarkers = new Map<string, Marker>();
-const showAllResultsOnMap = ref(false);
+const showAllResultsOnMap = placeSearch.mapActive;
 function clearResultMarkers(): void {
   for (const marker of resultMarkers.values()) marker.remove();
   resultMarkers.clear();
@@ -431,7 +449,7 @@ function clearResultMarkers(): void {
 function syncResultMarkers(): void {
   const instance = map.value;
   const places = showAllResultsOnMap.value && instance && markerConstructor && auth.user?.id
-    ? placeSearch.results.value : [];
+    ? placeSearch.mapResults.value : [];
   const current = new Set(places.filter(place => place.placeId !== placeSearch.selectedPlaceId.value)
     .map(place => place.placeId));
   for (const [id, marker] of resultMarkers) {
@@ -454,8 +472,8 @@ function syncResultMarkers(): void {
       button.addEventListener("click", (event) => {
         event.stopPropagation(); // Do not reverse-geocode a POI tap as an arbitrary map click.
         // Read the current result, never the captured response: a new query may have invalidated it.
-        const currentPlace = placeSearch.results.value.find(hit => hit.placeId === place.placeId);
-        if (showAllResultsOnMap.value && currentPlace) selectPlace(currentPlace);
+        const currentPlace = placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId);
+        if (showAllResultsOnMap.value && currentPlace) selectPlace(currentPlace, true);
       });
       button.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") event.stopPropagation();
@@ -473,26 +491,28 @@ function syncResultMarkers(): void {
 }
 function showAllSearchResults(): void {
   const instance = map.value;
-  const places = placeSearch.results.value;
-  if (!instance || !markerConstructor || !auth.user?.id || placeSearch.loading.value || !places.length) return;
+  if (!instance || !markerConstructor || !auth.user?.id) return;
   const bounds = instance.getMaxBounds();
+  if (bounds && placeSearch.results.value.some(place => !bounds.contains([place.lon, place.lat]))) return;
+  if (!placeSearch.showOnMap()) return;
+  const places = placeSearch.mapResults.value;
   if (bounds && places.some(place => !bounds.contains([place.lon, place.lat]))) return;
   const extent = resultExtent(places);
   if (!extent) return;
   closePlaceDetail(false);
-  showAllResultsOnMap.value = true;
   syncResultMarkers();
   userControlledCamera.value = true;
   const container = instance.getContainer();
   instance.fitBounds(extent, {
     padding: resultCameraPadding(container.clientWidth, container.clientHeight, isPhone.value),
     maxZoom: 15, duration: 700
-  }, { placeSearchSelection: true }); // A viewport search must retain this validated result snapshot.
+  }, { placeSearchSelection: true }); // Framing must not requery its own viewport.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
 }
 const placeDetailOpen = ref(false);
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
-  (result) => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
+  result => result.placeId === placeSearch.selectedPlaceId.value) ??
+  placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
 let restorePlaceFocus = false;
 function closePlaceDetail(restoreFocus = true): void {
   restorePlaceFocus = restoreFocus && placeDetailOpen.value;
@@ -544,15 +564,19 @@ watch(() => placeSearch.selectedPlaceId.value, () => {
   syncResultMarkers();
   if (!selectedSearchPlace.value) closePlaceDetail(false);
 }, { flush: "sync" });
+watch(() => placeSearch.mapResults.value, () => {
+  syncResultMarkers();
+  syncSelectedPlaceMarker();
+  if (!selectedSearchPlace.value) closePlaceDetail(false);
+}, { flush: "sync" });
 watch(() => placeSearch.results.value, () => {
-  showAllResultsOnMap.value = false;
-  clearResultMarkers();
+  syncSelectedPlaceMarker();
   if (!selectedSearchPlace.value) closePlaceDetail(false);
 }, { flush: "sync" });
 
-function selectPlace(place: GeocodeResult): void {
+function selectPlace(place: GeocodeResult, fromMap = false): void {
   const instance = map.value;
-  if (!instance || !placeSearch.results.value.some((result) => result.placeId === place.placeId)) return;
+  if (!instance) return;
   // A map restricted to an installed region would silently clamp a hit outside that region.
   const bounds = instance.getMaxBounds();
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
@@ -562,7 +586,9 @@ function selectPlace(place: GeocodeResult): void {
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
   // Leave the selected pin in the visible map area above the phone details sheet.
   const offsetY = isPhone.value ? -Math.min(150, Math.round(window.innerHeight * 0.22)) : 0;
-  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), offset: [0, offsetY], duration: 700 },
+  // A marker tap keeps the user's zoom; list selection still zooms in explicitly.
+  const zoom = fromMap ? instance.getZoom() : Math.min(16, instance.getMaxZoom());
+  instance.flyTo({ center: [place.lon, place.lat], zoom, offset: [0, offsetY], duration: 700 },
     { placeSearchSelection: true });
   // Dismiss the full-screen search before opening the details over the map.
   // Keep results mounted so another hit can be selected when search is reopened.
@@ -912,7 +938,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
   // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
-  placeSearch.refreshForViewport();
+  placeSearch.refreshForViewport(showAllResultsOnMap.value);
 }
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
@@ -1021,6 +1047,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   background: #e8efec;
   isolation: isolate;
 }
+
+.user-map-view__search-map-actions { display: none; }
 
 /* Numbered search pins are a separate keyboard/touch layer from purple selection,
    teal companion avatars and the blue private GPS icon. */
@@ -1227,6 +1255,24 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
  * stacked cards. The three complete tools remain mounted, but one scrollable surface opens over
  * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
 @media (max-width: 599px) {
+  /* Left of native zoom; below the route app bar and expanded attribution. */
+  .user-map-view__search-map-actions {
+    position: fixed; z-index: 6;
+    top: calc(8rem + env(safe-area-inset-top, 0px)); left: 0.75rem;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;
+    max-width: min(9.75rem, calc(100vw - 11rem)); pointer-events: auto;
+  }
+  .user-map-view__search-map-actions :deep(.v-btn) {
+    min-height: 44px; height: auto; max-width: 100%; padding-inline: 0.55rem;
+  }
+  .user-map-view__search-map-actions :deep(.v-btn__content) {
+    white-space: normal; text-align: center; font-size: 0.7rem; line-height: 1.2;
+  }
+  .user-map-view__search-map-actions > span {
+    padding: 0.2rem 0.4rem; border-radius: 0.5rem;
+    color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
+    font-size: 0.7rem; line-height: 1.35;
+  }
   :global(.user-map-view__search-dialog.v-dialog > .v-overlay__content) {
     margin: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
   }

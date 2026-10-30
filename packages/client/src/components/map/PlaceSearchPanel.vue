@@ -69,21 +69,26 @@
         prepend-icon="mdi-map-marker-multiple"
         aria-label="نمایش همهٔ نتایج روی نقشه"
         title="نمایش همهٔ نتایج روی نقشه"
-        :disabled="!ready || api.loading.value || !api.results.value.length"
+        :disabled="!ready || (!api.mapResults.value.length && (api.loading.value || !api.results.value.length))"
         @click="$emit('show-all')"
-      ><span class="place-search__show-all-label">نقشه ({{ api.results.value.length.toLocaleString('fa-IR') }})</span></v-btn>
+      ><span class="place-search__show-all-label">نقشه ({{ (api.mapActive.value ? api.mapResults.value.length : api.results.value.length).toLocaleString('fa-IR') }})</span></v-btn>
     </form>
     <div v-if="api.term.value.trim().length >= 2" class="place-search__results">
-      <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
-      <div v-else-if="api.failed.value" class="place-search__feedback" role="alert">
+      <p v-if="api.loading.value && !api.results.value.length" class="place-search__feedback" role="status">در حال جست‌وجو…</p>
+      <div v-else-if="api.failed.value && !api.results.value.length" class="place-search__feedback" role="alert">
         <p>جست‌وجوی مکان در دسترس نیست؛ اتصال یا محدودهٔ نقشه را بررسی کنید.</p>
-        <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.run()">تلاش دوباره</v-btn>
+        <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
       </div>
       <p v-else-if="api.searched.value && !api.results.value.length" class="place-search__feedback" role="status">
-        مکانی در این محدوده پیدا نشد.
+        {{ api.mapResults.value.length ? 'نتیجهٔ جدیدی در این محدوده نیست؛ نتایج قبلی روی نقشه باقی‌اند.' : 'مکانی در این محدوده پیدا نشد.' }}
       </p>
       <template v-else-if="api.results.value.length">
-        <p class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>
+        <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال به‌روزرسانی این محدوده؛ نتایج قبلی همچنان روی نقشه‌اند.</p>
+        <div v-else-if="api.failed.value" class="place-search__feedback" role="alert">
+          <p>به‌روزرسانی ناموفق بود؛ نتایج قبلی همچنان در دسترس‌اند.</p>
+          <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
+        </div>
+        <p v-else class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>
         <ul aria-label="نتایج جست‌وجوی مکان" role="list">
           <li v-for="place in api.results.value" :key="place.placeId">
             <button

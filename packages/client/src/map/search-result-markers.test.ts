@@ -23,6 +23,18 @@ describe("map search result geometry", () => {
     expect(new Set([...offsets.values()].map(([x, y]) => `${x}:${y}`)).size).toBe(5);
     expect(resultExtent(hits)).toEqual([[51.4, 35.7], [51.4, 35.7]]);
   });
+  it("spreads a bounded collection of repeated coordinates into distinct tappable positions", () => {
+    const hits = Array.from({ length: 30 }, (_, i) => place(`repeat-${i}`, 51.4, 35.7));
+    const offsets = [...resultMarkerOffsets(hits).values()];
+    expect(new Set(offsets.map(([x, y]) => `${x}:${y}`)).size).toBe(30);
+    for (let i = 0; i < offsets.length; i++) {
+      for (let j = i + 1; j < offsets.length; j++) {
+        const [x, y] = offsets[i]!, [otherX, otherY] = offsets[j]!;
+        expect(Math.hypot(x - otherX, y - otherY)).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
   it("reserves phone header and dock space without squeezing short screens to zero", () => {
     for (const [w, h] of [[320, 400], [360, 640], [568, 320]]) {
       const p = resultCameraPadding(w, h, true);

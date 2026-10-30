@@ -6,8 +6,9 @@ import type { PlaceSearchScope } from "./use-place-search";
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((res) => { resolve = res; });
-  return { promise, resolve };
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
 }
 const hit = (name: string): GeocodeResponse => [{ placeId: name, name, address: name, lon: 51, lat: 35, type: "place" }];
 function mount(search: NonNullable<Parameters<typeof usePlaceSearch>[0]>["search"],
@@ -130,8 +131,9 @@ describe("place search UI decisions", () => {
     bbox = "50.5,34.5,51.5,35.5";
     api.refreshForViewport();
     expect(search.mock.calls[1]?.[0]).toEqual({ q: "park", limit: 5, bbox });
-    expect(api.results.value).toEqual([]);
-    expect(api.selectedPlaceId.value).toBeNull();
+    expect(api.results.value).toEqual(hit("first")); // No flash while a new viewport is loading.
+    expect(api.selectedPlaceId.value).toBe("first");
+    expect(api.loading.value).toBe(true);
     const signal = search.mock.calls[1]?.[1] as AbortSignal;
     bbox = "51,35,52,36";
     api.refreshForViewport();
@@ -146,6 +148,99 @@ describe("place search UI decisions", () => {
     bbox = "50,34,51,35";
     api.refreshForViewport();
     expect(search).toHaveBeenCalledTimes(4);
+    scope.stop();
+  });
+
+  it("keeps previously explored map hits selectable as the viewport finds new POIs", async () => {
+    const next = deferred<GeocodeResponse>();
+    const search = vi.fn().mockResolvedValueOnce(hit("first")).mockImplementationOnce(() => next.promise);
+    let bbox = "50,34,51,35";
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: (kind) => ({
+      bbox: kind === "viewport" ? bbox : "50,34,52,36", contains: (place) => place.name !== "outside"
+    }) }))!;
+    api.update("park");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(api.showOnMap()).toBe(true);
+    expect(api.mapResults.value).toEqual(hit("first"));
+    bbox = "51,35,52,36";
+    api.refreshForViewport(true); // Show All follows the map without losing the library batch.
+    expect(api.scope.value).toBe("viewport");
+    expect(api.results.value).toEqual(hit("first"));
+    expect(api.mapResults.value).toEqual(hit("first"));
+    expect(api.loading.value).toBe(true);
+    next.resolve([...hit("second"), ...hit("outside")]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.results.value).toEqual(hit("second"));
+    expect(api.mapResults.value).toEqual([...hit("first"), ...hit("second")]);
+    expect(api.select(hit("first")[0]!)).toBe(true);
+    expect(api.selectedPlaceId.value).toBe("first");
+    search.mockResolvedValueOnce([]);
+    bbox = "52,35,53,36";
+    api.refreshForViewport(true);
+    await Promise.resolve(); await Promise.resolve();
+    expect(api.results.value).toEqual([]);
+    expect(api.mapResults.value).toEqual([...hit("first"), ...hit("second")]);
+    expect(api.showOnMap()).toBe(true); // Refit is still possible with no new nearby results.
+    api.update("new term");
+    expect(api.mapActive.value).toBe(false);
+    expect(api.mapResults.value).toEqual([]);
+    expect(api.select(hit("first")[0]!)).toBe(false);
+    scope.stop();
+  });
+
+  it("aborts obsolete viewport reads and retains visited pins on failed refresh, then retries", async () => {
+    const stale = deferred<GeocodeResponse>();
+    const failure = deferred<GeocodeResponse>();
+    const search = vi.fn().mockResolvedValueOnce(hit("first"))
+      .mockImplementationOnce(() => stale.promise).mockImplementationOnce(() => failure.promise)
+      .mockResolvedValueOnce(hit("recovered"));
+    let bbox = "50,34,51,35";
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => ({ bbox, contains: () => true }) }))!;
+    api.update("park"); await vi.advanceTimersByTimeAsync(300);
+    api.showOnMap();
+    bbox = "51,35,52,36"; api.refreshForViewport(true);
+    const oldSignal = search.mock.calls[1]?.[1] as AbortSignal;
+    bbox = "52,35,53,36"; api.refreshForViewport(true);
+    expect(oldSignal.aborted).toBe(true);
+    stale.resolve(hit("obsolete")); await Promise.resolve();
+    expect(api.mapResults.value).toEqual(hit("first"));
+    failure.reject(new Error("offline"));
+    await Promise.resolve(); await Promise.resolve();
+    expect(api.failed.value).toBe(true);
+    expect(api.loading.value).toBe(false);
+    expect(api.results.value).toEqual(hit("first"));
+    expect(api.select(hit("first")[0]!)).toBe(true);
+    api.retry(); await Promise.resolve(); await Promise.resolve();
+    expect(search).toHaveBeenCalledTimes(4);
+    expect(api.failed.value).toBe(false);
+    expect(api.mapResults.value).toEqual([...hit("first"), ...hit("recovered")]);
+    scope.stop();
+  });
+
+  it("bounds accumulated POIs while preserving both the selected hit and newest viewport", async () => {
+    let bbox = "0";
+    let sequence = 0;
+    const search = vi.fn(async () => Array.from({ length: 5 }, (_, i) => hit(`area-${sequence}-${i}`)[0]!));
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => ({ bbox, contains: () => true }) }))!;
+    api.update("park"); await vi.advanceTimersByTimeAsync(300);
+    api.showOnMap();
+    expect(api.select(hit("area-0-0")[0]!)).toBe(true);
+    for (sequence = 1; sequence <= 7; sequence++) {
+      bbox = String(sequence);
+      api.refreshForViewport(true);
+      await Promise.resolve(); await Promise.resolve();
+    }
+    expect(api.mapResults.value).toHaveLength(30);
+    expect(api.mapResults.value[0]?.placeId).toBe("area-0-0");
+    expect(api.mapResults.value.some(place => place.placeId === "area-7-4")).toBe(true);
+    expect(api.selectedPlaceId.value).toBe("area-0-0");
+    await api.setScope("library");
+    expect(api.mapResults.value).toEqual([]);
+    expect(api.selectedPlaceId.value).toBeNull();
     scope.stop();
   });
 

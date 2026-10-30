@@ -16,7 +16,7 @@ describe("show all current POIs on the map", () => {
   it("puts an accessible action beside the input, enabled only for current results", () => {
     expect(panel).toContain('class="place-search__show-all"');
     expect(panel).toContain('aria-label="نمایش همهٔ نتایج روی نقشه"');
-    expect(panel).toContain(':disabled="!ready || api.loading.value || !api.results.value.length"');
+    expect(panel).toContain(':disabled="!ready || (!api.mapResults.value.length && (api.loading.value || !api.results.value.length))"');
     expect(panel).toContain('@click="$emit(\'show-all\')"');
     expect(panel).toContain("'show-all': []");
     expect(view).toContain('@show-all="showAllSearchResults"');
@@ -29,6 +29,8 @@ describe("show all current POIs on the map", () => {
   it("validates the current snapshot, fits all in-bounds POIs and dismisses only the phone dialog", () => {
     const show = body("showAllSearchResults");
     expect(show).toContain("placeSearch.results.value");
+    expect(show).toContain("placeSearch.showOnMap()");
+    expect(show).toContain("placeSearch.mapResults.value");
     expect(show).toContain("bounds.contains([place.lon, place.lat])");
     expect(show).toContain("resultExtent(places)");
     expect(show).toContain("resultCameraPadding(");
@@ -46,11 +48,14 @@ describe("show all current POIs on the map", () => {
     expect(sync).toContain('document.createElement("button")');
     expect(sync).toContain('button.type = "button"');
     expect(sync).toContain('button.setAttribute("aria-label"');
-    expect(sync).toContain("selectPlace(currentPlace)");
+    expect(sync).toContain("selectPlace(currentPlace, true)");
+    expect(body("selectPlace")).toContain("fromMap ? instance.getZoom() : Math.min(16, instance.getMaxZoom())");
+    expect(view).toContain("placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value)");
     expect(sync).toContain("event.stopPropagation()");
     expect(sync).toContain("placeSearch.selectedPlaceId.value");
-    expect(view).toContain("watch(() => placeSearch.results.value, () => {");
-    expect(view).toContain("showAllResultsOnMap.value = false");
+    expect(sync).toContain("placeSearch.mapResults.value");
+    expect(view).toContain("watch(() => placeSearch.mapResults.value, () => {");
+    expect(view).toContain("const showAllResultsOnMap = placeSearch.mapActive");
     expect(body("onMapReady")).toContain("syncResultMarkers()");
     expect(body("onMapReady")).toContain("clearResultMarkers()");
     expect(view).toContain("onBeforeUnmount(() => {");
@@ -60,5 +65,10 @@ describe("show all current POIs on the map", () => {
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);
     expect(css.code).toContain(".user-map-view__result-marker");
+    expect(css.code).toContain(".user-map-view__search-map-actions");
+    expect(view).toContain("placeSearch.refreshForViewport(showAllResultsOnMap.value)");
+    expect(view).toContain('aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"');
+    expect(view).toContain('aria-label="تلاش دوباره برای نتایج این محدوده"');
+    expect(view).toContain('placeSearch.retry()');
   });
 });

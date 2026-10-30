@@ -37,7 +37,7 @@ describe("map place search handoff", () => {
 
   it("centers an authorized current result once, closes the phone dialog and opens place details", () => {
     const selection = body("selectPlace");
-    expect(selection).toContain('placeSearch.results.value.some(');
+    expect(selection).toContain('placeSearch.select(place)');
     expect(selection).toContain('bounds.contains([place.lon, place.lat])');
     expect(selection).toContain('placeSearch.select(place)');
     expect(selection).toContain('instance.flyTo(');

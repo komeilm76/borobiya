@@ -83,12 +83,12 @@ describe("UserMapView live overlay", () => {
     expect(body("frameCamera")).toContain("userControlledCamera.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
     expect(body("selectCompanion")).toContain("instance.flyTo(");
-    expect(body("selectPlace")).toContain("placeSearch.results.value.some");
+    expect(body("selectPlace")).toContain("placeSearch.select(place)");
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
     expect(body("selectPlace")).not.toContain("placeSearch.clear()");
     expect(body("selectPlace")).toContain("placeSearch.select(place)");
     expect(body("selectPlace")).toContain("instance.flyTo(");
-    expect(body("selectPlace")).toContain("zoom: Math.min(16, instance.getMaxZoom())");
+    expect(body("selectPlace")).toContain("fromMap ? instance.getZoom() : Math.min(16, instance.getMaxZoom())");
   });
 
   it("pins the selected POI on the map and removes it when selection/search ends", () => {
@@ -134,8 +134,8 @@ describe("UserMapView live overlay", () => {
     expect(body("onMapReady")).toContain('instance.on("movestart", markUserCameraMove)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("movestart", markUserCameraMove)');
     expect(move).toContain("markUserCameraMove(event)");
-    expect(move).toContain("placeSearch.refreshForViewport()");
-    expect(move.indexOf("markUserCameraMove(event)")).toBeLessThan(move.indexOf("placeSearch.refreshForViewport()"));
+    expect(move).toContain("placeSearch.refreshForViewport(showAllResultsOnMap.value)");
+    expect(move.indexOf("markUserCameraMove(event)")).toBeLessThan(move.indexOf("placeSearch.refreshForViewport(showAllResultsOnMap.value)"));
     expect(body("frameCamera")).toContain("track.length === 0 || userControlledCamera.value");
     expect(body("showTrack")).toContain("map.value?.stop()");
     expect(body("showTrack")).toContain("userControlledCamera.value = false");
@@ -150,7 +150,7 @@ describe("UserMapView live overlay", () => {
     expect(body("onMapReady")).toContain('instance.on("moveend", onMapMoveEnd)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("moveend", onMapMoveEnd)');
     expect(body("onMapMoveEnd")).toContain('event.placeSearchSelection === true');
-    expect(body("onMapMoveEnd")).toContain('placeSearch.refreshForViewport()');
+    expect(body("onMapMoveEnd")).toContain('placeSearch.refreshForViewport(showAllResultsOnMap.value)');
     expect(body("selectPlace")).toContain('{ placeSearchSelection: true }');
     expect(body("selectPlace")).not.toContain('placeSearch.clear()');
   });

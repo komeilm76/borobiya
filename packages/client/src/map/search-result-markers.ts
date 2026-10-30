@@ -14,7 +14,8 @@ export function resultMarkerOffsets(places: readonly GeocodeResult[]): Map<strin
     group.forEach((place, index) => {
       if (group.length === 1) { offsets.set(place.placeId, [0, 0]); return; }
       const angle = 2 * Math.PI * index / group.length - Math.PI / 2;
-      const radius = group.length < 4 ? 32 : 44;
+      // Keep 44px targets separated as hits accumulate across viewport searches.
+      const radius = group.length < 4 ? 32 : Math.max(44, Math.ceil(group.length * 48 / (2 * Math.PI)));
       offsets.set(place.placeId, [Math.round(radius * Math.cos(angle)), Math.round(radius * Math.sin(angle))]);
     });
   }
