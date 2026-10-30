@@ -54,6 +54,22 @@
       variant="flat"
       @click="centerOnOwnLocation"
     />
+    <!-- Sharing is opt-in, independent of the private map GPS watcher. The same
+         broadcast store powers the full companion dialog and dashboard. -->
+    <v-btn
+      class="user-map-view__share"
+      v-show="!(isShortPhone && activeTool)"
+      :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
+      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'success' : 'primary'"
+      :aria-label="broadcast.view.actionLabel"
+      :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
+      :aria-pressed="broadcast.view.isActive"
+      :disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"
+      variant="flat"
+      @click="broadcast.toggle()"
+    />
+    <span v-if="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error'"
+      class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
       {{ recenterError ?? own.error.value }}
     </span>
@@ -151,10 +167,12 @@ import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
 import { useOwnMapPosition } from "@/composables/use-own-map-position";
 import { useAuthStore } from "@/stores/auth";
+import { useBroadcastStore } from "@/stores/broadcast";
 import { useThemeStore } from "@/stores/theme";
 
 const theme = useThemeStore();
 const auth = useAuthStore();
+const broadcast = useBroadcastStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
@@ -167,7 +185,7 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
   { id: "live", label: "اشتراک و همراهان", shortLabel: "همراهان", icon: "mdi-account-group-outline" }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
-const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 480px)");
+const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const activeTool = ref<MapTool | null>(null);
 // A popstate changes Vue Router's history position before route-leave guards run.
 // Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
@@ -805,8 +823,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   pointer-events: none;
 }
 
-/* Align the private recenter action with the shared SOS button on every map size. */
-.user-map-view__recenter {
+/* One 48px map-action rail: sharing is opt-in and sits above the other map
+ * controls, with the same 8px gap and RTL/safe-area alignment as SOS. */
+.user-map-view__recenter, .user-map-view__share {
   position: fixed;
   z-index: 6;
   inset-inline-start: 1.25rem;
@@ -818,15 +837,18 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 50%;
   box-shadow: var(--bb-shadow-overlay);
 }
-.user-map-view__recenter:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
+.user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
+.user-map-view__recenter:focus-visible, .user-map-view__share:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px;
+}
 
 /* The live card remains interactive; unlike the playback column it must accept clicks. */
 .user-map-view__live {
   position: absolute;
   z-index: 2;
   inset-block-end: 1rem;
-  inset-inline-start: 1rem;
-  width: min(21rem, calc(100% - 2rem));
+  inset-inline-start: 5.75rem; /* Keep all three fixed map actions outside this card. */
+  width: min(21rem, calc(100% - 6.75rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -989,10 +1011,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     margin: 0;
   }
 
-  .user-map-view__recenter {
-    inset-inline-start: 0.75rem;
-    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
-  }
+  .user-map-view__recenter, .user-map-view__share { inset-inline-start: 0.75rem; }
+  .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
+  .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
   /* A nested Vuetify layout keeps bottom-navigation from reserving space in
    * the app shell. The frame positions the dock; Vuetify owns its selection. */
@@ -1039,10 +1060,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     inset-block-start: auto;
     inset-inline: 0;
-    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+    inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
     margin: 0 auto;
     width: min(26rem, calc(100% - 1.5rem));
-    max-height: min(60dvh, calc(100dvh - 21.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    max-height: min(60dvh, calc(100dvh - 24.75rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto;
     overscroll-behavior: contain;
     border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
@@ -1103,9 +1124,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
-/* Short portrait cannot fit the recenter action and a usable panel above SOS.
- * Hide only the recenter action while a tool is open, preserving the full scroll
- * surface and leaving SOS accessible. */
+/* Tiny portrait cannot fit three buttons below a useful panel. Both optional
+ * controls yield while a sheet is open; the full panels keep their old geometry. */
 @media (max-width: 479px) and (max-height: 480px) {
   :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     top: calc(8.25rem + env(safe-area-inset-top, 0px));
@@ -1113,9 +1133,24 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
+/* Mid-height portrait also yields both optional buttons while a sheet is open,
+ * retaining the previous sheet clearance instead of squeezing it to ~85px. */
+@media (max-width: 479px) and (min-height: 481px) and (max-height: 560px) {
+  :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
+    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: min(60dvh, calc(100dvh - 21.25rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  }
+}
+
 /* In short landscape, a left-aligned sheet leaves a separate lane for SOS and
  * the native zoom rail. Put the noninteractive scale beside, not under, the dock. */
 @media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
+  /* The zoom rail lives on the right at the top. Put recenter beside, not
+   * above, sharing in the clear right lane; SOS remains directly below. */
+  .user-map-view__recenter {
+    inset-inline-start: calc(0.75rem + 3.5rem);
+    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
+  }
   :global(.user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content) {
     inset-inline: auto;
     left: 0.75rem;

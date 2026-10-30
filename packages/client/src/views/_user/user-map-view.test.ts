@@ -242,7 +242,8 @@ describe("UserMapView live overlay", () => {
     expect(body("focusOwnIfRequested")).toContain('if (automaticFocus && userControlledCamera.value)');
     expect(view).toContain('ownMarker?.remove();');
     expect(view).toContain('own.stop();');
-    expect(view).not.toContain('broadcast.toggle()'); // A map GPS watch never starts sharing.
+    const automaticGps = view.slice(view.indexOf('watch([map, () => auth.user?.id'), view.indexOf('const reverse ='));
+    expect(automaticGps).not.toContain('broadcast.toggle()'); // Only the explicit share button can publish.
   });
 
   it("paints a peer change once, not again via a redundant peer-count watcher", () => {

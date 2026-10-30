@@ -148,6 +148,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain(".user-map-view__tool-sheet.v-bottom-sheet > .v-bottom-sheet__content.v-overlay__content");
     expect(view).toContain('v-show="!(isShortPhone && activeTool)"'); // On very short portrait, keep full panels usable.
     expect(phoneMap).toContain(".user-map-view__recenter");
+    expect(phoneMap).toContain("inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px))");
     expect(phoneMap).toContain("inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px))");
     // Vuetify's default translateY(100%) sweeps the open sheet across SOS and
     // the dock during animation, swallowing a quick second tool press.
@@ -155,8 +156,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain(".bottom-sheet-transition-leave-to");
     expect(phoneMap).toContain("transform: none;");
     expect(phoneMap).toContain("opacity: 0;");
-    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(12\.5rem \+ env\(safe-area-inset-bottom/);
-    expect(phoneMap).toContain("100dvh - 21.25rem"); // Space for expanded attribution above the sheet.
+    expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-block-end: calc\(16rem \+ env\(safe-area-inset-bottom/);
+    expect(phoneMap).toContain("100dvh - 24.75rem"); // Space for attribution and the third map action.
     expect(phoneMap).toMatch(/v-bottom-sheet > \.v-bottom-sheet__content\.v-overlay__content\)\s*\{[^}]*inset-inline: 0;[^}]*margin: 0 auto;/);
     expect(phoneMap).toContain("overflow-y: auto;"); // Sheet scrolls; full-size cards do not shrink.
     expect(phoneMap).toContain(".user-map-view__panel");
