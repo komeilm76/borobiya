@@ -3,13 +3,13 @@
     type="button"
     class="sos-fab"
     data-test="sos-trigger"
-    aria-label="درخواست امداد فوری (SOS)"
-    title="درخواست امداد فوری (SOS)"
+    aria-label="باز کردن فرم درخواست امداد فوری (SOS)"
+    title="باز کردن فرم درخواست امداد فوری (SOS)"
+    aria-haspopup="dialog"
     @click="$emit('trigger')"
   >
     <span class="sos-fab__ring" aria-hidden="true" />
-    <v-icon icon="mdi-alarm-light" size="22" class="sos-fab__icon" />
-    <span class="sos-fab__label">SOS امداد</span>
+    <v-icon icon="mdi-alarm-light" size="24" aria-hidden="true" />
   </button>
 </template>
 
@@ -25,17 +25,15 @@ defineEmits<{
   inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
   inset-inline-start: 1.25rem;
   z-index: 950;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.85rem 1.25rem;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: 2px solid rgba(255, 255, 255, 0.92);
-  border-radius: 999px;
+  border-radius: 50%;
   background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
   color: #ffffff;
-  font-weight: 800;
-  font-size: 0.96rem;
-  letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow: 0 0.75rem 1.9rem rgba(185, 28, 28, 0.45);
   transition: transform 0.16s ease, box-shadow 0.16s ease;

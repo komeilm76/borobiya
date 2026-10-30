@@ -42,12 +42,14 @@ describe("mobile map viewport and overlay tools", () => {
     expect(css(view, "UserMapView.vue")).toContain("height: 100dvh");
   });
 
-  it("uses a slightly smaller SOS pill on the phone map without shrinking its touch target or hiding its label", () => {
+  it("keeps the icon-only SOS accessible and above the phone-map dock without enlarging it", () => {
     const phoneShell = shell.split("@media (max-width: 599px) {").at(-1)!;
-    expect(phoneShell).toMatch(/\.app-shell--map \.sos-fab\.sos-fab\s*\{[^}]*min-height: 44px;[^}]*padding: 0\.5rem 0\.75rem;[^}]*font-size: 0\.875rem;/);
-    expect(phoneShell).toContain("inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))");
-    expect(sosTrigger).toContain('aria-label="درخواست امداد فوری (SOS)"');
-    expect(sosTrigger).toContain('<span class="sos-fab__label">SOS امداد</span>');
+    const mapSos = phoneShell.match(/\.app-shell--map \.sos-fab\.sos-fab\s*\{([^}]*)\}/)?.[1];
+    expect(mapSos).toContain("inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))");
+    expect(mapSos).toContain("inset-inline-start: 0.75rem;");
+    expect(mapSos).not.toMatch(/(?:padding|gap|font-size|width|height):/); // Share the global 48px target.
+    expect(sosTrigger).toContain('aria-label="باز کردن فرم درخواست امداد فوری (SOS)"');
+    expect(sosTrigger).not.toContain("sos-fab__label");
     expect(sosTrigger).toContain('@click="$emit(\'trigger\')"');
   });
 

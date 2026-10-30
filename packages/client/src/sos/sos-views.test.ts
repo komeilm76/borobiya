@@ -37,6 +37,18 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(triggerSource).toContain("prefers-reduced-motion: reduce");
   });
 
+  it("keeps the global emergency trigger recognizable and accessible as an icon-only control", () => {
+    expect(triggerSource).toContain('aria-label="باز کردن فرم درخواست امداد فوری (SOS)"');
+    expect(triggerSource).toContain('title="باز کردن فرم درخواست امداد فوری (SOS)"');
+    expect(triggerSource).toContain('aria-haspopup="dialog"');
+    expect(triggerSource).toContain('icon="mdi-alarm-light" size="24"');
+    expect(triggerSource).toContain('aria-hidden="true"');
+    expect(triggerSource).not.toContain("sos-fab__label");
+    expect(triggerSource).toMatch(/\.sos-fab\s*\{[^}]*width: 48px;[^}]*height: 48px;[^}]*padding: 0;[^}]*border-radius: 50%;/s);
+    expect(triggerSource).toContain(".sos-fab:focus-visible");
+    expect(triggerSource).toContain('@click="$emit(\'trigger\')"');
+  });
+
   it("renders a Vuetify bottom sheet with severity, incident type, map picker, and camera/gallery upload", () => {
     expect(sheetSource).toContain("<v-bottom-sheet");
     expect(sheetSource).toContain("<MapCanvas");

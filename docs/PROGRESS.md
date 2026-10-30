@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Use a compact icon-only SOS trigger (T4.4.1 follow-up)
+
+- Removed the visible text from the shared `SosTriggerButton` and centered its existing emergency-beacon icon in a 48×48px red circular control on every route. The accessible Persian name/hover tooltip now clarify that the icon opens a form rather than immediately sending a request; its dialog affordance, keyboard focus outline, reduced-motion handling, visible emergency styling and existing sheet action remain; on the phone map, only its safe-area-aware position is overridden so it clears the dock. Source-pinned regressions failed before the change. Mocked-data Chromium checks at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800 confirmed placement; clicking the icon at 320×568 opened and closed the SOS sheet. Live-backend and physical-device acceptance remain open.
+
 ### 2026-10-30 — Reduce the phone-map SOS footprint (T4.4.1 follow-up)
 
 - The SOS pill on the full-screen phone map felt too large beside the labelled tool dock. A map-route-only style override reduced its browser-measured footprint from 153×54px to 127×44px, keeping the visible label, accessible name, click handler, 44px touch height, fixed safety position and separation from the dock, sheet and MapLibre controls. The original SOS size on other routes is unchanged. A source regression failed before the fix; client tests/typecheck and mocked-data Chromium geometry checks at 320×400, 320×568, 360×640 and 568×320 passed. Real-device safe-area and full-backend checks remain open.
