@@ -208,7 +208,7 @@ test("serves route with local DEM, geocode, and reverse requests offline through
       geometries: "polyline", overview: "full"
     });
 
-    const geocodeResponse = await fetch(`http://127.0.0.1:${gatewayPort}/geocode?q=Azadi%20Square`);
+    const geocodeResponse = await fetch(`http://127.0.0.1:${gatewayPort}/geocode?q=%DA%A9%D8%A7%D9%81%D9%87&limit=30&bbox=51.2,35.6,51.6,35.9`);
     assert.equal(geocodeResponse.status, 200);
     assert.deepEqual(await geocodeResponse.json(), photonFixture);
 
@@ -219,8 +219,9 @@ test("serves route with local DEM, geocode, and reverse requests offline through
     const geocodeUrl = new URL(photonRequests[0], photonBase);
     const reverseUrl = new URL(photonRequests[1], photonBase);
     assert.equal(geocodeUrl.pathname, "/api");
-    assert.equal(geocodeUrl.searchParams.get("q"), "Azadi Square");
-    assert.equal(geocodeUrl.searchParams.get("limit"), "5");
+    assert.equal(geocodeUrl.searchParams.get("q"), "کافه");
+    assert.equal(geocodeUrl.searchParams.get("limit"), "30");
+    assert.equal(geocodeUrl.searchParams.get("bbox"), "51.2,35.6,51.6,35.9");
     assert.equal(reverseUrl.pathname, "/reverse");
     assert.equal(reverseUrl.searchParams.get("lat"), "35.7");
     assert.equal(reverseUrl.searchParams.get("lon"), "51.4");

@@ -51,16 +51,55 @@ export function photonPlaces(payload: unknown, limit: number): GeocodeResponse {
   return geocodeResponseSchema.parse(places);
 }
 
+/** Query-free failure facts safe to show or copy on a phone. Never store URL, q,
+ * bbox, response text or arbitrary upstream messages in this error.
+ */
+export type PlaceSearchErrorCode = "INVALID_QUERY" | "NETWORK_ERROR" | "HTTP_ERROR" | "INVALID_RESPONSE";
+const GATEWAY_CODES = new Set([
+  "invalid_geocode_query", "geocoding_unavailable", "geocoding_failed", "invalid_geocoder_response",
+  "not_found", "internal_error", "method_not_allowed"
+]);
+
+export class PlaceSearchError extends Error {
+  constructor(public readonly code: PlaceSearchErrorCode, public readonly status: number | null = null,
+    public readonly gatewayCode: string | null = null) {
+    super("PLACE_SEARCH_UNAVAILABLE");
+    this.name = "PlaceSearchError";
+  }
+}
+
 /** Local-only Photon gateway; never send place queries to a third-party browser origin. */
 export async function searchPlaces(input: GeocodeQueryInput, signal?: AbortSignal): Promise<GeocodeResponse> {
-  const query = geocodeQuerySchema.parse(input);
+  const parsed = geocodeQuerySchema.safeParse(input);
+  if (!parsed.success) throw new PlaceSearchError("INVALID_QUERY");
+  const query = parsed.data;
   const params = new URLSearchParams({ q: query.q, limit: String(query.limit) });
   if (query.bbox) params.set("bbox", query.bbox);
-  const response = await fetch(`/geocode?${params}`, {
-    method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
-  });
-  if (!response.ok) throw new Error("PLACE_SEARCH_UNAVAILABLE");
-  return photonPlaces(await response.json(), query.limit);
+  let response: Response;
+  try {
+    response = await fetch(`/geocode?${params}`, {
+      method: "GET", headers: { accept: "application/json" }, credentials: "same-origin", signal
+    });
+  } catch (error) {
+    if ((error as { name?: unknown } | null)?.name === "AbortError") throw error;
+    throw new PlaceSearchError("NETWORK_ERROR");
+  }
+  if (!response.ok) {
+    let gatewayCode: string | null = null;
+    try {
+      const body: unknown = await response.json();
+      if (body && typeof body === "object" && !Array.isArray(body) &&
+          "error" in body && typeof body.error === "string" && GATEWAY_CODES.has(body.error)) {
+        gatewayCode = body.error;
+      }
+    } catch { /* A reverse proxy may answer HTML. The HTTP status remains useful. */ }
+    throw new PlaceSearchError("HTTP_ERROR", response.status, gatewayCode);
+  }
+  try {
+    return photonPlaces(await response.json(), query.limit);
+  } catch {
+    throw new PlaceSearchError("INVALID_RESPONSE", response.status);
+  }
 }
 
 /** Photon reverse returns a GeoJSON collection, not the app's single-address contract. */

@@ -108,14 +108,39 @@
         </ul>
       </template>
     </div>
+    <div v-if="api.failed.value && api.diagnostic.value && api.term.value.trim().length >= 2"
+      class="place-search__diagnostic" role="group" aria-label="گزارش خطای جست‌وجو">
+      <p v-if="api.diagnostic.value.includes('invalid_geocode_query')">درگاه نقشه درخواست را رد کرد؛ نسخهٔ برنامه و درگاه جست‌وجو را با هم بررسی کنید.</p>
+      <p v-else-if="api.diagnostic.value.includes('geocoding_unavailable')">فتون یا اتصال درگاه نقشه در دسترس نیست؛ وضعیت سرویس را بررسی کنید.</p>
+      <p v-else-if="api.diagnostic.value.includes('MAP_BOUNDS_UNAVAILABLE')">محدودهٔ نقشه هنوز آماده نیست؛ بارگذاری نقشه را بررسی کنید.</p>
+      <p>گزارش امن خطا (بدون متن جست‌وجو یا مختصات):</p>
+      <code dir="ltr">{{ api.diagnostic.value }}</code>
+      <v-btn class="place-search__copy-report" variant="text" prepend-icon="mdi-content-copy" @click="copyDiagnostic">کپی گزارش</v-btn>
+      <small v-if="copyStatus" role="status">{{ copyStatus === 'copied' ? 'گزارش کپی شد.' : 'کپی خودکار ممکن نیست؛ متن بالا را لمس طولانی کنید و کپی کنید.' }}</small>
+    </div>
   </v-card>
 </template>
 
 <script setup lang="ts">
+import { ref, watch } from "vue";
 import type { GeocodeResult } from "@shared/index";
 import type { usePlaceSearch } from "@/composables/use-place-search";
 
-defineProps<{ api: ReturnType<typeof usePlaceSearch>; ready: boolean }>();
+const props = defineProps<{ api: ReturnType<typeof usePlaceSearch>; ready: boolean }>();
+const copyStatus = ref<"copied" | "manual" | null>(null);
+watch(() => props.api.diagnostic.value, () => { copyStatus.value = null; });
+async function copyDiagnostic(): Promise<void> {
+  const report = props.api.diagnostic.value;
+  if (!report) return;
+  try {
+    await navigator.clipboard.writeText(report);
+    copyStatus.value = "copied";
+  } catch {
+    // HTTP LAN pages may not have the secure-context clipboard API. Keep a
+    // selectable on-screen report for Android Chrome's long-press copy action.
+    copyStatus.value = "manual";
+  }
+}
 defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 </script>
 
@@ -140,6 +165,11 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__form { display: flex; align-items: start; gap: 0.5rem; margin-top: 0.75rem; }
 .place-search__form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
 .place-search__show-all { flex: 0 0 auto; min-width: 44px; min-height: 44px; height: 44px; white-space: nowrap; }
+.place-search__diagnostic { margin-top: 0.6rem; padding: 0.5rem; border-radius: 0.5rem; background: rgba(var(--v-theme-error), 0.09); }
+.place-search__diagnostic p { margin: 0 0 0.25rem; }
+.place-search__diagnostic code { display: block; direction: ltr; text-align: start; user-select: text; overflow-wrap: anywhere; font-size: 0.8rem; }
+.place-search__diagnostic small { display: block; }
+.place-search__copy-report { min-height: 44px; }
 .place-search__results { margin-top: 0.5rem; max-height: min(17rem, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
 .place-search__feedback { margin: 0.35rem 0.25rem 0.5rem; color: #536d6c; font-size: 0.75rem; line-height: 1.6; }
 .place-search__feedback p { margin: 0 0 0.5rem; }

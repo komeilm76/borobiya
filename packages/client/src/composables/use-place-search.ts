@@ -1,9 +1,20 @@
 import { onScopeDispose, ref } from "vue";
 import type { GeocodeResponse, GeocodeResult } from "@shared/index";
-import { searchPlaces } from "@/api/geocoding";
+import { PlaceSearchError, searchPlaces } from "@/api/geocoding";
 
 const DEBOUNCE_MS = 300;
 const MAX_SEARCH_RESULTS = 30;
+
+/** No query text, coordinates, token or raw upstream message in a mobile report. */
+export function placeSearchDiagnostic(error: unknown): string {
+  if (!(error instanceof PlaceSearchError)) return "GET /geocode · UNKNOWN_ERROR";
+  const status = error.status !== null && Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
+    ? ` · HTTP ${error.status}` : "";
+  const gateway = error.gatewayCode && ["invalid_geocode_query", "geocoding_unavailable",
+    "geocoding_failed", "invalid_geocoder_response", "not_found", "internal_error", "method_not_allowed"]
+    .includes(error.gatewayCode) ? ` · ${error.gatewayCode}` : "";
+  return `GET /geocode · ${error.code}${status}${gateway}`;
+}
 
 export type PlaceSearchScope = "library" | "viewport";
 
@@ -27,6 +38,7 @@ export function usePlaceSearch(options: {
   const selectedPlaceId = ref<string | null>(null);
   const loading = ref(false);
   const failed = ref(false);
+  const diagnostic = ref<string | null>(null);
   const searched = ref(false);
   let timer: ReturnType<typeof setTimeout> | null = null;
   let controller: AbortController | null = null;
@@ -51,6 +63,7 @@ export function usePlaceSearch(options: {
     selectedPlaceId.value = null;
     loading.value = false;
     failed.value = false;
+    diagnostic.value = null;
     searched.value = false;
   }
 
@@ -78,6 +91,7 @@ export function usePlaceSearch(options: {
       controller?.abort();
       controller = null;
       failed.value = false;
+      diagnostic.value = null;
       loading.value = false;
     } else invalidate();
     const q = term.value.trim();
@@ -95,7 +109,11 @@ export function usePlaceSearch(options: {
           !mapResults.value.some(place => place.placeId === selectedPlaceId.value)) selectedPlaceId.value = null;
     }
     // No map bounds means no safe local search. Never silently turn this into a global query.
-    if (!area) { failed.value = true; return; }
+    if (!area) {
+      failed.value = true;
+      diagnostic.value = "GET /geocode · MAP_BOUNDS_UNAVAILABLE";
+      return;
+    }
     const current = generation;
     controller = new AbortController();
     loading.value = true;
@@ -113,7 +131,10 @@ export function usePlaceSearch(options: {
     } catch (error) {
       if (disposed || current !== generation) return;
       // A failed refresh keeps only hits still in the new bbox and labels them stale.
-      if ((error as { name?: unknown } | null)?.name !== "AbortError") failed.value = true;
+      if ((error as { name?: unknown } | null)?.name !== "AbortError") {
+        failed.value = true;
+        diagnostic.value = placeSearchDiagnostic(error);
+      }
     } finally {
       if (!disposed && current === generation) {
         loading.value = false;
@@ -159,6 +180,7 @@ export function usePlaceSearch(options: {
         controller = null;
       }
       failed.value = false;
+      diagnostic.value = null;
       loading.value = awaitRefresh; // A selection flight prunes but never requests.
     }
     const visibleResults = area ? results.value.filter(area.contains) : [];
@@ -199,6 +221,6 @@ export function usePlaceSearch(options: {
   }
 
   onScopeDispose(() => { disposed = true; invalidate(); });
-  return { term, scope, results, mapResults, mapActive, selectedPlaceId, loading, failed, searched,
+  return { term, scope, results, mapResults, mapActive, selectedPlaceId, loading, failed, diagnostic, searched,
     run, update, clear, setScope, pruneForViewport, refreshForViewport, retry, showOnMap, select };
 }

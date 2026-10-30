@@ -1,7 +1,8 @@
 import { effectScope } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeocodeResponse } from "@shared/index";
-import { usePlaceSearch } from "./use-place-search";
+import { PlaceSearchError } from "@/api/geocoding";
+import { usePlaceSearch, placeSearchDiagnostic } from "./use-place-search";
 import type { PlaceSearchScope } from "./use-place-search";
 
 function deferred<T>() {
@@ -503,6 +504,25 @@ describe("place search UI decisions", () => {
     scope.stop();
   });
 
+  it("reports a query-free mobile diagnostic and clears it on retry or a new term", async () => {
+    const search = vi.fn().mockRejectedValueOnce(new PlaceSearchError("HTTP_ERROR", 503, "geocoding_unavailable"))
+      .mockResolvedValueOnce(hit("cafe"));
+    const { api, scope } = mount(search);
+    api.update("کافه"); await vi.advanceTimersByTimeAsync(300);
+    expect(api.failed.value).toBe(true);
+    expect(api.diagnostic.value).toBe("GET /geocode · HTTP_ERROR · HTTP 503 · geocoding_unavailable");
+    expect(api.diagnostic.value).not.toContain("کافه");
+    expect(placeSearchDiagnostic(new Error("private café 51.4,35.7"))).toBe("GET /geocode · UNKNOWN_ERROR");
+    expect(placeSearchDiagnostic(new PlaceSearchError("HTTP_ERROR", 502, "private café")))
+      .toBe("GET /geocode · HTTP_ERROR · HTTP 502");
+    api.retry(); await Promise.resolve(); await Promise.resolve();
+    expect(api.failed.value).toBe(false);
+    expect(api.diagnostic.value).toBeNull();
+    api.update("خانه خصوصی");
+    expect(api.diagnostic.value).toBeNull();
+    scope.stop();
+  });
+
   it("fails closed if map bounds are not available, instead of searching the whole world", async () => {
     const search = vi.fn(async () => hit("outside"));
     const scope = effectScope();
@@ -511,6 +531,7 @@ describe("place search UI decisions", () => {
     await vi.advanceTimersByTimeAsync(300);
     expect(search).not.toHaveBeenCalled();
     expect(api.failed.value).toBe(true);
+    expect(api.diagnostic.value).toBe("GET /geocode · MAP_BOUNDS_UNAVAILABLE");
     expect(api.results.value).toEqual([]);
     scope.stop();
   });

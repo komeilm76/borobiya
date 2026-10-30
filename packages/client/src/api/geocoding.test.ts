@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { photonAddress, photonPlaces, reversePlace, searchPlaces } from "./geocoding";
+import { PlaceSearchError, photonAddress, photonPlaces, reversePlace, searchPlaces } from "./geocoding";
 
 const feature = (name: string, coordinates: number[] = [51.38, 35.7], extras = {}) => ({
   type: "Feature", geometry: { type: "Point", coordinates },
@@ -35,6 +35,21 @@ describe("local Photon place search", () => {
     expect(fetcher.mock.calls[0]?.[0]).toBe("/geocode?q=%DA%A9%D8%A7%D9%81%D9%87&limit=30&bbox=51%2C35%2C52%2C36");
     expect(hits).toHaveLength(30);
     expect(hits.at(-1)?.name).toBe("Cafe 29");
+  });
+
+  it("distinguishes safe gateway status from network and invalid-response failures", async () => {
+    const request = { q: "کافه", bbox: "51,35,52,36", limit: 30 };
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "geocoding_unavailable", message: "private café query" }, { status: 503 })));
+    await expect(searchPlaces(request)).rejects.toMatchObject({ code: "HTTP_ERROR", status: 503,
+      gatewayCode: "geocoding_unavailable" });
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: "private café query" }, { status: 400 })));
+    await expect(searchPlaces(request)).rejects.toMatchObject({ code: "HTTP_ERROR", status: 400,
+      gatewayCode: null });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network: private café query"); }));
+    await expect(searchPlaces(request)).rejects.toMatchObject({ code: "NETWORK_ERROR", status: null });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>login</html>", { status: 200 })));
+    await expect(searchPlaces(request)).rejects.toMatchObject({ code: "INVALID_RESPONSE", status: 200 });
+    expect(new PlaceSearchError("NETWORK_ERROR").message).not.toContain("کافه");
   });
 
   it("drops malformed, duplicate, unnamed, non-point and out-of-bounds features, then caps valid results", () => {

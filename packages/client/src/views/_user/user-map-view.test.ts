@@ -124,6 +124,11 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain('v-for="place in api.results.value"');
     expect(search).toContain("$emit('select', place)");
     expect(search).toContain("api.failed.value");
+    expect(search).toContain("api.diagnostic.value");
+    expect(search).toContain('aria-label="گزارش خطای جست‌وجو"');
+    expect(search).toContain("user-select: text");
+    expect(search).toContain("navigator.clipboard.writeText(report)");
+    expect(search).toContain("متن بالا را لمس طولانی کنید");
     expect(search).toContain("api.searched.value");
     expect(search).toContain("api.run(api.mapActive.value)");
   });

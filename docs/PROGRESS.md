@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Mobile-safe place-search failure diagnostics (T4.4.1 follow-up)
+
+- A phone search failure previously reduced a missing map bbox, a disconnected proxy, a 400/502/503 and malformed HTTP 200 to the same Retry prompt. The panel now shows and can copy a query-free diagnostic (`GET /geocode`, fixed error class, HTTP status and allowlisted gateway code); an HTTP LAN clipboard failure leaves the text selectable by long-press. The adapter never includes the search term, bbox, bearer, raw upstream message or arbitrary response body in the report. Added a Persian 30-result bbox request through the actual local gateway with a synthetic Photon fixture; this checks the routing path, not the deployed VM or its offline index. Live Photon/device diagnosis still needs the safe line from the phone or an operator's verification output. The mobile guide also includes a no-computer Chrome smoke test comparing 5 and 30 results, useful for detecting an older gateway (max 20) without claiming that the VM was tested here.
+
 ### 2026-10-30 — Clear stale map search POIs during movement (T4.4.1 follow-up)
 
 - The earlier bbox refresh pruned only on MapLibre `moveend`: Karaj hits could persist throughout a drag or zoom, and an in-flight response could paint the old bbox before the camera settled in Tehran. Search now prunes the list, numbered pins and out-of-bounds detail selection as camera bounds change, aborts an obsolete read immediately, and starts exactly one 30-result bounded read on `moveend`. Even an explicitly library-wide search switches to viewport results on a real camera gesture, so moving the map never keeps old off-screen list items. Returning to the original bbox after pruning also refetches its results. The final selection flight also prunes outside hits without triggering another search; programmatic fit keeps its no-search behavior. Deferred tests cover mid-drag stale reads and a zoomed-in selection; real MapLibre, Photon and phone acceptance remain open.
