@@ -17,20 +17,34 @@
       />
     </header>
 
-    <p class="live-companions__status" role="status" aria-live="polite">{{ api.status.value.line }}</p>
+    <p class="live-companions__status" role="status" aria-live="polite">
+      {{ visible ? api.status.value.line : 'همراهان روی نقشه پنهان‌اند؛ با انتخاب یک همراه دوباره نمایش داده می‌شوند.' }}
+    </p>
+    <v-switch
+      :model-value="visible"
+      color="primary"
+      hide-details
+      aria-label="نمایش همراهان روی نقشه"
+      @update:model-value="$emit('update:visible', Boolean($event))"
+    >
+      <template #label>نمایش همراهان روی نقشه</template>
+    </v-switch>
 
-    <ul v-if="api.peers.value.length" class="live-companions__peers" role="list" tabindex="0" aria-label="فهرست همراهان روی نقشه">
-      <li v-for="peer in api.peers.value" :key="peer.userId" class="live-companions__peer">
-        <span
-          class="live-companions__dot"
-          :style="{ background: peer.stale ? colors.stale : colors.live }"
-          aria-hidden="true"
-        />
-        <span class="live-companions__name">{{ peer.name }}</span>
-        <span class="live-companions__age">{{ ageWords(peer.ageMs) }}</span>
-        <v-chip v-if="peer.accuracy !== null" size="x-small" variant="tonal" class="live-companions__accuracy">
-          ±{{ Math.round(peer.accuracy) }} متر
-        </v-chip>
+    <ul v-if="members.length" class="live-companions__peers" role="list" tabindex="0" aria-label="فهرست همراهان روی نقشه">
+      <li v-for="member in members" :key="member.userId" class="live-companions__peer">
+        <v-btn class="live-companions__peer-button" variant="text" block
+          :color="selectedUserId === member.userId ? 'primary' : undefined"
+          :aria-label="member.position ? `نمایش ${member.name} روی نقشه` : `${member.name}؛ در انتظار موقعیت`"
+          :disabled="!member.position" @click="$emit('select', member.userId)">
+          <span class="live-companions__dot"
+            :style="{ background: member.position ? (member.stale ? colors.stale : colors.live) : colors.stale }"
+            aria-hidden="true" />
+          <span class="live-companions__name">{{ member.name }}</span>
+          <span class="live-companions__age">{{ member.position ? ageWords(member.ageMs) : 'در انتظار موقعیت' }}</span>
+          <v-chip v-if="member.accuracy !== null" size="x-small" variant="tonal" class="live-companions__accuracy">
+            ±{{ Math.round(member.accuracy) }} متر
+          </v-chip>
+        </v-btn>
       </li>
     </ul>
 
@@ -62,8 +76,20 @@ import type { useLiveCompanions } from "@/composables/use-live-companions";
  * part users act on: "nobody has shared with you", "the list did not load" and "waiting for their first
  * update" look identical if a component is allowed to improvise them.
  */
-const props = defineProps<{ api: ReturnType<typeof useLiveCompanions> }>();
-void props;
+const props = defineProps<{
+  api: ReturnType<typeof useLiveCompanions>;
+  visible: boolean;
+  selectedUserId?: string | null;
+}>();
+defineEmits<{ 'update:visible': [visible: boolean]; select: [userId: string] }>();
+
+// Include permitted users who are waiting for their first fix; disabling their
+// action avoids pretending we can center on an unknown coordinate.
+const members = computed(() => Object.values(props.api.registry.value).map((entry) => {
+  const positioned = props.api.peers.value.find((peer) => peer.userId === entry.userId);
+  return { userId: entry.userId, name: entry.name, position: positioned?.position ?? null,
+    stale: positioned?.stale ?? true, ageMs: positioned?.ageMs ?? null, accuracy: positioned?.accuracy ?? null };
+}));
 
 const theme = useThemeStore();
 const colors = computed(() => liveMarkerColors(theme.isDark));
@@ -137,13 +163,32 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
   outline-offset: -2px;
 }
 
-.live-companions__peer {
+.live-companions__peer { min-width: 0; }
+
+.live-companions__peer-button {
+  min-width: 0;
+  min-height: 48px;
+  height: auto;
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.75rem;
+}
+.live-companions__peer-button :deep(.v-btn__content) {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.76rem;
+  width: 100%;
+  min-width: 0;
+  font-size: 0.8rem;
   line-height: 1.5;
+  white-space: normal;
+  text-align: start;
 }
+.live-companions__peer-button:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
+
+.live-companions__peer-button.v-btn--disabled { opacity: 1; }
+.live-companions__peer-button.v-btn--disabled :deep(.v-btn__content) { opacity: 1; }
+.live-companions__peer-button.v-btn--disabled .live-companions__name { color: #536d6c; }
+:global(:root.dark .live-companions__peer-button.v-btn--disabled .live-companions__name) { color: #a0b6b2; }
 
 .live-companions__dot {
   flex: 0 0 auto;
@@ -154,6 +199,8 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 }
 
 .live-companions__name {
+  flex: 1 1 auto;
+  min-width: 0;
   color: #193536;
   font-weight: 700;
   overflow: hidden;

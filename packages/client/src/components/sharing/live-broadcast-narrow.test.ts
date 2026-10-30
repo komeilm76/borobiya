@@ -8,7 +8,7 @@ const dashboard = readFileSync(new URL("../../views/_user/UserDashboardView.vue"
 
 describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)", () => {
   it("uses the available card width rather than the global viewport for compact and inset bars", () => {
-    expect(map).toContain("<LiveBroadcastBar compact />");
+    expect(map).toContain("<LiveBroadcastBar compact map-mode />");
     expect(dashboard).toContain("<LiveBroadcastBar inset />");
     expect(bar).toMatch(/\.broadcast-bar \{[^}]*container-type: inline-size;/);
     // At 200% zoom a 320px CSS viewport can be only ~160px; the old 12rem
@@ -27,7 +27,7 @@ describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)"
     });
     expect(unsupported.showDevicesLink).toBe(true);
     expect(unsupported.actionLabel.length).toBeGreaterThan(20);
-    expect(bar).toContain('v-if="state.showDevicesLink"');
+    expect(bar).toContain('v-if="state.showDevicesLink && !mapMode"');
     expect(bar).toContain('@click="broadcast.toggle()"');
     expect(bar).toContain(':disabled="!broadcast.isSupported"');
     const narrow = bar.slice(bar.indexOf("@container (max-width: 380px)"));

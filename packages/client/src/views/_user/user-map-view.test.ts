@@ -41,7 +41,7 @@ describe("UserMapView live overlay", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.
     expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl"');
+    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker, Popup } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(body("onMapReady")).toContain("markerConstructor = MarkerClass");
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
@@ -76,11 +76,12 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain("planOverlayRemoval");
   });
 
-  it("never moves the camera for a peer; only track framing and explicit place selection move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(4);
+  it("never moves the camera for a peer; only explicit peer/place selection and track framing move it", () => {
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(5);
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userControlledCamera.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
+    expect(body("selectCompanion")).toContain("instance.flyTo(");
     expect(body("selectPlace")).toContain("placeSearch.results.value.some");
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
     expect(body("selectPlace")).not.toContain("placeSearch.clear()");
@@ -250,7 +251,7 @@ describe("UserMapView live overlay", () => {
   });
 
   it("renders the live panel and no longer claims that live positions are missing", () => {
-    expect(view).toContain('<LiveCompanionPanel :api="live" />');
+    expect(view).toContain('<LiveCompanionPanel :api="live" :visible="showCompanions"');
     expect(view).not.toContain("هنوز روی این نقشه نمی‌آید");
   });
 
@@ -258,7 +259,7 @@ describe("UserMapView live overlay", () => {
     const dashboard = readFileSync(new URL("./UserDashboardView.vue", import.meta.url), "utf8");
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
     expect(view).toContain("ensureSession: () => auth.ensureSession()");
-    expect(view).toContain("<LiveBroadcastBar compact />");
+    expect(view).toContain("<LiveBroadcastBar compact map-mode />");
     expect(dashboard).toContain("<LiveBroadcastBar inset />");
     expect(dashboard).not.toContain("نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند");
   });
@@ -307,7 +308,7 @@ describe("LiveCompanionPanel", () => {
     expect(panel).not.toContain("برقرار");
     expect(panel).toContain("connectionTitle(api.connected.value)");
     expect(panel).toContain("api.status.value.line");
-    expect(panel).toContain("ageWords(peer.ageMs)");
+    expect(panel).toContain("ageWords(member.ageMs)");
   });
 
   it("announces itself politely instead of at every update", () => {
@@ -323,7 +324,7 @@ describe("LiveCompanionPanel", () => {
 
   it("paints its legend dot from the map's own colors", () => {
     expect(panel).toContain("liveMarkerColors(theme.isDark)");
-    expect(panel).toContain("peer.stale ? colors.stale : colors.live");
+    expect(panel).toContain("member.stale ? colors.stale : colors.live");
   });
 
   it("touches no map or maplibre API", () => {

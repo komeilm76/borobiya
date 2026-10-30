@@ -57,7 +57,7 @@ describe("map live companions accessibility (T4.4.3 partial)", () => {
 
   it("makes the scrolling peer list keyboard reachable without replacing its list semantics", () => {
     // list-style: none can suppress implicit list semantics in some screen readers.
-    expect(companion).toMatch(/<ul v-if="api\.peers\.value\.length" class="live-companions__peers" role="list" tabindex="0" aria-label="[^"]+">/);
+    expect(companion).toMatch(/<ul v-if="members\.length" class="live-companions__peers" role="list" tabindex="0" aria-label="[^"]+">/);
     expect(rule(companion, ".live-companions__peers")).toContain("overflow-y: auto;");
     expect(rule(companion, ".live-companions__peers:focus-visible"))
       .toContain("outline: 2px solid var(--bb-color-primary);");

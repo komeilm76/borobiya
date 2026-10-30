@@ -1,19 +1,19 @@
 <template>
   <v-card
     class="broadcast-bar"
-    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset, 'bb-floating-card': compact }]"
+    :class="[`broadcast-bar--${state.tone}`, { 'broadcast-bar--compact': compact, 'broadcast-bar--inset': inset, 'broadcast-bar--map': mapMode, 'bb-floating-card': compact }]"
     :elevation="inset ? 0 : 2"
     rounded="xl"
   >
     <div class="broadcast-bar__body">
-      <span class="broadcast-bar__indicator" aria-hidden="true" />
-      <div class="broadcast-bar__copy" role="status" aria-live="polite">
+      <span v-if="!mapMode" class="broadcast-bar__indicator" aria-hidden="true" />
+      <div v-if="!mapMode || state.tone === 'warn' || state.tone === 'error'" class="broadcast-bar__copy" role="status" aria-live="polite">
         <p class="broadcast-bar__headline">{{ state.headline }}</p>
         <p class="broadcast-bar__detail">{{ state.detail }}</p>
       </div>
       <div class="broadcast-bar__actions">
         <v-btn
-          v-if="state.showDevicesLink"
+          v-if="state.showDevicesLink && !mapMode"
           size="small"
           variant="text"
           color="primary"
@@ -49,7 +49,8 @@ import { useBroadcastStore } from "@/stores/broadcast";
  * Pure renderer for the user's outgoing live-location broadcast (`T2.1.5`) and multi-device
  * priority state (`T2.3.6`). Every sentence and tone is derived in `@/live/broadcast-status`.
  */
-withDefaults(defineProps<{ compact?: boolean; inset?: boolean }>(), { compact: false, inset: false });
+withDefaults(defineProps<{ compact?: boolean; inset?: boolean; mapMode?: boolean }>(),
+  { compact: false, inset: false, mapMode: false });
 
 const broadcast = useBroadcastStore();
 const state = computed(() => broadcast.view);
@@ -71,6 +72,9 @@ onMounted(() => {
 .broadcast-bar--compact {
   padding: 0.6rem 0.85rem;
 }
+.broadcast-bar--map .broadcast-bar__actions { width: 100%; margin-inline-start: 0; }
+.broadcast-bar--map .broadcast-bar__actions :deep(.v-btn) { width: 100%; min-height: 48px; height: auto; white-space: normal; }
+.broadcast-bar--map .broadcast-bar__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 
 /* The dashboard places this card inside another card; standalone bars keep xl corners. */
 .broadcast-bar--inset {

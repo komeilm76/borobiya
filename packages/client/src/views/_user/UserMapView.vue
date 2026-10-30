@@ -60,7 +60,7 @@
 
     <ReverseAddressSheet :api="reverse" />
 
-    <!-- One eager Vuetify sheet for the three remaining tools. On tablet/desktop the host is a
+    <!-- One eager Vuetify sheet for Search and History. On tablet/desktop the host is a
          boxless div, so the original panels keep their normal positions and order. -->
     <component
       :is="isPhone ? VBottomSheet : 'div'"
@@ -93,16 +93,32 @@
         />
       </aside>
 
-      <aside id="map-live-panel" v-show="!isPhone || activeTool === 'live'"
-        class="user-map-view__live user-map-view__panel" :role="isPhone ? 'region' : undefined"
-        :aria-label="isPhone ? 'اشتراک و همراهان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-        <div v-if="isPhone" class="user-map-view__panel-head">
-          <strong>اشتراک و همراهان</strong>
+    </component>
+
+    <!-- A phone's companions tool is a true fullscreen dialog, not another cramped
+         bottom sheet. Desktop/tablet keep their original map-side position. -->
+    <component
+      :is="isPhone ? VDialog : 'div'"
+      class="user-map-view__live-dialog"
+      v-bind="isPhone ? phoneLiveDialogProps : {}"
+      @update:model-value="onLiveDialogVisibilityChange"
+    >
+      <v-card class="user-map-view__live-surface" rounded="xl">
+        <v-card-title v-if="isPhone" class="user-map-view__live-title">
+          <span>اشتراک و همراهان</span>
           <v-btn icon="mdi-close" variant="text" aria-label="بستن همراهان" @click="closeTool()" />
-        </div>
-        <LiveBroadcastBar compact />
-        <LiveCompanionPanel :api="live" />
-      </aside>
+        </v-card-title>
+        <v-card-text class="user-map-view__live-body">
+          <aside id="map-live-panel" class="user-map-view__live user-map-view__panel"
+            :role="isPhone ? 'region' : undefined" aria-label="اشتراک و همراهان"
+            tabindex="-1" @keydown.esc="onPanelEscape">
+            <LiveBroadcastBar compact map-mode />
+            <LiveCompanionPanel :api="live" :visible="showCompanions" :selected-user-id="selectedCompanionId"
+              @update:visible="showCompanions = $event" @select="selectCompanion" />
+            <p v-if="peerSelectionError" class="user-map-view__peer-error" role="status" aria-live="polite">{{ peerSelectionError }}</p>
+          </aside>
+        </v-card-text>
+      </v-card>
     </component>
   </section>
 </template>
@@ -111,8 +127,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
-import { VBottomSheet } from "vuetify/components";
-import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
+import { VBottomSheet, VDialog } from "vuetify/components";
+import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker, Popup } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
@@ -129,8 +145,8 @@ import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
 import { historyCameraPadding } from "@/history/camera-padding";
 import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
-import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
-import { planOverlayRemoval, planOverlaySync, type OverlayOp } from "@/map/overlay-sync";
+import { LIVE_BOTTOM_LAYER_ID, ageWords, liveCompanionsStyle } from "@/live/companion-locations";
+import { planOverlayRemoval, planOverlaySync, pointsOverlay, type OverlayOp } from "@/map/overlay-sync";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
 import { useOwnMapPosition } from "@/composables/use-own-map-position";
@@ -142,8 +158,8 @@ const auth = useAuthStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
-// Only phones put the three supplementary tools in a dock and eager bottom sheet.
-// v-show preserves playback and socket state while a panel is closed.
+// Phones put search and history in a sheet; companions have their own fullscreen
+// dialog. The view owns the sockets so either overlay can close without stopping them.
 type MapTool = "search" | "history" | "live";
 const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
   { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
@@ -173,7 +189,7 @@ onBeforeRouteLeave(() => {
 
 // The desktop host is a boxless div; do not put dialog/overlay attributes on it.
 const phoneSheetProps = computed(() => ({
-  modelValue: activeTool.value !== null,
+  modelValue: activeTool.value === "search" || activeTool.value === "history",
   scrim: false,
   // The map (including its dock and controls) is part of the activator, so a
   // dock switch isn't an outside click. Let Vuetify handle Back and outside clicks.
@@ -187,13 +203,13 @@ const phoneSheetProps = computed(() => ({
   scrollStrategy: "none" as const,
   eager: true,
   "aria-modal": "false",
-  "aria-hidden": activeTool.value === null ? "true" : undefined,
+  "aria-hidden": activeTool.value !== "search" && activeTool.value !== "history" ? "true" : undefined,
   "aria-label": mapTools.find(tool => tool.id === activeTool.value)?.label
 }));
 
 // Vuetify's non-mandatory group emits undefined when the selected button is tapped
 // again. Normalize it to null: otherwise the sheet's `activeTool !== null` stays
-// true while all four panels are hidden, leaving an empty interactive overlay.
+// true while its panels are hidden, leaving an empty interactive overlay.
 // Keep selection and panel visibility on the same state, then move keyboard focus.
 async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
@@ -205,9 +221,23 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
 }
 
-// Keep Vuetify's model and the dock selection in sync on all other close paths.
+const phoneLiveDialogProps = computed(() => ({
+  modelValue: activeTool.value === "live",
+  fullscreen: true,
+  scrollable: true,
+  eager: true,
+  // The route-leave guard dismisses the phone modal on Back. Enabling Vuetify's
+  // own Back handler too makes both handlers traverse history (skipping the map).
+  closeOnBack: false,
+  "aria-label": "اشتراک و همراهان"
+}));
+
+// Keep Vuetify's models and the dock selection in sync on other close paths.
 function onSheetVisibilityChange(visible: boolean): void {
-  if (!visible && activeTool.value) closeTool();
+  if (!visible && activeTool.value && activeTool.value !== "live") closeTool();
+}
+function onLiveDialogVisibilityChange(visible: boolean): void {
+  if (!visible && activeTool.value === "live") closeTool();
 }
 
 function closeTool(restoreFocus = true): void {
@@ -374,6 +404,98 @@ const live = useLiveCompanions({
   ownUserId: computed(() => auth.user?.id ?? null)
 });
 const liveStyle = computed(() => liveCompanionsStyle(theme.isDark));
+const showCompanions = ref(true);
+const emptyCompanionOverlay = pointsOverlay([]);
+const selectedCompanionId = ref<string | null>(null);
+const peerSelectionError = ref<string | null>(null);
+let selectedCompanionPopup: Popup | null = null;
+let popupRequest = 0;
+
+function removeSelectedCompanion(): void {
+  popupRequest++;
+  selectedCompanionId.value = null;
+  const previous = selectedCompanionPopup;
+  selectedCompanionPopup = null;
+  previous?.remove();
+}
+
+/** Build popup DOM with textContent, never setHTML: usernames are untrusted data. */
+function selectedCompanionContent(peer: (typeof live.peers.value)[number]): HTMLElement {
+  const content = document.createElement("div");
+  content.className = "user-map-view__peer-popup";
+  const name = document.createElement("strong");
+  name.textContent = peer.name;
+  const details = document.createElement("p");
+  details.textContent = `${peer.stale ? "موقعیت قدیمی یا بدون زمان" : "موقعیت تازه"} · ${ageWords(peer.ageMs)}`;
+  const accuracy = document.createElement("p");
+  accuracy.textContent = peer.accuracy === null ? "دقت نامشخص" : `دقت ±${Math.round(peer.accuracy)} متر`;
+  content.append(name, details, accuracy);
+  return content;
+}
+
+function syncSelectedCompanion(): void {
+  const userId = selectedCompanionId.value;
+  if (!userId) return;
+  // A revoked share/account switch must remove coordinates and details immediately.
+  const authorized = live.registry.value[userId];
+  const peer = live.peers.value.find((candidate) => candidate.userId === userId);
+  if (!authorized || !peer || !showCompanions.value || !map.value) {
+    removeSelectedCompanion();
+    return;
+  }
+  if (selectedCompanionPopup) selectedCompanionPopup.setLngLat(peer.position).setDOMContent(selectedCompanionContent(peer));
+}
+
+async function showSelectedCompanion(userId: string): Promise<void> {
+  const instance = map.value;
+  const request = ++popupRequest;
+  // The map module is already loaded by MapCanvas; preserve route-level lazy loading.
+  const { Popup: PopupClass } = await import("maplibre-gl");
+  if (request !== popupRequest || !instance || instance !== map.value || !showCompanions.value ||
+      selectedCompanionId.value !== userId || !live.registry.value[userId]) return;
+  const peer = live.peers.value.find((candidate) => candidate.userId === userId);
+  if (!peer) return;
+  const previous = selectedCompanionPopup;
+  selectedCompanionPopup = null;
+  previous?.remove();
+  const popup = new PopupClass({ closeButton: true, closeOnClick: false, offset: 16, focusAfterOpen: false })
+    .setLngLat(peer.position).setDOMContent(selectedCompanionContent(peer)).addTo(instance);
+  selectedCompanionPopup = popup;
+  const closeButton = popup.getElement().querySelector(".maplibregl-popup-close-button");
+  closeButton?.setAttribute("aria-label", "بستن اطلاعات همراه");
+  closeButton?.setAttribute("title", "بستن اطلاعات همراه");
+  popup.on("close", () => {
+    if (selectedCompanionPopup === popup) {
+      selectedCompanionPopup = null;
+      selectedCompanionId.value = null;
+    }
+  });
+}
+
+function selectCompanion(userId: string): void {
+  const instance = map.value;
+  const authorized = live.registry.value[userId];
+  const peer = live.peers.value.find((candidate) => candidate.userId === userId);
+  if (!instance || !authorized || !peer) return;
+  const bounds = instance.getMaxBounds();
+  if (bounds && !bounds.contains(peer.position)) {
+    peerSelectionError.value = "موقعیت این همراه خارج از محدودهٔ نقشهٔ آفلاین است.";
+    return;
+  }
+  peerSelectionError.value = null;
+  showCompanions.value = true;
+  removeSelectedCompanion();
+  selectedCompanionId.value = userId;
+  userControlledCamera.value = true;
+  instance.flyTo({ center: peer.position, zoom: Math.min(15, instance.getMaxZoom()), duration: 700 });
+  if (isPhone.value && activeTool.value === "live") closeTool(false);
+  void showSelectedCompanion(userId);
+}
+
+watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); }, { flush: "sync" });
+watch(() => live.registry.value, syncSelectedCompanion, { flush: "sync" });
+watch(() => live.peers.value, syncSelectedCompanion);
+watch(() => auth.user?.id, () => { removeSelectedCompanion(); peerSelectionError.value = null; showCompanions.value = true; }, { flush: "sync" });
 
 /**
  * The maplibre calls the plan asked for, and nothing else. `data` and the layer spec cross a boundary
@@ -422,7 +544,7 @@ function paintLive(): void {
   if (!instance) return;
   // The live overlay owns the top of the stack, so it names no `beforeLayerId`: appending is the only
   // order that does not depend on a layer the base style might not declare.
-  for (const op of planOverlaySync(mapState(instance), liveStyle.value, () => live.overlay.value)) applyOp(instance, op);
+  for (const op of planOverlaySync(mapState(instance), liveStyle.value, () => showCompanions.value ? live.overlay.value : emptyCompanionOverlay)) applyOp(instance, op);
 }
 
 function playbackMapState(instance: MapLibreMap) {
@@ -484,7 +606,8 @@ function repaintOverlays(): void {
 let lastLongPressAt = 0;
 function onMapClick(event: MapMouseEvent): void {
   // Some touch browsers synthesize a click after a long-press contextmenu event.
-  if (Date.now() - lastLongPressAt < 700) return;
+  if (Date.now() - lastLongPressAt < 700 ||
+    (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".maplibregl-popup"))) return;
   if (isPhone.value && activeTool.value) closeTool(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
@@ -512,6 +635,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) { selectedPlaceMarker?.remove(); selectedPlaceMarker = null; }
+  if (map.value !== instance) removeSelectedCompanion();
   markerConstructor = MarkerClass;
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
@@ -540,7 +664,7 @@ watch(() => playbackStyle.value, () => {
 watch(() => live.overlay.value, paintLive);
 // The overlay already changes when peers arrive or leave; a second peer-count watcher would
 // duplicate MapLibre setData on those updates. An age-only tick updates the status panel, not
-// map GeoJSON. Peers never move the camera: the user chose where to look.
+// map GeoJSON. Updates never move the camera; selecting a peer explicitly can.
 watch(
   () => playback.frames.value,
   () => {
@@ -569,6 +693,7 @@ onBeforeUnmount(() => {
   map.value = null;
   markerConstructor = null;
   own.stop();
+  removeSelectedCompanion();
   ownMarker?.remove();
   ownMarker = null;
   selectedPlaceMarker?.remove();
@@ -601,8 +726,23 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   isolation: isolate;
 }
 
-/* Without a box, desktop absolute offsets and tablet flex order stay unchanged. */
-.user-map-view__tool-host { display: contents; }
+/* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
+.user-map-view__tool-host, .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
+.user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
+.user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
+:global(.user-map-view .maplibregl-popup-content) {
+  direction: rtl;
+  color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface));
+  border-radius: 0.85rem;
+  box-shadow: var(--bb-shadow-overlay);
+  padding: 0.75rem 1rem;
+}
+:global(.user-map-view .maplibregl-popup-tip) { border-top-color: rgb(var(--v-theme-surface)); }
+:global(.user-map-view .user-map-view__peer-popup) { padding-inline-start: 1.75rem; min-width: 12rem; }
+:global(.user-map-view .user-map-view__peer-popup p) { margin: 0.25rem 0 0; font-size: 0.8rem; }
+:global(.user-map-view .maplibregl-popup-close-button) { min-width: 36px; min-height: 36px; color: rgb(var(--v-theme-on-surface)); font-size: 1.4rem; }
+
 
 .user-map-view__canvas {
   position: absolute;
@@ -752,6 +892,48 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
  * stacked cards. The three complete tools remain mounted, but one scrollable surface opens over
  * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
 @media (max-width: 599px) {
+  :global(.user-map-view__live-dialog.v-dialog > .v-overlay__content) {
+    margin: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  :global(.user-map-view__live-dialog .user-map-view__live-surface) {
+    display: flex !important;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: rgb(var(--v-theme-surface));
+    border-radius: 0 !important; /* Fullscreen; other cards keep the shared xl radius. */
+  }
+  :global(.user-map-view__live-dialog .user-map-view__live-title) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    min-height: 56px;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  }
+  :global(.user-map-view__live-dialog .user-map-view__live-title .v-btn) { min-width: 44px; min-height: 44px; }
+  :global(.user-map-view__live-dialog .user-map-view__live-body) {
+    display: block !important;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  :global(.user-map-view__live-dialog .user-map-view__live) {
+    position: static;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  :global(.user-map-view__live-dialog .live-companions__peers) { max-height: none; }
+
   .user-map-view {
     position: fixed;
     inset: 0;
@@ -837,7 +1019,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     gap: 0.25rem;
     padding: 0.25rem;
   }
-  /* Vuetify's 80px minimum would clip four tools on a 320px-wide phone. */
+  /* Keep three 44px launchers reachable on a 320px-wide phone. */
   .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn) {
     flex: 1 1 0;
     min-width: 44px;

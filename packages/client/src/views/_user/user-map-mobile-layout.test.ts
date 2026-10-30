@@ -72,7 +72,8 @@ describe("mobile map viewport and overlay tools", () => {
     for (const tool of ["search", "history", "live"]) {
       expect(view).toContain(`id: "${tool}"`);
       expect(view).toContain(`id="map-${tool}-panel"`);
-      expect(view).toContain(`activeTool === '${tool}'`);
+      if (tool !== "live") expect(view).toContain(`activeTool === '${tool}'`);
+      else expect(view).toContain('activeTool.value === "live"');
     }
     expect(view).toContain(':id="`map-tool-${tool.id}`"');
     expect(view).toContain(':aria-expanded="activeTool === tool.id"');
@@ -82,9 +83,9 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('class="user-map-view__tool-host"');
     expect(view).toContain(`:class="isPhone ? 'user-map-view__tool-sheet' : undefined"`);
     expect(view).toContain('v-bind="isPhone ? phoneSheetProps : {}"');
-    expect(view).toContain('modelValue: activeTool.value !== null');
+    expect(view).toContain('modelValue: activeTool.value === "search" || activeTool.value === "history"');
     expect(view).toContain('@update:model-value="onSheetVisibilityChange"');
-    expect(view).toContain('if (!visible && activeTool.value) closeTool()');
+    expect(view).toContain('if (!visible && activeTool.value && activeTool.value !== "live") closeTool()');
     expect(view).toContain("eager: true");
     expect(view).toContain('persistent: false');
     expect(view).toContain('closeOnBack: true');
@@ -103,8 +104,8 @@ describe("mobile map viewport and overlay tools", () => {
     // Map controls, dock and SOS must remain interactive, not hidden behind a modal scrim.
     for (const prop of ['scrim: false', 'retainFocus: false', 'captureFocus: false',
       'scrollStrategy: "none"', '"aria-modal": "false"',
-      '"aria-hidden": activeTool.value === null ? "true" : undefined']) expect(view).toContain(prop);
-    expect(view).toContain('.user-map-view__tool-host { display: contents; }');
+      '"aria-hidden": activeTool.value !== "search" && activeTool.value !== "history" ? "true" : undefined']) expect(view).toContain(prop);
+    expect(view).toContain('.user-map-view__tool-host, .user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
     expect(view).toContain('@keydown.esc="onPanelEscape"');
     expect(view).toContain("if (!isPhone.value) return;");
     expect(view).toContain("event.stopPropagation()");
