@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Reduce the phone-map SOS footprint (T4.4.1 follow-up)
+
+- The SOS pill on the full-screen phone map felt too large beside the labelled tool dock. A map-route-only style override reduced its browser-measured footprint from 153×54px to 127×44px, keeping the visible label, accessible name, click handler, 44px touch height, fixed safety position and separation from the dock, sheet and MapLibre controls. The original SOS size on other routes is unchanged. A source regression failed before the fix; client tests/typecheck and mocked-data Chromium geometry checks at 320×400, 320×568, 360×640 and 568×320 passed. Real-device safe-area and full-backend checks remain open.
+
 ### 2026-10-30 — Simplify the companion map chrome and keep its tools reachable (T4.4.1 follow-up)
 
 - Removed the duplicate dashboard shortcut, redundant floating title and hard-coded Tehran chip from `/_user/map`; the shared app bar now shows a map-specific heading instead of the Borobiya brand on that route, while the section menu retains dashboard navigation. Desktop search moves up into the cleared edge. The full-screen phone map retains four full-content tools, now with visible launcher labels and a bottom-anchored scrolling sheet above SOS; short landscape gives SOS and MapLibre navigation/scale their own lanes. Auditing real OSM/OpenMapTiles attribution text revealed that its initially expanded credit could cover native zoom controls, so the credit now wraps within the opposite top corner and the sheet reserves space below it. This follows mobile-map space/touch guidance and compact bottom-sheet patterns ([1](https://mapuipatterns.com/mobile-map/), [2](https://m3.material.io/components/bottom-sheets/guidelines)). A source-pinned regression failed before the change; full client tests, typecheck/build and a **mocked-data** Chromium layout/scroll review at 320×400, 320×568, 360×640, 568×320, 800×800 and 1280×800 passed. Live authenticated backend, device safe-area, keyboard/IME, and screen-reader acceptance are still open; T4.4.1 remains open.

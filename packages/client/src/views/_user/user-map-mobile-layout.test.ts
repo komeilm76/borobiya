@@ -6,6 +6,7 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
+const sosTrigger = readFileSync(new URL("../../components/sos/SosTriggerButton.vue", import.meta.url), "utf8");
 
 function css(source: string, filename: string): string {
   const { descriptor } = parse(source, { filename });
@@ -39,6 +40,15 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toMatch(/\.user-map-view > \.user-map-view__canvas\s*\{[^}]*position: absolute;[^}]*height: 100%;/);
     expect(phoneMap).not.toContain("height: clamp(20rem, 55dvh, 32rem)");
     expect(css(view, "UserMapView.vue")).toContain("height: 100dvh");
+  });
+
+  it("uses a slightly smaller SOS pill on the phone map without shrinking its touch target or hiding its label", () => {
+    const phoneShell = shell.split("@media (max-width: 599px) {").at(-1)!;
+    expect(phoneShell).toMatch(/\.app-shell--map \.sos-fab\.sos-fab\s*\{[^}]*min-height: 44px;[^}]*padding: 0\.5rem 0\.75rem;[^}]*font-size: 0\.875rem;/);
+    expect(phoneShell).toContain("inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))");
+    expect(sosTrigger).toContain('aria-label="درخواست امداد فوری (SOS)"');
+    expect(sosTrigger).toContain('<span class="sos-fab__label">SOS امداد</span>');
+    expect(sosTrigger).toContain('@click="$emit(\'trigger\')"');
   });
 
   it("keeps full-size controls mounted and offers four accessible launchers with one scrollable panel", () => {

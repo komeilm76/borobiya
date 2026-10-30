@@ -456,8 +456,16 @@ a {
   .app-shell--map .login-button { margin-inline-start: 0; padding-inline: 0.55rem !important; }
   .app-shell--map .app-main { min-height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; }
   .app-shell--map .app-footer { display: none; }
-  /* Outrank SosTriggerButton's scoped .sos-fab[data-v-*] regardless of style injection order. */
-  .app-shell--map .sos-fab.sos-fab { inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px)); inset-inline-start: 0.75rem; }
+  /* Keep map SOS distinct from the tool dock without dominating the small map.
+   * This route-only override retains a 44px touch target and the visible label. */
+  .app-shell--map .sos-fab.sos-fab {
+    inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    inset-inline-start: 0.75rem;
+    min-height: 44px;
+    gap: 0.35rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
 }
 
 :root.dark {
