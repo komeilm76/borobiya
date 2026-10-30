@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-30 — Full-screen map search and automatic place details (T4.4.1 follow-up)
+
+- The phone dock’s «جست‌وجو» opens a full-height, scrollable Vuetify dialog rather than the former small bottom sheet; History keeps its phone bottom sheet and wider screens keep their in-flow/side search panel. Selecting a current in-bounds result closes the phone dialog, centers its purple MapLibre pin above the detail area, and automatically opens a scrollable place-detail bottom sheet with the result’s name, address, type and coordinates. Tap or keyboard-activate the retained pin to reopen details; results stay available for reselection. Close/Escape restores focus to the pin after the transition without stealing focus from newly opened tools. Existing current-result and offline-bounds checks, first-fix camera arbitration, Back handling and companion selection remain intact. Source/style contracts, client checks and mocked Chromium at 320×400, 360×640, 568×320 and 1280×800 covered dialog bounds, short-screen scrolling, selection/switching, focus, marker reopening, and wider layout. Live geocoder, real phone safe areas/IME and screen-reader acceptance remain open; T4.4.1 is partial.
+
 ### 2026-10-30 — Smaller companion portraits and distinct private-GPS target (T4.4.1 follow-up)
 
 - Reduced each on-map companion's visible initial portrait from 44px to 32px, retaining its separate 44px keyboard/touch button, freshness/selection outlines, and profile-sheet interaction. Replaced the private own-position MapLibre default destination pin with a blue GPS crosshairs icon and soft halo, labelled as local-only; the purple selected-search-place pin is unchanged. The own marker still moves with GPS updates, is removed on teardown, and is recreated if the map instance changes. Failing-before-change source/compiled-style regressions, full client checks, and mocked Chromium at five phone/desktop sizes covered the companion sheet, marker dimensions and accessibility; real-device GPS/screen-reader and genuine backend acceptance remain open.

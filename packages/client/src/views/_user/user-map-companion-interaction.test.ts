@@ -21,11 +21,12 @@ describe("map companions tool", () => {
     expect(view).toContain('fullscreen: true');
     expect(view).toContain('scrollable: true');
     expect(view).toContain('modelValue: activeTool.value === "live"');
-    expect(view).toContain('modelValue: activeTool.value === "search" || activeTool.value === "history"');
+    expect(view).toContain('modelValue: activeTool.value === "search"');
+    expect(view).toContain('modelValue: activeTool.value === "history"');
     expect(view).toContain('aria-label="اشتراک و همراهان"');
     expect(view).toContain('id="map-live-panel"');
     expect(view).toContain('aria-label="بستن همراهان"');
-    expect(view).toContain('.user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
+    expect(view).toContain('.user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
     // Vuetify's Back hook and the map's route-leave guard must not both move history.
     expect(view.slice(view.indexOf('const phoneLiveDialogProps'), view.indexOf('// Keep Vuetify\'s models')))
       .toContain('closeOnBack: false');

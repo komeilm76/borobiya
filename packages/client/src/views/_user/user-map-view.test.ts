@@ -92,15 +92,17 @@ describe("UserMapView live overlay", () => {
 
   it("pins the selected POI on the map and removes it when selection/search ends", () => {
     const marker = body("syncSelectedPlaceMarker");
-    expect(marker).toContain("placeSearch.selectedPlaceId.value");
-    expect(marker).toContain("placeSearch.results.value.find(");
+    expect(view).toContain("placeSearch.selectedPlaceId.value");
+    expect(view).toContain("placeSearch.results.value.find(");
+    expect(marker).toContain("const place = selectedSearchPlace.value");
     expect(marker).toContain("selectedPlaceMarker?.remove()");
     expect(marker).toContain("new markerConstructor(");
     expect(marker).toContain("setLngLat([place.lon, place.lat]).addTo(instance)");
     expect(marker).toContain("else selectedPlaceMarker.setLngLat([place.lon, place.lat])");
     expect(marker).toContain('setAttribute("aria-label",');
     expect(marker).toContain('setAttribute("title", place.name)');
-    expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value, syncSelectedPlaceMarker, { flush: "sync" })');
+    expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value, () => {');
+    expect(view).toContain('syncSelectedPlaceMarker();');
     expect(body("selectPlace")).toContain("placeSearch.select(place)");
     expect(body("onMapReady")).toContain("syncSelectedPlaceMarker()");
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain("selectedPlaceMarker?.remove()");

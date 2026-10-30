@@ -83,9 +83,11 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('class="user-map-view__tool-host"');
     expect(view).toContain(`:class="isPhone ? 'user-map-view__tool-sheet' : undefined"`);
     expect(view).toContain('v-bind="isPhone ? phoneSheetProps : {}"');
-    expect(view).toContain('modelValue: activeTool.value === "search" || activeTool.value === "history"');
+    expect(view).toContain('modelValue: activeTool.value === "history"');
+    expect(view).toContain('modelValue: activeTool.value === "search"');
     expect(view).toContain('@update:model-value="onSheetVisibilityChange"');
-    expect(view).toContain('if (!visible && activeTool.value && activeTool.value !== "live") closeTool()');
+    expect(view).toContain('if (!visible && activeTool.value === "history") closeTool()');
+    expect(view).toContain('if (!visible && activeTool.value === "search") closeTool()');
     expect(view).toContain("eager: true");
     expect(view).toContain('persistent: false');
     expect(view).toContain('closeOnBack: true');
@@ -104,8 +106,8 @@ describe("mobile map viewport and overlay tools", () => {
     // Map controls, dock and SOS must remain interactive, not hidden behind a modal scrim.
     for (const prop of ['scrim: false', 'retainFocus: false', 'captureFocus: false',
       'scrollStrategy: "none"', '"aria-modal": "false"',
-      '"aria-hidden": activeTool.value !== "search" && activeTool.value !== "history" ? "true" : undefined']) expect(view).toContain(prop);
-    expect(view).toContain('.user-map-view__tool-host, .user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
+      '"aria-hidden": activeTool.value !== "history" ? "true" : undefined']) expect(view).toContain(prop);
+    expect(view).toContain('.user-map-view__tool-host, .user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }');
     expect(view).toContain('@keydown.esc="onPanelEscape"');
     expect(view).toContain("if (!isPhone.value) return;");
     expect(view).toContain("event.stopPropagation()");
@@ -123,9 +125,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('document.getElementById(`map-tool-${previous}`)?.focus()');
     expect(view).toContain('document.getElementById(`map-tool-${tool}`)?.focus()');
     // Camera actions reveal their destination; opening the tool again retains the full content.
-    for (const tool of ["search", "history"]) {
-      expect(view).toContain(`if (isPhone.value && activeTool.value === "${tool}") closeTool()`);
-    }
+    expect(view).toContain('if (isPhone.value && activeTool.value === "search") closeTool(false)');
+    expect(view).toContain('if (isPhone.value && activeTool.value === "history") closeTool()');
   });
 
   it("does not let compact navigation, SOS, dock or MapLibre attribution obscure each other", () => {

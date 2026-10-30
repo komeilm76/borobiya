@@ -80,8 +80,31 @@
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
       @close="removeSelectedCompanion" @retry-profile="loadSelectedProfile" @retry-place="loadSelectedPlace" />
 
-    <!-- One eager Vuetify sheet for Search and History. On tablet/desktop the host is a
-         boxless div, so the original panels keep their normal positions and order. -->
+    <!-- Phone search gets the same full-height dialog treatment as Companions;
+         wider maps retain the existing in-flow/side search panel. -->
+    <component :is="isPhone ? VDialog : 'div'" class="user-map-view__search-dialog"
+      v-bind="isPhone ? phoneSearchDialogProps : {}"
+      @update:model-value="onSearchDialogVisibilityChange">
+      <v-card class="user-map-view__search-surface" rounded="xl">
+        <v-card-title v-if="isPhone" class="user-map-view__search-title">
+          <span>جست‌وجوی مکان</span>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
+        </v-card-title>
+        <v-card-text class="user-map-view__search-body">
+          <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
+            class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
+            :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
+            <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
+          </aside>
+        </v-card-text>
+      </v-card>
+    </component>
+
+    <PlaceDetailSheet :place="placeDetailOpen ? selectedSearchPlace : null"
+      @close="closePlaceDetail" @after-leave="onPlaceDetailAfterLeave" />
+
+    <!-- History alone uses the compact, click-through phone sheet. On larger
+         screens it stays in page flow beside the map. -->
     <component
       :is="isPhone ? VBottomSheet : 'div'"
       class="user-map-view__tool-host"
@@ -89,16 +112,6 @@
       v-bind="isPhone ? phoneSheetProps : {}"
       @update:model-value="onSheetVisibilityChange"
     >
-      <aside id="map-search-panel" v-show="!isPhone || activeTool === 'search'"
-        class="user-map-view__search user-map-view__panel" :role="isPhone ? 'region' : undefined"
-        :aria-label="isPhone ? 'جست‌وجوی مکان' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
-        <div v-if="isPhone" class="user-map-view__panel-head">
-          <strong>جست‌وجوی مکان</strong>
-          <v-btn icon="mdi-close" variant="text" aria-label="بستن جست‌وجو" @click="closeTool()" />
-        </div>
-        <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" />
-      </aside>
-
       <aside id="map-history-panel" v-show="!isPhone || activeTool === 'history'"
         class="user-map-view__playback user-map-view__panel" :role="isPhone ? 'region' : undefined"
         :aria-label="isPhone ? 'تاریخچهٔ مسیر' : undefined" tabindex="-1" @keydown.esc="onPanelEscape">
@@ -153,6 +166,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
+import PlaceDetailSheet from "@/components/map/PlaceDetailSheet.vue";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -184,8 +198,8 @@ const broadcast = useBroadcastStore();
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
 const mapPlaybackSession = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
-// Phones put search and history in a sheet; companions have their own fullscreen
-// dialog. The view owns the sockets so either overlay can close without stopping them.
+// Phones put search and companions in separate fullscreen dialogs, with a small
+// history sheet. The view owns the sockets so closing a tool does not stop sharing.
 type MapTool = "search" | "history" | "live";
 const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }[] = [
   { id: "search", label: "جست‌وجوی مکان", shortLabel: "جست‌وجو", icon: "mdi-magnify" },
@@ -206,17 +220,18 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (activeTool.value || selectedCompanionId.value) && typeof position === "number" &&
+  if (isPhone.value && (activeTool.value || selectedCompanionId.value || placeDetailOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
-    if (selectedCompanionId.value) removeSelectedCompanion();
+    if (placeDetailOpen.value) closePlaceDetail();
+    else if (selectedCompanionId.value) removeSelectedCompanion();
     else closeTool();
     return false;
   }
 });
 
-// The desktop host is a boxless div; do not put dialog/overlay attributes on it.
+// The desktop hosts are boxless divs; only phones register Vuetify overlays.
 const phoneSheetProps = computed(() => ({
-  modelValue: activeTool.value === "search" || activeTool.value === "history",
+  modelValue: activeTool.value === "history",
   scrim: false,
   // The map (including its dock and controls) is part of the activator, so a
   // dock switch isn't an outside click. Let Vuetify handle Back and outside clicks.
@@ -230,8 +245,8 @@ const phoneSheetProps = computed(() => ({
   scrollStrategy: "none" as const,
   eager: true,
   "aria-modal": "false",
-  "aria-hidden": activeTool.value !== "search" && activeTool.value !== "history" ? "true" : undefined,
-  "aria-label": mapTools.find(tool => tool.id === activeTool.value)?.label
+  "aria-hidden": activeTool.value !== "history" ? "true" : undefined,
+  "aria-label": "تاریخچهٔ مسیر"
 }));
 
 // Vuetify's non-mandatory group emits undefined when the selected button is tapped
@@ -242,11 +257,22 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
   const previous = activeTool.value;
   if (selected === previous) return;
+  if (selected) closePlaceDetail(false);
   activeTool.value = selected;
   await nextTick();
   if (selected) document.getElementById(`map-${selected}-panel`)?.focus();
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
 }
+
+const phoneSearchDialogProps = computed(() => ({
+  modelValue: activeTool.value === "search",
+  fullscreen: true,
+  scrollable: true,
+  eager: true,
+  // Router's first-Back guard dismisses this modal; don't traverse history twice.
+  closeOnBack: false,
+  "aria-label": "جست‌وجوی مکان"
+}));
 
 const phoneLiveDialogProps = computed(() => ({
   modelValue: activeTool.value === "live",
@@ -261,7 +287,10 @@ const phoneLiveDialogProps = computed(() => ({
 
 // Keep Vuetify's models and the dock selection in sync on other close paths.
 function onSheetVisibilityChange(visible: boolean): void {
-  if (!visible && activeTool.value && activeTool.value !== "live") closeTool();
+  if (!visible && activeTool.value === "history") closeTool();
+}
+function onSearchDialogVisibilityChange(visible: boolean): void {
+  if (!visible && activeTool.value === "search") closeTool();
 }
 function onLiveDialogVisibilityChange(visible: boolean): void {
   if (!visible && activeTool.value === "live") closeTool();
@@ -392,10 +421,32 @@ const placeSearch = usePlaceSearch({
 let fittedFor: string | null = null;
 const userControlledCamera = ref(false);
 let selectedPlaceMarker: Marker | null = null;
+const placeDetailOpen = ref(false);
+const selectedSearchPlace = computed(() => placeSearch.results.value.find(
+  (result) => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
+let restorePlaceFocus = false;
+function closePlaceDetail(restoreFocus = true): void {
+  restorePlaceFocus = restoreFocus && placeDetailOpen.value;
+  placeDetailOpen.value = false;
+}
+function onPlaceDetailAfterLeave(): void {
+  const shouldRestore = restorePlaceFocus;
+  restorePlaceFocus = false;
+  if (!shouldRestore || placeDetailOpen.value || activeTool.value || selectedCompanionId.value ||
+      reverse.open.value || !selectedSearchPlace.value) return;
+  selectedPlaceMarker?.getElement().focus({ preventScroll: true });
+}
+function openSelectedPlaceDetail(): void {
+  if (!selectedSearchPlace.value || !auth.user?.id || !map.value) return;
+  removeSelectedCompanion();
+  reverse.close();
+  restorePlaceFocus = false;
+  placeDetailOpen.value = true;
+}
 
 function syncSelectedPlaceMarker(): void {
   const instance = map.value;
-  const place = placeSearch.results.value.find((result) => result.placeId === placeSearch.selectedPlaceId.value);
+  const place = selectedSearchPlace.value;
   if (!instance || !markerConstructor || !place) {
     selectedPlaceMarker?.remove();
     selectedPlaceMarker = null;
@@ -406,11 +457,24 @@ function syncSelectedPlaceMarker(): void {
   if (!selectedPlaceMarker) {
     selectedPlaceMarker = new markerConstructor({ color: "#7c3aed" })
       .setLngLat([place.lon, place.lat]).addTo(instance);
+    const element = selectedPlaceMarker.getElement();
+    element.setAttribute("role", "button");
+    element.setAttribute("tabindex", "0");
+    element.setAttribute("aria-haspopup", "dialog");
+    element.addEventListener("click", (event) => { event.stopPropagation(); openSelectedPlaceDetail(); });
+    element.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault(); event.stopPropagation(); openSelectedPlaceDetail();
+    });
   } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
   selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}`);
   selectedPlaceMarker.getElement().setAttribute("title", place.name);
 }
-watch(() => placeSearch.selectedPlaceId.value, syncSelectedPlaceMarker, { flush: "sync" });
+watch(() => placeSearch.selectedPlaceId.value, () => {
+  syncSelectedPlaceMarker();
+  if (!selectedSearchPlace.value) closePlaceDetail(false);
+}, { flush: "sync" });
+watch(() => placeSearch.results.value, () => { if (!selectedSearchPlace.value) closePlaceDetail(false); }, { flush: "sync" });
 
 function selectPlace(place: GeocodeResult): void {
   const instance = map.value;
@@ -422,11 +486,14 @@ function selectPlace(place: GeocodeResult): void {
   userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
-  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 },
+  // Leave the selected pin in the visible map area above the phone details sheet.
+  const offsetY = isPhone.value ? -Math.min(150, Math.round(window.innerHeight * 0.22)) : 0;
+  instance.flyTo({ center: [place.lon, place.lat], zoom: Math.min(16, instance.getMaxZoom()), offset: [0, offsetY], duration: 700 },
     { placeSearchSelection: true });
-  // Reveal the pin rather than flying beneath the phone panel. Results remain mounted for
-  // picking another hit when the search tool is opened again.
-  if (isPhone.value && activeTool.value === "search") closeTool();
+  // Dismiss the full-screen search before opening the details over the map.
+  // Keep results mounted so another hit can be selected when search is reopened.
+  if (isPhone.value && activeTool.value === "search") closeTool(false);
+  openSelectedPlaceDetail();
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
@@ -615,6 +682,7 @@ function selectCompanion(userId: string, centerMap = true): void {
     peerSelectionError.value = "موقعیت این همراه خارج از محدودهٔ نقشهٔ آفلاین است.";
   } else peerSelectionError.value = null;
   showCompanions.value = true;
+  closePlaceDetail(false);
   if (selectedCompanionId.value !== userId) removeSelectedCompanion();
   selectedCompanionId.value = userId;
   syncPeerAvatars();
@@ -628,7 +696,10 @@ function selectCompanion(userId: string, centerMap = true): void {
 watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); syncPeerAvatars(); }, { flush: "sync" });
 watch(() => live.registry.value, syncSelectedCompanion, { flush: "sync" });
 watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }, { flush: "sync" });
-watch(() => auth.user?.id, () => { removeSelectedCompanion(); peerSelectionError.value = null; showCompanions.value = true; }, { flush: "sync" });
+watch(() => auth.user?.id, () => {
+  removeSelectedCompanion(); closePlaceDetail(false); placeSearch.clear();
+  peerSelectionError.value = null; showCompanions.value = true;
+}, { flush: "sync" });
 
 /**
  * The maplibre calls the plan asked for, and nothing else. `data` and the layer spec cross a boundary
@@ -742,12 +813,14 @@ function onMapClick(event: MapMouseEvent): void {
   if (Date.now() - lastLongPressAt < 700 ||
     (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".user-map-view__peer-avatar"))) return;
   if (isPhone.value && activeTool.value) closeTool(false);
+  closePlaceDetail(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 function onMapLongPress(event: MapMouseEvent): void {
   event.preventDefault();
   lastLongPressAt = Date.now();
   if (isPhone.value && activeTool.value) closeTool(false);
+  closePlaceDetail(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
 
@@ -835,6 +908,7 @@ onBeforeUnmount(() => {
   markerConstructor = null;
   own.stop();
   removeSelectedCompanion();
+  closePlaceDetail(false);
   for (const marker of peerMarkers.values()) marker.remove();
   peerMarkers.clear();
   ownMarker?.remove();
@@ -870,7 +944,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
-.user-map-view__tool-host, .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
+.user-map-view__tool-host, .user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
+.user-map-view__search-surface, .user-map-view__search-body,
 .user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
 :global(.user-map-view .user-map-view__peer-avatar) {
@@ -1061,6 +1136,32 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
  * stacked cards. The three complete tools remain mounted, but one scrollable surface opens over
  * the tiles at a time. Short screens reserve space for the safety SOS control and launcher. */
 @media (max-width: 599px) {
+  :global(.user-map-view__search-dialog.v-dialog > .v-overlay__content) {
+    margin: 0; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh;
+  }
+  :global(.user-map-view__search-dialog .user-map-view__search-surface) {
+    display: flex !important; flex-direction: column; height: 100%; min-height: 0;
+    background: rgb(var(--v-theme-surface)); border-radius: 0 !important;
+  }
+  :global(.user-map-view__search-dialog .user-map-view__search-title) {
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    min-height: 56px;
+    padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1rem 0.5rem;
+    border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  }
+  :global(.user-map-view__search-dialog .user-map-view__search-title .v-btn) { min-width: 44px; min-height: 44px; }
+  :global(.user-map-view__search-dialog .user-map-view__search-body) {
+    display: block !important; flex: 1 1 auto; min-height: 0;
+    padding: 1rem 0.75rem calc(1rem + env(safe-area-inset-bottom, 0px));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  :global(.user-map-view__search-dialog .user-map-view__search) {
+    position: static; width: 100%; max-height: none; display: flex; flex-direction: column;
+  }
+  :global(.user-map-view__search-dialog .place-search) {
+    flex: 0 0 auto; background: transparent; box-shadow: none !important; border: 0;
+  }
+  :global(.user-map-view__search-dialog .place-search .place-search__results) { max-height: none; overflow: visible; }
   :global(.user-map-view__live-dialog.v-dialog > .v-overlay__content) {
     margin: 0;
     width: 100vw;
