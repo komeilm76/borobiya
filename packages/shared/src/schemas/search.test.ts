@@ -41,6 +41,8 @@ describe("search and common query schemas", () => {
     expect(boundingBoxQuerySchema.safeParse("51.0,35.5,51.7,35.9").success).toBe(true);
     expect(boundingBoxQuerySchema.safeParse("51.7,35.5,51.0,35.9").success).toBe(false);
     expect(geocodeQuerySchema.parse({ q: "  Azadi Square  " })).toMatchObject({ q: "Azadi Square", limit: 5 });
+    expect(geocodeQuerySchema.parse({ q: "Cafe", limit: "30" }).limit).toBe(30);
+    expect(geocodeQuerySchema.safeParse({ q: "Cafe", limit: "31" }).success).toBe(false);
     expect(geocodeQuerySchema.safeParse({ q: "", limit: "0" }).success).toBe(false);
   });
 });

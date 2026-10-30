@@ -4,7 +4,11 @@
 
 ---
 
-### 2026-10-30 — Keep explored POIs through zoom and refresh map-area searches (T4.4.1 follow-up)
+### 2026-10-30 — Correct map search to current bbox's top 30 (T4.4.1 follow-up)
+
+- The prior accumulated-pin behavior was incorrect: map search now defaults to the visible bbox and requests up to 30 top hits per bbox (client, shared query and Photon gateway limits agree). On moving the camera, old list items and markers outside the new bbox are removed before the new request resolves. The latest answer replaces the snapshot; an empty answer removes old pins, and a failed/pending read retains only still-in-bbox hits with retry. An out-of-bbox selected place closes. Abort, stale reply protection and map-fit/selection flights remain intact. Pure tests and contract checks cover bounds, capacity, movement and retry; live Photon and real device/browser acceptance remain open.
+
+### 2026-10-30 — Keep explored POIs through zoom and refresh map-area searches (superseded by bbox-only correction above) (T4.4.1 follow-up)
 
 - Fixed disappearing search markers after panning/zooming: the search composable now retains a bounded, query-owned collection of up to 30 visited hits separately from the five latest viewport results. Showing All activates map follow mode; subsequent map gestures use an abortable bbox search, keep earlier POIs visible/selectable while loading or offline, merge newly returned hits without camera hijack, and never let an obsolete response overwrite the newest viewport. Map-selected results keep the user's current zoom; the phone map adds a compact **همهٔ نتایج** refit action so closing a detail sheet does not require reopening the full-screen search dialog to reach another POI. An explicit new term, scope switch or account change still clears previous pins; displayed loading/failure states identify older results and offer retry. Source/style and deferred-response tests cover preservation, stale abort, failure/retry, selection, 30-hit cap and cleanup; real browser/device and live-geocoder acceptance remain open.
 

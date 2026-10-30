@@ -32,7 +32,7 @@
         </v-btn>
       </div>
     </div>
-    <form class="place-search__form" role="search" @submit.prevent="api.run()">
+    <form class="place-search__form" role="search" @submit.prevent="api.run(api.mapActive.value)">
       <v-text-field
         :model-value="api.term.value"
         label="نام مکان یا خیابان"
@@ -80,12 +80,12 @@
         <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
       </div>
       <p v-else-if="api.searched.value && !api.results.value.length" class="place-search__feedback" role="status">
-        {{ api.mapResults.value.length ? 'نتیجهٔ جدیدی در این محدوده نیست؛ نتایج قبلی روی نقشه باقی‌اند.' : 'مکانی در این محدوده پیدا نشد.' }}
+        مکانی در این محدوده پیدا نشد.
       </p>
       <template v-else-if="api.results.value.length">
-        <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال به‌روزرسانی این محدوده؛ نتایج قبلی همچنان روی نقشه‌اند.</p>
+        <p v-if="api.loading.value" class="place-search__feedback" role="status">در حال به‌روزرسانی این محدوده؛ فقط نتایج داخل محدوده باقی می‌مانند.</p>
         <div v-else-if="api.failed.value" class="place-search__feedback" role="alert">
-          <p>به‌روزرسانی ناموفق بود؛ نتایج قبلی همچنان در دسترس‌اند.</p>
+          <p>به‌روزرسانی ناموفق بود؛ نتایج قبلیِ داخل همین محدوده در دسترس‌اند.</p>
           <v-btn size="small" variant="tonal" color="primary" rounded="lg" @click="api.retry()">تلاش دوباره</v-btn>
         </div>
         <p v-else class="place-search__feedback" role="status">نتایج را از فهرست انتخاب کنید یا همه را روی نقشه ببینید.</p>

@@ -379,7 +379,7 @@ MAP_GEOCODE_URL=http://localhost:8080/geocode MAP_REVERSE_URL=http://localhost:8
 
 The smoke test checks a non-empty forward search and reverse lookup using the selected area's catalog test points (Tehran default: `Azadi Square`). It also verifies GeoJSON shape, not just HTTP 200. The gateway returns 503 if the optional Photon service is not running. The Nominatim database and Photon index are local ignored data; a clean import may take time and needs adequate free disk and memory. If the area selection changes, do not reuse an old Nominatim database or Photon index—rebuild both from the newly verified dataset (Photon's import `-languages` and serve `-default-language` follow the selection; `scripts/setup-ubuntu-vm.sh` automates the reset and stamps the index with the dataset checksum).
 
-The shared query contract defaults forward geocoding to five results (maximum 20). Bounding boxes use `west,south,east,north`; reverse coordinates are validated against WGS84 ranges. The live `/geocode` and `/reverse` checks passed offline on the target VM on 2026-10-20 (see `docs/PROGRESS.md`).
+The shared query contract defaults forward geocoding to five results (maximum 30); the map UI requests 30 for its current-bbox snapshot. Bounding boxes use `west,south,east,north`; reverse coordinates are validated against WGS84 ranges. The live `/geocode` and `/reverse` checks passed offline on the target VM on 2026-10-20 (see `docs/PROGRESS.md`).
 
 ---
 

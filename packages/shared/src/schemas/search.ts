@@ -99,7 +99,7 @@ export type BoundingBoxQuery = z.infer<typeof boundingBoxQuerySchema>;
 
 export const geocodeQuerySchema = z.strictObject({
   q: z.string().trim().min(1).max(200),
-  limit: z.coerce.number().int().min(1).max(20).default(5),
+  limit: z.coerce.number().int().min(1).max(30).default(5),
   bbox: boundingBoxQuerySchema.optional()
 });
 export type GeocodeQuery = z.output<typeof geocodeQuerySchema>;

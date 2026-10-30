@@ -38,14 +38,14 @@ test("GET /geocode proxies a bounded Photon search and preserves GeoJSON", async
 
 test("GET /geocode forwards a validated result limit", async () => {
   let requestedUrl;
-  const response = await handleGeocodeRequest(get("/geocode?q=Tehran&limit=12"), {
+  const response = await handleGeocodeRequest(get("/geocode?q=Tehran&limit=30"), {
     fetchImpl: async (url) => {
       requestedUrl = new URL(url);
       return Response.json({ type: "FeatureCollection", features: [] });
     }
   });
   assert.equal(response.status, 200);
-  assert.equal(requestedUrl.searchParams.get("limit"), "12");
+  assert.equal(requestedUrl.searchParams.get("limit"), "30");
 });
 
 test("GET /reverse validates WGS84 coordinates and proxies to Photon", async () => {
@@ -74,7 +74,7 @@ test("geocode and reverse reject malformed/unknown query parameters before upstr
     "/geocode",
     "/geocode?q=%20%20",
     "/geocode?q=Tehran&limit=0",
-    "/geocode?q=Tehran&limit=21",
+    "/geocode?q=Tehran&limit=31",
     "/geocode?q=Tehran&limit=5.5",
     "/geocode?q=Tehran&bbox=51,91,52,92",
     "/geocode?q=Tehran&unexpected=1",

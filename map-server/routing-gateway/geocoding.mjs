@@ -120,7 +120,7 @@ export async function handleGeocodeRequest(request, {
   const limit = Number(limitText);
   const bbox = params?.get("bbox");
   if (!params || !query || query.length > 200 || !/^\d+$/.test(limitText) ||
-      !Number.isInteger(limit) || limit < 1 || limit > 20 || (bbox !== undefined && !validBbox(bbox))) {
+      !Number.isInteger(limit) || limit < 1 || limit > 30 || (bbox !== undefined && !validBbox(bbox))) {
     return json({ error: "invalid_geocode_query" }, 400);
   }
 

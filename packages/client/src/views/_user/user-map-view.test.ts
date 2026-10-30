@@ -125,7 +125,7 @@ describe("UserMapView live overlay", () => {
     expect(search).toContain("$emit('select', place)");
     expect(search).toContain("api.failed.value");
     expect(search).toContain("api.searched.value");
-    expect(search).toContain("api.run()");
+    expect(search).toContain("api.run(api.mapActive.value)");
   });
 
   it("offers return-to-track after a real map drag, wheel, keyboard move or zoom-control press", () => {

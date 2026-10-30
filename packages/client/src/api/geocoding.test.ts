@@ -22,8 +22,19 @@ describe("local Photon place search", () => {
       address: "Azadi Square, Tehran, Iran", lon: 51.38, lat: 35.7, type: "place" }]);
     await expect(searchPlaces({ q: " " })).rejects.toThrow();
     await expect(searchPlaces({ q: "valid", bbox: "51,91,52,92" })).rejects.toThrow();
-    await expect(searchPlaces({ q: "valid", limit: 21 })).rejects.toThrow();
+    await expect(searchPlaces({ q: "valid", limit: 31 })).rejects.toThrow();
     expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("supports a 30-place local search without changing the default limit", async () => {
+    const fetcher = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => Response.json(collection(
+      Array.from({ length: 35 }, (_, i) => feature(`Cafe ${i}`, [51.1 + i / 1000, 35.7], { osm_id: i }))
+    )));
+    vi.stubGlobal("fetch", fetcher);
+    const hits = await searchPlaces({ q: "کافه", bbox: "51,35,52,36", limit: 30 });
+    expect(fetcher.mock.calls[0]?.[0]).toBe("/geocode?q=%DA%A9%D8%A7%D9%81%D9%87&limit=30&bbox=51%2C35%2C52%2C36");
+    expect(hits).toHaveLength(30);
+    expect(hits.at(-1)?.name).toBe("Cafe 29");
   });
 
   it("drops malformed, duplicate, unnamed, non-point and out-of-bounds features, then caps valid results", () => {

@@ -18,7 +18,7 @@
       </v-btn>
       <span v-if="placeSearch.loading.value" role="status">در حال به‌روزرسانی نتایج…</span>
       <template v-else-if="placeSearch.failed.value">
-        <span role="alert">به‌روزرسانی ناموفق؛ نتایج قبلی.</span>
+        <span role="alert">به‌روزرسانی ناموفق؛ فقط نتایج داخل محدوده.</span>
         <v-btn size="small" variant="tonal" color="primary" prepend-icon="mdi-refresh"
           aria-label="تلاش دوباره برای نتایج این محدوده" @click="placeSearch.retry()">تلاش دوباره</v-btn>
       </template>
