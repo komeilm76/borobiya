@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Remove duplicate sharing button from companions modal (T4.4.1 follow-up)
+
+- The «اشتراک و همراهان» modal now shows companions without a second outgoing-location toggle; the icon-only map control remains the opt-in Start/Stop action. Warn/error status stays visible inside the modal, and the map refreshes multi-device priority on mount even without the old broadcast card. Dashboard and dedicated sharing screens retain their broadcast controls. Source-contract tests cover separation; real phone/keyboard acceptance remains open.
+
 ### 2026-10-30 — Isolate deployed geocode HTTP 400 (T4.4.1 follow-up)
 
 - A phone reported `GET /geocode · HTTP_ERROR · HTTP 400 · invalid_geocode_query`. The client requests 30; an older gateway rejected limits above 20, but the same 400 can also mean a bad bbox. After this specific failure, one same-origin diagnostic probe reuses the exact term and bbox with limit 5, reports only ACCEPTED/REJECTED/UNAVAILABLE without displaying incomplete results or leaking coordinates, and does not probe on other errors or after cancellation. The VM geocoding verifier now tests both limits, and the main-only production deployment probes the new local gateway/Photon with limit 30 before swapping the static bundle; its existing rollback stays active if the contract fails. Mocked legacy/current gateway and abort cases test classification; actual VM version and bbox remain unverified until the new report or operator checks arrive.

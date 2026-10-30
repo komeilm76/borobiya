@@ -163,7 +163,10 @@
           <aside id="map-live-panel" class="user-map-view__live user-map-view__panel"
             :role="isPhone ? 'region' : undefined" aria-label="اشتراک و همراهان"
             tabindex="-1" @keydown.esc="onPanelEscape">
-            <LiveBroadcastBar compact map-mode />
+            <p v-if="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error'"
+              class="user-map-view__broadcast-status" role="status" aria-live="polite">
+              {{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}
+            </p>
             <LiveCompanionPanel :api="live" :visible="showCompanions" :selected-user-id="selectedCompanionId"
               @update:visible="showCompanions = $event" @select="selectCompanion" />
             <p v-if="peerSelectionError" class="user-map-view__peer-error" role="status" aria-live="polite">{{ peerSelectionError }}</p>
@@ -195,7 +198,6 @@ import type { GeocodeResult, ReverseGeocodeResult, UserSearchResult } from "@sha
 import { usePlaceSearch } from "@/composables/use-place-search";
 import { placeSearchArea } from "@/map/place-search-area";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
-import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { shareSessionKey } from "@/sharing/share-submission-fence";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
@@ -236,6 +238,9 @@ let mapEntryPosition: number | undefined;
 onMounted(() => {
   const position: unknown = window.history.state?.position;
   mapEntryPosition = typeof position === "number" ? position : undefined;
+  // The modal no longer mounts LiveBroadcastBar; keep the map share control's
+  // multi-device status fresh without starting outgoing location sharing.
+  void broadcast.refreshPriority();
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
@@ -1080,6 +1085,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__tool-host, .user-map-view__search-dialog:not(.v-overlay), .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
 .user-map-view__search-surface, .user-map-view__search-body,
 .user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
+.user-map-view__broadcast-status { margin: 0; color: rgb(var(--v-theme-on-surface)); }
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
 :global(.user-map-view .user-map-view__peer-avatar) {
   display: grid; place-items: center; width: 44px; height: 44px;

@@ -7,8 +7,8 @@ const map = readFileSync(new URL("../../views/_user/UserMapView.vue", import.met
 const dashboard = readFileSync(new URL("../../views/_user/UserDashboardView.vue", import.meta.url), "utf8");
 
 describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)", () => {
-  it("uses the available card width rather than the global viewport for compact and inset bars", () => {
-    expect(map).toContain("<LiveBroadcastBar compact map-mode />");
+  it("keeps the companion dialog button-free and sizes standalone/inset bars by their host", () => {
+    expect(map).not.toContain("<LiveBroadcastBar"); // Map sharing stays on the icon outside Companions.
     expect(dashboard).toContain("<LiveBroadcastBar inset />");
     expect(bar).toMatch(/\.broadcast-bar \{[^}]*container-type: inline-size;/);
     // At 200% zoom a 320px CSS viewport can be only ~160px; the old 12rem
@@ -27,7 +27,8 @@ describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)"
     });
     expect(unsupported.showDevicesLink).toBe(true);
     expect(unsupported.actionLabel.length).toBeGreaterThan(20);
-    expect(bar).toContain('v-if="state.showDevicesLink && !mapMode"');
+    expect(bar).toContain('v-if="state.showDevicesLink"');
+    expect(bar).not.toContain("mapMode");
     expect(bar).toContain('@click="broadcast.toggle()"');
     expect(bar).toContain(':disabled="!broadcast.isSupported"');
     const narrow = bar.slice(bar.indexOf("@container (max-width: 380px)"));

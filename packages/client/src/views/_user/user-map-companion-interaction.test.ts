@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 // Contract tests: do not mount Vue SFCs (docs/TASKS.md).
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("../../components/map/LiveCompanionPanel.vue", import.meta.url), "utf8");
-const bar = readFileSync(new URL("../../components/sharing/LiveBroadcastBar.vue", import.meta.url), "utf8");
 
 function functionBody(name: string): string {
   const start = view.indexOf(`function ${name}(`);
@@ -34,14 +33,17 @@ describe("map companions tool", () => {
     expect(view).toContain('env(safe-area-inset-bottom, 0px)');
   });
 
-  it("offers just the consentful broadcast toggle in this tool; dashboard retains devices navigation", () => {
-    expect(view).toContain('<LiveBroadcastBar compact map-mode />');
-    expect(bar).toContain('mapMode?: boolean');
-    expect(bar).toContain('v-if="state.showDevicesLink && !mapMode"');
-    expect(bar).toContain('broadcast.toggle()');
-    expect(bar).toContain('state.tone === \'warn\' || state.tone === \'error\'');
-    expect(bar).toContain('to="/_user/devices"'); // Other instances still offer this where appropriate.
-    expect(view).not.toContain('to="/_user/devices"');
+  it("keeps the broadcast toggle on the map, not in the companions dialog", () => {
+    const dialog = view.slice(view.indexOf('class="user-map-view__live-dialog"'), view.indexOf('  </section>'));
+    expect(dialog).toContain('<LiveCompanionPanel :api="live"');
+    expect(dialog).toContain('broadcast.view.headline'); // Status is still visible if sharing fails.
+    expect(dialog).not.toContain('<LiveBroadcastBar');
+    expect(dialog).not.toContain('broadcast.toggle()');
+    expect(dialog).not.toContain('to="/_user/devices"');
+    const mapActions = view.slice(0, view.indexOf('class="user-map-view__live-dialog"'));
+    expect(mapActions).toContain('class="user-map-view__share"');
+    expect(mapActions).toContain('@click="broadcast.toggle()"');
+    expect(view).toContain('void broadcast.refreshPriority()');
   });
 
   it("keeps all granted companions in a selectable list and provides a separate map-visibility switch", () => {
