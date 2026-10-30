@@ -36,9 +36,9 @@
           :color="selectedUserId === member.userId ? 'primary' : undefined"
           :aria-label="member.position ? `نمایش ${member.name} روی نقشه` : `${member.name}؛ در انتظار موقعیت`"
           :disabled="!member.position" @click="$emit('select', member.userId)">
-          <span class="live-companions__dot"
-            :style="{ background: member.position ? (member.stale ? colors.stale : colors.live) : colors.stale }"
-            aria-hidden="true" />
+          <span class="live-companions__avatar"
+            :style="{ background: member.position && !member.stale ? colors.live : '#526b6b', color: member.position && !member.stale && theme.isDark ? '#071b1c' : '#fff' }"
+            aria-hidden="true">{{ avatarInitial(member.name) }}</span>
           <span class="live-companions__name">{{ member.name }}</span>
           <span class="live-companions__age">{{ member.position ? ageWords(member.ageMs) : 'در انتظار موقعیت' }}</span>
           <v-chip v-if="member.accuracy !== null" size="x-small" variant="tonal" class="live-companions__accuracy">
@@ -64,6 +64,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useThemeStore } from "@/stores/theme";
+import { avatarInitial } from "@/live/avatar-initial";
 import { ageWords, connectionTitle, liveMarkerColors } from "@/live/companion-locations";
 import type { useLiveCompanions } from "@/composables/use-live-companions";
 
@@ -190,12 +191,10 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 .live-companions__peer-button.v-btn--disabled .live-companions__name { color: #536d6c; }
 :global(:root.dark .live-companions__peer-button.v-btn--disabled .live-companions__name) { color: #a0b6b2; }
 
-.live-companions__dot {
-  flex: 0 0 auto;
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+.live-companions__avatar {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 2rem; height: 2rem; border-radius: 50%;
+  color: #fff; font-weight: 800; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
 
 .live-companions__name {
@@ -241,7 +240,7 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
   color: #71c7be;
 }
 
-:global(:root.dark .live-companions__dot) {
+:global(:root.dark .live-companions__avatar) {
   box-shadow: 0 0 0 2px rgba(7, 27, 28, 0.7);
 }
 </style>

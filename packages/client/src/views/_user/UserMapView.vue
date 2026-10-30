@@ -75,6 +75,10 @@
     </span>
 
     <ReverseAddressSheet :api="reverse" />
+    <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
+      :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
+      :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
+      @close="removeSelectedCompanion" @retry-profile="loadSelectedProfile" @retry-place="loadSelectedPlace" />
 
     <!-- One eager Vuetify sheet for Search and History. On tablet/desktop the host is a
          boxless div, so the original panels keep their normal positions and order. -->
@@ -144,13 +148,17 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { onBeforeRouteLeave } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
 import { VBottomSheet, VDialog } from "vuetify/components";
-import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker, Popup } from "maplibre-gl";
+import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import ReverseAddressSheet from "@/components/map/ReverseAddressSheet.vue";
+import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
+import { reversePlace } from "@/api/geocoding";
+import { searchUsers } from "@/api/location";
+import { avatarInitial } from "@/live/avatar-initial";
 import { useReversePlace } from "@/composables/use-reverse-place";
-import type { GeocodeResult } from "@shared/index";
+import type { GeocodeResult, ReverseGeocodeResult, UserSearchResult } from "@shared/index";
 import { usePlaceSearch } from "@/composables/use-place-search";
 import { placeSearchArea } from "@/map/place-search-area";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
@@ -161,7 +169,7 @@ import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
 import { historyCameraPadding } from "@/history/camera-padding";
 import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
-import { LIVE_BOTTOM_LAYER_ID, ageWords, liveCompanionsStyle } from "@/live/companion-locations";
+import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
 import { planOverlayRemoval, planOverlaySync, pointsOverlay, type OverlayOp } from "@/map/overlay-sync";
 import { needsOverlayRestore } from "@/map/overlay-restore";
 import { useLiveCompanions } from "@/composables/use-live-companions";
@@ -198,9 +206,10 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && activeTool.value && typeof position === "number" &&
+  if (isPhone.value && (activeTool.value || selectedCompanionId.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
-    closeTool();
+    if (selectedCompanionId.value) removeSelectedCompanion();
+    else closeTool();
     return false;
   }
 });
@@ -426,93 +435,182 @@ const showCompanions = ref(true);
 const emptyCompanionOverlay = pointsOverlay([]);
 const selectedCompanionId = ref<string | null>(null);
 const peerSelectionError = ref<string | null>(null);
-let selectedCompanionPopup: Popup | null = null;
-let popupRequest = 0;
+// This is a selection of an active inbound grant, not an arbitrary public-search result.
+// Never retain a peer's profile/address after that grant or the account goes away.
+const selectedCompanion = computed(() => {
+  const userId = selectedCompanionId.value;
+  return userId && showCompanions.value && live.registry.value[userId]
+    ? live.peers.value.find((peer) => peer.userId === userId) ?? null : null;
+});
+const selectedObservedAtMs = computed(() => selectedCompanionId.value
+  ? live.registry.value[selectedCompanionId.value]?.fix?.observedAtMs ?? null : null);
+const selectedProfile = shallowRef<UserSearchResult | null>(null);
+const selectedPlace = shallowRef<ReverseGeocodeResult | null>(null);
+const profileLoading = ref(false);
+const profileFailed = ref(false);
+const placeLoading = ref(false);
+const placeFailed = ref(false);
+let profileController: AbortController | null = null;
+let placeController: AbortController | null = null;
+const peerMarkers = new Map<string, Marker>();
 
 function removeSelectedCompanion(): void {
-  popupRequest++;
   selectedCompanionId.value = null;
-  const previous = selectedCompanionPopup;
-  selectedCompanionPopup = null;
-  previous?.remove();
-}
-
-/** Build popup DOM with textContent, never setHTML: usernames are untrusted data. */
-function selectedCompanionContent(peer: (typeof live.peers.value)[number]): HTMLElement {
-  const content = document.createElement("div");
-  content.className = "user-map-view__peer-popup";
-  const name = document.createElement("strong");
-  name.textContent = peer.name;
-  const details = document.createElement("p");
-  details.textContent = `${peer.stale ? "موقعیت قدیمی یا بدون زمان" : "موقعیت تازه"} · ${ageWords(peer.ageMs)}`;
-  const accuracy = document.createElement("p");
-  accuracy.textContent = peer.accuracy === null ? "دقت نامشخص" : `دقت ±${Math.round(peer.accuracy)} متر`;
-  content.append(name, details, accuracy);
-  return content;
+  for (const marker of peerMarkers.values()) {
+    marker.getElement().setAttribute("aria-pressed", "false");
+    marker.getElement().setAttribute("aria-expanded", "false");
+    marker.getElement().classList.remove("user-map-view__peer-avatar--selected");
+  }
+  profileController?.abort();
+  profileController = null;
+  placeController?.abort();
+  placeController = null;
+  selectedProfile.value = null;
+  selectedPlace.value = null;
+  profileLoading.value = false;
+  placeLoading.value = false;
+  profileFailed.value = false;
+  placeFailed.value = false;
 }
 
 function syncSelectedCompanion(): void {
   const userId = selectedCompanionId.value;
   if (!userId) return;
-  // A revoked share/account switch must remove coordinates and details immediately.
-  const authorized = live.registry.value[userId];
-  const peer = live.peers.value.find((candidate) => candidate.userId === userId);
-  if (!authorized || !peer || !showCompanions.value || !map.value) {
-    removeSelectedCompanion();
-    return;
-  }
-  if (selectedCompanionPopup) selectedCompanionPopup.setLngLat(peer.position).setDOMContent(selectedCompanionContent(peer));
+  if (!live.registry.value[userId] || !live.peers.value.some((peer) => peer.userId === userId) ||
+      !showCompanions.value || !map.value || !auth.user?.id) removeSelectedCompanion();
 }
 
-async function showSelectedCompanion(userId: string): Promise<void> {
+/** An ID match is mandatory: search is public and the result order/name is not an authorization grant. */
+async function loadSelectedProfile(): Promise<void> {
+  profileController?.abort();
+  profileController = null;
+  selectedProfile.value = null;
+  profileFailed.value = false;
+  profileLoading.value = false;
+  const peer = selectedCompanion.value;
+  const userId = peer?.userId;
+  const token = auth.accessToken;
+  if (!peer || !userId || !token || peer.name.length < 2 || peer.name.length > 30) return;
+  const controller = new AbortController();
+  profileController = controller;
+  profileLoading.value = true;
+  try {
+    const result = await searchUsers({ q: peer.name, sort: "username", limit: 20 }, token, controller.signal);
+    if (controller !== profileController || userId !== selectedCompanionId.value ||
+        !live.registry.value[userId] || token !== auth.accessToken) return;
+    selectedProfile.value = result.items.find((item) => item.id === userId) ?? null;
+  } catch {
+    if (controller === profileController && userId === selectedCompanionId.value &&
+        live.registry.value[userId] && !controller.signal.aborted) profileFailed.value = true;
+  } finally {
+    if (controller === profileController) { profileController = null; profileLoading.value = false; }
+  }
+}
+
+/** Address comes only from the installed same-origin map gateway, never an external browser API. */
+async function loadSelectedPlace(): Promise<void> {
+  placeController?.abort();
+  placeController = null;
+  selectedPlace.value = null;
+  placeFailed.value = false;
+  placeLoading.value = false;
+  const peer = selectedCompanion.value;
+  const userId = peer?.userId;
+  if (!peer || !userId) return;
+  const position = peer.position;
+  const controller = new AbortController();
+  placeController = controller;
+  placeLoading.value = true;
+  try {
+    const address = await reversePlace({ lat: peer.position[1], lon: peer.position[0] }, controller.signal);
+    const current = selectedCompanion.value;
+    if (controller !== placeController || current?.userId !== userId ||
+        current.position[0] !== position[0] || current.position[1] !== position[1]) return;
+    selectedPlace.value = address;
+  } catch {
+    if (controller === placeController && selectedCompanion.value?.userId === userId &&
+        !controller.signal.aborted) placeFailed.value = true;
+  } finally {
+    if (controller === placeController) { placeController = null; placeLoading.value = false; }
+  }
+}
+
+// An age-only tick does not re-fetch an address. A new fix at a new coordinate
+// cancels the previous lookup; a changed public username also refreshes its exact-ID match.
+watch(() => selectedCompanion.value && `${selectedCompanion.value.userId}:${selectedCompanion.value.name}`,
+  () => { void loadSelectedProfile(); }, { flush: "sync" });
+watch(() => selectedCompanion.value && `${selectedCompanion.value.userId}:${selectedCompanion.value.position.join(",")}`,
+  () => { void loadSelectedPlace(); }, { flush: "sync" });
+watch(() => auth.accessToken, () => {
+  if (!auth.accessToken || !auth.user?.id) removeSelectedCompanion();
+  else if (selectedCompanionId.value) void loadSelectedProfile();
+}, { flush: "sync" });
+
+/** MapLibre DOM markers keep a 44px focus/tap target; changing a fix moves rather than rebuilds it. */
+function syncPeerAvatars(): void {
   const instance = map.value;
-  const request = ++popupRequest;
-  // The map module is already loaded by MapCanvas; preserve route-level lazy loading.
-  const { Popup: PopupClass } = await import("maplibre-gl");
-  if (request !== popupRequest || !instance || instance !== map.value || !showCompanions.value ||
-      selectedCompanionId.value !== userId || !live.registry.value[userId]) return;
-  const peer = live.peers.value.find((candidate) => candidate.userId === userId);
-  if (!peer) return;
-  const previous = selectedCompanionPopup;
-  selectedCompanionPopup = null;
-  previous?.remove();
-  const popup = new PopupClass({ closeButton: true, closeOnClick: false, offset: 16, focusAfterOpen: false })
-    .setLngLat(peer.position).setDOMContent(selectedCompanionContent(peer)).addTo(instance);
-  selectedCompanionPopup = popup;
-  const closeButton = popup.getElement().querySelector(".maplibregl-popup-close-button");
-  closeButton?.setAttribute("aria-label", "بستن اطلاعات همراه");
-  closeButton?.setAttribute("title", "بستن اطلاعات همراه");
-  popup.on("close", () => {
-    if (selectedCompanionPopup === popup) {
-      selectedCompanionPopup = null;
-      selectedCompanionId.value = null;
+  const permitted = instance && markerConstructor && showCompanions.value ? live.peers.value : [];
+  const ids = new Set(permitted.map((peer) => peer.userId));
+  for (const [id, marker] of peerMarkers) {
+    if (ids.has(id)) continue;
+    marker.remove();
+    peerMarkers.delete(id);
+  }
+  if (!instance || !markerConstructor) return;
+  for (const peer of permitted) {
+    let marker = peerMarkers.get(peer.userId);
+    if (!marker) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.setAttribute("aria-haspopup", "dialog");
+      button.setAttribute("aria-controls", "companion-detail-sheet");
+      button.className = "user-map-view__peer-avatar";
+      button.dataset.userId = peer.userId;
+      button.addEventListener("click", (event) => {
+        event.stopPropagation(); // Don't reverse-geocode a companion tap as a map click.
+        selectCompanion(peer.userId, false);
+      });
+      marker = new markerConstructor({ element: button, anchor: "center" })
+        .setLngLat(peer.position).addTo(instance);
+      peerMarkers.set(peer.userId, marker);
     }
-  });
+    const button = marker.getElement();
+    button.textContent = avatarInitial(peer.name);
+    button.setAttribute("aria-label", `اطلاعات همراه ${peer.name}؛ ${peer.stale ? "موقعیت قدیمی" : "موقعیت تازه"}`);
+    button.setAttribute("title", peer.name);
+    button.setAttribute("aria-pressed", String(selectedCompanionId.value === peer.userId));
+    button.setAttribute("aria-expanded", String(selectedCompanionId.value === peer.userId));
+    button.classList.toggle("user-map-view__peer-avatar--stale", peer.stale);
+    button.classList.toggle("user-map-view__peer-avatar--selected", selectedCompanionId.value === peer.userId);
+    const current = marker.getLngLat();
+    if (current.lng !== peer.position[0] || current.lat !== peer.position[1]) marker.setLngLat(peer.position);
+  }
 }
 
-function selectCompanion(userId: string): void {
+function selectCompanion(userId: string, centerMap = true): void {
   const instance = map.value;
   const authorized = live.registry.value[userId];
   const peer = live.peers.value.find((candidate) => candidate.userId === userId);
-  if (!instance || !authorized || !peer) return;
+  if (!instance || !authorized || !peer || !auth.user?.id) return;
   const bounds = instance.getMaxBounds();
-  if (bounds && !bounds.contains(peer.position)) {
+  // The sheet still gives useful coordinates for a valid shared fix outside an installed region.
+  if (centerMap && bounds && !bounds.contains(peer.position)) {
     peerSelectionError.value = "موقعیت این همراه خارج از محدودهٔ نقشهٔ آفلاین است.";
-    return;
-  }
-  peerSelectionError.value = null;
+  } else peerSelectionError.value = null;
   showCompanions.value = true;
-  removeSelectedCompanion();
+  if (selectedCompanionId.value !== userId) removeSelectedCompanion();
   selectedCompanionId.value = userId;
-  userControlledCamera.value = true;
-  instance.flyTo({ center: peer.position, zoom: Math.min(15, instance.getMaxZoom()), duration: 700 });
+  syncPeerAvatars();
+  if (centerMap && (!bounds || bounds.contains(peer.position))) {
+    userControlledCamera.value = true;
+    instance.flyTo({ center: peer.position, zoom: Math.min(15, instance.getMaxZoom()), duration: 700 });
+  }
   if (isPhone.value && activeTool.value === "live") closeTool(false);
-  void showSelectedCompanion(userId);
 }
 
-watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); }, { flush: "sync" });
+watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); syncPeerAvatars(); }, { flush: "sync" });
 watch(() => live.registry.value, syncSelectedCompanion, { flush: "sync" });
-watch(() => live.peers.value, syncSelectedCompanion);
+watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }, { flush: "sync" });
 watch(() => auth.user?.id, () => { removeSelectedCompanion(); peerSelectionError.value = null; showCompanions.value = true; }, { flush: "sync" });
 
 /**
@@ -625,7 +723,7 @@ let lastLongPressAt = 0;
 function onMapClick(event: MapMouseEvent): void {
   // Some touch browsers synthesize a click after a long-press contextmenu event.
   if (Date.now() - lastLongPressAt < 700 ||
-    (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".maplibregl-popup"))) return;
+    (event.originalEvent?.target instanceof Element && event.originalEvent.target.closest(".user-map-view__peer-avatar"))) return;
   if (isPhone.value && activeTool.value) closeTool(false);
   reverse.select(event.lngLat.lat, event.lngLat.lng);
 }
@@ -653,7 +751,11 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) { selectedPlaceMarker?.remove(); selectedPlaceMarker = null; }
-  if (map.value !== instance) removeSelectedCompanion();
+  if (map.value !== instance) {
+    for (const marker of peerMarkers.values()) marker.remove();
+    peerMarkers.clear();
+    removeSelectedCompanion();
+  }
   markerConstructor = MarkerClass;
   map.value = instance;
   // A theme change calls `setStyle`, whose diff drops layers the new style does not declare — so every
@@ -670,6 +772,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   paintPlayback();
   syncOwnMarker();
   syncSelectedPlaceMarker();
+  syncPeerAvatars();
   frameCamera();
   focusOwnIfRequested();
 }
@@ -712,6 +815,8 @@ onBeforeUnmount(() => {
   markerConstructor = null;
   own.stop();
   removeSelectedCompanion();
+  for (const marker of peerMarkers.values()) marker.remove();
+  peerMarkers.clear();
   ownMarker?.remove();
   ownMarker = null;
   selectedPlaceMarker?.remove();
@@ -748,18 +853,16 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__tool-host, .user-map-view__live-dialog:not(.v-overlay) { display: contents; }
 .user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
-:global(.user-map-view .maplibregl-popup-content) {
-  direction: rtl;
-  color: rgb(var(--v-theme-on-surface));
-  background: rgb(var(--v-theme-surface));
-  border-radius: 0.85rem;
-  box-shadow: var(--bb-shadow-overlay);
-  padding: 0.75rem 1rem;
+:global(.user-map-view .user-map-view__peer-avatar) {
+  display: grid; place-items: center; width: 44px; height: 44px;
+  padding: 0; border: 4px solid rgb(var(--v-theme-surface)); border-radius: 50%;
+  color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
+  box-shadow: 0 2px 9px rgba(3, 29, 31, 0.4); cursor: pointer;
+  font-size: 1rem; font-weight: 800; line-height: 1; text-transform: none;
 }
-:global(.user-map-view .maplibregl-popup-tip) { border-top-color: rgb(var(--v-theme-surface)); }
-:global(.user-map-view .user-map-view__peer-popup) { padding-inline-start: 1.75rem; min-width: 12rem; }
-:global(.user-map-view .user-map-view__peer-popup p) { margin: 0.25rem 0 0; font-size: 0.8rem; }
-:global(.user-map-view .maplibregl-popup-close-button) { min-width: 36px; min-height: 36px; color: rgb(var(--v-theme-on-surface)); font-size: 1.4rem; }
+:global(.user-map-view .user-map-view__peer-avatar--stale) { background: #526b6b; color: #fff; }
+:global(.user-map-view .user-map-view__peer-avatar--selected) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
+:global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 3px; }
 
 
 .user-map-view__canvas {

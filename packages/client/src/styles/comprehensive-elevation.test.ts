@@ -20,7 +20,7 @@ describe("all page and component elevation roles", () => {
     const css = source("./tailwind.css");
     expect(css).not.toMatch(/\.v-card\s*\{[^}]*box-shadow:/);
     expect(source("../components/sos/SosTriggerButton.vue")).toContain("box-shadow: 0 0.75rem 1.9rem rgba(185, 28, 28, 0.45);");
-    expect(source("../components/map/LiveCompanionPanel.vue")).toContain(".live-companions__dot");
+    expect(source("../components/map/LiveCompanionPanel.vue")).toContain(".live-companions__avatar");
   });
 
   it("defines theme-aware depth for floating map controls and gradient heroes", () => {

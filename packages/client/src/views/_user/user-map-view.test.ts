@@ -41,7 +41,7 @@ describe("UserMapView live overlay", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.
     expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker, Popup } from "maplibre-gl"');
+    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(body("onMapReady")).toContain("markerConstructor = MarkerClass");
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
@@ -323,9 +323,10 @@ describe("LiveCompanionPanel", () => {
     expect(panel).toContain("تازه‌سازی فهرست");
   });
 
-  it("paints its legend dot from the map's own colors", () => {
+  it("keeps the fresh avatar on the map palette and stale initials legible", () => {
     expect(panel).toContain("liveMarkerColors(theme.isDark)");
-    expect(panel).toContain("member.stale ? colors.stale : colors.live");
+    expect(panel).toContain("member.position && !member.stale ? colors.live : '#526b6b'");
+    expect(panel).toContain("member.position && !member.stale && theme.isDark ? '#071b1c' : '#fff'");
   });
 
   it("touches no map or maplibre API", () => {

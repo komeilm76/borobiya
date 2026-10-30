@@ -15,13 +15,12 @@ import { pointsOverlay, type MapPosition, type OverlayCollection, type OverlaySt
  *    is also broadcasting would draw itself as one of its own companions unless `userId` is filtered.
  *
  * So a seeded peer gets `observedAtMs: null` and is rendered stale-but-present, which is exactly what
- * the server told us. And a live fix never moves a dot backwards, because the same fix can arrive
+ * the server told us. And a live fix never moves an avatar backwards, because the same fix can arrive
  * twice over two paths (HTTP `/location/update` fan-out and the socket ack) and a reconnect replays.
  */
 
 export const LIVE_SOURCE_ID = "borobiya-live-peers";
 export const LIVE_HALO_LAYER_ID = "borobiya-live-peers-halo";
-export const LIVE_DOT_LAYER_ID = "borobiya-live-peers-dot";
 
 /**
  * The bottom-most live layer. `UserMapView` passes it as `beforeLayerId` to the playback planner, so a
@@ -34,12 +33,12 @@ export const LIVE_BOTTOM_LAYER_ID = LIVE_HALO_LAYER_ID;
  *
  * A broadcaster sends every 3–5s (`LOCATION_UPDATE_INTERVAL_MS`) and the server allows 20 updates a
  * minute, so 45 seconds is roughly ten missed updates: long enough that a dropped packet never flips
- * a dot grey, short enough that a phone in a pocket stops claiming to be live within a minute.
+ * an avatar grey, short enough that a phone in a pocket stops claiming to be live within a minute.
  */
 export const STALE_AFTER_MS = 45_000;
 
 /**
- * After this much silence the dot leaves the map entirely.
+ * After this much silence the avatar leaves the map entirely.
  *
  * Deliberately not instant-on-stale: the age is what a user reads, so a peer who stopped 3 minutes ago
  * should still be on the map, grey and labelled. After half an hour "live companion" is a misnomer —
@@ -75,7 +74,7 @@ export interface CompanionPeer {
   readonly shareIds?: readonly string[];
 }
 
-/** Keyed by owner id, so one peer is one dot however many shares or devices feed it. */
+/** Keyed by owner id, so one peer is one avatar however many shares or devices feed it. */
 export type CompanionRegistry = Readonly<Record<string, CompanionPeer>>;
 
 export const emptyRegistry: CompanionRegistry = {};
@@ -148,7 +147,7 @@ export function applyPeerUpdate(
   if (observedAtMs === null) return { registry, changed: false, reason: "invalid" };
   const previous = known.fix?.observedAtMs ?? null;
   // A seeded fix (no time) is always replaced; a live one only by something newer. Same-instant
-  // duplicates from the double fan-out are dropped so the dot does not re-render on every echo.
+  // duplicates from the double fan-out are dropped so the avatar does not re-render on every echo.
   if (previous !== null && observedAtMs <= previous) return { registry, changed: false, reason: "stale-replay" };
 
   return {
@@ -318,7 +317,7 @@ function ageOf(fix: CompanionFix | null, nowMs: number): number | null {
 
 /**
  * Staleness is only ever *noticed* on a tick, so callers should read this as "stale within one tick of the
- * threshold" rather than at the exact millisecond; nothing about a dot changes between ticks anyway.
+ * threshold" rather than at the exact millisecond; nothing about a marker changes between ticks anyway.
  */
 function isStale(fix: CompanionFix | null, nowMs: number, staleAfterMs = STALE_AFTER_MS): boolean {
   // A seeded position is stale by definition: we cannot claim it is current when the API never said when it was taken.
@@ -333,7 +332,7 @@ export function countAwaiting(registry: CompanionRegistry): number {
 
 /** One `FeatureCollection` of every peer. Only map-visible properties belong in GeoJSON:
  * the status panel reads age from `peersOf`, but no map layer reads seconds. Reuse the previous
- * immutable collection when the clock advances without changing a dot; otherwise MapLibre's
+ * immutable collection when the clock advances without changing an avatar; otherwise MapLibre's
  * setData would reparse/repaint identical geometry at every 5-second status tick. Compare in
  * display order too: a reordered peer with identical coordinates may have a different name.
  */
@@ -355,9 +354,8 @@ export function peersOverlay(registry: CompanionRegistry, nowMs: number, previou
 }
 
 /**
- * The two marker colors, exposed because the status panel's legend dot has to be the *same* teal the map
- * paints. A component that hardcoded it would drift the first time the map palette moved, and nothing
- * here renders a map to catch that.
+ * The live/stale colors of the GeoJSON halo. The panel uses the live color for its
+ * avatar as well; its stale avatar needs an opaque fill to keep initials legible.
  */
 export function liveMarkerColors(dark: boolean): { live: string; stale: string } {
   return dark ? { live: "#6ee7d7", stale: "rgba(226, 240, 238, 0.55)" } : { live: "#0e6666", stale: "rgba(23, 59, 60, 0.45)" };
@@ -381,23 +379,12 @@ export function liveCompanionsStyle(dark: boolean): OverlayStyle {
         id: LIVE_HALO_LAYER_ID,
         type: "circle",
         source: LIVE_SOURCE_ID,
-        // The halo is what makes a moving dot findable on a busy map at street zoom; it grows with the
-        // zoom on purpose (interpolate), because at city zoom a 12px halo would fuse neighbouring peers.
+        // The halo keeps the DOM avatar findable on a busy map; it grows with the
+        // zoom; the 44px focus/touch target itself remains the same size at every zoom.
         paint: {
           "circle-color": color,
           "circle-opacity": 0.18,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 16, 16]
-        }
-      },
-      {
-        id: LIVE_DOT_LAYER_ID,
-        type: "circle",
-        source: LIVE_SOURCE_ID,
-        paint: {
-          "circle-color": color,
-          "circle-radius": 6,
-          "circle-stroke-width": 2,
-          "circle-stroke-color": dark ? "#071b1c" : "#ffffff"
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 22, 16, 25]
         }
       }
     ]

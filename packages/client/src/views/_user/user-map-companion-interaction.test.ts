@@ -55,23 +55,25 @@ describe("map companions tool", () => {
     expect(view).toContain('@update:visible="showCompanions = $event"');
     expect(view).toContain('@select="selectCompanion"');
     expect(functionBody("paintLive")).toContain('showCompanions.value ? live.overlay.value : emptyCompanionOverlay');
-    expect(view).toContain('watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); }, { flush: "sync" })');
+    expect(view).toContain('watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); syncPeerAvatars(); }, { flush: "sync" })');
   });
 
   it("centers only on an explicitly chosen, currently authorized, positioned companion and shows their data", () => {
     const select = functionBody("selectCompanion");
     expect(select).toContain('live.registry.value[userId]');
     expect(select).toContain('live.peers.value.find(');
-    expect(select).toContain('if (!instance || !authorized || !peer) return;');
+    expect(select).toContain('if (!instance || !authorized || !peer || !auth.user?.id) return;');
     expect(select).toContain('bounds.contains(peer.position)');
     expect(select).toContain('showCompanions.value = true');
     expect(select).toContain('instance.flyTo(');
-    expect(select).toContain('showSelectedCompanion(');
-    expect(view).toContain('ageWords(peer.ageMs)');
-    expect(view).toContain('peer.accuracy');
+    expect(select).toContain('selectedCompanionId.value = userId');
+    expect(view).toContain('<CompanionDetailSheet');
+    const details = readFileSync(new URL("../../components/map/CompanionDetailSheet.vue", import.meta.url), "utf8");
+    expect(details).toContain('ageWords(peer.ageMs)');
+    expect(details).toContain('peer.accuracy');
     expect(view).toContain('watch(() => live.registry.value,');
-    expect(view).toContain('previous?.remove()');
-    // Realtime updates repaint dots and the selected popup, never fly the camera again.
+    expect(view).toContain('profileController?.abort()');
+    // Realtime updates move avatars and update the sheet, never fly the camera again.
     expect(functionBody("paintLive")).not.toMatch(/flyTo|fitBounds|easeTo/);
     expect(functionBody("syncSelectedCompanion")).not.toMatch(/flyTo|fitBounds|easeTo/);
   });

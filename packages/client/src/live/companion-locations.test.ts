@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   DISCARD_AFTER_MS,
   LIVE_BOTTOM_LAYER_ID,
-  LIVE_DOT_LAYER_ID,
   LIVE_HALO_LAYER_ID,
   LIVE_SOURCE_ID,
   STALE_AFTER_MS,
@@ -306,10 +305,10 @@ describe("peersOverlay", () => {
 });
 
 describe("liveCompanionsStyle", () => {
-  it("declares one source and the two layers that read from it", () => {
+  it("declares one source and the halo beneath DOM avatar markers", () => {
     const style = liveCompanionsStyle(false);
     expect(style.sources.map((source) => source.id)).toEqual([LIVE_SOURCE_ID]);
-    expect(style.layers.map((layer) => layer.id)).toEqual([LIVE_HALO_LAYER_ID, LIVE_DOT_LAYER_ID]);
+    expect(style.layers.map((layer) => layer.id)).toEqual([LIVE_HALO_LAYER_ID]);
     for (const layer of style.layers) {
       expect(layer.source).toBe(LIVE_SOURCE_ID);
       expect(layer.type).toBe("circle");
