@@ -68,8 +68,12 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     if (wasActive) { try { level?.(); } catch { /* The map may already be disposing. */ } }
   }
   function clear(): void {
-    invalidate(); stop(); reverse.close(); point.value = null; sheetOpen.value = false; routesVisible.value = false;
-    routes.value = []; index.value = 0; error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom = null;
+    invalidate(); stop(); reverse.close();
+    // The point watcher paints map overlays synchronously. Drop route geometry first so
+    // clearing the point cannot briefly repaint a ghost route or origin marker.
+    routesVisible.value = false; routes.value = []; index.value = 0;
+    point.value = null; sheetOpen.value = false;
+    error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom = null;
     knownPlace.value = null; lastRerouteAt = Number.NEGATIVE_INFINITY;
   }
   function select(candidate: RoutePoint, place?: GeocodeResult): void {

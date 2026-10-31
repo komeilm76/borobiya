@@ -50,12 +50,12 @@
         <v-btn v-if="!routesOpen" id="point-route-show-routes" variant="tonal" color="primary" aria-controls="point-route-routes"
           :aria-expanded="routesOpen" @click="showRoutes">{{ api.navigating.value ? 'ویرایش مسیرها' : 'نمایش مسیرها' }}</v-btn>
         <v-btn v-else variant="text" @click="backToSummary">بازگشت</v-btn>
-        <v-btn v-if="!api.navigating.value" color="primary" variant="flat" :disabled="!ownFix || !api.selectedRoute.value || api.loading.value"
+        <v-btn v-if="routesOpen && (api.error.value || (!api.routes.value.length && !api.loading.value))"
+          variant="tonal" color="primary" :disabled="!ownFix || api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
+        <v-btn v-else-if="!api.navigating.value" color="primary" variant="flat" :disabled="!ownFix || !api.selectedRoute.value || api.loading.value"
           @click="emit('start')">{{ pausedForEdit ? 'شروع دوبارهٔ راهبری' : 'شروع راهبری' }}</v-btn>
         <v-btn v-else variant="tonal" @click="dismiss">بازگشت به نقشه</v-btn>
-        <v-btn v-if="routesOpen && (api.error.value || (!api.routes.value.length && !api.loading.value))"
-          variant="text" :disabled="!ownFix || api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
-        <v-btn v-if="routesOpen && !api.navigating.value" variant="text" @click="clearDestination">حذف مقصد</v-btn>
+        <v-btn class="point-route__clear" variant="text" color="error" @click="clearDestination">حذف مقصد</v-btn>
       </div>
     </v-card>
   </section>
@@ -119,7 +119,7 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
 .point-route__info p { margin: 0 0 .25rem; overflow-wrap: anywhere; }
 .point-route__info bdi { color: rgb(var(--v-theme-on-surface)); opacity: .8; }
 .point-route__info button { color: rgb(var(--v-theme-primary)); font: inherit; font-weight: 800; text-decoration: underline; }
-.point-route__status { margin: 0; padding: .4rem .85rem; font-size: .81rem; line-height: 1.45; }
+.point-route__status { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: .4rem .85rem; font-size: .81rem; line-height: 1.45; }
 .point-route__error { color: rgb(var(--v-theme-error)); }
 .point-route__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .65rem .85rem; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; }
@@ -153,7 +153,11 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
 }
 @media (max-width: 599px) {
   .point-route-shell { bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
-  .point-route__actions { padding-bottom: .4rem; }
+  /* Keep Clear visible even at 320px: two actions, then a full-width remove row.
+     The route details scroll independently, never the destructive action. */
+  .point-route__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: .4rem; }
+  .point-route__actions :deep(.v-btn) { width: 100%; min-width: 0; padding-inline: .25rem; }
+  .point-route__clear { grid-column: 1 / -1; }
   .point-route { max-height: min(38dvh, 19rem); }
   .point-route-shell--expanded .point-route { max-height: min(58dvh, 32rem); }
 }
@@ -164,7 +168,10 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
   .point-route__mode-grid button { flex-direction: column; font-size: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route { max-height: min(44dvh, 14rem); }
+  /* Landscape has room for three short, wrapping actions, but little map height. */
+  .point-route__actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .point-route__clear { grid-column: auto; }
+  .point-route { max-height: min(54dvh, 17rem); }
   .point-route-shell--expanded .point-route { max-height: min(55dvh, 22rem); }
 }
 @media (forced-colors: active) { .point-route__mode-grid button[aria-pressed="true"] { outline: 2px solid Highlight; } }

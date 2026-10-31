@@ -44,6 +44,28 @@ describe("progressive trip planning and editing", () => {
     }
   });
 
+  it("keeps removal reachable in summary, route review, and the closed active/paused bar", () => {
+    const clearButton = sheet.match(/<v-btn[^>]*@click="clearDestination"[^>]*>حذف مقصد<\/v-btn>/s)?.[0];
+    expect(clearButton).toBeDefined();
+    expect(clearButton).not.toMatch(/v-if|v-show|:disabled/);
+    expect(sheet).toContain("function clearDestination(): void { props.api.clear(); emit('dismiss'); }");
+    const bar = map.slice(map.indexOf('v-if="journey.point.value && !journey.sheetOpen.value"'),
+      map.indexOf('<p v-if="journey.rerouteMessage.value'));
+    const barClear = bar.match(/<v-btn icon="mdi-delete-outline"[^>]*\/>/s)?.[0];
+    expect(barClear).toContain('aria-label="حذف مسیر و مقصد"');
+    expect(barClear).toContain('@click="clearPointRoute"');
+    expect(barClear).not.toMatch(/v-if|v-show|:disabled/);
+    expect(map).toContain('function clearPointRoute(): void {');
+    expect(map).toContain('journey.clear()');
+    const clear = route.slice(route.indexOf('function clear(): void'), route.indexOf('function select('));
+    expect(clear.indexOf('routesVisible.value = false; routes.value = []')).toBeGreaterThanOrEqual(0);
+    expect(clear.indexOf('routesVisible.value = false; routes.value = []')).toBeLessThan(clear.indexOf('point.value = null'));
+    const styles = css(sheet, "PointRouteSheet.vue");
+    expect(styles).toContain('grid-column: 1 / -1');
+    expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
+    expect(styles).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+  });
+
   it("reserves modes and alternatives for Show Routes, with direct car start and mid-trip editing", () => {
     for (const label of ["زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "مسیر دیگر", "بازگشت", "شروع دوبارهٔ راهبری", "حذف مقصد"]) {
       expect(sheet).toContain(label);

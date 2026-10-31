@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Always-accessible trip removal
+
+- Follow-up review found that **Remove destination** was rendered only when the route-review pane was expanded and guidance was stopped. The compact initial bar, active guidance and the minimized journey bar therefore left a selected route without a visible remove action. Removal is now available in both compact and expanded panels, including during navigation, and from the minimized journey bar. Clearing stops guidance, aborts in-flight planning/rerouting and removes the selected route and endpoint pins before the map's synchronous point watcher can repaint a ghost route; late replies cannot revive it. On narrow phones, footer actions use a two-row grid so the remove action stays visible rather than clipping beneath a short panel. Source/CSS and pure cancellation tests cover these states; physical-phone, live-map and screen-reader verification remain open.
+
 ### 2026-10-31 — Progressive trip bar, mid-trip editing and off-route recovery
 
 - Corrected the trip-initiation flow: destination selection now opens a minimal bottom bar with title, a nearby place-info toggle and **Start navigation / Show routes**. The toggle reveals only address, POI type and coordinates. Show routes reveals car/bicycle/walk choices, route alternatives, estimates and caveats; the map draws the route options and labelled origin/destination pins only when reviewing routes or navigating. Direct Start uses the fastest car route by default. During guidance, **Details and change route** opens the bar; entering route editing pauses guidance, allows mode/alternative changes and an explicit restart. Stop remains separate.

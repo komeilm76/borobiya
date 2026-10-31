@@ -62,6 +62,46 @@ describe("private point-to-point route", () => {
     expect(journey.navigating.value).toBe(false); expect(journey.error.value).toContain("دسترسی");
     scope.stop();
   });
+  it("can remove the destination immediately while its first route is still loading", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const get = vi.fn((_from: unknown, _to: unknown, _mode: TransportProfile, _signal?: AbortSignal) => pending.promise);
+    const { journey, scope } = setup(get);
+    journey.select({ lat: 40, lon: -120 });
+    expect(journey.loading.value).toBe(true);
+    journey.clear();
+    expect(get.mock.calls[0]?.[3]?.aborted).toBe(true);
+    pending.resolve([fast]); await pending.promise; await nextTick();
+    expect(journey.point.value).toBeNull();
+    expect(journey.selectedRoute.value).toBeNull();
+    expect(journey.routesVisible.value).toBe(false);
+    scope.stop();
+  });
+  it("removes an active route, markers' source state and any pending reroute without reviving them", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const get = vi.fn().mockResolvedValueOnce([fast]).mockImplementationOnce(() => pending.promise);
+    const { journey, fix, level, scope } = setup(get);
+    const clock = vi.spyOn(Date, "now"); clock.mockReturnValue(100_000);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await nextTick(); await Promise.resolve();
+      expect(journey.start()).toBe(true);
+      fix.value = { lat: 38.5, lon: -120.21, accuracy: 8 };
+      clock.mockReturnValue(103_000);
+      fix.value = { lat: 38.5001, lon: -120.2101, accuracy: 8 };
+      expect(journey.replanning.value).toBe(true);
+      journey.clear();
+      expect(get.mock.calls[1]?.[3].aborted).toBe(true);
+      expect(level).toHaveBeenCalledTimes(1);
+      expect(journey.point.value).toBeNull();
+      expect(journey.routes.value).toEqual([]);
+      expect(journey.routesVisible.value).toBe(false);
+      expect(journey.sheetOpen.value).toBe(false);
+      expect(journey.navigating.value).toBe(false);
+      expect(journey.rerouteMessage.value).toBeNull();
+      pending.resolve([fast]); await pending.promise; await nextTick();
+      expect(journey.point.value).toBeNull();
+      expect(journey.routes.value).toEqual([]);
+    } finally { clock.mockRestore(); scope.stop(); }
+  });
   it("clears aborted work and private data on account change or disposal", async () => {
     const pending = deferred<RouteChoice[]>(); let signal!: AbortSignal;
     const { journey, owner, close, scope } = setup(async (_from, _to, _mode, s) => { signal = s!; return pending.promise; });

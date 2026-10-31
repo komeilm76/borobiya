@@ -99,9 +99,11 @@
       <span>{{ journey.navigating.value ? (journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.remaining.value === null
         ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
         : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
-      <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات و تغییر مسیر</v-btn>
+      <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
-      <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
+      <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
+      <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
+        title="حذف مسیر و مقصد" @click="clearPointRoute" />
     </div>
     <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
       role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
@@ -473,6 +475,10 @@ function openPointRouteDetails(): void {
   void nextTick(() => document.getElementById('point-route-info-button')?.focus());
 }
 function stopPointNavigation(): void { journey.stop(); openPointRouteDetails(); }
+function clearPointRoute(): void {
+  journey.clear(); // Also cancels any in-flight route/replan and removes both endpoint pins.
+  focusDestinationMarker();
+}
 function focusDestinationMarker(): void {
   void nextTick(() => (destinationMarker?.getElement() ?? map.value?.getCanvas())?.focus({ preventScroll: true }));
 }
@@ -1281,7 +1287,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-bar { top: calc(5rem + env(safe-area-inset-top, 0px)); width: min(28rem, calc(100vw - 2rem)); display: flex; align-items: center; gap: .65rem; padding: .55rem; }
 .user-map-view__reroute-status { top: calc(8.5rem + env(safe-area-inset-top, 0px)); max-width: min(28rem, calc(100vw - 2rem)); padding: .55rem .85rem; color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); font-size: .83rem; }
 .user-map-view__journey-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
-.user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; }
+.user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; }
 :global(.user-map-view__destination-marker:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 /* Blue private-GPS target with a decorative halo (not a GPS accuracy radius); unlike the purple search
  * pin or a route endpoint, it remains upright and moves with each fresh fix. */
