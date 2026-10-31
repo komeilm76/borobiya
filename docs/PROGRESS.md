@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Public and account typography refinement
+
+- Audited all explicit font sizes in the public landing/status/404 and login/registration/recovery/onboarding layouts. Reduced oversized display and section headings across desktop, tablet and phone breakpoints; removed negative letter spacing from Persian display text. Rebalanced card titles, navigation, calls to action, body copy, error text, labels, form hints and small status/footer copy so secondary text does not become too small. All changes are confined to the public/auth stylesheets (the onboarding screen shares the auth typography); UI behavior and route access are unchanged. Source-level typography bounds and responsive-heading tests protect the hierarchy; rendered browser/device checks remain open.
+
 ### 2026-10-31 — Dedicated public welcome and honest service-status pages
 
 - Replaced the guest-facing landing skeleton with a distinct responsive public shell (brand, lightweight navigation, account links, theme switch and footer), an editorial welcome hero with decorative companion-network artwork, privacy-first feature/steps sections and clear registration/login actions. Unknown URLs now use a helpful public 404 rather than the development skeleton. `/_public/health` now provides a bounded, abortable, no-cache same-origin API liveness check with retry and precise failure/unknown states; it explicitly does not claim that GPS, maps, sockets or SOS dispatch are healthy. Public and authenticated shells remain separate, and route guards are unchanged. Source/route regressions and client checks cover navigation and structure; rendered browser/device acceptance is still open.
