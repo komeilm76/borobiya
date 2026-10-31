@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Compass contrast, map GPS feedback and separate authentication shell
+
+- The map's native compass keeps its reset/drag behavior while its two arrow halves now use theme-specific high-contrast colors (at least 4:1 on both primary surfaces, with a forced-colors mask). Sharing/GPS failures and device-priority warnings appear as icon-led, readable alerts **inside** the companions card instead of unframed text on the map; phone screen-reader feedback remains when the companions dialog is closed. Login, registration and recovery no longer inherit the public/user app bar and footer: they use a separate full-height split layout with an accessible brand/home link and theme toggle, responsive compact phone flow, and dark-theme styling. Recovery's login-return prompt now has 1.5rem separation below its submit action. Source/style regression tests cover all four reported issues. Browser/phone visual acceptance remains open.
+
 ### 2026-10-31 — Map compass in the SOS/share action rail
 
 - Removed the MapLibre `+`/`−` controls from the companion map only; other embedded maps still default to zoom controls. Retained the native compass arrow with its bearing/drag behavior, moving its 48px circular button above the right-hand recenter/share/SOS rail across map widths with safe-area spacing, short-phone clearance and keyboard focus styling. Updated the source/style contracts and map instructions; real-browser and phone visual checks remain open.

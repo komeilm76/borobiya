@@ -17,6 +17,14 @@
       />
     </header>
 
+    <v-alert v-if="broadcastStatus" class="live-companions__broadcast-alert"
+      :class="{ 'live-companions__broadcast-alert--warning': broadcastStatus.tone === 'warn' }"
+      :type="broadcastStatus.tone === 'error' ? 'error' : 'warning'"
+      variant="tonal" density="comfortable" role="status" aria-live="polite">
+      <strong>{{ broadcastStatus.headline }}</strong>
+      <p>{{ broadcastStatus.detail }}</p>
+    </v-alert>
+
     <p class="live-companions__status" role="status" aria-live="polite">
       {{ visible ? api.status.value.line : 'همراهان روی نقشه پنهان‌اند؛ با انتخاب یک همراه دوباره نمایش داده می‌شوند.' }}
     </p>
@@ -82,6 +90,7 @@ import { computed } from "vue";
 import { useThemeStore } from "@/stores/theme";
 import { avatarInitial } from "@/live/avatar-initial";
 import { ageWords, connectionTitle, liveMarkerColors } from "@/live/companion-locations";
+import type { BroadcastStatusView } from "@/live/broadcast-status";
 import type { useLiveCompanions } from "@/composables/use-live-companions";
 
 /**
@@ -97,6 +106,7 @@ const props = defineProps<{
   api: ReturnType<typeof useLiveCompanions>;
   visible: boolean;
   selectedUserId?: string | null;
+  broadcastStatus?: BroadcastStatusView | null;
 }>();
 defineEmits<{ 'update:visible': [visible: boolean]; select: [userId: string]; 'create-share': [] }>();
 
@@ -129,6 +139,32 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 .live-companions__title-block h2 { margin: 0.1rem 0 0; color: #193536; font-size: 0.92rem; font-weight: 800; line-height: 1.4; }
 .live-companions__count, .live-companions__signal { flex: 0 0 auto; }
 .live-companions__signal { color: #0e6666; }
+.live-companions__broadcast-alert {
+  border: 1px solid #c96b70;
+  border-radius: var(--bb-radius-nested, 16px);
+  color: #6e2023 !important;
+  background: #fcecec !important;
+  font-size: 0.83rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.live-companions__broadcast-alert--warning {
+  border-color: #ae791e;
+  color: #553b0a !important;
+  background: #fff2d5 !important;
+}
+.live-companions__broadcast-alert strong { display: block; font-weight: 800; }
+.live-companions__broadcast-alert p { margin: 0.2rem 0 0; }
+:global(:root.dark .live-companions__broadcast-alert) {
+  border-color: #f37c7c;
+  color: #ffe2df !important;
+  background: #422b2b !important;
+}
+:global(:root.dark .live-companions__broadcast-alert--warning) {
+  border-color: #f4c06a;
+  color: #fff1cc !important;
+  background: #443522 !important;
+}
 .live-companions__status { margin: 0; color: #536d6c; font-size: 0.74rem; line-height: 1.6; }
 .live-companions__create { min-height: 44px; border-radius: 0.75rem; font-weight: 700; }
 .live-companions__peers {

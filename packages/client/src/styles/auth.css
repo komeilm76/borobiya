@@ -760,3 +760,129 @@
   color: #8bd7aa;
   background: #1d382d;
 }
+
+/* Account routes have their own quiet, full-height entry experience instead of
+ * inheriting the public/user app bar and footer. Keep long registration scrollable. */
+.app-shell--auth .app-main {
+  min-height: 100dvh;
+  padding: 0 !important;
+  background:
+    radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.18), transparent 34%),
+    radial-gradient(ellipse at 92% 92%, rgba(14, 102, 102, 0.12), transparent 38%),
+    #eef5f1;
+}
+.auth-chrome {
+  display: flex;
+  width: min(100%, 78rem);
+  min-height: 5.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-inline: auto;
+  padding: 1rem clamp(1rem, 4vw, 2.5rem);
+}
+.auth-chrome__actions { display: flex; align-items: center; gap: 0.5rem; }
+.auth-chrome__theme { min-width: 44px; min-height: 44px; color: #214c49 !important; }
+.auth-chrome__theme:focus-visible { outline: 3px solid #0e6666; outline-offset: 3px; }
+.auth-chrome__brand, .auth-chrome__home { display: inline-flex; align-items: center; gap: 0.65rem; }
+.auth-chrome__brand { color: #173b3c; font-size: 1.15rem; font-weight: 850; }
+.auth-chrome__mark {
+  display: grid; width: 42px; height: 42px; place-items: center;
+  border-radius: 13px; color: #fff; background: #0e6666;
+}
+.auth-chrome__home {
+  min-height: 44px; padding: 0.55rem 0.9rem;
+  border: 1px solid #b9d1ca; border-radius: 999px;
+  color: #214c49; background: rgba(255, 255, 255, 0.75);
+  font-size: 0.84rem; font-weight: 750;
+}
+.auth-chrome a:focus-visible { outline: 3px solid #0e6666; outline-offset: 3px; }
+.auth-chrome__home:hover { background: #fff; }
+.app-shell--auth .auth-page { min-height: calc(100dvh - 5.5rem); }
+.app-shell--auth .auth-layout {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid rgba(14, 102, 102, 0.16);
+  border-radius: var(--bb-radius-card, 24px);
+  background: #fff;
+  box-shadow: var(--bb-shadow-hero);
+}
+.app-shell--auth .auth-intro {
+  min-height: 35rem;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(155deg, #0c5154 0%, #164c4b 55%, #193c42 100%);
+  box-shadow: none;
+}
+.app-shell--auth .auth-kicker {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.13);
+}
+.app-shell--auth .auth-hero-title { color: #fff; }
+.app-shell--auth .auth-hero-title span { color: #f4d796; }
+.app-shell--auth .auth-hero-copy { color: #d9eeea; }
+.app-shell--auth .auth-trust-row {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+.app-shell--auth .auth-trust-row strong,
+.app-shell--auth .auth-feature-item strong { color: #fff; }
+.app-shell--auth .auth-trust-row small,
+.app-shell--auth .auth-feature-item small { color: #d4e9e4; }
+.app-shell--auth .auth-feature-item .feature-number {
+  color: #ffdfa1; background: rgba(255, 255, 255, 0.12);
+}
+.app-shell--auth .recovery-step { color: #c8e0dc; }
+.app-shell--auth .recovery-step.is-current { color: #fff; }
+.app-shell--auth .recovery-step-number {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff; background: rgba(255, 255, 255, 0.13);
+}
+.app-shell--auth .recovery-step.is-current .recovery-step-number,
+.app-shell--auth .recovery-step.is-complete .recovery-step-number {
+  color: #143f3f; background: #f4d796;
+}
+.app-shell--auth .auth-card {
+  border: 0;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.app-shell--auth .auth-card-body { padding: clamp(2rem, 5vw, 4rem) !important; }
+/* Unlike registration, recovery has no divider after its final form action. */
+.auth-switch-copy--recovery { margin-top: 1.5rem; }
+
+@media (max-width: 900px) {
+  .app-shell--auth .auth-intro { min-height: 0; }
+  .app-shell--auth .auth-page { align-items: flex-start; }
+}
+@media (max-width: 560px) {
+  .auth-chrome { min-height: 4.75rem; padding-block: 0.75rem; }
+  .app-shell--auth .auth-page { min-height: calc(100dvh - 4.75rem); padding-top: 0.5rem; }
+  .app-shell--auth .auth-layout { border-radius: 20px; }
+  .app-shell--auth .auth-intro { padding: 1.5rem; }
+  .app-shell--auth .auth-hero-title { margin-block: 0.75rem 0.4rem; font-size: clamp(1.8rem, 7vw, 2.2rem); }
+  .app-shell--auth .auth-trust-row { margin-top: 1.15rem; }
+  .app-shell--auth .auth-decoration { display: none; }
+  .app-shell--auth .auth-card-body { padding: 1.5rem !important; }
+}
+:root.dark .app-shell--auth .app-main {
+  background:
+    radial-gradient(ellipse at 5% 8%, rgba(233, 179, 90, 0.08), transparent 34%),
+    radial-gradient(ellipse at 92% 92%, rgba(113, 199, 190, 0.1), transparent 38%),
+    #101d1e;
+}
+:root.dark .auth-chrome__brand { color: #edf5f2; }
+:root.dark .auth-chrome__theme { color: #edf5f2 !important; }
+:root.dark .auth-chrome__theme:focus-visible { outline-color: #71c7be; }
+:root.dark .auth-chrome__home {
+  border-color: #49615d; color: #edf5f2; background: #203536;
+}
+:root.dark .auth-chrome__home:hover { background: #2c4a49; }
+:root.dark .auth-chrome a:focus-visible { outline-color: #71c7be; }
+:root.dark .app-shell--auth .auth-layout { border-color: #46615d; background: #1b292a; }
+:root.dark .app-shell--auth .auth-intro {
+  background: linear-gradient(155deg, #103b3c 0%, #1b3535 55%, #282f35 100%);
+}
+:root.dark .app-shell--auth .auth-hero-title span { color: #f4d796; }
+:root.dark .app-shell--auth .auth-card { background: #1b292a !important; }

@@ -38,7 +38,8 @@ describe("map companions tool", () => {
   it("keeps the broadcast toggle on the map, not in the companions dialog", () => {
     const dialog = view.slice(view.indexOf('class="user-map-view__live-dialog"'), view.indexOf('  </section>'));
     expect(dialog).toContain('<LiveCompanionPanel :api="live"');
-    expect(dialog).toContain('broadcast.view.headline'); // Status is still visible if sharing fails.
+    expect(dialog).toContain(':broadcast-status="broadcast.view.tone ==='); // Status stays inside the card if sharing fails.
+    expect(panel).toContain('{{ broadcastStatus.headline }}');
     expect(dialog).not.toContain('<LiveBroadcastBar');
     expect(dialog).not.toContain('broadcast.toggle()');
     expect(dialog).not.toContain('to="/_user/devices"');

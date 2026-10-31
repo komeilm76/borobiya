@@ -1,6 +1,6 @@
 <template>
-  <v-app :class="{ 'app-shell--map': isMapRoute }">
-    <v-app-bar v-if="!isMapRoute" class="app-topbar px-sm-6" flat height="64">
+  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute }">
+    <v-app-bar v-if="!isMapRoute && !isAuthRoute" class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
@@ -137,6 +137,23 @@
     </v-dialog>
 
     <v-main class="app-main dark:text-slate-100">
+      <header v-if="isAuthRoute" class="auth-chrome" aria-label="پیمایش حساب">
+        <RouterLink class="auth-chrome__brand" to="/_public/landing" aria-label="بوروبیا؛ بازگشت به صفحهٔ اصلی">
+          <span class="auth-chrome__mark" aria-hidden="true"><v-icon icon="mdi-plus" size="25" /></span>
+          <span>بوروبیا</span>
+        </RouterLink>
+        <div class="auth-chrome__actions">
+          <v-btn class="auth-chrome__theme" icon variant="text"
+            :aria-label="appTheme.isDark ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'"
+            :title="appTheme.isDark ? 'حالت روشن' : 'حالت تاریک'"
+            @click="appTheme.toggleTheme()">
+            <v-icon :icon="appTheme.isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" />
+          </v-btn>
+          <RouterLink class="auth-chrome__home" to="/_public/landing">
+            صفحهٔ اصلی <v-icon icon="mdi-arrow-left" size="18" aria-hidden="true" />
+          </RouterLink>
+        </div>
+      </header>
       <RouterView v-slot="{ Component, route }">
         <Transition mode="out-in" name="page-fade">
           <component :is="Component" :key="route.fullPath" />
@@ -184,7 +201,7 @@
       </template>
     </v-snackbar>
 
-    <footer class="app-footer">
+    <footer v-if="!isAuthRoute" class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
       <a
         class="osm-attribution"
@@ -264,6 +281,7 @@ const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustComp
 const router = useRouter();
 const route = useRoute();
 const isMapRoute = computed(() => route.name === "user-map");
+const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const logoutConfirmation = useLogoutConfirmation({
   isAuthenticated: computed(() => auth.isAuthenticated),
   logout: () => auth.logout(),

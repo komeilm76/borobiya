@@ -8,7 +8,7 @@ const shell = readFileSync(new URL("./tailwind.css", import.meta.url), "utf8");
 describe("global shell at narrow widths", () => {
   it("keeps profile/appearance, proposal inbox and sections reachable while collapsing the redundant brand text", () => {
     expect(app).toContain('class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا"');
-    expect(app).toContain('<v-app-bar v-if="!isMapRoute" class="app-topbar px-sm-6" flat height="64">');
+    expect(app).toContain('<v-app-bar v-if="!isMapRoute && !isAuthRoute" class="app-topbar px-sm-6" flat height="64">');
     expect(app).toContain('<AccountProfileMenu');
     expect(app).toContain('@change-theme="appTheme.setPreference"');
     expect(shell).toContain('.top-nav__sections { max-height: min(70dvh, 30rem); overflow-y: auto;');

@@ -124,7 +124,7 @@
             </v-btn>
           </div>
 
-          <p v-if="step < 4" class="auth-switch-copy">
+          <p v-if="step < 4" class="auth-switch-copy auth-switch-copy--recovery">
             گذرواژه را به یاد آوردید؟
             <RouterLink class="text-link text-link-strong" to="/_auth/login">بازگشت به ورود</RouterLink>
           </p>

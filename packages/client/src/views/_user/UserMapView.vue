@@ -87,7 +87,7 @@
       variant="flat"
       @click="broadcast.toggle()"
     />
-    <span v-if="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error'"
+    <span v-if="isPhone && activeTool !== 'live' && (broadcast.view.tone === 'warn' || broadcast.view.tone === 'error')"
       class="sr-only" role="status" aria-live="polite">{{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}</span>
     <span v-if="own.error.value || recenterError" class="sr-only" role="status" aria-live="polite">
       {{ recenterError ?? own.error.value }}
@@ -164,11 +164,8 @@
           <aside id="map-live-panel" class="user-map-view__live user-map-view__panel"
             :role="isPhone ? 'region' : undefined" aria-label="همراهان"
             tabindex="-1" @keydown.esc="onPanelEscape">
-            <p v-if="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error'"
-              class="user-map-view__broadcast-status" role="status" aria-live="polite">
-              {{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}
-            </p>
             <LiveCompanionPanel :api="live" :visible="showCompanions" :selected-user-id="selectedCompanionId"
+              :broadcast-status="broadcast.view.tone === 'warn' || broadcast.view.tone === 'error' ? broadcast.view : null"
               @update:visible="showCompanions = $event" @select="selectCompanion" @create-share="shareOpen = true" />
             <p v-if="peerSelectionError" class="user-map-view__peer-error" role="status" aria-live="polite">{{ peerSelectionError }}</p>
           </aside>
@@ -1092,7 +1089,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__search-surface, .user-map-view__search-body,
 .user-map-view__history-surface, .user-map-view__history-body,
 .user-map-view__live-surface, .user-map-view__live-body { display: contents !important; }
-.user-map-view__broadcast-status { margin: 0; color: rgb(var(--v-theme-on-surface)); }
 .user-map-view__peer-error { color: rgb(var(--v-theme-error)); margin: 0.5rem 0; }
 :global(.user-map-view .user-map-view__peer-avatar) {
   display: grid; place-items: center; width: 44px; height: 44px;
@@ -1168,9 +1164,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
   border-radius: 50%;
 }
+/* MapLibre's stock #333/#ccc arrows disappear on the themed primary surface.
+ * Keep its real rotating icon element and pointer/keyboard behavior, but paint
+ * two distinct high-contrast halves (>=4:1 against each theme's primary). */
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
-  /* Keep the north/south halves distinct instead of whitening both arrows. */
-  filter: invert(1);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23ffffff' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23f4c06a' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
+}
+:global(:root.dark .user-map-view__canvas .maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath fill='%23111c1d' d='m10.5 14 4-8 4 8z'/%3E%3Cpath fill='%23315555' d='m10.5 16 4 8 4-8z'/%3E%3C/svg%3E");
+}
+@media (forced-colors: active) {
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+    background-image: none;
+    background-color: ButtonText;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 29 29'%3E%3Cpath d='m10.5 14 4-8 4 8z m0 2 4 8 4-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
 }
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:hover) {
   background: rgba(var(--v-theme-on-primary), 0.12);
