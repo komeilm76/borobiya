@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Map-only sidebar replaces the app bar (T4.4.1 follow-up)
+
+- On `/_user/map` only, removed the shared app bar and its redundant «نقشهٔ همراهان» heading. A single safe-area-aware icon at the physical top-left opens a left-anchored, scrollable dialog-sidebar with the existing page destinations, account name/role/groups, system/light/dark selection and the existing confirmed logout; backdrop, Escape/Back and Close dismiss it. Other pages retain their app bar, profile menu and guest login. The map occupies the viewport on phone and desktop, while tablet cards remain scrollable in flow below the launcher. Desktop search moves down out of the icon's hit area; phone native zoom uses the opposite corner and attribution stays below the launcher. SOS, the three full-size phone dialogs and the map dock remain available. Source/compiled-style tests, client checks and build cover structure and responsive safety; real rendered-browser/phone, keyboard focus and screen-reader review remain open.
+
 ### 2026-10-31 — Keep signed-in accounts off auth pages (guard follow-up)
 
 - Reviewed navigation, session restoration and login redirect behavior. The canonical `/_auth/*` guard already rejected authenticated navigation, but unprefixed `/auth/*` addresses fell through to not-found rather than following the guest-only contract, and an auth view already on screen was not rechecked when a session arrived later. The three short URLs now alias the canonical views and share the guest-only check. The router also leaves an already-open auth page when authentication arrives; login captures its return path before a concurrent redirect changes the route. Admins default to their admin home, onboarding still takes precedence, and malformed/external/auth return paths are rejected. Memory-router tests (without mounting `.vue` components) cover guest/user/admin, back, aliases, logout, deferred/real cookie restoration, late session updates, onboarding, return paths and path boundaries; full tests, lint, typecheck and build passed. Live-browser/VM session behavior still needs verification.

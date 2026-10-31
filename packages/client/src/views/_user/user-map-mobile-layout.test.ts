@@ -8,7 +8,7 @@ const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
 const sosTrigger = readFileSync(new URL("../../components/sos/SosTriggerButton.vue", import.meta.url), "utf8");
 const playbackPanel = readFileSync(new URL("../../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
-const profileMenu = readFileSync(new URL("../../components/shell/AccountProfileMenu.vue", import.meta.url), "utf8");
+const sidebar = readFileSync(new URL("../../components/shell/MapSidebar.vue", import.meta.url), "utf8");
 
 function css(source: string, filename: string): string {
   const { descriptor } = parse(source, { filename });
@@ -18,22 +18,25 @@ function css(source: string, filename: string): string {
 }
 
 describe("mobile map viewport and overlay tools", () => {
-  it("uses a route title instead of the app logo or a second dashboard shortcut on the map", () => {
-    expect(app).toContain('v-if="!isMapRoute" class="brand-link"');
-    expect(app).toContain('<h1 v-else class="app-map-title">نقشهٔ همراهان</h1>');
+  it("removes the map app bar and title but keeps all other routes' shell unchanged", () => {
+    expect(app).toContain('<v-app-bar v-if="!isMapRoute" class="app-topbar');
+    expect(app).toContain('<MapSidebar\n      v-if="isMapRoute"');
+    expect(app).not.toContain('app-map-title');
+    expect(app).not.toContain('نقشهٔ همراهان');
+    expect(shell).not.toContain('.app-map-title');
     expect(view).not.toContain('to="/_user/dashboard"');
     expect(view).not.toContain('user-map-view__toolbar');
     expect(view).not.toContain('user-map-view__map-chip'); // No hard-coded Tehran label for other regions.
-    expect(app).toContain('title="فهرست بخش‌ها"');
+    expect(app).toContain('title="فهرست بخش‌ها"'); // Other routes retain their menu.
   });
 
-  it("uses a full-height map on phones with shell navigation over the tiles, not flow panels and footer", () => {
+  it("uses a full-height map on phones and desktop with no app-bar offset or footer", () => {
     expect(app).toContain("'app-shell--map': isMapRoute");
     expect(app).toContain('route.name === "user-map"');
+    expect(shell).toContain(".app-shell--map .app-footer { display: none; }");
+    expect(shell).toContain(".app-shell--map .app-main {");
+    expect(shell).toContain("padding-top: 0 !important;");
     const phoneShell = shell.split("@media (max-width: 599px) {").at(-1)!;
-    expect(phoneShell).toContain(".app-shell--map .app-topbar");
-    expect(phoneShell).toContain(".app-shell--map .app-footer { display: none; }");
-    expect(phoneShell).toContain(".app-shell--map .app-main");
     expect(phoneShell).toContain(".app-shell--map .sos-fab.sos-fab"); // Beats the component's scoped selector.
     const phoneMap = view.split("@media (max-width: 599px) {")[1]!;
     expect(phoneMap).toContain("position: fixed;");
@@ -42,6 +45,16 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toMatch(/\.user-map-view > \.user-map-view__canvas\s*\{[^}]*position: absolute;[^}]*height: 100%;/);
     expect(phoneMap).not.toContain("height: clamp(20rem, 55dvh, 32rem)");
     expect(css(view, "UserMapView.vue")).toContain("height: 100dvh");
+  });
+
+  it("gives the physical-left launcher its own hit area at desktop and tablet widths", () => {
+    const mapCss = css(view, "UserMapView.vue");
+    expect(mapCss).toMatch(/\.user-map-view\[data-v-map-mobile\]\s*\{[^}]*height: 100dvh;/);
+    expect(mapCss).toContain('inset-block-start: calc(5rem + env(safe-area-inset-top, 0px))'); // Desktop search clears menu.
+    expect(mapCss).toMatch(/@media \(max-width: 1023px\)[\s\S]*?padding: calc\(4\.5rem \+ env\(safe-area-inset-top, 0px\)\) 0\.65rem 0\.65rem;/);
+    expect(mapCss).toMatch(/@media \(max-width: 599px\)[\s\S]*?\.user-map-view\[data-v-map-mobile\][^{]*\{[^}]*padding: 0;/); // Phone map stays full-bleed.
+    expect(shell).toContain('@media (min-width: 600px) and (max-width: 1023px) {');
+    expect(shell).toContain('.app-shell--map .app-main { overflow: visible; }');
   });
 
   it("keeps the icon-only SOS accessible and above the phone-map dock without enlarging it", () => {
@@ -143,17 +156,33 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('closeOnBack: false');
   });
 
-  it("keeps the map toolbar, profile and three dock targets inside phone safe areas", () => {
-    const phoneShell = shell.split("@media (max-width: 599px) {").at(-1)!;
-    expect(phoneShell).toContain('height: calc(56px + env(safe-area-inset-top, 0px)) !important;');
-    expect(phoneShell).toContain('padding-top: env(safe-area-inset-top, 0px);');
-    expect(phoneShell).toContain('padding-left: max(0.5rem, env(safe-area-inset-left, 0px)) !important;');
-    expect(phoneShell).toContain('padding-right: max(0.5rem, env(safe-area-inset-right, 0px)) !important;');
-    expect(profileMenu).toContain('@media (max-width: 1023px) {');
-    expect(profileMenu).toContain('.account-profile__trigger-name, .account-profile__chevron { display: none; }');
-    expect(profileMenu).toContain('.account-profile__trigger { width: 44px; padding: 0; }');
-    expect(phoneShell).toContain('.app-shell--map .top-nav .v-btn--icon { min-width: 44px; min-height: 44px; }');
-    expect(phoneShell).toContain('min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;');
+  it("keeps a single physical-left menu button, identity/theme/logout drawer and three dock targets", () => {
+    expect(app).toContain(':items="mapNavItems"');
+    expect(app).toContain('auth.user?.role === "admin" && !auth.mustCompleteSecurityQuestions');
+    expect(app).toContain('[{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]');
+    expect(app).toContain(':user="auth.user"');
+    expect(app).toContain(':categories="auth.userCategories"');
+    expect(app).toContain('@change-theme="appTheme.setPreference"');
+    expect(app).toContain('@request-logout="logoutConfirmation.request()"');
+    expect(sidebar).toContain('aria-label="باز کردن فهرست برنامه"');
+    expect(sidebar).toContain('aria-labelledby="map-sidebar-title"');
+    expect(sidebar).toContain('aria-label="بخش‌های برنامه"');
+    expect(sidebar).toContain('aria-label="حساب کاربری"');
+    expect(sidebar).toContain('aria-label="انتخاب پوسته"');
+    expect(sidebar).toContain('خروج از حساب');
+    expect(sidebar).toContain('open.value = false;');
+    const drawerCss = css(sidebar, "MapSidebar.vue");
+    expect(drawerCss).toContain('top: calc(0.75rem + env(safe-area-inset-top, 0px))');
+    expect(drawerCss).toContain('left: calc(0.75rem + env(safe-area-inset-left, 0px))');
+    expect(drawerCss).toContain('width: 48px');
+    expect(drawerCss).toContain('.map-sidebar__dialog.v-dialog > .v-overlay__content');
+    expect(drawerCss).toContain('height: 100dvh !important');
+    expect(drawerCss).toContain('.map-sidebar__dialog.v-dialog > .v-overlay__content > .map-sidebar__panel > .map-sidebar__scroll');
+    expect(drawerCss).toContain('env(safe-area-inset-left, 0px) !important'); // Beat Vuetify's 24px dialog gutter.
+    expect(drawerCss).toContain('overflow: hidden !important'); // One scrollbar, not an outer card scroll.
+    expect(drawerCss).toContain('overflow-y: auto');
+    expect(drawerCss).toContain('safe-area-inset-bottom');
+    expect(drawerCss).toContain('forced-colors: active');
     const phoneMap = view.split("@media (max-width: 599px) {")[1]!;
     expect(phoneMap).toContain('left: calc(0.75rem + env(safe-area-inset-left, 0px));');
     expect(phoneMap).toContain('right: calc(0.75rem + env(safe-area-inset-right, 0px));');
@@ -171,7 +200,8 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("safe-area-inset-bottom");
     expect(phoneMap).toContain(".maplibregl-ctrl-top-right");
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right");
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4rem[^}]*bottom: auto;/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*top: calc\(0\.75rem[^}]*right: calc\(0\.75rem/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4\.5rem[^}]*bottom: auto;/);
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
     expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));"); // Real OSM/OpenMapTiles credit must not cover zoom.
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-left\)\s*\{\s*bottom: calc\(5\.5rem/);

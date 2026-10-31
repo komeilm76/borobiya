@@ -1052,8 +1052,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view {
   position: relative;
   width: 100%;
-  height: calc(100dvh - 120px);
-  min-height: 28rem;
+  height: 100dvh;
+  min-height: 0;
   overflow: hidden;
   background: #e8efec;
   isolation: isolate;
@@ -1160,7 +1160,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__search {
   position: absolute;
   z-index: 3;
-  inset-block-start: 1rem;
+  /* Leave the physical top-left corner free for the map-only sidebar launcher. */
+  inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
   inset-inline-end: 1rem;
   width: min(25rem, calc(100% - 2rem));
   display: flex;
@@ -1217,8 +1218,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     flex-direction: column;
     gap: 0.65rem;
     height: auto;
-    min-height: calc(100dvh - 120px);
-    padding: 0.65rem;
+    min-height: 100dvh;
+    padding: calc(4.5rem + env(safe-area-inset-top, 0px)) 0.65rem 0.65rem;
     overflow: visible;
   }
 
@@ -1265,10 +1266,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__live { order: 4; }
 }
 
-/* Phone map: an edge-to-edge viewport behind the slim app rail, not a map squeezed between
- * stacked cards. Fullscreen tools keep their own scrolling content and clear close actions. */
+/* Phone map: edge-to-edge behind a single top-left menu launcher, not a bar or
+ * stacked cards. Fullscreen tools keep their own scrolling content and close actions. */
 @media (max-width: 599px) {
-  /* Left of native zoom; below the route app bar and expanded attribution. */
+  /* Left of native zoom; below the menu launcher and expanded attribution. */
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;
     top: calc(8rem + env(safe-area-inset-top, 0px)); left: calc(0.75rem + env(safe-area-inset-left, 0px));
@@ -1371,9 +1372,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* Keep native zoom and compass together at the top edge, clear of the app bar. */
+  /* Native zoom/compass use the physical right lane opposite the left menu. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: calc(4rem + env(safe-area-inset-top, 0px));
+    top: calc(0.75rem + env(safe-area-inset-top, 0px));
     right: calc(0.75rem + env(safe-area-inset-right, 0px));
     left: auto;
     width: 132px;
@@ -1385,13 +1386,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-top: 0;
     border-inline-start: 1px solid #627a7a;
   }
-  /* Attribution stays visible between the app bar and the bottom sheet, never
-   * buried beneath an open tool or the SOS pill. Preserve MapLibre's own control. */
+  /* Preserve MapLibre's attribution above the bottom tools and below the menu
+   * launcher, never buried beneath an open tool or the SOS pill. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
-    top: calc(4rem + env(safe-area-inset-top, 0px));
+    top: calc(4.5rem + env(safe-area-inset-top, 0px));
     bottom: auto;
     left: calc(0.25rem + env(safe-area-inset-left, 0px));
     right: auto;

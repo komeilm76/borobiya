@@ -1,7 +1,7 @@
 <template>
   <v-app :class="{ 'app-shell--map': isMapRoute }">
-    <v-app-bar class="app-topbar px-sm-6" flat height="64">
-      <RouterLink v-if="!isMapRoute" class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
+    <v-app-bar v-if="!isMapRoute" class="app-topbar px-sm-6" flat height="64">
+      <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
         </span>
@@ -10,7 +10,6 @@
           <span class="brand-tagline">شبکهٔ امداد و همراهی</span>
         </span>
       </RouterLink>
-      <h1 v-else class="app-map-title">نقشهٔ همراهان</h1>
 
       <v-spacer />
 
@@ -90,6 +89,17 @@
         />
       </nav>
     </v-app-bar>
+
+    <MapSidebar
+      v-if="isMapRoute"
+      :items="mapNavItems"
+      :user="auth.user"
+      :categories="auth.userCategories"
+      :preference="appTheme.preference"
+      :is-dark="appTheme.isDark"
+      @change-theme="appTheme.setPreference"
+      @request-logout="logoutConfirmation.request()"
+    />
 
     <v-dialog
       :model-value="logoutConfirmation.open.value"
@@ -189,6 +199,7 @@
 import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
+import MapSidebar from "./components/shell/MapSidebar.vue";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";
@@ -239,6 +250,12 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     { to: "/_user/devices", label: "دستگاه‌ها", icon: "mdi-devices" }
   ];
 });
+// Admins can reach the user map; keep its current-route link available in the
+// map sidebar alongside their admin destinations without changing other headers.
+const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustCompleteSecurityQuestions
+  ? [{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]
+  : navItems.value
+);
 const router = useRouter();
 const route = useRoute();
 const isMapRoute = computed(() => route.name === "user-map");

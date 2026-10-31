@@ -46,16 +46,6 @@ a {
   padding-inline: clamp(var(--bb-space-two, 1rem), 4vw, var(--bb-space-six, 3rem)) !important;
 }
 
-/* The map has its own page heading in the app rail, not a second brand/home action on the tiles. */
-.app-map-title {
-  margin: 0;
-  color: inherit;
-  font-size: 1rem;
-  font-weight: 800;
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
 .brand-link {
   display: inline-flex;
   align-items: center;
@@ -445,34 +435,25 @@ a {
   .app-topbar .v-toolbar__content { padding-inline: 0.5rem !important; }
 }
 
-/* Only the companion map uses an immersive phone shell. Keep the app's navigation, inbox,
- * theme and sign-out available in a slim glass rail over the tiles; never reserve page flow
- * or hide the safety-critical SOS action. All other routes retain the ordinary shell. */
+/* The companion map owns the entire viewport at every width. Its single menu
+ * launcher and drawer replace (rather than overlay) the shared app bar. */
+.app-shell--map { min-height: 100dvh; }
+.app-shell--map .app-main {
+  min-height: 100dvh;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  overflow: hidden;
+}
+.app-shell--map .app-footer { display: none; }
+
+/* Tablet panels still scroll in page flow instead of covering the map. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .app-shell--map .app-main { overflow: visible; }
+}
+
 @media (max-width: 599px) {
-  .app-shell--map { height: 100dvh; min-height: 100dvh; overflow: hidden; }
-  /* On cutout/PWA displays the toolbar starts below the top safe area. Keep
-   * three real 44px actions visible even when the profile name is long. */
-  .app-shell--map .app-topbar {
-    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
-    min-height: calc(56px + env(safe-area-inset-top, 0px)) !important;
-  }
-  .app-shell--map .app-topbar .v-toolbar__content {
-    height: calc(56px + env(safe-area-inset-top, 0px)) !important;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-left: max(0.5rem, env(safe-area-inset-left, 0px)) !important;
-    padding-right: max(0.5rem, env(safe-area-inset-right, 0px)) !important;
-  }
-  .app-shell--map .app-map-title {
-    min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis;
-    font-size: 0.95rem;
-  }
-  .app-shell--map .top-nav { flex: 0 0 auto; gap: 0.125rem; }
-  .app-shell--map .top-nav .v-btn--icon { min-width: 44px; min-height: 44px; }
-  /* AccountProfileMenu already collapses its name/chevron to a 44px avatar
-   * below 1024px; do not duplicate that component's responsive rule here. */
-  .app-shell--map .login-button { margin-inline-start: 0; padding-inline: 0.55rem !important; }
-  .app-shell--map .app-main { min-height: 0; padding-top: 0 !important; padding-bottom: 0 !important; overflow: hidden; }
-  .app-shell--map .app-footer { display: none; }
+  .app-shell--map { height: 100dvh; overflow: hidden; }
+  .app-shell--map .app-main { min-height: 0; }
   /* Outrank the trigger's scoped position so the same 48px SOS control clears
    * the dock; do not enlarge or hide it on the map. */
   .app-shell--map .sos-fab.sos-fab {
