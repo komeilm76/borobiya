@@ -75,33 +75,35 @@
             </template>
           </p>
 
-          <v-list v-if="hasResults" density="compact" class="share-dialog__results" lines="two">
-            <v-list-item
-              v-for="candidate in results"
-              :key="candidate.id"
-              :title="candidate.username"
-              :subtitle="subtitleFor(candidate)"
-            >
-              <template #append>
-                <v-btn
-                  size="small"
-                  :variant="isSelected(candidate) ? 'flat' : 'tonal'"
-                  :color="isSelected(candidate) ? 'success' : 'primary'"
-                  :disabled="isSelf(candidate)"
-                  :aria-label="
-                    isSelf(candidate)
-                      ? 'نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید'
-                      : isSelected(candidate)
-                        ? `حذف ${candidate.username} از فهرست`
-                        : `افزودن ${candidate.username} به فهرست`
-                  "
-                  @click="toggle(candidate)"
-                >
-                  <v-icon :icon="isSelected(candidate) ? 'mdi-check' : 'mdi-plus'" size="18" />
-                </v-btn>
-              </template>
-            </v-list-item>
-          </v-list>
+          <ul v-if="hasResults" class="share-dialog__results" role="list" aria-label="نتایج جستجوی همراهان">
+            <li v-for="candidate in results" :key="candidate.id" class="share-dialog__result">
+              <div class="share-dialog__result-header">
+                <v-avatar color="primary" size="42" aria-hidden="true">{{ avatarInitial(candidate.username) }}</v-avatar>
+                <strong dir="auto">{{ candidate.username }}</strong>
+              </div>
+              <PublicProfileFacts :profile="candidate" :show-username="false" />
+              <p v-if="candidate.distance !== null" class="share-dialog__result-distance">
+                فاصله: {{ candidate.distance.toLocaleString('fa-IR') }} کیلومتر
+              </p>
+              <v-btn
+                class="share-dialog__result-action"
+                :variant="isSelected(candidate) ? 'tonal' : 'flat'"
+                :color="isSelected(candidate) ? 'success' : 'primary'"
+                :disabled="isSelf(candidate) || (recipientsFull && !isSelected(candidate))"
+                :aria-label="
+                  isSelf(candidate)
+                    ? 'نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید'
+                    : isSelected(candidate)
+                      ? `حذف ${candidate.username} از فهرست`
+                      : `افزودن ${candidate.username} به فهرست`
+                "
+                @click="toggle(candidate)"
+              >
+                <v-icon :icon="isSelected(candidate) ? 'mdi-check' : 'mdi-plus'" size="18" class="me-1" />
+                {{ isSelf(candidate) ? 'حساب شما' : isSelected(candidate) ? 'انتخاب‌شده؛ حذف' : 'افزودن همراه' }}
+              </v-btn>
+            </li>
+          </ul>
 
           <v-alert
             v-else-if="
@@ -178,6 +180,23 @@
                 تا وقتی خاموش کنم
               </button>
             </div>
+            <p class="share-dialog__duration-value" role="status">
+              {{ mode === 'permanent' ? 'تا وقتی خاموش کنم' : durationWords(durationMinutes) }}
+            </p>
+            <v-slider
+              :model-value="sliderStepForMinutes(durationMinutes)"
+              :min="0"
+              :max="DURATION_SLIDER_MAX"
+              :step="1"
+              color="primary"
+              hide-details
+              :aria-valuetext="durationWords(durationMinutes)"
+              aria-label="تنظیم مدت اشتراک تا ۳۰ روز"
+              @update:model-value="chooseLiveDuration(minutesForSliderStep($event))"
+            />
+            <div class="share-dialog__slider-limits" aria-hidden="true">
+              <span>{{ durationWords(15) }}</span><span>{{ durationWords(maxMinutes) }}</span>
+            </div>
           </div>
 
           <div v-else-if="mode === 'history'" class="share-dialog__duration">
@@ -196,24 +215,18 @@
             </div>
 
             <div class="share-dialog__history-fields">
-              <label class="share-dialog__history-field">
-                <span>از زمان</span>
-                <input
-                  v-model="historyFromInput"
-                  type="datetime-local"
-                  :max="historyToInput || undefined"
-                  @input="activeHistoryPresetHours = null"
-                />
-              </label>
-              <label class="share-dialog__history-field">
-                <span>تا زمان</span>
-                <input
-                  v-model="historyToInput"
-                  type="datetime-local"
-                  :min="historyFromInput || undefined"
-                  @input="activeHistoryPresetHours = null"
-                />
-              </label>
+              <HistoryDateTimeField
+                v-model="historyFromInput"
+                label="از زمان"
+                :max="historyToInput"
+                @update:model-value="activeHistoryPresetHours = null"
+              />
+              <HistoryDateTimeField
+                v-model="historyToInput"
+                label="تا زمان"
+                :min="historyFromInput"
+                @update:model-value="activeHistoryPresetHours = null"
+              />
             </div>
 
             <v-text-field
@@ -313,6 +326,10 @@ import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
 import { createLocationHistoryShare, createLocationShare } from "@/api/location";
 import { isoToLocalInput, localInputToIso } from "@/history/playback";
+import { avatarInitial } from "@/live/avatar-initial";
+import { DURATION_SLIDER_MAX, minutesForSliderStep, sliderStepForMinutes } from "@/sharing/duration-slider";
+import HistoryDateTimeField from "@/components/sharing/HistoryDateTimeField.vue";
+import PublicProfileFacts from "@/components/sharing/PublicProfileFacts.vue";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
 import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-submission-fence";
@@ -482,21 +499,12 @@ function isSelected(candidate: UserSearchResult): boolean {
   return recipients.value.some((recipient) => recipient.id === candidate.id);
 }
 
-function subtitleFor(candidate: UserSearchResult): string {
-  const parts: string[] = [];
-  if (candidate.category) parts.push(candidate.category);
-  if (candidate.distance !== null) parts.push(`${candidate.distance} کیلومتر فاصله`);
-  if (candidate.avgRating !== null) parts.push(`امتیاز ${candidate.avgRating}`);
-  parts.push(candidate.isOnline ? "آنلاین" : "آفلاین");
-  return parts.join(" • ");
-}
-
 function deviceLabel(deviceId: string, index: number): string {
   return choiceDeviceOptionLabel(deviceId, knownDevices.value, index);
 }
 
 function toggle(candidate: UserSearchResult): void {
-  if (isSelf(candidate)) return;
+  if (isSelf(candidate) || (recipientsFull.value && !isSelected(candidate))) return;
   recipients.value = isSelected(candidate)
     ? removeRecipient(recipients.value, candidate.id)
     : addRecipient(recipients.value, candidate);
@@ -634,6 +642,8 @@ watch(
       formError.value = null;
       createdCount.value = 0;
       reusedCount.value = 0;
+      // A "recent" history preset must be relative to this opening, not component mount time.
+      if (activeHistoryPresetHours.value !== null) applyHistoryPreset(activeHistoryPresetHours.value);
       return;
     }
     invalidateSubmission();
@@ -719,12 +729,23 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__results {
-  margin-top: 0.5rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  display: grid;
+  gap: 0;
+  list-style: none;
+  padding: 0;
+  margin: 0.65rem 0 0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
   border-radius: var(--bb-radius-nested, 16px);
-  max-height: 15rem;
+  max-height: 22rem;
   overflow-y: auto;
 }
+
+.share-dialog__result { min-width: 0; padding: 0.8rem; }
+.share-dialog__result + .share-dialog__result { border-top: 1px solid rgba(var(--v-theme-on-surface), 0.14); }
+.share-dialog__result-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.55rem; }
+.share-dialog__result-header strong { min-width: 0; overflow-wrap: anywhere; font-size: 0.93rem; }
+.share-dialog__result-distance { color: var(--bb-color-muted); font-size: 0.8rem; margin: 0.4rem 0; }
+.share-dialog__result-action { margin-top: 0.55rem; min-height: 44px; }
 
 .share-dialog__selected {
   margin-top: 1rem;
@@ -747,42 +768,26 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   margin-top: 0.75rem;
 }
 
-.share-dialog__history-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  color: var(--bb-color-muted);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.share-dialog__history-field input {
-  min-height: 2.35rem;
-  padding: 0.35rem 0.6rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.24);
-  border-radius: 10px;
-  color: var(--bb-color-text);
-  background: transparent;
-  font: inherit;
-}
+.share-dialog__duration-value { margin: 0.7rem 0 0; color: var(--bb-color-text); font-weight: 700; font-size: 0.88rem; }
+.share-dialog__slider-limits { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: var(--bb-color-muted); }
 
 .share-dialog__presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
-  margin-top: 0.5rem;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
 }
 
 .share-dialog__chip {
-  min-height: 2.75rem;
-  padding: 0.35rem 0.85rem;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.6rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
   border-radius: 999px;
   background: rgba(var(--v-theme-on-surface), 0.03);
   color: var(--bb-color-text);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.76rem;
   font-weight: 700;
   transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }

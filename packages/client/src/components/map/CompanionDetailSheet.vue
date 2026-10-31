@@ -21,12 +21,7 @@
             <p>دریافت اطلاعات عمومی ممکن نشد.</p>
             <v-btn size="small" variant="tonal" @click="$emit('retry-profile')">تلاش دوباره</v-btn>
           </div>
-          <dl v-else-if="profile" class="companion-detail__facts">
-            <div><dt>نام کاربری</dt><dd>{{ profile.username }}</dd></div>
-            <div v-if="profile.category"><dt>دسته‌بندی</dt><dd>{{ profile.category }}</dd></div>
-            <div v-if="profile.avgRating !== null"><dt>میانگین امتیاز</dt><dd>{{ profile.avgRating.toLocaleString('fa-IR') }} از ۵</dd></div>
-            <div><dt>وضعیت حساب</dt><dd>{{ profile.isOnline ? 'آنلاین' : 'آفلاین' }}</dd></div>
-          </dl>
+          <PublicProfileFacts v-else-if="profile" :profile="profile" />
           <p v-else role="status">جزئیات عمومی بیشتری برای این همراه در دسترس نیست.</p>
         </div>
 
@@ -71,6 +66,7 @@ import type { ReverseGeocodeResult, UserSearchResult } from "@shared/index";
 import type { CompanionView } from "@/live/companion-locations";
 import { ageWords } from "@/live/companion-locations";
 import { avatarInitial } from "@/live/avatar-initial";
+import PublicProfileFacts from "@/components/sharing/PublicProfileFacts.vue";
 
 defineProps<{
   peer: CompanionView | null;

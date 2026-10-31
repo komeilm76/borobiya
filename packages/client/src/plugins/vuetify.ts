@@ -10,6 +10,9 @@ function getInitialThemeName(): "borobiyaLight" | "borobiyaDark" {
 }
 
 export const vuetify = createVuetify({
+  // The bundled native date adapter computes Gregorian months. Its default fa-IR labels
+  // would otherwise show Persian month names on Gregorian day grids (wrong dates).
+  date: { locale: { fa: "fa-IR-u-ca-gregory" } },
   locale: {
     locale: "fa",
     fallback: "en",

@@ -60,9 +60,11 @@ describe("companion map avatar and detail sheet", () => {
     expect(view).toContain('reversePlace({ lat: peer.position[1], lon: peer.position[0] }');
     expect(view).toContain('profileController?.abort()');
     expect(view).toContain('placeController?.abort()');
-    expect(sheet).toContain('profile.category');
-    expect(sheet).toContain('profile.avgRating');
-    expect(sheet).toContain('profile.isOnline');
+    const facts = readFileSync(new URL("../../components/sharing/PublicProfileFacts.vue", import.meta.url), "utf8");
+    expect(sheet).toContain('<PublicProfileFacts v-else-if="profile" :profile="profile" />');
+    expect(facts).toContain('profile.category');
+    expect(facts).toContain('profile.avgRating');
+    expect(facts).toContain('profile.isOnline');
     expect(sheet).toContain('place.formattedAddress');
     expect(sheet).toContain('place.city');
     expect(sheet).toContain('place.country');
