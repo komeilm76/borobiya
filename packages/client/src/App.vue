@@ -109,6 +109,7 @@
       aria-labelledby="logout-confirm-title"
       aria-describedby="logout-confirm-description"
       @update:model-value="(visible: boolean) => { if (!visible) logoutConfirmation.cancel(); }"
+      @after-leave="restoreLogoutFocus"
     >
       <v-card rounded="xl">
         <v-card-title id="logout-confirm-title">خروج از حساب کاربری؟</v-card-title>
@@ -264,6 +265,15 @@ const logoutConfirmation = useLogoutConfirmation({
   logout: () => auth.logout(),
   onLoggedOut: () => router.replace("/_auth/login")
 });
+
+function restoreLogoutFocus(): void {
+  // The confirmation dialog has two different openers but no VDialog activator;
+  // without an explicit target, Cancel leaves focus on its now-removed button.
+  // Do not steal focus after a successful sign-out or while another dialog is open.
+  if (!auth.isAuthenticated || logoutConfirmation.open.value || logoutConfirmation.submitting.value) return;
+  const selector = isMapRoute.value ? ".map-sidebar__menu-button" : ".account-profile__trigger";
+  document.querySelector<HTMLButtonElement>(selector)?.focus({ preventScroll: true });
+}
 
 async function openAlertOnMap(): Promise<void> {
   const alertId = adminSos.latestAlert?.id;

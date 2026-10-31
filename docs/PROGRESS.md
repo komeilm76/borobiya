@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Restore keyboard focus after cancelling logout (map sidebar follow-up)
+
+- A mocked-session Chromium audit of the new map sidebar at 320×568, 568×320 and 1024×768 found that cancelling the shared logout confirmation left keyboard focus on the page body: the dialog has no activator to return to after its Cancel button disappears. The shared dialog now restores focus after its exit transition to the map menu launcher or, on other pages, the account-profile trigger. It does not steal focus while another confirmation is open or after a successful sign-out. A source-pinned regression failed before the fix; mocked Chromium confirmed focus return for both map and regular-page menus, theme selection, navigation and no page exceptions. This is not a live backend, phone or screen-reader validation.
+
 ### 2026-10-31 — Map-only sidebar replaces the app bar (T4.4.1 follow-up)
 
 - On `/_user/map` only, removed the shared app bar and its redundant «نقشهٔ همراهان» heading. A single safe-area-aware icon at the physical top-left opens a left-anchored, scrollable dialog-sidebar with the existing page destinations, account name/role/groups, system/light/dark selection and the existing confirmed logout; backdrop, Escape/Back and Close dismiss it. Other pages retain their app bar, profile menu and guest login. The map occupies the viewport on phone and desktop, while tablet cards remain scrollable in flow below the launcher. Desktop search moves down out of the icon's hit area; phone native zoom uses the opposite corner and attribution stays below the launcher. SOS, the three full-size phone dialogs and the map dock remain available. Source/compiled-style tests, client checks and build cover structure and responsive safety; real rendered-browser/phone, keyboard focus and screen-reader review remain open.

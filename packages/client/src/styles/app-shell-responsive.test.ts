@@ -28,6 +28,11 @@ describe("global shell at narrow widths", () => {
     expect(app).toContain('<v-card-actions class="logout-confirm-actions">');
     expect(app).toContain(':disabled="logoutConfirmation.submitting.value" @click="logoutConfirmation.cancel()"');
     expect(app).toContain('@click="logoutConfirmation.confirm()"');
+    // VDialog has no activator of its own: cancel must return keyboard focus to
+    // whichever menu opened confirmation, not leave it on a removed dialog button.
+    expect(app).toContain('@after-leave="restoreLogoutFocus"');
+    expect(app).toContain('isMapRoute.value ? ".map-sidebar__menu-button" : ".account-profile__trigger"');
+    expect(app).toContain('if (!auth.isAuthenticated || logoutConfirmation.open.value || logoutConfirmation.submitting.value) return;');
     const phone = app.split("@media (max-width: 599px) {")[1]?.split("\n}")[0];
     expect(phone).toBeDefined();
     expect(phone).toContain(".logout-confirm-actions { flex-direction: column; align-items: stretch;");
