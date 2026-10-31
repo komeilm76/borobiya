@@ -58,6 +58,8 @@ describe("client auth navigation guard", () => {
       .toBe("/_user/dashboard");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "/_auth/register" }), auth))
       .toBe("/_user/dashboard");
+    expect(resolveAuthNavigation(location("/auth/forgot-password"), auth)).toBe("/_user/dashboard");
+    expect(resolveAuthNavigation(location("/authentic"), auth)).toBe(true);
   });
 
   it("requires an admin role for admin pages", () => {
@@ -80,6 +82,10 @@ describe("client auth navigation guard", () => {
     expect(resolvePostLoginDestination("/_admin/dashboard?tab=overview", auth)).toBe("/_admin/dashboard?tab=overview");
     expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/users");
     expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("/auth/register", auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("/_auth?registered=1", auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("/\\\\attacker.example", auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/users");
   });
 
   it("restores auth state before navigating to a guest-only or protected page", async () => {

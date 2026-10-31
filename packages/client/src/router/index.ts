@@ -1,3 +1,4 @@
+import { watch } from "vue";
 import {
   createRouter,
   createWebHistory,
@@ -6,7 +7,7 @@ import {
 } from "vue-router";
 import { pinia } from "../stores";
 import { useAuthStore } from "../stores/auth";
-import { createAuthGuard, type AuthGuardState } from "./guards";
+import { createAuthGuard, isGuestOnlyPath, resolvePostLoginDestination, type AuthGuardState } from "./guards";
 
 export const routeRecords: RouteRecordRaw[] = [
   { path: "/", redirect: "/_public/landing" },
@@ -32,16 +33,19 @@ export const routeRecords: RouteRecordRaw[] = [
   },
   {
     path: "/_auth/login",
+    alias: "/auth/login",
     name: "auth-login",
     component: () => import("@client/views/_auth/LoginView.vue")
   },
   {
     path: "/_auth/register",
+    alias: "/auth/register",
     name: "auth-register",
     component: () => import("@client/views/_auth/RegisterView.vue")
   },
   {
     path: "/_auth/forgot-password",
+    alias: "/auth/forgot-password",
     name: "auth-forgot-password",
     component: () => import("@client/views/_auth/ForgotPasswordView.vue")
   },
@@ -150,5 +154,20 @@ export function createAppRouter(
 ) {
   const router = createRouter({ history, routes: routeRecords });
   router.beforeEach(createAuthGuard(auth));
+  // A guard runs only when navigation occurs. A session can also arrive while a guest
+  // view is already open (e.g. a late cookie refresh); don't leave that view visible.
+  watch(
+    () => [auth.isAuthenticated, auth.mustCompleteSecurityQuestions] as const,
+    ([authenticated, onboarding]) => {
+      if (!authenticated) return;
+      const current = router.currentRoute.value;
+      if (onboarding && current.path !== "/_user/complete-security-questions") {
+        void router.replace("/_user/complete-security-questions");
+      } else if (isGuestOnlyPath(current.path)) {
+        void router.replace(resolvePostLoginDestination(current.query.redirect, auth));
+      }
+    },
+    { flush: "post" }
+  );
   return router;
 }

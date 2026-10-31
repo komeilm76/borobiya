@@ -138,6 +138,9 @@ async function submitLogin(): Promise<void> {
   }
 
   submitting.value = true;
+  // Session restoration can redirect an already-open auth view while login is in flight.
+  // Keep the original return path rather than reading the now-changed route afterwards.
+  const returnTo = route.query.redirect;
   try {
     // The device label a native build reports (spec §7.3) is looked up only once the credentials have
     // parsed, and it can never cost anyone their login: `loginDeviceName()` resolves to `undefined` on
@@ -146,7 +149,7 @@ async function submitLogin(): Promise<void> {
     // reports something absurd is bounded before it leaves the browser.
     const deviceName = await loginDeviceName();
     await auth.login(deviceName ? { ...parsed.data, deviceName } : parsed.data);
-    await router.replace(resolvePostLoginDestination(route.query.redirect, auth));
+    await router.replace(resolvePostLoginDestination(returnTo, auth));
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ورود انجام نشد. دوباره تلاش کنید.");
   } finally {

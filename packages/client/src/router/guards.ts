@@ -1,5 +1,5 @@
 import type { AuthUser } from "@shared/index";
-import type { LocationQuery, RouteLocationRaw, RouteLocationNormalized } from "vue-router";
+import type { RouteLocationRaw, RouteLocationNormalized } from "vue-router";
 
 const LOGIN_PATH = "/_auth/login";
 const DASHBOARD_PATH = "/_user/dashboard";
@@ -15,8 +15,9 @@ export interface AuthGuardState {
 
 export type AuthGuardLocation = Pick<RouteLocationNormalized, "path" | "fullPath" | "query">;
 
-function isGuestOnlyPath(path: string): boolean {
-  return path === "/_auth" || path.startsWith("/_auth/");
+export function isGuestOnlyPath(path: string): boolean {
+  // The short /auth/* URLs are aliases for the canonical /_auth/* views.
+  return ["/_auth", "/auth"].some((root) => path === root || path.startsWith(`${root}/`));
 }
 
 function isAdminPath(path: string): boolean {
@@ -32,16 +33,12 @@ function safeRedirectPath(candidate: unknown): string | null {
     typeof candidate !== "string" ||
     !candidate.startsWith("/") ||
     candidate.startsWith("//") ||
-    candidate === "/_auth" ||
-    candidate.startsWith("/_auth/")
+    /[\\\u0000-\u001f\u007f]/.test(candidate) ||
+    isGuestOnlyPath(candidate.split(/[?#]/, 1)[0] ?? "")
   ) {
     return null;
   }
   return candidate;
-}
-
-function safeRedirect(query: LocationQuery): string | null {
-  return safeRedirectPath(query.redirect);
 }
 
 export function resolvePostLoginDestination(
@@ -63,8 +60,7 @@ export function resolveAuthNavigation(
   }
 
   if (isGuestOnlyPath(to.path) && auth.isAuthenticated) {
-    if (auth.mustCompleteSecurityQuestions) return ONBOARDING_PATH;
-    return safeRedirect(to.query) ?? DASHBOARD_PATH;
+    return resolvePostLoginDestination(to.query.redirect, auth);
   }
 
   if (!isProtectedPath(to.path)) return true;
