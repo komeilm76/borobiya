@@ -100,6 +100,11 @@
       @change-theme="appTheme.setPreference"
       @request-logout="logoutConfirmation.request()"
     />
+    <MapProposalSidebar
+      v-if="isMapRoute && auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions"
+      :inbox="proposalInbox"
+      :user-id="auth.user.id"
+    />
 
     <v-dialog
       :model-value="logoutConfirmation.open.value"
@@ -201,6 +206,7 @@ import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
 import MapSidebar from "./components/shell/MapSidebar.vue";
+import MapProposalSidebar from "./components/shell/MapProposalSidebar.vue";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
 import { useLogoutConfirmation } from "./composables/use-logout-confirmation";

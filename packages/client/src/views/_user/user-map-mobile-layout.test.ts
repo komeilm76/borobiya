@@ -200,7 +200,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain("safe-area-inset-bottom");
     expect(phoneMap).toContain(".maplibregl-ctrl-top-right");
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right");
-    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*top: calc\(0\.75rem[^}]*right: calc\(0\.75rem/);
+    expect(phoneMap).toMatch(/\.maplibregl-ctrl-top-right\)\s*\{[^}]*top: calc\(4\.5rem[^}]*right: calc\(0\.75rem/);
     expect(phoneMap).toMatch(/\.maplibregl-ctrl-bottom-right\)\s*\{[^}]*top: calc\(4\.5rem[^}]*bottom: auto;/);
     expect(phoneMap).toContain(".maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib");
     expect(phoneMap).toContain("max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));"); // Real OSM/OpenMapTiles credit must not cover zoom.

@@ -1172,7 +1172,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__playback {
   position: absolute;
   z-index: 2;
-  inset-block-start: 1rem;
+  /* The right-hand notifications launcher needs its own 48px hit area. */
+  inset-block-start: calc(5rem + env(safe-area-inset-top, 0px));
   inset-inline-start: 1rem;
   width: min(24rem, calc(100% - 2rem));
   max-height: calc(100% - 2rem);
@@ -1372,9 +1373,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* Native zoom/compass use the physical right lane opposite the left menu. */
+  /* Zoom/compass sit below the right bell; the left attribution stays below
+   * the menu. Both remain available without covering either launcher. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: calc(0.75rem + env(safe-area-inset-top, 0px));
+    top: calc(4.5rem + env(safe-area-inset-top, 0px));
     right: calc(0.75rem + env(safe-area-inset-right, 0px));
     left: auto;
     width: 132px;

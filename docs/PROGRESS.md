@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Separate map proposal sidebar (T3.4.2 follow-up)
+
+- Added a top-right notification bell on `/_user/map` for eligible signed-in users, distinct from the top-left navigation sidebar. Its right-hand, safe-area-aware dialog previews pending mission proposals using the existing user-scoped inbox (including count, severity, timestamp, requester and description) with loading, empty, failed-refresh and paginated states. Proposal links navigate to the guarded `/_user/proposals?offer=…` detail/decision screen; non-map pages retain their original bell. Phone zoom and desktop History controls now clear the new launcher. Source/compiled-CSS and existing map tests pass; mocked-session Chromium at 320×568 (light and dark), 568×320 and 1024×768 confirmed the panel, paging, refresh failure, Escape/focus return and no horizontal overflow. Live backend, physical phone, screen reader and real safe-area insets remain unverified.
+
 ### 2026-10-31 — Restore keyboard focus after cancelling logout (map sidebar follow-up)
 
 - A mocked-session Chromium audit of the new map sidebar at 320×568, 568×320 and 1024×768 found that cancelling the shared logout confirmation left keyboard focus on the page body: the dialog has no activator to return to after its Cancel button disappears. The shared dialog now restores focus after its exit transition to the map menu launcher or, on other pages, the account-profile trigger. It does not steal focus while another confirmation is open or after a successful sign-out. A source-pinned regression failed before the fix; mocked Chromium confirmed focus return for both map and regular-page menus, theme selection, navigation and no page exceptions. This is not a live backend, phone or screen-reader validation.
