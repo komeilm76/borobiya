@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { usePointRoute, pointDistance } from "./use-point-route";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import type { OwnMapFix } from "./use-own-map-position";
+import type { GeocodeResult } from "@shared/index";
+
+const poi: GeocodeResult = { placeId: "poi-azadi", name: "میدان آزادی", address: "تهران، میدان آزادی",
+  lat: 40, lon: -120, type: "میدان" };
 
 const polyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@";
 const short = { polyline, distance_m: 4000, duration_s: 600 } satisfies RouteChoice;
@@ -84,7 +88,7 @@ describe("private point-to-point route", () => {
   });
   it("uses a selected search result's trusted title and address without a redundant reverse lookup", async () => {
     const { journey, select, close, scope } = setup();
-    journey.select({ lat: 40, lon: -120 }, { name: "  میدان آزادی  ", address: "  تهران، میدان آزادی  " });
+    journey.select({ lat: 40, lon: -120 }, { ...poi, name: "  میدان آزادی  ", address: "  تهران، میدان آزادی  " });
     await nextTick(); await Promise.resolve();
     expect(journey.sheetOpen.value).toBe(true);
     expect(journey.title.value).toBe("میدان آزادی");
@@ -99,6 +103,32 @@ describe("private point-to-point route", () => {
     expect(select).toHaveBeenCalledWith(39, -121);
     expect(journey.title.value).toBe("نقطهٔ انتخاب‌شده");
     expect(close).toHaveBeenCalled();
+    scope.stop();
+  });
+  it("retains a selected POI's full details after search refresh, but clears them on new selection or logout", async () => {
+    const { journey, owner, select, scope } = setup();
+    const searchList = ref<GeocodeResult[]>([poi]);
+    journey.select({ lat: poi.lat, lon: poi.lon }, searchList.value[0]);
+    searchList.value = []; // Viewport/search replacement must not remove the selected route's POI details.
+    expect(journey.knownPlace.value?.placeId).toBe("poi-azadi");
+    expect(journey.knownPlace.value?.type).toBe("میدان");
+    expect(journey.address.value).toBe(poi.address);
+    expect(select).not.toHaveBeenCalled();
+    journey.select({ lat: 38.51, lon: -120.1 });
+    expect(journey.knownPlace.value).toBeNull();
+    journey.select({ lat: poi.lat, lon: poi.lon }, poi);
+    owner.value = null;
+    expect(journey.point.value).toBeNull();
+    expect(journey.knownPlace.value).toBeNull();
+    scope.stop();
+  });
+  it("keeps valid route alternatives when another candidate has corrupt geometry", async () => {
+    const { journey, scope } = setup(async () => [{ ...short, polyline: "invalid!" }, fast]);
+    journey.select({ lat: poi.lat, lon: poi.lon });
+    await nextTick(); await Promise.resolve();
+    expect(journey.error.value).toBeNull();
+    expect(journey.routes.value).toEqual([fast]);
+    expect(journey.selectedRoute.value).toEqual(fast);
     scope.stop();
   });
   it("calculates proximity in metres and rejects invalid point selection", () => {

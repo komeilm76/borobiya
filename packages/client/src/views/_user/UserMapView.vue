@@ -101,7 +101,7 @@
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>
     <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
-      :can-show-place-details="isSelectedSearchDestination" @start="startPointNavigation" @details="openSelectedPlaceDetail" />
+      :can-show-place-details="!!destinationSearchPlace" @start="startPointNavigation" @details="openSelectedPlaceDetail" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -127,7 +127,7 @@
       </v-card>
     </component>
 
-    <PlaceDetailSheet :place="placeDetailOpen ? selectedSearchPlace : null"
+    <PlaceDetailSheet :place="placeDetailOpen ? destinationSearchPlace : null"
       @close="closePlaceDetail" @after-leave="onPlaceDetailAfterLeave" />
 
     <!-- History needs the full phone viewport for range, transport and scrub controls.
@@ -546,11 +546,18 @@ const placeDetailOpen = ref(false);
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
   placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
-const isSelectedSearchDestination = computed(() => !!journey.point.value && !!journey.knownPlace.value &&
-  !!selectedSearchPlace.value && journey.point.value.lat === selectedSearchPlace.value.lat &&
-  journey.point.value.lon === selectedSearchPlace.value.lon &&
-  journey.knownPlace.value.name === selectedSearchPlace.value.name &&
-  journey.knownPlace.value.address === selectedSearchPlace.value.address);
+// Search results are scoped to a moving viewport. Keep the selected POI facts with
+// the route, not with a list that can be pruned while the detail sheet is open.
+const destinationSearchPlace = computed(() => {
+  const place = journey.knownPlace.value, point = journey.point.value;
+  return place && point && place.lat === point.lat && place.lon === point.lon ? place : null;
+});
+const isSelectedSearchDestination = computed(() => !!destinationSearchPlace.value &&
+  !!selectedSearchPlace.value && selectedSearchPlace.value.placeId === destinationSearchPlace.value.placeId &&
+  selectedSearchPlace.value.lat === destinationSearchPlace.value.lat &&
+  selectedSearchPlace.value.lon === destinationSearchPlace.value.lon &&
+  selectedSearchPlace.value.name === destinationSearchPlace.value.name &&
+  selectedSearchPlace.value.address === destinationSearchPlace.value.address);
 let restorePlaceFocus = false;
 function closePlaceDetail(restoreFocus = true): void {
   restorePlaceFocus = restoreFocus && placeDetailOpen.value;
@@ -560,15 +567,13 @@ function onPlaceDetailAfterLeave(): void {
   const shouldRestore = restorePlaceFocus;
   restorePlaceFocus = false;
   if (!shouldRestore || placeDetailOpen.value || activeTool.value || selectedCompanionId.value ||
-      !selectedSearchPlace.value) return;
-  if (isSelectedSearchDestination.value) { journey.sheetOpen.value = true; return; }
-  if (!journey.sheetOpen.value) selectedPlaceMarker?.getElement().focus({ preventScroll: true });
+      !destinationSearchPlace.value) return;
+  journey.sheetOpen.value = true;
 }
 function openSelectedPlaceDetail(): void {
-  if (!selectedSearchPlace.value || !auth.user?.id || !map.value) return;
+  if (!destinationSearchPlace.value || !auth.user?.id || !map.value) return;
   removeSelectedCompanion();
-  if (isSelectedSearchDestination.value) journey.sheetOpen.value = false;
-  else journey.clear();
+  journey.sheetOpen.value = false;
   restorePlaceFocus = false;
   placeDetailOpen.value = true;
 }
@@ -604,20 +609,16 @@ function syncSelectedPlaceMarker(): void {
   selectedPlaceMarker.getElement().setAttribute("title", place.name);
 }
 watch(() => isSelectedSearchDestination.value, syncSelectedPlaceMarker);
+watch(() => destinationSearchPlace.value, (place) => { if (!place) closePlaceDetail(false); }, { flush: "sync" });
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
   syncResultMarkers();
-  if (!selectedSearchPlace.value) closePlaceDetail(false);
 }, { flush: "sync" });
 watch(() => placeSearch.mapResults.value, () => {
   syncResultMarkers();
   syncSelectedPlaceMarker();
-  if (!selectedSearchPlace.value) closePlaceDetail(false);
 }, { flush: "sync" });
-watch(() => placeSearch.results.value, () => {
-  syncSelectedPlaceMarker();
-  if (!selectedSearchPlace.value) closePlaceDetail(false);
-}, { flush: "sync" });
+watch(() => placeSearch.results.value, syncSelectedPlaceMarker, { flush: "sync" });
 
 function selectPlace(place: GeocodeResult, fromMap = false): void {
   const instance = map.value;
@@ -642,7 +643,7 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // Keep results mounted; a later query refresh must not change this destination.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
   closePlaceDetail(false); removeSelectedCompanion();
-  journey.select({ lat: place.lat, lon: place.lon }, { name: place.name, address: place.address });
+  journey.select({ lat: place.lat, lon: place.lon }, place);
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
