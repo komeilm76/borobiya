@@ -42,6 +42,7 @@ export const implementedOperationIds: ReadonlySet<string> = new Set([
   "adminDispatchSosRequest",
   "userCompleteSecurityQuestions",
   "userListDevices",
+  "userRevokeDevice",
   "userSearch",
   "locationCreateShare",
   "locationCreateHistoryShare",

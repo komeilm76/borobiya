@@ -16,8 +16,8 @@ describe("shared km-api route descriptors", () => {
   });
 
   it("registers the documented REST surface with unique operation IDs and method/URL pairs", () => {
-    // 69 routes: T4.3.4 activates the existing sync descriptor without adding a new one.
-    expect(allApiRoutes).toHaveLength(69);
+    // 70 routes: remote-session termination adds one owner-scoped DELETE to the documented surface.
+    expect(allApiRoutes).toHaveLength(70);
     const operationIds = allApiRoutes.map((route) => route.meta.operationId);
     const methodUrls = allApiRoutes.map((route) => `${route.method} ${route.url}`);
 
@@ -53,6 +53,15 @@ describe("shared km-api route descriptors", () => {
     // T2.1.3 revocation returns an empty body and must document the ownership-safe 404.
     expect(Object.keys(route.schema.responses)).toEqual(["200", "400", "401", "403", "404", "409", "429"]);
     expect(route.meta.description).toContain("SHARE_NOT_FOUND");
+  });
+
+  it("scopes remote-session termination to a validated session id", () => {
+    const route = apiRoutes.user.revokeDevice;
+    expect(route.method).toBe("DELETE");
+    expect(route.schema.params?.safeParse({ sessionId: "not-a-uuid" }).success).toBe(false);
+    expect(route.makeFullPath({ sessionId: "00000000-0000-4000-8000-000000000001" }))
+      .toBe("/_user/devices/00000000-0000-4000-8000-000000000001");
+    expect(route.schema.responses[404]).toBeDefined();
   });
 
   it("converts OpenAPI placeholders for Fastify routes with static suffixes", () => {

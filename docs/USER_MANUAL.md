@@ -205,11 +205,11 @@ If you are logged in on **two devices** (e.g., phone + laptop):
 2. Choose a device (e.g., “Samsung S23”) → **Confirm**.
 3. Only that device’s GPS is used; the other is ignored.
 
-Manage at **`/_user/devices`** (linked from the map menu and Location Sharing page): a table of the account's **live sessions** — device label, online/offline, minutes since last activity, IP, and how many of your shares each one is currently broadcasting — plus a chooser per share and an “apply to all” action.
+Manage the broadcaster on **`/_user/location-shares`**: choose the **اشتراک‌های من** tab, then choose a device beside each live recipient and press **اعمال**. A confirmation lets you assign the current device to all eligible live shares; partial failures are reported. The **از دیگران** tab lists live and history access others gave you. Expired shares cannot be silently restarted through the device selector.
 
-[Screenshot: Priority device modal + Devices table]
+See **`/_user/devices`** for the account's **currently signed-in sessions**, their device labels, connection status, last activity and last credential-exchange IP. IP is not a verified physical location. To end another session, press **پایان نشست** and confirm; its access token and live socket stop working. If it was broadcasting, check the affected share pins afterward. Use **خروج** in the account menu to end this current session. Sessions that already logged out are not shown as login history.
 
-Two things this screen will not do, both of them deliberate:
+Two things these controls will not do, both of them deliberate:
 
 - **It does not extend a share.** Changing the device of a timed share keeps the expiry exactly where it is; if it were to run out in under a minute, the change is refused and you are told to open a fresh share instead.
 - **It lists live sessions only.** A device you have logged out of is absent rather than shown as “offline”, and a share still pinned to a device that just left keeps showing that id as “no longer in the list” until the server re-points it (or you choose a new one).
@@ -410,7 +410,8 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 | Forgot password | `/_auth/forgot-password` |
 | Location Shares | `/_user/location-shares` |
 | Full map (live companions + playback) | `/_user/map` |
-| Active Devices & Priority Device | `/_user/devices` |
+| Active sessions and termination | `/_user/devices` |
+| Broadcaster for each location share | `/_user/location-shares` → اشتراک‌های من |
 | Rescue proposals (map bell) | `/_user/map` |
 | Active rescuer mission | `/_user/mission` |
 | SOS request history & cancellation | `/_user/sos-history` |

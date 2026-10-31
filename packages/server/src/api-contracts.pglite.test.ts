@@ -1176,6 +1176,31 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
     expect((await app.inject({ method: "GET", headers: requesterHeaders,
       url: `${apiRoutes.sos.sync.url}?since=${encodeURIComponent(new Date(Date.now() - 31 * 86400_000).toISOString())}` })).statusCode).toBe(400);
 
+    // Terminate a second login after the mission/sharing checks so revocation cannot change their setup.
+    // This runs the real Drizzle write against migrated PGlite, not an injected store stub.
+    const remoteLogin = await callContract<{ accessToken: string }>(apiRoutes.auth.login, 200, {
+      url: apiRoutes.auth.login.url,
+      payload: { username: "field_requester", password: "NewPassword99", deviceName: "Other browser" }
+    });
+    const sessionsBefore = await callContract<Array<{ id: string; isCurrentDevice: boolean }>>(
+      apiRoutes.user.devices, 200, { url: apiRoutes.user.devices.url, headers: requesterHeaders }
+    );
+    const currentSession = sessionsBefore.find(row => row.isCurrentDevice)!;
+    const remoteSession = sessionsBefore.find(row => !row.isCurrentDevice)!;
+    const targetPath = (id: string) => apiRoutes.user.revokeDevice.makeFullPath({ sessionId: id });
+    expect((await app.inject({ method: "DELETE", url: targetPath(currentSession.id), headers: requesterHeaders })).statusCode).toBe(403);
+    expect((await app.inject({ method: "DELETE", url: targetPath(responderDevices[0]!.id), headers: requesterHeaders })).statusCode).toBe(404);
+    await callContract(apiRoutes.user.revokeDevice, 200, {
+      url: targetPath(remoteSession.id), headers: requesterHeaders
+    });
+    expect((await app.inject({ method: "GET", url: apiRoutes.user.me.url,
+      headers: { authorization: `Bearer ${remoteLogin.accessToken}` } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "DELETE", url: targetPath(remoteSession.id), headers: requesterHeaders })).statusCode).toBe(404);
+    const sessionsAfter = await callContract<Array<{ id: string }>>(
+      apiRoutes.user.devices, 200, { url: apiRoutes.user.devices.url, headers: requesterHeaders }
+    );
+    expect(sessionsAfter.map(row => row.id)).not.toContain(remoteSession.id);
+
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);
 

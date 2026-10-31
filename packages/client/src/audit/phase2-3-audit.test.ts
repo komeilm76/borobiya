@@ -325,7 +325,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
       new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url),
       "utf8"
     );
-    expect(devicePriorityPanel).toContain('if (minutes <= 0) return "همین الان"');
+    expect(devicePriorityPanel).toContain('minutes <= 0 ? "همین الان"');
   });
 
   it("useAdminSosStore hydrates cancelled_by_rescuer + dispatched counts accurately on initial load and prefers visible requests", async () => {

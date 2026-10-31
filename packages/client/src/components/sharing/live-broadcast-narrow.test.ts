@@ -20,14 +20,13 @@ describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)"
     expect(narrow).toMatch(/\.broadcast-bar__actions \{[^}]*grid-column: 1 \/ -1;[^}]*width: 100%;/);
   });
 
-  it("keeps both device and toggle actions reachable with wrapping 44px targets in all status states", () => {
+  it("keeps the toggle action reachable with wrapping 44px targets in all status states", () => {
     const unsupported = describeBroadcastState({
       status: "idle", lastErrorCode: null, peerCount: 0, isSupported: false,
       priority: { hasMultipleDevices: true, broadcastingCount: 0, ignoredCount: 0, hasShares: false }
     });
-    expect(unsupported.showDevicesLink).toBe(true);
     expect(unsupported.actionLabel.length).toBeGreaterThan(20);
-    expect(bar).toContain('v-if="state.showDevicesLink"');
+    expect(bar).not.toContain('to="/_user/devices"');
     expect(bar).not.toContain("mapMode");
     expect(bar).toContain('@click="broadcast.toggle()"');
     expect(bar).toContain(':disabled="!broadcast.isSupported"');

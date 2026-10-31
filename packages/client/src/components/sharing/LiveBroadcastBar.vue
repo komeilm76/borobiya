@@ -13,15 +13,6 @@
       </div>
       <div class="broadcast-bar__actions">
         <v-btn
-          v-if="state.showDevicesLink"
-          size="small"
-          variant="text"
-          color="primary"
-          to="/_user/devices"
-        >
-          دستگاه‌ها
-        </v-btn>
-        <v-btn
           size="small"
           :color="state.isActive ? 'error' : 'primary'"
           :variant="state.isActive ? 'tonal' : 'flat'"

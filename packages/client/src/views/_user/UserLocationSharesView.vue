@@ -8,14 +8,10 @@
         </p>
         <h1 id="user-shares-title">اشتراک موقعیت</h1>
         <p class="user-shares-page__lead">
-          پخش زندهٔ موقعیت، اشتراک‌های مدت‌دار یا دائمی، و بازه‌های تاریخچهٔ مسیر خود را از یکجا مدیریت کنید.
+          ببینید چه کسانی موقعیت شما را می‌بینند، دستگاه پخش‌کنندهٔ هر همراه را تغییر دهید و دسترسی‌ها را مدیریت کنید.
         </p>
       </div>
       <div class="user-shares-page__actions">
-        <v-btn to="/_user/devices" variant="tonal" color="primary" rounded="lg" size="small">
-          <v-icon class="me-1" icon="mdi-devices" size="18" />
-          دستگاه‌ها
-        </v-btn>
         <v-btn to="/_user/map" variant="flat" color="primary" rounded="lg" size="small">
           <v-icon class="me-1" icon="mdi-map-outline" size="18" />
           نقشهٔ همراهان
@@ -25,7 +21,7 @@
 
     <div class="user-shares-page__stack">
       <LiveBroadcastBar />
-      <ShareLists ref="shareLists" @create="shareOpen = true" @changed="onSharesChanged" />
+      <ShareLists ref="shareLists" :device-settings="deviceSettings" @create="shareOpen = true" @changed="onSharesChanged" />
     </div>
 
     <ShareDialog v-model="shareOpen" @shared="onShared" />
@@ -33,22 +29,33 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { useDeviceSettings } from "@/composables/use-device-settings";
+import { useAuthStore } from "@/stores/auth";
 import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import ShareDialog from "@/components/sharing/ShareDialog.vue";
 import ShareLists from "@/components/sharing/ShareLists.vue";
 import { useBroadcastStore } from "@/stores/broadcast";
 
+const auth = useAuthStore();
+const deviceSettings = useDeviceSettings({
+  accessToken: computed(() => auth.accessToken),
+  accountId: computed(() => auth.user?.id ?? null),
+  ensureSession: () => auth.ensureSession()
+});
+onMounted(() => { void deviceSettings.refresh(); });
 const broadcast = useBroadcastStore();
 const shareOpen = ref(false);
 const shareLists = ref<{ refresh: () => Promise<void> } | null>(null);
 
 function onShared(): void {
   void shareLists.value?.refresh();
+  void deviceSettings.refresh();
   void broadcast.refreshPriority();
 }
 
 function onSharesChanged(): void {
+  void deviceSettings.refresh();
   void broadcast.refreshPriority();
 }
 </script>

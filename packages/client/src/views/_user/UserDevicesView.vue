@@ -13,7 +13,7 @@
       </v-btn>
       <div class="user-devices__title-block">
         <p>تنظیمات حساب</p>
-        <h1 id="user-devices-title">دستگاه‌ها و پخش موقعیت</h1>
+        <h1 id="user-devices-title">دستگاه‌های واردشده</h1>
       </div>
       <v-chip v-if="auth.isAuthenticated && settings.loaded.value && !settings.failed.value && !settings.loading.value"
         class="user-devices__count" size="small" variant="tonal" color="primary">
@@ -22,11 +22,13 @@
     </header>
 
     <p class="user-devices__intro">
-      وقتی با دو دستگاه وارد شده‌اید، فقط دستگاهی که به‌عنوان پخش‌کننده انتخاب می‌کنید موقعیت می‌فرستد؛
-      بقیهٔ دستگاه‌ها موقعیت نمی‌فرستند، هرچند وارد حساب باشند. این انتخاب را می‌توانید هر زمان عوض کنید —
-      تغییر دستگاه، مدت اشتراک را زیاد یا کم نمی‌کند.
+      نشست‌های فعلی حساب را از دستگاه‌های مختلف ببینید و دسترسی دستگاه‌های دیگر را در صورت نیاز قطع کنید.
+      IP نشان‌دهندهٔ محل دقیق ورود نیست. انتخاب دستگاه پخش‌کنندهٔ هر همراه در صفحهٔ اشتراک موقعیت انجام می‌شود.
     </p>
 
+    <v-btn class="user-devices__shares-link" to="/_user/location-shares" variant="tonal" color="primary" prepend-icon="mdi-account-multiple-outline">
+      مدیریت اشتراک‌های موقعیت و دستگاه پخش‌کننده
+    </v-btn>
     <DevicePriorityPanel :api="settings" />
   </section>
 </template>
@@ -38,18 +40,18 @@ import { useDeviceSettings } from "@/composables/use-device-settings";
 import { useAuthStore } from "@/stores/auth";
 
 /**
- * The Active Devices screen (spec §7.3, T2.3.5). Everything the user can decide here is a call into
- * `useDeviceSettings`; this file only owns the mount-time refresh and the framing copy, so there is no
- * screen-local rule to lose.
+ * The session screen reads only active sessions. Per-person broadcast pins belong on the share screen;
+ * session termination is confirmed in the device panel and verified by the server.
  */
 const auth = useAuthStore();
 const settings = useDeviceSettings({
   accessToken: computed(() => auth.accessToken),
   accountId: computed(() => auth.user?.id ?? null),
-  ensureSession: () => auth.ensureSession()
+  ensureSession: () => auth.ensureSession(),
+  includeShares: false
 });
 
-const deviceCount = computed(() => `${settings.devices.value.length.toLocaleString("fa-IR")} دستگاه`);
+const deviceCount = computed(() => `${settings.devices.value.length.toLocaleString("fa-IR")} نشست`);
 
 onMounted(() => {
   void settings.refresh();
@@ -63,6 +65,9 @@ onMounted(() => {
   gap: 1rem;
   padding: 1.25rem clamp(0.85rem, 3vw, 2rem) 2.5rem;
 }
+
+.user-devices__shares-link { align-self: flex-start; min-height: 44px; }
+@media (max-width: 599px) { .user-devices__shares-link { align-self: stretch; } }
 
 .user-devices__header {
   display: flex;

@@ -42,6 +42,8 @@ export interface UseDeviceSettingsOptions {
   /** The displayed account, paired with JWT session ID to distinguish login switches from bearer renewal. */
   accountId?: ComputedRef<string | null> | Ref<string | null>;
   ensureSession?: () => Promise<void>;
+  /** Sessions screen needs only sessions; share management also needs owner pins. */
+  includeShares?: boolean;
 }
 
 const faNumber = (value: number) => value.toLocaleString("fa-IR");
@@ -49,7 +51,7 @@ const faNumber = (value: number) => value.toLocaleString("fa-IR");
 export function useDeviceSettings(options: UseDeviceSettingsOptions) {
   const devices = ref<UserDevice[]>([]);
   const liveShares = ref<OwnedLocationShare[]>([]);
-  // Until both owner-scoped reads succeed, an empty array is not proof that there are no devices/shares.
+  // On the shares screen both reads must succeed; the sessions screen deliberately skips share reads.
   const loading = ref(true);
   const loaded = ref(false);
   const failed = ref(false);
@@ -164,13 +166,16 @@ export function useDeviceSettings(options: UseDeviceSettingsOptions) {
         setStatus("warn", unavailableStatus());
         return;
       }
-      const [deviceList, shares] = await Promise.all([fetchUserDevices(accessToken), listLocationShares(accessToken)]);
+      const [deviceList, shares] = await Promise.all([
+        fetchUserDevices(accessToken),
+        options.includeShares === false ? Promise.resolve(null) : listLocationShares(accessToken)
+      ]);
       if (version !== readVersion) return;
       devices.value = deviceList;
       // Owned rows only: the pin belongs to the sharer's sessions, so a received share is not this
       // screen's to edit — and `sharedWithMe` rows carry the *owner's* device ids, which would be both
       // meaningless and a leak of their session list to offer them here.
-      liveShares.value = shares.owned;
+      liveShares.value = shares?.owned ?? [];
       loaded.value = true;
       failed.value = false;
       if ([READ_FAILED_STALE, READ_FAILED_FIRST, SIGN_IN_REQUIRED, SESSION_PENDING].includes(status.value?.text ?? "")) status.value = null;

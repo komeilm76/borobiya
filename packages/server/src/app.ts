@@ -208,7 +208,7 @@ export async function createFastifyApp(
   });
   // Registered after the `/_user` authorization hook so the device list inherits the access-token,
   // account-state, onboarding, and live-session checks and can trust `request.authenticatedUser`.
-  await registerUserDevicesRoute(app, { store: userDeviceStore });
+  await registerUserDevicesRoute(app, { store: userDeviceStore, io: realtime.io });
   await registerUserSearchRoute(app, { store: userSearchStore });
   await registerAuthRoutes(app, { store: registrationStore, hashPassword: dependencies.hashPassword });
   await registerLoginRoute(app, {

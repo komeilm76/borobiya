@@ -2,8 +2,8 @@
   <v-card class="share-lists bb-surface-card" elevation="0" rounded="xl">
     <div class="share-lists__header">
       <div>
-        <p class="share-lists__kicker">حریم خصوصی</p>
-        <h2>اشتراک‌های موقعیت</h2>
+        <p class="share-lists__kicker">مدیریت دسترسی</p>
+        <h2>همراهان و دستگاه‌ها</h2>
       </div>
       <div class="share-lists__tools">
         <v-btn
@@ -23,6 +23,11 @@
       </div>
     </div>
 
+    <v-tabs v-model="activeTab" class="share-lists__tabs" color="primary" grow aria-label="نوع اشتراک موقعیت">
+      <v-tab value="owned">اشتراک‌های من</v-tab>
+      <v-tab value="received">از دیگران</v-tab>
+    </v-tabs>
+
     <v-alert v-if="loadError" class="mt-3" type="error" variant="tonal" density="compact" role="alert">
       {{ loadError }}
     </v-alert>
@@ -37,32 +42,52 @@
         در حال لغو…
       </p>
 
-      <section class="share-lists__section" aria-labelledby="share-lists-owned-title">
+      <section v-if="activeTab === 'owned'" class="share-lists__section" aria-labelledby="share-lists-owned-title">
         <h3 id="share-lists-owned-title">
-          اشتراک‌های من
+          موقعیت زندهٔ من
           <v-chip v-if="liveFresh && !loading" size="x-small" variant="tonal">{{ ownedRows.length }}</v-chip>
         </h3>
+        <v-btn v-if="canApplyAll || deviceSettings.bulkRunning.value" size="small" variant="tonal"
+          color="primary" class="share-lists__bulk" :disabled="!canApplyAll" :loading="deviceSettings.bulkRunning.value"
+          @click="bulkConfirmOpen = true">پخش همه از همین دستگاه</v-btn>
         <ul v-if="ownedRows.length" class="share-lists__rows" role="list">
-          <li v-for="row in ownedRows" :key="row.id" class="share-lists__row">
-            <v-icon :icon="row.kind === 'expired' ? 'mdi-map-marker-off-outline' : 'mdi-map-marker-outline'" size="20" />
-            <div class="share-lists__row-main">
-              <p class="share-lists__row-title">
-                <bdi dir="ltr">{{ row.label }}</bdi>
-                <span class="share-lists__row-state">{{ stateText(row.kind) }}</span>
-              </p>
-              <p class="share-lists__row-sub">{{ detail(row).join(" • ") }}</p>
+          <li v-for="row in ownedRows" :key="row.id" class="share-lists__row share-lists__row--owned">
+            <div class="share-lists__row-top">
+              <v-icon :icon="row.kind === 'expired' ? 'mdi-map-marker-off-outline' : 'mdi-map-marker-outline'" size="20" />
+              <div class="share-lists__row-main">
+                <p class="share-lists__row-title">
+                  <bdi dir="ltr">{{ row.label }}</bdi>
+                  <span class="share-lists__row-state">{{ stateText(row.kind) }}</span>
+                </p>
+                <p class="share-lists__row-sub">{{ detail(row).join(" • ") }}</p>
+              </div>
+              <v-btn
+                size="x-small"
+                variant="text"
+                color="error"
+                :loading="pendingRevocation === row.id"
+                :disabled="revoking"
+                :aria-label="`لغو اشتراک با ${row.label}`"
+                @click="askRevoke(row)"
+              >
+                لغو
+              </v-btn>
             </div>
-            <v-btn
-              size="x-small"
-              variant="text"
-              color="error"
-              :loading="pendingRevocation === row.id"
-              :disabled="revoking"
-              :aria-label="`لغو اشتراک با ${row.label}`"
-              @click="askRevoke(row)"
-            >
-              لغو
-            </v-btn>
+            <div v-if="row.kind !== 'expired'" class="share-lists__device-line">
+              <span class="share-lists__device-caption">پخش از</span>
+              <v-select
+                :model-value="drafts[row.id] ?? row.share.priorityDeviceId"
+                :items="deviceSettings.choicesFor(row.share)"
+                item-title="label" item-value="value" density="compact" variant="outlined" hide-details
+                :aria-label="`دستگاه پخش‌کنندهٔ ${row.label}`" placeholder="انتخاب دستگاه"
+                :disabled="deviceSettings.loading.value || deviceSettings.failed.value || !deviceSettings.loaded.value || Boolean(deviceSettings.busyShareId.value) || deviceSettings.bulkRunning.value"
+                @update:model-value="drafts[row.id] = $event"
+              />
+              <v-btn size="small" variant="tonal" color="primary"
+                :loading="deviceSettings.busyShareId.value === row.id"
+                :disabled="!canApplyDevice(row)"
+                :aria-label="`اعمال دستگاه برای ${row.label}`" @click="applyDevice(row)">اعمال</v-btn>
+            </div>
           </li>
         </ul>
         <p v-else-if="ownState === 'empty'" class="share-lists__empty">هیچ‌کس موقعیت زندهٔ شما را نمی‌بیند.</p>
@@ -72,9 +97,9 @@
         <p v-else class="share-lists__empty" role="status">در حال بررسی اشتراک‌های زنده…</p>
       </section>
 
-      <section class="share-lists__section" aria-labelledby="share-lists-received-title">
+      <section v-if="activeTab === 'received'" class="share-lists__section" aria-labelledby="share-lists-received-title">
         <h3 id="share-lists-received-title">
-          با من به اشتراک گذاشته‌اند
+          موقعیت‌ها و مسیرهای دریافتی
           <v-chip v-if="liveFresh && historyFresh && !loading" size="x-small" variant="tonal">
             {{ receivedRows.length + receivedHistoryRows.length }}
           </v-chip>
@@ -119,7 +144,7 @@
         <p v-else class="share-lists__empty" role="status">در حال بررسی اشتراک‌های دریافتی…</p>
       </section>
 
-      <section v-if="historyRows.length > 0" class="share-lists__section" aria-labelledby="share-lists-history-title">
+      <section v-if="activeTab === 'owned' && historyRows.length > 0" class="share-lists__section" aria-labelledby="share-lists-history-title">
         <h3 id="share-lists-history-title">
           بازه‌های تاریخچه
           <v-chip v-if="historyFresh && !loading" size="x-small" variant="tonal">{{ historyRows.length }}</v-chip>
@@ -150,9 +175,29 @@
       </section>
     </template>
 
-    <v-dialog v-model="confirmOpen" max-width="420" scrollable>
+    <p v-if="activeTab === 'owned' && deviceSettings.status.value" class="share-lists__device-status"
+      :class="`share-lists__device-status--${deviceSettings.status.value.tone}`" role="status" aria-live="polite">
+      {{ deviceSettings.status.value.text }}
+    </p>
+
+    <v-dialog v-model="bulkConfirmOpen" max-width="420" scrollable aria-labelledby="share-bulk-title">
+      <v-card rounded="xl">
+        <v-card-title id="share-bulk-title">تغییر دستگاه همهٔ همراهان؟</v-card-title>
+        <v-card-text class="share-lists__confirm-body">
+          <p class="share-lists__confirm">دستگاه همین نشست برای اشتراک‌های زنده‌ای که به دستگاه دیگری وصل‌اند انتخاب می‌شود. مدت هیچ اشتراکی بیشتر نمی‌شود. هر تغییر جداگانه انجام می‌شود؛ ممکن است بعضی موفق و بعضی ناموفق باشند.</p>
+        </v-card-text>
+        <v-card-actions class="share-lists__confirm-actions">
+          <v-spacer />
+          <v-btn variant="text" :disabled="deviceSettings.bulkRunning.value" @click="bulkConfirmOpen = false">بازگشت</v-btn>
+          <v-btn color="primary" variant="flat" :loading="deviceSettings.bulkRunning.value"
+            :disabled="!canApplyAll" @click="applyAllDevices">تأیید تغییر</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog v-model="confirmOpen" max-width="420" scrollable aria-labelledby="share-revoke-title">
       <v-card rounded="xl" v-if="pendingRow">
-        <v-card-title>{{ pendingRow.history ? "حذف دسترسی تاریخچه؟" : "لغو این اشتراک؟" }}</v-card-title>
+        <v-card-title id="share-revoke-title">{{ pendingRow.history ? "حذف دسترسی تاریخچه؟" : "لغو این اشتراک؟" }}</v-card-title>
         <v-card-text class="share-lists__confirm-body">
           <p v-if="pendingRow.history" class="share-lists__confirm">
             دسترسی <bdi dir="ltr">{{ pendingRow.label }}</bdi> به این بازهٔ تاریخچهٔ مسیر بلافاصله قطع می‌شود.
@@ -175,7 +220,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type {
   LocationHistoryShare,
   LocationShare,
@@ -185,6 +230,7 @@ import type {
   ReceivedLocationShare
 } from "@shared/index";
 import { friendlyErrorMessage } from "@/api/error-message";
+import type { DeviceSettings } from "@/composables/use-device-settings";
 import {
   listLocationHistoryShares,
   listLocationShares,
@@ -210,6 +256,7 @@ import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-sub
  * so the expiry arithmetic is the tested one, and the tick on every refresh is a real request:
  * a share can be revoked from another device at any moment.
  */
+const { deviceSettings } = defineProps<{ deviceSettings: DeviceSettings }>();
 const emit = defineEmits<{
   (event: "create"): void;
   (event: "changed"): void;
@@ -222,6 +269,10 @@ interface LiveRowView {
   remainingMinutes: number | null;
   note: string | null;
   history: false;
+}
+
+interface OwnedView extends LiveRowView {
+  share: OwnedLocationShare;
 }
 
 interface HistoryRowView {
@@ -241,6 +292,9 @@ interface ReceivedView extends LiveRowView {
 const auth = useAuthStore();
 const sessionKey = computed(() => shareSessionKey(auth.user?.id ?? null, auth.accessToken));
 
+const activeTab = ref<"owned" | "received">("owned");
+const bulkConfirmOpen = ref(false);
+const drafts = reactive<Record<string, string>>({});
 const loading = ref(true);
 const loaded = ref(false);
 const liveFresh = ref(false);
@@ -297,7 +351,7 @@ onBeforeUnmount(() => {
   clock = undefined;
 });
 
-const ownedRows = computed<LiveRowView[]>(() => {
+const ownedRows = computed<OwnedView[]>(() => {
   const now = new Date(nowMs.value);
   return owned.value.map((share) => {
     const described = describeLiveShareRow(share, now);
@@ -305,7 +359,8 @@ const ownedRows = computed<LiveRowView[]>(() => {
       ...described,
             // The server names the target; `names` is the fallback for the row its left join could not name.
       label: shareRowLabel(share.targetUserId, names.value, share.targetUsername),
-      history: false
+      history: false,
+      share
     };
   });
 });
@@ -455,6 +510,43 @@ function formatInstant(value: string): string {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
 
+const canApplyAll = computed(() => {
+  const current = deviceSettings.currentDeviceId.value;
+  return Boolean(current && deviceSettings.loaded.value && !deviceSettings.failed.value &&
+    !deviceSettings.loading.value && !deviceSettings.busyShareId.value && !deviceSettings.bulkRunning.value &&
+    ownedRows.value.some(row => row.kind !== "expired" && row.share.priorityDeviceId !== current));
+});
+
+async function applyAllDevices(): Promise<void> {
+  if (!canApplyAll.value) return;
+  const identity = sessionKey.value;
+  await deviceSettings.assignCurrentDevice();
+  if (disposed || identity !== sessionKey.value) return;
+  bulkConfirmOpen.value = false;
+  for (const key of Object.keys(drafts)) delete drafts[key];
+  await refresh();
+  if (!disposed && identity === sessionKey.value) emit("changed");
+}
+
+function canApplyDevice(row: OwnedView): boolean {
+  const chosen = drafts[row.id];
+  return Boolean(chosen && chosen !== row.share.priorityDeviceId && row.kind !== "expired" &&
+    deviceSettings.loaded.value && !deviceSettings.failed.value && !deviceSettings.loading.value &&
+    !deviceSettings.busyShareId.value && !deviceSettings.bulkRunning.value);
+}
+
+async function applyDevice(row: OwnedView): Promise<void> {
+  if (!canApplyDevice(row)) return;
+  const choice = drafts[row.id];
+  const identity = sessionKey.value;
+  if (!choice) return;
+  const applied = await deviceSettings.assign(row.id, choice);
+  if (!applied || disposed || identity !== sessionKey.value) return;
+  delete drafts[row.id];
+  await refresh();
+  if (!disposed && identity === sessionKey.value) emit("changed");
+}
+
 function askRevoke(row: LiveRowView): void {
   if (revoking.value) return;
   pendingRow.value = row;
@@ -523,6 +615,7 @@ function resetShareRows(): void {
   revoking.value = false;
   pendingRevocation.value = null;
   owned.value = [];
+  for (const key of Object.keys(drafts)) delete drafts[key];
   received.value = [];
   ownedHistory.value = [];
   receivedHistory.value = [];
@@ -534,6 +627,7 @@ function resetShareRows(): void {
     ? "نشست و حساب هنوز هماهنگ نیستند؛ دوباره تلاش کنید."
     : "برای بررسی وضعیت اشتراک‌ها دوباره وارد حساب شوید.";
   confirmOpen.value = false;
+  bulkConfirmOpen.value = false;
   pendingRow.value = null;
 }
 
@@ -594,6 +688,7 @@ defineExpose({ refresh });
 
 .share-lists__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
@@ -663,6 +758,24 @@ defineExpose({ refresh });
   border-radius: var(--bb-radius-nested, 16px);
 }
 
+.share-lists__bulk { margin-bottom: 0.6rem; min-height: 44px; max-width: 100%; height: auto; }
+.share-lists__bulk :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.share-lists__device-caption { flex: 0 0 auto; color: var(--bb-color-muted); font-size: 0.76rem; font-weight: 700; }
+.share-lists__tabs { margin-top: 1rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.1); }
+.share-lists__tabs :deep(.v-tab) { min-width: 0; min-height: 48px; white-space: normal; font-size: 0.82rem; }
+.share-lists__row--owned { display: block; }
+.share-lists__row-top { display: flex; align-items: center; gap: 0.6rem; }
+.share-lists__row-top > .v-btn { min-width: 44px; min-height: 44px; }
+.share-lists__device-line { display: flex; align-items: center; gap: 0.5rem; padding-top: 0.5rem; margin-top: 0.45rem;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08); color: var(--bb-color-muted); }
+.share-lists__device-line :deep(.v-select) { flex: 1 1 auto; min-width: 0; }
+.share-lists__device-line > .v-btn { min-width: 50px; min-height: 44px; }
+.share-lists__device-status { margin: 0.65rem 0 0; color: var(--bb-color-muted); font-size: 0.82rem; line-height: 1.7; }
+.share-lists__device-status--ok { color: #195e46; }
+.share-lists__device-status--error { color: #b3261e; }
+:global(:root.dark .share-lists__device-status--ok) { color: #7fdcb2; }
+:global(:root.dark .share-lists__device-status--error) { color: #ffb4ab; }
+
 .share-lists__row-main {
   min-width: 0;
   flex: 1;
@@ -670,6 +783,7 @@ defineExpose({ refresh });
 
 .share-lists__row-title {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
   margin: 0;
@@ -678,6 +792,7 @@ defineExpose({ refresh });
   font-weight: 700;
 }
 
+.share-lists__row-title bdi { min-width: 0; overflow-wrap: anywhere; }
 .share-lists__row-state {
   color: var(--bb-color-muted);
   font-size: 0.72rem;
@@ -702,6 +817,8 @@ defineExpose({ refresh });
 .share-lists__confirm-body { min-height: 0; overflow-y: auto; }
 
 @media (max-width: 599px) {
+  .share-lists__header > div:first-child { width: 100%; }
+  .share-lists__tools { flex: 1 1 100%; justify-content: flex-end; }
   .share-lists__confirm-actions { flex-direction: column; align-items: stretch; gap: 0.5rem; }
   .share-lists__confirm-actions :deep(.v-spacer) { display: none; }
   .share-lists__confirm-actions :deep(.v-btn) { width: 100%; min-width: 0; min-height: 44px; height: auto; margin: 0; }

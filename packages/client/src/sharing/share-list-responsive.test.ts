@@ -8,7 +8,7 @@ describe("share revocation confirmation on short and narrow viewports (T4.4.1 pa
   it("keeps a long recipient name scrollable and both privacy actions reachable", () => {
     const dialog = source.split('<v-dialog v-model="confirmOpen"')[1]?.split("</v-dialog>")[0];
     expect(dialog).toBeDefined();
-    expect(source).toContain('<v-dialog v-model="confirmOpen" max-width="420" scrollable>');
+    expect(source).toContain('<v-dialog v-model="confirmOpen" max-width="420" scrollable aria-labelledby="share-revoke-title">');
     expect(dialog).toContain('<v-card-text class="share-lists__confirm-body">');
     expect(dialog).toContain('<v-card-actions class="share-lists__confirm-actions">');
     expect(dialog).toContain(':disabled="revoking" @click="confirmOpen = false"');

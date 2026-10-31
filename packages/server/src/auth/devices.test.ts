@@ -48,11 +48,14 @@ function deviceRecord(overrides: Partial<UserDeviceRecord> = {}): UserDeviceReco
 
 async function makeApp(options: {
   listDevices?: UserDeviceStore["listDevices"];
+  revokeOtherSession?: UserDeviceStore["revokeOtherSession"];
   user?: AuthenticatedUserContext | null;
   requireToken?: boolean;
+  io?: Parameters<typeof registerUserDevicesRoute>[1]["io"];
 } = {}) {
   const listDevices = vi.fn<UserDeviceStore["listDevices"]>(options.listDevices ?? (async () => [deviceRecord()]));
-  const store: UserDeviceStore = { listDevices };
+  const revokeOtherSession = vi.fn<UserDeviceStore["revokeOtherSession"]>(options.revokeOtherSession ?? (async () => true));
+  const store: UserDeviceStore = { listDevices, revokeOtherSession };
   const app = Fastify({ logger: false });
   app.decorateRequest("authenticatedUser", null);
   app.addHook("preHandler", async (request, reply) => {
@@ -61,9 +64,9 @@ async function makeApp(options: {
     }
     request.authenticatedUser = options.user === undefined ? sessionUser() : options.user;
   });
-  await registerUserDevicesRoute(app, { store });
+  await registerUserDevicesRoute(app, { store, io: options.io });
   apps.push(app);
-  return { app, listDevices };
+  return { app, listDevices, revokeOtherSession };
 }
 
 describe("GET /_user/devices", () => {
@@ -147,5 +150,49 @@ describe("GET /_user/devices", () => {
 
     expect(response.statusCode).toBe(401);
     expect(listDevices).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("DELETE /_user/devices/:sessionId", () => {
+  const path = (id: string) => apiRoutes.user.revokeDevice.makeFullPath({ sessionId: id });
+  const otherSession = randomUUID();
+
+  it("rejects unauthorized, missing context, malformed and current-session targets without a write", async () => {
+    const { app, revokeOtherSession } = await makeApp();
+    expect((await app.inject({ method: "DELETE", url: path(otherSession) })).statusCode).toBe(401);
+    expect((await app.inject({ method: "DELETE", url: "/_user/devices/not-a-uuid", headers: { authorization: "Bearer test-token" } })).statusCode).toBe(400);
+    const current = await app.inject({ method: "DELETE", url: path(sessionId), headers: { authorization: "Bearer test-token" } });
+    expect(current.statusCode).toBe(403);
+    expect(current.json().code).toBe("CURRENT_SESSION");
+    expect(revokeOtherSession).not.toHaveBeenCalled();
+    const empty = await makeApp({ user: null });
+    expect((await empty.app.inject({ method: "DELETE", url: path(otherSession), headers: { authorization: "Bearer test-token" } })).statusCode).toBe(401);
+  });
+
+  it("disconnects only a successfully revoked session's realtime sockets", async () => {
+    const disconnectSockets = vi.fn();
+    const inRoom = vi.fn(() => ({ disconnectSockets }));
+    const { app } = await makeApp({ io: { in: inRoom } as unknown as Parameters<typeof registerUserDevicesRoute>[1]["io"],
+      revokeOtherSession: async input => input.sessionId === otherSession });
+    const headers = { authorization: "Bearer test-token" };
+    await app.inject({ method: "DELETE", url: path(randomUUID()), headers });
+    expect(inRoom).not.toHaveBeenCalled();
+    await app.inject({ method: "DELETE", url: path(otherSession), headers });
+    expect(inRoom).toHaveBeenCalledWith(`session:${otherSession}`);
+    expect(disconnectSockets).toHaveBeenCalledWith(true);
+  });
+
+  it("revokes only an owned other session and gives unknown / foreign sessions the same response", async () => {
+    const { app, revokeOtherSession } = await makeApp({ revokeOtherSession: async (input) => input.sessionId === otherSession });
+    const headers = { authorization: "Bearer test-token" };
+    const ok = await app.inject({ method: "DELETE", url: path(otherSession), headers });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toEqual({ ok: true });
+    expect(ok.headers["cache-control"]).toBe("no-store");
+    expect(revokeOtherSession).toHaveBeenCalledWith({ userId, sessionId: otherSession, currentSessionId: sessionId });
+    const unknown = await app.inject({ method: "DELETE", url: path(randomUUID()), headers });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json().code).toBe("DEVICE_NOT_FOUND");
   });
 });

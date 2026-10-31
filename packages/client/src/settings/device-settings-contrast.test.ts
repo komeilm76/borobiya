@@ -32,7 +32,7 @@ function lightColor(source: string, selector: string): string {
 describe("device settings small text contrast (T4.4.3 partial)", () => {
   it("keeps small labels readable against the white cards and light page", () => {
     for (const selector of [
-      ".device-priority__kicker", ".device-priority__table th", ".device-priority__muted", ".device-priority__share-now"
+      ".device-priority__kicker", ".device-priority__hint", ".device-priority__meta", ".device-priority__icon"
     ]) {
       expect(contrast(lightColor(panel, selector), palettes.light.surface), selector).toBeGreaterThanOrEqual(4.5);
     }
@@ -43,7 +43,7 @@ describe("device settings small text contrast (T4.4.3 partial)", () => {
 
   it("preserves dark-theme overrides for the same labels", () => {
     for (const selector of [
-      ".device-priority__kicker", ".device-priority__table th", ".device-priority__muted", ".device-priority__share-now"
+      ".device-priority__kicker", ".device-priority__hint", ".device-priority__meta", ".device-priority__icon"
     ]) {
       expect(panel).toContain(`:global(:root.dark ${selector})`);
     }

@@ -23,7 +23,6 @@ export interface BroadcastStatusView {
   readonly actionLabel: string;
   readonly headline: string;
   readonly detail: string;
-  readonly showDevicesLink: boolean;
 }
 
 function errorDetail(code: string | null): { tone: "warn" | "error"; headline: string; detail: string } {
@@ -33,7 +32,7 @@ function errorDetail(code: string | null): { tone: "warn" | "error"; headline: s
       return {
         tone: "warn",
         headline: "پخش از دستگاه دیگر فعال است",
-        detail: "برای اشتراک‌های فعلی دستگاه دیگری به‌عنوان پخش‌کننده انتخاب شده است؛ از بخش «دستگاه‌ها» می‌توانید این دستگاه را فعال کنید."
+        detail: "برای اشتراک‌های فعلی دستگاه دیگری به‌عنوان پخش‌کننده انتخاب شده است؛ از بخش «اشتراک‌های من» دستگاه پخش‌کنندهٔ هر همراه را تغییر دهید."
       };
     case "GEOLOCATION_DENIED":
       return {
@@ -84,11 +83,6 @@ function errorDetail(code: string | null): { tone: "warn" | "error"; headline: s
 export function describeBroadcastState(input: BroadcastStatusInput): BroadcastStatusView {
   const { status, lastErrorCode, peerCount, isSupported, priority } = input;
   const isActive = status === "connecting" || status === "broadcasting";
-  const showDevicesLink =
-    lastErrorCode === "WRONG_DEVICE" ||
-    lastErrorCode === "PRIORITY_DEVICE_REQUIRED" ||
-    priority.ignoredCount > 0 ||
-    priority.hasMultipleDevices;
 
   if (!isSupported) {
     return {
@@ -97,7 +91,6 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
       actionLabel: "پخش زنده پشتیبانی نمی‌شود",
       headline: "مرورگر موقعیت مکانی نمی‌دهد",
       detail: "پخش زنده نیاز به بافت امن (HTTPS یا localhost) و پشتیبانی Geolocation دارد.",
-      showDevicesLink
     };
   }
 
@@ -109,7 +102,6 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
       actionLabel: "تلاش دوباره برای پخش زنده",
       headline: failure.headline,
       detail: failure.detail,
-      showDevicesLink
     };
   }
 
@@ -120,7 +112,6 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
       actionLabel: "توقف پخش زنده",
       headline: "در حال اتصال و خواندن موقعیت…",
       detail: "پس از دریافت اولین نقطه، موقعیت شما هر ۴ ثانیه ارسال می‌شود.",
-      showDevicesLink
     };
   }
 
@@ -132,7 +123,6 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
         actionLabel: "توقف پخش زنده",
         headline: "این دستگاه پخش‌کنندهٔ انتخابی نیست",
         detail: `${priority.ignoredCount.toLocaleString("fa-IR")} اشتراک به دستگاه دیگری وصل است و موقعیت این مرورگر جایگزین آن نمی‌شود.`,
-        showDevicesLink: true
       };
     }
     const detail =
@@ -147,13 +137,12 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
       actionLabel: "توقف پخش زنده",
       headline: "پخش زنده فعال است",
       detail,
-      showDevicesLink
     };
   }
 
   const idleNote =
     priority.ignoredCount > 0 && priority.broadcastingCount === 0
-      ? "اشتراک‌های فعلی روی دستگاه دیگری تنظیم شده‌اند؛ پیش از پخش از بخش «دستگاه‌ها» بررسی کنید."
+      ? "اشتراک‌های فعلی روی دستگاه دیگری تنظیم شده‌اند؛ پیش از پخش، دستگاه هر همراه را در «اشتراک‌های من» بررسی کنید."
       : status === "stopped"
         ? "پخش زنده متوقف شد؛ هر زمان آماده بودید دوباره روشنش کنید."
         : "برای ارسال موقعیت لحظه‌ای خود به همراهان مجاز، پخش زنده را روشن کنید.";
@@ -164,6 +153,5 @@ export function describeBroadcastState(input: BroadcastStatusInput): BroadcastSt
     actionLabel: "شروع پخش موقعیت زنده",
     headline: status === "stopped" ? "پخش زنده خاموش است" : "آمادهٔ پخش موقعیت",
     detail: idleNote,
-    showDevicesLink
   };
 }

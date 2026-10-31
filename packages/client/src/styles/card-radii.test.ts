@@ -38,7 +38,7 @@ const nested: Record<string, string[]> = {
   "styles/tailwind.css": [".skeleton-note"],
   "components/map/PlaceSearchPanel.vue": [".place-search__result"],
   "components/mission/MissionLivePanel.vue": [".live-panel__member", ".live-panel__map"],
-  "components/settings/DevicePriorityPanel.vue": [".device-priority__share"],
+  "components/settings/DevicePriorityPanel.vue": [".device-priority__session"],
   "components/sharing/ShareDialog.vue": [".share-dialog__results"],
   "components/sharing/ShareLists.vue": [".share-lists__row"],
   "components/sos/SosRequestSheet.vue": [".sos-severity-card", ".sos-sheet__map-wrap"],

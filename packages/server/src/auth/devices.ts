@@ -1,11 +1,13 @@
 import { apiRoutes } from "@borobiya/shared/api";
-import { MAX_USER_DEVICE_LIST_ITEMS } from "@borobiya/shared";
+import { MAX_USER_DEVICE_LIST_ITEMS, idSchema } from "@borobiya/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { disconnectSessionSockets, type SocketDisconnector } from "../realtime/socket";
 import type { UserDeviceRecord, UserDeviceStore } from "../db/device-store";
 import type { AuthenticatedUserContext } from "./user-security-questions";
 
 export interface UserDevicesRouteDependencies {
   store: UserDeviceStore;
+  io?: SocketDisconnector;
 }
 
 function errorResponse(code: string, message: string) {
@@ -59,5 +61,20 @@ export async function registerUserDevicesRoute(
     });
 
     return reply.code(200).header("cache-control", "no-store").send(devices.map(devicePayload));
+  });
+
+  app.delete(apiRoutes.user.revokeDevice.url, async (request: FastifyRequest<{ Params: { sessionId: string } }>, reply) => {
+    const user = request.authenticatedUser;
+    if (!user) return sendError(reply, 401, "UNAUTHORIZED", "A valid access token is required.");
+    const parsed = idSchema.safeParse(request.params.sessionId);
+    if (!parsed.success) return sendError(reply, 400, "VALIDATION_ERROR", "Invalid session id.");
+    // Never terminate the bearer executing this write. Its refresh cookie must be cleared by logout.
+    if (parsed.data === user.sessionId) return sendError(reply, 403, "CURRENT_SESSION", "Log out to end this session.");
+    const revoked = await dependencies.store.revokeOtherSession({
+      userId: user.userId, sessionId: parsed.data, currentSessionId: user.sessionId
+    });
+    if (!revoked) return sendError(reply, 404, "DEVICE_NOT_FOUND", "Session not found.");
+    disconnectSessionSockets(dependencies.io, parsed.data);
+    return reply.code(200).header("cache-control", "no-store").send({ ok: true });
   });
 }

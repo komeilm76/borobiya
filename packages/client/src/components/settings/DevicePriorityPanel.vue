@@ -1,433 +1,188 @@
 <template>
-  <div class="device-priority">
-    <v-card class="device-priority__card" elevation="0" rounded="xl">
-      <header class="device-priority__header">
-        <div>
-          <p class="device-priority__kicker">نشست‌های فعال همین حساب</p>
-          <h2>دستگاه‌ها</h2>
-        </div>
-        <v-btn
-          size="small"
-          variant="tonal"
-          color="primary"
-          :loading="api.loading.value"
-          aria-label="تازه‌کردن فهرست دستگاه‌ها"
-          @click="api.refresh()"
-        >
-          تازه‌سازی
-        </v-btn>
-      </header>
-      <p v-if="api.loading.value && api.loaded.value" class="device-priority__hint" role="status">
-        در حال به‌روزرسانی دستگاه‌ها و اشتراک‌ها؛ ردیف‌های پیشین هنوز تأیید نشده‌اند…
-      </p>
-
-      <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
-        <span>در حال خواندن دستگاه‌ها…</span>
-        <v-skeleton-loader type="list-item-two-line@3" aria-hidden="true" />
+  <v-card class="device-priority__card" elevation="0" rounded="xl">
+    <header class="device-priority__header">
+      <div>
+        <p class="device-priority__kicker">امنیت حساب</p>
+        <h2>نشست‌های واردشده</h2>
       </div>
-      <v-table v-else-if="api.deviceRows.value.length" class="device-priority__table">
-        <thead>
-          <tr>
-            <th scope="col">دستگاه</th>
-            <th scope="col">وضعیت</th>
-            <th scope="col">آخرین فعالیت</th>
-            <th scope="col">IP</th>
-            <th scope="col">پخش‌کنندهٔ</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="row in api.deviceRows.value" :key="row.deviceId">
-            <td>
-              <span class="device-priority__device-name">{{ row.label }}</span>
-              <span v-if="row.isCurrent" class="device-priority__badge">همین دستگاه</span>
-            </td>
-            <td>
-              <v-chip size="x-small" :color="row.isOnline ? 'success' : 'grey'" variant="tonal">
-                {{ row.isOnline ? "آنلاین" : `آفلاین · ${ageText(row.minutesSinceActive)}` }}
-              </v-chip>
-            </td>
-            <td>{{ ageText(row.minutesSinceActive) }}</td>
-            <td>{{ row.ip ?? "—" }}</td>
-            <td>
-              <span v-if="row.pinnedShareCount">{{ pluralShares(row.pinnedShareCount) }}</span>
-              <span v-else class="device-priority__muted">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </v-table>
-
-      <p v-else-if="api.loading.value" class="device-priority__hint" role="status">در حال بازبینی دستگاه‌ها…</p>
-      <p v-else-if="api.failed.value" class="device-priority__hint device-priority__hint--error" role="alert">
-        فهرست دستگاه‌ها تأیید نشد؛ برای بررسی نشست‌ها دوباره تلاش کنید.
-      </p>
-      <p v-else class="device-priority__hint">
-        این فهرست فقط نشست‌هایی را نشان می‌دهد که هنوز توکن تازه‌کردن دارند؛ دستگاهی که از آن خارج شده‌اید
-        در اینجا نیامده است.
-      </p>
-      <p v-if="!api.failed.value && !api.loading.value && !api.hasMultipleDevices.value && api.deviceRows.value.length === 1"
-        class="device-priority__hint">
-        با یک دستگاهِ فعال، انتخابی لازم نیست: هر اشتراک تازه به همین دستگاه وصل می‌شود.
-      </p>
-      <p v-if="api.failed.value && api.deviceRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
-        آخرین خواندن ناموفق بود؛ مقادیر بالا ممکن است کهنه باشند.
-      </p>
-    </v-card>
-
-    <v-card class="device-priority__card" elevation="0" rounded="xl">
-      <header class="device-priority__header">
-        <div>
-          <p class="device-priority__kicker">کدام دستگاه موقعیت بفرستد</p>
-          <h2>دستگاه پخش‌کنندهٔ هر اشتراک</h2>
-        </div>
-        <v-btn
-          v-if="api.hasMultipleDevices.value && api.shareRows.value.length"
-          size="small"
-          variant="flat"
-          color="primary"
-          :loading="api.bulkRunning.value"
-          :disabled="api.loading.value || api.failed.value || Boolean(api.busyShareId.value) || api.bulkRunning.value"
-          @click="applyToAll"
-        >
-          اعمال این دستگاه برای همه
-        </v-btn>
-      </header>
-
-      <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
-        <span>در حال خواندن اشتراک‌ها…</span>
-        <v-skeleton-loader type="list-item-two-line@2" aria-hidden="true" />
-      </div>
-      <div v-else-if="api.shareRows.value.length" class="device-priority__shares">
-        <div v-for="entry in api.shareRows.value" :key="entry.share.id" class="device-priority__share">
-          <div class="device-priority__share-head">
-            <v-icon icon="mdi-crosshairs-gps" size="18" />
-            <span class="device-priority__share-name">{{ shareLabel(entry.share) }}</span>
-            <v-chip size="x-small" variant="tonal" :color="chipColor(entry.row.kind)">
-              {{ stateLabel(entry.row.kind, entry.row.remainingMinutes) }}
-            </v-chip>
+      <v-btn size="small" variant="tonal" color="primary" :loading="api.loading.value"
+        aria-label="تازه‌کردن فهرست دستگاه‌ها" @click="api.refresh()">
+        <v-icon icon="mdi-refresh" class="me-1" size="18" />تازه‌سازی
+      </v-btn>
+    </header>
+    <p class="device-priority__hint">فقط نشست‌هایی که هنوز وارد حساب هستند نمایش داده می‌شوند. نشانی IP، محل تقریبی نیست.</p>
+    <p v-if="api.loading.value && api.loaded.value" class="device-priority__hint" role="status">
+      در حال به‌روزرسانی؛ جزئیات زیر ممکن است کهنه باشند…
+    </p>
+    <div v-if="api.loading.value && !api.loaded.value" class="device-priority__skeleton" role="status">
+      <span>در حال خواندن دستگاه‌ها…</span>
+      <v-skeleton-loader type="list-item-two-line@3" aria-hidden="true" />
+    </div>
+    <ul v-else-if="api.deviceRows.value.length" class="device-priority__list" role="list">
+      <li v-for="row in api.deviceRows.value" :key="row.deviceId" class="device-priority__session">
+        <v-icon class="device-priority__icon" icon="mdi-devices" size="22" aria-hidden="true" />
+        <div class="device-priority__details">
+          <div class="device-priority__name-line">
+            <strong class="device-priority__name">{{ row.label }}</strong>
+            <v-chip v-if="row.isCurrent" size="x-small" color="primary" variant="tonal">همین نشست</v-chip>
           </div>
-          <div class="device-priority__share-body">
-            <v-select
-              v-model="drafts[entry.share.id]"
-              :items="api.choicesFor(entry.share)"
-              item-title="label"
-              item-value="value"
-              :disabled="entry.row.kind === 'expired' || Boolean(api.busyShareId.value) || api.bulkRunning.value || api.loading.value || api.failed.value"
-              density="compact"
-              variant="outlined"
-              hide-details="auto"
-              :label="`دستگاه پخش‌کننده`"
-            />
-            <v-btn
-              size="small"
-              color="primary"
-              variant="tonal"
-              :loading="busy(entry.share.id)"
-              :disabled="!canApply(entry)"
-              @click="apply(entry.share.id)"
-            >
-              اعمال
-            </v-btn>
-          </div>
-          <p class="device-priority__share-now">
-            اکنون: {{ pinnedLabel(entry.share) }}
+          <p class="device-priority__meta">
+            <span>{{ row.isOnline ? 'متصل' : 'بدون اتصال زنده' }}</span>
+            <span>آخرین فعالیت: {{ ageText(row.minutesSinceActive) }}</span>
+          </p>
+          <p class="device-priority__meta">
+            <span>IP: <bdi dir="ltr">{{ row.ip ?? 'ثبت نشده' }}</bdi></span>
           </p>
         </div>
-      </div>
-      <p v-else-if="api.loading.value" class="device-priority__hint" role="status">در حال بازبینی اشتراک‌ها…</p>
-      <p v-else-if="api.failed.value" class="device-priority__hint device-priority__hint--error" role="alert">
-        فهرست اشتراک‌ها تأیید نشد؛ نمی‌توان گفت هیچ اشتراک زنده‌ای ندارید.
-      </p>
-      <p v-else class="device-priority__hint">
-        هنوز اشتراک زنده‌ای باز نکرده‌اید؛ دستگاه پخش‌کننده هنگام ساختن اولین اشتراک انتخاب می‌شود.
-      </p>
-      <p v-if="api.failed.value && api.shareRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
-        دستگاه‌های پخش‌کنندهٔ بالا ممکن است کهنه باشند؛ فهرست را تازه کنید.
-      </p>
+        <v-btn v-if="!row.isCurrent" size="small" variant="tonal" color="error"
+          :disabled="api.loading.value || api.failed.value || terminating"
+          :aria-label="`پایان نشست ${row.label}`" @click="askTerminate(row)">پایان نشست</v-btn>
+      </li>
+    </ul>
+    <p v-else-if="api.loading.value" class="device-priority__hint" role="status">در حال بازبینی نشست‌ها…</p>
+    <p v-else-if="api.failed.value" class="device-priority__hint device-priority__hint--error" role="alert">
+      فهرست نشست‌ها تأیید نشد؛ دوباره تلاش کنید.
+    </p>
+    <p v-else class="device-priority__hint">نشست واردشده‌ای پیدا نشد.</p>
+    <p v-if="api.failed.value && api.deviceRows.value.length" class="device-priority__hint device-priority__hint--error" role="alert">
+      آخرین خواندن ناموفق بود؛ نشست‌های بالا ممکن است دیگر فعال نباشند. برای پایان نشست، فهرست را تازه کنید.
+    </p>
+    <p v-if="api.deviceRows.value.some(row => row.isCurrent)" class="device-priority__hint">
+      برای پایان همین نشست، از گزینهٔ «خروج» در منوی حساب استفاده کنید.
+    </p>
+    <p v-if="message" class="device-priority__hint" :class="error ? 'device-priority__hint--error' : ''" role="status" aria-live="polite">{{ message }}</p>
 
-      <p class="device-priority__status" role="status" aria-live="polite" :class="statusClass">
-        {{ api.status.value?.text ?? "تغییری انجام نشده است." }}
-      </p>
-    </v-card>
-  </div>
+    <v-dialog v-model="confirmOpen" max-width="420" scrollable aria-labelledby="device-termination-title">
+      <v-card v-if="pending" rounded="xl">
+        <v-card-title id="device-termination-title">پایان این نشست؟</v-card-title>
+        <v-card-text class="device-priority__confirm">
+          <p>دسترسی <bdi dir="auto">{{ pending.label }}</bdi> بلافاصله قطع می‌شود. اگر این دستگاه موقعیت اشتراکی را پخش می‌کند، ممکن است پخش تا انتخاب یا بازتخصیص دستگاه دیگری متوقف شود.</p>
+        </v-card-text>
+        <v-card-actions class="device-priority__confirm-actions">
+          <v-spacer />
+          <v-btn variant="text" :disabled="terminating" @click="confirmOpen = false">بازگشت</v-btn>
+          <v-btn color="error" variant="flat" :loading="terminating" @click="terminate">پایان نشست</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+  </v-card>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive } from "vue";
-import type { LocationShare } from "@shared/index";
-import { formatDuration, shareRowLabel, type ShareRowKind } from "@/sharing/share-form";
+import { onBeforeUnmount, ref, watch } from "vue";
+import { useAuthStore } from "@/stores/auth";
+import { revokeUserDevice } from "@/api/devices";
+import { friendlyErrorMessage } from "@/api/error-message";
+import { formatDuration } from "@/sharing/share-form";
 import type { DeviceSettings } from "@/composables/use-device-settings";
-import { deviceLabelFor } from "@/settings/priority-device";
+import type { DeviceRow } from "@/settings/priority-device";
+import { shareSessionKey } from "@/sharing/share-submission-fence";
 
-/**
- * The Active Devices table and the per-share priority chooser (spec §7.3, T2.3.5).
- *
- * A renderer: the ages, the eligibility of a row, the body a click produces and every refusal sentence
- * come from `use-device-settings` and `settings/priority-device.ts`. The one thing decided here is what
- * the drafts hold — a per-share selection that has not been applied yet, kept out of the composable so
- * that a user can look at a different device before committing to it.
- */
-const props = defineProps<{
-  api: DeviceSettings;
-  names?: ReadonlyMap<string, string>;
-}>();
+const { api } = defineProps<{ api: DeviceSettings }>();
+const auth = useAuthStore();
+const confirmOpen = ref(false);
+const pending = ref<DeviceRow | null>(null);
+const terminating = ref(false);
+const message = ref<string | null>(null);
+const error = ref(false);
+let disposed = false;
+onBeforeUnmount(() => { disposed = true; });
+const session = () => shareSessionKey(auth.user?.id ?? null, auth.accessToken);
 
-const drafts = reactive<Record<string, string>>({});
-
-const statusClass = computed(() =>
-  props.api.status.value ? `device-priority__status--${props.api.status.value.tone}` : ""
-);
-
-function shareLabel(share: { targetUserId: string; targetUsername?: string | null }): string {
-  const names = props.names ?? new Map<string, string>();
-  return shareRowLabel(share.targetUserId, names, share.targetUsername);
-}
+watch(session, () => {
+  pending.value = null;
+  confirmOpen.value = false;
+  message.value = null;
+}, { flush: "sync" });
 
 function ageText(minutes: number): string {
-  if (minutes <= 0) return "همین الان";
-  return `${formatDuration(minutes)} پیش`;
+  return minutes <= 0 ? "همین الان" : `${formatDuration(minutes)} پیش`;
 }
 
-function pluralShares(count: number): string {
-  return `${count.toLocaleString("fa-IR")} اشتراک`;
+function askTerminate(row: DeviceRow): void {
+  if (row.isCurrent || api.failed.value || api.loading.value || terminating.value) return;
+  pending.value = row;
+  message.value = null;
+  confirmOpen.value = true;
 }
 
-function stateLabel(kind: ShareRowKind, remainingMinutes: number | null): string {
-  if (kind === "permanent") return "همیشگی";
-  if (kind === "expired") return "منقضی شده";
-  return `${formatDuration(remainingMinutes ?? 0)} مانده`;
-}
-
-function chipColor(kind: ShareRowKind): string {
-  if (kind === "expired") return "grey";
-  return kind === "permanent" ? "primary" : "secondary";
-}
-
-function pinnedLabel(share: LocationShare): string {
-  return deviceLabelFor(props.api.deviceRows.value, share.priorityDeviceId);
-}
-
-function busy(shareId: string): boolean {
-  return props.api.busyShareId.value === shareId;
-}
-
-function canApply(entry: { share: LocationShare; row: { kind: ShareRowKind } }): boolean {
-  const chosen = drafts[entry.share.id];
-  if (!chosen || entry.row.kind === "expired" || props.api.busyShareId.value || props.api.bulkRunning.value ||
-      props.api.loading.value || props.api.failed.value) return false;
-  // The button is disabled when it would do nothing the server has not already done. The composable
-  // refuses the same case; a control that is lit for a no-op is a bug the user finds by pressing it.
-  return chosen !== entry.share.priorityDeviceId;
-}
-
-function apply(shareId: string): void {
-  const chosen = drafts[shareId];
-  if (!chosen) return;
-  void props.api.assign(shareId, chosen);
-}
-
-function applyToAll(): void {
-  const chosen = props.api.currentDeviceId.value;
-  if (!chosen) return;
-  void props.api.assignEverywhere(chosen);
+async function terminate(): Promise<void> {
+  const target = pending.value;
+  if (!target || target.isCurrent || terminating.value || api.failed.value || api.loading.value) return;
+  const identity = session();
+  terminating.value = true;
+  try {
+    await auth.ensureSession();
+    if (!identity || identity !== session() || disposed) return;
+    const token = auth.accessToken;
+    const device = api.devices.value.find(row => row.deviceId === target.deviceId);
+    if (!token || !device || device.isCurrentDevice) {
+      confirmOpen.value = false;
+      pending.value = null;
+      message.value = "این نشست دیگر در فهرست نیست؛ فهرست را تازه کنید.";
+      error.value = true;
+      await api.refresh();
+      return;
+    }
+    await revokeUserDevice(device.id, token);
+    if (identity !== session() || disposed) return;
+    confirmOpen.value = false;
+    pending.value = null;
+    message.value = "نشست پایان یافت. وضعیت دستگاه پخش‌کننده را در اشتراک‌های موقعیت بررسی کنید.";
+    error.value = false;
+    await api.refresh();
+  } catch (cause) {
+    if (identity !== session() || disposed) return;
+    message.value = friendlyErrorMessage(cause, "پایان نشست انجام نشد؛ دوباره تلاش کنید.");
+    error.value = true;
+    confirmOpen.value = false;
+    await api.refresh();
+  } finally {
+    terminating.value = false;
+  }
 }
 </script>
 
 <style scoped>
-.device-priority {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
 .device-priority__card {
   border: 1px solid rgba(25, 53, 54, 0.08);
   background: rgb(var(--v-theme-surface));
   box-shadow: var(--bb-shadow-surface) !important;
+  padding-bottom: 0.5rem;
 }
-
-.device-priority__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem 1.3rem 0.6rem;
-}
-
-.device-priority__kicker {
-  margin: 0;
-  color: #536d6c;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.device-priority__header h2 {
-  margin: 0.15rem 0 0;
-  color: #193536;
-  font-size: 1.05rem;
-  font-weight: 800;
-}
-
-.device-priority__table {
-  padding: 0 0.4rem 0.6rem;
-}
-
-.device-priority__table th {
-  color: #536d6c;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.device-priority__table td {
-  font-size: 0.82rem;
-}
-
-.device-priority__device-name {
-  font-weight: 700;
-}
-
-.device-priority__badge {
-  margin-inline-start: 0.4rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 999px;
-  background: rgba(14, 102, 102, 0.12);
-  color: #0e6666;
-  font-size: 0.66rem;
-  font-weight: 700;
-}
-
-.device-priority__muted {
-  color: #536d6c;
-}
-
-.device-priority__skeleton {
-  margin: 0 1.3rem 0.8rem;
-  max-width: calc(100% - 2.6rem);
-  color: #536d6c;
-  font-size: 0.76rem;
-}
-
-.device-priority__hint {
-  margin: 0;
-  padding: 0 1.3rem 1rem;
-  color: #536d6c;
-  font-size: 0.76rem;
-  line-height: 1.7;
-}
-
-.device-priority__hint--error {
-  color: #b3261e;
-}
-
-.device-priority__shares {
-  display: flex;
-  flex-direction: column;
-  gap: 0.8rem;
-  padding: 0 1.3rem 0.6rem;
-}
-
-.device-priority__share {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid rgba(25, 53, 54, 0.1);
-  border-radius: var(--bb-radius-nested, 16px);
-}
-
-.device-priority__share-head {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-}
-
-.device-priority__share-name {
-  font-size: 0.88rem;
-  font-weight: 800;
-}
-
-.device-priority__share-body {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
-
-.device-priority__share-body :deep(.v-select) {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.device-priority__share-body .v-btn {
-  flex: 0 0 auto;
-  margin-top: 0.35rem;
-}
-
-.device-priority__share-now {
-  margin: 0;
-  color: #536d6c;
-  font-size: 0.72rem;
-}
-
-.device-priority__status {
-  margin: 0;
-  padding: 0.55rem 1.3rem 1rem;
-  color: #536d6c;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.7;
-}
-
-.device-priority__status--ok {
-  color: #1b6f4d;
-}
-
-.device-priority__status--error {
-  color: #b3261e;
-}
-
-:global(:root.dark .device-priority__card) {
-  border-color: rgba(226, 240, 238, 0.12);
-  background: rgb(27, 41, 42);
-}
-
-:global(:root.dark .device-priority__header h2) {
-  color: #edf5f2;
-}
-
-:global(:root.dark .device-priority__kicker),
-:global(:root.dark .device-priority__table th),
-:global(:root.dark .device-priority__muted),
-:global(:root.dark .device-priority__hint),
-:global(:root.dark .device-priority__status),
-:global(:root.dark .device-priority__share-now) {
-  color: #a0b6b2;
-}
-
-:global(:root.dark .device-priority__hint--error),
-:global(:root.dark .device-priority__status--error) {
-  color: #ffb4ab;
-}
-
-:global(:root.dark .device-priority__status--ok) {
-  color: #7fdcb2;
-}
-
-:global(:root.dark .device-priority__share) {
-  border-color: rgba(226, 240, 238, 0.14);
-}
-
-@media (max-width: 600px) {
-  .device-priority__header,
-  .device-priority__hint,
-  .device-priority__status {
-    padding-inline: 0.85rem;
-  }
-
-  .device-priority__shares {
-    padding-inline: 0.85rem;
-  }
-
-  .device-priority__share-body {
-    flex-wrap: wrap;
-  }
+.device-priority__header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem 1.2rem 0.35rem; }
+.device-priority__kicker { margin: 0; color: #536d6c; font-size: 0.75rem; font-weight: 700; }
+.device-priority__header h2 { margin: 0.1rem 0 0; color: #193536; font-size: 1.08rem; font-weight: 800; }
+.device-priority__hint { margin: 0; padding: 0.4rem 1.2rem; color: #536d6c; font-size: 0.82rem; line-height: 1.7; }
+.device-priority__hint--error { color: #b3261e; }
+.device-priority__skeleton { padding: 0.5rem 1.2rem; color: #536d6c; font-size: 0.82rem; }
+.device-priority__list { display: grid; gap: 0.5rem; list-style: none; padding: 0.5rem 1.2rem; margin: 0; }
+.device-priority__session { display: flex; align-items: center; gap: 0.85rem; padding: 0.8rem;
+  border: 1px solid rgba(25, 53, 54, 0.1); border-radius: var(--bb-radius-nested, 16px); }
+.device-priority__icon { flex: none; color: #536d6c; }
+.device-priority__details { min-width: 0; flex: 1 1 auto; }
+.device-priority__name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.device-priority__name { color: #193536; font-size: 0.93rem; overflow-wrap: anywhere; }
+.device-priority__meta { margin: 0.2rem 0 0; display: flex; flex-wrap: wrap; gap: 0.2rem 0.8rem;
+  color: #536d6c; font-size: 0.77rem; line-height: 1.5; }
+.device-priority__meta bdi { overflow-wrap: anywhere; }
+.device-priority__session > .v-btn { flex: none; min-height: 44px; }
+.device-priority__confirm p { margin: 0 0 0.5rem; line-height: 1.7; overflow-wrap: anywhere; }
+:global(:root.dark .device-priority__card) { border-color: rgba(226, 240, 238, 0.12); background: rgb(27, 41, 42); }
+:global(:root.dark .device-priority__header h2), :global(:root.dark .device-priority__name) { color: #edf5f2; }
+:global(:root.dark .device-priority__kicker), :global(:root.dark .device-priority__hint),
+:global(:root.dark .device-priority__meta), :global(:root.dark .device-priority__icon),
+:global(:root.dark .device-priority__skeleton) { color: #a0b6b2; }
+:global(:root.dark .device-priority__hint--error) { color: #ffb4ab; }
+:global(:root.dark .device-priority__session) { border-color: rgba(226, 240, 238, 0.14); }
+@media (max-width: 599px) {
+  .device-priority__header, .device-priority__hint, .device-priority__skeleton { padding-inline: 0.85rem; }
+  .device-priority__list { padding-inline: 0.85rem; }
+  .device-priority__session { flex-wrap: wrap; }
+  .device-priority__meta bdi { overflow-wrap: anywhere; }
+.device-priority__session > .v-btn { margin-inline-start: auto; }
+  .device-priority__confirm-actions { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .device-priority__confirm-actions :deep(.v-spacer) { display: none; }
+  .device-priority__confirm-actions :deep(.v-btn) { width: 100%; min-height: 44px; margin: 0; }
 }
 </style>

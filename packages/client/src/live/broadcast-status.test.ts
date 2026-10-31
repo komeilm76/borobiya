@@ -22,7 +22,7 @@ describe("describeBroadcastState", () => {
     expect(view.detail).toContain("HTTPS");
   });
 
-  it("guides non-priority devices to /_user/devices on WRONG_DEVICE rejection or ignored shares", () => {
+  it("guides non-priority devices to their per-share controls on WRONG_DEVICE rejection or ignored shares", () => {
     const rejected = describeBroadcastState({
       status: "rejected",
       lastErrorCode: "WRONG_DEVICE",
@@ -31,8 +31,7 @@ describe("describeBroadcastState", () => {
       priority: { hasMultipleDevices: true, broadcastingCount: 0, ignoredCount: 2, hasShares: true }
     });
     expect(rejected.tone).toBe("warn");
-    expect(rejected.showDevicesLink).toBe(true);
-    expect(rejected.detail).toContain("دستگاه‌ها");
+    expect(rejected.detail).toContain("اشتراک‌های من");
 
     const passiveWarning = describeBroadcastState({
       status: "broadcasting",
@@ -42,7 +41,6 @@ describe("describeBroadcastState", () => {
       priority: { hasMultipleDevices: true, broadcastingCount: 0, ignoredCount: 2, hasShares: true }
     });
     expect(passiveWarning.tone).toBe("warn");
-    expect(passiveWarning.showDevicesLink).toBe(true);
   });
 
   it("distinguishes geolocation permission denial from generic socket errors", () => {

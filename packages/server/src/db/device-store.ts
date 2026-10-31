@@ -1,12 +1,12 @@
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
 import type { Database } from "./client";
 import { userSessions } from "./schema";
 import { PRESENCE_STALE_MS } from "../realtime/presence";
 
 /**
- * Reads for the Active Devices table (spec §7.3). Writing `user_sessions` belongs to
- * `login-store.ts` (login, refresh rotation, revocation); this store only reads it back so the
- * account owner — and the priority-device selection in T2.3.3 — can see what is signed in.
+ * Account-scoped active-session read and remote-session termination. Login and refresh rotation
+ * remain in login-store.ts; a remote termination updates the same session columns as logout,
+ * but only for another active session owned by the authenticated caller.
  */
 
 export interface UserDeviceRow {
@@ -36,6 +36,8 @@ export interface UserDeviceStore {
     currentSessionId: string;
     limit: number;
   }): Promise<UserDeviceRecord[]>;
+  /** Atomic, owner-scoped and excludes the caller's own session even if a forged id reaches the route. */
+  revokeOtherSession(input: { userId: string; sessionId: string; currentSessionId: string }): Promise<boolean>;
 }
 
 /** The single statement behind the device list, exported so its SQL shape is testable. */
@@ -65,5 +67,18 @@ export class DrizzleUserDeviceStore implements UserDeviceStore {
   }): Promise<UserDeviceRecord[]> {
     const rows = await userDeviceListQuery(this.db, { userId: input.userId, limit: input.limit });
     return rows.map((row) => ({ ...row, isCurrentDevice: row.id === input.currentSessionId }));
+  }
+
+  async revokeOtherSession(input: { userId: string; sessionId: string; currentSessionId: string }): Promise<boolean> {
+    const revoked = await this.db.update(userSessions)
+      .set({ refreshTokenHash: null, isOnline: false })
+      .where(and(
+        eq(userSessions.userId, input.userId),
+        eq(userSessions.id, input.sessionId),
+        ne(userSessions.id, input.currentSessionId),
+        isNotNull(userSessions.refreshTokenHash)
+      ))
+      .returning({ id: userSessions.id });
+    return revoked.length === 1;
   }
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchUserDevices } from "./devices";
+import { fetchUserDevices, revokeUserDevice } from "./devices";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -55,5 +55,21 @@ describe("fetchUserDevices", () => {
     stubFetch([bare]);
     const [device] = await fetchUserDevices("access-token");
     expect(device).toMatchObject({ deviceName: null, ip: null });
+  });
+});
+
+describe("revokeUserDevice", () => {
+  it("uses an authenticated same-origin DELETE for one session and validates confirmation", async () => {
+    const calls = stubFetch({ ok: true });
+    await revokeUserDevice(row.id, "access-token");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe(`/api/_user/devices/${row.id}`);
+    expect(calls[0]!.init.method).toBe("DELETE");
+    expect(new Headers(calls[0]!.init.headers).get("authorization")).toBe("Bearer access-token");
+  });
+
+  it("does not present a malformed response as successful termination", async () => {
+    stubFetch({ ok: false });
+    await expect(revokeUserDevice(row.id, "access-token")).rejects.toThrow();
   });
 });

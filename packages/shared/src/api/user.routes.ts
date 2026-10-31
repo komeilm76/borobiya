@@ -2,7 +2,8 @@ import {
   completeSecurityQuestionsResponseSchema,
   completeSecurityQuestionsSchema
 } from "../schemas/auth";
-import { errorSchema } from "../schemas/common";
+import { errorSchema, idSchema } from "../schemas/common";
+import { z } from "zod";
 import {
   devicesSchema,
   updateUserProfileSchema,
@@ -45,6 +46,21 @@ export const userRoutes = {
       operationId: "userListDevices",
       summary: "List devices associated with the authenticated account",
       tags: ["user"],
+      access: "authenticated"
+    }
+  }),
+  revokeDevice: defineRoute({
+    method: "DELETE",
+    url: "/_user/devices/:sessionId",
+    schema: {
+      params: z.strictObject({ sessionId: idSchema }),
+      responses: { 200: z.strictObject({ ok: z.literal(true) }), 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
+    },
+    meta: {
+      operationId: "userRevokeDevice",
+      summary: "Terminate one other signed-in session of the account",
+      description: "The current session must use logout. Unknown, already terminated and other accounts' sessions return the same 404; only a session of the caller's account can be revoked.",
+      tags: ["user", "auth"],
       access: "authenticated"
     }
   }),

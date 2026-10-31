@@ -200,32 +200,25 @@ describe("deviceLabelFor", () => {
  * The panel and the view are not mounted in tests (repo convention), so the two rules that only exist as
  * template wiring are pinned against their source.
  */
-describe("the settings screen", () => {
+describe("device pin management lives beside the owner share, not in the sessions screen", () => {
   const panel = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
-  expect(panel).toContain("`آفلاین · ${ageText(row.minutesSinceActive)}`");
+  const lists = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
   const view = readFileSync(new URL("../views/_user/UserDevicesView.vue", import.meta.url), "utf8");
   const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
 
-  it("builds no request body outside the planner", () => {
-    // One payload builder for the share endpoint: a second place assembling `targetUserIds` is how a
-    // settings screen starts extending expiries.
-    expect(panel).not.toContain("targetUserIds");
-    expect(panel).toContain("api.assign(");
-    expect(panel).toContain("api.assignEverywhere(");
-  });
-
-  it("refuses the click the plan refuses, and says the same thing", () => {
-    expect(panel).toContain("chosen !== entry.share.priorityDeviceId");
-    expect(panel).toContain('role="status"');
-    expect(panel).toContain('aria-live="polite"');
+  it("keeps pin writes in the shared planner and per-user control", () => {
+    expect(lists).not.toContain("targetUserIds");
+    expect(lists).toContain("deviceSettings.assign(row.id, choice)");
+    expect(lists).toContain("deviceSettings.choicesFor(row.share)");
+    expect(lists).toContain("chosen !== row.share.priorityDeviceId");
+    expect(panel).not.toContain("api.assign(");
     expect(view).toContain("void settings.refresh()");
   });
 
-  it("keeps one table of server refusals for both screens", () => {
-    // The dialog and the devices screen answer `unknown_priority_device` with the same sentence, so the
-    // switch lives in `sharing/share-form.ts` and neither component may restate it.
+  it("keeps the same server rejection table for the dialog and pin controls", () => {
     expect(panel).not.toContain("unknown_priority_device");
-    expect(dialog).not.toContain("unknown_priority_device");
+    expect(lists).not.toContain("unknown_priority_device");
     expect(dialog).toContain("rejectionText(rejection)");
+    expect(lists).toContain('aria-live="polite"');
   });
 });

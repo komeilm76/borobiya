@@ -141,6 +141,24 @@ async function settle(): Promise<void> {
 const posts = () => calls.filter((call) => call.method === "POST");
 const deviceReads = () => calls.filter((call) => call.url.endsWith("/_user/devices"));
 
+describe("sessions-only read", () => {
+  it("loads signed-in sessions without depending on the share endpoint", async () => {
+    const scope = effectScope();
+    const api = scope.run(() => useDeviceSettings({
+      accessToken: ref("access-token"), accountId: ref("owner-a"), includeShares: false
+    }))!;
+    responder = (url, method) => url.endsWith("/_user/location/shares")
+      ? { status: 500, body: { code: "BROKEN" } }
+      : defaultResponder(url, method);
+    await api.refresh();
+    expect(api.deviceRows.value).toHaveLength(2);
+    expect(api.loaded.value).toBe(true);
+    expect(api.failed.value).toBe(false);
+    expect(calls.some(call => call.url.endsWith("/_user/location/shares"))).toBe(false);
+    scope.stop();
+  });
+});
+
 describe("reading the two lists", () => {
   it("starts unresolved, reports an initial failed read rather than an empty account, and recovers on retry", async () => {
     const { api } = mount();
@@ -843,11 +861,10 @@ describe("leaving the screen", () => {
       priorityDeviceId: PHONE
     });
 
-    const panelSource = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
-    expect(panelSource).toContain("share.targetUsername");
-    expect(panelSource).toContain("api.currentDeviceId.value");
-    expect(panelSource).toContain("api.assignEverywhere(");
-    expect(panelSource).toContain("Boolean(api.busyShareId.value) || api.bulkRunning.value");
-    expect(panelSource).toContain("props.api.busyShareId.value || props.api.bulkRunning.value");
+    const lists = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
+    expect(lists).toContain("share.targetUsername");
+    expect(lists).toContain("deviceSettings.choicesFor(row.share)");
+    expect(lists).toContain("deviceSettings.assign(row.id, choice)");
+    expect(lists).toContain("!deviceSettings.busyShareId.value && !deviceSettings.bulkRunning.value");
   });
 });
