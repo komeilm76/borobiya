@@ -340,9 +340,8 @@ describe("duration wording", () => {
   });
 
   it("labels every preset chip by the rule rather than as a raw minute count", () => {
-    // The reported bug: a chip for 1440 minutes read "1440 دقیقه".
     expect(DURATION_PRESET_MINUTES[0]).toBe(15);
-    expect(DURATION_PRESET_MINUTES).toContain(30);
+    expect(DURATION_PRESET_MINUTES).toEqual([15, 60, 360]);
     expect(DURATION_PRESET_MINUTES).toEqual([...DURATION_PRESET_MINUTES].sort((a, b) => a - b));
     expect(new Set(DURATION_PRESET_MINUTES).size).toBe(DURATION_PRESET_MINUTES.length);
     expect(DURATION_PRESET_MINUTES.every((minutes) => minutes >= 1 && minutes <= MAX_LOCATION_SHARE_MINUTES)).toBe(true);
@@ -460,8 +459,7 @@ describe("server refusals", () => {
 
   it("phrases the duration ceiling in the same units as the chips", () => {
     // The dialog is not mounted in tests (repo convention), so this pins its source instead: the
-    // ceiling must reach for the shared formatter rather than interpolating a raw minute count again,
-    // which is the rule the chips, the slider label, and the share lists already follow.
+    // ceiling must reach for the shared formatter rather than interpolating a raw minute count.
     const source = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
     expect(source).toContain("durationWords(maxMinutes)");
     expect(source).not.toContain("${maxMinutes}");

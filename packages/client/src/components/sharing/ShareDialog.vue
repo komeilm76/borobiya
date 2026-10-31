@@ -4,12 +4,13 @@
     max-width="660"
     scrollable
     :fullscreen="$vuetify.display.smAndDown"
+    aria-labelledby="share-dialog-title"
     @update:model-value="onVisibility"
   >
     <v-card rounded="xl" class="share-dialog">
       <v-card-title class="share-dialog__title">
         <v-icon class="me-2" icon="mdi-map-marker-account-outline" />
-        اشتراک موقعیت
+        <span id="share-dialog-title">اشتراک موقعیت</span>
       </v-card-title>
 
       <v-card-text class="share-dialog__body">
@@ -18,8 +19,11 @@
             هر همراهی که انتخاب کنید فقط نقاط ثبت‌شدهٔ شما در بازهٔ انتخابی را روی نقشه می‌بیند و هر
             زمان بخواهید می‌توانید دسترسی این بازه را حذف کنید.
           </template>
+          <template v-else-if="mode === 'permanent'">
+            هر همراهی که انتخاب کنید موقعیت زندهٔ شما را تا وقتی اشتراک را خاموش کنید می‌بیند.
+          </template>
           <template v-else>
-            هر همراهی که انتخاب کنید موقعیت زندهٔ شما را تا پایان بازهٔ انتخابی می‌بیند. می‌توانید هر
+            هر همراهی که انتخاب کنید موقعیت زندهٔ شما را تا پایان مدت انتخابی می‌بیند. می‌توانید هر
             زمان که خواستید اشتراک را لغو کنید.
           </template>
         </p>
@@ -49,30 +53,9 @@
             </template>
           </v-text-field>
 
-          <div class="share-dialog__filters">
-            <v-select
-              v-model="incidentTypeChoice"
-              :items="incidentTypeOptions"
-              item-title="title"
-              item-value="value"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="share-dialog__rating"
-              label="نوع رویداد"
-            />
-            <v-select
-              v-model="minRatingChoice"
-              :items="ratingOptions"
-              item-title="title"
-              item-value="value"
-              density="compact"
-              variant="outlined"
-              hide-details
-              class="share-dialog__rating"
-              label="حداقل امتیاز"
-            />
-            <v-btn-toggle v-model="onlineFilter" density="compact" divided mandatory>
+          <div class="share-dialog__online-filter">
+            <span id="share-online-label" class="share-dialog__label">نمایش همراهان</span>
+            <v-btn-toggle v-model="onlineFilter" density="compact" divided mandatory aria-labelledby="share-online-label">
               <v-btn value="all" size="small">همه</v-btn>
               <v-btn value="online" size="small">
                 <v-icon class="me-1" icon="mdi-wifi" size="16" />
@@ -122,7 +105,7 @@
 
           <v-alert
             v-else-if="
-              (hasTerm || incidentTypeChoice !== null || minRatingChoice !== null || onlineFilter === 'online') &&
+              (hasTerm || onlineFilter === 'online') &&
               !searchFailed && !searching && (termTooShort || searchVerified)
             "
             class="mt-2"
@@ -159,15 +142,11 @@
         <v-divider class="my-5" />
 
         <div class="share-dialog__field">
-          <p class="share-dialog__label">نوع اشتراک</p>
-          <v-btn-toggle v-model="mode" density="comfortable" divided mandatory>
-            <v-btn value="timed">
-              <v-icon class="me-1" icon="mdi-timer-outline" size="18" />
-              مدت‌دار
-            </v-btn>
-            <v-btn value="permanent">
-              <v-icon class="me-1" icon="mdi-infinity" size="18" />
-              تا لغو دستی
+          <p id="share-kind-label" class="share-dialog__label">نوع اشتراک</p>
+          <v-btn-toggle v-model="shareKind" density="comfortable" divided mandatory aria-labelledby="share-kind-label">
+            <v-btn value="live">
+              <v-icon class="me-1" icon="mdi-map-marker-account-outline" size="18" />
+              موقعیت زنده
             </v-btn>
             <v-btn value="history">
               <v-icon class="me-1" icon="mdi-map-marker-path" size="18" />
@@ -175,37 +154,30 @@
             </v-btn>
           </v-btn-toggle>
 
-          <div v-if="mode === 'timed'" class="share-dialog__duration">
-            <p class="share-dialog__duration-label">
-              {{ durationWords(durationMinutes) }}
-              <span class="share-dialog__duration-units">{{ durationMinutes }} دقیقه</span>
-            </p>
-            <v-slider
-              v-model="durationMinutes"
-              :min="1"
-              :max="maxMinutes"
-              :step="1"
-              color="primary"
-              hide-details
-              aria-label="مدت اشتراک بر حسب دقیقه"
-            />
-            <div class="share-dialog__presets" role="group" aria-label="میان‌برهای مدت">
+          <div v-if="shareKind === 'live'" class="share-dialog__duration">
+            <p class="share-dialog__label">مدت اشتراک زنده</p>
+            <div class="share-dialog__presets" role="group" aria-label="مدت دسترسی به موقعیت زنده">
               <button
                 v-for="minutes in presets"
                 :key="minutes"
                 type="button"
                 class="share-dialog__chip"
-                :class="{ 'share-dialog__chip--on': durationMinutes === minutes }"
-                :aria-pressed="durationMinutes === minutes"
-                @click="durationMinutes = minutes"
+                :class="{ 'share-dialog__chip--on': mode === 'timed' && durationMinutes === minutes }"
+                :aria-pressed="mode === 'timed' && durationMinutes === minutes"
+                @click="chooseLiveDuration(minutes)"
               >
                 {{ durationWords(minutes) }}
               </button>
+              <button
+                type="button"
+                class="share-dialog__chip"
+                :class="{ 'share-dialog__chip--on': mode === 'permanent' }"
+                :aria-pressed="mode === 'permanent'"
+                @click="chooseLiveDuration(null)"
+              >
+                تا وقتی خاموش کنم
+              </button>
             </div>
-            <p class="share-dialog__hint">
-              سقف {{ durationWords(maxMinutes) }} ({{ maxMinutes }} دقیقه) است؛ برای دید کامل‌تر «تا لغو
-              دستی» را انتخاب کنید.
-            </p>
           </div>
 
           <div v-else-if="mode === 'history'" class="share-dialog__duration">
@@ -333,11 +305,9 @@ import {
   MAX_LOCATION_SHARE_MINUTES,
   MAX_LOCATION_SHARE_NOTE_LENGTH,
   MAX_LOCATION_SHARE_TARGETS,
-  type IncidentType,
   type UserDevice,
   type UserSearchResult
 } from "@shared/index";
-import { listPublicIncidentTypes } from "@/api/admin-catalog";
 import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
@@ -384,14 +354,7 @@ const emit = defineEmits<{
 const auth = useAuthStore();
 const accessToken = computed(() => auth.accessToken);
 
-const incidentTypes = ref<IncidentType[]>([]);
-const incidentTypeChoice = ref<string | null>(null);
-const minRatingChoice = ref<number | null>(null);
 const onlineFilter = ref<"all" | "online">("all");
-const incidentTypeOptions = computed(() => [
-  { title: "همهٔ تخصص‌ها", value: null as string | null },
-  ...incidentTypes.value.map((item) => ({ title: item.name, value: item.id }))
-]);
 const {
   term: searchTerm,
   results,
@@ -405,13 +368,29 @@ const {
 } = useTargetSearch({
   accessToken,
   ensureSession: () => auth.refreshSession(),
-  incidentType: computed(() => incidentTypeChoice.value ?? undefined),
-  minRating: computed(() => minRatingChoice.value ?? undefined),
   online: computed(() => (onlineFilter.value === "online" ? true : undefined))
 });
 
 const mode = ref<ShareMode>("timed");
-const durationMinutes = ref(24 * 60);
+const lastLiveMode = ref<"timed" | "permanent">("timed");
+const shareKind = computed<"live" | "history">({
+  get: () => mode.value === "history" ? "history" : "live",
+  set: (kind) => {
+    if (kind === "history") {
+      if (mode.value !== "history") lastLiveMode.value = mode.value;
+      mode.value = "history";
+    } else if (mode.value === "history") {
+      mode.value = lastLiveMode.value;
+    }
+  }
+});
+const durationMinutes = ref(60);
+
+function chooseLiveDuration(minutes: number | null): void {
+  mode.value = minutes === null ? "permanent" : "timed";
+  if (minutes !== null) durationMinutes.value = minutes;
+  lastLiveMode.value = mode.value;
+}
 const note = ref("");
 const recipients = ref<UserSearchResult[]>([]);
 
@@ -453,13 +432,6 @@ const maxNote = MAX_LOCATION_SHARE_NOTE_LENGTH;
 const maxTargets = MAX_LOCATION_SHARE_TARGETS;
 const presets = DURATION_PRESET_MINUTES;
 const historyPresets = HISTORY_PRESET_HOURS;
-const ratingOptions = [
-  { title: "بدون فیلتر امتیاز", value: null },
-  { title: "۳ و بالاتر", value: 3 },
-  { title: "۴ و بالاتر", value: 4 },
-  { title: "۴٫۵ و بالاتر", value: 4.5 }
-];
-
 const parsedHistoryMaxPoints = computed<number | null>(() => {
   const raw = String(historyMaxPointsInput.value ?? "").trim();
   if (!raw) return null;
@@ -655,15 +627,6 @@ function close(): void {
   emit("update:modelValue", false);
 }
 
-async function loadIncidentTypes(): Promise<void> {
-  if (incidentTypes.value.length > 0) return;
-  try {
-    incidentTypes.value = await listPublicIncidentTypes();
-  } catch {
-    // Keep search operational even if the public specialty catalog is temporarily unreachable.
-  }
-}
-
 watch(
   () => props.modelValue,
   (open) => {
@@ -671,13 +634,11 @@ watch(
       formError.value = null;
       createdCount.value = 0;
       reusedCount.value = 0;
-      void loadIncidentTypes();
       return;
     }
     invalidateSubmission();
     cancelPending();
     searchTerm.value = "";
-    incidentTypeChoice.value = null;
   },
   { flush: "sync" }
 );
@@ -731,18 +692,15 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   font-weight: 800;
 }
 
-.share-dialog__filters {
+.share-dialog__online-filter {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem 0.75rem;
   margin-top: 0.75rem;
 }
 
-.share-dialog__rating {
-  min-width: 11rem;
-  max-width: 14rem;
-}
+.share-dialog__online-filter .share-dialog__label { margin: 0; }
 
 .share-dialog__hint {
   margin: 0.5rem 0 0;
@@ -808,22 +766,6 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   font: inherit;
 }
 
-.share-dialog__duration-label {
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin: 0 0 0.25rem;
-  color: var(--bb-color-text);
-  font-size: 0.95rem;
-  font-weight: 700;
-}
-
-.share-dialog__duration-units {
-  color: var(--bb-color-muted);
-  font-size: 0.78rem;
-  font-weight: 500;
-}
-
 .share-dialog__presets {
   display: flex;
   flex-wrap: wrap;
@@ -832,8 +774,8 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__chip {
-  min-height: 2.1rem;
-  padding: 0.25rem 0.7rem;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.85rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.18);
   border-radius: 999px;
   background: rgba(var(--v-theme-on-surface), 0.03);

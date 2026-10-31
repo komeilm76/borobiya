@@ -314,7 +314,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     expect(playbackPanel).toContain('props.api.selectSource("grant")');
     expect(playbackPanel).toContain("props.api.selectGrant(");
 
-    expect(shareDialog).toContain("incidentTypeChoice !== null || minRatingChoice !== null || onlineFilter === 'online'");
+    expect(shareDialog).toContain("(hasTerm || onlineFilter === 'online')");
 
     const memberSearch = readFileSync(new URL("../admin/use-category-member-search.ts", import.meta.url), "utf8");
     expect(adminCategories).toContain("useCategoryMemberSearch(async (term) =>");

@@ -314,15 +314,8 @@ export function choiceDeviceOptionLabel(
   return matched.isCurrentDevice ? `${name} (${currentDeviceSuffix})` : name;
 }
 
-/**
- * Slider presets, in minutes. A share that outlasts an operation is usually hours or days, so the
- * short end of the range is minutes and the long end jumps in whole days. The labels are *not*
- * stored here: a chip that says `1d` is a translation table waiting to drift from the rule below, so
- * the component formats each value with `formatDuration`.
- */
-export const DURATION_PRESET_MINUTES: readonly number[] = [
-  15, 30, 60, 180, 360, 720, 24 * 60, 3 * 24 * 60, 7 * 24 * 60
-];
+/** Live-share choices (permanent is a separate mode, not a duration). */
+export const DURATION_PRESET_MINUTES: readonly number[] = [15, 60, 360];
 
 export const MINUTES_PER_HOUR = 60;
 export const MINUTES_PER_DAY = 24 * 60;
