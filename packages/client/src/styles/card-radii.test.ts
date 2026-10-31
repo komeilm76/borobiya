@@ -97,7 +97,7 @@ describe("card corner scale (source-pinned; no Vue mount)", () => {
     expect(declaration("components/sharing/LiveBroadcastBar.vue", ".broadcast-bar--inset"))
       .toContain("border-radius: var(--bb-radius-nested, 16px)");
     const shares = readFileSync(join(src, "views/_user/UserLocationSharesView.vue"), "utf8");
-    expect(shares).toContain("<LiveBroadcastBar />");
+    expect(shares).not.toContain("<LiveBroadcastBar");
   });
 
   it("keeps alert banners on one scale instead of mixing card-sized corners into them", () => {

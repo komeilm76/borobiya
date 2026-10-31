@@ -7,12 +7,12 @@ const panel = readFileSync(new URL("../../components/map/LiveCompanionPanel.vue"
 const dialog = readFileSync(new URL("../../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
 
 describe("sharing from the map companions widget", () => {
-  it("opens the existing recipient form as a full-screen dialog and keeps the map broadcast control separate", () => {
+  it("opens the existing recipient form fullscreen on phones only and keeps the map broadcast control separate", () => {
     expect(panel).toContain('اشتراک موقعیت');
     expect(panel).toContain("$emit('create-share')");
     expect(view).toContain('@create-share="shareOpen = true"');
-    expect(view).toContain('<ShareDialog v-model="shareOpen" fullscreen');
-    expect(dialog).toContain(':fullscreen="fullscreen || $vuetify.display.smAndDown"');
+    expect(view).toContain('<ShareDialog v-model="shareOpen" :fullscreen="isPhone"');
+    expect(dialog).toContain(':fullscreen="fullscreen ?? $vuetify.display.xs"');
     expect(view).toContain('@shared="onShareCreated"');
     expect(view).toContain('void broadcast.refreshPriority()');
     expect(view).toContain('@click="broadcast.toggle()"');

@@ -3,7 +3,7 @@
     :model-value="modelValue"
     max-width="660"
     scrollable
-    :fullscreen="fullscreen || $vuetify.display.smAndDown"
+    :fullscreen="fullscreen ?? $vuetify.display.xs"
     :close-on-back="!fullscreen"
     aria-labelledby="share-dialog-title"
     @update:model-value="onVisibility"
@@ -374,7 +374,8 @@ import {
  * choice and the debounced search all live in `@/sharing/share-form` and
  * `@/composables/use-target-search`, where they are tested without a browser.
  */
-const props = withDefaults(defineProps<{ modelValue: boolean; fullscreen?: boolean }>(), { fullscreen: false });
+// An explicit map breakpoint wins; the standalone form defaults to phone-only fullscreen.
+const props = defineProps<{ modelValue: boolean; fullscreen?: boolean }>();
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
   (event: "shared"): void;

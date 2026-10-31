@@ -14,7 +14,7 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
   });
 
   it("keeps the form body scrollable while the live status and actions fit a narrow fullscreen footer", () => {
-    expect(source).toContain(':fullscreen="fullscreen || $vuetify.display.smAndDown"');
+    expect(source).toContain(':fullscreen="fullscreen ?? $vuetify.display.xs"');
     expect(source).toContain("    scrollable\n");
     expect(source).toContain('<v-card-text class="share-dialog__body">');
     expect(source).toContain('<v-card-actions class="share-dialog__actions">');

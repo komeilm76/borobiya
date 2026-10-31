@@ -40,9 +40,9 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
     }
   });
 
-  it("preserves inset broadcast styling alongside the standalone sharing page", () => {
+  it("preserves inset broadcast styling without reinstating the removed sharing-page bar", () => {
     const broadcast = source("../components/sharing/LiveBroadcastBar.vue");
-    expect(source("../views/_user/UserLocationSharesView.vue")).toContain("<LiveBroadcastBar />");
+    expect(source("../views/_user/UserLocationSharesView.vue")).not.toContain("<LiveBroadcastBar");
     expect(broadcast).toContain(':elevation="inset ? 0 : 2"');
     expect(rule(broadcast, ".broadcast-bar--inset")).toContain("border-radius: var(--bb-radius-nested, 16px) !important;");
   });

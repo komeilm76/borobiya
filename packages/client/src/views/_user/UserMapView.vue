@@ -175,7 +175,7 @@
       </v-card>
     </component>
 
-    <ShareDialog v-model="shareOpen" fullscreen @shared="onShareCreated" />
+    <ShareDialog v-model="shareOpen" :fullscreen="isPhone" @shared="onShareCreated" />
   </section>
 </template>
 

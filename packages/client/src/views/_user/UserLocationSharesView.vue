@@ -19,10 +19,7 @@
       </div>
     </header>
 
-    <div class="user-shares-page__stack">
-      <LiveBroadcastBar />
-      <ShareLists ref="shareLists" :device-settings="deviceSettings" @create="shareOpen = true" @changed="onSharesChanged" />
-    </div>
+    <ShareLists ref="shareLists" :device-settings="deviceSettings" @create="shareOpen = true" @changed="onSharesChanged" />
 
     <ShareDialog v-model="shareOpen" @shared="onShared" />
   </section>
@@ -32,7 +29,6 @@
 import { computed, onMounted, ref } from "vue";
 import { useDeviceSettings } from "@/composables/use-device-settings";
 import { useAuthStore } from "@/stores/auth";
-import LiveBroadcastBar from "@/components/sharing/LiveBroadcastBar.vue";
 import ShareDialog from "@/components/sharing/ShareDialog.vue";
 import ShareLists from "@/components/sharing/ShareLists.vue";
 import { useBroadcastStore } from "@/stores/broadcast";
@@ -104,11 +100,6 @@ function onSharesChanged(): void {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-}
-
-.user-shares-page__stack {
-  display: grid;
-  gap: 1rem;
 }
 
 :global(:root.dark .user-shares-page__header h1) {

@@ -7,9 +7,9 @@ const map = readFileSync(new URL("../../views/_user/UserMapView.vue", import.met
 const sharing = readFileSync(new URL("../../views/_user/UserLocationSharesView.vue", import.meta.url), "utf8");
 
 describe("broadcast controls in a narrow host / zoomed viewport (source-pinned)", () => {
-  it("keeps the companion dialog button-free and sizes standalone/inset bars by their host", () => {
+  it("keeps the companion dialog button-free and avoids restoring the broadcast bar on the shares page", () => {
     expect(map).not.toContain("<LiveBroadcastBar"); // Map sharing stays on the icon outside Companions.
-    expect(sharing).toContain("<LiveBroadcastBar />");
+    expect(sharing).not.toContain("<LiveBroadcastBar");
     expect(bar).toMatch(/\.broadcast-bar \{[^}]*container-type: inline-size;/);
     // At 200% zoom a 320px CSS viewport can be only ~160px; the old 12rem
     // minimum copy width (192 CSS px) cannot fit before card padding/actions.

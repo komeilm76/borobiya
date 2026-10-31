@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Responsive map share form and remove redundant sharing-page broadcast bar
+
+- The map companions widget still opens the same «اشتراک موقعیت» form, but only phone widths (up to 599px) make it full-screen. Tablet and desktop use the existing centered 660px, scrollable dialog; phone Back retains the map route guard. Removed the redundant «پخش زنده خاموش است» / live-broadcast bar from `/_user/location-shares` while keeping recipient/device management, share-list refresh, priority reconciliation, and the separate map broadcast Start/Stop control. New source-contract tests failed before the change and now pass. Repository lint, shared/server/client typechecks, all 63/575/1,109 tests and build pass. Rendered browser/physical-device acceptance was not available in this sandbox.
+
 ### 2026-10-31 — Proposal review pagination bug audit (map-home follow-up)
 
 - Reproduced two related defects introduced/exposed by moving proposal review into the map dialog. After opening a specific offer on page 1, navigating to page 2 left that old selection active, hiding page 2’s incident details and decision buttons behind an incorrect “no longer in your list” message. A failed page-2 read kept page-1 offers but mislabeled them “page 2 of 2”. The detail now resets its selection on page changes (while preserving an unavailable deep-linked offer warning), and the inbox store tracks the last successfully loaded page to restore its label on a failed page change without rewinding data it had already cleared. Test-first source/store regressions, including a superseded read, and mocked Chromium at 360×640 reproduced both failures before and verified both fixes after; live backend/phone acceptance is still open. Corrected README/API routing descriptions that still advertised the retired dashboard as a login destination. Repository lint, shared/server/client typechecks, all tests (62/571/1,091) and production client build passed.
