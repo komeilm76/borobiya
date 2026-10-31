@@ -193,24 +193,19 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain('instance.off("resize", frameCamera)');
   });
 
-  it("docks native map navigation in the desktop overlay gap, then restores the edge rail on phones", () => {
-    // The page is RTL: top-right navigation was hidden by the top-right history card.
-    // At the 1024px overlay cutoff the left toolbar and right history leave a 208px gap.
-    expect(1024 - (25 * 16 + 24 * 16 + 2 * 16)).toBe(208);
+  it("keeps MapLibre's compass behavior on the map without +/- and leaves other maps unchanged", () => {
     expect(canvas).toContain('new NavigationControl({');
-    expect(canvas).toContain('}), "top-right");');
+    expect(canvas).toContain('showZoom: props.showZoom');
+    expect(canvas).toContain('showCompass: true');
+    expect(canvas).toContain('visualizePitch: true');
+    expect(canvas).toContain('showZoom: true');
+    expect(view).toContain(':show-zoom="false"');
     const { descriptor } = parse(view);
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-map-test", scoped: true });
     expect(css.errors).toEqual([]);
-    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*left: 50%;[^}]*right: auto;[^}]*width: 132px;[^}]*transform: translateX\(-50%\);/);
-    // Three 44px controls share one compact row, inside the existing 96px camera top padding.
-    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right \.maplibregl-ctrl-group\s*\{[^}]*display: flex;/);
-    expect(css.code).toMatch(/@media \(max-width: 1023px\)[\s\S]*?\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*right: 0;[^}]*left: auto;[^}]*transform: none;/);
-    expect(css.code).toMatch(/@media \(max-width: 1023px\)[\s\S]*?\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right \.maplibregl-ctrl-group\s*\{[^}]*display: block;/);
-    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right \.maplibregl-ctrl-group button\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
-    expect(css.code).toMatch(/@media \(max-width: 1023px\)[\s\S]*?\.maplibregl-ctrl-group button \+ button\s*\{[^}]*border-top: 1px solid #627a7a;[^}]*border-inline-start: 0;/);
-    expect(canvas).not.toContain('showZoom: false');
-    expect(canvas).not.toContain('showCompass: false');
+    expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*position: fixed;[^}]*inset-inline-start: 1\.25rem;[^}]*inset-block-end:/);
+    expect(css.code).toContain('.maplibregl-ctrl-compass');
+    expect(css.code).not.toContain('transform: translateX(-50%)');
   });
 
   it("moves narrow map controls into a scrollable, non-occluding flow", () => {

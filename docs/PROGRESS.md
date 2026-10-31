@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Map compass in the SOS/share action rail
+
+- Removed the MapLibre `+`/`−` controls from the companion map only; other embedded maps still default to zoom controls. Retained the native compass arrow with its bearing/drag behavior, moving its 48px circular button above the right-hand recenter/share/SOS rail across map widths with safe-area spacing, short-phone clearance and keyboard focus styling. Updated the source/style contracts and map instructions; real-browser and phone visual checks remain open.
+
 ### 2026-10-31 — Bottom-left live companions card on the map
 
 - Repositioned the desktop `/_user/map` «موقعیت زنده / همراهان» card to the physical bottom-left (including in RTL), with safe-area spacing and scrolling on short windows. Shifted the MapLibre scale beside it instead of covering the control. The tablet's in-flow card and phone's full-screen companion dialog remain unchanged. Added failing-before-change source/compiled-style regression tests; focused tests and client typecheck pass. Real browser/phone visual acceptance remains open.

@@ -44,11 +44,13 @@ const props = withDefaults(defineProps<{
   zoom?: number;
   ariaLabel?: string;
   constrainBounds?: boolean;
+  showZoom?: boolean;
 }>(), {
   styleUrl: DEFAULT_MAP_STYLE,
   zoom: DEFAULT_MAP_ZOOM,
   ariaLabel: "نقشهٔ تعاملی",
-  constrainBounds: true
+  constrainBounds: true,
+  showZoom: true
 });
 
 const emit = defineEmits<{
@@ -191,7 +193,7 @@ function initializeMap(controller: AbortController, maplibre: typeof import("map
   try {
     instance.addControl(new NavigationControl({
       showCompass: true,
-      showZoom: true,
+      showZoom: props.showZoom,
       visualizePitch: true
     }), "top-right");
     instance.addControl(new ScaleControl({ maxWidth: 120, unit: "metric" }), "bottom-left");

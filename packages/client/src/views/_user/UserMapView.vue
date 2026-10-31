@@ -3,6 +3,7 @@
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
+      :show-zoom="false"
       aria-label="نقشهٔ تعاملی"
       @ready="onMapReady"
     />
@@ -1138,41 +1139,51 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border-radius: 0;
 }
 
-/* This page is RTL: MapLibre's physical top-right rail sits directly behind the history card.
- * Dock only this map's native navigation controls in the gap between history and search;
- * other MapCanvas users keep their own edge controls and MapLibre button behavior. */
+/* Keep MapLibre's native compass (tap to reset north, drag to rotate/pitch),
+ * but place its sole button in the same physical-right 48px rail as the SOS,
+ * sharing and recenter actions. Other MapCanvas users retain their +/- controls. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-  top: 1rem;
-  left: 50%;
+  position: fixed;
+  z-index: 6;
+  top: auto;
   right: auto;
-  width: 132px;
-  transform: translateX(-50%);
+  bottom: auto;
+  left: auto;
+  inset-inline-start: 1.25rem;
+  inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 10.5rem);
+  width: 48px;
 }
-
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) {
-  margin: 0;
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) { margin: 0; }
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group:not(:empty)) {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(var(--v-theme-primary));
+  box-shadow: var(--bb-shadow-overlay);
+}
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass) {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.15);
+  border-radius: 50%;
+}
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+  /* Keep the north/south halves distinct instead of whitening both arrows. */
+  filter: invert(1);
+}
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:hover) {
+  background: rgba(var(--v-theme-on-primary), 0.12);
+}
+.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-compass:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: 3px;
 }
 
 /* Keep MapLibre's scale visible beside, rather than underneath, the bottom-left
  * companions card. Its own bottom-left control slot is still used on narrow maps. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
   left: calc(27rem + env(safe-area-inset-left, 0px));
-}
-
-/* A short horizontal rail stays within the existing top camera padding, rather than
- * running down the middle of the map. MapLibre still owns click, keyboard and compass logic. */
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) {
-  display: flex;
-}
-
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
-  border-top: 0;
-  border-inline-start: 1px solid #627a7a;
-}
-
-.user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button) {
-  min-width: 44px;
-  min-height: 44px;
 }
 
 .user-map-view__search {
@@ -1255,24 +1266,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: var(--bb-radius-nested, 16px);
   }
 
-  /* In flow there are no cards over the canvas; return navigation to its familiar edge. */
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: 0;
-    right: 0;
-    left: auto;
-    width: auto;
-    transform: none;
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) {
-    margin: 10px 10px 0 0;
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) {
-    display: block;
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
-    border-top: 1px solid #627a7a;
-    border-inline-start: 0;
-  }
+  /* The map scale returns to its own edge; the compass stays in the action rail. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) { left: 0; }
 
   .user-map-view__search,
@@ -1293,7 +1287,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Phone map: edge-to-edge behind a single top-left menu launcher, not a bar or
  * stacked cards. Fullscreen tools keep their own scrolling content and close actions. */
 @media (max-width: 599px) {
-  /* Left of native zoom; below the menu launcher and expanded attribution. */
+  /* Left of the action rail; below the menu launcher and expanded attribution. */
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;
     top: calc(8rem + env(safe-area-inset-top, 0px)); left: calc(0.75rem + env(safe-area-inset-left, 0px));
@@ -1396,20 +1390,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-radius: 0;
   }
 
-  /* Zoom/compass sit below the right bell; the left attribution stays below
-   * the menu. Both remain available without covering either launcher. */
+  /* On phones the compass clears the SOS/share/recenter stack and the dock. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: calc(4.5rem + env(safe-area-inset-top, 0px));
-    right: calc(0.75rem + env(safe-area-inset-right, 0px));
-    left: auto;
-    width: 132px;
-    transform: none;
-  }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl) { margin: 0; }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) { display: flex; }
-  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group button + button) {
-    border-top: 0;
-    border-inline-start: 1px solid #627a7a;
+    inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(16rem + env(safe-area-inset-bottom, 0px));
   }
   /* Preserve MapLibre's attribution above the bottom tools and below the menu
    * launcher, never buried beneath an open tool or the SOS pill. */
@@ -1424,7 +1408,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   /* The map's real OSM/OpenMapTiles credit is much wider than a compact phone.
    * Include its built-in padding in the cap, so its expanded text wraps beside
-   * (not over) the native zoom rail and remains fully readable. */
+   * (not over) the app rail and remains fully readable. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib) {
     box-sizing: border-box;
     max-width: calc(100vw - 9.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
@@ -1492,12 +1476,23 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
 }
 
-/* In short landscape, recenter sits beside sharing without covering native zoom. */
-@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
-  /* The zoom rail lives on the right at the top. Put recenter beside, not
-   * above, sharing in the clear right lane; SOS remains directly below. */
+/* A short phone cannot fit four stacked 48px targets under the top-right bell.
+ * Put recenter beside sharing and bring the compass down one slot. */
+@media (max-width: 599px) and (max-height: 360px) {
   .user-map-view__recenter {
-    inset-inline-start: calc(0.75rem + 3.5rem);
+    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
+  }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* In short landscape, recenter sits beside sharing so the compass stays above it. */
+@media (min-width: 480px) and (max-width: 599px) and (max-height: 480px) {
+  /* Put recenter beside sharing, leaving room for the compass above and SOS below. */
+  .user-map-view__recenter {
+    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
     inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
