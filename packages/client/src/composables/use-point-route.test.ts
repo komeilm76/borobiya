@@ -82,6 +82,25 @@ describe("private point-to-point route", () => {
     expect(journey.start()).toBe(true);
     scope.stop();
   });
+  it("uses a selected search result's trusted title and address without a redundant reverse lookup", async () => {
+    const { journey, select, close, scope } = setup();
+    journey.select({ lat: 40, lon: -120 }, { name: "  میدان آزادی  ", address: "  تهران، میدان آزادی  " });
+    await nextTick(); await Promise.resolve();
+    expect(journey.sheetOpen.value).toBe(true);
+    expect(journey.title.value).toBe("میدان آزادی");
+    expect(journey.address.value).toBe("تهران، میدان آزادی");
+    expect(select).not.toHaveBeenCalled();
+    journey.changeProfile("foot"); await nextTick(); await Promise.resolve();
+    expect(journey.title.value).toBe("میدان آزادی");
+    journey.clear();
+    expect(journey.knownPlace.value).toBeNull();
+    expect(journey.address.value).toBeNull();
+    journey.select({ lat: 39, lon: -121 });
+    expect(select).toHaveBeenCalledWith(39, -121);
+    expect(journey.title.value).toBe("نقطهٔ انتخاب‌شده");
+    expect(close).toHaveBeenCalled();
+    scope.stop();
+  });
   it("calculates proximity in metres and rejects invalid point selection", () => {
     expect(pointDistance({ lat: 0, lon: 0 }, { lat: 0, lon: 0 })).toBe(0);
     expect(pointDistance({ lat: 0, lon: 0 }, { lat: 0, lon: 1 })).toBeGreaterThan(110_000);

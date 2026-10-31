@@ -35,24 +35,32 @@ describe("map place search handoff", () => {
     expect(css.code).toContain("overflow-y: auto");
   });
 
-  it("centers an authorized current result once, closes the phone dialog and opens place details", () => {
+  it("routes a current search hit directly to the navigation sheet without losing POI details", () => {
     const selection = body("selectPlace");
-    expect(selection).toContain('placeSearch.select(place)');
     expect(selection).toContain('bounds.contains([place.lon, place.lat])');
-    expect(selection).toContain('placeSearch.select(place)');
+    expect(selection).toContain('current !== place || !placeSearch.select(place)');
     expect(selection).toContain('instance.flyTo(');
     expect(selection).toContain('offset: [0, offsetY]');
     expect(selection).toContain('{ placeSearchSelection: true }');
     expect(selection).toContain('closeTool(false)');
-    expect(selection).toContain('openSelectedPlaceDetail()');
+    expect(selection).toContain('closePlaceDetail(false); removeSelectedCompanion()');
+    expect(selection).toContain('journey.select({ lat: place.lat, lon: place.lon }, { name: place.name, address: place.address })');
+    expect(selection).not.toContain('openSelectedPlaceDetail()');
     expect(selection).not.toContain('placeSearch.clear()');
+    expect(view).toContain('<PointRouteSheet :api="journey"');
+    expect(view).toContain(':can-show-place-details="isSelectedSearchDestination"');
+    expect(view).toContain('@details="openSelectedPlaceDetail"');
     expect(view).toContain('<PlaceDetailSheet');
     expect(view).toContain('@after-leave="onPlaceDetailAfterLeave"');
+    expect(body('onPlaceDetailAfterLeave')).toContain('journey.sheetOpen.value = true');
     expect(body('onPlaceDetailAfterLeave')).toContain('selectedPlaceMarker?.getElement().focus({ preventScroll: true })');
+    expect(body('openSelectedPlaceDetail')).toContain('if (isSelectedSearchDestination.value) journey.sheetOpen.value = false');
+    expect(body('syncSelectedPlaceMarker')).toContain('isSelectedSearchDestination.value ? null : selectedSearchPlace.value');
+    expect(body('syncSelectedPlaceMarker')).toContain('openSelectedPlaceRoute()');
+    expect(body('openSelectedPlaceRoute')).toContain('selectPlace(selectedSearchPlace.value, true)');
     expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value,');
     expect(view).toContain('if (!selectedSearchPlace.value) closePlaceDetail(false)');
     expect(body("attachHold")).toContain('closePlaceDetail(false)');
-    expect(body("syncSelectedPlaceMarker")).toContain('openSelectedPlaceDetail()');
     expect(detail).toContain('<v-bottom-sheet');
     expect(detail).toContain('place.name');
     expect(detail).toContain('place.address');

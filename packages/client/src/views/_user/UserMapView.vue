@@ -100,7 +100,8 @@
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>
-    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value" @start="startPointNavigation" />
+    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
+      :can-show-place-details="isSelectedSearchDestination" @start="startPointNavigation" @details="openSelectedPlaceDetail" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -545,6 +546,11 @@ const placeDetailOpen = ref(false);
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
   placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
+const isSelectedSearchDestination = computed(() => !!journey.point.value && !!journey.knownPlace.value &&
+  !!selectedSearchPlace.value && journey.point.value.lat === selectedSearchPlace.value.lat &&
+  journey.point.value.lon === selectedSearchPlace.value.lon &&
+  journey.knownPlace.value.name === selectedSearchPlace.value.name &&
+  journey.knownPlace.value.address === selectedSearchPlace.value.address);
 let restorePlaceFocus = false;
 function closePlaceDetail(restoreFocus = true): void {
   restorePlaceFocus = restoreFocus && placeDetailOpen.value;
@@ -554,20 +560,26 @@ function onPlaceDetailAfterLeave(): void {
   const shouldRestore = restorePlaceFocus;
   restorePlaceFocus = false;
   if (!shouldRestore || placeDetailOpen.value || activeTool.value || selectedCompanionId.value ||
-      journey.sheetOpen.value || !selectedSearchPlace.value) return;
-  selectedPlaceMarker?.getElement().focus({ preventScroll: true });
+      !selectedSearchPlace.value) return;
+  if (isSelectedSearchDestination.value) { journey.sheetOpen.value = true; return; }
+  if (!journey.sheetOpen.value) selectedPlaceMarker?.getElement().focus({ preventScroll: true });
 }
 function openSelectedPlaceDetail(): void {
   if (!selectedSearchPlace.value || !auth.user?.id || !map.value) return;
   removeSelectedCompanion();
-  journey.clear();
+  if (isSelectedSearchDestination.value) journey.sheetOpen.value = false;
+  else journey.clear();
   restorePlaceFocus = false;
   placeDetailOpen.value = true;
 }
 
+function openSelectedPlaceRoute(): void {
+  if (selectedSearchPlace.value) selectPlace(selectedSearchPlace.value, true);
+}
 function syncSelectedPlaceMarker(): void {
   const instance = map.value;
-  const place = selectedSearchPlace.value;
+  // The amber route pin owns this POI during navigation; do not stack two pins.
+  const place = isSelectedSearchDestination.value ? null : selectedSearchPlace.value;
   if (!instance || !markerConstructor || !place) {
     selectedPlaceMarker?.remove();
     selectedPlaceMarker = null;
@@ -582,15 +594,16 @@ function syncSelectedPlaceMarker(): void {
     element.setAttribute("role", "button");
     element.setAttribute("tabindex", "0");
     element.setAttribute("aria-haspopup", "dialog");
-    element.addEventListener("click", (event) => { event.stopPropagation(); openSelectedPlaceDetail(); });
+    element.addEventListener("click", (event) => { event.stopPropagation(); openSelectedPlaceRoute(); });
     element.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault(); event.stopPropagation(); openSelectedPlaceDetail();
+      event.preventDefault(); event.stopPropagation(); openSelectedPlaceRoute();
     });
   } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
-  selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}`);
+  selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ نمایش مسیر`);
   selectedPlaceMarker.getElement().setAttribute("title", place.name);
 }
+watch(() => isSelectedSearchDestination.value, syncSelectedPlaceMarker);
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
   syncResultMarkers();
@@ -612,7 +625,10 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // A map restricted to an installed region would silently clamp a hit outside that region.
   const bounds = instance.getMaxBounds();
   if (bounds && !bounds.contains([place.lon, place.lat])) return;
-  if (!placeSearch.select(place)) return;
+  // A prior result with the same ID is not proof that this captured card is current.
+  const current = placeSearch.results.value.find(hit => hit.placeId === place.placeId) ??
+    (showAllResultsOnMap.value ? placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId) : null);
+  if (current !== place || !placeSearch.select(place)) return;
   userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
@@ -622,10 +638,11 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   const zoom = fromMap ? instance.getZoom() : Math.min(16, instance.getMaxZoom());
   instance.flyTo({ center: [place.lon, place.lat], zoom, offset: [0, offsetY], duration: 700 },
     { placeSearchSelection: true });
-  // Dismiss the full-screen search before opening the details over the map.
-  // Keep results mounted so another hit can be selected when search is reopened.
+  // Dismiss the full-screen search before opening route choices over the map.
+  // Keep results mounted; a later query refresh must not change this destination.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
-  openSelectedPlaceDetail();
+  closePlaceDetail(false); removeSelectedCompanion();
+  journey.select({ lat: place.lat, lon: place.lon }, { name: place.name, address: place.address });
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));

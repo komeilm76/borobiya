@@ -96,7 +96,7 @@ describe("UserMapView live overlay", () => {
     const marker = body("syncSelectedPlaceMarker");
     expect(view).toContain("placeSearch.selectedPlaceId.value");
     expect(view).toContain("placeSearch.results.value.find(");
-    expect(marker).toContain("const place = selectedSearchPlace.value");
+    expect(marker).toContain("const place = isSelectedSearchDestination.value ? null : selectedSearchPlace.value");
     expect(marker).toContain("selectedPlaceMarker?.remove()");
     expect(marker).toContain("new markerConstructor(");
     expect(marker).toContain("setLngLat([place.lon, place.lat]).addTo(instance)");
@@ -313,7 +313,8 @@ describe("hold-to-select destination and map navigation", () => {
     for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "مسیر دیگر", "شروع راهبری", "حذف مقصد", "ترافیک زنده"]) {
       expect(sheet).toContain(label);
     }
-    expect(sheet).toContain('reverse.address.value?.formattedAddress');
+    expect(sheet).toContain('api.address.value');
+    expect(sheet).toContain('اطلاعات مکان');
     expect(sheet).toContain('api.routes.value.length > 1');
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');

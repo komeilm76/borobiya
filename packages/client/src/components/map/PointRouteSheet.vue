@@ -9,9 +9,9 @@
       <v-card-text class="point-route__body">
         <div class="point-route__address">
           <v-icon icon="mdi-map-marker-outline" size="20" aria-hidden="true" />
-          <p v-if="reverse.loading.value" role="status">در حال یافتن نشانی…</p>
-          <p v-else-if="reverse.failed.value" role="status">نشانی در دسترس نیست. <button type="button" @click="reverse.load()">تلاش دوباره</button></p>
-          <p v-else>{{ reverse.address.value?.formattedAddress ?? 'برای این نقطه نشانی پیدا نشد؛ مختصات مقصد روی نقشه مشخص است.' }}</p>
+          <p v-if="!api.address.value && reverse.loading.value" role="status">در حال یافتن نشانی…</p>
+          <p v-else-if="!api.address.value && reverse.failed.value" role="status">نشانی در دسترس نیست. <button type="button" @click="reverse.load()">تلاش دوباره</button></p>
+          <p v-else>{{ api.address.value ?? 'برای این نقطه نشانی پیدا نشد؛ مختصات مقصد روی نقشه مشخص است.' }}</p>
         </div>
         <p v-if="api.point.value" class="point-route__coords"><bdi dir="ltr">{{ api.point.value.lat.toFixed(5) }}, {{ api.point.value.lon.toFixed(5) }}</bdi></p>
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">
@@ -39,6 +39,7 @@
             @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
         </div>
         <div class="point-route__actions">
+          <v-btn v-if="canShowPlaceDetails" variant="tonal" color="primary" @click="emit('details')">اطلاعات مکان</v-btn>
           <v-btn v-if="api.error.value || (api.point.value && !api.routes.value.length && !api.loading.value)"
             variant="tonal" color="primary" :disabled="!ownFix || api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
           <v-btn color="primary" variant="flat" prepend-icon="mdi-navigation-variant" :disabled="!ownFix || !api.selectedRoute.value || api.loading.value || api.navigating.value"
@@ -56,8 +57,9 @@ import type { OwnMapFix } from "@/composables/use-own-map-position";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
-const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace>; ownFix: OwnMapFix | null }>();
-const emit = defineEmits<{ start: [] }>();
+const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace>;
+  ownFix: OwnMapFix | null; canShowPlaceDetails?: boolean }>();
+const emit = defineEmits<{ start: []; details: [] }>();
 const modes: { value: TransportProfile; icon: string; label: string }[] = [
   { value: "car", icon: "mdi-car", label: "خودرو" },
   { value: "bicycle", icon: "mdi-bicycle", label: "دوچرخه" },

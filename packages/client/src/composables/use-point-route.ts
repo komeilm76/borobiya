@@ -28,14 +28,18 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   const navigating = ref(false);
   const arrived = ref(false);
   const remaining = ref<number | null>(null);
+  // Search results already carry a validated title/address. Keep that snapshot even if
+  // the search list refreshes; don't replace a known POI with a reverse-geocoded street.
+  const knownPlace = ref<{ name: string; address: string } | null>(null);
   const selectedRoute = computed(() => routes.value[index.value] ?? null);
   const routePoints = computed(() => {
     try { return selectedRoute.value ? decodeRoutePolyline(selectedRoute.value.polyline) : []; }
     catch { return []; }
   });
-  const title = computed(() => reverse.address.value?.street
+  const title = computed(() => knownPlace.value?.name ?? (reverse.address.value?.street
     ? `${reverse.address.value.street}${reverse.address.value.houseNumber ? ` ${reverse.address.value.houseNumber}` : ""}`
-    : reverse.address.value?.city ?? "نقطهٔ انتخاب‌شده");
+    : reverse.address.value?.city ?? "نقطهٔ انتخاب‌شده"));
+  const address = computed(() => knownPlace.value?.address ?? reverse.address.value?.formattedAddress ?? null);
   let controller: AbortController | null = null;
   let generation = 0;
   let waitingForFix = false;
@@ -51,12 +55,15 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   function clear(): void {
     invalidate(); stop(); reverse.close(); point.value = null; sheetOpen.value = false;
     routes.value = []; index.value = 0; error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom = null;
+    knownPlace.value = null;
   }
-  function select(candidate: RoutePoint): void {
+  function select(candidate: RoutePoint, place?: { name: string; address: string }): void {
     if (!owner.value || !Number.isFinite(candidate.lat) || Math.abs(candidate.lat) > 90 ||
       !Number.isFinite(candidate.lon) || Math.abs(candidate.lon) > 180) return;
     clear(); point.value = { ...candidate }; sheetOpen.value = true; profile.value = "car";
-    reverse.select(candidate.lat, candidate.lon);
+    if (place?.name.trim() && place.address.trim()) {
+      knownPlace.value = { name: place.name.trim(), address: place.address.trim() };
+    } else reverse.select(candidate.lat, candidate.lon);
     void findRoutes();
   }
   async function findRoutes(): Promise<void> {
@@ -140,7 +147,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   watch(owner, clear, { flush: "sync" });
   onScopeDispose(clear);
   return { point, sheetOpen, profile, routes, index, loading, error, navigating, arrived,
-    remaining, selectedRoute, routePoints, title, select, findRoutes, changeProfile, choose, start, stop, clear,
+    remaining, selectedRoute, routePoints, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, clear,
     distanceLabel: computed(() => selectedRoute.value ? formatRouteDistance(selectedRoute.value.distance_m) : "—"),
     durationLabel: computed(() => selectedRoute.value ? formatRouteDuration(selectedRoute.value.duration_s) : "—") };
 }
