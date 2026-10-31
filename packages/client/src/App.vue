@@ -1,6 +1,6 @@
 <template>
-  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute }">
-    <v-app-bar v-if="!isMapRoute && !isAuthRoute" class="app-topbar px-sm-6" flat height="64">
+  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute }">
+    <v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute" class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
@@ -137,6 +137,28 @@
     </v-dialog>
 
     <v-main class="app-main dark:text-slate-100">
+      <header v-if="isPublicRoute" class="public-chrome">
+        <RouterLink class="public-chrome__brand" to="/_public/landing" aria-label="بوروبیا؛ صفحهٔ اصلی">
+          <span class="public-chrome__mark" aria-hidden="true"><v-icon icon="mdi-plus" size="26" /></span>
+          <span>بوروبیا<small>شبکهٔ امداد و همراهی</small></span>
+        </RouterLink>
+        <nav class="public-chrome__nav" aria-label="پیمایش عمومی">
+          <RouterLink to="/_public/landing">خانه</RouterLink>
+          <RouterLink to="/_public/health">وضعیت سرور</RouterLink>
+        </nav>
+        <div class="public-chrome__actions">
+          <button class="public-chrome__theme" type="button"
+            :aria-label="appTheme.isDark ? 'تغییر به حالت روشن' : 'تغییر به حالت تاریک'"
+            :title="appTheme.isDark ? 'حالت روشن' : 'حالت تاریک'" @click="appTheme.toggleTheme()">
+            <v-icon :icon="appTheme.isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'" size="21" aria-hidden="true" />
+          </button>
+          <RouterLink v-if="auth.isAuthenticated" class="public-chrome__login" to="/_user/map">نقشه</RouterLink>
+          <template v-else>
+            <RouterLink class="public-chrome__login" to="/_auth/login">ورود</RouterLink>
+            <RouterLink class="public-chrome__join" to="/_auth/register">ساخت حساب <v-icon icon="mdi-arrow-left" size="19" aria-hidden="true" /></RouterLink>
+          </template>
+        </div>
+      </header>
       <header v-if="isAuthRoute" class="auth-chrome" aria-label="پیمایش حساب">
         <RouterLink class="auth-chrome__brand" to="/_public/landing" aria-label="بوروبیا؛ بازگشت به صفحهٔ اصلی">
           <span class="auth-chrome__mark" aria-hidden="true"><v-icon icon="mdi-plus" size="25" /></span>
@@ -201,7 +223,18 @@
       </template>
     </v-snackbar>
 
-    <footer v-if="!isAuthRoute" class="app-footer">
+    <footer v-if="isPublicRoute" class="public-footer">
+      <div class="public-footer__inner">
+        <p><strong>بوروبیا</strong><span>برای روزهایی که کنار هم بودن مهم است.</span></p>
+        <nav aria-label="پیوندهای عمومی">
+          <RouterLink to="/_public/landing">خانه</RouterLink>
+          <RouterLink to="/_public/health">وضعیت سرور</RouterLink>
+          <RouterLink v-if="auth.isAuthenticated" to="/_user/map">نقشه</RouterLink>
+          <RouterLink v-else to="/_auth/login">ورود</RouterLink>
+        </nav>
+      </div>
+    </footer>
+    <footer v-if="!isAuthRoute && !isPublicRoute" class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
       <a
         class="osm-attribution"
@@ -282,6 +315,7 @@ const router = useRouter();
 const route = useRoute();
 const isMapRoute = computed(() => route.name === "user-map");
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
+const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutConfirmation = useLogoutConfirmation({
   isAuthenticated: computed(() => auth.isAuthenticated),
   logout: () => auth.logout(),

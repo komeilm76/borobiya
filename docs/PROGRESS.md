@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Dedicated public welcome and honest service-status pages
+
+- Replaced the guest-facing landing skeleton with a distinct responsive public shell (brand, lightweight navigation, account links, theme switch and footer), an editorial welcome hero with decorative companion-network artwork, privacy-first feature/steps sections and clear registration/login actions. Unknown URLs now use a helpful public 404 rather than the development skeleton. `/_public/health` now provides a bounded, abortable, no-cache same-origin API liveness check with retry and precise failure/unknown states; it explicitly does not claim that GPS, maps, sockets or SOS dispatch are healthy. Public and authenticated shells remain separate, and route guards are unchanged. Source/route regressions and client checks cover navigation and structure; rendered browser/device acceptance is still open.
+
 ### 2026-10-31 — Compass contrast, map GPS feedback and separate authentication shell
 
 - The map's native compass keeps its reset/drag behavior while its two arrow halves now use theme-specific high-contrast colors (at least 4:1 on both primary surfaces, with a forced-colors mask). Sharing/GPS failures and device-priority warnings appear as icon-led, readable alerts **inside** the companions card instead of unframed text on the map; phone screen-reader feedback remains when the companions dialog is closed. Login, registration and recovery no longer inherit the public/user app bar and footer: they use a separate full-height split layout with an accessible brand/home link and theme toggle, responsive compact phone flow, and dark-theme styling. Recovery's login-return prompt now has 1.5rem separation below its submit action. Source/style regression tests cover all four reported issues. Browser/phone visual acceptance remains open.

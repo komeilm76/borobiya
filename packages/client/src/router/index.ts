@@ -14,22 +14,12 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_public/landing",
     name: "public-landing",
-    component: () => import("@client/views/_public/PlaceholderView.vue"),
-    props: {
-      title: "خانه",
-      description: "بوروبیا پیوندی امن میان مردم و گروه‌های امدادی محلی است؛ برای روزهایی که کنار هم بودن اهمیت دارد.",
-      icon: "mdi-home-heart"
-    }
+    component: () => import("@client/views/_public/PublicLandingView.vue")
   },
   {
     path: "/_public/health",
     name: "public-health",
-    component: () => import("@client/views/_public/PlaceholderView.vue"),
-    props: {
-      title: "وضعیت سرویس",
-      description: "نمایی ساده از در دسترس بودن سرویس‌های بوروبیا در این بخش قرار می‌گیرد.",
-      icon: "mdi-heart-pulse"
-    }
+    component: () => import("@client/views/_public/PublicHealthView.vue")
   },
   {
     path: "/_auth/login",
@@ -135,12 +125,7 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/:pathMatch(.*)*",
     name: "not-found",
-    component: () => import("@client/views/_public/PlaceholderView.vue"),
-    props: {
-      title: "صفحه پیدا نشد",
-      description: "نشانی واردشده در برنامه وجود ندارد؛ می‌توانید از خانه دوباره شروع کنید.",
-      icon: "mdi-map-marker-question-outline"
-    }
+    component: () => import("@client/views/_public/PublicNotFoundView.vue")
   }
 ];
 

@@ -19,7 +19,7 @@ function css(source: string, filename: string): string {
 
 describe("mobile map viewport and overlay tools", () => {
   it("removes the map app bar and title but keeps all other routes' shell unchanged", () => {
-    expect(app).toContain('<v-app-bar v-if="!isMapRoute && !isAuthRoute" class="app-topbar');
+    expect(app).toContain('<v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute" class="app-topbar');
     expect(app).toContain('<MapSidebar\n      v-if="isMapRoute"');
     expect(app).not.toContain('app-map-title');
     expect(app).not.toContain('نقشهٔ همراهان');

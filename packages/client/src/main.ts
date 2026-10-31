@@ -9,6 +9,7 @@ import { registerMapCacheWorker } from "./services/map-cache";
 import "@mdi/font/css/materialdesignicons.css";
 import "./styles/tailwind.css";
 import "./styles/auth.css";
+import "./styles/public.css";
 
 installDesignTokenStyles(document);
 const theme = useThemeStore(pinia);

@@ -45,7 +45,7 @@ Roles:
 
 ## 2. Access & Requirements
 
-- **Web:** Open `https://borobiya.yourdomain.com` (or `http://borobiya.local` on LAN) in Chrome/Firefox/Edge.
+- **Web:** Open `https://borobiya.yourdomain.com` (or `http://borobiya.local` on LAN) in Chrome/Firefox/Edge. The public home (`/_public/landing`) introduces the available companion, optional location-sharing and SOS flows and links directly to registration/login; it is not a live map. **وضعیت سرور** (`/_public/health`) probes only the same-origin API when opened or retried and does **not** certify map tiles, GPS, realtime sharing or rescue availability.
 - **Android:** Install APK `Borobiya.apk` → allow Location + Camera. No Play Store required if sideloaded.
 - **Location permission:** Allow “While using app” (browser: Allow Location prompt).
 - **Offline note:** Map still loads offline on LAN; SOS/admin alerts need LAN connection to server.
