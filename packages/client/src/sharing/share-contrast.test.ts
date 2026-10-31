@@ -31,7 +31,7 @@ describe("share privacy flow small text contrast (T4.4.3 partial)", () => {
     for (const [source, selectors, token] of [
       [lists, [".share-lists__kicker", ".share-lists__row-state", ".share-lists__row-sub", ".share-lists__empty", ".share-lists__pending"], "muted"],
       [lists, [".share-lists__header h2", ".share-lists__section h3", ".share-lists__row-title"], "text"],
-      [dialog, [".share-dialog__label", ".share-dialog__hint", ".share-dialog__result-distance", ".share-dialog__slider-limits"], "muted"],
+      [dialog, [".share-dialog__label", ".share-dialog__hint", ".share-dialog__result-meta", ".share-dialog__slider-limits"], "muted"],
       [dialog, [".share-dialog__title", ".share-dialog__chip", ".share-dialog__lead", ".share-dialog__duration-value"], "text"],
       [dialog, [".share-dialog__status"], "success"]
     ] as const) {

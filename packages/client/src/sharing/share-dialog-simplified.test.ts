@@ -31,8 +31,8 @@ describe("simplified location-sharing dialog", () => {
     expect(dialog).not.toContain('durationMinutes }} دقیقه');
   });
 
-  it("reuses public profile facts in search and keeps a full-size add/remove button", () => {
-    expect(dialog).toContain('<PublicProfileFacts :profile="candidate" :show-username="false" />');
+  it("keeps public profile facts in a compact search result with a full-size add/remove target", () => {
+    expect(dialog).toContain('class="share-dialog__result-meta"');
     expect(dialog).toContain('avatarInitial(candidate.username)');
     expect(dialog).toContain('recipientsFull && !isSelected(candidate)');
     expect(dialog).toContain('min-height: 44px');

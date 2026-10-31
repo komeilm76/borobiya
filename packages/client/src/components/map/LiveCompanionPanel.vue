@@ -20,6 +20,12 @@
     <p class="live-companions__status" role="status" aria-live="polite">
       {{ visible ? api.status.value.line : 'همراهان روی نقشه پنهان‌اند؛ با انتخاب یک همراه دوباره نمایش داده می‌شوند.' }}
     </p>
+
+    <v-btn id="map-share-location-button" class="live-companions__create" block color="primary" variant="tonal"
+      prepend-icon="mdi-account-plus-outline" @click="$emit('create-share')">
+      اشتراک موقعیت
+    </v-btn>
+
     <v-switch
       :model-value="visible"
       color="primary"
@@ -34,16 +40,26 @@
       <li v-for="member in members" :key="member.userId" class="live-companions__peer">
         <v-btn class="live-companions__peer-button" variant="text" block
           :color="selectedUserId === member.userId ? 'primary' : undefined"
-          :aria-label="member.position ? `نمایش ${member.name} روی نقشه` : `${member.name}؛ در انتظار موقعیت`"
+          :aria-label="member.position
+            ? `نمایش ${member.name} روی نقشه؛ ${member.ageMs === null ? 'آخرین موقعیت ثبت‌شده' : member.stale ? 'موقعیت قدیمی' : 'موقعیت تازه'}، ${member.ageMs === null ? 'زمان نامشخص' : ageWords(member.ageMs)}${member.accuracy !== null ? `، دقت ±${Math.round(member.accuracy)} متر` : ''}`
+            : `${member.name}؛ در انتظار موقعیت`"
           :disabled="!member.position" @click="$emit('select', member.userId)">
           <span class="live-companions__avatar"
             :style="{ background: member.position && !member.stale ? colors.live : '#526b6b', color: member.position && !member.stale && theme.isDark ? '#071b1c' : '#fff' }"
             aria-hidden="true">{{ avatarInitial(member.name) }}</span>
-          <span class="live-companions__name">{{ member.name }}</span>
-          <span class="live-companions__age">{{ member.position ? ageWords(member.ageMs) : 'در انتظار موقعیت' }}</span>
-          <v-chip v-if="member.accuracy !== null" size="x-small" variant="tonal" class="live-companions__accuracy">
-            ±{{ Math.round(member.accuracy) }} متر
-          </v-chip>
+          <span class="live-companions__peer-main">
+            <strong class="live-companions__name" dir="auto">{{ member.name }}</strong>
+            <span class="live-companions__peer-meta">
+              <span class="live-companions__freshness" :class="{ 'live-companions__freshness--stale': !member.position || member.stale }">
+                {{ !member.position ? 'در انتظار موقعیت' : member.ageMs === null ? 'آخرین موقعیت ثبت‌شده' : member.stale ? 'موقعیت قدیمی' : 'موقعیت تازه' }}
+              </span>
+              <span v-if="member.position" class="live-companions__age">{{ member.ageMs === null ? 'زمان نامشخص' : ageWords(member.ageMs) }}</span>
+              <span v-if="member.position && member.accuracy !== null" class="live-companions__accuracy">
+                ±{{ Math.round(member.accuracy) }} متر
+              </span>
+            </span>
+          </span>
+          <v-icon v-if="member.position" icon="mdi-chevron-left" size="20" class="live-companions__arrow" aria-hidden="true" />
         </v-btn>
       </li>
     </ul>
@@ -82,7 +98,7 @@ const props = defineProps<{
   visible: boolean;
   selectedUserId?: string | null;
 }>();
-defineEmits<{ 'update:visible': [visible: boolean]; select: [userId: string] }>();
+defineEmits<{ 'update:visible': [visible: boolean]; select: [userId: string]; 'create-share': [] }>();
 
 // Include permitted users who are waiting for their first fix; disabling their
 // action avoids pretending we can center on an unknown coordinate.
@@ -100,147 +116,89 @@ const colors = computed(() => liveMarkerColors(theme.isDark));
 .live-companions {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.7rem 0.85rem;
+  gap: 0.65rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.85rem;
   background: rgba(var(--v-theme-surface), 0.94);
   backdrop-filter: blur(10px);
 }
-
-.live-companions__header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.live-companions__title-block {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.live-companions__title-block p {
-  margin: 0;
-  color: #536d6c;
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
-.live-companions__title-block h2 {
-  margin: 0.1rem 0 0;
-  color: #193536;
-  font-size: 0.92rem;
-  font-weight: 800;
-  line-height: 1.4;
-}
-
-.live-companions__count,
-.live-companions__signal {
-  flex: 0 0 auto;
-}
-
-.live-companions__signal {
-  color: #0e6666;
-}
-
-.live-companions__status {
-  margin: 0;
-  color: #536d6c;
-  font-size: 0.74rem;
-  line-height: 1.6;
-}
-
+.live-companions__header { display: flex; align-items: center; gap: 0.5rem; }
+.live-companions__title-block { min-width: 0; flex: 1 1 auto; }
+.live-companions__title-block p { margin: 0; color: #536d6c; font-size: 0.68rem; font-weight: 700; }
+.live-companions__title-block h2 { margin: 0.1rem 0 0; color: #193536; font-size: 0.92rem; font-weight: 800; line-height: 1.4; }
+.live-companions__count, .live-companions__signal { flex: 0 0 auto; }
+.live-companions__signal { color: #0e6666; }
+.live-companions__status { margin: 0; color: #536d6c; font-size: 0.74rem; line-height: 1.6; }
+.live-companions__create { min-height: 44px; border-radius: 0.75rem; font-weight: 700; }
 .live-companions__peers {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
+  gap: 0.25rem;
+  width: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 11rem;
+  max-height: 16rem;
   overflow-y: auto;
 }
-
-.live-companions__peers:focus-visible {
-  outline: 2px solid var(--bb-color-primary);
-  outline-offset: -2px;
-}
-
-.live-companions__peer { min-width: 0; }
-
+.live-companions__peers:focus-visible { outline: 2px solid var(--bb-color-primary); outline-offset: -2px; }
+.live-companions__peer { min-width: 0; width: 100%; }
 .live-companions__peer-button {
+  width: 100%;
   min-width: 0;
-  min-height: 48px;
+  min-height: 64px;
   height: auto;
-  padding: 0.5rem 0.65rem;
+  padding: 0.55rem 0.65rem;
   border-radius: 0.75rem;
+  background: rgba(var(--v-theme-on-surface), 0.04);
 }
 .live-companions__peer-button :deep(.v-btn__content) {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.65rem;
   width: 100%;
   min-width: 0;
-  font-size: 0.8rem;
-  line-height: 1.5;
+  font-size: 0.82rem;
+  line-height: 1.45;
   white-space: normal;
   text-align: start;
+  text-transform: none;
 }
 .live-companions__peer-button:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
-
 .live-companions__peer-button.v-btn--disabled { opacity: 1; }
 .live-companions__peer-button.v-btn--disabled :deep(.v-btn__content) { opacity: 1; }
 .live-companions__peer-button.v-btn--disabled .live-companions__name { color: #536d6c; }
 :global(:root.dark .live-companions__peer-button.v-btn--disabled .live-companions__name) { color: #a0b6b2; }
-
 .live-companions__avatar {
   flex: 0 0 auto; display: grid; place-items: center;
-  width: 2rem; height: 2rem; border-radius: 50%;
+  width: 2.25rem; height: 2.25rem; border-radius: 50%;
   color: #fff; font-weight: 800; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
 }
-
+.live-companions__peer-main { flex: 1 1 auto; display: flex; flex-direction: column; gap: 0.16rem; min-width: 0; }
 .live-companions__name {
-  flex: 1 1 auto;
-  min-width: 0;
   color: #193536;
-  font-weight: 700;
+  font-weight: 800;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.live-companions__age {
-  color: #536d6c;
-  font-size: 0.7rem;
-}
-
-.live-companions__accuracy {
-  margin-inline-start: auto;
-  flex: 0 0 auto;
-}
-
-.live-companions__retry {
-  align-self: flex-start;
-}
-
-:global(:root.dark .live-companions) {
-  background: rgba(27, 41, 42, 0.94);
-}
-
+.live-companions__peer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.5rem; min-width: 0; }
+.live-companions__freshness { color: #195e46; font-size: 0.75rem; }
+.live-companions__freshness--stale { color: #986000; }
+.live-companions__age { color: #536d6c; font-size: 0.75rem; }
+.live-companions__accuracy { color: #536d6c; font-size: 0.75rem; }
+.live-companions__arrow { flex: 0 0 auto; }
+.live-companions__retry { align-self: flex-start; }
+:global(:root.dark .live-companions) { background: rgba(27, 41, 42, 0.94); }
 :global(:root.dark .live-companions__title-block h2),
-:global(:root.dark .live-companions__name) {
-  color: #edf5f2;
-}
-
+:global(:root.dark .live-companions__name) { color: #edf5f2; }
 :global(:root.dark .live-companions__status),
 :global(:root.dark .live-companions__title-block p),
-:global(:root.dark .live-companions__age) {
-  color: #a0b6b2;
-}
-
-:global(:root.dark .live-companions__signal) {
-  color: #71c7be;
-}
-
-:global(:root.dark .live-companions__avatar) {
-  box-shadow: 0 0 0 2px rgba(7, 27, 28, 0.7);
-}
+:global(:root.dark .live-companions__age),
+:global(:root.dark .live-companions__accuracy) { color: #a0b6b2; }
+:global(:root.dark .live-companions__freshness) { color: #71c7be; }
+:global(:root.dark .live-companions__freshness--stale) { color: #f4c06a; }
+:global(:root.dark .live-companions__signal) { color: #71c7be; }
+:global(:root.dark .live-companions__avatar) { box-shadow: 0 0 0 2px rgba(7, 27, 28, 0.7); }
 </style>

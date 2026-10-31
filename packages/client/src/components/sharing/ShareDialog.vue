@@ -3,7 +3,8 @@
     :model-value="modelValue"
     max-width="660"
     scrollable
-    :fullscreen="$vuetify.display.smAndDown"
+    :fullscreen="fullscreen || $vuetify.display.smAndDown"
+    :close-on-back="!fullscreen"
     aria-labelledby="share-dialog-title"
     @update:model-value="onVisibility"
   >
@@ -76,20 +77,33 @@
           </p>
 
           <ul v-if="hasResults" class="share-dialog__results" role="list" aria-label="نتایج جستجوی همراهان">
-            <li v-for="candidate in results" :key="candidate.id" class="share-dialog__result">
-              <div class="share-dialog__result-header">
-                <v-avatar color="primary" size="42" aria-hidden="true">{{ avatarInitial(candidate.username) }}</v-avatar>
-                <strong dir="auto">{{ candidate.username }}</strong>
+            <li v-for="candidate in results" :key="candidate.id" class="share-dialog__result"
+              :class="{ 'share-dialog__result--selected': isSelected(candidate) }">
+              <v-avatar color="primary" size="36" aria-hidden="true" class="share-dialog__result-avatar">
+                {{ avatarInitial(candidate.username) }}
+              </v-avatar>
+              <div class="share-dialog__result-main">
+                <strong class="share-dialog__result-name" dir="auto">{{ candidate.username }}</strong>
+                <div class="share-dialog__result-meta">
+                  <span v-if="candidate.category">{{ candidate.category }}</span>
+                  <span v-if="candidate.avgRating !== null" class="share-dialog__result-rating">
+                    <v-icon icon="mdi-star" size="14" aria-hidden="true" />{{ candidate.avgRating.toLocaleString('fa-IR') }}
+                  </span>
+                  <span class="share-dialog__result-presence" :class="{ 'share-dialog__result-presence--online': candidate.isOnline }">
+                    <span class="share-dialog__result-dot" aria-hidden="true" />{{ candidate.isOnline ? 'آنلاین' : 'آفلاین' }}
+                  </span>
+                  <span v-if="candidate.distance !== null">{{ candidate.distance.toLocaleString('fa-IR') }} کیلومتر</span>
+                </div>
               </div>
-              <PublicProfileFacts :profile="candidate" :show-username="false" />
-              <p v-if="candidate.distance !== null" class="share-dialog__result-distance">
-                فاصله: {{ candidate.distance.toLocaleString('fa-IR') }} کیلومتر
-              </p>
               <v-btn
                 class="share-dialog__result-action"
-                :variant="isSelected(candidate) ? 'tonal' : 'flat'"
+                icon
+                size="small"
+                variant="tonal"
                 :color="isSelected(candidate) ? 'success' : 'primary'"
                 :disabled="isSelf(candidate) || (recipientsFull && !isSelected(candidate))"
+                :aria-pressed="isSelected(candidate)"
+                :title="isSelf(candidate) ? 'حساب شما' : isSelected(candidate) ? 'حذف همراه' : 'افزودن همراه'"
                 :aria-label="
                   isSelf(candidate)
                     ? 'نمی‌توانید موقعیت خود را با خودتان به اشتراک بگذارید'
@@ -99,8 +113,7 @@
                 "
                 @click="toggle(candidate)"
               >
-                <v-icon :icon="isSelected(candidate) ? 'mdi-check' : 'mdi-plus'" size="18" class="me-1" />
-                {{ isSelf(candidate) ? 'حساب شما' : isSelected(candidate) ? 'انتخاب‌شده؛ حذف' : 'افزودن همراه' }}
+                <v-icon :icon="isSelected(candidate) ? 'mdi-check' : 'mdi-plus'" size="21" />
               </v-btn>
             </li>
           </ul>
@@ -329,7 +342,6 @@ import { isoToLocalInput, localInputToIso } from "@/history/playback";
 import { avatarInitial } from "@/live/avatar-initial";
 import { DURATION_SLIDER_MAX, minutesForSliderStep, sliderStepForMinutes } from "@/sharing/duration-slider";
 import HistoryDateTimeField from "@/components/sharing/HistoryDateTimeField.vue";
-import PublicProfileFacts from "@/components/sharing/PublicProfileFacts.vue";
 import { useTargetSearch } from "@/composables/use-target-search";
 import { useAuthStore } from "@/stores/auth";
 import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-submission-fence";
@@ -362,7 +374,7 @@ import {
  * choice and the debounced search all live in `@/sharing/share-form` and
  * `@/composables/use-target-search`, where they are tested without a browser.
  */
-const props = defineProps<{ modelValue: boolean }>();
+const props = withDefaults(defineProps<{ modelValue: boolean; fullscreen?: boolean }>(), { fullscreen: false });
 const emit = defineEmits<{
   (event: "update:modelValue", value: boolean): void;
   (event: "shared"): void;
@@ -676,11 +688,17 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__title {
   display: flex;
   align-items: center;
+  width: 100%;
+  max-width: 45rem;
+  margin-inline: auto;
   color: var(--bb-color-text);
   font-weight: 800;
 }
 
 .share-dialog__body {
+  width: 100%;
+  max-width: 45rem;
+  margin-inline: auto;
   padding-inline: clamp(1rem, 3vw, 1.75rem);
 }
 
@@ -729,23 +747,43 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__results {
-  display: grid;
-  gap: 0;
   list-style: none;
   padding: 0;
-  margin: 0.65rem 0 0;
-  border: 1px solid rgba(var(--v-theme-on-surface), 0.14);
+  margin: 0.6rem 0 0;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: var(--bb-radius-nested, 16px);
-  max-height: 22rem;
+  max-height: 17rem;
   overflow-y: auto;
+  background: rgb(var(--v-theme-surface));
 }
 
-.share-dialog__result { min-width: 0; padding: 0.8rem; }
-.share-dialog__result + .share-dialog__result { border-top: 1px solid rgba(var(--v-theme-on-surface), 0.14); }
-.share-dialog__result-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.55rem; }
-.share-dialog__result-header strong { min-width: 0; overflow-wrap: anywhere; font-size: 0.93rem; }
-.share-dialog__result-distance { color: var(--bb-color-muted); font-size: 0.8rem; margin: 0.4rem 0; }
-.share-dialog__result-action { margin-top: 0.55rem; min-height: 44px; }
+.share-dialog__result {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  min-height: 66px;
+  padding: 0.55rem 0.7rem;
+}
+.share-dialog__result + .share-dialog__result { border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08); }
+.share-dialog__result--selected { background: rgba(var(--v-theme-success), 0.07); }
+.share-dialog__result-avatar { flex: 0 0 auto; font-size: 0.85rem; font-weight: 800; }
+.share-dialog__result-main { flex: 1 1 auto; min-width: 0; }
+.share-dialog__result-name {
+  display: block; color: var(--bb-color-text); font-size: 0.88rem;
+  line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.share-dialog__result-meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.6rem;
+  color: var(--bb-color-muted); font-size: 0.76rem; line-height: 1.5;
+}
+.share-dialog__result-rating { display: inline-flex; align-items: center; gap: 0.1rem; }
+.share-dialog__result-rating :deep(.v-icon) { color: #986000; }
+.share-dialog__result-presence { display: inline-flex; align-items: center; gap: 0.25rem; }
+.share-dialog__result-dot { width: 0.42rem; height: 0.42rem; border-radius: 50%; background: #758989; }
+.share-dialog__result-presence--online .share-dialog__result-dot { background: #268251; }
+.share-dialog__result-action { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+.share-dialog__result-action:focus-visible { outline: 2px solid var(--bb-color-primary); outline-offset: 2px; }
 
 .share-dialog__selected {
   margin-top: 1rem;
@@ -808,6 +846,9 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__actions {
+  width: 100%;
+  max-width: 45rem;
+  margin-inline: auto;
   padding: 0.75rem clamp(1rem, 3vw, 1.75rem) 1rem;
 }
 

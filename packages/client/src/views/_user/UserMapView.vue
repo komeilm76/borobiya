@@ -168,12 +168,14 @@
               {{ broadcast.view.headline }}؛ {{ broadcast.view.detail }}
             </p>
             <LiveCompanionPanel :api="live" :visible="showCompanions" :selected-user-id="selectedCompanionId"
-              @update:visible="showCompanions = $event" @select="selectCompanion" />
+              @update:visible="showCompanions = $event" @select="selectCompanion" @create-share="shareOpen = true" />
             <p v-if="peerSelectionError" class="user-map-view__peer-error" role="status" aria-live="polite">{{ peerSelectionError }}</p>
           </aside>
         </v-card-text>
       </v-card>
     </component>
+
+    <ShareDialog v-model="shareOpen" fullscreen @shared="onShareCreated" />
   </section>
 </template>
 
@@ -198,6 +200,7 @@ import type { GeocodeResult, ReverseGeocodeResult, UserSearchResult } from "@sha
 import { usePlaceSearch } from "@/composables/use-place-search";
 import { placeSearchArea } from "@/map/place-search-area";
 import LiveCompanionPanel from "@/components/map/LiveCompanionPanel.vue";
+import ShareDialog from "@/components/sharing/ShareDialog.vue";
 import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { shareSessionKey } from "@/sharing/share-submission-fence";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
@@ -230,6 +233,14 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const activeTool = ref<MapTool | null>(null);
+const shareOpen = ref(false);
+function onShareCreated(): void {
+  // A new outgoing grant can change the device assigned to broadcast; do not start GPS here.
+  void broadcast.refreshPriority();
+}
+watch(shareOpen, (open, previous) => {
+  if (!open && previous) void nextTick(() => document.getElementById("map-share-location-button")?.focus());
+});
 // A popstate changes Vue Router's history position before route-leave guards run.
 // Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
 // keep the map visible on the first Back and dismiss just the open tool. Ordinary
@@ -244,9 +255,10 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (activeTool.value || selectedCompanionId.value || placeDetailOpen.value) && typeof position === "number" &&
+  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || placeDetailOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
-    if (placeDetailOpen.value) closePlaceDetail();
+    if (shareOpen.value) shareOpen.value = false;
+    else if (placeDetailOpen.value) closePlaceDetail();
     else if (selectedCompanionId.value) removeSelectedCompanion();
     else closeTool();
     return false;
@@ -1205,7 +1217,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   z-index: 2;
   inset-block-end: 1rem;
   inset-inline-start: 5.75rem; /* Keep all three fixed map actions outside this card. */
-  width: min(21rem, calc(100% - 6.75rem));
+  width: min(26rem, calc(100% - 6.75rem));
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
