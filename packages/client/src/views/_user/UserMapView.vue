@@ -1153,6 +1153,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   margin: 0;
 }
 
+/* Keep MapLibre's scale visible beside, rather than underneath, the bottom-left
+ * companions card. Its own bottom-left control slot is still used on narrow maps. */
+.user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+  left: calc(27rem + env(safe-area-inset-left, 0px));
+}
+
 /* A short horizontal rail stays within the existing top camera padding, rather than
  * running down the middle of the map. MapLibre still owns click, keyboard and compass logic. */
 .user-map-view__canvas :deep(.maplibregl-ctrl-top-right .maplibregl-ctrl-group) {
@@ -1211,17 +1217,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px;
 }
 
-/* The live card remains interactive; unlike the playback column it must accept clicks. */
+/* The live card sits at the physical bottom-left in this RTL page. Leave the
+ * opposite edge free for the fixed SOS, sharing and recenter actions. */
 .user-map-view__live {
   position: absolute;
   z-index: 2;
-  inset-block-end: 1rem;
-  inset-inline-start: 5.75rem; /* Keep all three fixed map actions outside this card. */
-  width: min(26rem, calc(100% - 6.75rem));
+  inset-block-end: calc(1rem + env(safe-area-inset-bottom, 0px));
+  inset-inline-end: calc(1rem + env(safe-area-inset-left, 0px));
+  width: min(26rem, calc(100% - 2rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+  max-height: calc(100dvh - 7rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
+.user-map-view__live :deep(.live-companions) { flex-shrink: 0; }
 
 /* At narrow/tablet widths, side panels would overlap each other and cover the map.
  * Stack them in page flow instead; keep a definite canvas height for MapLibre. */
@@ -1263,6 +1273,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     border-top: 1px solid #627a7a;
     border-inline-start: 0;
   }
+  .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) { left: 0; }
 
   .user-map-view__search,
   .user-map-view__playback,

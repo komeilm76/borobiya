@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Bottom-left live companions card on the map
+
+- Repositioned the desktop `/_user/map` «موقعیت زنده / همراهان» card to the physical bottom-left (including in RTL), with safe-area spacing and scrolling on short windows. Shifted the MapLibre scale beside it instead of covering the control. The tablet's in-flow card and phone's full-screen companion dialog remain unchanged. Added failing-before-change source/compiled-style regression tests; focused tests and client typecheck pass. Real browser/phone visual acceptance remains open.
+
 ### 2026-10-31 — Responsive map share form and remove redundant sharing-page broadcast bar
 
 - The map companions widget still opens the same «اشتراک موقعیت» form, but only phone widths (up to 599px) make it full-screen. Tablet and desktop use the existing centered 660px, scrollable dialog; phone Back retains the map route guard. Removed the redundant «پخش زنده خاموش است» / live-broadcast bar from `/_user/location-shares` while keeping recipient/device management, share-list refresh, priority reconciliation, and the separate map broadcast Start/Stop control. New source-contract tests failed before the change and now pass. Repository lint, shared/server/client typechecks, all 63/575/1,109 tests and build pass. Rendered browser/physical-device acceptance was not available in this sandbox.
