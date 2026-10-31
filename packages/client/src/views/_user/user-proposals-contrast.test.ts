@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { palettes } from "../../styles/tokens";
 
 // Source-pinned CSS audit; do not mount Vue SFCs in unit tests (TASKS.md convention).
-const source = readFileSync(new URL("./UserProposalsView.vue", import.meta.url), "utf8");
+const source = readFileSync(new URL("../../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8");
 const styles = source.split("<style scoped>")[1] ?? "";
 
 function rule(selector: string): string {

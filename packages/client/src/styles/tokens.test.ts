@@ -73,9 +73,11 @@ describe("T4.4.5 design primitives", () => {
     expect(users).toContain("color: var(--bb-color-text);\n  font-size: 1.1rem;");
     expect(users).toContain("background: rgba(var(--v-theme-on-surface), 0.04);");
     expect(views("_user/UserLocationSharesView")).toContain("color: var(--bb-color-muted);");
-    for (const name of ["UserSosHistoryView", "UserRescuerHistoryView", "UserMissionView", "UserProposalsView"]) {
+    for (const name of ["UserSosHistoryView", "UserRescuerHistoryView", "UserMissionView"]) {
       expect(views(`_user/${name}`)).toContain("color: rgb(var(--v-theme-primary));");
     }
+    expect(readFileSync(new URL("../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8"))
+      .toContain("color: rgb(var(--v-theme-primary));");
     expect(views("_user/UserRescuerHistoryView")).toContain(":global(:root.dark .history__stars) { color: var(--bb-color-secondary); }");
   });
 

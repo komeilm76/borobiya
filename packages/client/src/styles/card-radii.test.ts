@@ -28,7 +28,7 @@ const outer: Record<string, string[]> = {
   "components/mission/MissionRatingPanel.vue": [".rating"],
   "components/mission/MissionTimelinePanel.vue": [".timeline"],
   "views/_user/UserMissionView.vue": [".mission-route", ".mission-hero", ".mission-desk__card, .mission-desk__empty"],
-  "views/_user/UserProposalsView.vue": [".offers__hero", ".accepted-map", ".offer-detail", ".offers__empty"],
+  "components/shell/ProposalInboxContent.vue": [".offers__hero", ".accepted-map", ".offer-detail", ".offers__empty"],
   "views/_user/UserRescuerHistoryView.vue": [".history__hero", ".history__detail,.history__empty"],
   "views/_user/UserSosHistoryView.vue": [".history__hero", ".history__panel,.history__empty"]
 };
@@ -44,10 +44,9 @@ const nested: Record<string, string[]> = {
   "components/sos/SosRequestSheet.vue": [".sos-severity-card", ".sos-sheet__map-wrap"],
   "views/_admin/AdminDispatchView.vue": [".dispatch-mission-timeline"],
   "views/_admin/AdminUsersView.vue": [".admin-users-table-wrap", ".admin-mobile-card"],
-  "views/_user/UserDashboardView.vue": [".user-dashboard__map-preview"],
   "views/_user/UserMapView.vue": [".user-map-view > .user-map-view__canvas"],
   "views/_user/UserMissionView.vue": [".mission-route__stops", ".mission-route__map", ".mission-route__choice", ".mission-steps__item"],
-  "views/_user/UserProposalsView.vue": [".offers__stat", ".offer-card", ".offer-detail__facts > div", ".offers__skeleton", ".accepted-map__canvas", ".offer-detail__map", ".offer-detail__photo"],
+  "components/shell/ProposalInboxContent.vue": [".offers__stat", ".offer-card", ".offer-detail__facts > div", ".offers__skeleton", ".accepted-map__canvas", ".offer-detail__map", ".offer-detail__photo"],
   "views/_user/UserRescuerHistoryView.vue": [".history__item"],
   "views/_user/UserSosHistoryView.vue": [".history__item", ".history__evidence img"]
 };
@@ -86,15 +85,13 @@ describe("card corner scale (source-pinned; no Vue mount)", () => {
     expect(mission).not.toMatch(/\.mission-route\s*\{[^}]*border-radius:\s*18px/);
     const auth = readFileSync(join(src, "styles/auth.css"), "utf8");
     expect(auth).not.toMatch(/\.(?:auth-card|auth-intro)\s*\{[^}]*border-radius:\s*22px/);
-    for (const file of ["UserProposalsView.vue", "UserRescuerHistoryView.vue", "UserSosHistoryView.vue"]) {
-      const source = readFileSync(join(src, "views/_user", file), "utf8");
+    for (const file of ["components/shell/ProposalInboxContent.vue", "views/_user/UserRescuerHistoryView.vue", "views/_user/UserSosHistoryView.vue"]) {
+      const source = readFileSync(join(src, file), "utf8");
       expect(source).toMatch(/\.\w+__items:focus-visible\s*\{[^}]*border-radius:\s*var\(--bb-radius-nested, 16px\)/);
     }
   });
 
-  it("uses nested corners for the dashboard broadcast card, but keeps standalone broadcast cards full-sized", () => {
-    const dashboard = readFileSync(join(src, "views/_user/UserDashboardView.vue"), "utf8");
-    expect(dashboard).toContain("<LiveBroadcastBar inset />");
+  it("keeps standalone broadcast cards full-sized while preserving the inset variant", () => {
     const broadcast = readFileSync(join(src, "components/sharing/LiveBroadcastBar.vue"), "utf8");
     expect(broadcast).toContain("'broadcast-bar--inset': inset");
     expect(declaration("components/sharing/LiveBroadcastBar.vue", ".broadcast-bar--inset"))

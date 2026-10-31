@@ -3,11 +3,11 @@
     <header class="user-devices__header">
       <v-btn
         class="user-devices__back"
-        to="/_user/dashboard"
+        to="/_user/map"
         variant="text"
         icon
-        aria-label="بازگشت به پیشخوان"
-        title="بازگشت به پیشخوان"
+        aria-label="بازگشت به نقشه"
+        title="بازگشت به نقشه"
       >
         <v-icon icon="mdi-arrow-right" />
       </v-btn>

@@ -1,11 +1,11 @@
 <template>
-  <main class="offers" dir="rtl">
+  <div class="offers" dir="rtl">
     <div class="offers__shell">
       <header class="offers__hero">
         <div class="offers__intro">
-          <div class="offers__eyebrow"><span class="offers__live-dot" /> میز امدادگر · پیشنهادهای دریافتی</div>
-          <h1>جایی که کمک آغاز می‌شود.</h1>
-          <p>پیشنهادها را با آرامش بررسی کنید. با پذیرش یک مأموریت، پیشنهادهای دیگر شما خودکار بسته می‌شوند.</p>
+          <div class="offers__eyebrow"><span class="offers__live-dot" /> میز امدادگر</div>
+          <h3>پیشنهادهای فعال</h3>
+          <p>جزئیات را بررسی کنید؛ پذیرش یک مأموریت، پیشنهادهای دیگر را می‌بندد.</p>
         </div>
         <div class="offers__stat" aria-live="polite">
           <v-icon icon="mdi-bell-ring-outline" size="27" />
@@ -52,7 +52,7 @@
 
       <div class="offers__toolbar">
         <div>
-          <h2>پیشنهادهای فعال</h2>
+          <h2>فهرست و جزئیات</h2>
           <p>فقط درخواست‌هایی که برای شما فرستاده شده‌اند نمایش داده می‌شوند.</p>
         </div>
         <v-btn color="primary" variant="tonal" rounded="lg" prepend-icon="mdi-refresh" :loading="inbox.loading"
@@ -71,8 +71,8 @@
       <div v-else-if="!inbox.proposals.length" class="offers__empty">
         <div class="offers__empty-icon"><v-icon icon="mdi-hand-heart-outline" size="34" /></div>
         <h3>فعلاً پیشنهادی در انتظار نیست</h3>
-        <p>هنگام دریافت درخواست تازه، زنگ بالای صفحه به شما خبر می‌دهد. این صفحه هر ۳۰ ثانیه نیز تازه می‌شود.</p>
-        <v-btn to="/_user/dashboard" variant="text" color="primary" rounded="lg">بازگشت به پیشخوان</v-btn>
+        <p>هنگام دریافت درخواست تازه، زنگ نقشه به شما خبر می‌دهد. این فهرست هر ۳۰ ثانیه نیز تازه می‌شود.</p>
+        <v-btn variant="text" color="primary" rounded="lg" @click="emit('close')">بازگشت به نقشه</v-btn>
       </div>
       <div v-else class="offers__layout">
         <section class="offers__list" aria-label="فهرست پیشنهادهای مأموریت">
@@ -80,7 +80,7 @@
             :tabindex="inbox.proposals.length > 1 ? 0 : -1">
             <button v-for="offer in inbox.proposals" :key="offer.id" class="offer-card" type="button"
               :class="{ 'offer-card--selected': selected?.id === offer.id }"
-              :aria-pressed="selected?.id === offer.id" @click="selectedId = offer.id">
+              :aria-pressed="selected?.id === offer.id" @click="selectOffer(offer.id)">
               <span class="offer-card__stripe" :class="`offer-card__stripe--${severity(offer).tone}`" />
               <span class="offer-card__body">
                 <span class="offer-card__top">
@@ -107,7 +107,7 @@
           </div>
         </section>
 
-        <section v-if="selected" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده">
+        <section v-if="selected" ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده">
           <div class="offer-detail__top">
             <span class="offer-detail__kicker">پروندهٔ امداد · {{ proposalTime(selected.createdAt) }}</span>
             <h2>{{ selected.details?.incidentTypeName ?? 'درخواست امداد' }}</h2>
@@ -160,6 +160,9 @@
             </div>
           </div>
         </section>
+        <div v-else class="offers__empty" role="status">
+          این پیشنهاد دیگر در فهرست شما نیست. پیشنهاد دیگری را انتخاب کنید یا فهرست را تازه کنید.
+        </div>
       </div>
     </div>
 
@@ -181,13 +184,12 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
-  </main>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import type { Map as MapLibreMap, Marker } from "maplibre-gl";
-import { useRoute } from "vue-router";
 import type { ProposalInboxItem } from "@shared/index";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { DEFAULT_DARK_MAP_STYLE, DEFAULT_MAP_STYLE } from "@/components/map/map-canvas-options";
@@ -198,12 +200,21 @@ import { useAuthStore } from "@/stores/auth";
 import { useProposalInboxStore } from "@/stores/proposal-inbox";
 import { useThemeStore } from "@/stores/theme";
 
+const props = defineProps<{ selectedOfferId: string | null }>();
+const emit = defineEmits<{ close: [] }>();
 const inbox = useProposalInboxStore();
-const route = useRoute();
 const auth = useAuthStore();
 const theme = useThemeStore();
-const selectedId = ref<string | null>(null);
-const selected = computed(() => inbox.proposals.find((item) => item.id === selectedId.value) ?? inbox.proposals[0] ?? null);
+const selectedId = ref<string | null>(props.selectedOfferId);
+const selected = computed(() => selectedId.value
+  ? inbox.proposals.find((item) => item.id === selectedId.value) ?? null
+  : inbox.proposals[0] ?? null);
+const detailRef = ref<HTMLElement | null>(null);
+async function selectOffer(id: string): Promise<void> {
+  selectedId.value = id;
+  await nextTick();
+  detailRef.value?.scrollIntoView({ block: "start" });
+}
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
 const confirmAction = ref<"accept" | "decline" | null>(null);
 const declineReason = ref("");
@@ -298,12 +309,13 @@ async function submitDecision(): Promise<void> {
   const action = confirmAction.value;
   if (!id || !action) return;
   const success = await inbox.decide(id, action, action === "decline" ? declineReason.value.trim() || undefined : undefined);
-  if (success) { confirmAction.value = null; declineReason.value = ""; }
+  if (success) {
+    confirmAction.value = null;
+    declineReason.value = "";
+    if (action === "decline") selectedId.value = null;
+  }
 }
-watch(() => [route.query.offer, inbox.proposals.map((item) => item.id).join(',')], () => {
-  const offer = route.query.offer;
-  if (typeof offer === "string" && inbox.proposals.some((item) => item.id === offer)) selectedId.value = offer;
-}, { immediate: true });
+watch(() => props.selectedOfferId, (id) => { selectedId.value = id; });
 watch(() => selected.value?.id, () => {
   photoGeneration++;
   photoSrc.value = null;
@@ -331,17 +343,16 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 </script>
 
 <style scoped>
-.offers { min-height: calc(100vh - 140px); padding: clamp(18px, 4vw, 52px) 18px 100px; background: radial-gradient(ellipse at 80% 0%, rgba(48, 117, 106, .11), transparent 48%), rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }
+.offers { min-height: 0; padding: clamp(12px, 3vw, 30px) 12px 32px; background: radial-gradient(ellipse at 80% 0%, rgba(48, 117, 106, .11), transparent 48%), rgb(var(--v-theme-background)); color: rgb(var(--v-theme-on-background)); }
 .offers__shell { max-width: 1260px; margin-inline: auto; }
-.offers__hero { display: flex; gap: 24px; align-items: center; justify-content: space-between; padding: clamp(24px, 4vw, 42px); border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: var(--bb-shadow-hero); overflow: hidden; position: relative; }
-.offers__hero::after { content: "✳"; position: absolute; inset-inline-end: -24px; top: -95px; color: rgba(255,255,255,.055); font-size: 320px; line-height: 1; pointer-events: none; }
-.offers__intro { position: relative; z-index: 1; max-width: 680px; }
-.offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: .8rem; font-weight: 700; letter-spacing: .02em; }
+.offers__hero { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: var(--bb-shadow-hero); }
+.offers__intro { min-width: 0; }
+.offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: .74rem; font-weight: 700; }
 .offers__live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #74e9be; box-shadow: 0 0 0 4px rgba(116,233,190,.17); }
-.offers__hero h1 { font-size: clamp(1.65rem, 3vw, 2.6rem); margin: 15px 0 12px; line-height: 1.25; font-weight: 800; }
-.offers__hero p { color: #d2e8e2; line-height: 1.9; margin: 0; font-size: .93rem; }
-.offers__stat { position: relative; z-index: 1; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.11); border-radius: var(--bb-radius-nested, 16px); min-width: 150px; min-height: 140px; gap: 2px; font-size: .79rem; color: #e1f7ec; }
-.offers__stat-number { font-size: 2.5rem; line-height: 1.1; font-weight: 800; color: #fff; }
+.offers__hero h3 { font-size: 1.15rem; margin: 3px 0; line-height: 1.3; font-weight: 800; }
+.offers__hero p { color: #d2e8e2; line-height: 1.45; margin: 0; font-size: .78rem; }
+.offers__stat { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.11); border-radius: var(--bb-radius-nested, 16px); min-width: 66px; min-height: 66px; padding: 4px; gap: 0; font-size: .65rem; color: #e1f7ec; text-align: center; }
+.offers__stat-number { font-size: 1.25rem; line-height: 1.1; font-weight: 800; color: #fff; }
 .accepted-map { margin-top: 22px; padding: clamp(18px, 3vw, 28px); border-radius: var(--bb-radius-card, 24px); border: 1px solid rgba(49,149,129,.28); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-surface); }
 .accepted-map__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
 .accepted-map__intro h2 { font-size: 1.25rem; font-weight: 800; margin: 0 0 5px; }
@@ -350,7 +361,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .accepted-map__canvas :deep(.map-canvas), .accepted-map__canvas :deep(.map-canvas__viewport) { min-height: 0; }
 .accepted-map__caption { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; font-size: .83rem; margin: 16px 0 0; line-height: 1.7; }
 .accepted-map__caption bdi { font-weight: 700; }
-.offers__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 32px 0 17px; }
+.offers__toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 18px 0 12px; }
 .offers__toolbar h2 { font-size: 1.28rem; font-weight: 800; margin: 0 0 4px; }
 .offers__toolbar p { font-size: .82rem; opacity: .66; margin: 0; }
 .offers__layout { display: grid; grid-template-columns: minmax(265px, 385px) minmax(0, 1fr); gap: 20px; align-items: start; }
@@ -386,15 +397,15 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offers__empty { border: 1px dashed rgba(89,145,133,.4); background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); text-align: center; padding: 65px 20px; margin-top: 18px; }.offers__empty-icon { display: inline-flex; padding: 15px; background: rgba(48,148,123,.12); border-radius: 50%; color: rgb(var(--v-theme-primary)); }.offers__empty h3 { font-size: 1.25rem; margin: 16px 0 8px; }.offers__empty p { opacity: .7; font-size: .9rem; line-height: 1.8; max-width: 440px; margin: 0 auto 20px; }.offers__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }.offers__skeleton { border-radius: var(--bb-radius-nested, 16px); }
 @media (max-width: 850px) {
   .offers__layout { grid-template-columns: 1fr; }
+  .offers__list { order: 1; } /* Put the chosen incident first in the full-screen dialog. */
   .offers__items { max-height: min(45vh, 26rem); max-height: min(45dvh, 26rem); overflow-y: auto; padding: 8px 10px 12px; }
   .offers__items:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; border-radius: var(--bb-radius-nested, 16px); }
   .offer-detail { scroll-margin-top: 85px; }
 }
 @media (max-width: 580px) {
   .offers { padding-inline: 12px; }
-  .offers__hero { flex-direction: column; align-items: stretch; padding: 26px 23px; }
-  .offers__stat { flex-direction: row; min-height: 67px; gap: 12px; }
-  .offers__stat-number { font-size: 1.6rem; }
+  .offers__hero { padding: 12px; }
+  .offers__stat { min-width: 60px; }
   .offers__toolbar { align-items: start; }
   .offers__toolbar p { display: none; }
   .offers__grid { grid-template-columns: 1fr; }

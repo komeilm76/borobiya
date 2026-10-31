@@ -31,8 +31,8 @@
       <section v-else-if="!history.items.value.length && history.listVerified.value" class="history__empty">
         <v-icon icon="mdi-lifebuoy" size="42" color="primary" />
         <h2>هنوز مأموریتی ندارید</h2>
-        <p>پیشنهادهای مأموریت از بخش «پیشنهادها» در دسترس‌اند.</p>
-        <v-btn to="/_user/proposals" color="primary" variant="tonal">مشاهدهٔ پیشنهادها</v-btn>
+        <p>پیشنهادهای مأموریت را از زنگ بالای نقشه بررسی کنید.</p>
+        <v-btn to="/_user/map?inbox=1" color="primary" variant="tonal">مشاهدهٔ پیشنهادها</v-btn>
       </section>
       <section v-else-if="!history.items.value.length" class="history__empty" role="status">
         نبودن مأموریت قابل تأیید نیست؛ لطفاً فهرست را دوباره تازه‌سازی کنید.

@@ -38,8 +38,9 @@ describe("client route records", () => {
     }
   });
 
-  it("binds the user dashboard and map routes to their functional views", () => {
-    expect(routeRecords.find((route) => route.path === "/_user/dashboard")?.component).toEqual(expect.any(Function));
+  it("uses the map as the only user home view and redirects legacy bookmarks", () => {
+    expect(routeRecords.find((route) => route.path === "/_user/dashboard")?.redirect).toBe("/_user/map");
+    expect(routeRecords.find((route) => route.path === "/_user/proposals")?.component).toBeUndefined();
     expect(routeRecords.find((route) => route.path === "/_user/map")?.component).toEqual(expect.any(Function));
   });
 
@@ -107,7 +108,6 @@ describe("client route records", () => {
       "/_admin/users",
       "/_admin/categories",
       "/_admin/incidents",
-      "/_user/dashboard",
       "/_user/map",
       "/_user/mission",
       "/_user/location-shares",

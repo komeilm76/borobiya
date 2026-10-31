@@ -2,7 +2,7 @@ import type { AuthUser } from "@shared/index";
 import type { RouteLocationRaw, RouteLocationNormalized } from "vue-router";
 
 const LOGIN_PATH = "/_auth/login";
-const DASHBOARD_PATH = "/_user/dashboard";
+const USER_HOME_PATH = "/_user/map";
 const ADMIN_USERS_PATH = "/_admin/users";
 const ONBOARDING_PATH = "/_user/complete-security-questions";
 
@@ -48,7 +48,7 @@ export function resolvePostLoginDestination(
   const safeRedirect = safeRedirectPath(redirect);
   if (safeRedirect) return safeRedirect;
   if (auth.mustCompleteSecurityQuestions) return ONBOARDING_PATH;
-  return auth.user?.role === "admin" ? ADMIN_USERS_PATH : DASHBOARD_PATH;
+  return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
 }
 
 export function resolveAuthNavigation(
@@ -71,10 +71,10 @@ export function resolveAuthNavigation(
     return ONBOARDING_PATH;
   }
   if (!auth.mustCompleteSecurityQuestions && to.path === ONBOARDING_PATH) {
-    return DASHBOARD_PATH;
+    return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
   }
   if (isAdminPath(to.path) && auth.user?.role !== "admin") {
-    return DASHBOARD_PATH;
+    return USER_HOME_PATH;
   }
   return true;
 }

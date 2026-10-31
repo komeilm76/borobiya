@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const missions = readFileSync(new URL("./UserRescuerHistoryView.vue", import.meta.url), "utf8");
-const offers = readFileSync(new URL("./UserProposalsView.vue", import.meta.url), "utf8");
+const offers = readFileSync(new URL("../../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8");
 
 /** Source-pinned responsive structure; the repo convention is not to mount Vue SFCs in unit tests. */
 describe("rescuer stacked master/detail screens (T4.4.1)", () => {
@@ -21,8 +21,8 @@ describe("rescuer stacked master/detail screens (T4.4.1)", () => {
   it("keeps proposal pagination and the incident map/decision buttons outside the bounded list", () => {
     expect(offers).toMatch(/<div class="offers__items" role="region"[^>]*:tabindex="inbox\.proposals\.length > 1 \? 0 : -1"[^>]*>[\s\S]*?<button v-for="offer in inbox\.proposals"/);
     expect(offers).toMatch(/<\/button>\s*<\/div>\s*<div v-if="inbox\.totalPages > 1" class="offers__pages"/);
-    expect(offers.indexOf('class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده"')).toBeGreaterThan(offers.indexOf('class="offers__pages"'));
-    expect(offers).toContain('@click="selectedId = offer.id"');
+    expect(offers.indexOf('ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده"')).toBeGreaterThan(offers.indexOf('class="offers__pages"'));
+    expect(offers).toContain('@click="selectOffer(offer.id)"');
     // The details default to the first offer (or fall back after paging); the visible/ARIA
     // selected state must track that computed offer, not only an explicit click.
     expect(offers).toContain(":class=\"{ 'offer-card--selected': selected?.id === offer.id }\"");

@@ -45,32 +45,34 @@ describe("client auth navigation guard", () => {
 
   it("redirects accounts that already completed onboarding away from its form", () => {
     const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser });
-    expect(resolveAuthNavigation(location("/_user/complete-security-questions"), auth)).toBe("/_user/dashboard");
+    expect(resolveAuthNavigation(location("/_user/complete-security-questions"), auth)).toBe("/_user/map");
+    expect(resolveAuthNavigation(location("/_user/complete-security-questions"), makeAuth({ isAuthenticated: true, user: admin })))
+      .toBe("/_admin/users");
   });
 
   it("keeps authenticated users out of guest-only pages and accepts only safe return paths", () => {
     const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser });
 
-    expect(resolveAuthNavigation(location("/_auth/register"), auth)).toBe("/_user/dashboard");
+    expect(resolveAuthNavigation(location("/_auth/register"), auth)).toBe("/_user/map");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "/_user/map?theme=dark" }), auth))
       .toBe("/_user/map?theme=dark");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "//attacker.example/path" }), auth))
-      .toBe("/_user/dashboard");
+      .toBe("/_user/map");
     expect(resolveAuthNavigation(location("/_auth/login", { redirect: "/_auth/register" }), auth))
-      .toBe("/_user/dashboard");
-    expect(resolveAuthNavigation(location("/auth/forgot-password"), auth)).toBe("/_user/dashboard");
+      .toBe("/_user/map");
+    expect(resolveAuthNavigation(location("/auth/forgot-password"), auth)).toBe("/_user/map");
     expect(resolveAuthNavigation(location("/authentic"), auth)).toBe(true);
   });
 
   it("requires an admin role for admin pages", () => {
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: ordinaryUser })))
-      .toBe("/_user/dashboard");
+      .toBe("/_user/map");
     expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: admin }))).toBe(true);
   });
 
   it("sends admins to user management after login and keeps user onboarding/default destinations", () => {
     expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/users");
-    expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/dashboard");
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/map");
     expect(resolvePostLoginDestination(undefined, makeAuth({
       user: admin,
       mustCompleteSecurityQuestions: true

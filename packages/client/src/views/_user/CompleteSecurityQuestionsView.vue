@@ -150,7 +150,7 @@ async function submitAnswers(): Promise<void> {
   submitting.value = true;
   try {
     await auth.completeSecurityQuestions(parsed.data);
-    await router.replace("/_user/dashboard");
+    await router.replace("/_user/map");
   } catch (error) {
     formError.value = friendlyErrorMessage(error, "ذخیرهٔ پاسخ‌ها انجام نشد. دوباره تلاش کنید.");
   } finally {

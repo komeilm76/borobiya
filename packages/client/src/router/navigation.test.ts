@@ -12,7 +12,6 @@ vi.mock("@client/views/_auth/RegisterView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_auth/ForgotPasswordView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_public/PlaceholderView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_user/CompleteSecurityQuestionsView.vue", () => ({ default: {} }));
-vi.mock("@client/views/_user/UserDashboardView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_user/UserMapView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_user/UserDevicesView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_admin/AdminUsersView.vue", () => ({ default: {} }));
@@ -53,9 +52,9 @@ describe("real router auth navigation (no Vue components mounted)", () => {
       auth.user = user;
       await router.push("/_public/health");
       router.back();
-      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/dashboard"));
+      await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/map"));
       await router.push(path);
-      expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+      expect(router.currentRoute.value.path).toBe("/_user/map");
     }
   );
 
@@ -75,7 +74,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     await router.push("/_auth/login");
     auth.user = user;
     auth.isAuthenticated = true;
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/dashboard"));
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/map"));
     auth.mustCompleteSecurityQuestions = true;
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/complete-security-questions"));
   });
@@ -97,7 +96,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     const auth = useAuthStore(createPinia());
     const router = setup(auth);
     await router.push("/_auth/forgot-password");
-    expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+    expect(router.currentRoute.value.path).toBe("/_user/map");
     expect(auth.isAuthenticated).toBe(true);
     expect(auth.user?.role).toBe("user");
     expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -123,7 +122,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     await router.push("/_auth/login");
     expect(router.currentRoute.value.name).toBe("auth-login");
     await auth.refreshSession();
-    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/dashboard"));
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe("/_user/map"));
     expect(auth.user?.role).toBe("user");
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -139,7 +138,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     auth.user = user;
     restore();
     await navigation;
-    expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+    expect(router.currentRoute.value.path).toBe("/_user/map");
     expect(auth.ensureSession).toHaveBeenCalled();
   });
 
@@ -166,7 +165,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     auth.isAuthenticated = true;
     auth.user = user;
     await router.replace(resolvePostLoginDestination(router.currentRoute.value.query.redirect, auth));
-    expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+    expect(router.currentRoute.value.path).toBe("/_user/map");
   });
 
   it("keeps external, auth and malformed return targets out of the auth flow", async () => {
@@ -174,7 +173,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     const router = setup(auth);
     for (const redirect of ["//example.org/x", "/_auth/register", "/auth/login", "https://example.org", "/_auth?again=1"]) {
       await router.push({ path: "/_auth/login", query: { redirect } });
-      expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+      expect(router.currentRoute.value.path).toBe("/_user/map");
     }
   });
 
@@ -187,7 +186,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     expect(router.currentRoute.value.path).toBe("/_admin/dispatch");
     auth.user = user;
     await router.push("/_admin/users");
-    expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+    expect(router.currentRoute.value.path).toBe("/_user/map");
   });
 
   it("enforces onboarding from auth, protected, and public routes after session restoration", async () => {
@@ -200,7 +199,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     auth.mustCompleteSecurityQuestions = false;
     await router.push("/_public/health");
     await router.push("/_user/complete-security-questions");
-    expect(router.currentRoute.value.path).toBe("/_user/dashboard");
+    expect(router.currentRoute.value.path).toBe("/_user/map");
   });
 
   it("does not confuse similar public paths with auth or protected paths", async () => {

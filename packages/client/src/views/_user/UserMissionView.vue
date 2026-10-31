@@ -79,7 +79,7 @@
         <div class="mission-desk__empty-icon"><v-icon icon="mdi-check-decagram-outline" size="36" /></div>
         <h3>در حال حاضر مأموریت فعالی ندارید</h3>
         <p>برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.</p>
-        <v-btn color="primary" variant="flat" rounded="lg" to="/_user/proposals">مشاهدهٔ پیشنهادها</v-btn>
+        <v-btn color="primary" variant="flat" rounded="lg" to="/_user/map?inbox=1">مشاهدهٔ پیشنهادها</v-btn>
       </section>
       <MissionLivePanel v-if="desk.activeMission.value" :mission="desk.activeMission.value" />
       <section v-if="routing.visible.value && desk.activeMission.value" class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت">

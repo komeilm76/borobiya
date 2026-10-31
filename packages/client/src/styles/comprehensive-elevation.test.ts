@@ -60,7 +60,7 @@ describe("all page and component elevation roles", () => {
   it("gives dark gradient heroes depth while leaving the SOS action and decorative rings alone", () => {
     for (const [path, selector] of [
       ["../views/_user/UserMissionView.vue", ".mission-hero"],
-      ["../views/_user/UserProposalsView.vue", ".offers__hero"],
+      ["../components/shell/ProposalInboxContent.vue", ".offers__hero"],
       ["../views/_user/UserSosHistoryView.vue", ".history__hero"]
     ]) {
       const css = source(path);

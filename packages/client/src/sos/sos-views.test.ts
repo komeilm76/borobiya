@@ -13,10 +13,6 @@ const sheetSource = readFileSync(
   resolve(import.meta.dirname, "../components/sos/SosRequestSheet.vue"),
   "utf8"
 );
-const dashboardSource = readFileSync(
-  resolve(import.meta.dirname, "../views/_user/UserDashboardView.vue"),
-  "utf8"
-);
 
 describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
   it("opens and closes the shared SOS sheet store cleanly", () => {
@@ -123,8 +119,4 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(sheetSource).toContain('max-height: min(74vh, 42rem);');
   });
 
-  it("replaces the dashboard 'coming soon' rescue card with an active SOS trigger", () => {
-    expect(dashboardSource).toContain("sosSheet.openSheet()");
-    expect(dashboardSource).not.toContain("درخواست و پیگیری امداد در گام بعدی اضافه می‌شود");
-  });
 });

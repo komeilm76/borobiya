@@ -10,7 +10,7 @@ import { useAuthStore } from "./auth";
  * Single app-scoped live broadcast controller (`T2.1.5` + `T2.3.6`).
  *
  * Kept in Pinia rather than inside a single route component so starting a broadcast on
- * `/_user/dashboard` keeps streaming smoothly when navigating to `/_user/map` or `/_user/devices`,
+ * The map keeps streaming smoothly when navigating to `/_user/location-shares` or `/_user/devices`,
  * while logging out immediately halts hardware GPS and closes the socket.
  */
 export const useBroadcastStore = defineStore("broadcast", () => {

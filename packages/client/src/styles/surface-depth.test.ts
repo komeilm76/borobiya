@@ -33,17 +33,14 @@ describe("surface depth across light and dark UI", () => {
       .toMatch(/\.admin-users-card\s*\{[^}]*box-shadow:\s*var\(--bb-shadow-surface\)\s*!important;/);
   });
 
-  it("makes dashboard and device surfaces visible despite Vuetify elevation-0", () => {
-    const dashboard = source("../views/_user/UserDashboardView.vue");
-    expect(dashboard).toMatch(/\.user-dashboard__note-card\s*\{[^}]*box-shadow:\s*var\(--bb-shadow-surface\)\s*!important;/);
-    expect(dashboard).not.toMatch(/:global\(:root\.dark \.user-dashboard__feature-card\)\s*\{[^}]*box-shadow:/);
+  it("makes device surfaces visible despite Vuetify elevation-0", () => {
     const devices = source("../components/settings/DevicePriorityPanel.vue");
     expect(devices).toMatch(/\.device-priority__card\s*\{[^}]*box-shadow:\s*var\(--bb-shadow-surface\)\s*!important;/);
   });
 
   it("keeps custom primary panels aligned without raising nested rows and selection rings", () => {
     const mission = source("../views/_user/UserMissionView.vue");
-    const proposals = source("../views/_user/UserProposalsView.vue");
+    const proposals = source("../components/shell/ProposalInboxContent.vue");
     const history = source("../views/_user/UserSosHistoryView.vue");
     const rescuer = source("../views/_user/UserRescuerHistoryView.vue");
     for (const [text, selector] of [

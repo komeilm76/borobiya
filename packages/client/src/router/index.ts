@@ -54,11 +54,12 @@ export const routeRecords: RouteRecordRaw[] = [
     name: "user-complete-security-questions",
     component: () => import("@client/views/_user/CompleteSecurityQuestionsView.vue")
   },
-  {
-    path: "/_user/dashboard",
-    name: "user-dashboard",
-    component: () => import("@client/views/_user/UserDashboardView.vue")
-  },
+  // Old bookmarks remain safe but no longer load separate dashboard/proposals pages.
+  { path: "/_user/dashboard", redirect: "/_user/map" },
+  { path: "/_user/proposals", redirect: (to) => ({
+    path: "/_user/map",
+    query: typeof to.query.offer === "string" ? { offer: to.query.offer } : {}
+  }) },
   {
     path: "/_user/map",
     name: "user-map",
@@ -68,11 +69,6 @@ export const routeRecords: RouteRecordRaw[] = [
     path: "/_user/location-shares",
     name: "user-location-shares",
     component: () => import("@client/views/_user/UserLocationSharesView.vue")
-  },
-  {
-    path: "/_user/proposals",
-    name: "user-proposals",
-    component: () => import("@client/views/_user/UserProposalsView.vue")
   },
   {
     path: "/_user/mission",

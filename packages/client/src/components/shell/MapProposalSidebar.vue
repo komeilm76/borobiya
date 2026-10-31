@@ -70,11 +70,7 @@
 
         <ul v-if="inbox.proposals.length" class="map-proposal__list" aria-label="پیشنهادهای دریافتی">
           <li v-for="offer in inbox.proposals" :key="offer.id">
-            <RouterLink
-              class="map-proposal__item"
-              :to="{ path: '/_user/proposals', query: { offer: offer.id } }"
-              @click="open = false"
-            >
+            <button type="button" class="map-proposal__item" @click="openOffer(offer.id)">
               <span class="map-proposal__item-head">
                 <span class="map-proposal__incident">{{ offer.details?.incidentTypeName ?? 'درخواست امداد' }}</span>
                 <span class="map-proposal__severity" :class="`map-proposal__severity--${proposalSeverity[offer.details?.sosRequest.severity ?? 'medium'].tone}`">
@@ -82,7 +78,7 @@
                 </span>
               </span>
               <span v-if="offer.details?.sosRequest.description" class="map-proposal__description">{{ offer.details.sosRequest.description }}</span>
-              <span v-else class="map-proposal__description">جزئیات در صفحهٔ پیشنهادها در دسترس است.</span>
+              <span v-else class="map-proposal__description">برای بررسی، جزئیات پیشنهاد را باز کنید.</span>
               <span v-if="offer.details?.requesterName" class="map-proposal__requester">
                 <v-icon icon="mdi-account-outline" size="16" aria-hidden="true" />
                 درخواست‌دهنده: <span dir="auto">{{ offer.details.requesterName }}</span>
@@ -91,7 +87,7 @@
                 <span><v-icon icon="mdi-clock-outline" size="16" aria-hidden="true" /> {{ proposalTime(offer.createdAt) }}</span>
                 <span>جزئیات <v-icon icon="mdi-chevron-left" size="17" aria-hidden="true" /></span>
               </span>
-            </RouterLink>
+            </button>
           </li>
         </ul>
         <nav v-if="inbox.totalPages > 1" class="map-proposal__pages" aria-label="صفحه‌بندی پیشنهادها">
@@ -104,32 +100,70 @@
       </v-card-text>
 
       <v-card-actions class="map-proposal__footer">
-        <span>پذیرش یا رد پیشنهاد در صفحهٔ جزئیات انجام می‌شود.</span>
-        <v-btn block variant="tonal" color="primary" rounded="lg" to="/_user/proposals"
-          append-icon="mdi-arrow-left" @click="open = false">مشاهدهٔ همهٔ پیشنهادها</v-btn>
+        <span>برای پذیرش یا رد، جزئیات هر پیشنهاد را باز کنید.</span>
+        <v-btn block variant="tonal" color="primary" rounded="lg"
+          append-icon="mdi-arrow-left" @click="openOffer(null)">بررسی همهٔ پیشنهادها</v-btn>
       </v-card-actions>
+    </v-card>
+  </v-dialog>
+
+  <v-dialog v-model="detailsOpen" class="map-proposal__details" fullscreen
+    :persistent="Boolean(inbox.decidingId)" aria-labelledby="map-proposal-details-title"
+    @after-leave="restoreBellFocus">
+    <v-card class="map-proposal__details-panel" rounded="xl" elevation="0">
+      <v-card-title class="map-proposal__details-header">
+        <h2 id="map-proposal-details-title">بررسی پیشنهادهای مأموریت</h2>
+        <v-btn icon="mdi-close" variant="text" aria-label="بستن جزئیات پیشنهادها"
+          :disabled="Boolean(inbox.decidingId)" @click="closeDetails" />
+      </v-card-title>
+      <v-card-text class="map-proposal__details-scroll">
+        <ProposalInboxContent v-if="detailsOpen" :selected-offer-id="selectedOfferId" @close="closeDetails" />
+      </v-card-text>
     </v-card>
   </v-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, defineAsyncComponent, ref, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { proposalSeverity, proposalTime } from "@/sos/proposal-presentation";
 import type { useProposalInboxStore } from "@/stores/proposal-inbox";
 
 const props = defineProps<{ inbox: ReturnType<typeof useProposalInboxStore>; userId: string }>();
+const ProposalInboxContent = defineAsyncComponent(() => import("./ProposalInboxContent.vue"));
 const open = ref(false);
+const detailsOpen = ref(false);
+const selectedOfferId = ref<string | null>(null);
 const route = useRoute();
+
+function openOffer(id: string | null): void {
+  selectedOfferId.value = id;
+  open.value = false;
+  detailsOpen.value = true;
+}
+function closeDetails(): void {
+  if (props.inbox.decidingId) return;
+  detailsOpen.value = false;
+}
+function restoreBellFocus(): void {
+  if (!detailsOpen.value) document.querySelector<HTMLButtonElement>(".map-proposal__bell")?.focus({ preventScroll: true });
+}
 const bellLabel = computed(() => props.inbox.failed
   ? "پیشنهادهای مأموریت؛ به‌روزرسانی ناموفق"
   : props.inbox.total
     ? `پیشنهادهای مأموریت؛ ${props.inbox.total.toLocaleString('fa-IR')} پیشنهاد در انتظار`
     : "پیشنهادهای مأموریت؛ بدون پیشنهاد جدید");
 
-// The store fences late reads on account changes; also close an already-open
-// preview immediately so a previous account's details cannot linger on screen.
-watch([() => props.userId, () => route.fullPath], () => { open.value = false; });
+// The store fences late reads on account changes. Hide both overlays immediately
+// so no previous-account details linger while a new session is restoring.
+watch(() => props.userId, () => { open.value = false; detailsOpen.value = false; selectedOfferId.value = null; });
+watch(() => route.fullPath, () => {
+  open.value = false;
+  detailsOpen.value = false;
+  if (route.path !== "/_user/map") return;
+  if (typeof route.query.offer === "string") openOffer(route.query.offer);
+  else if (route.query.inbox === "1") { open.value = true; void props.inbox.refresh(); }
+}, { immediate: true });
 </script>
 
 <style scoped>
@@ -205,7 +239,8 @@ watch([() => props.userId, () => route.fullPath], () => { open.value = false; })
 .map-proposal__inline-link { color: rgb(var(--v-theme-primary)); font-weight: 800; text-decoration: underline; }
 .map-proposal__list { display: grid; gap: 0.65rem; margin: 0; padding: 0; list-style: none; }
 .map-proposal__item {
-  display: grid; gap: 0.55rem; min-height: 108px; padding: 0.85rem;
+  display: grid; gap: 0.55rem; width: 100%; min-height: 108px; padding: 0.85rem;
+  font: inherit; color: inherit; text-align: start; cursor: pointer;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.13); border-radius: 1rem;
   background: rgba(var(--v-theme-primary), 0.035);
   transition: border-color 0.15s ease, background-color 0.15s ease;
@@ -232,6 +267,27 @@ watch([() => props.userId, () => route.fullPath], () => { open.value = false; })
 .map-proposal__footer > span { font-size: 0.74rem; line-height: 1.4; opacity: 0.8; }
 .map-proposal__footer :deep(.v-btn) { min-height: 44px; height: auto; }
 .map-proposal__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
+:global(.map-proposal__details.v-dialog > .v-overlay__content) {
+  width: 100vw !important; max-width: 100vw !important;
+  height: 100dvh !important; max-height: 100dvh !important; margin: 0 !important;
+}
+:global(.map-proposal__details.v-dialog > .v-overlay__content > .map-proposal__details-panel) {
+  display: flex; flex-direction: column; width: 100%; height: 100%; min-height: 0;
+  overflow: hidden !important; border-radius: 0 !important;
+}
+.map-proposal__details-header {
+  display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 0.5rem;
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px))
+    calc(1rem + env(safe-area-inset-right, 0px)) 0.5rem
+    calc(1rem + env(safe-area-inset-left, 0px));
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+}
+.map-proposal__details-header h2 { min-width: 0; font-size: 1rem; font-weight: 800; overflow-wrap: anywhere; }
+.map-proposal__details-header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
+:global(.map-proposal__details.v-dialog > .v-overlay__content > .map-proposal__details-panel > .map-proposal__details-scroll) {
+  flex: 1 1 auto; min-height: 0; padding: 0 !important;
+  overflow-y: auto; overscroll-behavior: contain;
+}
 :global(:root.dark .map-proposal__severity--urgent) { color: #ffadad; }
 :global(:root.dark .map-proposal__severity--important) { color: #f9ca76; }
 @media (forced-colors: active) {

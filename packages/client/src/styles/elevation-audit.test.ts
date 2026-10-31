@@ -20,7 +20,7 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
     expect(shadows.light.itemHover).not.toBe(shadows.dark.itemHover);
     expect(light).toContain(`--bb-shadow-item: ${shadows.light.item}`);
     expect(dark).toContain(`--bb-shadow-item: ${shadows.dark.item}`);
-    const offers = source("../views/_user/UserProposalsView.vue");
+    const offers = source("../components/shell/ProposalInboxContent.vue");
     const sos = source("../views/_user/UserSosHistoryView.vue");
     const rescuer = source("../views/_user/UserRescuerHistoryView.vue");
     for (const [css, selector] of [[offers, ".offer-card"], [sos, ".history__item"], [rescuer, ".history__item"]]) {
@@ -40,9 +40,8 @@ describe("remaining CSS, Tailwind and Vuetify elevation audit", () => {
     }
   });
 
-  it("avoids elevating the broadcast bar when it is inside a dashboard card", () => {
+  it("preserves inset broadcast styling alongside the standalone sharing page", () => {
     const broadcast = source("../components/sharing/LiveBroadcastBar.vue");
-    expect(source("../views/_user/UserDashboardView.vue")).toContain("<LiveBroadcastBar inset />");
     expect(source("../views/_user/UserLocationSharesView.vue")).toContain("<LiveBroadcastBar />");
     expect(broadcast).toContain(':elevation="inset ? 0 : 2"');
     expect(rule(broadcast, ".broadcast-bar--inset")).toContain("border-radius: var(--bb-radius-nested, 16px) !important;");

@@ -31,7 +31,7 @@
         <v-icon icon="mdi-text-box-search-outline" size="42" color="primary" />
         <h3>هنوز درخواستی ثبت نکرده‌اید</h3>
         <p>در زمان نیاز، دکمهٔ شناور SOS در دسترس شماست.</p>
-        <v-btn to="/_user/dashboard" color="primary" variant="tonal" rounded="lg">بازگشت به پیشخوان</v-btn>
+        <v-btn to="/_user/map" color="primary" variant="tonal" rounded="lg">بازگشت به نقشه</v-btn>
       </section>
       <section v-else-if="!history.items.value.length" class="history__empty" role="status">
         نبودن درخواست قابل تأیید نیست؛ لطفاً دریافت فهرست را دوباره امتحان کنید.

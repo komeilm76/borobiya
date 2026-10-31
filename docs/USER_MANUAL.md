@@ -73,7 +73,7 @@ Roles:
 
 1. Open **Login**.
 2. Enter **Username** + **Password** → **Sign in**.
-3. If your account was created by an admin without security questions, you will be redirected to **Complete Security Questions** (see §6).
+3. Rescuer/user accounts open the full-screen **Map** (`/_user/map`) by default; admin accounts open user management. If your account was created without security questions, first complete **Security Questions** (§6). An explicit, safe return link to another page still takes precedence.
 
 To sign out, open the account menu in the top bar (or the map's top-left menu), select **خروج از حساب**, and confirm **بله، خروج از حساب**. Choose **انصراف** (or dismiss the dialog) to stay signed in.
 
@@ -127,7 +127,7 @@ If admin created you (`mustCompleteSecurityQuestions` flag):
 
 ## 8. Map Basics
 
-Open **Map** (`/_user/map`) for the full-height MapLibre view, or use the map preview on **Dashboard** (`/_user/dashboard`). The map starts at the configured offline region and follows the selected app theme. After you allow GPS, the authenticated full map automatically shows your private live position as a blue crosshairs target with a soft halo (not a destination pin), and centers on its first fix (unless you already moved the camera).
+Open **Map** (`/_user/map`) for the full-height MapLibre view. It is the user home screen after login; the former dashboard address now redirects here. Sharing lists and broadcast controls remain available on **Location Shares** (`/_user/location-shares`). The map starts at the configured offline region and follows the selected app theme. After you allow GPS, the authenticated full map automatically shows your private live position as a blue crosshairs target with a soft halo (not a destination pin), and centers on its first fix (unless you already moved the camera).
 
 - **Pan:** drag the map.
 - **Zoom:** scroll/pinch or use the map's zoom controls.
@@ -135,7 +135,7 @@ Open **Map** (`/_user/map`) for the full-height MapLibre view, or use the map pr
 - If map settings are unavailable, the view uses safe default bounds and zoom. Map resource errors show a retry toast; previously cached resources may still be displayed.
 - The first map visit needs the local Map Server. The browser cache stores map resources after a successful load on secure origins (HTTPS or localhost); already-loaded tiles also remain in MapLibre's in-memory cache for the current page session.
 
-**On this screen:** the map has no app bar or redundant page title. The icon button at the physical top-left opens a sidebar with page links, your account, theme settings and confirmed logout; tap outside it, press Escape/Back or use Close to dismiss it. Phones keep the map full-screen: Search, History and Companions open as full-screen dialogs from the three-action dock. Scroll each dialog's content below its fixed title; its complete controls and results use the available width rather than a smaller nested card. Tablet/desktop keep the full map-side panels. The icon directly above SOS starts/stops **outgoing** location sharing; its state changes when broadcasting is active and its accessible label explains Start/Stop. The next icon above it recenters the map on your own private GPS fix. If a fix is still pending, tapping it waits for the next one; after permission/error, tapping it retries. If your position is outside the installed offline map region, it cannot be centered and the control explains why. Opening the map only watches GPS locally while it is visible; it does **not** start location broadcasting or share your position with companions. Leaving the map, signing out or changing accounts stops this private watch. To broadcast, explicitly press the map sharing icon or **شروع پخش** on the dashboard or dedicated Location Sharing page. Turning off map companion *visibility* does not stop outgoing sharing; use the sharing icon or **توقف پخش** for that.
+**On this screen:** the map has no app bar or redundant page title. The icon button at the physical top-left opens a sidebar with page links, your account, theme settings and confirmed logout; tap outside it, press Escape/Back or use Close to dismiss it. Phones keep the map full-screen: Search, History and Companions open as full-screen dialogs from the three-action dock. Scroll each dialog's content below its fixed title; its complete controls and results use the available width rather than a smaller nested card. Tablet/desktop keep the full map-side panels. The icon directly above SOS starts/stops **outgoing** location sharing; its state changes when broadcasting is active and its accessible label explains Start/Stop. The next icon above it recenters the map on your own private GPS fix. If a fix is still pending, tapping it waits for the next one; after permission/error, tapping it retries. If your position is outside the installed offline map region, it cannot be centered and the control explains why. Opening the map only watches GPS locally while it is visible; it does **not** start location broadcasting or share your position with companions. Leaving the map, signing out or changing accounts stops this private watch. To broadcast, explicitly press the map sharing icon or **شروع پخش** on the Location Sharing page. Turning off map companion *visibility* does not stop outgoing sharing; use the sharing icon or **توقف پخش** for that.
 
 - **جست‌وجوی مکان** — open Search from the phone dock for a full-screen dialog (or use the search panel on tablet/desktop). Search the current viewport by default, or switch to the whole installed offline map (moving the map returns to viewport search); up to 30 top results in the chosen area are listed. Press the map-marker button **next to the search field** (labeled «نمایش همهٔ نتایج روی نقشه»; icon-only on narrow phones) to close the phone dialog and show all results as numbered amber POI markers in a fitted map view. Tap a marker, or focus it and press Enter/Space, to select that place and automatically open its details; the selected POI becomes a purple pin and the other hits remain available on the map. Choose a listed result instead to close the phone dialog, move the map to its location, show its purple pin above the details sheet, and open the same place-details bottom sheet with name, address, type and coordinates. Dismiss the sheet with Close or Escape; the pin remains available to reopen it by tap/keyboard. Search results are kept when you reopen Search. After showing them on the map, pan or zoom to search the new visible area automatically: results outside the changing bbox disappear from both the list and map during the gesture, before the new search begins; up to 30 top results for that bbox replace the pins when the search completes. During a pending or failed refresh, only earlier results still inside the new bbox may remain, with a status and retry. On phones, after closing a place sheet, use **همهٔ نتایج** on the map to fit the current-bbox POIs back into view without reopening Search. Tapping a map POI keeps your current zoom rather than forcing a close-up. Editing the query, explicitly changing search scope or signing out clears the old POIs; moving the map removes out-of-bbox POIs and replaces the visible-area results. Places outside the installed offline bounds cannot be selected. On short screens, scroll the dialog or the detail sheet instead of shrinking their contents.
 - **تاریخچهٔ مسیر / پخش حرکت** — on phones open History from the dock into a full-screen, scrollable dialog. Its full-size playback controls are visible immediately; Close/Escape returns to the map. A direct link to shared history also opens the controls. On wider screens the in-flow/side panel starts open and remains collapsible. Pick your own track or a companion's grant, choose 1/7/30 days or type a window, then scrub or play at 1×/4×/16×/60×. The grey dashed line is the whole recorded path, the solid one is what has been played, and the caption says when the server sampled the window (`maxPoints`) rather than showing every point.
@@ -205,7 +205,7 @@ If you are logged in on **two devices** (e.g., phone + laptop):
 2. Choose a device (e.g., “Samsung S23”) → **Confirm**.
 3. Only that device’s GPS is used; the other is ignored.
 
-Manage at **`/_user/devices`** (linked from the dashboard card «دستگاه پخش‌کننده»): a table of the account's **live sessions** — device label, online/offline, minutes since last activity, IP, and how many of your shares each one is currently broadcasting — plus a chooser per share and an “apply to all” action.
+Manage at **`/_user/devices`** (linked from the map menu and Location Sharing page): a table of the account's **live sessions** — device label, online/offline, minutes since last activity, IP, and how many of your shares each one is currently broadcasting — plus a chooser per share and an “apply to all” action.
 
 [Screenshot: Priority device modal + Devices table]
 
@@ -224,7 +224,7 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ### Big red SOS button
 
-- Always visible across all authenticated screens after security-question onboarding: floating **SOS امداد** red button in the corner (plus the **درخواست امداد فوری (SOS)** card on `/_user/dashboard`).
+- Always visible across all authenticated screens after security-question onboarding: floating **SOS امداد** red button in the corner.
 
 ### Steps
 
@@ -264,11 +264,11 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 16. SOS — Responding as Rescuer
 
-> **Current status:** The proposal inbox and accept/decline actions are live at `/_user/proposals`. After acceptance, the inbox shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; foreground GPS-follow navigation is live, while live participant locations and client-side status controls remain planned under T3.5.
+> **Current status:** The proposal inbox and accept/decline actions open from the top-right bell on `/_user/map` (not a separate page). After acceptance, the inbox dialog shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; foreground GPS-follow navigation is live, while live participant locations and client-side status controls remain planned under T3.5.
 
 ### Inbox
 
-- **Bell icon** with pending count → choose an offer or open `/_user/proposals` for all pages. Select an offer to see its incident and requester, description, on-map location, and photo (if attached). Choose “محاسبهٔ فاصله با اجازهٔ شما” for an optional straight-line distance; it is **not** a travel-time estimate. The photo uses a short-lived participant-only URL; you can request it again if it expires.
+- **Map bell icon** with pending count → open the right-hand sidebar, choose an offer or select **بررسی همهٔ پیشنهادها**. On other pages the top-bar bell takes you to the same map workspace. The old `/_user/proposals` address redirects to the map. Select an offer to see its incident and requester, description, on-map location, and photo (if attached). Choose “محاسبهٔ فاصله با اجازهٔ شما” for an optional straight-line distance; it is **not** a travel-time estimate. The photo uses a short-lived participant-only URL; you can request it again if it expires.
 
 ### Rules
 
@@ -408,11 +408,10 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 | Register | `/_auth/register` |
 | Login | `/_auth/login` |
 | Forgot password | `/_auth/forgot-password` |
-| Dashboard (live + history shares) | `/_user/dashboard` |
 | Location Shares | `/_user/location-shares` |
 | Full map (live companions + playback) | `/_user/map` |
 | Active Devices & Priority Device | `/_user/devices` |
-| Rescue proposal inbox | `/_user/proposals` |
+| Rescue proposals (map bell) | `/_user/map` |
 | Active rescuer mission | `/_user/mission` |
 | SOS request history & cancellation | `/_user/sos-history` |
 | Rescuer mission history | `/_user/mission-history` |

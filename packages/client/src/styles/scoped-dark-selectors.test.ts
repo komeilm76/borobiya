@@ -72,20 +72,15 @@ describe("dark selectors in scoped Vue styles", () => {
         }
       }
     }
-    expect(checked).toBeGreaterThanOrEqual(64);
+    // The retired dashboard contributed nine selectors; keep coverage over the remaining UI.
+    expect(checked).toBeGreaterThanOrEqual(55);
   });
 
   it("gives the reported headings and adjacent small text at least 4.5:1 dark contrast", () => {
-    const page = palettes.dark.background;
     const card = palettes.dark.surface;
     // A white map tile beneath a 94% opaque map overlay is its lightest backdrop.
     const mapCard = overWhite(card, 0.94);
     for (const [file, selector, background] of [
-      ["views/_user/UserDashboardView.vue", ".user-dashboard h1", page],
-      ["views/_user/UserDashboardView.vue", ".user-dashboard__card-header h2", card],
-      ["views/_user/UserDashboardView.vue", ".user-dashboard__feature-card h2", card],
-      ["views/_user/UserDashboardView.vue", ".user-dashboard__note-card h2", card],
-      ["views/_user/UserDashboardView.vue", ".user-dashboard__welcome", page],
       ["components/sharing/LiveBroadcastBar.vue", ".broadcast-bar__headline", card],
       ["components/sharing/LiveBroadcastBar.vue", ".broadcast-bar__detail", card],
       ["components/map/OwnPositionBar.vue", ".own-position__headline", mapCard],

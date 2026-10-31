@@ -2,14 +2,14 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { routeRecords } from "../../router";
 
-const view = readFileSync(new URL("./UserProposalsView.vue", import.meta.url), "utf8");
+const view = readFileSync(new URL("../../components/shell/ProposalInboxContent.vue", import.meta.url), "utf8");
 const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 
-describe("rescuer inbox markup and route", () => {
-  it("has a guarded user route reachable from the bell and navigation", () => {
-    expect(routeRecords.find((item) => item.path === "/_user/proposals")?.component).toEqual(expect.any(Function));
-    expect(app).toContain('to="/_user/proposals"');
-    expect(app).toContain("path: '/_user/proposals'");
+describe("rescuer inbox content in the map dialog", () => {
+  it("retires the separate route and links the other-page bell to the map", () => {
+    expect(routeRecords.find((item) => item.path === "/_user/proposals")?.component).toBeUndefined();
+    expect(app).toContain('to="/_user/map?inbox=1"');
+    expect(app).toContain("path: '/_user/map', query: { offer: proposal.id }");
   });
 
   it("provides a focused incident map, consent-based distance and signed photo access", () => {
@@ -64,7 +64,7 @@ describe("rescuer inbox markup and route", () => {
     expect(view).toContain('confirmAction = \'accept\'');
     expect(view).toContain("پیشنهادهای دیگر شما خودکار بسته می‌شوند");
     expect(view).toContain("inbox.decide(id, action");
-    expect(view).toContain("if (success) { confirmAction.value = null; declineReason.value = \"\"; }");
+    expect(view).toContain('if (action === "decline") selectedId.value = null;');
     expect(view).toContain("v-textarea");
   });
 });

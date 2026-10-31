@@ -44,9 +44,12 @@ describe("map-only proposal notifications", () => {
     expect(sidebar).toContain('پیشنهاد جدیدی ندارید');
   });
 
-  it("opens each suggestion on the guarded detail page; never accepts or rejects from the preview", () => {
-    expect(sidebar).toContain("path: '/_user/proposals', query: { offer: offer.id }");
-    expect(sidebar).toContain('to="/_user/proposals"');
+  it("opens each suggestion in a fullscreen map dialog; never accepts or rejects from the preview", () => {
+    expect(sidebar).toContain('openOffer(offer.id)');
+    expect(sidebar).toContain('<ProposalInboxContent v-if="detailsOpen"');
+    expect(sidebar).toContain('fullscreen');
+    expect(sidebar).toContain(':persistent="Boolean(inbox.decidingId)"');
+    expect(sidebar).toContain('@after-leave="restoreBellFocus"');
     expect(sidebar).toContain("proposalSeverity[offer.details?.sosRequest.severity ?? 'medium']");
     expect(sidebar).toContain('proposalTime(offer.createdAt)');
     expect(sidebar).toContain('offer.details.requesterName');

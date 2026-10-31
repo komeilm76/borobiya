@@ -269,15 +269,12 @@ describe("UserMapView live overlay", () => {
     expect(view).not.toContain("هنوز روی این نقشه نمی‌آید");
   });
 
-  it("keeps the map's consentful sharing action and the dashboard broadcast bar", () => {
-    const dashboard = readFileSync(new URL("./UserDashboardView.vue", import.meta.url), "utf8");
+  it("keeps map sharing opt-in without mounting the standalone sharing bar", () => {
     expect(view).toMatch(/ownUserId: computed\(\(\) => auth\.user\?\.id \?\? null\)/);
     expect(view).toContain("ensureSession: () => auth.ensureSession()");
     expect(view).toContain('class="user-map-view__share"');
     expect(view).toContain('@click="broadcast.toggle()"');
     expect(view).not.toContain("<LiveBroadcastBar");
-    expect(dashboard).toContain("<LiveBroadcastBar inset />");
-    expect(dashboard).not.toContain("نشانگرهای همراهانِ فعال در گام بعدی روی همین نقشه می‌آیند");
   });
 });
 

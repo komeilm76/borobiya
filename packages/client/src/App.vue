@@ -33,10 +33,10 @@
               :title="proposal.details?.incidentTypeName ?? `درخواست امداد ${proposal.sosRequestId.slice(0, 8)}`"
               :subtitle="new Date(proposal.createdAt).toLocaleString('fa-IR')"
               prepend-icon="mdi-lifebuoy"
-              :to="{ path: '/_user/proposals', query: { offer: proposal.id } }"
+              :to="{ path: '/_user/map', query: { offer: proposal.id } }"
             />
             <v-divider />
-            <v-list-item title="مشاهدهٔ همهٔ پیشنهادها" prepend-icon="mdi-arrow-left" to="/_user/proposals" />
+            <v-list-item title="مشاهدهٔ همهٔ پیشنهادها روی نقشه" prepend-icon="mdi-arrow-left" to="/_user/map?inbox=1" />
           </v-list>
         </v-menu>
         <v-btn
@@ -247,9 +247,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     ];
   }
   return [
-    { to: "/_user/dashboard", label: "پیشخوان", icon: "mdi-view-dashboard-outline" },
     { to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" },
-    { to: "/_user/proposals", label: !proposalInbox.failed && proposalInbox.total ? `پیشنهادها (${proposalInbox.total})` : "پیشنهادها", icon: "mdi-hand-heart-outline" },
     { to: "/_user/mission", label: "مأموریت من", icon: "mdi-lifebuoy" },
     { to: "/_user/sos-history", label: "درخواست‌های من", icon: "mdi-history" },
     { to: "/_user/mission-history", label: "سوابق امدادگری", icon: "mdi-timeline-clock-outline" },
