@@ -60,7 +60,9 @@ describe("show all current POIs on the map", () => {
     expect(body("onMapReady")).toContain("clearResultMarkers()");
     expect(view).toContain("onBeforeUnmount(() => {");
     expect(view).toContain("clearResultMarkers()");
-    expect(body("onMapClick")).toContain('closest(".user-map-view__peer-avatar, .user-map-view__result-marker")');
+    // Holds attach only to the canvas, not the independently clickable result/peer markers.
+    expect(body("attachHold")).toContain("instance.getCanvasContainer()");
+    expect(body("onMapReady")).toContain("detachHold = attachHold(instance)");
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);

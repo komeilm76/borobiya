@@ -41,7 +41,7 @@ describe("UserMapView live overlay", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.
     expect(view).not.toMatch(/import\s*\{[^}]*\bMarker\b[^}]*\}\s*from\s*["']maplibre-gl["']/);
-    expect(view).toContain('import type { Map as MapLibreMap, MapMouseEvent, MapMovementEvent, Marker } from "maplibre-gl"');
+    expect(view).toContain('import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl"');
     expect(canvas).toContain('emit("ready", instance, Marker)');
     expect(body("onMapReady")).toContain("markerConstructor = MarkerClass");
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
@@ -76,8 +76,9 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain("planOverlayRemoval");
   });
 
-  it("never moves the camera for a peer; only explicit peer/place selection and track framing move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(6);
+  it("never moves the camera for a peer; only explicit peer/place/destination selection and track framing move it", () => {
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(7);
+    expect(view).toContain("if (!instance || journey.point.value || track.length === 0");
     expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userControlledCamera.value");
@@ -205,7 +206,9 @@ describe("UserMapView live overlay", () => {
     expect(css.errors).toEqual([]);
     expect(css.code).toMatch(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*position: fixed;[^}]*inset-inline-start: 1\.25rem;[^}]*inset-block-end:/);
     expect(css.code).toContain('.maplibregl-ctrl-compass');
-    expect(css.code).not.toContain('transform: translateX(-50%)');
+    const compass = css.code.match(/\.user-map-view__canvas\[data-v-map-test\] \.maplibregl-ctrl-top-right\s*\{[^}]*\}/)?.[0];
+    expect(compass).toBeDefined();
+    expect(compass).not.toContain('transform: translateX(-50%)');
   });
 
   it("moves narrow map controls into a scrollable, non-occluding flow", () => {
@@ -273,38 +276,49 @@ describe("UserMapView live overlay", () => {
   });
 });
 
-describe("Map reverse-address sheet", () => {
-  it("opens for map clicks and long presses and unregisters both listeners on teardown", () => {
+describe("hold-to-select destination and map navigation", () => {
+  it("replaces tap-to-address with stationary primary pointer holds on the canvas", () => {
     const ready = body("onMapReady");
+    const hold = body("attachHold");
     const teardown = view.slice(view.indexOf("onBeforeUnmount("));
-    expect(ready).toContain('instance.on("click", onMapClick)');
-    expect(ready).toContain('instance.on("contextmenu", onMapLongPress)');
-    expect(body("onMapClick")).toContain("reverse.select(event.lngLat.lat, event.lngLat.lng)");
-    expect(body("onMapLongPress")).toContain("reverse.select(event.lngLat.lat, event.lngLat.lng)");
-    expect(teardown).toContain('instance.off("click", onMapClick)');
-    expect(teardown).toContain('instance.off("contextmenu", onMapLongPress)');
-    expect(view).toContain('<ReverseAddressSheet :api="reverse" />');
+    expect(ready).toContain('detachHold = attachHold(instance)');
+    expect(ready).not.toContain('instance.on("click", onMapClick)');
+    expect(hold).toContain('createHoldToSelect(');
+    expect(hold).toContain('instance.getCanvasContainer()');
+    expect(hold).toContain('canvas.addEventListener("pointerdown", down)');
+    expect(hold).toContain('window.addEventListener("pointercancel", up)');
+    expect(hold).toContain('window.addEventListener("blur", hold.cancel)');
+    expect(hold).toContain('instance.unproject([x - rect.left, y - rect.top])');
+    expect(hold).toContain('bounds.contains(location)');
+    expect(hold).toContain('journey.select({ lat: location.lat, lon: location.lng })');
+    expect(teardown).toContain('detachHold?.(); detachHold = null;');
+    expect(view).not.toContain('<ReverseAddressSheet');
   });
 
-  it("exposes a selectable address and clear copy failures without mounting Vue", () => {
-    const sheet = readFileSync(new URL("../../components/map/ReverseAddressSheet.vue", import.meta.url), "utf8");
-    expect(sheet).toContain("api.address.value.formattedAddress");
-    expect(sheet).toContain("readonly");
-    expect(sheet).toContain("api.copy()");
-    expect(sheet).toContain("api.copyFailed.value");
-    expect(sheet).toContain("api.load()");
-    expect(sheet).toContain("api.close()");
+  it("keeps the selected pin, route and private GPS arrow on the full map", () => {
+    expect(body("syncDestinationMarker")).toContain('new markerConstructor({ color: "#d97706" })');
+    expect(body("syncDestinationMarker")).toContain('aria-haspopup');
+    expect(body("paintPointRoute")).toContain('type: "line"');
+    expect(body("repaintOverlays")).toContain('paintPointRoute()');
+    expect(body("paintPlayback")).toContain('if (journey.point.value)');
+    expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
+    expect(body("syncOwnMarker")).toContain('mdi-navigation-variant');
+    expect(view).toContain('transform: perspective(120px) rotateX(18deg)');
+    expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
+    expect(view).toContain('<PointRouteSheet :api="journey"');
   });
 
-  it("keeps long addresses scrollable below a reachable close control on short mobile viewports", () => {
-    const sheet = readFileSync(new URL("../../components/map/ReverseAddressSheet.vue", import.meta.url), "utf8");
-    expect(sheet).toContain('<v-card-text class="reverse-address__body">');
-    expect(sheet).toContain('class="reverse-address__close"');
-    expect(sheet).toMatch(/\.reverse-address \{[^}]*max-height: calc\(100dvh - 1rem - env\(safe-area-inset-bottom, 0px\)\);[^}]*overflow: hidden;/);
-    expect(sheet).toMatch(/\.reverse-address__body \{[^}]*min-height: 0;[^}]*overflow-y: auto;/);
-    expect(sheet).toMatch(/\.reverse-address__text \{[^}]*max-height: min\(11rem, 32dvh\);[^}]*overflow-wrap: anywhere;/);
-    expect(sheet).toContain('.reverse-address__close { min-width: 44px; min-height: 44px; flex-shrink: 0; }');
-    expect(sheet).toContain('.reverse-address__body :deep(.v-btn) { min-height: 44px; height: auto; }');
+  it("presents titled address, travel modes, time, distance, alternatives, start and stop without implying live traffic", () => {
+    const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "مسیر دیگر", "شروع راهبری", "حذف مقصد", "ترافیک زنده"]) {
+      expect(sheet).toContain(label);
+    }
+    expect(sheet).toContain('reverse.address.value?.formattedAddress');
+    expect(sheet).toContain('api.routes.value.length > 1');
+    expect(sheet).toContain('aria-pressed');
+    expect(sheet).toContain('overflow-y: auto');
+    expect(view).toContain('journey.navigating.value');
+    expect(view).toContain('stopPointNavigation');
   });
 });
 

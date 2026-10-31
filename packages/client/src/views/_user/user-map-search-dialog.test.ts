@@ -51,7 +51,7 @@ describe("map place search handoff", () => {
     expect(body('onPlaceDetailAfterLeave')).toContain('selectedPlaceMarker?.getElement().focus({ preventScroll: true })');
     expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value,');
     expect(view).toContain('if (!selectedSearchPlace.value) closePlaceDetail(false)');
-    expect(body("onMapClick")).toContain('closePlaceDetail(false)');
+    expect(body("attachHold")).toContain('closePlaceDetail(false)');
     expect(body("syncSelectedPlaceMarker")).toContain('openSelectedPlaceDetail()');
     expect(detail).toContain('<v-bottom-sheet');
     expect(detail).toContain('place.name');
