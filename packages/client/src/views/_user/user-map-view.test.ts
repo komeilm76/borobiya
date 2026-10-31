@@ -297,7 +297,8 @@ describe("hold-to-select destination and map navigation", () => {
 
   it("keeps the selected pin, route and private GPS arrow on the full map", () => {
     expect(body("syncDestinationMarker")).toContain('new markerConstructor({ color: "#d97706" })');
-    expect(body("syncDestinationMarker")).toContain('aria-haspopup');
+    expect(body("syncDestinationMarker")).toContain('aria-controls');
+    expect(body("syncRouteOriginMarker")).toContain('مبدأ مسیر انتخابی');
     expect(body("paintPointRoute")).toContain('type: "line"');
     expect(body("repaintOverlays")).toContain('paintPointRoute()');
     expect(body("paintPlayback")).toContain('if (journey.point.value)');
@@ -315,7 +316,9 @@ describe("hold-to-select destination and map navigation", () => {
     }
     expect(sheet).toContain('api.address.value');
     expect(sheet).toContain('api.knownPlace.value?.type');
-    expect(sheet).not.toContain('اطلاعات مکان');
+    expect(sheet).toContain('نمایش اطلاعات مکان');
+    expect(sheet).not.toContain('<v-bottom-sheet');
+    expect(sheet).toContain('نمایش مسیرها');
     expect(sheet).toContain('api.routes.value.length > 1');
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');

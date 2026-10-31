@@ -2,6 +2,7 @@ import { computed, onScopeDispose, ref, watch, type Ref } from "vue";
 import { getMissionRouteChoices, type RouteChoice, type RoutePoint, type TransportProfile } from "@/api/mission-routing";
 import { decodeRoutePolyline, formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import { navigationCamera, type NavigationCamera } from "@/sos/navigation-follow";
+import { deviationThreshold, distanceFromRoute } from "@/map/route-deviation";
 import type { GeocodeResult } from "@shared/index";
 import type { OwnMapFix } from "./use-own-map-position";
 import type { useReversePlace } from "./use-reverse-place";
@@ -18,9 +19,10 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   gpsError: Ref<string | null>, reverse: ReturnType<typeof useReversePlace>,
   follow: (camera: NavigationCamera) => void,
   getRoutes: typeof getMissionRouteChoices = getMissionRouteChoices,
-  level?: () => void) {
+  level?: () => void, alertOffRoute?: () => void) {
   const point = ref<RoutePoint | null>(null);
   const sheetOpen = ref(false);
+  const routesVisible = ref(false);
   const profile = ref<TransportProfile>("car");
   const routes = ref<RouteChoice[]>([]);
   const index = ref(0);
@@ -29,6 +31,8 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   const navigating = ref(false);
   const arrived = ref(false);
   const remaining = ref<number | null>(null);
+  const replanning = ref(false);
+  const rerouteMessage = ref<string | null>(null);
   // Search results already carry a validated title/address. Keep that snapshot even if
   // the search list refreshes; don't replace a known POI with a reverse-geocoded street.
   const knownPlace = ref<GeocodeResult | null>(null);
@@ -46,6 +50,9 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   let waitingForFix = false;
   let plannedFrom: RoutePoint | null = null;
   let lastCameraAt = Number.NEGATIVE_INFINITY;
+  let firstDeviationAt: number | null = null;
+  let lastRerouteAt = Number.NEGATIVE_INFINITY;
+  let statusTimer: ReturnType<typeof setTimeout> | null = null;
   const invalidate = () => { ++generation; controller?.abort(); controller = null; loading.value = false; };
   function originIsStale(origin: RoutePoint): boolean {
     const latest = position.value;
@@ -54,13 +61,16 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   function stop(): void {
     const wasActive = navigating.value;
     navigating.value = false;
+    if (replanning.value) invalidate();
+    replanning.value = false; firstDeviationAt = null; rerouteMessage.value = null;
+    if (statusTimer) clearTimeout(statusTimer); statusTimer = null;
     lastCameraAt = Number.NEGATIVE_INFINITY;
     if (wasActive) { try { level?.(); } catch { /* The map may already be disposing. */ } }
   }
   function clear(): void {
-    invalidate(); stop(); reverse.close(); point.value = null; sheetOpen.value = false;
+    invalidate(); stop(); reverse.close(); point.value = null; sheetOpen.value = false; routesVisible.value = false;
     routes.value = []; index.value = 0; error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom = null;
-    knownPlace.value = null;
+    knownPlace.value = null; lastRerouteAt = Number.NEGATIVE_INFINITY;
   }
   function select(candidate: RoutePoint, place?: GeocodeResult): void {
     if (!owner.value || !Number.isFinite(candidate.lat) || Math.abs(candidate.lat) > 90 ||
@@ -133,8 +143,45 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       return false;
     }
     error.value = null; arrived.value = false; navigating.value = true; sheetOpen.value = false;
+    firstDeviationAt = null; rerouteMessage.value = null; routesVisible.value = true;
     updateFix(position.value);
     return navigating.value;
+  }
+  /** Explicitly pause guidance before changing a mode or choosing another route. */
+  function editNavigation(): void { if (navigating.value) stop(); sheetOpen.value = true; routesVisible.value = true; }
+  async function replanFromDeviation(): Promise<void> {
+    const to = point.value, account = owner.value, fix = position.value, transport = profile.value;
+    if (!to || !account || !fix || replanning.value || !navigating.value) return;
+    const origin = { lat: fix.lat, lon: fix.lon };
+    const current = ++generation, signal = (controller = new AbortController()).signal;
+    replanning.value = true; remaining.value = null;
+    rerouteMessage.value = "از مسیر خارج شده‌اید؛ در حال محاسبهٔ مسیر تازه…";
+    try {
+      const choices = await getRoutes(origin, to, transport, signal);
+      if (current !== generation || !navigating.value || owner.value !== account || point.value !== to || profile.value !== transport) return;
+      if (originIsStale(origin)) {
+        // Never publish a route from a vanished or obsolete GPS origin.
+        if (!position.value || position.value.accuracy === null || position.value.accuracy > 80) throw new Error("STALE_GPS");
+        replanning.value = false; controller = null;
+        void replanFromDeviation(); return;
+      }
+      const valid = choices.filter((choice) => {
+        try { decodeRoutePolyline(choice.polyline); return true; } catch { return false; }
+      });
+      if (!valid.length) throw new Error("INVALID_ROUTE");
+      routes.value = valid.sort((a, b) => a.duration_s - b.duration_s || a.distance_m - b.distance_m);
+      index.value = 0; plannedFrom = origin; firstDeviationAt = null;
+      remaining.value = position.value ? pointDistance(position.value, to) : null;
+      rerouteMessage.value = "مسیر تازه آماده است؛ با احتیاط ادامه دهید.";
+      statusTimer = setTimeout(() => { rerouteMessage.value = null; statusTimer = null; }, 5000);
+    } catch {
+      if (current !== generation || signal.aborted) return;
+      stop(); routes.value = []; index.value = 0; plannedFrom = null;
+      error.value = "بازمحاسبهٔ مسیر ممکن نشد؛ راهبری متوقف شد. موقعیت و مسیر را بررسی و دوباره تلاش کنید.";
+      sheetOpen.value = true;
+    } finally {
+      if (current === generation) { replanning.value = false; controller = null; }
+    }
   }
   function updateFix(fix: OwnMapFix | null): void {
     if (!navigating.value || !point.value) return;
@@ -142,14 +189,24 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       // A coarse fix must not yank the camera away or present a false live distance.
       remaining.value = null;
       lastCameraAt = Number.NEGATIVE_INFINITY; // Follow immediately when reliable GPS returns.
+      firstDeviationAt = null;
       return;
     }
+    if (replanning.value) return;
     remaining.value = pointDistance(fix, point.value);
     // Do not declare arrival on a coarse/inaccurate fix.
     if (fix.accuracy !== null && fix.accuracy <= 35 && remaining.value <= 25) {
       stop(); arrived.value = true; sheetOpen.value = true; return;
     }
     const now = Date.now();
+    if (fix.accuracy <= 35 && distanceFromRoute(fix, routePoints.value) > deviationThreshold(profile.value, fix.accuracy)) {
+      if (firstDeviationAt === null || now - firstDeviationAt > 10_000) firstDeviationAt = now;
+      else if (now - firstDeviationAt >= 2000 && now - lastRerouteAt >= 20_000) {
+        firstDeviationAt = null; lastRerouteAt = now;
+        try { alertOffRoute?.(); } catch { /* Audio is optional; rerouting must continue. */ }
+        void replanFromDeviation(); return;
+      }
+    } else firstDeviationAt = null;
     if (now - lastCameraAt < 1000) return;
     lastCameraAt = now;
     try {
@@ -172,8 +229,8 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   }, { flush: "sync" });
   watch(owner, clear, { flush: "sync" });
   onScopeDispose(clear);
-  return { point, sheetOpen, profile, routes, index, loading, error, navigating, arrived,
-    remaining, selectedRoute, routePoints, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, clear,
+  return { point, sheetOpen, routesVisible, profile, routes, index, loading, error, navigating, arrived, replanning, rerouteMessage,
+    remaining, selectedRoute, routePoints, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, editNavigation, clear,
     distanceLabel: computed(() => selectedRoute.value ? formatRouteDistance(selectedRoute.value.distance_m) : "—"),
     durationLabel: computed(() => selectedRoute.value ? formatRouteDuration(selectedRoute.value.duration_s) : "—") };
 }

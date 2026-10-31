@@ -369,7 +369,7 @@ describe("the panel and the view", () => {
     expect(view).toContain("paintLive();\n  paintPlayback();");
     expect(view).toContain('instance.on("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);');
     expect(view).toContain("paintPlayback();\n  paintPointRoute();");
-    expect(view).toContain("syncOwnMarker();\n  syncDestinationMarker();\n  syncSelectedPlaceMarker();\n  syncResultMarkers();\n  syncPeerAvatars();\n  frameCamera();");
+    expect(view).toContain("syncOwnMarker();\n  syncDestinationMarker();\n  syncRouteOriginMarker();\n  syncSelectedPlaceMarker();\n  syncResultMarkers();\n  syncPeerAvatars();\n  frameCamera();");
   });
 
   it("frames the camera once per track, and does not zoom into a single fix", () => {

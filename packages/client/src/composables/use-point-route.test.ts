@@ -17,10 +17,10 @@ function setup(routes: (from: { lat: number; lon: number }, to: { lat: number; l
   signal?: AbortSignal) => Promise<RouteChoice[]> = async () => [short, fast]) {
   const scope = effectScope(); const owner = ref<string | null>("owner");
   const fix = ref<OwnMapFix | null>({ lat: 38.5, lon: -120.2, accuracy: 8 }); const gpsError = ref<string | null>(null);
-  const follow = vi.fn(); const level = vi.fn(); const close = vi.fn(); const select = vi.fn();
+  const follow = vi.fn(); const level = vi.fn(); const alert = vi.fn(); const close = vi.fn(); const select = vi.fn();
   const reverse = { close, select, address: ref(null) } as unknown as Parameters<typeof usePointRoute>[3];
-  const journey = scope.run(() => usePointRoute(owner, fix, gpsError, reverse, follow, routes, level))!;
-  return { scope, owner, fix, gpsError, follow, level, close, select, journey };
+  const journey = scope.run(() => usePointRoute(owner, fix, gpsError, reverse, follow, routes, level, alert))!;
+  return { scope, owner, fix, gpsError, follow, level, alert, close, select, journey };
 }
 
 describe("private point-to-point route", () => {
@@ -191,6 +191,90 @@ describe("private point-to-point route", () => {
     fix.value = { lat: 38.501, lon: -120.2, accuracy: 7 };
     expect(journey.remaining.value).toBeGreaterThan(0);
     scope.stop();
+  });
+  it("starts with the default car route and pauses guidance for safe mode/route editing", async () => {
+    const get = vi.fn(async (_from: unknown, _to: unknown, _profile: TransportProfile) => [short, fast]);
+    const { journey, scope, level } = setup(get);
+    journey.select({ lat: 40, lon: -120 }); await nextTick(); await Promise.resolve();
+    expect(journey.profile.value).toBe("car");
+    expect(journey.routesVisible.value).toBe(false);
+    expect(journey.start()).toBe(true);
+    expect(journey.routesVisible.value).toBe(true);
+    journey.editNavigation();
+    expect(journey.navigating.value).toBe(false);
+    expect(journey.sheetOpen.value).toBe(true);
+    expect(level).toHaveBeenCalledTimes(1);
+    journey.choose(1); expect(journey.selectedRoute.value).toEqual(short);
+    journey.changeProfile("foot"); await nextTick(); await Promise.resolve();
+    expect(get.mock.lastCall?.[2]).toBe("foot");
+    expect(journey.start()).toBe(true);
+    scope.stop();
+  });
+  it("ignores drift and reroutes once after two reliable off-route fixes, with an audible alert", async () => {
+    const second = deferred<RouteChoice[]>();
+    const get = vi.fn().mockResolvedValueOnce([fast]).mockImplementationOnce(() => second.promise);
+    const { journey, fix, alert, scope } = setup(get);
+    const clock = vi.spyOn(Date, "now"); clock.mockReturnValue(100_000);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await nextTick(); await Promise.resolve();
+      expect(journey.start()).toBe(true);
+      fix.value = { lat: 38.5, lon: -120.2, accuracy: 300 };
+      expect(alert).not.toHaveBeenCalled();
+      clock.mockReturnValue(101_000);
+      fix.value = { lat: 38.5, lon: -120.21, accuracy: 8 }; // First good fix, no alert.
+      expect(alert).not.toHaveBeenCalled();
+      clock.mockReturnValue(103_100);
+      fix.value = { lat: 38.5001, lon: -120.2101, accuracy: 8 };
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(get).toHaveBeenCalledTimes(2);
+      expect(journey.replanning.value).toBe(true);
+      expect(journey.remaining.value).toBeNull();
+      expect(journey.rerouteMessage.value).toContain("در حال محاسبه");
+      journey.stop(); // Stop must cancel and silence an in-flight reply.
+      expect(get.mock.calls[1]?.[3].aborted).toBe(true);
+      second.resolve([fast]); await second.promise; await nextTick();
+      expect(journey.navigating.value).toBe(false);
+      expect(alert).toHaveBeenCalledTimes(1);
+    } finally { clock.mockRestore(); scope.stop(); }
+  });
+  it("replaces the stale route with the latest GPS-origin route without replaying the alert", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const get = vi.fn().mockResolvedValueOnce([short]).mockImplementationOnce(() => pending.promise);
+    const { journey, fix, alert, scope } = setup(get);
+    const clock = vi.spyOn(Date, "now"); clock.mockReturnValue(100_000);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await nextTick(); await Promise.resolve();
+      expect(journey.start()).toBe(true);
+      fix.value = { lat: 38.5, lon: -120.21, accuracy: 8 };
+      clock.mockReturnValue(103_000);
+      fix.value = { lat: 38.5001, lon: -120.2101, accuracy: 8 };
+      expect(journey.selectedRoute.value).toEqual(short); // Keep context, but do not follow the old route.
+      expect(journey.replanning.value).toBe(true);
+      pending.resolve([fast]); await pending.promise; await nextTick(); await Promise.resolve();
+      expect(journey.selectedRoute.value).toEqual(fast);
+      expect(journey.replanning.value).toBe(false);
+      expect(journey.navigating.value).toBe(true);
+      expect(journey.rerouteMessage.value).toContain("مسیر تازه");
+      expect(get.mock.calls[1]?.[0]).toEqual({ lat: 38.5001, lon: -120.2101 });
+      expect(alert).toHaveBeenCalledTimes(1);
+    } finally { clock.mockRestore(); scope.stop(); }
+  });
+  it("fails safely when rerouting cannot produce a valid path", async () => {
+    const get = vi.fn().mockResolvedValueOnce([fast]).mockRejectedValueOnce(new Error("NO_ROUTE"));
+    const { journey, fix, scope } = setup(get);
+    const clock = vi.spyOn(Date, "now"); clock.mockReturnValue(100_000);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await nextTick(); await Promise.resolve();
+      expect(journey.start()).toBe(true);
+      fix.value = { lat: 38.5, lon: -120.21, accuracy: 8 };
+      clock.mockReturnValue(103_000);
+      fix.value = { lat: 38.5001, lon: -120.2101, accuracy: 8 };
+      await nextTick(); await Promise.resolve();
+      expect(journey.navigating.value).toBe(false);
+      expect(journey.sheetOpen.value).toBe(true);
+      expect(journey.error.value).toContain("راهبری متوقف شد");
+      expect(journey.selectedRoute.value).toBeNull(); // Unsafe stale route must not be startable.
+    } finally { clock.mockRestore(); scope.stop(); }
   });
   it("calculates proximity in metres and rejects invalid point selection", () => {
     expect(pointDistance({ lat: 0, lon: 0 }, { lat: 0, lon: 0 })).toBe(0);

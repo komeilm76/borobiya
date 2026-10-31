@@ -51,7 +51,8 @@ describe("map place search handoff", () => {
     expect(view).not.toContain('openSelectedPlaceDetail');
     expect(view).not.toContain('can-show-place-details');
     const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    expect(sheet).not.toContain('اطلاعات مکان');
+    expect(sheet).toContain('نمایش اطلاعات مکان');
+    expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain("emit('details')");
     expect(sheet).toContain('api.title.value');
     expect(sheet).toContain('api.address.value');

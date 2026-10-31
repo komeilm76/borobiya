@@ -4,7 +4,12 @@
 
 ---
 
-### 2026-10-31 — Map-visible route preview for trip initiation
+### 2026-10-31 — Progressive trip bar, mid-trip editing and off-route recovery
+
+- Corrected the trip-initiation flow: destination selection now opens a minimal bottom bar with title, a nearby place-info toggle and **Start navigation / Show routes**. The toggle reveals only address, POI type and coordinates. Show routes reveals car/bicycle/walk choices, route alternatives, estimates and caveats; the map draws the route options and labelled origin/destination pins only when reviewing routes or navigating. Direct Start uses the fastest car route by default. During guidance, **Details and change route** opens the bar; entering route editing pauses guidance, allows mode/alternative changes and an explicit restart. Stop remains separate.
+- Guidance now detects a sustained departure from the selected route's segments using two separated, accurate GPS fixes and mode/accuracy-dependent thresholds, then gives a short two-note alert (when browser audio is available after Start), displays an accessible warning and replans privately from the current fix. An obsolete response is not published; failed replan stops guidance rather than silently following a known-wrong route. A GPS uncertainty spike does not issue an alert. Pure geometry/audio/race tests and source/CSS contracts cover this behavior; real GPS, audio device, screen-reader and rendered layout acceptance remain open.
+
+### 2026-10-31 — Map-visible route preview for trip initiation (superseded by progressive bar above)
 
 - Replaced the blocking destination bottom sheet on `/_user/map` with a compact nonmodal trip planner: the map remains pannable, with a separate expanded state for address, coordinates and trip caveats. The selected teal route and amber alternatives are painted together; touching an alternative selects it, while the panel also offers transport choice, route cycling, retry, Start and Clear. Route overview frames all alternatives and the pins above the panel; map style changes restore both layers. Phone layout clears the control rail, dock, map scale and attribution; tablet places the panel below its in-flow map rather than over companion widgets. Escape collapses before closing, and closing returns focus to the destination pin. Pure geometry/padding tests and source/compiled-style contracts avoid mounting Vue. Automated checks cover behavior and build, but actual rendered browser, physical phone/safe-area, screen-reader and live GPS/routing review remain open.
 

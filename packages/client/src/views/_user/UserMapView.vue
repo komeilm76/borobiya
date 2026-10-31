@@ -10,7 +10,7 @@
 
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
          again after zooming into one without reopening the full-screen dialog. -->
-    <div v-if="isPhone && showAllResultsOnMap" v-show="!activeTool"
+    <div v-if="isPhone && showAllResultsOnMap && !journey.sheetOpen.value && !journey.navigating.value" v-show="!activeTool"
       class="user-map-view__search-map-actions">
       <v-btn color="primary" variant="flat" prepend-icon="mdi-map-marker-multiple" size="small"
         :disabled="!placeSearch.mapResults.value.length" aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"
@@ -96,12 +96,15 @@
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
     <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
       <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-      <span>{{ journey.navigating.value ? (journey.remaining.value === null
+      <span>{{ journey.navigating.value ? (journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.remaining.value === null
         ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
         : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
+      <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات و تغییر مسیر</v-btn>
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>
+    <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
+      role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
     <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="fitPointRoute" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
@@ -195,6 +198,7 @@ import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
 import { pointRouteExtent, pointRouteFeatures, pointRouteOverviewBottom } from "@/map/point-route-preview";
+import { createNavigationAlert } from "@/map/navigation-alert";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
@@ -453,16 +457,22 @@ watch([map, () => auth.user?.id ?? null], ([instance, ownerId]) => {
   startOwnLocation(true);
 }, { immediate: true });
 const reverse = useReversePlace();
+const navigationAlert = createNavigationAlert();
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   (camera) => map.value?.easeTo(camera), undefined,
-  () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }));
+  () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
 let destinationMarker: Marker | null = null;
+let routeOriginMarker: Marker | null = null;
 let detachHold: (() => void) | null = null;
 const ROUTE_SOURCE = "user-selected-destination-route";
 const ROUTE_LAYER = "user-selected-destination-route-line";
 const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
-function stopPointNavigation(): void { journey.stop(); journey.sheetOpen.value = true; }
+function openPointRouteDetails(): void {
+  journey.sheetOpen.value = true;
+  void nextTick(() => document.getElementById('point-route-info-button')?.focus());
+}
+function stopPointNavigation(): void { journey.stop(); openPointRouteDetails(); }
 function focusDestinationMarker(): void {
   void nextTick(() => (destinationMarker?.getElement() ?? map.value?.getCanvas())?.focus({ preventScroll: true }));
 }
@@ -575,7 +585,7 @@ function syncSelectedPlaceMarker(): void {
     const element = selectedPlaceMarker.getElement();
     element.setAttribute("role", "button");
     element.setAttribute("tabindex", "0");
-    element.setAttribute("aria-haspopup", "dialog");
+    element.setAttribute("aria-controls", "map-point-route-sheet");
     element.addEventListener("click", (event) => { event.stopPropagation(); openSelectedPlaceRoute(); });
     element.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -928,7 +938,7 @@ function showTrack(): void {
 function repaintOverlays(): void {
   const instance = map.value;
   if (!instance) return;
-  if (journey.selectedRoute.value && (!instance.getSource(ROUTE_SOURCE) || !instance.getLayer(ROUTE_LAYER) ||
+  if (journey.routesVisible.value && journey.selectedRoute.value && (!instance.getSource(ROUTE_SOURCE) || !instance.getLayer(ROUTE_LAYER) ||
     !instance.getLayer(ROUTE_ALT_LAYER))) paintPointRoute();
   const state = mapState(instance);
   const styles = journey.point.value ? [liveStyle.value] : [liveStyle.value, playbackStyle.value];
@@ -949,7 +959,7 @@ function syncDestinationMarker(): void {
     const element = destinationMarker.getElement();
     element.classList.add("user-map-view__destination-marker");
     element.setAttribute("role", "button"); element.setAttribute("tabindex", "0");
-    element.setAttribute("aria-haspopup", "dialog");
+    element.setAttribute("aria-controls", "map-point-route-sheet");
     element.addEventListener("click", (event) => { event.stopPropagation(); journey.sheetOpen.value = true; });
     element.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -959,10 +969,24 @@ function syncDestinationMarker(): void {
   destinationMarker.getElement().setAttribute("aria-label", `مقصد انتخاب‌شده: ${journey.title.value}؛ نمایش جزئیات مسیر`);
   destinationMarker.getElement().setAttribute("title", journey.title.value);
 }
+function syncRouteOriginMarker(): void {
+  const instance = map.value, first = journey.routePoints.value[0];
+  if (!instance || !markerConstructor || !first || !journey.routesVisible.value) {
+    routeOriginMarker?.remove(); routeOriginMarker = null; return;
+  }
+  if (!routeOriginMarker) {
+    const element = document.createElement("div");
+    element.className = "user-map-view__route-origin";
+    element.setAttribute("role", "img"); element.setAttribute("aria-label", "مبدأ مسیر انتخابی");
+    const label = document.createElement("span"); label.textContent = "A"; element.append(label);
+    routeOriginMarker = new markerConstructor({ element, anchor: "bottom", offset: [-14, 0] })
+      .setLngLat(first).addTo(instance);
+  } else routeOriginMarker.setLngLat(first);
+}
 function paintPointRoute(): void {
   const instance = map.value;
   if (!instance || !instance.isStyleLoaded()) return;
-  const geometries = routeGeometries.value;
+  const geometries = journey.routesVisible.value ? routeGeometries.value : [];
   if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
     if (instance.getLayer(ROUTE_ALT_LAYER)) instance.removeLayer(ROUTE_ALT_LAYER);
@@ -982,7 +1006,7 @@ function paintPointRoute(): void {
     paint: { "line-color": "#0d7770", "line-width": 7, "line-opacity": .95 } });
 }
 function onAlternativeRouteClick(event: { features?: Array<{ properties?: { index?: unknown } }> }): void {
-  if (journey.navigating.value || !journey.sheetOpen.value) return;
+  if (journey.navigating.value || !journey.sheetOpen.value || !journey.routesVisible.value) return;
   const index = Number(event.features?.[0]?.properties?.index);
   journey.choose(index);
 }
@@ -1028,16 +1052,17 @@ function startPointNavigation(): void {
     return;
   }
   if (journey.start()) {
+    navigationAlert.arm();
     userControlledCamera.value = true;
     syncOwnMarker();
     void nextTick(() => (document.querySelector('.user-map-view__journey-bar .v-btn') as HTMLElement | null)?.focus());
   }
 }
-watch(() => journey.point.value, () => { syncDestinationMarker(); paintPlayback(); paintPointRoute(); }, { flush: "sync" });
+watch(() => journey.point.value, () => { syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
 function fitPointRoute(): void {
   const instance = map.value;
-  if (!instance || !journey.selectedRoute.value || journey.navigating.value) return;
+  if (!instance || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;
   const geometries = routeGeometries.value;
   if (!geometries.length) return;
   const extent = pointRouteExtent(geometries);
@@ -1050,7 +1075,8 @@ function fitPointRoute(): void {
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }
-watch(() => journey.selectedRoute.value, () => { paintPointRoute(); void nextTick(fitPointRoute); });
+watch(() => journey.selectedRoute.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
+watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.navigating.value, () => { syncOwnMarker(); paintPointRoute(); });
 
 function markUserCameraMove(event: MapMovementEvent): void {
@@ -1090,6 +1116,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
     detachHold?.(); detachHold = null;
     ownMarker?.remove(); ownMarker = null;
     destinationMarker?.remove(); destinationMarker = null;
+    routeOriginMarker?.remove(); routeOriginMarker = null;
     selectedPlaceMarker?.remove(); selectedPlaceMarker = null;
     clearResultMarkers();
   }
@@ -1116,6 +1143,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   instance.on("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
   syncOwnMarker();
   syncDestinationMarker();
+  syncRouteOriginMarker();
   syncSelectedPlaceMarker();
   syncResultMarkers();
   syncPeerAvatars();
@@ -1160,12 +1188,14 @@ onBeforeUnmount(() => {
   map.value = null;
   markerConstructor = null;
   own.stop();
+  navigationAlert.dispose();
   removeSelectedCompanion();
   for (const marker of peerMarkers.values()) marker.remove();
   peerMarkers.clear();
   ownMarker?.remove();
   ownMarker = null;
   destinationMarker?.remove(); destinationMarker = null;
+  routeOriginMarker?.remove(); routeOriginMarker = null;
   selectedPlaceMarker?.remove();
   selectedPlaceMarker = null;
   clearResultMarkers();
@@ -1202,6 +1232,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
 /* Numbered search pins are a separate keyboard/touch layer from purple selection,
    teal companion avatars and the blue private GPS icon. */
+:global(.user-map-view .user-map-view__route-origin) {
+  display: grid; place-items: center; width: 32px; height: 32px; border: 3px solid #fff;
+  border-radius: 50%; color: #fff;
+  background: #2563eb; box-shadow: 0 2px 9px rgba(4, 24, 40, .5); font-weight: 900;
+}
 :global(.user-map-view .user-map-view__result-marker) {
   display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
   border: 3px solid rgb(var(--v-theme-surface)); border-radius: 50%;
@@ -1236,7 +1271,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 
 /* Hold guidance and active journey remain compact; the map stays edge-to-edge. */
-.user-map-view__hold-hint, .user-map-view__journey-bar {
+.user-map-view__hold-hint, .user-map-view__journey-bar, .user-map-view__reroute-status {
   position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
   max-width: calc(100vw - 2rem); border: 1px solid rgba(var(--v-theme-on-surface), .15);
   border-radius: 16px; color: rgb(var(--v-theme-on-surface));
@@ -1244,6 +1279,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 .user-map-view__hold-hint { top: calc(5rem + env(safe-area-inset-top, 0px)); width: max-content; margin: 0; padding: .55rem .85rem; text-align: center; font-size: .82rem; pointer-events: none; }
 .user-map-view__journey-bar { top: calc(5rem + env(safe-area-inset-top, 0px)); width: min(28rem, calc(100vw - 2rem)); display: flex; align-items: center; gap: .65rem; padding: .55rem; }
+.user-map-view__reroute-status { top: calc(8.5rem + env(safe-area-inset-top, 0px)); max-width: min(28rem, calc(100vw - 2rem)); padding: .55rem .85rem; color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); font-size: .83rem; }
 .user-map-view__journey-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
 .user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; }
 :global(.user-map-view__destination-marker:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
@@ -1446,6 +1482,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
  * stacked cards. Fullscreen tools keep their own scrolling content and close actions. */
 @media (max-width: 599px) {
   /* Left of the action rail; below the menu launcher and expanded attribution. */
+  .user-map-view__journey-bar { flex-wrap: wrap; }
+  .user-map-view__journey-bar > span { flex-basis: calc(100% - 2.8rem); }
+  .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;
     top: calc(8rem + env(safe-area-inset-top, 0px)); left: calc(0.75rem + env(safe-area-inset-left, 0px));
@@ -1561,7 +1600,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   /* The compact planner occupies the scale's normal phone position. Keep the
      scale on the visible map, clear of both the planner and the attribution. */
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
-    bottom: auto; top: calc(12rem + env(safe-area-inset-top, 0px));
+    bottom: auto; top: calc(8.5rem + env(safe-area-inset-top, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
     top: calc(4.5rem + env(safe-area-inset-top, 0px));
