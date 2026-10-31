@@ -4,7 +4,6 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 
 // Source/style contracts only; project policy forbids mounting .vue components in unit tests.
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
-const detail = readFileSync(new URL("../../components/map/PlaceDetailSheet.vue", import.meta.url), "utf8");
 function body(name: string): string {
   const start = view.indexOf(`function ${name}(`);
   expect(start, name).toBeGreaterThan(-1);
@@ -35,19 +34,7 @@ describe("map place search handoff", () => {
     expect(css.code).toContain("overflow-y: auto");
   });
 
-  it("retains the POI detail sheet after a viewport refresh removes the search hit", () => {
-    expect(view).toContain(':can-show-place-details="!!destinationSearchPlace"');
-    expect(view).toContain(':place="placeDetailOpen ? destinationSearchPlace : null"');
-    expect(view).toContain('const destinationSearchPlace = computed(');
-    expect(view).toContain('const place = journey.knownPlace.value, point = journey.point.value');
-    expect(view).toContain('selectedSearchPlace.value.placeId === destinationSearchPlace.value.placeId');
-    expect(view).toContain('watch(() => destinationSearchPlace.value, (place) => { if (!place) closePlaceDetail(false); }');
-    expect(body("openSelectedPlaceDetail")).toContain('if (!destinationSearchPlace.value');
-    expect(body("onPlaceDetailAfterLeave")).toContain('!destinationSearchPlace.value) return');
-    expect(body("selectPlace")).toContain('journey.select({ lat: place.lat, lon: place.lon }, place)');
-  });
-
-  it("routes a current search hit directly to the navigation sheet without losing POI details", () => {
+  it("routes a current search hit to one navigation sheet without a duplicate POI modal", () => {
     const selection = body("selectPlace");
     expect(selection).toContain('bounds.contains([place.lon, place.lat])');
     expect(selection).toContain('current !== place || !placeSearch.select(place)');
@@ -55,31 +42,33 @@ describe("map place search handoff", () => {
     expect(selection).toContain('offset: [0, offsetY]');
     expect(selection).toContain('{ placeSearchSelection: true }');
     expect(selection).toContain('closeTool(false)');
-    expect(selection).toContain('closePlaceDetail(false); removeSelectedCompanion()');
+    expect(selection).toContain('removeSelectedCompanion()');
     expect(selection).toContain('journey.select({ lat: place.lat, lon: place.lon }, place)');
-    expect(selection).not.toContain('openSelectedPlaceDetail()');
     expect(selection).not.toContain('placeSearch.clear()');
     expect(view).toContain('<PointRouteSheet :api="journey"');
-    expect(view).toContain(':can-show-place-details="!!destinationSearchPlace"');
-    expect(view).toContain('@details="openSelectedPlaceDetail"');
-    expect(view).toContain('<PlaceDetailSheet');
-    expect(view).toContain('@after-leave="onPlaceDetailAfterLeave"');
-    expect(body('onPlaceDetailAfterLeave')).toContain('journey.sheetOpen.value = true');
-    expect(body('onPlaceDetailAfterLeave')).toContain('!destinationSearchPlace.value) return');
-    expect(body('openSelectedPlaceDetail')).toContain('journey.sheetOpen.value = false');
+    expect(view).not.toContain('PlaceDetailSheet');
+    expect(view).not.toContain('placeDetailOpen');
+    expect(view).not.toContain('openSelectedPlaceDetail');
+    expect(view).not.toContain('can-show-place-details');
+    const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    expect(sheet).not.toContain('اطلاعات مکان');
+    expect(sheet).not.toContain("emit('details')");
+    expect(sheet).toContain('api.title.value');
+    expect(sheet).toContain('api.address.value');
+    expect(sheet).toContain('api.knownPlace.value?.type');
+    expect(sheet).toContain('api.point.value.lat.toFixed(5)');
+    expect(sheet).toContain('api.durationLabel.value');
+    expect(sheet).toContain('api.distanceLabel.value');
+  });
+
+  it("keeps the route pin distinct from search results and accessible after list refresh", () => {
+    expect(view).toContain('const selectedSearchPlace = computed(');
+    expect(view).toContain('journey.knownPlace.value, point = journey.point.value');
+    expect(view).toContain('selected.placeId === place.placeId');
     expect(body('syncSelectedPlaceMarker')).toContain('isSelectedSearchDestination.value ? null : selectedSearchPlace.value');
     expect(body('syncSelectedPlaceMarker')).toContain('openSelectedPlaceRoute()');
     expect(body('openSelectedPlaceRoute')).toContain('selectPlace(selectedSearchPlace.value, true)');
     expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value,');
-    expect(view).not.toContain('if (!selectedSearchPlace.value) closePlaceDetail(false)');
-    expect(body("attachHold")).toContain('closePlaceDetail(false)');
-    expect(detail).toContain('<v-bottom-sheet');
-    expect(detail).toContain('place.name');
-    expect(detail).toContain('place.address');
-    expect(detail).toContain('place.type');
-    expect(detail).toContain('place.lat');
-    expect(detail).toContain('place.lon');
-    expect(detail).toContain('aria-label="بستن اطلاعات مکان"');
-    expect(detail).toContain('overflow-y: auto');
+    expect(body('attachHold')).toContain('journey.select({ lat: location.lat, lon: location.lng })');
   });
 });

@@ -13,6 +13,7 @@
           <p v-else-if="!api.address.value && reverse.failed.value" role="status">نشانی در دسترس نیست. <button type="button" @click="reverse.load()">تلاش دوباره</button></p>
           <p v-else>{{ api.address.value ?? 'برای این نقطه نشانی پیدا نشد؛ مختصات مقصد روی نقشه مشخص است.' }}</p>
         </div>
+        <p v-if="api.knownPlace.value?.type" class="point-route__place-type">نوع مکان: {{ api.knownPlace.value.type }}</p>
         <p v-if="api.point.value" class="point-route__coords"><bdi dir="ltr">{{ api.point.value.lat.toFixed(5) }}, {{ api.point.value.lon.toFixed(5) }}</bdi></p>
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">
           <div><v-icon icon="mdi-clock-outline" size="20" aria-hidden="true" /><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
@@ -39,7 +40,6 @@
             @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
         </div>
         <div class="point-route__actions">
-          <v-btn v-if="canShowPlaceDetails" variant="tonal" color="primary" @click="emit('details')">اطلاعات مکان</v-btn>
           <v-btn v-if="api.error.value || (api.point.value && !api.routes.value.length && !api.loading.value)"
             variant="tonal" color="primary" :disabled="!ownFix || api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
           <v-btn color="primary" variant="flat" prepend-icon="mdi-navigation-variant" :disabled="!ownFix || !api.selectedRoute.value || api.loading.value || api.navigating.value"
@@ -58,8 +58,8 @@ import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
 const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace>;
-  ownFix: OwnMapFix | null; canShowPlaceDetails?: boolean }>();
-const emit = defineEmits<{ start: []; details: [] }>();
+  ownFix: OwnMapFix | null }>();
+const emit = defineEmits<{ start: [] }>();
 const modes: { value: TransportProfile; icon: string; label: string }[] = [
   { value: "car", icon: "mdi-car", label: "خودرو" },
   { value: "bicycle", icon: "mdi-bicycle", label: "دوچرخه" },
@@ -81,6 +81,7 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
 .point-route__address .v-icon { flex: 0 0 auto; color: rgb(var(--v-theme-primary)); }
 .point-route__address p { margin: 0; overflow-wrap: anywhere; }
 .point-route__address button { color: rgb(var(--v-theme-primary)); font: inherit; font-weight: 800; text-decoration: underline; }
+.point-route__place-type { margin: .4rem 0 0; font-size: .83rem; line-height: 1.6; overflow-wrap: anywhere; color: rgb(var(--v-theme-on-surface)); opacity: .82; }
 .point-route__coords { margin: .4rem 0 1rem; color: rgb(var(--v-theme-on-surface)); opacity: .75; font-size: .83rem; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .65rem; }
 .point-route__metrics > div { display: grid; gap: .2rem; padding: .8rem; border: 1px solid rgba(var(--v-theme-on-surface), .14); border-radius: 14px; }

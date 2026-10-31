@@ -314,7 +314,8 @@ describe("hold-to-select destination and map navigation", () => {
       expect(sheet).toContain(label);
     }
     expect(sheet).toContain('api.address.value');
-    expect(sheet).toContain('اطلاعات مکان');
+    expect(sheet).toContain('api.knownPlace.value?.type');
+    expect(sheet).not.toContain('اطلاعات مکان');
     expect(sheet).toContain('api.routes.value.length > 1');
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');

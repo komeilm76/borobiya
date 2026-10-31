@@ -10,7 +10,7 @@
 
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
          again after zooming into one without reopening the full-screen dialog. -->
-    <div v-if="isPhone && showAllResultsOnMap" v-show="!activeTool && !placeDetailOpen"
+    <div v-if="isPhone && showAllResultsOnMap" v-show="!activeTool"
       class="user-map-view__search-map-actions">
       <v-btn color="primary" variant="flat" prepend-icon="mdi-map-marker-multiple" size="small"
         :disabled="!placeSearch.mapResults.value.length" aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"
@@ -94,7 +94,7 @@
     </span>
 
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
-    <div v-if="journey.point.value && !journey.sheetOpen.value && !placeDetailOpen" class="user-map-view__journey-bar" role="status">
+    <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
       <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
       <span>{{ journey.navigating.value ? (journey.remaining.value === null
         ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
@@ -102,8 +102,7 @@
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>
-    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
-      :can-show-place-details="!!destinationSearchPlace" @start="startPointNavigation" @details="openSelectedPlaceDetail" />
+    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value" @start="startPointNavigation" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -128,9 +127,6 @@
         </v-card-text>
       </v-card>
     </component>
-
-    <PlaceDetailSheet :place="placeDetailOpen ? destinationSearchPlace : null"
-      @close="closePlaceDetail" @after-leave="onPlaceDetailAfterLeave" />
 
     <!-- History needs the full phone viewport for range, transport and scrub controls.
          Tablet/desktop keep the existing in-flow/side playback panel. -->
@@ -201,7 +197,6 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { formatRouteDistance } from "@/sos/route-preview";
-import PlaceDetailSheet from "@/components/map/PlaceDetailSheet.vue";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -266,11 +261,10 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || placeDetailOpen.value || journey.sheetOpen.value) && typeof position === "number" &&
+  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
     if (shareOpen.value) shareOpen.value = false;
     else if (journey.sheetOpen.value) journey.sheetOpen.value = false;
-    else if (placeDetailOpen.value) closePlaceDetail();
     else if (selectedCompanionId.value) removeSelectedCompanion();
     else closeTool();
     return false;
@@ -297,7 +291,6 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
   const previous = activeTool.value;
   if (selected === previous) return;
-  if (selected) closePlaceDetail(false);
   activeTool.value = selected;
   await nextTick();
   if (selected) document.getElementById(`map-${selected}-panel`)?.focus();
@@ -534,7 +527,6 @@ function showAllSearchResults(): void {
   if (bounds && places.some(place => !bounds.contains([place.lon, place.lat]))) return;
   const extent = resultExtent(places);
   if (!extent) return;
-  closePlaceDetail(false);
   syncResultMarkers();
   userControlledCamera.value = true;
   const container = instance.getContainer();
@@ -544,41 +536,17 @@ function showAllSearchResults(): void {
   }, { placeSearchSelection: true }); // Framing must not requery its own viewport.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
 }
-const placeDetailOpen = ref(false);
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
   placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
-// Search results are scoped to a moving viewport. Keep the selected POI facts with
-// the route, not with a list that can be pruned while the detail sheet is open.
-const destinationSearchPlace = computed(() => {
-  const place = journey.knownPlace.value, point = journey.point.value;
-  return place && point && place.lat === point.lat && place.lon === point.lon ? place : null;
+// Hide the purple search pin only while the same result has an amber route pin.
+// The route retains its own POI snapshot even if the search list is pruned.
+const isSelectedSearchDestination = computed(() => {
+  const selected = selectedSearchPlace.value, place = journey.knownPlace.value, point = journey.point.value;
+  return !!selected && !!place && !!point && place.lat === point.lat && place.lon === point.lon &&
+    selected.placeId === place.placeId && selected.lat === place.lat && selected.lon === place.lon &&
+    selected.name === place.name && selected.address === place.address;
 });
-const isSelectedSearchDestination = computed(() => !!destinationSearchPlace.value &&
-  !!selectedSearchPlace.value && selectedSearchPlace.value.placeId === destinationSearchPlace.value.placeId &&
-  selectedSearchPlace.value.lat === destinationSearchPlace.value.lat &&
-  selectedSearchPlace.value.lon === destinationSearchPlace.value.lon &&
-  selectedSearchPlace.value.name === destinationSearchPlace.value.name &&
-  selectedSearchPlace.value.address === destinationSearchPlace.value.address);
-let restorePlaceFocus = false;
-function closePlaceDetail(restoreFocus = true): void {
-  restorePlaceFocus = restoreFocus && placeDetailOpen.value;
-  placeDetailOpen.value = false;
-}
-function onPlaceDetailAfterLeave(): void {
-  const shouldRestore = restorePlaceFocus;
-  restorePlaceFocus = false;
-  if (!shouldRestore || placeDetailOpen.value || activeTool.value || selectedCompanionId.value ||
-      !destinationSearchPlace.value) return;
-  journey.sheetOpen.value = true;
-}
-function openSelectedPlaceDetail(): void {
-  if (!destinationSearchPlace.value || !auth.user?.id || !map.value) return;
-  removeSelectedCompanion();
-  journey.sheetOpen.value = false;
-  restorePlaceFocus = false;
-  placeDetailOpen.value = true;
-}
 
 function openSelectedPlaceRoute(): void {
   if (selectedSearchPlace.value) selectPlace(selectedSearchPlace.value, true);
@@ -611,7 +579,6 @@ function syncSelectedPlaceMarker(): void {
   selectedPlaceMarker.getElement().setAttribute("title", place.name);
 }
 watch(() => isSelectedSearchDestination.value, syncSelectedPlaceMarker);
-watch(() => destinationSearchPlace.value, (place) => { if (!place) closePlaceDetail(false); }, { flush: "sync" });
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
   syncResultMarkers();
@@ -644,7 +611,7 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // Dismiss the full-screen search before opening route choices over the map.
   // Keep results mounted; a later query refresh must not change this destination.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
-  closePlaceDetail(false); removeSelectedCompanion();
+  removeSelectedCompanion();
   journey.select({ lat: place.lat, lon: place.lon }, place);
 }
 
@@ -834,7 +801,6 @@ function selectCompanion(userId: string, centerMap = true): void {
     peerSelectionError.value = "موقعیت این همراه خارج از محدودهٔ نقشهٔ آفلاین است.";
   } else peerSelectionError.value = null;
   showCompanions.value = true;
-  closePlaceDetail(false);
   if (selectedCompanionId.value !== userId) removeSelectedCompanion();
   selectedCompanionId.value = userId;
   syncPeerAvatars();
@@ -849,7 +815,7 @@ watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); pa
 watch(() => live.registry.value, syncSelectedCompanion, { flush: "sync" });
 watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }, { flush: "sync" });
 watch(() => auth.user?.id, () => {
-  removeSelectedCompanion(); closePlaceDetail(false); placeSearch.clear();
+  removeSelectedCompanion(); placeSearch.clear();
   peerSelectionError.value = null; showCompanions.value = true;
 }, { flush: "sync" });
 
@@ -1012,7 +978,7 @@ function attachHold(instance: MapLibreMap): () => void {
     const bounds = instance.getMaxBounds();
     if (bounds && !bounds.contains(location)) return;
     if (isPhone.value && activeTool.value) closeTool(false);
-    closePlaceDetail(false); removeSelectedCompanion();
+    removeSelectedCompanion();
     userControlledCamera.value = true;
     journey.select({ lat: location.lat, lon: location.lng });
   });
@@ -1163,7 +1129,6 @@ onBeforeUnmount(() => {
   markerConstructor = null;
   own.stop();
   removeSelectedCompanion();
-  closePlaceDetail(false);
   for (const marker of peerMarkers.values()) marker.remove();
   peerMarkers.clear();
   ownMarker?.remove();
