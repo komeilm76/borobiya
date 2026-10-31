@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Map-visible route preview for trip initiation
+
+- Replaced the blocking destination bottom sheet on `/_user/map` with a compact nonmodal trip planner: the map remains pannable, with a separate expanded state for address, coordinates and trip caveats. The selected teal route and amber alternatives are painted together; touching an alternative selects it, while the panel also offers transport choice, route cycling, retry, Start and Clear. Route overview frames all alternatives and the pins above the panel; map style changes restore both layers. Phone layout clears the control rail, dock, map scale and attribution; tablet places the panel below its in-flow map rather than over companion widgets. Escape collapses before closing, and closing returns focus to the destination pin. Pure geometry/padding tests and source/compiled-style contracts avoid mounting Vue. Automated checks cover behavior and build, but actual rendered browser, physical phone/safe-area, screen-reader and live GPS/routing review remain open.
+
 ### 2026-10-31 — One destination sheet instead of duplicated place details
 
 - Removed the redundant «اطلاعات مکان» action and its second bottom sheet from `/_user/map`. The route sheet already presents the selected destination's name, address, coordinates, distance and time; it now also shows the POI type when a search result supplies one. Search-result selection and hold selection still open the same route sheet, and the route's POI snapshot remains independent of search-list refresh. Removed unused modal state, Back/focus handlers and the now-unreferenced component. Source-contract and client tests/typecheck/build cover the handoff; rendered-browser/phone review remains open.

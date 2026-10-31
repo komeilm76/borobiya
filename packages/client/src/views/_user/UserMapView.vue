@@ -1,5 +1,5 @@
 <template>
-  <section class="user-map-view" aria-label="نقشهٔ تعاملی همراهان">
+  <section class="user-map-view" :class="{ 'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
@@ -102,7 +102,8 @@
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>
-    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value" @start="startPointNavigation" />
+    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
+      @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="fitPointRoute" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -193,10 +194,11 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
+import { pointRouteExtent, pointRouteFeatures, pointRouteOverviewBottom } from "@/map/point-route-preview";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
-import { formatRouteDistance } from "@/sos/route-preview";
+import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -333,8 +335,8 @@ function closeTool(restoreFocus = true): void {
   const tool = activeTool.value;
   if (!tool) return;
   activeTool.value = null;
-  // A map tap may open the *modal* reverse-address sheet immediately afterwards.
-  // Do not move focus behind that dialog when dismissing the nonmodal tool.
+  // A search selection may open the route planner immediately afterwards.
+  // Avoid moving focus back into the just-closed search dialog in that case.
   if (restoreFocus) void nextTick(() => document.getElementById(`map-tool-${tool}`)?.focus());
 }
 
@@ -458,7 +460,12 @@ let destinationMarker: Marker | null = null;
 let detachHold: (() => void) | null = null;
 const ROUTE_SOURCE = "user-selected-destination-route";
 const ROUTE_LAYER = "user-selected-destination-route-line";
+const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
+const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
 function stopPointNavigation(): void { journey.stop(); journey.sheetOpen.value = true; }
+function focusDestinationMarker(): void {
+  void nextTick(() => (destinationMarker?.getElement() ?? map.value?.getCanvas())?.focus({ preventScroll: true }));
+}
 const placeSearch = usePlaceSearch({
   area: (scope) => {
     const library = map.value?.getMaxBounds() ?? null;
@@ -493,7 +500,7 @@ function syncResultMarkers(): void {
       button.type = "button";
       button.className = "user-map-view__result-marker";
       button.setAttribute("aria-haspopup", "dialog");
-      button.setAttribute("aria-controls", "map-place-detail-sheet");
+      button.setAttribute("aria-controls", "map-point-route-sheet");
       const number = document.createElement("span");
       number.setAttribute("aria-hidden", "true");
       button.append(number);
@@ -602,7 +609,7 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
-  // Leave the selected pin in the visible map area above the phone details sheet.
+  // Leave the selected pin in the visible map area above the compact route panel.
   const offsetY = isPhone.value ? -Math.min(150, Math.round(window.innerHeight * 0.22)) : 0;
   // A marker tap keeps the user's zoom; list selection still zooms in explicitly.
   const zoom = fromMap ? instance.getZoom() : Math.min(16, instance.getMaxZoom());
@@ -921,7 +928,8 @@ function showTrack(): void {
 function repaintOverlays(): void {
   const instance = map.value;
   if (!instance) return;
-  if (journey.selectedRoute.value && (!instance.getSource(ROUTE_SOURCE) || !instance.getLayer(ROUTE_LAYER))) paintPointRoute();
+  if (journey.selectedRoute.value && (!instance.getSource(ROUTE_SOURCE) || !instance.getLayer(ROUTE_LAYER) ||
+    !instance.getLayer(ROUTE_ALT_LAYER))) paintPointRoute();
   const state = mapState(instance);
   const styles = journey.point.value ? [liveStyle.value] : [liveStyle.value, playbackStyle.value];
   // `setData`/`setPaintProperty` from paintLive/paintPlayback can themselves trigger styledata
@@ -954,19 +962,31 @@ function syncDestinationMarker(): void {
 function paintPointRoute(): void {
   const instance = map.value;
   if (!instance || !instance.isStyleLoaded()) return;
-  const points = journey.routePoints.value;
-  if (points.length < 2) {
+  const geometries = routeGeometries.value;
+  if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
+    if (instance.getLayer(ROUTE_ALT_LAYER)) instance.removeLayer(ROUTE_ALT_LAYER);
     if (instance.getSource(ROUTE_SOURCE)) instance.removeSource(ROUTE_SOURCE);
     return;
   }
-  const data = { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: points } } as const;
+  const features = pointRouteFeatures(geometries, journey.index.value, journey.navigating.value);
+  const data = { type: "FeatureCollection", features } as const;
   const source = instance.getSource(ROUTE_SOURCE) as { setData(data: unknown): void } | undefined;
   if (source) source.setData(data);
   else instance.addSource(ROUTE_SOURCE, { type: "geojson", data } as Parameters<MapLibreMap["addSource"]>[1]);
-  if (!instance.getLayer(ROUTE_LAYER)) instance.addLayer({ id: ROUTE_LAYER, source: ROUTE_SOURCE, type: "line",
-    paint: { "line-color": "#0d7770", "line-width": 6, "line-opacity": .92 } });
+  if (!instance.getLayer(ROUTE_ALT_LAYER)) instance.addLayer({ id: ROUTE_ALT_LAYER, source: ROUTE_SOURCE,
+    type: "line", filter: ["==", ["get", "selected"], false],
+    paint: { "line-color": "#a95010", "line-width": 6, "line-opacity": .8 } });
+  if (!instance.getLayer(ROUTE_LAYER)) instance.addLayer({ id: ROUTE_LAYER, source: ROUTE_SOURCE,
+    type: "line", filter: ["==", ["get", "selected"], true],
+    paint: { "line-color": "#0d7770", "line-width": 7, "line-opacity": .95 } });
 }
+function onAlternativeRouteClick(event: { features?: Array<{ properties?: { index?: unknown } }> }): void {
+  if (journey.navigating.value || !journey.sheetOpen.value) return;
+  const index = Number(event.features?.[0]?.properties?.index);
+  journey.choose(index);
+}
+
 function attachHold(instance: MapLibreMap): () => void {
   const canvas = instance.getCanvasContainer();
   let suppressContextUntil = 0;
@@ -1007,25 +1027,31 @@ function startPointNavigation(): void {
     journey.error.value = "موقعیت شما خارج از محدودهٔ نقشهٔ آفلاین است؛ راهبری روی این نقشه ممکن نیست.";
     return;
   }
-  if (journey.start()) { userControlledCamera.value = true; syncOwnMarker(); }
+  if (journey.start()) {
+    userControlledCamera.value = true;
+    syncOwnMarker();
+    void nextTick(() => (document.querySelector('.user-map-view__journey-bar .v-btn') as HTMLElement | null)?.focus());
+  }
 }
 watch(() => journey.point.value, () => { syncDestinationMarker(); paintPlayback(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
-watch(() => journey.selectedRoute.value, (route) => {
-  paintPointRoute();
+function fitPointRoute(): void {
   const instance = map.value;
-  if (!instance || !route || journey.navigating.value) return;
-  const coords = journey.routePoints.value;
-  if (!coords.length) return;
-  let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
-  for (const [lon, lat] of coords) { west = Math.min(west, lon); east = Math.max(east, lon);
-    south = Math.min(south, lat); north = Math.max(north, lat); }
-  const inset = Math.min(260, Math.round(window.innerHeight * .34));
-  instance.fitBounds([[west, south], [east, north]],
-    { padding: { top: 48, bottom: inset, left: 36, right: 36 }, maxZoom: 15, duration: 500 }, { placeSearchSelection: true });
+  if (!instance || !journey.selectedRoute.value || journey.navigating.value) return;
+  const geometries = routeGeometries.value;
+  if (!geometries.length) return;
+  const extent = pointRouteExtent(geometries);
+  if (!extent) return;
+  const canvas = instance.getContainer().getBoundingClientRect();
+  const sheet = document.getElementById("map-point-route-sheet")?.getBoundingClientRect() ?? null;
+  const bottom = pointRouteOverviewBottom(canvas, sheet);
+  instance.fitBounds(extent,
+    { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: 15, duration: 500 },
+    { placeSearchSelection: true });
   userControlledCamera.value = true;
-});
-watch(() => journey.navigating.value, syncOwnMarker);
+}
+watch(() => journey.selectedRoute.value, () => { paintPointRoute(); void nextTick(fitPointRoute); });
+watch(() => journey.navigating.value, () => { syncOwnMarker(); paintPointRoute(); });
 
 function markUserCameraMove(event: MapMovementEvent): void {
   // MapLibre forwards originalEvent from drag/wheel/keyboard gestures and its zoom controls,
@@ -1054,8 +1080,13 @@ function onMapMoveEnd(event: MapMovementEvent): void {
   placeSearch.refreshForViewport(followViewport);
 }
 
+function onMapResize(): void {
+  frameCamera();
+  if (journey.sheetOpen.value) fitPointRoute();
+}
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) {
+    map.value?.off("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
     detachHold?.(); detachHold = null;
     ownMarker?.remove(); ownMarker = null;
     destinationMarker?.remove(); destinationMarker = null;
@@ -1078,10 +1109,11 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   instance.on("movestart", markUserCameraMove);
   instance.on("move", onMapMoving);
   instance.on("moveend", onMapMoveEnd);
-  instance.on("resize", frameCamera);
+  instance.on("resize", onMapResize);
   paintLive();
   paintPlayback();
   paintPointRoute();
+  instance.on("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
   syncOwnMarker();
   syncDestinationMarker();
   syncSelectedPlaceMarker();
@@ -1139,12 +1171,13 @@ onBeforeUnmount(() => {
   clearResultMarkers();
   detachHold?.(); detachHold = null;
   if (instance) {
+    instance.off("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
     instance.off("styledata", repaintOverlays);
     instance.off("idle", repaintOverlays);
     instance.off("movestart", markUserCameraMove);
     instance.off("move", onMapMoving);
     instance.off("moveend", onMapMoveEnd);
-    instance.off("resize", frameCamera);
+    instance.off("resize", onMapResize);
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     for (const op of planOverlayRemoval(mapState(instance), liveStyle.value)) applyOp(instance, op);
   }
@@ -1524,6 +1557,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
    * launcher, never buried beneath an open tool or the SOS pill. */
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+  /* The compact planner occupies the scale's normal phone position. Keep the
+     scale on the visible map, clear of both the planner and the attribution. */
+  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    bottom: auto; top: calc(12rem + env(safe-area-inset-top, 0px));
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-right) {
     top: calc(4.5rem + env(safe-area-inset-top, 0px));

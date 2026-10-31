@@ -189,9 +189,9 @@ describe("UserMapView live overlay", () => {
     const camera = body("frameCamera");
     expect(camera).toContain('window.matchMedia("(max-width: 1023px)").matches');
     expect(camera).toContain("historyCameraPadding(compact, isPhone.value ? window.innerHeight : undefined)");
-    expect(body("onMapReady")).toContain('instance.on("resize", frameCamera)');
+    expect(body("onMapReady")).toContain('instance.on("resize", onMapResize)');
     const teardown = view.slice(view.indexOf("onBeforeUnmount("));
-    expect(teardown).toContain('instance.off("resize", frameCamera)');
+    expect(teardown).toContain('instance.off("resize", onMapResize)');
   });
 
   it("keeps MapLibre's compass behavior on the map without +/- and leaves other maps unchanged", () => {
