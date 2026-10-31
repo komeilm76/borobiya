@@ -23,6 +23,8 @@ describe("rescuer stacked master/detail screens (T4.4.1)", () => {
     expect(offers).toMatch(/<\/button>\s*<\/div>\s*<div v-if="inbox\.totalPages > 1" class="offers__pages"/);
     expect(offers.indexOf('ref="detailRef" class="offer-detail" aria-label="جزئیات پیشنهاد انتخاب‌شده"')).toBeGreaterThan(offers.indexOf('class="offers__pages"'));
     expect(offers).toContain('@click="selectOffer(offer.id)"');
+    // Paging away from an explicitly chosen card must select a valid card on the new page.
+    expect(offers).toContain('watch(() => inbox.page, () => { selectedId.value = null; });');
     // The details default to the first offer (or fall back after paging); the visible/ARIA
     // selected state must track that computed offer, not only an explicit click.
     expect(offers).toContain(":class=\"{ 'offer-card--selected': selected?.id === offer.id }\"");

@@ -315,6 +315,9 @@ async function submitDecision(): Promise<void> {
     if (action === "decline") selectedId.value = null;
   }
 }
+// The inbox keeps the previous page's rows visible while the next page loads.
+// An ID chosen on the old page must not strand the new page without details.
+watch(() => inbox.page, () => { selectedId.value = null; });
 watch(() => props.selectedOfferId, (id) => { selectedId.value = id; });
 watch(() => selected.value?.id, () => {
   photoGeneration++;

@@ -246,6 +246,61 @@ describe("proposal inbox", () => {
     expect(decline).toHaveBeenCalledWith("rescuer-token", proposal.id, "Unavailable today");
   });
 
+  it("keeps the displayed page number aligned with retained rows when a page change fails", async () => {
+    const other = { ...proposal, id: "66666666-6666-4666-8666-666666666666" };
+    let failSecondPage = true;
+    const list = vi.fn(async (_token: string, currentPage = 1) => {
+      if (currentPage === 2 && failSecondPage) throw new Error("offline");
+      return { items: currentPage === 1 ? [proposal] : [other], total: 21, page: currentPage,
+        limit: 20, totalPages: 2 };
+    });
+    configureProposalInboxForTests({ list, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.totalPages).toBe(2));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(inbox.failed).toBe(true));
+    expect(inbox.page).toBe(1); // A failed page 2 must not label page 1's retained offers as page 2.
+    expect(inbox.proposals).toEqual([proposal]);
+    failSecondPage = false;
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(inbox.proposals).toEqual([other]));
+    expect(inbox.page).toBe(2);
+    expect(inbox.failed).toBe(false);
+  });
+
+  it("rolls back a failed page change even when a newer refresh supersedes the first read", async () => {
+    let finishOld!: (result: ReturnType<typeof page>) => void;
+    const pending = new Promise<ReturnType<typeof page>>((resolve) => { finishOld = resolve; });
+    let secondPageReads = 0;
+    const list = vi.fn(async (_token: string, currentPage = 1) => {
+      if (currentPage === 1) return { ...page([proposal]), total: 21, totalPages: 2 };
+      if (++secondPageReads === 1) return pending;
+      throw new Error("offline on retry");
+    });
+    configureProposalInboxForTests({ list, openSocket: async () => ({
+      socket: new EventEmitter() as never, connect: vi.fn(), updateToken: vi.fn(), close: vi.fn()
+    }) });
+    const auth = useAuthStore();
+    auth.user = { id: rescuerId, username: "rescuer", role: "user", mustCompleteSecurityQuestions: false };
+    auth.accessToken = "rescuer-token";
+    const inbox = useProposalInboxStore();
+    await vi.waitFor(() => expect(inbox.totalPages).toBe(2));
+    inbox.setPage(2);
+    await vi.waitFor(() => expect(secondPageReads).toBe(1));
+    await inbox.refresh();
+    expect(inbox.failed).toBe(true);
+    expect(inbox.page).toBe(1);
+    finishOld({ ...page([]), page: 2, total: 21, totalPages: 2 });
+    await nextTick();
+    expect(inbox.proposals).toEqual([proposal]);
+    expect(inbox.page).toBe(1);
+  });
+
   it("returns to the last real page after declining the sole offer on a now-empty page", async () => {
     const previous = Array.from({ length: 20 }, (_, index) => ({ ...proposal, id: `older-${index}` }));
     let declined = false;

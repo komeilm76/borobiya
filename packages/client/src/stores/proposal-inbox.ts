@@ -38,6 +38,9 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
 
   let generation = 0;
   let sessionGeneration = 0;
+  // `page` changes at click time, but rows remain from the last successful read
+  // until the next one resolves. Keep their real page for failed navigation.
+  let loadedPage = 1;
   let interval: ReturnType<typeof setInterval> | null = null;
   let client: RealtimeClient | null = null;
   let opening: object | null = null;
@@ -66,11 +69,18 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
         if (gen !== generation || identity.value !== userId) return;
       }
       proposals.value = result.items;
+      loadedPage = requestedPage;
       total.value = result.total;
       totalPages.value = result.totalPages;
       failed.value = false;
     } catch {
-      if (gen === generation && identity.value === userId) failed.value = true;
+      if (gen === generation && identity.value === userId) {
+        failed.value = true;
+        // Do not label retained page-one rows as page two after a failed page
+        // change. Rewind failures that cleared the rows retain their honest
+        // retry page instead of showing an unrelated old page number.
+        if (proposals.value.length && page.value !== loadedPage) page.value = loadedPage;
+      }
     } finally {
       if (gen === generation) loading.value = false;
     }
@@ -137,6 +147,7 @@ export const useProposalInboxStore = defineStore("proposal-inbox", () => {
     proposals.value = [];
     total.value = 0;
     page.value = 1;
+    loadedPage = 1;
     totalPages.value = 0;
     decidingId.value = null;
     decisionError.value = null;

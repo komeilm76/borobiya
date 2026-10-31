@@ -671,7 +671,7 @@ Table missions (
 
 **`_auth/*` — Guest Only**
 - If request has valid JWT (logged in), backend returns `403 { code: "ALREADY_AUTHENTICATED" }`
-- Frontend `beforeEach` guard: if `authStore.isLoggedIn` → redirect to `/_user/dashboard` or `/_admin/dashboard` based on role.
+- Frontend `beforeEach` guard: signed-in users default to `/_user/map`, and admins default to `/_admin/users` (unless a safe return path was requested). The retired `/_user/dashboard` address redirects to the map.
 - Contains:
   ```
   POST /_auth/register
@@ -744,7 +744,7 @@ fastify.register(async (r) => { r.addHook('preHandler', r.authenticate); r.addHo
 ```ts
 router.beforeEach((to) => {
   const auth = useAuthStore()
-  if (to.path.startsWith('/_auth') && auth.isLoggedIn) return '/_user/dashboard'
+  if (to.path.startsWith('/_auth') && auth.isLoggedIn) return auth.user?.role === 'admin' ? '/_admin/users' : '/_user/map'
   if (to.path.startsWith('/_user') && !auth.isLoggedIn) return '/_auth/login'
   if (to.path.startsWith('/_admin') && auth.user?.role !== 'admin') return '/403'
 })
@@ -845,10 +845,9 @@ This trio creates a **type-safe, single-source-of-truth** API contract between S
   - **Performance:** Lazy-load routes, virtual scroll for user lists, debounce search
 - **Pages to include:**
   - `/_auth/login`, `/_auth/register`, `/_auth/forgot-password`
-  - `/_user/dashboard` (map + my shares + nearby users)
-  - `/_user/map` (full-screen map, search, routing)
-  - `/_user/location/shares` (manage shares)
-  - `/_user/sos/history` (my requests + my missions)
+  - `/_user/map` (full-screen home map, search, companions, history and proposal review from the top-right bell)
+  - `/_user/location-shares` (manage sharing and broadcasting)
+  - `/_user/sos-history`, `/_user/mission-history`, `/_user/mission` (requests, rescue history and mission routing)
   - `/_user/settings` (devices, theme, security questions)
   - `/_admin/dashboard` (stats + live SOS alerts)
   - `/_admin/users`, `/_admin/categories`, `/_admin/incidents`
