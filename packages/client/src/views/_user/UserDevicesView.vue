@@ -87,7 +87,7 @@ onMounted(() => {
 .user-devices__title-block p {
   margin: 0;
   color: #536d6c;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -107,7 +107,7 @@ onMounted(() => {
   margin: 0;
   max-width: 58rem;
   color: #536d6c;
-  font-size: 0.84rem;
+  font-size: 0.94rem;
   line-height: 1.85;
 }
 

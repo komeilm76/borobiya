@@ -92,7 +92,7 @@ function onSharesChanged(): void {
   margin: 0.3rem 0 0;
   max-width: 44rem;
   color: rgba(var(--v-theme-on-surface), 0.72);
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   line-height: 1.7;
 }
 

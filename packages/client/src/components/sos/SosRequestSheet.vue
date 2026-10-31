@@ -638,7 +638,7 @@ onBeforeUnmount(() => {
 }
 
 .sos-severity-hint {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   opacity: 0.75;
   line-height: 1.35;
 }

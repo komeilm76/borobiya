@@ -1,5 +1,5 @@
 <template>
-  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute }">
+  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute, 'app-shell--workspace': !isAuthRoute && !isPublicRoute }">
     <v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute" class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">

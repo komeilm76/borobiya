@@ -112,7 +112,7 @@ onMounted(() => {
 .broadcast-bar__detail {
   margin: 0.12rem 0 0;
   color: #536d6c;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.55;
 }
 

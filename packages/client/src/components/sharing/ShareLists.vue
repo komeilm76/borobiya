@@ -697,7 +697,7 @@ defineExpose({ refresh });
 .share-lists__kicker {
   margin: 0;
   color: var(--bb-color-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
@@ -738,7 +738,7 @@ defineExpose({ refresh });
 .share-lists__pending {
   margin: 0.5rem 0 0;
   color: var(--bb-color-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .share-lists__rows {
@@ -760,7 +760,7 @@ defineExpose({ refresh });
 
 .share-lists__bulk { margin-bottom: 0.6rem; min-height: 44px; max-width: 100%; height: auto; }
 .share-lists__bulk :deep(.v-btn__content) { white-space: normal; text-align: center; }
-.share-lists__device-caption { flex: 0 0 auto; color: var(--bb-color-muted); font-size: 0.76rem; font-weight: 700; }
+.share-lists__device-caption { flex: 0 0 auto; color: var(--bb-color-muted); font-size: 0.82rem; font-weight: 700; }
 .share-lists__tabs { margin-top: 1rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.1); }
 .share-lists__tabs :deep(.v-tab) { min-width: 0; min-height: 48px; white-space: normal; font-size: 0.82rem; }
 .share-lists__row--owned { display: block; }
@@ -795,14 +795,14 @@ defineExpose({ refresh });
 .share-lists__row-title bdi { min-width: 0; overflow-wrap: anywhere; }
 .share-lists__row-state {
   color: var(--bb-color-muted);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 600;
 }
 
 .share-lists__row-sub {
   margin: 0.15rem 0 0;
   color: var(--bb-color-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }

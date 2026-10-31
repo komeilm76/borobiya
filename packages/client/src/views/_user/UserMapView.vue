@@ -1100,7 +1100,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   border: 3px solid rgb(var(--v-theme-surface)); border-radius: 50%;
   color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
   box-shadow: 0 2px 7px rgba(3, 29, 31, 0.4);
-  font-size: 0.75rem; font-weight: 800; line-height: 1; text-transform: none;
+  font-size: 0.82rem; font-weight: 800; line-height: 1; text-transform: none;
 }
 :global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face) { background: #526b6b; color: #fff; }
 :global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; }
@@ -1306,12 +1306,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
     min-height: 44px; height: auto; max-width: 100%; padding-inline: 0.55rem;
   }
   .user-map-view__search-map-actions :deep(.v-btn__content) {
-    white-space: normal; text-align: center; font-size: 0.7rem; line-height: 1.2;
+    white-space: normal; text-align: center; font-size: 0.82rem; line-height: 1.2;
   }
   .user-map-view__search-map-actions > span {
     padding: 0.2rem 0.4rem; border-radius: 0.5rem;
     color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface));
-    font-size: 0.7rem; line-height: 1.35;
+    font-size: 0.82rem; line-height: 1.35;
   }
   /* These are three independent dialogs but share one phone layout. VCard is
    * required by Vuetify; the reusable map-side widgets are flattened *only*
@@ -1467,7 +1467,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__dock :deep(.v-bottom-navigation__content > .v-btn.v-btn--selected) {
     background: rgba(var(--v-theme-primary), 0.14);
   }
-  .user-map-view__dock-label { font-size: 0.75rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+  .user-map-view__dock-label { font-size: 0.82rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
   .user-map-view__dock :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: -2px; }
 
   .user-map-view__panel {

@@ -46,7 +46,7 @@ function onVisible(visible: boolean): void {
 .place-detail__header { display: flex; align-items: center; gap: 0.8rem; flex: 0 0 auto; padding: 0.9rem 1rem; white-space: normal; }
 .place-detail__identity { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5; }
 .place-detail__identity strong { font-size: 1rem; overflow-wrap: anywhere; }
-.place-detail__identity span { font-size: 0.76rem; opacity: 0.72; }
+.place-detail__identity span { font-size: 0.82rem; opacity: 0.72; }
 .place-detail__close { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 .place-detail__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-block: 0 1.4rem; }
 .place-detail__section { padding-block: 0.7rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12); }

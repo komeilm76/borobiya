@@ -995,7 +995,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: rgba(15, 23, 42, 0.82);
   color: #f8fafc;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
 }
 
 .legend-item {

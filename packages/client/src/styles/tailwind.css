@@ -77,7 +77,7 @@ a {
 
 .brand-tagline {
   color: #718686;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
@@ -103,6 +103,16 @@ a {
 /* The guest sign-in is the primary action; authenticated actions live inside the profile menu. */
 .login-button.v-btn--variant-flat {
   box-shadow: var(--bb-shadow-item-hover);
+}
+
+/* Vuetify sets Roboto on v-app and its text utilities. Keep Persian text in the
+   same type family as the rest of the UI on user/admin routes only. */
+.v-application.app-shell--workspace {
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif) !important;
+}
+.app-shell--workspace :is(.text-h5, .text-subtitle-1, .text-subtitle-2, .text-body-2, .text-caption) {
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif) !important;
+  letter-spacing: normal !important;
 }
 
 .app-main {
@@ -173,13 +183,12 @@ a {
 }
 
 .hero-title {
-  max-width: 12ch;
+  max-width: 100%;
   margin: 1.25rem 0 0.85rem;
   color: #173b3c;
-  font-size: clamp(2.3rem, 5vw, 4rem);
+  font-size: clamp(1.65rem, 2.5vw, 2.15rem);
   font-weight: 800;
-  letter-spacing: -0.045em;
-  line-height: 1.25;
+  line-height: 1.45;
 }
 
 .hero-copy {
@@ -265,7 +274,7 @@ a {
   border-radius: 999px;
   color: #39765f;
   background: #eff8f3;
-  font-size: 0.77rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -326,14 +335,14 @@ a {
 .note-copy {
   margin-top: 0.2rem;
   color: #7d9090;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
 }
 
 .note-version {
   margin-inline-start: auto;
   color: #97a8a6;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
 }
 
 .app-footer {
@@ -346,7 +355,7 @@ a {
   border-top: 1px solid rgba(26, 67, 68, 0.07);
   color: #819292;
   background: rgba(255, 255, 255, 0.76);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
 }
 
 .osm-attribution {
@@ -399,7 +408,7 @@ a {
 
   .hero-title {
     max-width: 100%;
-    font-size: clamp(2rem, 8vw, 3rem);
+    font-size: clamp(1.65rem, 5vw, 2rem);
   }
 
   .welcome-card {

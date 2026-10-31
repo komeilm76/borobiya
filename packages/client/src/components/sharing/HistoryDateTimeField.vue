@@ -92,7 +92,7 @@ function chooseTime(time: unknown): void {
 
 <style scoped>
 .history-date-time { min-width: 0; }
-.history-date-time__label { display: block; color: var(--bb-color-muted); font-size: 0.78rem; font-weight: 700; margin-bottom: 0.35rem; }
+.history-date-time__label { display: block; color: var(--bb-color-muted); font-size: 0.82rem; font-weight: 700; margin-bottom: 0.35rem; }
 .history-date-time__controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
 .history-date-time__controls :deep(.v-field__input) { min-width: 0; }
 .history-date-time__picker { min-height: 0; }

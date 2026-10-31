@@ -95,7 +95,7 @@ function onVisible(visible: boolean): void {
 .companion-detail__avatar { flex: 0 0 auto; font-weight: 800; }
 .companion-detail__identity { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.5; }
 .companion-detail__identity strong { font-size: 1rem; overflow-wrap: anywhere; }
-.companion-detail__identity span { font-size: 0.76rem; opacity: 0.72; }
+.companion-detail__identity span { font-size: 0.82rem; opacity: 0.72; }
 .companion-detail__close { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 .companion-detail__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-block: 0 1.4rem; }
 .companion-detail__section { padding-block: 0.7rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12); }

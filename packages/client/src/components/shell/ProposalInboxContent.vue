@@ -350,11 +350,11 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offers__shell { max-width: 1260px; margin-inline: auto; }
 .offers__hero { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 18px; border-radius: var(--bb-radius-card, 24px); background: linear-gradient(118deg, #103c3d, #185352 60%, #29736b); color: #fff; box-shadow: var(--bb-shadow-hero); }
 .offers__intro { min-width: 0; }
-.offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: .74rem; font-weight: 700; }
+.offers__eyebrow { display: inline-flex; gap: 8px; align-items: center; color: #bbefdf; font-size: 0.82rem; font-weight: 700; }
 .offers__live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #74e9be; box-shadow: 0 0 0 4px rgba(116,233,190,.17); }
 .offers__hero h3 { font-size: 1.15rem; margin: 3px 0; line-height: 1.3; font-weight: 800; }
-.offers__hero p { color: #d2e8e2; line-height: 1.45; margin: 0; font-size: .78rem; }
-.offers__stat { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.11); border-radius: var(--bb-radius-nested, 16px); min-width: 66px; min-height: 66px; padding: 4px; gap: 0; font-size: .65rem; color: #e1f7ec; text-align: center; }
+.offers__hero p { color: #d2e8e2; line-height: 1.45; margin: 0; font-size: 0.82rem; }
+.offers__stat { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.11); border-radius: var(--bb-radius-nested, 16px); min-width: 78px; min-height: 88px; padding: 6px; gap: 0; font-size: 0.82rem; color: #e1f7ec; text-align: center; }
 .offers__stat-number { font-size: 1.25rem; line-height: 1.1; font-weight: 800; color: #fff; }
 .accepted-map { margin-top: 22px; padding: clamp(18px, 3vw, 28px); border-radius: var(--bb-radius-card, 24px); border: 1px solid rgba(49,149,129,.28); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-surface); }
 .accepted-map__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 18px; }
@@ -379,23 +379,23 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 .offer-card__top, .offer-card__foot { display: flex; align-items: center; gap: 10px; }
 .offer-card__icon { display: inline-flex; justify-content: center; align-items: center; background: rgba(49,149,129,.12); color: rgb(var(--v-theme-primary)); border-radius: 11px; width: 36px; height: 36px; flex-shrink: 0; }
 .offer-card__title { font-weight: 800; font-size: .95rem; flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: .78rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
+.offer-card__severity, .offer-detail__pill { font-weight: 750; font-size: 0.82rem; border-radius: 50px; padding: 5px 10px; white-space: nowrap; }
 .offer-card__severity--urgent { background: #ffe7e4; color: #a2241e; }.offer-card__severity--important { background: #fff0d4; color: #875000; }.offer-card__severity--standard { background: #d9f4ed; color: #066b57; }
 .offer-card__description { font-size: .83rem; opacity: .77; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.offer-card__foot { justify-content: space-between; flex-wrap: wrap; font-size: .72rem; color: rgb(var(--v-theme-primary)); }
+.offer-card__foot { justify-content: space-between; flex-wrap: wrap; font-size: 0.82rem; color: rgb(var(--v-theme-primary)); }
 .offer-card__foot span { min-width: 0; overflow-wrap: anywhere; }
 .offer-card__foot span:first-child { opacity: .9; }
 .offers__pages { display: flex; justify-content: center; gap: 8px; align-items: center; font-size: .8rem; }
 .offer-detail { background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); border: 1px solid rgba(128,155,151,.25); box-shadow: var(--bb-shadow-surface); overflow: hidden; }
 .offer-detail__top { padding: 28px clamp(22px, 3vw, 36px); border-bottom: 1px solid rgba(128,155,151,.18); background: linear-gradient(105deg, rgba(42,137,114,.1), transparent 80%); }
-.offer-detail__kicker { font-size: .77rem; color: rgb(var(--v-theme-primary)); font-weight: 700; }.offer-detail__top h2 { margin: 8px 0 12px; font-size: clamp(1.35rem, 2vw, 1.7rem); font-weight: 800; }
+.offer-detail__kicker { font-size: 0.82rem; color: rgb(var(--v-theme-primary)); font-weight: 700; }.offer-detail__top h2 { margin: 8px 0 12px; font-size: clamp(1.35rem, 2vw, 1.7rem); font-weight: 800; }
 .offer-detail__pill { display: inline-flex; align-items: center; gap: 5px; }
 .offer-detail__facts { display: flex; flex-wrap: wrap; gap: 12px; padding: 22px clamp(22px, 3vw, 36px) 0; }
-.offer-detail__facts > div { flex: 1 1 180px; display: grid; gap: 5px; padding: 14px 17px; background: rgba(128,155,151,.08); border-radius: var(--bb-radius-nested, 16px); }.offer-detail__facts span { opacity: .65; font-size: .76rem; }.offer-detail__facts strong { font-size: .92rem; }
+.offer-detail__facts > div { flex: 1 1 180px; display: grid; gap: 5px; padding: 14px 17px; background: rgba(128,155,151,.08); border-radius: var(--bb-radius-nested, 16px); }.offer-detail__facts span { opacity: .65; font-size: 0.82rem; }.offer-detail__facts strong { font-size: .92rem; }
 .offer-detail__section { padding: 23px clamp(22px, 3vw, 36px) 0; }.offer-detail__section h3 { display: flex; align-items: center; gap: 8px; font-size: .91rem; font-weight: 800; margin-bottom: 11px; color: rgb(var(--v-theme-primary)); }.offer-detail__description { line-height: 2; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .92rem; }
 .offer-detail__map { height: 216px; border-radius: var(--bb-radius-nested, 16px); overflow: hidden; background: rgba(43,112,104,.08); }.offer-detail__map :deep(.map-canvas) { min-height: 0; height: 100%; }.offer-detail__map :deep(.map-canvas__viewport) { min-height: 0; }
-.offer-detail__coords { margin: 10px 0 0; font-size: .77rem; opacity: .7; }.offer-detail__photo { max-width: 100%; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); background: #163b39; }.offer-detail__photo img { max-width: 100%; max-height: 360px; display: block; margin-inline: auto; object-fit: contain; }
-.offer-detail__hint { font-size: .79rem; line-height: 1.7; opacity: .7; margin: 6px 32px 0; }
+.offer-detail__coords { margin: 10px 0 0; font-size: 0.82rem; opacity: .7; }.offer-detail__photo { max-width: 100%; overflow: hidden; border-radius: var(--bb-radius-nested, 16px); background: #163b39; }.offer-detail__photo img { max-width: 100%; max-height: 360px; display: block; margin-inline: auto; object-fit: contain; }
+.offer-detail__hint { font-size: 0.82rem; line-height: 1.7; opacity: .7; margin: 6px 32px 0; }
 .offer-detail__actions { margin-top: 26px; padding: 22px clamp(22px, 3vw, 36px) 27px; border-top: 1px solid rgba(128,155,151,.18); }.offer-detail__actions p { margin: 0 0 16px; display: flex; gap: 8px; align-items: center; font-size: .8rem; opacity: .75; }.offer-detail__buttons { display: flex; flex-wrap: wrap; gap: 10px; }
 .offers__empty { border: 1px dashed rgba(89,145,133,.4); background: rgb(var(--v-theme-surface)); border-radius: var(--bb-radius-card, 24px); text-align: center; padding: 65px 20px; margin-top: 18px; }.offers__empty-icon { display: inline-flex; padding: 15px; background: rgba(48,148,123,.12); border-radius: 50%; color: rgb(var(--v-theme-primary)); }.offers__empty h3 { font-size: 1.25rem; margin: 16px 0 8px; }.offers__empty p { opacity: .7; font-size: .9rem; line-height: 1.8; max-width: 440px; margin: 0 auto 20px; }.offers__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }.offers__skeleton { border-radius: var(--bb-radius-nested, 16px); }
 @media (max-width: 850px) {
@@ -408,7 +408,7 @@ onBeforeUnmount(() => { marker?.remove(); acceptedIncidentMarker?.remove(); acce
 @media (max-width: 580px) {
   .offers { padding-inline: 12px; }
   .offers__hero { padding: 12px; }
-  .offers__stat { min-width: 60px; }
+  .offers__stat { min-width: 74px; }
   .offers__toolbar { align-items: start; }
   .offers__toolbar p { display: none; }
   .offers__grid { grid-template-columns: 1fr; }

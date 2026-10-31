@@ -184,7 +184,7 @@ async function requestLogout(): Promise<void> {
 .map-sidebar__header h2 { margin: 0; font-size: 1.1rem; font-weight: 800; line-height: 1.4; }
 .map-sidebar__header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; min-height: 44px; }
 .map-sidebar__eyebrow, .map-sidebar__section-label {
-  color: rgb(var(--v-theme-primary)); font-size: 0.76rem; font-weight: 800;
+  color: rgb(var(--v-theme-primary)); font-size: 0.82rem; font-weight: 800;
 }
 .map-sidebar__eyebrow { display: block; margin-bottom: 0.15rem; }
 .map-sidebar__scroll { scrollbar-gutter: stable; }
@@ -203,7 +203,7 @@ async function requestLogout(): Promise<void> {
 .map-sidebar__categories { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.6rem 1.2rem 0; }
 .map-sidebar__categories span {
   padding: 0.2rem 0.5rem; border-radius: 0.6rem;
-  background: rgba(var(--v-theme-primary), 0.1); font-size: 0.73rem; overflow-wrap: anywhere;
+  background: rgba(var(--v-theme-primary), 0.1); font-size: 0.82rem; overflow-wrap: anywhere;
 }
 .map-sidebar__navigation, .map-sidebar__preferences { margin-top: 1.1rem; }
 .map-sidebar__section-label { margin: 0 1.3rem 0.4rem; }
@@ -221,7 +221,7 @@ async function requestLogout(): Promise<void> {
   display: flex; flex: 1 1 0; flex-direction: column; align-items: center; justify-content: center;
   gap: 0.25rem; min-width: 0; min-height: 58px; padding: 0.4rem 0.2rem;
   border: 1px solid rgba(var(--v-theme-on-surface), 0.16); border-radius: 0.85rem;
-  color: inherit; background: transparent; cursor: pointer; font: inherit; font-size: 0.78rem;
+  color: inherit; background: transparent; cursor: pointer; font: inherit; font-size: 0.82rem;
 }
 .map-sidebar__theme--selected { border-color: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.1); font-weight: 800; }
 .map-sidebar__footer { margin: 1.25rem 1rem 0; padding-top: 1rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.1); }

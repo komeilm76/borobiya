@@ -573,16 +573,15 @@ onUnmounted(() => {
   gap: 0.45rem;
   margin: 0 0 0.55rem;
   color: var(--bb-color-primary);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 800;
 }
 
 .admin-users-header h1 {
   margin: 0;
   color: var(--bb-color-text);
-  font-size: clamp(1.7rem, 3.5vw, 2.45rem);
+  font-size: clamp(1.5rem, 2.3vw, 1.95rem);
   font-weight: 850;
-  letter-spacing: -0.035em;
   line-height: 1.45;
 }
 
@@ -631,7 +630,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 0.75rem;
   color: var(--bb-color-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-weight: 650;
 }
 
@@ -641,7 +640,7 @@ onUnmounted(() => {
   border-radius: 999px;
   color: var(--bb-color-primary);
   background: rgba(var(--v-theme-primary), 0.12);
-  font-size: 0.7rem;
+  font-size: 0.82rem;
 }
 
 .admin-users-state {
@@ -693,7 +692,7 @@ onUnmounted(() => {
   height: 52px !important;
   color: var(--bb-color-muted) !important;
   background: rgba(var(--v-theme-on-surface), 0.04);
-  font-size: 0.74rem !important;
+  font-size: 0.82rem !important;
   font-weight: 800 !important;
   white-space: nowrap;
 }
@@ -747,7 +746,7 @@ onUnmounted(() => {
 .admin-user-copy small,
 .admin-self-note {
   color: var(--bb-color-muted);
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   font-weight: 500;
 }
 
@@ -761,7 +760,7 @@ onUnmounted(() => {
   border-radius: 999px;
   color: var(--bb-color-muted);
   background: rgba(var(--v-theme-on-surface), 0.06);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 750;
   white-space: nowrap;
 }
@@ -827,7 +826,7 @@ onUnmounted(() => {
   gap: 1rem;
   padding-top: 0.9rem;
   color: var(--bb-color-muted);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
 }
 
 .admin-users-pagination :deep(.v-pagination__list) {
@@ -865,7 +864,7 @@ onUnmounted(() => {
 .admin-status-dialog :deep(.v-card-text) {
   padding: 0.6rem 1.5rem 0.9rem;
   color: var(--bb-color-muted);
-  font-size: 0.86rem;
+  font-size: 0.94rem;
   line-height: 1.9;
 }
 
@@ -884,7 +883,7 @@ onUnmounted(() => {
   border-radius: 8px;
   color: #816a42;
   background: rgba(var(--v-theme-secondary), 0.12);
-  font-size: 0.78rem;
+  font-size: 0.9rem;
 }
 
 :global(:root.dark .admin-deactivation-note) {
@@ -893,7 +892,7 @@ onUnmounted(() => {
 
 .admin-dialog-error {
   margin-top: 0.8rem;
-  font-size: 0.78rem;
+  font-size: 0.9rem;
 }
 
 .admin-status-dialog-actions {
@@ -912,7 +911,7 @@ onUnmounted(() => {
   .admin-mobile-username { overflow-wrap: anywhere; color: var(--bb-color-text); font-size: 0.88rem; font-weight: 800; }
   .admin-mobile-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr)); gap: 0.6rem; margin: 0.85rem 0; }
   .admin-mobile-meta > div { min-width: 0; }
-  .admin-mobile-meta dt { color: var(--bb-color-muted); font-size: 0.72rem; }
+  .admin-mobile-meta dt { color: var(--bb-color-muted); font-size: 0.82rem; }
   .admin-mobile-meta dd { margin: 0.25rem 0 0; color: var(--bb-color-text); font-size: 0.82rem; overflow-wrap: anywhere; }
   .admin-mobile-categories { display: flex; flex-wrap: wrap; gap: 0.25rem; }
   .admin-mobile-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.7rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.10); }
@@ -951,7 +950,7 @@ onUnmounted(() => {
   }
 
   .admin-users-intro {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
   }
 
   .admin-users-results-meta,

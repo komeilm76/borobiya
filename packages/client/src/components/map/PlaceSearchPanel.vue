@@ -162,7 +162,7 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search--error .place-search__indicator { background: #b3261e; box-shadow: none; }
 .place-search__copy { min-width: 0; flex: 1 1 9rem; }
 .place-search__headline { margin: 0; color: #173b3c; font-size: 0.86rem; font-weight: 800; line-height: 1.4; }
-.place-search__detail { margin: 0.12rem 0 0; color: #536d6c; font-size: 0.75rem; line-height: 1.55; overflow-wrap: anywhere; }
+.place-search__detail { margin: 0.12rem 0 0; color: #536d6c; font-size: 0.82rem; line-height: 1.55; overflow-wrap: anywhere; }
 .place-search__actions { display: flex; align-items: center; margin-inline-start: auto; }
 .place-search__form { display: flex; align-items: start; gap: 0.5rem; margin-top: 0.75rem; }
 .place-search__form :deep(.v-input) { flex: 1 1 auto; min-width: 0; }
@@ -173,7 +173,7 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__diagnostic small { display: block; }
 .place-search__copy-report { min-height: 44px; }
 .place-search__results { margin-top: 0.5rem; max-height: min(17rem, 40dvh); overflow-y: auto; overscroll-behavior: contain; }
-.place-search__feedback { margin: 0.35rem 0.25rem 0.5rem; color: #536d6c; font-size: 0.75rem; line-height: 1.6; }
+.place-search__feedback { margin: 0.35rem 0.25rem 0.5rem; color: #536d6c; font-size: 0.82rem; line-height: 1.6; }
 .place-search__feedback p { margin: 0 0 0.5rem; }
 .place-search__results ul { margin: 0; padding: 0; list-style: none; }
 .place-search__results li + li { margin-top: 0.3rem; }
@@ -188,8 +188,8 @@ defineEmits<{ select: [place: GeocodeResult]; 'show-all': [] }>();
 .place-search__result--selected { border-color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), 0.12); }
 .place-search__result-title { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 0.25rem 0.5rem; }
 .place-search__result-title strong { font-size: 0.82rem; line-height: 1.5; }
-.place-search__result-title small { color: rgb(var(--v-theme-primary)); font-size: 0.72rem; font-weight: 700; }
-.place-search__address { display: block; color: #536d6c; font-size: 0.75rem; line-height: 1.55; }
+.place-search__result-title small { color: rgb(var(--v-theme-primary)); font-size: 0.82rem; font-weight: 700; }
+.place-search__address { display: block; color: #536d6c; font-size: 0.82rem; line-height: 1.55; }
 
 @container (max-width: 380px) {
   .place-search__show-all { width: 44px; padding-inline: 0; }

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — User/admin workspace typography audit
+
+- Audited type declarations across active user/admin screens, shared navigation, map/history/sharing/SOS widgets, and the user-settings/admin-dashboard placeholders. Reined in oversized mission/history/admin headings at desktop and phone widths; removed cramped Persian headline tracking and the placeholder's artificial 12-character line limit. Increased explicit explanatory text smaller than 0.8rem (including map playback dates, sharing hints, table labels and alert metadata), gave the enlarged inbox counter enough room, and kept the map's full-screen and 44px launcher behavior intact. The user/admin workspace now overrides Vuetify's Roboto text utilities with the app's Persian-first font stack without changing guest/auth routes. Source typography checks and client tests cover the size floor and page caps; actual browser/device visual review remains open.
+
 ### 2026-10-31 — Public and account typography refinement
 
 - Audited all explicit font sizes in the public landing/status/404 and login/registration/recovery/onboarding layouts. Reduced oversized display and section headings across desktop, tablet and phone breakpoints; removed negative letter spacing from Persian display text. Rebalanced card titles, navigation, calls to action, body copy, error text, labels, form hints and small status/footer copy so secondary text does not become too small. All changes are confined to the public/auth stylesheets (the onboarding screen shares the auth typography); UI behavior and route access are unchanged. Source-level typography bounds and responsive-heading tests protect the hierarchy; rendered browser/device checks remain open.

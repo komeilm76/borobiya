@@ -110,7 +110,7 @@ const tone = computed(() => ownPositionTone(props.api.position.value, props.api.
 .own-position__detail {
   margin: 0.12rem 0 0;
   color: #536d6c;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -127,7 +127,7 @@ const tone = computed(() => ownPositionTone(props.api.position.value, props.api.
   padding-top: 0.5rem;
   border-top: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   color: #536d6c;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   line-height: 1.6;
 }
 

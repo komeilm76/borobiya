@@ -426,7 +426,7 @@ function scrub(value: number | readonly number[]): void {
 .history-playback__title-block p {
   margin: 0.12rem 0 0;
   color: #536d6c;
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.55;
 }
 
@@ -530,7 +530,7 @@ function scrub(value: number | readonly number[]): void {
   flex-direction: column;
   gap: 0.15rem;
   color: #536d6c;
-  font-size: 0.66rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
@@ -543,7 +543,7 @@ function scrub(value: number | readonly number[]): void {
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 1rem;
 }
 
 .history-playback__field input:focus-visible {
@@ -565,7 +565,7 @@ function scrub(value: number | readonly number[]): void {
 .history-playback__clock {
   min-width: 4.5rem;
   flex: 1 1 auto;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -586,7 +586,7 @@ function scrub(value: number | readonly number[]): void {
 .history-playback__hint {
   margin: 0;
   color: #536d6c;
-  font-size: 0.68rem;
+  font-size: 0.82rem;
   line-height: 1.6;
 }
 
@@ -595,7 +595,7 @@ function scrub(value: number | readonly number[]): void {
   padding: 0.55rem 0.65rem;
   border-radius: var(--bb-radius-nested, 16px);
   background: rgba(var(--v-theme-primary), 0.08);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   line-height: 1.6;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;

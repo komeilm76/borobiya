@@ -734,7 +734,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 .share-dialog__hint {
   margin: 0.5rem 0 0;
   color: var(--bb-color-muted);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.6;
 }
 
@@ -776,7 +776,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 .share-dialog__result-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.6rem;
-  color: var(--bb-color-muted); font-size: 0.76rem; line-height: 1.5;
+  color: var(--bb-color-muted); font-size: 0.82rem; line-height: 1.5;
 }
 .share-dialog__result-rating { display: inline-flex; align-items: center; gap: 0.1rem; }
 .share-dialog__result-rating :deep(.v-icon) { color: #986000; }
@@ -808,7 +808,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
 }
 
 .share-dialog__duration-value { margin: 0.7rem 0 0; color: var(--bb-color-text); font-weight: 700; font-size: 0.88rem; }
-.share-dialog__slider-limits { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.76rem; color: var(--bb-color-muted); }
+.share-dialog__slider-limits { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.82rem; color: var(--bb-color-muted); }
 
 .share-dialog__presets {
   display: flex;
@@ -826,7 +826,7 @@ onBeforeUnmount(() => { invalidateSubmission(); cancelPending(); });
   color: var(--bb-color-text);
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.82rem;
   font-weight: 700;
   transition: border-color 0.16s ease, background-color 0.16s ease, color 0.16s ease;
 }
