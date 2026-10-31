@@ -319,6 +319,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');
     expect(view).toContain('journey.navigating.value');
+    expect(view).toContain('GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است');
     expect(view).toContain('stopPointNavigation');
   });
 });

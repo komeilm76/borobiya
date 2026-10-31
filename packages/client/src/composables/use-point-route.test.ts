@@ -131,6 +131,67 @@ describe("private point-to-point route", () => {
     expect(journey.selectedRoute.value).toEqual(fast);
     scope.stop();
   });
+  it("replans instead of showing an obsolete origin when GPS moves during or after a request", async () => {
+    const first = deferred<RouteChoice[]>(), second = deferred<RouteChoice[]>();
+    const get = vi.fn().mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise)
+      .mockResolvedValue([fast]);
+    const { journey, fix, scope } = setup(get);
+    journey.select({ lat: 40, lon: -120 });
+    fix.value = { lat: 38.51, lon: -120.2, accuracy: 8 }; // More than 150 m during the first request.
+    first.resolve([fast]); await first.promise; await nextTick(); await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(journey.routes.value).toEqual([]); // Do not flash the old estimate.
+    expect(get.mock.calls[1]?.[0]).toEqual({ lat: 38.51, lon: -120.2 });
+    second.resolve([fast]); await second.promise; await nextTick(); await Promise.resolve();
+    expect(journey.routes.value).toEqual([fast]);
+    fix.value = { lat: 38.52, lon: -120.2, accuracy: 8 };
+    await nextTick(); await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(3);
+    expect(get.mock.calls[2]?.[0]).toEqual({ lat: 38.52, lon: -120.2 });
+    scope.stop();
+  });
+  it("retries an old-origin routing failure against the latest GPS position", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const get = vi.fn().mockImplementationOnce(() => pending.promise).mockResolvedValue([fast]);
+    const { journey, fix, scope } = setup(get);
+    journey.select({ lat: 40, lon: -120 });
+    fix.value = { lat: 38.51, lon: -120.2, accuracy: 8 };
+    pending.reject(new Error("NO_ROUTE"));
+    await pending.promise.catch(() => {}); await nextTick(); await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(journey.error.value).toBeNull();
+    expect(journey.routes.value).toEqual([fast]);
+    scope.stop();
+  });
+  it("discards a route that resolves after GPS disappears, then retries when a precise fix returns", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const get = vi.fn().mockImplementationOnce(() => pending.promise).mockResolvedValue([fast]);
+    const { journey, fix, scope } = setup(get);
+    journey.select({ lat: 40, lon: -120 });
+    fix.value = null;
+    pending.resolve([fast]); await pending.promise; await nextTick(); await Promise.resolve();
+    expect(journey.routes.value).toEqual([]);
+    expect(journey.error.value).toContain("GPS");
+    fix.value = { lat: 38.51, lon: -120.2, accuracy: 9 };
+    await nextTick(); await Promise.resolve();
+    expect(get).toHaveBeenCalledTimes(2);
+    expect(journey.routes.value).toEqual([fast]);
+    scope.stop();
+  });
+  it("does not follow or display a misleading remaining distance for a coarse navigation fix", async () => {
+    const { journey, follow, fix, scope } = setup();
+    journey.select({ lat: 38.505, lon: -120.2 }); await nextTick(); await Promise.resolve();
+    expect(journey.start()).toBe(true);
+    const followed = follow.mock.calls.length;
+    fix.value = { lat: 40, lon: -121, accuracy: 400 };
+    expect(journey.navigating.value).toBe(true);
+    expect(journey.remaining.value).toBeNull();
+    expect(follow).toHaveBeenCalledTimes(followed);
+    fix.value = null; expect(journey.remaining.value).toBeNull();
+    fix.value = { lat: 38.501, lon: -120.2, accuracy: 7 };
+    expect(journey.remaining.value).toBeGreaterThan(0);
+    scope.stop();
+  });
   it("calculates proximity in metres and rejects invalid point selection", () => {
     expect(pointDistance({ lat: 0, lon: 0 }, { lat: 0, lon: 0 })).toBe(0);
     expect(pointDistance({ lat: 0, lon: 0 }, { lat: 0, lon: 1 })).toBeGreaterThan(110_000);

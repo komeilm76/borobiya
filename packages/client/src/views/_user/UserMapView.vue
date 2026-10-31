@@ -96,7 +96,9 @@
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
     <div v-if="journey.point.value && !journey.sheetOpen.value && !placeDetailOpen" class="user-map-view__journey-bar" role="status">
       <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-      <span>{{ journey.navigating.value ? (own.position.value ? `فاصلهٔ مستقیم تا مقصد: ${journey.remaining.value === null ? 'نامشخص' : formatRouteDistance(journey.remaining.value)}` : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست') : journey.title.value }}</span>
+      <span>{{ journey.navigating.value ? (journey.remaining.value === null
+        ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
+        : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
       <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
       <v-btn v-else variant="tonal" color="primary" @click="journey.sheetOpen.value = true">جزئیات مسیر</v-btn>
     </div>

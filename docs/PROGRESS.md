@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-31 — Navigation GPS accuracy and route-origin bug review
+
+- Reproduced two further map-navigation failures in pure tests: while a route request was pending, moving more than 150 m could publish a route and ETA from the old GPS origin, and a coarse (e.g. 400 m accuracy) fix during navigation could fling the pitched camera and show a misleading remaining distance. Route replies now check the latest accurate fix before display and automatically replan if the origin changed; a planned route also replans when the user moves significantly before starting. GPS loss while planning discards that response and waits for a fresh fix. During active navigation, missing/coarse fixes pause the camera and clear the displayed remaining distance; a precise fix resumes following immediately, and an inaccurate fix still cannot declare arrival. Source-level HUD checks and pure route/race tests cover these paths; no live GPS/device acceptance is claimed.
+
 ### 2026-10-31 — Map route/detail bug review
 
 - Reproduced two regressions without mounting Vue components: after selecting a search POI, viewport pruning or a new search removed the result from the search list, which hid «اطلاعات مکان» and could close its open detail sheet; and one corrupt route alternative caused all valid alternatives to be rejected. The selected route now retains the validated POI's full name, address, type and coordinates independently of search-list lifetime, while clearing that private snapshot on destination change/logout. Its detail action and return-to-route behavior remain available after search refresh, but stale results still cannot start a new route. Route planning filters invalid geometry and offers any valid alternatives; an entirely invalid response still shows an error. Regressions failed before the fixes; client typecheck, full suite and build pass. Real-browser/mobile GPS and live map-server acceptance remain open.

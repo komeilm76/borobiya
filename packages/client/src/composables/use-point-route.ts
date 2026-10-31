@@ -47,6 +47,10 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   let plannedFrom: RoutePoint | null = null;
   let lastCameraAt = Number.NEGATIVE_INFINITY;
   const invalidate = () => { ++generation; controller?.abort(); controller = null; loading.value = false; };
+  function originIsStale(origin: RoutePoint): boolean {
+    const latest = position.value;
+    return !latest || latest.accuracy === null || latest.accuracy > 150 || pointDistance(latest, origin) > 150;
+  }
   function stop(): void {
     const wasActive = navigating.value;
     navigating.value = false;
@@ -82,24 +86,33 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     const current = generation, transport = profile.value;
     const signal = (controller = new AbortController()).signal;
     loading.value = true; error.value = null;
+    let retryFromLatestFix = false;
     try {
       const choices = await getRoutes(origin, to, transport, signal);
       if (current !== generation || owner.value !== account || point.value !== to || profile.value !== transport) return;
-      // A bad alternative must not hide a valid route or become a navigation bearing.
-      const valid = choices.filter((choice) => {
-        try { decodeRoutePolyline(choice.polyline); return true; } catch { return false; }
-      });
-      if (!valid.length) throw new Error("INVALID_ROUTE");
-      routes.value = valid.sort((a, b) => a.duration_s - b.duration_s || a.distance_m - b.distance_m);
-      plannedFrom = origin;
+      if (originIsStale(origin)) {
+        // The reply belongs to an old GPS origin. Do not show its ETA, even briefly.
+        retryFromLatestFix = true;
+      } else {
+        // A bad alternative must not hide a valid route or become a navigation bearing.
+        const valid = choices.filter((choice) => {
+          try { decodeRoutePolyline(choice.polyline); return true; } catch { return false; }
+        });
+        if (!valid.length) throw new Error("INVALID_ROUTE");
+        routes.value = valid.sort((a, b) => a.duration_s - b.duration_s || a.distance_m - b.distance_m);
+        plannedFrom = origin;
+      }
     } catch (reason) {
       if (current !== generation || signal.aborted) return;
-      error.value = (reason as Error)?.message === "NO_ROUTE"
+      if (originIsStale(origin)) retryFromLatestFix = true;
+      else error.value = (reason as Error)?.message === "NO_ROUTE"
         ? "برای این وسیله در شبکهٔ محلی مسیری پیدا نشد. وسیلهٔ دیگری را امتحان کنید."
         : "مسیر قابل‌اعتماد دریافت نشد. اتصال سرور مسیر را بررسی و دوباره تلاش کنید.";
     } finally {
       if (current === generation) { loading.value = false; controller = null; }
     }
+    if (retryFromLatestFix && current === generation && owner.value === account &&
+        point.value === to && profile.value === transport) void findRoutes();
   }
   function changeProfile(next: TransportProfile): void {
     if (next === profile.value || !["car", "bicycle", "foot"].includes(next)) return;
@@ -124,7 +137,13 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     return navigating.value;
   }
   function updateFix(fix: OwnMapFix | null): void {
-    if (!navigating.value || !point.value || !fix) return;
+    if (!navigating.value || !point.value) return;
+    if (!fix || fix.accuracy === null || fix.accuracy > 80) {
+      // A coarse fix must not yank the camera away or present a false live distance.
+      remaining.value = null;
+      lastCameraAt = Number.NEGATIVE_INFINITY; // Follow immediately when reliable GPS returns.
+      return;
+    }
     remaining.value = pointDistance(fix, point.value);
     // Do not declare arrival on a coarse/inaccurate fix.
     if (fix.accuracy !== null && fix.accuracy <= 35 && remaining.value <= 25) {
@@ -141,6 +160,10 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   watch(position, (fix) => {
     if (navigating.value) updateFix(fix);
     else if (waitingForFix && point.value && fix) void findRoutes();
+    else if (point.value && plannedFrom && !loading.value && fix && fix.accuracy !== null &&
+             fix.accuracy <= 150 && pointDistance(fix, plannedFrom) > 150) {
+      void findRoutes(); // Keep the planned distance/time tied to the user's actual origin.
+    }
   }, { flush: "sync" });
   watch(gpsError, (message) => {
     if (message && navigating.value && message.includes("دسترسی")) {
