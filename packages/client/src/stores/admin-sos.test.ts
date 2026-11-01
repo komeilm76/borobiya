@@ -705,7 +705,7 @@ describe("useAdminSosStore (T3.2.5)", () => {
     const request = makeSosRecord();
     const near = { userId: "44444444-4444-4444-8444-444444444441", username: "rescuer_near",
       distance: 100, avgRating: null, categoryName: "امداد", lastActiveAt: "2026-10-23T12:10:00.000Z" };
-    const far = { ...near, userId: "44444444-4444-4444-8444-444444444442", username: "rescuer_far", distance: 12000 };
+    const far = { ...near, userId: "44444444-4444-4444-8444-444444444442", username: "rescuer_far", distance: null, categoryName: null };
     const getNearestResponders = vi.fn(async (_id: string, _token: string,
       _signal?: AbortSignal, _excludeAssigned?: boolean, search?: string) => ({ responders: search ? [far] : [near] }));
     configureAdminSosRuntimeForTests({
@@ -721,16 +721,18 @@ describe("useAdminSosStore (T3.2.5)", () => {
     store.selectAllNearestResponders();
     store.setResponderSearch(" rescuer_far ");
     await store.loadNearestResponders();
-    expect(getNearestResponders).toHaveBeenLastCalledWith(request.id, "admin-jwt", undefined, false, "rescuer_far");
+    expect(getNearestResponders).toHaveBeenLastCalledWith(request.id, "admin-jwt", undefined, false, "rescuer_far", true);
     expect(store.nearestResponders).toEqual([far]);
     store.selectAllNearestResponders();
     expect(store.selectedResponderIds).toEqual([near.userId, far.userId]);
     expect(store.selectedResponderNames[near.userId]).toBe("rescuer_near");
+    expect(store.selectedResponderWarnings[far.userId]).toBe("تخصص مرتبط ثبت نشده؛ فاصله و موقعیت بررسی نشده");
     store.setResponderSearch("");
     await store.loadNearestResponders();
     expect(store.selectedResponderIds).toEqual([near.userId, far.userId]);
     store.toggleResponderSelection(far.userId);
     expect(store.selectedResponderIds).toEqual([near.userId]);
+    expect(store.selectedResponderWarnings[far.userId]).toBeUndefined();
     store.selectRequest(null);
     await nextTick();
     expect(store.selectedResponderNames).toEqual({});

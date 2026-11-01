@@ -222,7 +222,8 @@ export type SosRequestDetail = z.infer<typeof sosRequestDetailSchema>;
 export const nearestResponderSchema = z.strictObject({
   userId: idSchema,
   username: usernameSchema,
-  distance: z.number().finite().nonnegative(),
+  // Null only for a manually searched account with no recorded position; never treat it as 0m.
+  distance: z.number().finite().nonnegative().nullable(),
   avgRating: z.number().finite().min(0).max(5).nullable(),
   categoryName: z.string().nullable(),
   lastActiveAt: timestampSchema

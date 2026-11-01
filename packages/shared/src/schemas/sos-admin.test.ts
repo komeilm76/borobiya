@@ -27,6 +27,9 @@ describe("SOS and admin schemas", () => {
     expect(query.safeParse({ search: "r" }).success).toBe(false);
     expect(query.safeParse({ search: "r".repeat(65) }).success).toBe(false);
     expect(query.safeParse({ search: "rescue", extra: "yes" }).success).toBe(false);
+    expect(query.parse({ mode: "manual", search: "  rescuer  " })).toEqual({ mode: "manual", search: "rescuer" });
+    expect(query.safeParse({ mode: "manual" }).success).toBe(false);
+    expect(query.safeParse({ mode: "manual", search: "r" }).success).toBe(false);
   });
   it("validates SOS description, location, and incident reference", () => {
     const valid = {

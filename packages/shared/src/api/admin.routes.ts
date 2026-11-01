@@ -304,7 +304,10 @@ export const adminRoutes = {
       params: uuidPathParamsSchema,
       query: z.strictObject({
         excludeAssigned: z.enum(["true", "false"]).optional(),
-        search: z.string().trim().min(2).max(64).optional()
+        search: z.string().trim().min(2).max(64).optional(),
+        mode: z.enum(["manual"]).optional()
+      }).refine((query) => query.mode !== "manual" || !!query.search, {
+        path: ["search"], message: "Manual search requires a username query."
       }),
       responses: { 200: nearestRespondersResponseSchema, 400: errorSchema, 401: errorSchema, 403: errorSchema, 404: errorSchema }
     },

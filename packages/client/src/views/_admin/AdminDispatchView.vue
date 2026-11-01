@@ -413,7 +413,7 @@
           <v-card-title class="d-flex flex-wrap align-center justify-space-between ga-2 text-subtitle-1 font-weight-bold">
             <div class="d-flex align-center ga-2">
               <v-icon color="primary" icon="mdi-account-group-outline" />
-              <span>نزدیک‌ترین امدادگران واجد شرایط</span>
+              <span>{{ adminSos.responderSearch ? 'جست‌وجوی دستی برای اعزام' : 'نزدیک‌ترین امدادگران واجد شرایط' }}</span>
               <v-chip v-if="adminSos.nearestLoaded && !adminSos.nearestLoading" color="primary" size="x-small" variant="tonal">
                 {{ adminSos.nearestResponders.length }} نفر
               </v-chip>
@@ -452,15 +452,16 @@
           <v-divider />
           <form class="admin-dispatch__responder-search pa-4 pb-0 d-flex align-center ga-2" role="search" @submit.prevent="searchResponders">
             <v-text-field v-model="responderSearchInput" label="جست‌وجوی امدادگر با نام کاربری"
-              placeholder="حداقل ۲ حرف؛ جست‌وجو در همهٔ امدادگران واجد شرایط"
+              placeholder="حداقل ۲ حرف؛ جست‌وجوی دستی حتی بدون موقعیت یا تخصص مرتبط"
               variant="outlined" density="compact" hide-details autocomplete="off" maxlength="64"
               aria-label="جست‌وجوی امدادگر با نام کاربری" />
             <v-btn type="submit" color="primary" variant="tonal" :disabled="responderSearchInput.trim().length === 1"
               :loading="adminSos.nearestLoading">جست‌وجو</v-btn>
           </form>
           <p class="px-4 mt-2 text-caption text-medium-emphasis">
-            {{ adminSos.responderSearch ? 'نزدیک‌ترین ۱۰ نتیجهٔ منطبق با جست‌وجو' : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند؛ برای دیگران نام کاربری را جست‌وجو کنید.' }}
-            فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده قابل انتخاب‌اند.
+            {{ adminSos.responderSearch
+              ? 'تا ۱۰ حساب فعال و آزاد با نام کاربری منطبق؛ حتی بدون تخصص مرتبط یا موقعیت ثبت‌شده. موقعیت/فاصله در جست‌وجوی دستی نمایش داده نمی‌شود. پیش از اعزام، صلاحیت و دسترسی را بررسی کنید.'
+              : '۱۰ امدادگر نزدیک‌تر نمایش داده می‌شوند؛ برای دیگران نام کاربری را جست‌وجو کنید. فقط امدادگران فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده پیشنهاد می‌شوند.' }}
           </p>
           <div v-if="adminSos.selectedResponderIds.length" class="px-4 pb-2 d-flex flex-wrap ga-1" aria-label="امدادگران انتخاب‌شده">
             <v-chip v-for="id in adminSos.selectedResponderIds" :key="id" closable size="small" color="primary"
@@ -498,7 +499,7 @@
             class="py-6 text-center text-medium-emphasis" role="status"
           >
             {{ adminSos.responderSearch
-              ? 'برای این نام کاربری امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده یافت نشد.'
+              ? 'برای این نام کاربری حساب فعال و آزاد دیگری یافت نشد. نام کاربری را بررسی کنید.'
               : 'در حال حاضر امدادگر فعال، آزاد، هم‌تخصص و دارای موقعیت ثبت‌شده برای این حادثه یافت نشد.' }}
           </v-card-text>
 
@@ -532,8 +533,8 @@
                   </div>
 
                   <div class="d-flex align-center ga-2">
-                    <v-chip color="primary" size="x-small" variant="flat">
-                      {{ formatDistance(responder.distance) }}
+                    <v-chip :color="responder.distance === null ? 'warning' : 'primary'" size="x-small" variant="flat">
+                      {{ responder.distance === null ? 'فاصله نامشخص' : formatDistance(responder.distance) }}
                     </v-chip>
                     <v-chip color="amber-darken-2" size="x-small" variant="tonal">
                       {{ responder.avgRating !== null ? `★ ${responder.avgRating.toFixed(1)}` : "بدون امتیاز" }}
@@ -542,9 +543,8 @@
                 </v-list-item-title>
 
                 <v-list-item-subtitle class="d-flex flex-wrap align-center ga-2 mt-1">
-                  <span v-if="responder.categoryName">
-                    تخصص: {{ responder.categoryName }}
-                  </span>
+                  <span v-if="responder.categoryName">تخصص: {{ responder.categoryName }}</span>
+                  <span v-else class="text-warning">تخصص مرتبط ثبت نشده</span>
                   <span>•</span>
                   <span>آخرین فعالیت: {{ formatTimestamp(responder.lastActiveAt) }}</span>
                 </v-list-item-subtitle>
@@ -568,12 +568,30 @@
               prepend-icon="mdi-send-check-outline"
               rounded="lg"
               variant="flat"
-              @click="adminSos.dispatchSelectedResponders()"
+              @click="requestDispatch"
             >
               اعزام امدادگران انتخاب‌شده ({{ adminSos.selectedResponderIds.length }})
             </v-btn>
           </v-card-actions>
         </v-card>
+        <v-dialog v-model="manualDispatchConfirmation" max-width="480" aria-label="تأیید اعزام دستی">
+          <v-card title="تأیید اعزام دستی" rounded="xl">
+            <v-card-text>
+              موقعیت یا تخصص مرتبط برای افراد زیر تأیید نشده است. پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید:
+              <ul class="mt-2 ps-6">
+                <li v-for="item in selectedDispatchWarnings" :key="item.id">
+                  <span dir="ltr">@{{ item.username }}</span> — {{ item.warning }}
+                </li>
+              </ul>
+            </v-card-text>
+            <v-card-actions>
+              <v-spacer />
+              <v-btn variant="text" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
+              <v-btn color="error" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
+                @click="confirmManualDispatch">ارسال با آگاهی از محدودیت‌ها</v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-dialog>
       </v-col>
 
     </v-row>
@@ -654,7 +672,24 @@ const proposedRescuerIdSet = computed(
   () => new Set(adminSos.selectedRequestProposals.map((proposal) => proposal.rescuerId))
 );
 const responderSearchInput = ref("");
-watch(() => adminSos.selectedId, () => { responderSearchInput.value = ""; });
+const manualDispatchConfirmation = ref(false);
+const selectedDispatchWarnings = computed(() => adminSos.selectedResponderIds
+  .filter((id) => !!adminSos.selectedResponderWarnings[id])
+  .map((id) => ({ id, username: adminSos.selectedResponderNames[id] ?? id,
+    warning: adminSos.selectedResponderWarnings[id]! })));
+watch(() => adminSos.selectedId, () => {
+  responderSearchInput.value = "";
+  manualDispatchConfirmation.value = false;
+});
+function requestDispatch(): void {
+  if (!adminSos.canDispatchSelected) return;
+  if (selectedDispatchWarnings.value.length) manualDispatchConfirmation.value = true;
+  else void adminSos.dispatchSelectedResponders();
+}
+async function confirmManualDispatch(): Promise<void> {
+  if (!adminSos.canDispatchSelected) return;
+  if (await adminSos.dispatchSelectedResponders()) manualDispatchConfirmation.value = false;
+}
 function searchResponders(): void {
   const term = responderSearchInput.value.trim();
   if (term.length === 1) return;

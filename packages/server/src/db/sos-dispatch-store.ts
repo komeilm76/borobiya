@@ -103,7 +103,7 @@ export type AcceptProposalResult =
 export interface SosDispatchStore {
   acceptProposal?(proposalId: string, rescuerId: string): Promise<AcceptProposalResult>;
   declineProposal?(proposalId: string, rescuerId: string, reason?: string): Promise<"declined" | "not_found" | "not_pending">;
-  findNearestResponders(sosRequestId: string, limit?: number, excludeAssigned?: boolean, search?: string): Promise<FindNearestRespondersResult>;
+  findNearestResponders(sosRequestId: string, limit?: number, excludeAssigned?: boolean, search?: string, manual?: boolean): Promise<FindNearestRespondersResult>;
   dispatchResponders?(input: DispatchSosInput): Promise<DispatchSosResult>;
   listProposalsByRequest?(sosRequestId: string): Promise<MissionProposalRecord[]>;
   listPendingProposals?(rescuerId: string, page: number, limit: number): Promise<{ items: PendingProposalRecord[]; total: number }>;
@@ -131,8 +131,13 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
     sosRequestId: string,
     limit: number = NEAREST_RESPONDERS_DEFAULT_LIMIT,
     excludeAssigned = false,
-    search?: string
+    search?: string,
+    manual = false
   ): Promise<FindNearestRespondersResult> {
+    // The privileged manual search is deliberately opt-in and cannot list all accounts.
+    if (manual && (!search || search.trim().length < 2)) {
+      throw new Error("Manual dispatch search requires a username query");
+    }
     const requestRows = await this.db
       .select({
         id: sosRequests.id,
@@ -148,7 +153,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       return { status: "not_found" };
     }
 
-    const distanceExpr = sql<number>`ST_Distance(
+    const distanceExpr = sql<number | null>`ST_Distance(
       "users"."last_location",
       (SELECT "sos_requests"."location" FROM "sos_requests" WHERE "sos_requests"."id" = ${sosRequestId})
     )::double precision`;
@@ -171,7 +176,9 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       .select({
         userId: users.id,
         username: users.username,
-        distance: distanceExpr,
+        // A manual lookup must not disclose the stored position of arbitrary accounts.
+        // Only qualified nearest suggestions may project their SOS distance.
+        distance: manual ? sql<number | null>`NULL::double precision` : distanceExpr,
         avgRating: users.avgRating,
         categoryName: categoryNameExpr,
         lastActiveAt: lastActiveAtExpr
@@ -187,7 +194,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
             WHERE ${missions.rescuerId} = ${users.id}
               AND ${inArray(missions.status, ACTIVE_MISSION_STATUSES)}
           )`,
-          isNotNull(users.lastLocation),
+          manual ? undefined : isNotNull(users.lastLocation),
           ne(users.id, targetRequest.requesterId),
           // Match before the nearest-ten cap. POSITION treats % and _ literally and
           // binds the search term; searching a known, more distant rescuer works.
@@ -199,7 +206,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
             WHERE prior."sos_request_id" = ${sosRequestId}
               AND prior."rescuer_id" = ${users.id}
           )` : undefined,
-          sql`EXISTS (
+          manual ? undefined : sql`EXISTS (
             SELECT 1
             FROM "category_users"
             INNER JOIN "category_incident_types"
@@ -210,8 +217,10 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
         )
       )
       .orderBy(
-        asc(distanceExpr),
-        sql`COALESCE("users"."avg_rating", 0) DESC`,
+        // A username search is not a GPS lookup: do not leak relative distance via ordering.
+        // Put exact matches ahead of substring hits so the intended account survives LIMIT.
+        manual ? sql`CASE WHEN LOWER(${users.username}) = LOWER(${search}) THEN 0 ELSE 1 END` : asc(distanceExpr),
+        manual ? asc(users.username) : sql`COALESCE("users"."avg_rating", 0) DESC`,
         asc(users.id)
       )
       .limit(limit);
@@ -221,7 +230,7 @@ export class DrizzleSosDispatchStore implements SosDispatchStore {
       responders: rows.map((row) => ({
         userId: row.userId,
         username: row.username,
-        distance: Number(row.distance),
+        distance: row.distance === null ? null : Number(row.distance),
         avgRating: row.avgRating === null ? null : Number(row.avgRating),
         categoryName: row.categoryName ?? null,
         lastActiveAt: toValidDate(row.lastActiveAt).toISOString()

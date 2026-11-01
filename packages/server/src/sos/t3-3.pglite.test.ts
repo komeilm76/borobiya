@@ -334,6 +334,49 @@ describe("T3.3.1 + T3.3.3 nearest qualified responder SQL & GET /_admin/sos/requ
     expect(missing.json()).toMatchObject({ code: "SOS_REQUEST_NOT_FOUND" });
   });
 
+  it("lets an admin explicitly search dispatchable accounts without GPS or incident membership, without changing nearest suggestions", async () => {
+    const sosId = "78000000-0000-4000-8000-000000000001";
+    await pg.query(`INSERT INTO sos_requests (id,requester_id,severity,description,incident_type_id,location)
+      VALUES ($1,$2,'high','An incident needing a manual dispatch search.', $3,'POINT(51.4 35.7)')`,
+      [sosId, REQUESTER_ID, INCIDENT_MEDICAL_ID]);
+    const noLocation = "78000000-0000-4000-8000-000000000002";
+    const noCategory = "78000000-0000-4000-8000-000000000003";
+    const busy = "78000000-0000-4000-8000-000000000004";
+    await seedUser({ id: noLocation, username: "manual_no_gps" });
+    await pg.query(`INSERT INTO category_users (category_id,user_id) VALUES ($1,$2)`, [CAT_MEDICAL_ALPHA_ID, noLocation]);
+    await seedUser({ id: noCategory, username: "manual_no_category", lat: 35.7, lon: 51.401 });
+    await seedUser({ id: busy, username: "manual_busy", isOnMission: true });
+    await seedUser({ id: "78000000-0000-4000-8000-000000000005", username: "manual_inactive", isActive: false });
+    await seedUser({ id: "78000000-0000-4000-8000-000000000006", username: "manual_suspended", isSuspended: true });
+    const url = `/_admin/sos/requests/${sosId}/nearest`;
+    const headers = { authorization: `Bearer ${adminToken}` };
+    const read = async (query: string) => app.inject({ method: "GET", url: `${url}?${query}`, headers });
+    expect(nearestRespondersResponseSchema.parse((await read("search=manual")).json()).responders).toEqual([]);
+    const manual = await read("mode=manual&search=manual");
+    expect(manual.statusCode).toBe(200);
+    expect(nearestRespondersResponseSchema.parse(manual.json()).responders.map((r) =>
+      ({ username: r.username, distance: r.distance, categoryName: r.categoryName }))).toEqual([
+      { username: "manual_no_category", distance: null, categoryName: null },
+      { username: "manual_no_gps", distance: null, categoryName: "امداد شهری" }
+    ]);
+    expect((await read("mode=manual")).statusCode).toBe(400); // never enumerate arbitrary accounts
+    expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual_busy")).json()).responders).toEqual([]);
+    expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual_no_gps")).json()).responders[0]?.userId).toBe(noLocation);
+    // The manual route cannot suggest the requester, even if they match the query.
+    expect(nearestRespondersResponseSchema.parse((await read("mode=manual&search=requester")).json()).responders).toEqual([]);
+    // This mode must not allow a caller to infer the saved GPS position from distance or ordering.
+    const exactId = "78000000-0000-4000-8000-000000000007";
+    await seedUser({ id: exactId, username: "manual", lat: 35.7, lon: 51.4 });
+    const exact = nearestRespondersResponseSchema.parse((await read("mode=manual&search=manual")).json()).responders;
+    expect(exact[0]?.userId).toBe(exactId);
+    expect(exact.every((item) => item.distance === null)).toBe(true);
+    const dispatch = await app.inject({ method: "POST", url: `/_admin/sos/requests/${sosId}/dispatch`, headers,
+      payload: { rescuerIds: [noLocation, noCategory] } });
+    expect(dispatch.statusCode).toBe(201);
+    expect(dispatchResponseSchema.parse(dispatch.json()).proposals.map((p) => p.rescuerId).sort())
+      .toEqual([noLocation, noCategory].sort());
+  });
+
   it("filters ineligible responders, deduplicates multi-category memberships, breaks distance ties by avgRating DESC, and caps at 10", async () => {
     const createRes = await app.inject({
       method: "POST",

@@ -50,7 +50,8 @@ export interface AdminSosRuntime {
     accessToken: string,
     signal?: AbortSignal,
     excludeAssigned?: boolean,
-    search?: string
+    search?: string,
+    manual?: boolean
   ) => Promise<{ responders: NearestResponder[] }>;
   listRequestMissions?: (accessToken: string, requestId: string, includeTerminal: boolean) => Promise<Mission[]>;
   dispatchResponders?: (
@@ -99,6 +100,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
   const responderSearch = ref("");
   const selectedResponderIds = ref<string[]>([]);
   const selectedResponderNames = ref<Record<string, string>>({});
+  const selectedResponderWarnings = ref<Record<string, string>>({});
   const dispatchSubmitting = ref(false);
   const dispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
   const quickDispatchFeedback = ref<DispatchFeedbackBanner | null>(null);
@@ -259,7 +261,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     const search = responderSearch.value;
     try {
       const response = await withAdminAuthRetry((token) => search
-        ? nearestFn(targetId, token, undefined, false, search)
+        ? nearestFn(targetId, token, undefined, false, search, true)
         : nearestFn(targetId, token));
       if (gen !== nearestGeneration || !response) return;
       nearestResponders.value = response.responders;
@@ -295,26 +297,32 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
       const remaining = { ...selectedResponderNames.value };
       delete remaining[userId];
       selectedResponderNames.value = remaining;
+      const warnings = { ...selectedResponderWarnings.value };
+      delete warnings[userId];
+      selectedResponderWarnings.value = warnings;
     } else {
       const responder = nearestResponders.value.find((item) => item.userId === userId);
-      if (!responder) return; // only displayed eligible candidates can be selected
+      if (!responder) return; // only displayed candidates can be selected
       selectedResponderIds.value = [...selectedResponderIds.value, userId];
       selectedResponderNames.value = { ...selectedResponderNames.value, [userId]: responder.username };
+      const caveats = [
+        responder.categoryName === null ? "تخصص مرتبط ثبت نشده" : null,
+        responder.distance === null ? "فاصله و موقعیت بررسی نشده" : null
+      ].filter(Boolean).join("؛ ");
+      if (caveats) selectedResponderWarnings.value = { ...selectedResponderWarnings.value, [userId]: caveats };
     }
   }
 
   function selectAllNearestResponders(): void {
     for (const responder of nearestResponders.value) {
-      if (!selectedResponderIds.value.includes(responder.userId)) {
-        selectedResponderIds.value = [...selectedResponderIds.value, responder.userId];
-      }
-      selectedResponderNames.value = { ...selectedResponderNames.value, [responder.userId]: responder.username };
+      if (!selectedResponderIds.value.includes(responder.userId)) toggleResponderSelection(responder.userId);
     }
   }
 
   function clearResponderSelection(): void {
     selectedResponderIds.value = [];
     selectedResponderNames.value = {};
+    selectedResponderWarnings.value = {};
   }
 
   async function dispatchSelectedResponders(): Promise<boolean> {
@@ -755,6 +763,7 @@ export const useAdminSosStore = defineStore("admin-sos", () => {
     responderSearch,
     selectedResponderIds,
     selectedResponderNames,
+    selectedResponderWarnings,
     dispatchSubmitting,
     dispatchFeedback,
     quickDispatchFeedback,

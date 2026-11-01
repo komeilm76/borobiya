@@ -21,5 +21,7 @@ describe("admin responder search API", () => {
     expect(calls[0]?.[0]).toBe(`/api/_admin/sos/requests/${requestId}/nearest?search=rescue%2Bfar`);
     await getNearestSosResponders(requestId, "admin-jwt", undefined, true);
     expect(calls[1]?.[0]).toBe(`/api/_admin/sos/requests/${requestId}/nearest?excludeAssigned=true`);
+    await getNearestSosResponders(requestId, "admin-jwt", undefined, false, "no_gps", true);
+    expect(calls[2]?.[0]).toBe(`/api/_admin/sos/requests/${requestId}/nearest?search=no_gps&mode=manual`);
   });
 });

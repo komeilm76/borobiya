@@ -74,12 +74,14 @@ export async function getNearestSosResponders(
   accessToken: string,
   signal?: AbortSignal,
   excludeAssigned = false,
-  search?: string
+  search?: string,
+  manual = false
 ): Promise<NearestRespondersResponse> {
   const base = apiRoutes.admin.getNearestResponders.url.replace(":id", encodeURIComponent(id));
   const params = new URLSearchParams();
   if (excludeAssigned) params.set("excludeAssigned", "true");
   if (search) params.set("search", search);
+  if (manual) params.set("mode", "manual");
   const query = params.toString();
   const path = query ? `${base}?${query}` : base;
   const response = await requestJson<unknown>(path, {

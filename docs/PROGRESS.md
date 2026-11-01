@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Restore manual SOS assignee discovery
+
+- Reproduced an SOS with active, free users who had no stored GPS or matching incident-category membership: the automatic nearest list and its username search returned nobody, although dispatch would accept those users. The admin search now explicitly opts into a manual mode that finds such accounts by username while keeping the automatic nearest/replacement rules unchanged. The list hides distances for every manual result (no arbitrary-account GPS disclosure) and labels missing specialty separately, and a second confirmation explains the limitations before a proposal is sent. Inactive, suspended, busy and self-dispatch exclusions remain enforced; the server still checks availability during dispatch, and the recipient must accept. PGlite integration, shared contract, store and source-level view tests cover the paths. No live responder/GPS or rendered-browser acceptance was performed.
+
 ### 2026-11-01 — Remove redundant phone route instructions
 
 - Removed the phone route summary's how-to paragraphs for Start, route editing and Show Routes. It now shows route metrics, or a short pending status only when no route, loading message or error already explains the state. The existing GPS warnings, buttons and full-width sheet remain unchanged. Source-level regression covers the copy; rendered-phone acceptance remains open.
