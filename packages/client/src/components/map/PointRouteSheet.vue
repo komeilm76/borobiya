@@ -3,7 +3,7 @@
   <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
     :model-value="isPhone ? api.sheetOpen.value : undefined" :scrim="isPhone ? false : undefined"
-    :persistent="isPhone" :close-on-back="false"
+    :persistent="isPhone" :close-on-back="false" :retain-focus="!confirmDeleteOpen"
     aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
     @keydown.esc.stop.prevent="onEscape">
     <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl">
@@ -29,8 +29,8 @@
               :value="copyFallback" readonly dir="auto" aria-label="متن مقصد برای کپی دستی" @focus="selectFallback" />
           </v-card>
         </v-menu>
-        <v-btn icon="mdi-close" color="error" variant="text" aria-label="حذف مقصد و مسیر" title="حذف مقصد و مسیر"
-          @click="clearDestination" />
+        <v-btn id="point-route-remove-button" icon="mdi-close" color="error" variant="text"
+          aria-label="حذف مقصد و مسیر" title="حذف مقصد و مسیر" @click="requestDelete" />
       </div>
       <v-snackbar v-model="copyToastOpen" location="top" color="success" :timeout="2200" :z-index="2600">
         {{ copyFeedback }}
@@ -90,6 +90,23 @@
       </div>
     </v-card>
   </component>
+  <!-- The header X only requests deletion. The route remains intact until the
+       explicit destructive choice; Escape/Back/outside cancel this dialog. -->
+  <v-dialog v-model="confirmDeleteOpen" max-width="24rem" :close-on-back="false"
+    aria-labelledby="point-route-delete-title" aria-describedby="point-route-delete-description"
+    @after-enter="focusCancelRemoval">
+    <v-card class="point-route__delete-confirm" rounded="xl" dir="rtl">
+      <v-card-title id="point-route-delete-title">مقصد و مسیر حذف شود؟</v-card-title>
+      <v-card-text id="point-route-delete-description">
+        مقصد <strong><bdi dir="auto">{{ api.title.value }}</bdi></strong> و مسیرهای محاسبه‌شده حذف می‌شوند؛
+        راهبری جاری متوقف می‌شود.
+      </v-card-text>
+      <v-card-actions>
+        <v-btn id="point-route-cancel-remove" variant="tonal" color="primary" @click="cancelDelete">انصراف</v-btn>
+        <v-btn color="error" variant="flat" @click="confirmDelete">حذف مقصد و مسیر</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup lang="ts">
@@ -107,6 +124,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
 const isPhone = useMediaQuery("(max-width: 599px)");
+const confirmDeleteOpen = defineModel<boolean>("confirmDeleteOpen", { default: false });
 const menuOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
 const copyFeedback = ref("");
 const copyToastOpen = ref(false);
@@ -116,8 +134,18 @@ function resetMenu(): void {
   ++copyGeneration; menuOpen.value = false; copyToastOpen.value = false;
   copyFeedback.value = ""; copyFallback.value = null;
 }
-watch(() => props.api.point.value, () => { resetMenu(); routesOpen.value = false; pausedForEdit.value = false; });
-watch(() => props.api.sheetOpen.value, (open) => { if (open) { resetMenu(); routesOpen.value = false; } });
+watch(() => props.api.point.value, () => {
+  confirmDeleteOpen.value = false;
+  resetMenu(); routesOpen.value = false; pausedForEdit.value = false;
+});
+watch(() => props.api.sheetOpen.value, (open) => {
+  if (!open) confirmDeleteOpen.value = false;
+  else { resetMenu(); routesOpen.value = false; }
+});
+watch(confirmDeleteOpen, (open, previous) => {
+  if (!open && previous && props.api.point.value && props.api.sheetOpen.value)
+    void nextTick(() => document.getElementById("point-route-remove-button")?.focus());
+});
 watch(routesOpen, async () => { await nextTick(); emit('layout-change'); });
 function onMenuVisibilityChange(open: boolean): void {
   ++copyGeneration; // A pending clipboard response cannot populate a reopened menu.
@@ -155,11 +183,19 @@ function backToSummary(): void {
   routesOpen.value = false;
   void nextTick(() => document.getElementById('point-route-show-routes')?.focus());
 }
-function dismiss(): void { resetMenu(); props.api.sheetOpen.value = false; emit('dismiss'); }
+function dismiss(): void { confirmDeleteOpen.value = false; resetMenu(); props.api.sheetOpen.value = false; emit('dismiss'); }
 function onVisible(visible: boolean): void { if (!visible) dismiss(); }
-function clearDestination(): void { props.api.clear(); emit('dismiss'); }
+function requestDelete(): void { menuOpen.value = false; confirmDeleteOpen.value = true; }
+function cancelDelete(): void { confirmDeleteOpen.value = false; }
+function focusCancelRemoval(): void { document.getElementById("point-route-cancel-remove")?.focus(); }
+function confirmDelete(): void {
+  if (!confirmDeleteOpen.value || !props.api.point.value) return;
+  confirmDeleteOpen.value = false;
+  props.api.clear(); emit('dismiss');
+}
 function onEscape(): void {
-  if (menuOpen.value) { menuOpen.value = false; void nextTick(() => document.getElementById('point-route-menu-button')?.focus()); }
+  if (confirmDeleteOpen.value) cancelDelete();
+  else if (menuOpen.value) { menuOpen.value = false; void nextTick(() => document.getElementById('point-route-menu-button')?.focus()); }
   else if (routesOpen.value) backToSummary();
   else dismiss();
 }
@@ -202,6 +238,13 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
 .point-route__header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; height: 44px; }
 .point-route__header :deep(.v-btn:focus-visible), .point-route button:focus-visible, .point-route__body:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
+/* The confirmation is a separate modal, not more content in the short sheet. */
+.point-route__delete-confirm { max-height: min(85dvh, 24rem); overflow: hidden; }
+.point-route__delete-confirm :deep(.v-card-title) { white-space: normal; overflow-wrap: anywhere; }
+.point-route__delete-confirm :deep(.v-card-text) { overflow-y: auto; overflow-wrap: anywhere; line-height: 1.65; }
+.point-route__delete-confirm :deep(.v-card-actions) { flex-wrap: wrap; gap: .4rem;
+  padding: .5rem .75rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+.point-route__delete-confirm :deep(.v-card-actions .v-btn) { min-height: 44px; }
 /* Keep the copy menu outside the compact sheet's document flow. HTTP LAN clients
  * can select the fallback text without a clipboard API or losing the route. */
 :global(.point-route__copy-menu) { display: grid; gap: .15rem; width: min(18rem, calc(100vw - 1.5rem));

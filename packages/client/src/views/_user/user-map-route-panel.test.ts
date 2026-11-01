@@ -233,12 +233,13 @@ describe("progressive trip planning and editing", () => {
   it("keeps removal reachable in summary, route review, and the closed active/paused bar", () => {
     const header = sheet.slice(sheet.indexOf('class="point-route__header"'), sheet.indexOf('class="point-route__endpoints"'));
     const footer = sheet.slice(sheet.indexOf('class="point-route__actions"'), sheet.indexOf('</v-card>'));
-    const clearButton = header.match(/<v-btn icon="mdi-close"[^>]*@click="clearDestination"[^>]*\/>/s)?.[0];
+    const clearButton = header.match(/<v-btn id="point-route-remove-button"[^>]*@click="requestDelete"[^>]*\/>/s)?.[0];
     expect(clearButton).toContain('aria-label="حذف مقصد و مسیر"');
     expect(clearButton).not.toMatch(/v-if|v-show|:disabled/);
-    expect(footer).not.toContain('clearDestination');
+    expect(footer).not.toContain('requestDelete');
     expect(footer).not.toContain('حذف مقصد');
-    expect(sheet).toContain("function clearDestination(): void { props.api.clear(); emit('dismiss'); }");
+    expect(sheet).toContain('function requestDelete(): void { menuOpen.value = false; confirmDeleteOpen.value = true; }');
+    expect(sheet).not.toContain('function clearDestination()');
     const bar = map.slice(map.indexOf('v-if="journey.point.value && !journey.sheetOpen.value"'),
       map.indexOf('<p v-if="journey.rerouteMessage.value'));
     const barClear = bar.match(/<v-btn icon="mdi-delete-outline"[^>]*\/>/s)?.[0];
@@ -254,6 +255,36 @@ describe("progressive trip planning and editing", () => {
     expect(styles).not.toContain('.point-route__clear');
     expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
     expect(styles).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
+  });
+
+  it("confirms destructive route removal without closing the planner on cancel or Back", () => {
+    const dialog = sheet.slice(sheet.indexOf('<v-dialog v-model="confirmDeleteOpen"'), sheet.indexOf('</v-dialog>'));
+    expect(dialog).toContain('aria-labelledby="point-route-delete-title" aria-describedby="point-route-delete-description"');
+    expect(dialog).toContain('id="point-route-cancel-remove"');
+    expect(dialog).toContain('@click="cancelDelete">انصراف');
+    expect(dialog).toContain('color="error" variant="flat" @click="confirmDelete"');
+    expect(dialog).toContain('راهبری جاری متوقف می‌شود');
+    expect(dialog).toContain('api.title.value');
+    expect(dialog).not.toContain('persistent');
+    expect(sheet).toContain(':retain-focus="!confirmDeleteOpen"');
+    const request = sheet.slice(sheet.indexOf('function requestDelete()'), sheet.indexOf('function cancelDelete()'));
+    expect(request).not.toContain('props.api.clear()');
+    const cancel = sheet.slice(sheet.indexOf('function cancelDelete()'), sheet.indexOf('function focusCancelRemoval()'));
+    expect(cancel).not.toContain('props.api.clear()');
+    const confirm = sheet.slice(sheet.indexOf('function confirmDelete()'), sheet.indexOf('function onEscape()'));
+    expect(confirm).toContain('if (!confirmDeleteOpen.value || !props.api.point.value) return;');
+    expect(confirm).toContain("props.api.clear(); emit('dismiss');");
+    expect(sheet).toContain('if (!open) confirmDeleteOpen.value = false;');
+    expect(sheet).toContain('watch(() => props.api.point.value');
+    expect(sheet).toContain('document.getElementById("point-route-remove-button")?.focus()');
+    expect(map).toContain('v-model:confirm-delete-open="routeDeleteConfirmOpen"');
+    expect(map).toContain('if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }');
+    expect(map.indexOf('if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }'))
+      .toBeLessThan(map.indexOf('const position: unknown = window.history.state?.position;', map.indexOf('onBeforeRouteLeave(() => {')));
+    const styles = css(sheet, "PointRouteSheet.vue");
+    expect(styles).toContain('.point-route__delete-confirm');
+    expect(styles).toContain('min-height: 44px');
+    expect(styles).toContain('safe-area-inset-bottom');
   });
 
   it("reserves modes and alternatives for Show Routes, with direct car start and mid-trip editing", () => {

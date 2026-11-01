@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-02 — Confirm route removal from the planner header
+
+- The route-planner header X no longer deletes immediately. It opens a focused Vuetify confirmation dialog naming the destructive effect: removing the destination and calculated routes stops active guidance. Only the explicit **حذف مقصد و مسیر** action clears the route; **انصراف**, Escape, outside dismissal or the first phone Back return to the same planner/route without deleting. The parent map owns the confirmation state for Back handling, so Android Back cannot close the whole planner instead of the modal. Changing destination, closing the planner or leaving the map also discards pending confirmation. The two-button planner footer remains unchanged; source/style regressions, typecheck and build cover the behavior, but physical-phone/back-button and screen-reader review are outstanding.
+
 ### 2026-11-02 — Compact route-planner header and destination copy
 
 - Moved **حذف مقصد** from the phone route sheet's footer to its header close icon (now clearly labeled **حذف مقصد و مسیر**). The summary/review footer keeps only primary actions; Escape/Back and the return-to-map action still dismiss without deleting. Removed the duplicate information/address disclosure; the existing start/end address rows remain single-line, while the header now opens a menu for **کپی مختصات مقصد** and **کپی نشانی مقصد**. The POI type remains available in this menu. Coordinates are latitude, longitude; the address action is disabled until a real address exists (never copy loading/error placeholder text), with reverse-geocoder retry on failure. On insecure HTTP LAN or denied clipboard permission, the menu keeps the actual text selectable for manual copy; success gives a brief visible confirmation. Late clipboard completions cannot show stale text after a destination/menu change. Pure copy tests and source/style contracts cover the change; rendered phone/keyboard/screen-reader and clipboard-permission acceptance are still open.

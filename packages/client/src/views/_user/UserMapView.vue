@@ -157,6 +157,7 @@
       </div>
     </component>
     <PointRouteSheet :api="journey" :reverse="reverse" :origin-reverse="originReverse"
+      v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -318,6 +319,7 @@ const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const activeTool = ref<MapTool | null>(null);
 const navigationSearchOpen = ref(false);
+const routeDeleteConfirmOpen = ref(false);
 function closeNavigationSearch(event?: KeyboardEvent): void {
   if (!navigationSearchOpen.value) return;
   event?.preventDefault();
@@ -335,7 +337,8 @@ watch(shareOpen, (open, previous) => {
 // A popstate changes Vue Router's history position before route-leave guards run.
 // Vuetify's overlay Back hook is not guaranteed to intercept that navigation;
 // keep the map visible on the first Back and dismiss just the open tool. Ordinary
-// menu/link navigation (a push) must still leave immediately.
+// menu/link navigation (a push) must still leave immediately unless a destructive
+// confirmation is open.
 let mapEntryPosition: number | undefined;
 onMounted(() => {
   const position: unknown = window.history.state?.position;
@@ -345,8 +348,13 @@ onMounted(() => {
   void broadcast.refreshPriority();
 });
 onBeforeRouteLeave(() => {
+  // Never abandon a pending destructive choice through a link or browser Back,
+  // even when the map was the first history entry or the screen is not a phone.
+  if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (arrivalDialogOpen.value || shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
+  if (isPhone.value &&
+    (arrivalDialogOpen.value || shareOpen.value || activeTool.value ||
+      selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
     if (arrivalDialogOpen.value) closeArrivalDialog();
     else if (shareOpen.value) shareOpen.value = false;
