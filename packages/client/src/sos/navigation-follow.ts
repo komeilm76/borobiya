@@ -15,26 +15,45 @@ export const NAVIGATION_VIEW: Record<TransportProfile, { pitch: number; zoom: nu
   foot: { pitch: 0, zoom: 17 }
 };
 
-/** Pick the next local route point, not a remote geocoding service or a simulated heading. */
+/** Align the camera with the nearest *segment*, not a vertex or an inaccurate GPS-to-vertex
+ * vector. Sparse polylines and duplicate vertices otherwise swing the view before a turn. */
 export function routeBearing(position: MissionMapPoint, route: readonly [number, number][]): number {
   if (route.length < 2) return 0;
   const latitudeScale = Math.cos(position.lat * Math.PI / 180);
-  let closest = 0;
+  let closest = -1;
   let best = Infinity;
-  for (let i = 0; i < route.length; i++) {
-    const [lon, lat] = route[i]!;
-    const squared = ((lon - position.lon) * latitudeScale) ** 2 + (lat - position.lat) ** 2;
+  for (let i = 0; i < route.length - 1; i++) {
+    const a = route[i]!, b = route[i + 1]!;
+    const dx = (b[0] - a[0]) * latitudeScale, dy = b[1] - a[1];
+    const length2 = dx * dx + dy * dy;
+    if (length2 < 1e-18) continue; // Repeated polyline vertices have no direction.
+    const x = (position.lon - a[0]) * latitudeScale, y = position.lat - a[1];
+    const fraction = Math.max(0, Math.min(1, (x * dx + y * dy) / length2));
+    const squared = (x - fraction * dx) ** 2 + (y - fraction * dy) ** 2;
     if (squared < best) { best = squared; closest = i; }
   }
-  const next = route[Math.min(closest + 1, route.length - 1)]!;
-  const current = route[closest === route.length - 1 ? Math.max(0, closest - 1) : closest]!;
-  const start = closest === route.length - 1 ? current : [position.lon, position.lat];
-  const fromLat = start[1]! * Math.PI / 180;
-  const toLat = next[1] * Math.PI / 180;
-  const dLon = (next[0] - start[0]!) * Math.PI / 180;
+  if (closest < 0) return 0;
+  const [fromLon, fromLatitude] = route[closest]!;
+  const [toLon, toLatitude] = route[closest + 1]!;
+  const fromLat = fromLatitude * Math.PI / 180;
+  const toLat = toLatitude * Math.PI / 180;
+  const dLon = (toLon - fromLon) * Math.PI / 180;
   const y = Math.sin(dLon) * Math.cos(toLat);
   const x = Math.cos(fromLat) * Math.sin(toLat) - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(dLon);
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+/** MapLibre's positive Y offset puts the GPS marker below the viewport centre. Reserve the
+ * guidance banner and bottom controls rather than placing the user behind them; leave more
+ * visible road ahead for faster modes. The view supplies live DOM occlusion measurements. */
+export function navigationCameraOffset(profile: TransportProfile, height: number,
+  topOcclusion: number, bottomOcclusion: number): [number, number] {
+  if (!Number.isFinite(height) || height <= 0) return [0, 0];
+  const top = Math.max(0, Math.min(height, topOcclusion)) + 16;
+  const bottom = Math.max(0, Math.min(height, bottomOcclusion)) + 16;
+  if (top + bottom >= height) return [0, 0];
+  const fraction = profile === "car" ? 0.68 : profile === "bicycle" ? 0.61 : 0.55;
+  return [0, Math.round(top + (height - top - bottom) * fraction - height / 2)];
 }
 
 export function navigationCamera(position: MissionMapPoint, route: readonly [number, number][],

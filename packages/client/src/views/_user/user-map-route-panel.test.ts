@@ -81,7 +81,8 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('syncRouteOriginMarker()');
     expect(map).toContain('pointRouteExtent(geometries)');
     expect(map).toContain('pointRouteOverviewBottom(canvas, sheet)');
-    expect(map).toContain('@layout-change="fitPointRoute"');
+    expect(map).toContain('@layout-change="onPointRouteLayoutChange"');
+    expect(map).toContain('if (navigationFollowEnabled.value) journey.focus()');
     expect(map).toContain('جزئیات و تغییر مسیر');
     expect(map).toContain('journey.rerouteMessage.value');
     expect(map).toContain('journey.rerouteWaitingForFix.value');

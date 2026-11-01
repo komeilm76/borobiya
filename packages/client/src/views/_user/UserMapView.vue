@@ -109,7 +109,7 @@
     <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
       role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
     <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
-      @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="fitPointRoute" />
+      @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -206,7 +206,7 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
-import type { NavigationCamera } from "@/sos/navigation-follow";
+import { navigationCameraOffset, type NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -408,6 +408,7 @@ function syncOwnMarker(): void {
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
   const element = ownMarker.getElement();
   element.classList.toggle("user-map-view__own-marker--navigating", journey.navigating.value);
+  element.classList.toggle("user-map-view__own-marker--walking", journey.navigating.value && journey.profile.value === "foot");
   element.setAttribute("aria-label", journey.navigating.value ? "موقعیت زندهٔ من؛ جهت راهبری" : "موقعیت زندهٔ من");
   const icon = element.querySelector(".user-map-view__own-marker-icon");
   icon?.classList.toggle("mdi-navigation-variant", journey.navigating.value);
@@ -465,7 +466,22 @@ const reverse = useReversePlace();
 const navigationAlert = createNavigationAlert();
 const navigationFollowEnabled = ref(true);
 function followNavigationCamera(camera: NavigationCamera): void {
-  if (navigationFollowEnabled.value) map.value?.easeTo(camera);
+  if (navigationFollowEnabled.value) {
+    const instance = map.value;
+    if (!instance) return;
+    const canvas = instance.getContainer().getBoundingClientRect();
+    const bar = document.querySelector('.user-map-view__journey-bar')?.getBoundingClientRect();
+    const status = document.querySelector('.user-map-view__reroute-status')?.getBoundingClientRect();
+    const sheet = document.getElementById('map-point-route-sheet')?.getBoundingClientRect();
+    const top = Math.max(0, (bar?.bottom ?? 0) - canvas.top, (status?.bottom ?? 0) - canvas.top);
+    // On wide screens the sheet is beside the GPS target, not over it.
+    const centreX = canvas.left + canvas.width / 2;
+    const bottom = sheet && sheet.left <= centreX && sheet.right >= centreX && sheet.top < canvas.bottom
+      ? Math.max(56, canvas.bottom - sheet.top) : 56;
+    const offset = navigationCameraOffset(journey.profile.value, canvas.height, top, bottom);
+    instance.easeTo({ ...camera, offset, zoom: Math.min(camera.zoom, instance.getMaxZoom()),
+      pitch: Math.min(camera.pitch, instance.getMaxPitch()) });
+  }
 }
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
@@ -1081,6 +1097,11 @@ function startPointNavigation(): void {
 }
 watch(() => journey.point.value, () => { syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
+function onPointRouteLayoutChange(): void {
+  if (journey.navigating.value) {
+    if (navigationFollowEnabled.value) journey.focus();
+  } else fitPointRoute();
+}
 function fitPointRoute(): void {
   const instance = map.value;
   if (!instance || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;
@@ -1100,6 +1121,11 @@ watch(() => journey.selectedRoute.value, () => { syncRouteOriginMarker(); paintP
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
   () => { syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
+watch(() => journey.sheetOpen.value, async () => {
+  if (!journey.navigating.value || !navigationFollowEnabled.value) return;
+  await nextTick(); // The compact bar and bottom sheet exchange DOM positions.
+  if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
+});
 watch(() => journey.navigating.value, (active) => {
   if (!active) {
     navigationFollowEnabled.value = true;
@@ -1145,7 +1171,8 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 
 function onMapResize(): void {
   frameCamera();
-  if (journey.sheetOpen.value) fitPointRoute();
+  if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
+  else if (journey.sheetOpen.value) fitPointRoute();
 }
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) {
@@ -1341,6 +1368,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   background: linear-gradient(145deg, #4e9aff, #1745a9); font-size: 27px;
   box-shadow: 0 8px 0 #122d70, 0 14px 20px rgba(10, 31, 83, .5);
   transform: perspective(120px) rotateX(18deg);
+}
+/* Walking keeps a flat 2D view: the position arrow must not imitate a raised vehicle. */
+:global(.user-map-view .user-map-view__own-marker--walking .user-map-view__own-marker-icon) {
+  transform: none; box-shadow: 0 3px 10px rgba(10, 31, 83, .4);
 }
 :global(:root.dark .user-map-view .user-map-view__own-marker) { background: rgba(96, 165, 250, 0.26); }
 @media (forced-colors: active) {

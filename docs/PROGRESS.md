@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Car, bicycle and walking camera follow audit
+
+- Fixed a route-heading defect shared by all three modes: snapping to the nearest polyline **vertex** could rotate toward the next street before the actual corner, and GPS cross-track drift could tilt the bearing toward a distant point. The camera now follows the tangent of the nearest nondegenerate route **segment**; duplicate vertices no longer create a spurious north-up heading. Car remains 60°/zoom 17, bicycle 45°/zoom 16 and walking flat/zoom 17, subject to the map's installed zoom and pitch limits.
+- The GPS target now sits below the guidance banner rather than behind it, with more look-ahead space for car than bicycle or walking. Camera offset is derived from the actual map, banner and bottom sheet bounds; an open route sheet, a phone resize and closing/reopening the sheet trigger reframing only while automatic following is enabled. The walking arrow is flat to match its 2D camera. Pure bearing/viewport tests and source/CSS contracts cover these changes; live GPS and rendered phone/desktop acceptance remain unverified.
+
 ### 2026-11-01 — Navigation-follow bug audit and map interaction
 
 - Found and fixed several private point-navigation defects: a reroute could publish a new line and remaining distance from a GPS fix too coarse for guidance (81–150 m), and an accurate arrival during an in-flight reroute could be ignored. Guidance now hides the obsolete route/origin while recalculating, waits for a precise fix instead of treating GPS loss as a routing-server failure, resumes from that fix, and recognizes arrival immediately; stopping mid-reroute cannot offer the stale line for restart. Initial and off-route route requests time out after 15 seconds even if an adapter ignores cancellation; a failed reroute stops guidance safely. The new route bearing is applied as soon as a valid reroute arrives.

@@ -76,8 +76,8 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain("planOverlayRemoval");
   });
 
-  it("never moves the camera for a peer; only explicit peer/place/destination selection and track framing move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(7);
+  it("never moves the camera for a peer; only explicit selection, track framing and private GPS guidance move it", () => {
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(8);
     expect(view).toContain("if (!instance || journey.point.value || track.length === 0");
     expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");
@@ -306,6 +306,9 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('mdi-navigation-variant');
     expect(view).toContain('transform: perspective(120px) rotateX(18deg)');
+    expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--walking');
+    expect(view).toContain('user-map-view__own-marker--walking .user-map-view__own-marker-icon');
+    expect(view).toContain('transform: none; box-shadow:');
     expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
     expect(view).toContain('<PointRouteSheet :api="journey"');
   });
@@ -316,6 +319,17 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("syncResultMarkers")).toContain('!journey.navigating.value');
     expect(body("syncSelectedPlaceMarker")).toContain('journey.navigating.value ? null');
     expect(view).toContain('placeSearch.pruneForViewport(showAllResultsOnMap.value, false)');
+  });
+
+  it("keeps all three mode cameras within offline zoom/pitch limits and visible above route chrome", () => {
+    const camera = body("followNavigationCamera");
+    expect(camera).toContain('navigationCameraOffset(journey.profile.value');
+    expect(camera).toContain('Math.min(camera.zoom, instance.getMaxZoom())');
+    expect(camera).toContain('Math.min(camera.pitch, instance.getMaxPitch())');
+    expect(camera).toContain('instance.easeTo({ ...camera, offset');
+    expect(camera).toContain('map-point-route-sheet');
+    expect(view).toContain('watch(() => journey.sheetOpen.value');
+    expect(body("onMapResize")).toContain('journey.focus()');
   });
 
   it("lets the user inspect the map during guidance and explicitly return to following", () => {
