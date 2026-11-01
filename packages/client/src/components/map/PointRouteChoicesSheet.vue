@@ -2,7 +2,7 @@
   <!-- A separate, scrollable route chooser; the map remains visible behind it. -->
   <component :is="isPhone ? VBottomSheet : 'section'" v-if="open && api.point.value"
     class="point-route-choices-shell" :model-value="isPhone ? true : undefined"
-    :scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false"
+    :scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"
     :aria-modal="false" aria-label="انتخاب مسیر" @update:model-value="onVisible"
     @after-enter="emit('layout-change')" @keydown.esc.stop.prevent="emit('close')">
     <v-card id="map-point-route-choices-sheet" class="point-route-choices" rounded="xl" dir="rtl" tabindex="-1">

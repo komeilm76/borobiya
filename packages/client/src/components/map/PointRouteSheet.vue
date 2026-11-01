@@ -3,8 +3,8 @@
   <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
     :model-value="isPhone ? api.sheetOpen.value : undefined" :scrim="isPhone ? false : undefined"
-    :persistent="isPhone" :close-on-back="false" :retain-focus="!confirmDeleteOpen"
-    aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
+    :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"
+    :aria-modal="false" aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
     @keydown.esc.stop.prevent="onEscape">
     <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl" tabindex="-1">
       <div class="point-route__header">

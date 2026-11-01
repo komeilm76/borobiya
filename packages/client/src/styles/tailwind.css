@@ -492,6 +492,15 @@ a {
     inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
     inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
   }
+  /* The planner and route-choice sheets cover the lower map. Keep both App-level
+   * actions visible and adjacent above the currently measured sheet. */
+  .app-shell--map:has(.user-map-view--route-preview) .sos-fab.sos-fab {
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 0.5rem);
+  }
+  .app-shell--map:has(.user-map-view--route-preview) .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle {
+    inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 0.5rem);
+    inset-inline-start: calc(0.75rem + 3.25rem + env(safe-area-inset-right, 0px));
+  }
   /* SOS is an App.vue sibling of the map. During guidance it leads the action
    * row just above the measured navigation sheet, not behind its overlay. */
   .app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {

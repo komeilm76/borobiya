@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-02 — Restore usable route sheets after point selection
+
+- Found a phone-only interaction defect missed by the earlier source contracts: both the SOS and route-choice controls were fixed inside the **bottom sheet's covered area** (even though their horizontal offsets matched); meanwhile the planner's Vuetify dialog retained keyboard focus, so the separate route chooser could not reliably be reached from the map. The map now observes the active planner/choice card's real height (including expanded details and async route cards), positions SOS and the route icon together just **above** the sheet, and lays out sharing/recenter/compass beside them without shrinking hit targets. The nonmodal planner and choice sheet no longer trap keyboard focus or apply document-level scroll blocking; the destructive confirmation retains its own modal focus. The measured CSS variable and ResizeObserver are cleared on sheet changes and unmount. Source/style regressions, client suite, typecheck and build cover the code path; browser/device geometry, focus and Android Back remain unverified.
+
 ### 2026-11-02 — Keep route-choice launcher physically beside SOS
 
 - The route-choice launcher previously lived inside the map's isolated stacking context, while SOS was an App.vue sibling; matching offsets there did not guarantee a shared positioning context or visibility. The map now teleports its launcher into an App-owned anchor alongside SOS, and both controls use paired viewport/safe-area and measured guidance-sheet offsets in one global stylesheet. The planner action formerly labeled **نمایش مسیرها** is now **جزئیات و وسیلهٔ حرکت**: it opens trip estimates and transport settings, not alternative selection (which remains in the separate card sheet). Source/layout contracts cover both phone and guidance offsets; rendered mobile behavior and physical devices remain to be verified.

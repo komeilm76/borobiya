@@ -172,7 +172,7 @@
       :choices-open="routeChoicesOpen" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen"
-      @choose="selectPointRoute" @close="closeRouteChoices" @layout-change="fitPointRoute" />
+      @choose="selectPointRoute" @close="closeRouteChoices" @layout-change="onRouteChoicesLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -656,6 +656,35 @@ watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => jour
     observer = new ResizeObserver(update);
     observer.observe(element);
   }, { flush: "post" });
+// The compact planner and the alternative-card chooser are mutually exclusive.
+// Keep SOS and the route launcher ABOVE whichever phone sheet is visible, rather
+// than under Vuetify's teleported content. React to async route results, review
+// expansion and safe-area changes without guessing a fixed sheet height.
+function measurePointSheet(): void {
+  if (!isPhone.value || !journey.point.value || !journey.sheetOpen.value) return;
+  const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
+  if (element) document.documentElement.style.setProperty("--bb-map-point-sheet-height",
+    `${Math.ceil(element.getBoundingClientRect().height)}px`);
+}
+watch([isPhone, () => journey.point.value, () => journey.sheetOpen.value, routeChoicesOpen],
+  async (_values, _previous, onCleanup) => {
+    let disposed = false;
+    let observer: ResizeObserver | undefined;
+    onCleanup(() => {
+      disposed = true; observer?.disconnect();
+      document.documentElement.style.removeProperty("--bb-map-point-sheet-height");
+    });
+    if (!isPhone.value || !journey.point.value || !journey.sheetOpen.value) return;
+    await nextTick();
+    await nextTick(); // Vuetify mounts its teleported overlay after the first render.
+    if (disposed) return;
+    const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
+    if (!element) return; // The sheet's after-enter callback is another measurement opportunity.
+    measurePointSheet();
+    observer = new ResizeObserver(measurePointSheet);
+    observer.observe(element);
+  }, { flush: "post" });
+
 // Recheck freshness even when the device stops sending fixes silently. No persistent GPS
 // samples or speed-limit guesses; stopping guidance tears down the ticker.
 const telemetryNow = ref(Date.now());
@@ -1383,10 +1412,12 @@ function onNavigationSheetLayoutChange(): void {
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
 }
 function onPointRouteLayoutChange(): void {
+  measurePointSheet();
   if (journey.navigating.value) {
     if (navigationFollowEnabled.value) journey.focus();
   } else fitPointRoute();
 }
+function onRouteChoicesLayoutChange(): void { measurePointSheet(); fitPointRoute(); }
 function fitPointRoute(): void {
   const instance = map.value, to = journey.point.value;
   if (!instance || !to || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;
@@ -1538,6 +1569,7 @@ watch(
 
 onBeforeUnmount(() => {
   document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height");
+  document.documentElement.style.removeProperty("--bb-map-point-sheet-height");
   // `map.value` is cleared first: Vue runs a parent's `beforeUnmount` before the child's, so the map is
   // still alive here and nothing else can paint after this point.
   const instance = map.value;
@@ -2150,6 +2182,22 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 
 @media (max-width: 599px) {
+  /* The nonmodal planner covers the lower map. Put the full control row above
+   * its measured top edge; keep the 48px hit areas on 320px RTL phones. */
+  .user-map-view--route-preview .user-map-view__share,
+  .user-map-view--route-preview .user-map-view__recenter,
+  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
+  }
+  .user-map-view--route-preview .user-map-view__share {
+    right: calc(.75rem + 6.5rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--route-preview .user-map-view__recenter {
+    right: calc(.75rem + 9.75rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(.75rem + 13rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
   .user-map-view--navigating .user-map-view__recenter,
   .user-map-view--navigating .user-map-view__share,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {

@@ -270,7 +270,9 @@ describe("progressive trip planning and editing", () => {
     expect(dialog).toContain('راهبری جاری متوقف می‌شود');
     expect(dialog).toContain('api.title.value');
     expect(dialog).not.toContain('persistent');
-    expect(sheet).toContain(':retain-focus="!confirmDeleteOpen"');
+    expect(sheet).toContain(':retain-focus="false" scroll-strategy="none"');
+    expect(sheet).toContain(':aria-modal="false"');
+    expect(dialog).not.toContain('retain-focus="false"');
     const request = sheet.slice(sheet.indexOf('function requestDelete()'), sheet.indexOf('function cancelDelete()'));
     expect(request).not.toContain('props.api.clear()');
     const cancel = sheet.slice(sheet.indexOf('function cancelDelete()'), sheet.indexOf('function focusCancelRemoval()'));
@@ -317,6 +319,33 @@ describe("progressive trip planning and editing", () => {
     expect(map).not.toContain('.user-map-view--navigating .user-map-view__route-choices-toggle,'); // Teleported element is not a map descendant.
   });
 
+  it("keeps SOS and route choices reachable above whichever phone route sheet is open", () => {
+    expect(map).toContain("'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value");
+    expect(map).toContain('function measurePointSheet(): void {');
+    expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
+    expect(map).toContain('new ResizeObserver(measurePointSheet)');
+    expect(map).toContain('document.documentElement.style.removeProperty("--bb-map-point-sheet-height")');
+    expect(map).toContain('function onPointRouteLayoutChange(): void {\n  measurePointSheet();');
+    expect(map).toContain('function onRouteChoicesLayoutChange(): void { measurePointSheet(); fitPointRoute(); }');
+    expect(map).toContain('@layout-change="onRouteChoicesLayoutChange"');
+    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
+    const rule = '.app-shell--map:has(.user-map-view--route-preview)';
+    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 0.5rem)';
+    for (const selector of ['.sos-fab.sos-fab', '.user-map-view__route-choices-toggle.user-map-view__route-choices-toggle']) {
+      const start = phone.indexOf(`${rule} ${selector} {`);
+      expect(start).toBeGreaterThan(0);
+      expect(phone.slice(start, phone.indexOf('}', start))).toContain(bottom);
+    }
+    const rail = css(map, "UserMapView.vue");
+    expect(rail).toContain('.user-map-view--route-preview');
+    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + .5rem');
+    expect(rail).toContain('13rem + env(safe-area-inset-right, 0px)');
+    // Five 48px actions with >=4px gaps fit a 320px phone with 20px insets.
+    const lastActionLeft = 320 - (12 + 13 * 16 + 20) - 48;
+    expect(lastActionLeft).toBeGreaterThanOrEqual(20);
+    expect(sheet).toContain(':retain-focus="false"'); // The map and action row remain keyboard-reachable.
+  });
+
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
     const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
     expect(hold).toContain('if (!auth.user?.id || journey.navigating.value || map.value !== instance) return;');
@@ -343,7 +372,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
     expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
     expect(choices).toContain("isPhone ? VBottomSheet : 'section'");
-    expect(choices).toContain(':scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false"');
+    expect(choices).toContain(':scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"');
     expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');
     expect(choices).toContain(':aria-pressed="index === api.index.value"');
