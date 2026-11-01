@@ -1,4 +1,4 @@
-import { effectScope, nextTick, ref } from "vue";
+import { effectScope, nextTick, ref, watch } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import { usePointRoute, pointDistance } from "./use-point-route";
 import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
@@ -70,9 +70,17 @@ describe("private point-to-point route", () => {
     journey.select({ lat: 38.505, lon: -120.2 }); await settle();
     expect(journey.start()).toBe(true);
     expect(follow).toHaveBeenCalled(); expect(follow.mock.lastCall?.[0].pitch).toBeGreaterThanOrEqual(50);
+    let arrivalEvents = 0;
+    const unwatch = watch(journey.arrived, (arrived) => { if (arrived) arrivalEvents++; }, { flush: "sync" });
     fix.value = { lat: 38.505, lon: -120.2, accuracy: 100 }; expect(journey.navigating.value).toBe(true);
+    fix.value = { lat: 38.505, lon: -120.2, accuracy: 36 }; expect(journey.navigating.value).toBe(true);
     fix.value = { lat: 38.505, lon: -120.2, accuracy: 5 };
-    expect(journey.arrived.value).toBe(true); expect(journey.sheetOpen.value).toBe(true); expect(level).toHaveBeenCalledTimes(1);
+    expect(journey.arrived.value).toBe(true); expect(journey.sheetOpen.value).toBe(false);
+    expect(journey.navigating.value).toBe(false); expect(journey.routesVisible.value).toBe(false);
+    expect(level).toHaveBeenCalledTimes(1);
+    fix.value = { lat: 38.505, lon: -120.2, accuracy: 5 }; // Repeated in-radius fixes do not replay arrival.
+    expect(arrivalEvents).toBe(1);
+    unwatch();
     fix.value = { lat: 38.5, lon: -120.2, accuracy: 8 };
     journey.select({ lat: 40, lon: -120 }); await settle();
     expect(journey.start()).toBe(true); gpsError.value = "دسترسی مکان قطع شد";
@@ -611,7 +619,8 @@ describe("private point-to-point route", () => {
       fix.value = { lat: 40, lon: -120, accuracy: 5 };
       expect(journey.arrived.value).toBe(true);
       expect(journey.navigating.value).toBe(false);
-      expect(journey.sheetOpen.value).toBe(true);
+      expect(journey.sheetOpen.value).toBe(false);
+      expect(journey.routesVisible.value).toBe(false);
       expect(get.mock.calls[1]?.[3].aborted).toBe(true);
       pending.resolve([fast]); await pending.promise; await settle();
       expect(level).toHaveBeenCalledTimes(1);

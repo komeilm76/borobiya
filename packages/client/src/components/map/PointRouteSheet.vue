@@ -34,7 +34,6 @@
       </div>
       <p v-if="api.loading.value && !routesOpen" class="point-route__status" role="status">در حال آماده‌سازی مسیر {{ modeLabel }}…</p>
       <p v-else-if="api.error.value && !routesOpen" class="point-route__status point-route__error" role="alert">{{ api.error.value }}</p>
-      <p v-if="api.arrived.value && !routesOpen" class="point-route__status" role="status">به نزدیکی مقصد رسیدید. محیط واقعی را بررسی کنید.</p>
       <div v-if="isPhone && !routesOpen" class="point-route__summary" aria-label="خلاصهٔ مسیر">
         <div v-if="api.selectedRoute.value" class="point-route__metrics" aria-label="برآورد مسیر انتخابی">
           <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>

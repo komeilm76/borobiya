@@ -290,7 +290,10 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     // fix must never declare arrival or expose an untrusted remaining distance.
     const directDistance = pointDistance(fix, point.value);
     if (fix.accuracy <= 35 && directDistance <= 25) {
-      stop(); error.value = null; arrived.value = true; remaining.value = 0; sheetOpen.value = true; return;
+      // Arrival ends guidance immediately. The map view acknowledges it separately;
+      // do not open the editable route planner or leave the old route line on screen.
+      stop(); error.value = null; remaining.value = 0;
+      routesVisible.value = false; sheetOpen.value = false; arrived.value = true; return;
     }
     if (replanning.value) return;
     if (rerouteWaitingForFix.value) { void replanFromDeviation(); return; }

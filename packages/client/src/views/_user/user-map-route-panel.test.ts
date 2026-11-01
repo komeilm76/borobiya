@@ -75,6 +75,22 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('aria-label="حد مجاز نامشخص"'); // Never invent a legal limit.
   });
 
+  it("acknowledges accurate arrival once and removes guidance instead of opening the route planner", () => {
+    expect(route).toContain('if (fix.accuracy <= 35 && directDistance <= 25)');
+    expect(route).toContain('routesVisible.value = false; sheetOpen.value = false; arrived.value = true; return;');
+    expect(map).toContain('watch(() => journey.arrived.value, (arrived) => {');
+    expect(map).toContain('arrivalDestination.value = journey.title.value;');
+    expect(map).toContain('journey.clear();');
+    expect(map).toContain('navigationAlert.playArrival();');
+    expect(map).toContain('}, { flush: "post" });');
+    expect(map).toContain('aria-labelledby="map-arrival-title" aria-describedby="map-arrival-message"');
+    expect(map).toContain('role="alert"');
+    expect(map).toContain('متوجه شدم');
+    expect(map).toContain('if (arrivalDialogOpen.value) closeArrivalDialog();'); // First phone Back.
+    expect(map).toContain('arrivalDialogOpen.value = false; arrivalDestination.value = null;'); // Sign-out.
+    expect(sheet).not.toContain('api.arrived.value'); // Arrival is no longer route editing.
+  });
+
   it("begins as a compact planner with a separate place-info toggle", () => {
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain('role="dialog"');

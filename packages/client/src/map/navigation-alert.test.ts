@@ -7,7 +7,7 @@ describe("off-route chime", () => {
   it("fails quietly if browser audio is unavailable", () => {
     vi.stubGlobal("AudioContext", undefined);
     const alert = createNavigationAlert();
-    expect(() => { alert.play(); alert.arm(); alert.play(); alert.dispose(); }).not.toThrow();
+    expect(() => { alert.play(); alert.playArrival(); alert.arm(); alert.playArrival(); alert.dispose(); }).not.toThrow();
   });
 
   it("only schedules the short two-note signal after the user's start action", () => {
@@ -23,9 +23,10 @@ describe("off-route chime", () => {
       resume = vi.fn(async () => {}); close = close;
     });
     const alert = createNavigationAlert();
-    alert.play(); expect(notes).toEqual([]);
+    alert.play(); alert.playArrival(); expect(notes).toEqual([]);
     alert.arm(); alert.play(); expect(notes).toEqual([740, 590]);
-    alert.dispose(); alert.play(); expect(notes).toHaveLength(2);
+    alert.playArrival(); expect(notes).toEqual([740, 590, 523, 659, 784]);
+    alert.dispose(); alert.play(); alert.playArrival(); expect(notes).toHaveLength(5);
     expect(close).toHaveBeenCalledTimes(1);
   });
 });

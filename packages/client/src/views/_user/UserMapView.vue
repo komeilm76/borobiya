@@ -234,6 +234,24 @@
       </v-card>
     </component>
 
+    <!-- Confirm arrival independently of route editing. Guidance and the route line
+         have already stopped; audio is optional and never the only signal. -->
+    <v-dialog v-model="arrivalDialogOpen" max-width="24rem" :close-on-back="false"
+      aria-labelledby="map-arrival-title" aria-describedby="map-arrival-message"
+      @after-enter="focusArrivalDismiss">
+      <v-card class="user-map-view__arrival-card" rounded="xl" dir="rtl">
+        <v-card-title id="map-arrival-title" class="user-map-view__arrival-title">
+          <v-icon icon="mdi-map-marker-check" color="success" aria-hidden="true" /> رسیدن به مقصد
+        </v-card-title>
+        <v-card-text id="map-arrival-message" role="alert">
+          به نزدیکی {{ arrivalDestination ?? 'مقصد' }} رسیدید. راهبری پایان یافت. پیش از توقف یا پیاده‌شدن،
+          موقعیت و محیط واقعی را بررسی کنید.
+        </v-card-text>
+        <v-card-actions class="user-map-view__arrival-actions">
+          <v-btn id="map-arrival-dismiss" color="primary" variant="flat" @click="closeArrivalDialog">متوجه شدم</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     <ShareDialog v-model="shareOpen" :fullscreen="isPhone" @shared="onShareCreated" />
   </section>
 </template>
@@ -328,9 +346,10 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
+  if (isPhone.value && (arrivalDialogOpen.value || shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
-    if (shareOpen.value) shareOpen.value = false;
+    if (arrivalDialogOpen.value) closeArrivalDialog();
+    else if (shareOpen.value) shareOpen.value = false;
     else if (journey.sheetOpen.value) journey.sheetOpen.value = false;
     else if (navigationSearchOpen.value) closeNavigationSearch();
     else if (selectedCompanionId.value) removeSelectedCompanion();
@@ -541,6 +560,16 @@ watch([map, () => auth.user?.id ?? null], ([instance, ownerId]) => {
 }, { immediate: true });
 const reverse = useReversePlace();
 const navigationAlert = createNavigationAlert();
+const arrivalDialogOpen = ref(false);
+const arrivalDestination = ref<string | null>(null);
+function closeArrivalDialog(): void { arrivalDialogOpen.value = false; }
+function focusArrivalDismiss(): void { document.getElementById("map-arrival-dismiss")?.focus(); }
+watch(arrivalDialogOpen, (open) => {
+  if (!open && auth.user?.id) void nextTick(() => {
+    if (auth.user?.id) map.value?.getCanvas().focus({ preventScroll: true });
+  });
+});
+watch(() => auth.user?.id, () => { arrivalDialogOpen.value = false; arrivalDestination.value = null; });
 const navigationFollowEnabled = ref(true);
 function followNavigationCamera(camera: NavigationCamera): void {
   if (navigationFollowEnabled.value) {
@@ -568,6 +597,15 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+// Arrival is a one-time GPS event. Snapshot the destination before removing the
+// entire route; a second fix cannot replay the sound or reopen the planner.
+watch(() => journey.arrived.value, (arrived) => {
+  if (!arrived || !auth.user?.id || !journey.point.value) return;
+  arrivalDestination.value = journey.title.value;
+  journey.clear();
+  arrivalDialogOpen.value = true;
+  navigationAlert.playArrival(); // Web Audio may be blocked; the alert remains visible.
+}, { flush: "post" });
 // Vuetify teleports the sheet outside the map shell. Share its measured height with
 // the map action rail and SOS (an App.vue sibling), including when results expand.
 watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => journey.sheetOpen.value],
@@ -1511,6 +1549,13 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__peer-avatar--stale .user-map-view__peer-avatar-face) { background: #526b6b; color: #fff; }
 :global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; }
 :global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
+
+/* Arrival acknowledgement stays readable above the map and safe-area home indicator. */
+.user-map-view__arrival-title { display: flex; align-items: center; gap: .5rem;
+  white-space: normal; overflow-wrap: anywhere; font-weight: 800; }
+.user-map-view__arrival-card :deep(.v-card-text) { line-height: 1.7; overflow-wrap: anywhere; }
+.user-map-view__arrival-actions { padding: .5rem .75rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
+.user-map-view__arrival-actions :deep(.v-btn) { min-height: 44px; }
 
 /* Active journey stays compact; the map remains edge-to-edge. */
 .user-map-view__journey-stack:not(.v-bottom-sheet) {
