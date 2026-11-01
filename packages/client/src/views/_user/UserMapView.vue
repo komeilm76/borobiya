@@ -95,19 +95,16 @@
 
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
     <div v-if="journey.point.value" class="user-map-view__journey-stack">
-      <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
+      <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar">
         <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-        <span>{{ journey.navigating.value ? (journey.navigationPending.value
-          ? (journey.loading.value ? 'در حال محاسبهٔ مسیر…' : 'در انتظار GPS برای محاسبهٔ مسیر…')
-          : journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.rerouteWaitingForFix.value
-          ? 'منتظر GPS دقیق برای مسیر تازه…' : journey.remaining.value === null
-          ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
-          : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
-        <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
-        <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
-        <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
-        <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
-          title="حذف مسیر و مقصد" @click="clearPointRoute" />
+        <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+        <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های مسیر">
+          <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
+          <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
+          <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
+          <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
+            title="حذف مسیر و مقصد" @click="clearPointRoute" />
+        </div>
       </div>
       <div v-if="journey.navigating.value && (journey.gpsWarning.value || journey.rerouteMessage.value)"
         class="user-map-view__navigation-status">
@@ -518,6 +515,16 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+const journeyBarLabel = computed(() => {
+  if (!journey.navigating.value) return journey.title.value;
+  if (journey.navigationPending.value) return journey.loading.value
+    ? "در حال محاسبهٔ مسیر…" : "در انتظار GPS برای محاسبهٔ مسیر…";
+  if (journey.replanning.value) return "در حال محاسبهٔ مسیر تازه…";
+  if (journey.rerouteWaitingForFix.value) return "منتظر GPS دقیق برای مسیر تازه…";
+  if (journey.remaining.value === null) return own.position.value
+    ? "GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است" : "در انتظار GPS؛ موقعیت زنده در دسترس نیست";
+  return `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`;
+});
 let destinationMarker: Marker | null = null;
 let routeOriginMarker: Marker | null = null;
 let detachHold: (() => void) | null = null;
@@ -1388,8 +1395,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__hold-hint { width: max-content; margin: 0; padding: .55rem .85rem; text-align: center;
   font-size: .82rem; pointer-events: none; border: 1px solid rgba(var(--v-theme-on-surface), .15);
   border-radius: 16px; color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .96); box-shadow: var(--bb-shadow-overlay); }
-.user-map-view__journey-stack { width: min(28rem, calc(100vw - 2rem)); display: grid; gap: .35rem; pointer-events: none; }
-.user-map-view__journey-bar { display: flex; align-items: center; gap: .65rem; padding: .55rem;
+.user-map-view__journey-stack { width: min(36rem, calc(100vw - 2rem)); display: grid; gap: .35rem; pointer-events: none; }
+/* The label has a full line of its own; button widths cannot squeeze it into
+ * several short lines. Keep the actual text intact for assistive technology. */
+.user-map-view__journey-bar { display: grid; grid-template-columns: 21px minmax(0, 1fr);
+  align-items: center; column-gap: .65rem; row-gap: .4rem; padding: .55rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .15); border-radius: 16px;
   color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .96);
   box-shadow: var(--bb-shadow-overlay); pointer-events: auto; }
@@ -1399,8 +1409,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); }
 .user-map-view__gps-warning { display: flex; align-items: flex-start; gap: .4rem; }
 .user-map-view__gps-warning .v-icon { flex: 0 0 auto; margin-top: .12rem; }
-.user-map-view__journey-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
-.user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; }
+.user-map-view__journey-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: .86rem; font-weight: 700; }
+.user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .4rem; }
+.user-map-view__journey-actions > :first-child { flex: 1 1 auto; }
+.user-map-view__journey-actions .v-btn { min-height: 44px; min-width: 44px; height: auto; }
+.user-map-view__journey-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 :global(.user-map-view__destination-marker:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 /* Private GPS halo is decorative, not an accuracy radius. The idle crosshair stays
  * screen-upright; the SVG arrow is rotated by MapLibre against the route bearing. */
@@ -1610,9 +1624,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 /* Phone map: edge-to-edge behind a single top-left menu launcher, not a bar or
  * stacked cards. Fullscreen tools keep their own scrolling content and close actions. */
 @media (max-width: 599px) {
-  /* Left of the action rail; below the menu launcher and expanded attribution. */
-  .user-map-view__journey-bar { flex-wrap: wrap; }
-  .user-map-view__journey-bar > span { flex-basis: calc(100% - 2.8rem); }
+  /* Leave the journey label a full row even on narrow phones; the controls wrap separately. */
   .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;

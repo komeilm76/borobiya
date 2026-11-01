@@ -55,6 +55,21 @@ describe("progressive trip planning and editing", () => {
     }
   });
 
+  it("gives the active journey label its own full-width row without squeezing its controls", () => {
+    const bar = map.slice(map.indexOf('class="user-map-view__journey-bar"'),
+      map.indexOf('class="user-map-view__navigation-status"'));
+    expect(bar).toContain('class="user-map-view__journey-label"');
+    expect(bar).toContain('class="user-map-view__journey-actions"');
+    expect(bar).toContain('aria-label="کنترل‌های مسیر"');
+    const styles = css(map, "UserMapView.vue");
+    expect(styles).toMatch(/\.user-map-view__journey-bar[^{}]*\{[^}]*display: grid/);
+    expect(styles).toMatch(/\.user-map-view__journey-actions[^{}]*\{[^}]*grid-column: 1 \/ -1/);
+    expect(styles).toMatch(/\.user-map-view__journey-label[^{}]*\{[^}]*white-space: nowrap[^}]*text-overflow: ellipsis/);
+    expect(styles).not.toContain('.user-map-view__journey-bar > span');
+    expect(styles).not.toContain('.user-map-view__journey-bar { flex-wrap: wrap; }');
+    expect(styles).toMatch(/\.user-map-view__journey-actions[^}]*flex-wrap: wrap/);
+  });
+
   it("keeps removal reachable in summary, route review, and the closed active/paused bar", () => {
     const clearButton = sheet.match(/<v-btn[^>]*@click="clearDestination"[^>]*>حذف مقصد<\/v-btn>/s)?.[0];
     expect(clearButton).toBeDefined();

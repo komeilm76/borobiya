@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Compact navigation card spacing
+
+- After starting navigation, the compact map card squeezed its title/status beside three buttons, causing narrow, multi-line text. The card now gives the label a dedicated full-width single line and puts the details, Stop and Remove actions in a separate wrapping row with their existing touch sizes. The full text remains in the DOM and native title for assistive access when a very narrow viewport requires truncation. The card can use more of a desktop map width without covering the phone map; the GPS warning remains below it. Source/compiled-style regression tests cover the layout without mounting Vue; rendered phone, desktop zoom and screen-reader acceptance remain open.
+
 ### 2026-11-01 — Navigation arrow and mode-specific follow zoom audit
 
 - During guidance, the route-origin A pin could cover the private GPS direction arrow at the same coordinates. Hide A while navigation is active and restore it in route review after stopping. When an accurate fix reports a valid travel heading and mode-appropriate movement speed, point the arrow in the actual travel direction rather than the nearest route segment; fall back to the route tangent when heading/speed are absent, stationary or unreliable. This does not relax the existing GPS guidance gate or publish a location.
