@@ -29,6 +29,20 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   const loading = ref(false);
   const error = ref<string | null>(null);
   const navigating = ref(false);
+  // A Start request is allowed before GPS/route planning completes; no camera or live
+  // distance is published until a usable fix and a route actually exist.
+  const navigationPending = ref(false);
+  const gpsWarning = computed(() => {
+    if (!navigating.value) return null;
+    const fix = position.value;
+    if (!fix) return navigationPending.value
+      ? "GPS در دسترس نیست؛ درخواست راهبری ثبت شد. پس از دریافت موقعیت، مسیر محاسبه می‌شود."
+      : "GPS در دسترس نیست؛ مسیر انتخابی باقی می‌ماند اما موقعیت زنده و فاصلهٔ باقیمانده نامشخص‌اند.";
+    if (fix.accuracy === null || fix.accuracy > 80) return navigationPending.value
+      ? "سیگنال GPS ضعیف است؛ تا دریافت موقعیت قابل‌استفاده، مسیر تأیید یا محاسبه نمی‌شود."
+      : "سیگنال GPS ضعیف است؛ مسیر فعلی برآوردی است و موقعیت زنده و فاصلهٔ باقیمانده تا بهبود دقت نمایش داده نمی‌شوند.";
+    return null;
+  });
   const arrived = ref(false);
   const remaining = ref<number | null>(null);
   const replanning = ref(false);
@@ -83,11 +97,15 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   function stop(): void {
     const wasActive = navigating.value;
     const oldRouteUnsafe = replanning.value || rerouteWaitingForFix.value;
-    navigating.value = false;
-    if (oldRouteUnsafe) {
+    const pendingStart = navigationPending.value;
+    if (oldRouteUnsafe || pendingStart) {
+      // Drop the untrusted line before synchronous map watchers repaint on state change.
       invalidate(); routes.value = []; index.value = 0; plannedFrom.value = null;
-      error.value = "مسیر پیشین معتبر نیست؛ برای ادامه، مسیر را دوباره محاسبه کنید.";
+      error.value = oldRouteUnsafe ? "مسیر پیشین معتبر نیست؛ برای ادامه، مسیر را دوباره محاسبه کنید." : null;
+      waitingForFix = false;
     }
+    navigating.value = false;
+    navigationPending.value = false;
     replanning.value = false; rerouteWaitingForFix.value = false;
     firstDeviationAt = null; rerouteMessage.value = null;
     if (statusTimer) clearTimeout(statusTimer); statusTimer = null;
@@ -114,11 +132,11 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   }
   async function findRoutes(): Promise<void> {
     const to = point.value, fix = position.value, account = owner.value;
-    if (!to || !account || loading.value || navigating.value) return;
+    if (!to || !account || loading.value || (navigating.value && !navigationPending.value)) return;
     invalidate(); routes.value = []; index.value = 0; arrived.value = false; plannedFrom.value = null;
     if (!fix || fix.accuracy === null || fix.accuracy > 150) {
       waitingForFix = true;
-      error.value = !fix ? (gpsError.value ?? "برای محاسبهٔ مسیر، موقعیت GPS خود را فعال کنید.")
+      error.value = navigating.value ? null : !fix ? (gpsError.value ?? "برای محاسبهٔ مسیر، موقعیت GPS خود را فعال کنید.")
         : "برای محاسبهٔ مسیر، منتظر موقعیت GPS با دقت کافی هستیم.";
       return;
     }
@@ -155,7 +173,16 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       if (current === generation) { loading.value = false; controller = null; }
     }
     if (retryFromLatestFix && current === generation && owner.value === account &&
-        point.value === to && profile.value === transport) void findRoutes();
+        point.value === to && profile.value === transport) { void findRoutes(); return; }
+    if (current === generation && navigating.value && navigationPending.value) {
+      if (selectedRoute.value) {
+        navigationPending.value = false;
+        updateFix(position.value); // The warning stays until GPS becomes reliable.
+      } else if (error.value) {
+        const failure = error.value;
+        stop(); error.value = failure; sheetOpen.value = true;
+      }
+    }
   }
   function changeProfile(next: TransportProfile): void {
     if (next === profile.value || !["car", "bicycle", "foot"].includes(next)) return;
@@ -167,18 +194,22 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     index.value = indexValue;
   }
   function start(): boolean {
-    if (!owner.value || !point.value || !position.value || !selectedRoute.value || !routePoints.value.length || loading.value) return false;
-    if (position.value.accuracy === null || position.value.accuracy > 80) {
-      error.value = "دقت موقعیت GPS برای شروع راهبری کافی نیست."; sheetOpen.value = true; return false;
-    }
-    if (!plannedFrom.value || pointDistance(position.value, plannedFrom.value) > 150) {
-      void findRoutes(); // A stale route must not be followed from a different starting position.
-      return false;
-    }
+    if (!owner.value || !point.value) return false;
+    if (navigating.value) return true;
+    const fix = position.value;
+    // Starting is a user intent, not proof of a valid GPS route. Never follow a
+    // lost/stale origin, but do not trap the user behind a disabled Start button.
+    const usable = !loading.value && !!selectedRoute.value && routePoints.value.length >= 2 &&
+      !!fix && fix.accuracy !== null && fix.accuracy <= 150 && !!plannedFrom.value &&
+      pointDistance(fix, plannedFrom.value) <= 150;
+    navigationPending.value = !usable;
     error.value = null; arrived.value = false; navigating.value = true; sheetOpen.value = false;
     firstDeviationAt = null; rerouteWaitingForFix.value = false;
     rerouteMessage.value = null; routesVisible.value = true;
-    updateFix(position.value);
+    if (navigationPending.value) {
+      remaining.value = null;
+      if (!loading.value && fix && fix.accuracy !== null && fix.accuracy <= 150) void findRoutes();
+    } else updateFix(fix);
     return navigating.value;
   }
   /** Explicitly pause guidance before changing a mode or choosing another route. */
@@ -238,7 +269,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     }
   }
   function updateFix(fix: OwnMapFix | null): void {
-    if (!navigating.value || !point.value) return;
+    if (!navigating.value || navigationPending.value || !point.value) return;
     if (!fix || fix.accuracy === null || fix.accuracy > 80) {
       // A coarse fix must not yank the camera away or present a false live distance.
       remaining.value = null;
@@ -270,14 +301,16 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   /** Recenter immediately without synthesizing a second GPS fix or rechecking deviation. */
   function focus(): void {
     const fix = position.value;
-    if (!navigating.value || replanning.value || rerouteWaitingForFix.value ||
+    if (!navigating.value || navigationPending.value || replanning.value || rerouteWaitingForFix.value ||
       !fix || fix.accuracy === null || fix.accuracy > 80 || routePoints.value.length < 2) return;
     lastCameraAt = Date.now();
     try { follow(navigationCamera(fix, routePoints.value, profile.value)); }
     catch { stop(); error.value = "نمایش نقشهٔ راهبری ممکن نشد؛ مسیر را بررسی کنید."; sheetOpen.value = true; }
   }
   watch(position, (fix) => {
-    if (navigating.value) updateFix(fix);
+    if (navigating.value && navigationPending.value) {
+      if (!loading.value && fix && fix.accuracy !== null && fix.accuracy <= 150) void findRoutes();
+    } else if (navigating.value) updateFix(fix);
     else if (waitingForFix && point.value && fix) void findRoutes();
     else if (point.value && plannedFrom.value && !loading.value && fix && fix.accuracy !== null &&
              fix.accuracy <= 150 && pointDistance(fix, plannedFrom.value) > 150) {
@@ -285,13 +318,13 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     }
   }, { flush: "sync" });
   watch(gpsError, (message) => {
-    if (message && navigating.value && message.includes("دسترسی")) {
+    if (message && navigating.value && !navigationPending.value && message.includes("دسترسی")) {
       stop(); error.value = message; sheetOpen.value = true;
     }
   }, { flush: "sync" });
   watch(owner, clear, { flush: "sync" });
   onScopeDispose(clear);
-  return { point, sheetOpen, routesVisible, profile, routes, index, loading, error, navigating, arrived,
+  return { point, sheetOpen, routesVisible, profile, routes, index, loading, error, navigating, navigationPending, gpsWarning, arrived,
     replanning, rerouteWaitingForFix, rerouteMessage,
     remaining, selectedRoute, routePoints, plannedFrom, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, focus, editNavigation, clear,
     distanceLabel: computed(() => selectedRoute.value ? formatRouteDistance(selectedRoute.value.distance_m) : "—"),

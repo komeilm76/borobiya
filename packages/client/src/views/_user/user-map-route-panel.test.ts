@@ -29,6 +29,15 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('v-if="!routesOpen" id="point-route-show-routes" variant="tonal"');
     expect(sheet).toContain('نمایش مسیرها');
     expect(sheet).toContain('شروع راهبری');
+    expect(sheet).toContain('v-if="!api.navigating.value" color="primary" variant="flat" :disabled="!api.point.value"');
+    expect(sheet).not.toContain('v-else-if="!api.navigating.value"');
+    expect(sheet).not.toContain(':disabled="!ownFix || !api.selectedRoute.value || api.loading.value"');
+    expect(map).toContain('journey.gpsWarning.value');
+    expect(map).toContain('class="user-map-view__navigation-status"');
+    expect(map).toContain('class="user-map-view__gps-warning" role="status" aria-live="polite"');
+    expect(map).toContain('در انتظار GPS برای محاسبهٔ مسیر');
+    expect(map).toContain('journey.navigationPending.value');
+    expect(css(map, "UserMapView.vue")).toContain('.user-map-view__journey-stack');
     expect(sheet).toContain('props.api.routesVisible.value = true');
     expect(sheet).toContain('props.api.editNavigation()');
     expect(sheet).toContain('watch(() => props.api.point.value');
@@ -92,8 +101,8 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('جزئیات و تغییر مسیر');
     expect(map).toContain('journey.rerouteMessage.value');
     expect(map).toContain('journey.rerouteWaitingForFix.value');
-    expect(map).toContain('journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :');
-    expect(map).toContain('watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value]');
+    expect(map).toContain('journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :');
+    expect(map).toContain('watch([() => journey.navigationPending.value, () => journey.replanning.value, () => journey.rerouteWaitingForFix.value]');
     expect(map).toContain('navigationAlert.arm()');
     expect(map).toContain('navigationAlert.dispose()');
     expect(css(map, "UserMapView.vue")).toContain(".user-map-view--route-preview .user-map-view__canvas");

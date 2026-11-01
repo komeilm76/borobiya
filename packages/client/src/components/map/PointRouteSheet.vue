@@ -51,8 +51,8 @@
           :aria-expanded="routesOpen" @click="showRoutes">{{ api.navigating.value ? 'ویرایش مسیرها' : 'نمایش مسیرها' }}</v-btn>
         <v-btn v-else variant="text" @click="backToSummary">بازگشت</v-btn>
         <v-btn v-if="routesOpen && (api.error.value || (!api.routes.value.length && !api.loading.value))"
-          variant="tonal" color="primary" :disabled="!ownFix || api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
-        <v-btn v-else-if="!api.navigating.value" color="primary" variant="flat" :disabled="!ownFix || !api.selectedRoute.value || api.loading.value"
+          variant="tonal" color="primary" :disabled="api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
+        <v-btn v-if="!api.navigating.value" color="primary" variant="flat" :disabled="!api.point.value"
           @click="emit('start')">{{ pausedForEdit ? 'شروع دوبارهٔ راهبری' : 'شروع راهبری' }}</v-btn>
         <v-btn v-else variant="tonal" @click="dismiss">بازگشت به نقشه</v-btn>
         <v-btn class="point-route__clear" variant="text" color="error" @click="clearDestination">حذف مقصد</v-btn>
@@ -63,12 +63,10 @@
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import type { OwnMapFix } from "@/composables/use-own-map-position";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
-const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace>;
-  ownFix: OwnMapFix | null }>();
+const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace> }>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
 const infoOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
 watch(() => props.api.point.value, () => { infoOpen.value = false; routesOpen.value = false; pausedForEdit.value = false; });

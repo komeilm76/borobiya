@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Start navigation despite weak or unavailable GPS
+
+- Removed the GPS/selected-route gate on **Start Navigation**, including when route review is expanded and a retry control is shown. A start request now opens a stoppable navigation session even if the initial route is loading or no fix has arrived. The compact bar shows whether route calculation is pending; an accessible, persistent warning directly below it reports weak or unavailable GPS. The same status stack retains reroute alerts without overlapping the bar on narrow screens.
+- A route cannot be fabricated without a location: while the fix is absent or too coarse to calculate from, navigation waits for a usable GPS origin, then calculates and resumes automatically. A route already planned from a usable origin can be shown under weak GPS, but camera-follow, live remaining distance, directional marker and unsafe rerouting stay suspended until accuracy recovers. Stop/Remove cancel pending requests, and routing failures return to the editable sheet rather than claiming guidance is active. Pure composable race/GPS tests and source/CSS contracts cover these states; live GPS, rendered-device layout and screen-reader acceptance remain open.
+
 ### 2026-11-01 — Route removal, review framing and exact start marker
 
 - Fixed a route-line lifecycle gap: clearing a destination while a MapLibre style was not yet loaded could leave the selected green source/layers in place. The map's existing style/idle reconciliation now removes stale route layers and source even after the clear has finished, including partially restored overlays. It remains idempotent when no route exists. To prevent a different teal history-playback track from looking like the deleted route, history stays hidden after route removal until the user explicitly opens History or chooses Return to Track; history data and controls are retained.

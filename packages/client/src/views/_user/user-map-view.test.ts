@@ -311,6 +311,8 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("paintPointRoute")).toContain('type: "line"');
     expect(body("repaintOverlays")).toContain('paintPointRoute()');
     expect(body("repaintOverlays")).toContain('pointRouteOverlayNeedsSync(');
+    expect(body("repaintOverlays")).toContain('routePaintDeferred ||');
+    expect(body("paintPointRoute")).toContain('routePaintDeferred = true');
     expect(body("repaintOverlays")).toContain('!!journey.point.value');
     expect(body("paintPlayback")).toContain('if (journey.point.value || historySuppressedAfterRouteClear.value)');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');

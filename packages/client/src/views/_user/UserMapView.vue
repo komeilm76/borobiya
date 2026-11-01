@@ -94,21 +94,31 @@
     </span>
 
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
-    <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
-      <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-      <span>{{ journey.navigating.value ? (journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.rerouteWaitingForFix.value
-        ? 'منتظر GPS دقیق برای مسیر تازه…' : journey.remaining.value === null
-        ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
-        : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
-      <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
-      <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
-      <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
-      <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
-        title="حذف مسیر و مقصد" @click="clearPointRoute" />
+    <div v-if="journey.point.value" class="user-map-view__journey-stack">
+      <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
+        <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
+        <span>{{ journey.navigating.value ? (journey.navigationPending.value
+          ? (journey.loading.value ? 'در حال محاسبهٔ مسیر…' : 'در انتظار GPS برای محاسبهٔ مسیر…')
+          : journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.rerouteWaitingForFix.value
+          ? 'منتظر GPS دقیق برای مسیر تازه…' : journey.remaining.value === null
+          ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
+          : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
+        <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
+        <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
+        <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
+        <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
+          title="حذف مسیر و مقصد" @click="clearPointRoute" />
+      </div>
+      <div v-if="journey.navigating.value && (journey.gpsWarning.value || journey.rerouteMessage.value)"
+        class="user-map-view__navigation-status">
+        <p v-if="journey.gpsWarning.value" class="user-map-view__gps-warning" role="status" aria-live="polite">
+          <v-icon icon="mdi-signal-off" aria-hidden="true" />{{ journey.gpsWarning.value }}
+        </p>
+        <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
+          role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
+      </div>
     </div>
-    <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
-      role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
-    <PointRouteSheet :api="journey" :reverse="reverse" :own-fix="own.position.value"
+    <PointRouteSheet :api="journey" :reverse="reverse"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -421,7 +431,8 @@ function syncOwnMarker(): void {
     ownMarker = new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })
       .setLngLat([fix.lon, fix.lat]).addTo(instance);
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
-  const reliableHeading = journey.navigating.value && !journey.replanning.value && !journey.rerouteWaitingForFix.value &&
+  const reliableHeading = journey.navigating.value && !journey.navigationPending.value &&
+    !journey.replanning.value && !journey.rerouteWaitingForFix.value &&
     fix.accuracy !== null && fix.accuracy <= 80 && journey.routePoints.value.length >= 2;
   // 'map' applies heading - map bearing on every camera move, including a manual compass
   // turn. The static GPS crosshair instead remains upright outside reliable guidance.
@@ -490,7 +501,7 @@ function followNavigationCamera(camera: NavigationCamera): void {
     if (!instance) return;
     const canvas = instance.getContainer().getBoundingClientRect();
     const bar = document.querySelector('.user-map-view__journey-bar')?.getBoundingClientRect();
-    const status = document.querySelector('.user-map-view__reroute-status')?.getBoundingClientRect();
+    const status = document.querySelector('.user-map-view__navigation-status')?.getBoundingClientRect();
     const sheet = document.getElementById('map-point-route-sheet')?.getBoundingClientRect();
     const top = Math.max(0, (bar?.bottom ?? 0) - canvas.top, (status?.bottom ?? 0) - canvas.top);
     // On wide screens the sheet is beside the GPS target, not over it.
@@ -511,6 +522,7 @@ let detachHold: (() => void) | null = null;
 const ROUTE_SOURCE = "user-selected-destination-route";
 const ROUTE_LAYER = "user-selected-destination-route-line";
 const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
+let routePaintDeferred = false;
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
 function openPointRouteDetails(): void {
   journey.sheetOpen.value = true;
@@ -992,7 +1004,7 @@ function repaintOverlays(): void {
   const instance = map.value;
   if (!instance) return;
   const routeActive = !!journey.point.value && journey.routesVisible.value && !!journey.selectedRoute.value;
-  if (pointRouteOverlayNeedsSync(routeActive, !!instance.getLayer(ROUTE_LAYER),
+  if (routePaintDeferred || pointRouteOverlayNeedsSync(routeActive, !!instance.getLayer(ROUTE_LAYER),
     !!instance.getLayer(ROUTE_ALT_LAYER), !!instance.getSource(ROUTE_SOURCE))) paintPointRoute();
   const state = mapState(instance);
   const styles = journey.point.value || historySuppressedAfterRouteClear.value
@@ -1027,7 +1039,7 @@ function syncDestinationMarker(): void {
 function syncRouteOriginMarker(): void {
   const instance = map.value, origin = journey.plannedFrom.value;
   if (!instance || !markerConstructor || !origin || !journey.selectedRoute.value || !journey.routesVisible.value ||
-    journey.replanning.value || journey.rerouteWaitingForFix.value) {
+    journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value) {
     routeOriginMarker?.remove(); routeOriginMarker = null; return;
   }
   if (!routeOriginMarker) {
@@ -1041,7 +1053,9 @@ function syncRouteOriginMarker(): void {
 }
 function paintPointRoute(): void {
   const instance = map.value;
-  if (!instance || !instance.isStyleLoaded()) return;
+  if (!instance) return;
+  if (!instance.isStyleLoaded()) { routePaintDeferred = true; return; }
+  routePaintDeferred = false;
   const geometries = journey.point.value && journey.routesVisible.value ? routeGeometries.value : [];
   if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
@@ -1049,7 +1063,7 @@ function paintPointRoute(): void {
     if (instance.getSource(ROUTE_SOURCE)) instance.removeSource(ROUTE_SOURCE);
     return;
   }
-  const features = journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :
+  const features = journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :
     pointRouteFeatures(geometries, journey.index.value, journey.navigating.value);
   const data = { type: "FeatureCollection", features } as const;
   const source = instance.getSource(ROUTE_SOURCE) as { setData(data: unknown): void } | undefined;
@@ -1109,7 +1123,7 @@ function resumePointFollowing(): void {
 }
 function startPointNavigation(): void {
   const fix = own.position.value, bounds = map.value?.getMaxBounds();
-  if (fix && bounds && !bounds.contains([fix.lon, fix.lat])) {
+  if (fix && fix.accuracy !== null && fix.accuracy <= 80 && bounds && !bounds.contains([fix.lon, fix.lat])) {
     journey.error.value = "موقعیت شما خارج از محدودهٔ نقشهٔ آفلاین است؛ راهبری روی این نقشه ممکن نیست.";
     return;
   }
@@ -1148,7 +1162,7 @@ function fitPointRoute(): void {
 }
 watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
-watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
+watch([() => journey.navigationPending.value, () => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
   () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.sheetOpen.value, async () => {
   if (!journey.navigating.value || !navigationFollowEnabled.value) return;
@@ -1365,15 +1379,24 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 
 /* Hold guidance and active journey remain compact; the map stays edge-to-edge. */
-.user-map-view__hold-hint, .user-map-view__journey-bar, .user-map-view__reroute-status {
+.user-map-view__hold-hint, .user-map-view__journey-stack {
   position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
-  max-width: calc(100vw - 2rem); border: 1px solid rgba(var(--v-theme-on-surface), .15);
-  border-radius: 16px; color: rgb(var(--v-theme-on-surface));
-  background: rgba(var(--v-theme-surface), .96); box-shadow: var(--bb-shadow-overlay);
+  top: calc(5rem + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 2rem);
 }
-.user-map-view__hold-hint { top: calc(5rem + env(safe-area-inset-top, 0px)); width: max-content; margin: 0; padding: .55rem .85rem; text-align: center; font-size: .82rem; pointer-events: none; }
-.user-map-view__journey-bar { top: calc(5rem + env(safe-area-inset-top, 0px)); width: min(28rem, calc(100vw - 2rem)); display: flex; align-items: center; gap: .65rem; padding: .55rem; }
-.user-map-view__reroute-status { top: calc(8.5rem + env(safe-area-inset-top, 0px)); max-width: min(28rem, calc(100vw - 2rem)); padding: .55rem .85rem; color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); font-size: .83rem; }
+.user-map-view__hold-hint { width: max-content; margin: 0; padding: .55rem .85rem; text-align: center;
+  font-size: .82rem; pointer-events: none; border: 1px solid rgba(var(--v-theme-on-surface), .15);
+  border-radius: 16px; color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .96); box-shadow: var(--bb-shadow-overlay); }
+.user-map-view__journey-stack { width: min(28rem, calc(100vw - 2rem)); display: grid; gap: .35rem; pointer-events: none; }
+.user-map-view__journey-bar { display: flex; align-items: center; gap: .65rem; padding: .55rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .15); border-radius: 16px;
+  color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .96);
+  box-shadow: var(--bb-shadow-overlay); pointer-events: auto; }
+.user-map-view__navigation-status { display: grid; gap: .35rem; pointer-events: none; }
+.user-map-view__gps-warning, .user-map-view__reroute-status { margin: 0; padding: .55rem .85rem;
+  border-radius: 16px; box-shadow: var(--bb-shadow-overlay); font-size: .83rem; line-height: 1.5;
+  color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); }
+.user-map-view__gps-warning { display: flex; align-items: flex-start; gap: .4rem; }
+.user-map-view__gps-warning .v-icon { flex: 0 0 auto; margin-top: .12rem; }
 .user-map-view__journey-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
 .user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; }
 :global(.user-map-view__destination-marker:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
