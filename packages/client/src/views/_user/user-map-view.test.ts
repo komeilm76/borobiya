@@ -47,6 +47,14 @@ describe("UserMapView live overlay", () => {
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
   });
 
+  it("does not replace a cleared green route with a green playback line until history is requested", () => {
+    expect(body("paintPlayback")).toContain('historySuppressedAfterRouteClear.value');
+    expect(view).toContain('if (!next && previous) historySuppressedAfterRouteClear.value = true;');
+    expect(body("showTrack")).toContain('historySuppressedAfterRouteClear.value = false');
+    expect(body("selectTool")).toContain('selected === "history"');
+    expect(body("repaintOverlays")).toContain('historySuppressedAfterRouteClear.value');
+  });
+
   it("restores missing layers on idle without rewriting every existing source on each idle event", () => {
     const restore = body("repaintOverlays");
     expect(restore).toContain("needsOverlayRestore(");
@@ -302,7 +310,9 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("syncRouteOriginMarker")).toContain('مبدأ مسیر انتخابی');
     expect(body("paintPointRoute")).toContain('type: "line"');
     expect(body("repaintOverlays")).toContain('paintPointRoute()');
-    expect(body("paintPlayback")).toContain('if (journey.point.value)');
+    expect(body("repaintOverlays")).toContain('pointRouteOverlayNeedsSync(');
+    expect(body("repaintOverlays")).toContain('!!journey.point.value');
+    expect(body("paintPlayback")).toContain('if (journey.point.value || historySuppressedAfterRouteClear.value)');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
     expect(body("syncOwnMarker")).toContain('routeBearing(fix, journey.routePoints.value)');

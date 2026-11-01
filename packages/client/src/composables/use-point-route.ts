@@ -49,7 +49,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   let controller: AbortController | null = null;
   let generation = 0;
   let waitingForFix = false;
-  let plannedFrom: RoutePoint | null = null;
+  const plannedFrom = ref<RoutePoint | null>(null);
   let lastCameraAt = Number.NEGATIVE_INFINITY;
   let firstDeviationAt: number | null = null;
   let lastRerouteAt = Number.NEGATIVE_INFINITY;
@@ -85,7 +85,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     const oldRouteUnsafe = replanning.value || rerouteWaitingForFix.value;
     navigating.value = false;
     if (oldRouteUnsafe) {
-      invalidate(); routes.value = []; index.value = 0; plannedFrom = null;
+      invalidate(); routes.value = []; index.value = 0; plannedFrom.value = null;
       error.value = "مسیر پیشین معتبر نیست؛ برای ادامه، مسیر را دوباره محاسبه کنید.";
     }
     replanning.value = false; rerouteWaitingForFix.value = false;
@@ -100,7 +100,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     // clearing the point cannot briefly repaint a ghost route or origin marker.
     routesVisible.value = false; routes.value = []; index.value = 0;
     point.value = null; sheetOpen.value = false;
-    error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom = null;
+    error.value = null; arrived.value = false; remaining.value = null; waitingForFix = false; plannedFrom.value = null;
     knownPlace.value = null; lastRerouteAt = Number.NEGATIVE_INFINITY;
   }
   function select(candidate: RoutePoint, place?: GeocodeResult): void {
@@ -115,7 +115,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   async function findRoutes(): Promise<void> {
     const to = point.value, fix = position.value, account = owner.value;
     if (!to || !account || loading.value || navigating.value) return;
-    invalidate(); routes.value = []; index.value = 0; arrived.value = false; plannedFrom = null;
+    invalidate(); routes.value = []; index.value = 0; arrived.value = false; plannedFrom.value = null;
     if (!fix || fix.accuracy === null || fix.accuracy > 150) {
       waitingForFix = true;
       error.value = !fix ? (gpsError.value ?? "برای محاسبهٔ مسیر، موقعیت GPS خود را فعال کنید.")
@@ -141,7 +141,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
         });
         if (!valid.length) throw new Error("INVALID_ROUTE");
         routes.value = valid.sort((a, b) => a.duration_s - b.duration_s || a.distance_m - b.distance_m);
-        plannedFrom = origin;
+        plannedFrom.value = origin;
       }
     } catch (reason) {
       if (current !== generation || (signal.aborted && (reason as Error)?.message !== "ROUTE_TIMEOUT")) return;
@@ -159,7 +159,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   }
   function changeProfile(next: TransportProfile): void {
     if (next === profile.value || !["car", "bicycle", "foot"].includes(next)) return;
-    stop(); invalidate(); routes.value = []; index.value = 0; error.value = null; arrived.value = false; plannedFrom = null;
+    stop(); invalidate(); routes.value = []; index.value = 0; error.value = null; arrived.value = false; plannedFrom.value = null;
     profile.value = next; if (point.value) void findRoutes();
   }
   function choose(indexValue: number): void {
@@ -171,7 +171,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     if (position.value.accuracy === null || position.value.accuracy > 80) {
       error.value = "دقت موقعیت GPS برای شروع راهبری کافی نیست."; sheetOpen.value = true; return false;
     }
-    if (!plannedFrom || pointDistance(position.value, plannedFrom) > 150) {
+    if (!plannedFrom.value || pointDistance(position.value, plannedFrom.value) > 150) {
       void findRoutes(); // A stale route must not be followed from a different starting position.
       return false;
     }
@@ -219,7 +219,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       });
       if (!valid.length) throw new Error("INVALID_ROUTE");
       routes.value = valid.sort((a, b) => a.duration_s - b.duration_s || a.distance_m - b.distance_m);
-      index.value = 0; plannedFrom = origin; firstDeviationAt = null;
+      index.value = 0; plannedFrom.value = origin; firstDeviationAt = null;
       remaining.value = position.value ? pointDistance(position.value, to) : null;
       rerouteMessage.value = "مسیر تازه آماده است؛ با احتیاط ادامه دهید.";
       statusTimer = setTimeout(() => { rerouteMessage.value = null; statusTimer = null; }, 5000);
@@ -227,7 +227,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     } catch (reason) {
       if (current !== generation || (signal.aborted && (reason as Error)?.message !== "ROUTE_TIMEOUT")) return;
       if (!originStillUsable()) return;
-      stop(); routes.value = []; index.value = 0; plannedFrom = null;
+      stop(); routes.value = []; index.value = 0; plannedFrom.value = null;
       error.value = "بازمحاسبهٔ مسیر ممکن نشد؛ راهبری متوقف شد. موقعیت و مسیر را بررسی و دوباره تلاش کنید.";
       sheetOpen.value = true;
     } finally {
@@ -279,8 +279,8 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   watch(position, (fix) => {
     if (navigating.value) updateFix(fix);
     else if (waitingForFix && point.value && fix) void findRoutes();
-    else if (point.value && plannedFrom && !loading.value && fix && fix.accuracy !== null &&
-             fix.accuracy <= 150 && pointDistance(fix, plannedFrom) > 150) {
+    else if (point.value && plannedFrom.value && !loading.value && fix && fix.accuracy !== null &&
+             fix.accuracy <= 150 && pointDistance(fix, plannedFrom.value) > 150) {
       void findRoutes(); // Keep the planned distance/time tied to the user's actual origin.
     }
   }, { flush: "sync" });
@@ -293,7 +293,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   onScopeDispose(clear);
   return { point, sheetOpen, routesVisible, profile, routes, index, loading, error, navigating, arrived,
     replanning, rerouteWaitingForFix, rerouteMessage,
-    remaining, selectedRoute, routePoints, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, focus, editNavigation, clear,
+    remaining, selectedRoute, routePoints, plannedFrom, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, focus, editNavigation, clear,
     distanceLabel: computed(() => selectedRoute.value ? formatRouteDistance(selectedRoute.value.distance_m) : "—"),
     durationLabel: computed(() => selectedRoute.value ? formatRouteDuration(selectedRoute.value.duration_s) : "—") };
 }

@@ -200,7 +200,8 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
-import { pointRouteExtent, pointRouteFeatures, pointRouteOverviewBottom } from "@/map/point-route-preview";
+import { pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverlayNeedsSync,
+  pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
@@ -302,6 +303,7 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const previous = activeTool.value;
   if (selected === previous) return;
   activeTool.value = selected;
+  if (selected === "history") { historySuppressedAfterRouteClear.value = false; paintPlayback(); }
   await nextTick();
   if (selected) document.getElementById(`map-${selected}-panel`)?.focus();
   else if (previous) document.getElementById(`map-tool-${previous}`)?.focus();
@@ -530,6 +532,9 @@ const placeSearch = usePlaceSearch({
 });
 let fittedFor: string | null = null;
 const userControlledCamera = ref(false);
+// A removed navigation line must not appear to survive because the teal history track
+// immediately repaints underneath it. History remains available on explicit request.
+const historySuppressedAfterRouteClear = ref(false);
 let selectedPlaceMarker: Marker | null = null;
 const resultMarkers = new Map<string, Marker>();
 const showAllResultsOnMap = placeSearch.mapActive;
@@ -945,7 +950,7 @@ function paintPlayback(): void {
   if (!instance) return;
   // Route planning owns the map while a destination is selected; a historical track
   // behind the live route is misleading. The history panel's data remains intact.
-  if (journey.point.value) {
+  if (journey.point.value || historySuppressedAfterRouteClear.value) {
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     return;
   }
@@ -975,6 +980,8 @@ function showTrack(): void {
   // Stop any in-flight gesture/inertia first: its moveend still carries the original DOM event.
   // Otherwise it can immediately mark the just-restored track as user-controlled again.
   map.value?.stop();
+  historySuppressedAfterRouteClear.value = false;
+  paintPlayback();
   userControlledCamera.value = false;
   fittedFor = null;
   frameCamera();
@@ -984,10 +991,12 @@ function showTrack(): void {
 function repaintOverlays(): void {
   const instance = map.value;
   if (!instance) return;
-  if (journey.routesVisible.value && journey.selectedRoute.value && (!instance.getSource(ROUTE_SOURCE) || !instance.getLayer(ROUTE_LAYER) ||
-    !instance.getLayer(ROUTE_ALT_LAYER))) paintPointRoute();
+  const routeActive = !!journey.point.value && journey.routesVisible.value && !!journey.selectedRoute.value;
+  if (pointRouteOverlayNeedsSync(routeActive, !!instance.getLayer(ROUTE_LAYER),
+    !!instance.getLayer(ROUTE_ALT_LAYER), !!instance.getSource(ROUTE_SOURCE))) paintPointRoute();
   const state = mapState(instance);
-  const styles = journey.point.value ? [liveStyle.value] : [liveStyle.value, playbackStyle.value];
+  const styles = journey.point.value || historySuppressedAfterRouteClear.value
+    ? [liveStyle.value] : [liveStyle.value, playbackStyle.value];
   // `setData`/`setPaintProperty` from paintLive/paintPlayback can themselves trigger styledata
   // and then idle. Event-driven writes must be restore-only, or an unchanged map repaints forever.
   if (!needsOverlayRestore(state, styles.flatMap((style) => style.sources.map((source) => source.id)),
@@ -1016,8 +1025,8 @@ function syncDestinationMarker(): void {
   destinationMarker.getElement().setAttribute("title", journey.title.value);
 }
 function syncRouteOriginMarker(): void {
-  const instance = map.value, first = journey.routePoints.value[0];
-  if (!instance || !markerConstructor || !first || !journey.routesVisible.value ||
+  const instance = map.value, origin = journey.plannedFrom.value;
+  if (!instance || !markerConstructor || !origin || !journey.selectedRoute.value || !journey.routesVisible.value ||
     journey.replanning.value || journey.rerouteWaitingForFix.value) {
     routeOriginMarker?.remove(); routeOriginMarker = null; return;
   }
@@ -1026,14 +1035,14 @@ function syncRouteOriginMarker(): void {
     element.className = "user-map-view__route-origin";
     element.setAttribute("role", "img"); element.setAttribute("aria-label", "مبدأ مسیر انتخابی");
     const label = document.createElement("span"); label.textContent = "A"; element.append(label);
-    routeOriginMarker = new markerConstructor({ element, anchor: "bottom", offset: [-14, 0] })
-      .setLngLat(first).addTo(instance);
-  } else routeOriginMarker.setLngLat(first);
+    routeOriginMarker = new markerConstructor({ element, anchor: "center" })
+      .setLngLat([origin.lon, origin.lat]).addTo(instance);
+  } else routeOriginMarker.setLngLat([origin.lon, origin.lat]);
 }
 function paintPointRoute(): void {
   const instance = map.value;
   if (!instance || !instance.isStyleLoaded()) return;
-  const geometries = journey.routesVisible.value ? routeGeometries.value : [];
+  const geometries = journey.point.value && journey.routesVisible.value ? routeGeometries.value : [];
   if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
     if (instance.getLayer(ROUTE_ALT_LAYER)) instance.removeLayer(ROUTE_ALT_LAYER);
@@ -1112,7 +1121,10 @@ function startPointNavigation(): void {
     void nextTick(() => (document.querySelector('.user-map-view__journey-bar .v-btn') as HTMLElement | null)?.focus());
   }
 }
-watch(() => journey.point.value, () => { syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute(); }, { flush: "sync" });
+watch(() => journey.point.value, (next, previous) => {
+  if (!next && previous) historySuppressedAfterRouteClear.value = true;
+  syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute();
+}, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
 function onPointRouteLayoutChange(): void {
   if (journey.navigating.value) {
@@ -1120,17 +1132,17 @@ function onPointRouteLayoutChange(): void {
   } else fitPointRoute();
 }
 function fitPointRoute(): void {
-  const instance = map.value;
-  if (!instance || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;
-  const geometries = routeGeometries.value;
-  if (!geometries.length) return;
-  const extent = pointRouteExtent(geometries);
+  const instance = map.value, to = journey.point.value;
+  if (!instance || !to || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;
+  const from = journey.plannedFrom.value;
+  const extent = pointRouteSelectionExtent(journey.routePoints.value,
+    from ? [from.lon, from.lat] : null, [to.lon, to.lat]);
   if (!extent) return;
   const canvas = instance.getContainer().getBoundingClientRect();
   const sheet = document.getElementById("map-point-route-sheet")?.getBoundingClientRect() ?? null;
   const bottom = pointRouteOverviewBottom(canvas, sheet);
   instance.fitBounds(extent,
-    { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: 15, duration: 500 },
+    { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: instance.getMaxZoom(), duration: 500 },
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }
@@ -1229,6 +1241,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   syncResultMarkers();
   syncPeerAvatars();
   frameCamera();
+  if (journey.sheetOpen.value && journey.selectedRoute.value) void nextTick(fitPointRoute);
   focusOwnIfRequested();
 }
 

@@ -4,6 +4,12 @@
 
 ---
 
+### 2026-11-01 — Route removal, review framing and exact start marker
+
+- Fixed a route-line lifecycle gap: clearing a destination while a MapLibre style was not yet loaded could leave the selected green source/layers in place. The map's existing style/idle reconciliation now removes stale route layers and source even after the clear has finished, including partially restored overlays. It remains idempotent when no route exists. To prevent a different teal history-playback track from looking like the deleted route, history stays hidden after route removal until the user explicitly opens History or chooses Return to Track; history data and controls are retained.
+- Route review now frames the **chosen** route plus the exact GPS origin and selected destination, rather than zooming out for every alternative; the map's configured maximum zoom replaces a hard-coded zoom-15 cap. Other alternatives remain selectable, and choosing one refits the camera to that route at the highest zoom that keeps its path and endpoints visible above the sheet, including when the map finishes loading after route planning.
+- The A start marker now uses the recorded GPS request origin, not the road-snapped polyline vertex, and is center-anchored without a pixel offset. The origin is cleared with the route and refreshed on a new calculation. Pure geometry/state tests and source-level map contracts cover these scenarios; physical-map rendering and live routing/GPS acceptance remain open.
+
 ### 2026-11-01 — Navigation arrow bearing and brand marker
 
 - Corrected a navigation-marker angle mismatch: the former MDI arrow stayed upright in the viewport even when the map rotated, so panning/compass changes could make it point away from the selected route. A new SVG arrow has a north-facing tip, the shared route-segment bearing, MapLibre `rotationAlignment: map` and viewport pitch alignment; MapLibre subtracts the current map bearing so the marker stays aligned when the camera rotates. A reliable GPS fix and valid route are required to show directional guidance; uncertain fixes and rerouting show the non-directional private-GPS crosshair instead. Route replacements refresh the arrow without waiting for another GPS fix.

@@ -9,7 +9,7 @@ export function pointRouteFeatures(routes: readonly RouteLine[], selected: numbe
   }]);
 }
 
-/** All alternatives must fit the overview, not only the currently selected one. */
+/** Geographic bounds of the supplied route lines. */
 export function pointRouteExtent(routes: readonly RouteLine[]): [[number, number], [number, number]] | null {
   if (!routes.length) return null;
   let west = Infinity, south = Infinity, east = -Infinity, north = -Infinity;
@@ -18,6 +18,20 @@ export function pointRouteExtent(routes: readonly RouteLine[]): [[number, number
     south = Math.min(south, lat); north = Math.max(north, lat);
   }
   return Number.isFinite(west) ? [[west, south], [east, north]] : null;
+}
+
+/** For route review, zoom as far as possible while keeping the selected path and the
+ * exact requested start/destination visible. Other alternatives remain selectable on the map. */
+export function pointRouteSelectionExtent(route: RouteLine, start: readonly [number, number] | null,
+  destination: readonly [number, number]): [[number, number], [number, number]] | null {
+  return pointRouteExtent([route, start ? [start, destination] : [destination]]);
+}
+
+/** An idle/styledata event must also remove a route that was cleared while the style
+ * was not loaded. Checking only for *missing* active layers leaves ghost lines behind. */
+export function pointRouteOverlayNeedsSync(active: boolean, selectedLayer: boolean, alternativeLayer: boolean,
+  source: boolean): boolean {
+  return active ? !selectedLayer || !alternativeLayer || !source : selectedLayer || alternativeLayer || source;
 }
 
 /** Fit above the actual on-screen sheet, while leaving at least 64 px of map on a short display. */

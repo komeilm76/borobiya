@@ -45,6 +45,17 @@ describe("private point-to-point route", () => {
     journey.choose(99); expect(journey.selectedRoute.value).toEqual(short);
     scope.stop();
   });
+  it("retains the exact GPS request origin even when the road route snaps to another point", async () => {
+    const { journey, fix, scope } = setup();
+    const origin = { lat: 38.5004, lon: -120.2003, accuracy: 8 };
+    fix.value = origin;
+    journey.select({ lat: 40, lon: -120 }); await settle();
+    expect(journey.plannedFrom.value).toEqual({ lat: origin.lat, lon: origin.lon });
+    expect(journey.routePoints.value[0]).not.toEqual([origin.lon, origin.lat]);
+    journey.clear();
+    expect(journey.plannedFrom.value).toBeNull();
+    scope.stop();
+  });
   it("waits for a GPS fix, retries on first fix, and distinguishes no route and invalid geometry", async () => {
     const get = vi.fn().mockRejectedValueOnce(new Error("NO_ROUTE")).mockResolvedValueOnce([{ ...short, polyline: "invalid!" }]);
     const { journey, fix, scope } = setup(get);
