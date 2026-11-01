@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-02 — Center held destinations and choose alternatives in their own sheet
+
+- A stationary map hold now animates the selected point into the map's geometric center without changing the user's zoom or bypassing account/offline-bound checks; GPS auto-focus and viewport-search pruning cannot undo the deliberate camera move. Alternative routes no longer cycle through one short planner button. A new 48px icon beside SOS opens a separate, height-bounded, scrollable route-choice sheet with one selectable card per route, distance, estimated duration and selected state; loading/unavailable routes are explained. Selecting a card or Back/Escape returns to the same route planner with the selected route, while a tap during active guidance explicitly pauses guidance before route editing (the launcher warns about this). Map preview fits the sheet in use, and route state is cleared on destination/account change. Source/style contracts, client tests/typecheck/build cover this flow; rendered map, touch/short-phone and screen-reader review remain open.
+
 ### 2026-11-02 — Confirm route removal from the planner header
 
 - The route-planner header X no longer deletes immediately. It opens a focused Vuetify confirmation dialog naming the destructive effect: removing the destination and calculated routes stops active guidance. Only the explicit **حذف مقصد و مسیر** action clears the route; **انصراف**, Escape, outside dismissal or the first phone Back return to the same planner/route without deleting. The parent map owns the confirmation state for Back handling, so Android Back cannot close the whole planner instead of the modal. Changing destination, closing the planner or leaving the map also discards pending confirmation. The two-button planner footer remains unchanged; source/style regressions, typecheck and build cover the behavior, but physical-phone/back-button and screen-reader review are outstanding.

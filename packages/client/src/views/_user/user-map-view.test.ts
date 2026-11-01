@@ -85,12 +85,13 @@ describe("UserMapView live overlay", () => {
   });
 
   it("never moves the camera for a peer; only explicit selection, track framing and private GPS guidance move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(8);
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(9);
     expect(view).toContain("if (!instance || journey.point.value || track.length === 0");
     expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");
     expect(body("frameCamera")).toContain("userControlledCamera.value");
     expect(body("paintLive")).not.toMatch(/fitBounds|easeTo|flyTo/);
+    expect(body("attachHold")).toContain('instance.easeTo({ center: [location.lng, location.lat], duration: 450 }');
     expect(body("selectCompanion")).toContain("instance.flyTo(");
     expect(body("selectPlace")).toContain("placeSearch.select(place)");
     expect(body("selectPlace")).toContain("bounds.contains([place.lon, place.lat])");
@@ -361,7 +362,7 @@ describe("hold-to-select destination and map navigation", () => {
 
   it("presents titled address, travel modes, time, distance, alternatives, start and stop without implying live traffic", () => {
     const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "مسیر دیگر", "شروع راهبری", "حذف مقصد", "ترافیک زنده"]) {
+    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "شروع راهبری", "حذف مقصد", "ترافیک زنده"]) {
       expect(sheet).toContain(label);
     }
     expect(sheet).toContain('api.address.value');

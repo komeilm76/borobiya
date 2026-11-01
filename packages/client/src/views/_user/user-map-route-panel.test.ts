@@ -4,6 +4,7 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 
 // Source and compiled CSS contracts only; never mount Vue SFCs in unit tests.
 const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
 const map = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const route = readFileSync(new URL("../../composables/use-point-route.ts", import.meta.url), "utf8");
 const css = (source: string, filename: string) => {
@@ -32,7 +33,7 @@ describe("progressive trip planning and editing", () => {
     const dock = map.slice(map.indexOf('<v-bottom-navigation'), map.indexOf('</v-bottom-navigation>'));
     expect(dock).not.toContain('sos');
     expect(dock).not.toContain('SOS');
-    expect(sheet).toContain("'با «مسیر دیگر» گزینه‌ها را عوض کنید.'");
+    expect(sheet).toContain('برای بررسی مسیرها از دکمهٔ انتخاب مسیر کنار SOS استفاده کنید.');
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('.point-route-shell.v-bottom-sheet > .v-overlay__content');
     expect(styles).toContain('width: 100vw');
@@ -103,7 +104,7 @@ describe("progressive trip planning and editing", () => {
   it("keeps a compact planner with menu-based destination copying instead of duplicated place info", () => {
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain('role="dialog"');
-    expect(sheet).toContain('v-if="api.point.value && api.sheetOpen.value"');
+    expect(sheet).toContain('v-if="api.point.value && api.sheetOpen.value && !choicesOpen"');
     expect(sheet).toContain('id="map-point-route-sheet"');
     expect(sheet).not.toContain('point-route-info');
     expect(sheet).not.toContain('mdi-information');
@@ -287,14 +288,54 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('safe-area-inset-bottom');
   });
 
+  it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
+    const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
+    expect(hold).toContain('if (!auth.user?.id || journey.navigating.value || map.value !== instance) return;');
+    expect(hold).toContain('if (bounds && !bounds.contains(location)) return;');
+    expect(hold.indexOf('journey.select({ lat: location.lat, lon: location.lng })'))
+      .toBeLessThan(hold.indexOf('instance.easeTo({ center: [location.lng, location.lat], duration: 450 }'));
+    expect(hold).toContain('{ placeSearchSelection: true }');
+    expect(hold).not.toContain('zoom:'); // Preserve user zoom on hold.
+  });
+
+  it("moves alternative selection into a separate accessible sheet and returns to the planner", () => {
+    expect(map).toContain('id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"');
+    expect(map).toContain('aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"');
+    expect(map).toContain('ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود');
+    expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return; }');
+    expect(map).toContain('if (journey.navigating.value) journey.editNavigation();');
+    expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return false; }');
+    expect(map).toContain(':choices-open="routeChoicesOpen"');
+    expect(sheet).toContain('if (!visible && !props.choicesOpen) dismiss();');
+    expect(map).toContain('@choose="selectPointRoute" @close="closeRouteChoices"');
+    expect(map).toContain('journey.choose(index);\n  closeRouteChoices();');
+    expect(map).toContain("document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true })");
+    expect(map).toContain('routeChoicesOpen.value = false;\n  journey.clear();');
+    expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
+    expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
+    expect(choices).toContain("isPhone ? VBottomSheet : 'section'");
+    expect(choices).toContain(':scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false"');
+    expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
+    expect(choices).toContain('v-for="(route, index) in api.routes.value"');
+    expect(choices).toContain(':aria-pressed="index === api.index.value"');
+    expect(choices).toContain("formatRouteDuration(route.duration_s)");
+    expect(choices).toContain("formatRouteDistance(route.distance_m)");
+    expect(choices).toContain("@click=\"emit('choose', index)\"");
+    expect(choices).toContain('api.loading.value');
+    expect(choices).toContain('api.error.value');
+    expect(choices).toContain('safe-area-inset-bottom');
+    expect(css(choices, "PointRouteChoicesSheet.vue")).toContain('.point-route-choices__card[aria-pressed="true"]');
+    expect(css(map, "UserMapView.vue")).toContain('.user-map-view__route-choices-toggle');
+  });
+
   it("reserves modes and alternatives for Show Routes, with direct car start and mid-trip editing", () => {
-    for (const label of ["زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "مسیر دیگر", "بازگشت", "شروع دوبارهٔ راهبری", "حذف مقصد"]) {
+    for (const label of ["زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "بازگشت", "شروع دوبارهٔ راهبری", "حذف مقصد"]) {
       expect(sheet).toContain(label);
     }
-    expect(sheet).toContain('api.choose((api.index.value + 1) % api.routes.value.length)');
+    expect(sheet).not.toContain('api.choose((api.index.value + 1) % api.routes.value.length)');
     const review = sheet.slice(sheet.indexOf('id="point-route-routes"'), sheet.indexOf('class="point-route__actions"'));
     expect(review.indexOf('class="point-route__alternative"')).toBeLessThan(review.indexOf('class="point-route__metrics"'));
-    expect(css(sheet, "PointRouteSheet.vue")).toMatch(/\.point-route__alternative\[data-v-route-panel\] \.v-btn \{[^}]*min-height: 44px/);
+    expect(choices).toContain('v-for="(route, index) in api.routes.value"');
     expect(route).toContain('const profile = ref<TransportProfile>("car")');
     expect(route).toContain('routesVisible.value = false');
     expect(route).toContain('routesVisible.value = true');

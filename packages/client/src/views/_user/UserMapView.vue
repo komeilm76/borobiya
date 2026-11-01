@@ -61,6 +61,15 @@
       </v-layout>
     </div>
 
+    <!-- Route choices live in their own bottom sheet, not inside the compact planner.
+         Keep the 48px launcher beside SOS without covering map attribution. -->
+    <v-btn v-if="journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
+      icon="mdi-routes" variant="flat" color="primary" :aria-expanded="routeChoicesOpen"
+      aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"
+      :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
+      :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
+      @click="openRouteChoices" />
+
     <!-- Keep location a map feature, not a fourth panel. This is a private GPS
          watcher; opening the map never starts outgoing location sharing. -->
     <v-btn
@@ -157,8 +166,10 @@
       </div>
     </component>
     <PointRouteSheet :api="journey" :reverse="reverse" :origin-reverse="originReverse"
-      v-model:confirm-delete-open="routeDeleteConfirmOpen"
+      :choices-open="routeChoicesOpen" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
+    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen"
+      @choose="selectPointRoute" @close="closeRouteChoices" @layout-change="fitPointRoute" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -271,6 +282,7 @@ import { pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverlayNeedsSyn
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
+import PointRouteChoicesSheet from "@/components/map/PointRouteChoicesSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
@@ -320,6 +332,7 @@ const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)")
 const activeTool = ref<MapTool | null>(null);
 const navigationSearchOpen = ref(false);
 const routeDeleteConfirmOpen = ref(false);
+const routeChoicesOpen = ref(false);
 function closeNavigationSearch(event?: KeyboardEvent): void {
   if (!navigationSearchOpen.value) return;
   event?.preventDefault();
@@ -351,6 +364,7 @@ onBeforeRouteLeave(() => {
   // Never abandon a pending destructive choice through a link or browser Back,
   // even when the map was the first history entry or the screen is not a phone.
   if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }
+  if (routeChoicesOpen.value) { closeRouteChoices(); return false; }
   const position: unknown = window.history.state?.position;
   if (isPhone.value &&
     (arrivalDialogOpen.value || shareOpen.value || activeTool.value ||
@@ -685,12 +699,40 @@ const ROUTE_LAYER = "user-selected-destination-route-line";
 const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
 let routePaintDeferred = false;
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
+function openRouteChoices(): void {
+  if (routeChoicesOpen.value) { closeRouteChoices(); return; }
+  if (!journey.point.value || routeDeleteConfirmOpen.value) return;
+  // Editing an active route pauses guidance explicitly; no mid-trip silent switch.
+  if (journey.navigating.value) journey.editNavigation();
+  journey.sheetOpen.value = true;
+  journey.routesVisible.value = true;
+  routeChoicesOpen.value = true;
+  void nextTick(() => {
+    const first = document.querySelector<HTMLElement>('.point-route-choices__card') ??
+      document.getElementById('map-point-route-choices-sheet');
+    first?.focus({ preventScroll: true });
+  });
+}
+function closeRouteChoices(): void {
+  if (!routeChoicesOpen.value) return;
+  routeChoicesOpen.value = false;
+  if (!journey.point.value) return;
+  journey.sheetOpen.value = true;
+  void nextTick(() => document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true }));
+}
+function selectPointRoute(index: number): void {
+  if (!routeChoicesOpen.value || !journey.point.value || !journey.routes.value[index] ||
+    !Number.isInteger(index)) return;
+  journey.choose(index);
+  closeRouteChoices();
+}
 function openPointRouteDetails(): void {
   journey.sheetOpen.value = true;
   void nextTick(() => document.getElementById('point-route-menu-button')?.focus());
 }
 function stopPointNavigation(): void { journey.stop(); openPointRouteDetails(); }
 function clearPointRoute(): void {
+  routeChoicesOpen.value = false;
   journey.clear(); // Also cancels any in-flight route/replan and removes both endpoint pins.
   focusDestinationMarker();
 }
@@ -1264,7 +1306,8 @@ function paintPointRoute(): void {
 function onAlternativeRouteClick(event: { features?: Array<{ properties?: { index?: unknown } }> }): void {
   if (journey.navigating.value || !journey.sheetOpen.value || !journey.routesVisible.value) return;
   const index = Number(event.features?.[0]?.properties?.index);
-  journey.choose(index);
+  if (routeChoicesOpen.value) selectPointRoute(index);
+  else journey.choose(index);
 }
 
 function attachHold(instance: MapLibreMap): () => void {
@@ -1280,7 +1323,11 @@ function attachHold(instance: MapLibreMap): () => void {
     if (isPhone.value && activeTool.value) closeTool(false);
     removeSelectedCompanion();
     userControlledCamera.value = true;
+    // A hold uses the held coordinates, not the last gesture's camera center.
+    // Preserve the user's zoom; the selected pin lands in the exact map center.
+    routeChoicesOpen.value = false;
     journey.select({ lat: location.lat, lon: location.lng });
+    instance.easeTo({ center: [location.lng, location.lat], duration: 450 }, { placeSearchSelection: true });
   });
   const pointer = (event: PointerEvent): HoldPointer => ({ id: event.pointerId, x: event.clientX, y: event.clientY,
     button: event.button, primary: event.isPrimary, type: event.pointerType });
@@ -1325,6 +1372,7 @@ function startPointNavigation(): void {
 }
 watch(() => journey.point.value, (next, previous) => {
   if (!next && previous) historySuppressedAfterRouteClear.value = true;
+  if (next !== previous) routeChoicesOpen.value = false;
   syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute();
 }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
@@ -1344,13 +1392,15 @@ function fitPointRoute(): void {
     from ? [from.lon, from.lat] : null, [to.lon, to.lat]);
   if (!extent) return;
   const canvas = instance.getContainer().getBoundingClientRect();
-  const sheet = document.getElementById("map-point-route-sheet")?.getBoundingClientRect() ?? null;
+  const sheet = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet")
+    ?.getBoundingClientRect() ?? null;
   const bottom = pointRouteOverviewBottom(canvas, sheet);
   instance.fitBounds(extent,
     { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: instance.getMaxZoom(), duration: 500 },
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }
+watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });
 watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch([() => journey.navigationPending.value, () => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
@@ -1752,6 +1802,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   pointer-events: none;
 }
 
+/* Route chooser sits beside SOS (not in the already crowded planner). */
+.user-map-view__route-choices-toggle {
+  position: fixed; z-index: 6;
+  inset-inline-start: calc(1.25rem + 3.5rem); inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  width: 48px; height: 48px; min-width: 48px; border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
+}
+.user-map-view__route-choices-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
+
 /* One 48px map-action rail: sharing is opt-in and sits above the other map
  * controls, with the same 8px gap and RTL/safe-area alignment as SOS. */
 .user-map-view__recenter, .user-map-view__share {
@@ -2014,6 +2072,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__recenter, .user-map-view__share {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
+  .user-map-view__route-choices-toggle {
+    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
+    inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
   .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
@@ -2099,6 +2161,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) {
   .user-map-view--navigating .user-map-view__recenter,
   .user-map-view--navigating .user-map-view__share,
+  .user-map-view--navigating .user-map-view__route-choices-toggle,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }

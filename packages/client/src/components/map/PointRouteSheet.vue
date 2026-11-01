@@ -1,12 +1,12 @@
 <template>
   <!-- Desktop stays a nonmodal map panel; phones use the SOS-style bottom sheet. -->
-  <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value"
+  <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
     :model-value="isPhone ? api.sheetOpen.value : undefined" :scrim="isPhone ? false : undefined"
     :persistent="isPhone" :close-on-back="false" :retain-focus="!confirmDeleteOpen"
     aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
     @keydown.esc.stop.prevent="onEscape">
-    <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl">
+    <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl" tabindex="-1">
       <div class="point-route__header">
         <v-icon class="point-route__pin" icon="mdi-map-marker" size="23" aria-hidden="true" />
         <div class="point-route__headings"><small>مقصد انتخاب‌شده</small><strong :title="api.title.value">{{ api.title.value }}</strong></div>
@@ -59,8 +59,6 @@
           <span>مسیر {{ (api.index.value + 1).toLocaleString('fa-IR') }} از {{ api.routes.value.length.toLocaleString('fa-IR') }}
             <small>{{ api.index.value === 0 ? 'سریع‌ترین گزینهٔ دریافت‌شده' : 'مسیر جایگزین' }}</small>
           </span>
-          <v-btn v-if="api.routes.value.length > 1" variant="tonal" color="primary"
-            @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
         </div>
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">
           <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
@@ -75,7 +73,7 @@
         </fieldset>
         <p v-if="api.loading.value" role="status" class="point-route__message">در حال محاسبهٔ مسیرهای {{ modeLabel }}…</p>
         <p v-else-if="api.error.value" role="alert" class="point-route__message point-route__error">{{ api.error.value }}</p>
-        <p v-if="api.routes.value.length > 1" class="point-route__legend">خط سبز مسیر انتخابی و خط نارنجی جایگزین است؛ {{ isPhone ? 'با «مسیر دیگر» گزینه‌ها را عوض کنید.' : 'هر خط را روی نقشه هم می‌توانید لمس کنید.' }}</p>
+        <p v-if="api.routes.value.length > 1" class="point-route__legend">خط سبز مسیر انتخابی و خط نارنجی جایگزین است؛ برای بررسی مسیرها از دکمهٔ انتخاب مسیر کنار SOS استفاده کنید.</p>
         <p class="point-route__disclaimer">زمان و مسافت، برآورد آخرین موقعیت GPS هستند و ترافیک زنده یا رسیدن قطعی را نشان نمی‌دهند.</p>
       </div>
       <div class="point-route__actions">
@@ -121,6 +119,7 @@ const props = defineProps<{
   api: ReturnType<typeof usePointRoute>;
   reverse: ReturnType<typeof useReversePlace>;
   originReverse: ReturnType<typeof useReversePlace>;
+  choicesOpen: boolean;
 }>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
 const isPhone = useMediaQuery("(max-width: 599px)");
@@ -184,7 +183,7 @@ function backToSummary(): void {
   void nextTick(() => document.getElementById('point-route-show-routes')?.focus());
 }
 function dismiss(): void { confirmDeleteOpen.value = false; resetMenu(); props.api.sheetOpen.value = false; emit('dismiss'); }
-function onVisible(visible: boolean): void { if (!visible) dismiss(); }
+function onVisible(visible: boolean): void { if (!visible && !props.choicesOpen) dismiss(); }
 function requestDelete(): void { menuOpen.value = false; confirmDeleteOpen.value = true; }
 function cancelDelete(): void { confirmDeleteOpen.value = false; }
 function focusCancelRemoval(): void { document.getElementById("point-route-cancel-remove")?.focus(); }
