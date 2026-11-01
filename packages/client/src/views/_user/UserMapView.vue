@@ -217,7 +217,7 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
-import { navigationCameraOffset, routeBearing, type NavigationCamera } from "@/sos/navigation-follow";
+import { navigationArrowBearing, navigationCameraOffset, navigationFollowZoom, type NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -437,7 +437,7 @@ function syncOwnMarker(): void {
   // 'map' applies heading - map bearing on every camera move, including a manual compass
   // turn. The static GPS crosshair instead remains upright outside reliable guidance.
   ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport");
-  ownMarker.setRotation(reliableHeading ? routeBearing(fix, journey.routePoints.value) : 0);
+  ownMarker.setRotation(reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0);
   const element = ownMarker.getElement();
   element.classList.toggle("user-map-view__own-marker--navigating", reliableHeading);
   element.classList.toggle("user-map-view__own-marker--walking", reliableHeading && journey.profile.value === "foot");
@@ -509,8 +509,10 @@ function followNavigationCamera(camera: NavigationCamera): void {
     const bottom = sheet && sheet.left <= centreX && sheet.right >= centreX && sheet.top < canvas.bottom
       ? Math.max(56, canvas.bottom - sheet.top) : 56;
     const offset = navigationCameraOffset(journey.profile.value, canvas.height, top, bottom);
-    instance.easeTo({ ...camera, offset, zoom: Math.min(camera.zoom, instance.getMaxZoom()),
-      pitch: Math.min(camera.pitch, instance.getMaxPitch()) });
+    const pitch = Math.min(camera.pitch, instance.getMaxPitch());
+    const zoom = navigationFollowZoom(journey.profile.value, camera.center[1], canvas.height, top, bottom,
+      instance.getMinZoom(), instance.getMaxZoom(), pitch);
+    instance.easeTo({ ...camera, offset, zoom, pitch });
   }
 }
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
@@ -1039,7 +1041,7 @@ function syncDestinationMarker(): void {
 function syncRouteOriginMarker(): void {
   const instance = map.value, origin = journey.plannedFrom.value;
   if (!instance || !markerConstructor || !origin || !journey.selectedRoute.value || !journey.routesVisible.value ||
-    journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value) {
+    journey.navigating.value || journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value) {
     routeOriginMarker?.remove(); routeOriginMarker = null; return;
   }
   if (!routeOriginMarker) {
@@ -1177,7 +1179,7 @@ watch(() => journey.navigating.value, (active) => {
     if (showAllResultsOnMap.value) placeSearch.pruneForViewport(showAllResultsOnMap.value, false);
   }
   syncResultMarkers(); syncSelectedPlaceMarker();
-  syncOwnMarker(); paintPointRoute();
+  syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute();
 });
 
 function markUserCameraMove(event: MapMovementEvent): void {

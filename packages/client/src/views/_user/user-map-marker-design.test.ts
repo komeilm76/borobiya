@@ -46,7 +46,9 @@ describe("own and companion marker design", () => {
     expect(own).toContain('createElementNS("http://www.w3.org/2000/svg", "svg")');
     expect(own).toContain('new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })');
     expect(own).toContain('ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport")');
-    expect(own).toContain('ownMarker.setRotation(reliableHeading ? routeBearing(fix, journey.routePoints.value) : 0)');
+    expect(own).toContain('ownMarker.setRotation(reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0)');
+    expect(body("syncRouteOriginMarker")).toContain('journey.navigating.value');
+    expect(view).toMatch(/watch\(\(\) => journey\.navigating\.value,[\s\S]*?syncRouteOriginMarker\(\)/);
     expect(own).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
     expect(own).toContain('fix.accuracy !== null && fix.accuracy <= 80');
     expect(own).toContain('body.setAttribute("d", "M24 3 L43 41 L24 32 L5 41 Z")');

@@ -1,9 +1,9 @@
 import { onScopeDispose, ref, watch, type Ref } from "vue";
 import { coordinatesSchema } from "@shared/index";
 
-export interface OwnMapFix { lat: number; lon: number; accuracy: number | null }
+export interface OwnMapFix { lat: number; lon: number; accuracy: number | null; heading?: number; speed?: number }
 export interface OwnMapPositionRuntime {
-  subscribe: (onFix: (fix: { lat: number; lon: number; accuracy?: number }) => void,
+  subscribe: (onFix: (fix: { lat: number; lon: number; accuracy?: number; heading?: number | null; speed?: number | null }) => void,
     onError: (denied: boolean) => void) => () => void;
 }
 
@@ -11,7 +11,8 @@ const browserRuntime: OwnMapPositionRuntime = {
   subscribe(onFix, onError) {
     if (typeof navigator === "undefined" || !navigator.geolocation) throw new Error("GEOLOCATION_UNAVAILABLE");
     const id = navigator.geolocation.watchPosition(
-      ({ coords }) => onFix({ lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy }),
+      ({ coords }) => onFix({ lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy,
+        heading: coords.heading, speed: coords.speed }),
       (error) => onError(error.code === 1),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 12_000 }
     );
@@ -51,7 +52,10 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
         const parsed = coordinatesSchema.safeParse({ lat: fix.lat, lon: fix.lon });
         if (!parsed.success || (fix.accuracy !== undefined &&
           (!Number.isFinite(fix.accuracy) || fix.accuracy < 0))) return;
-        position.value = { ...parsed.data, accuracy: fix.accuracy ?? null };
+        position.value = { ...parsed.data, accuracy: fix.accuracy ?? null,
+          ...(fix.heading != null && Number.isFinite(fix.heading) && fix.heading >= 0 && fix.heading < 360
+            ? { heading: fix.heading } : {}),
+          ...(fix.speed != null && Number.isFinite(fix.speed) && fix.speed >= 0 ? { speed: fix.speed } : {}) };
         error.value = null;
       }, (denied) => {
         if (current !== generation || owner.value !== account) return;

@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Navigation arrow and mode-specific follow zoom audit
+
+- During guidance, the route-origin A pin could cover the private GPS direction arrow at the same coordinates. Hide A while navigation is active and restore it in route review after stopping. When an accurate fix reports a valid travel heading and mode-appropriate movement speed, point the arrow in the actual travel direction rather than the nearest route segment; fall back to the route tangent when heading/speed are absent, stationary or unreliable. This does not relax the existing GPS guidance gate or publish a location.
+- Follow zoom now uses the unobstructed viewport height, current latitude, effective pitch and distinct forward look-ahead distances for car, bicycle and walking. It zooms out on short/covered screens and preserves mode differences beneath an installed map zoom ceiling instead of clamping all three to one value. Pure geometry/GPS validation tests and source-level view contracts cover the fixes without mounting Vue; live GPS, physical-device visual placement, map tiles and screen-reader acceptance remain unverified.
+
 ### 2026-11-01 — Calculate a provisional route from low-accuracy GPS
 
 - Follow-up correction: weak or unknown **accuracy** does not mean the latitude/longitude coordinates are absent. Route planning now requests alternatives from available coordinates regardless of their accuracy, so review and Start can use a provisional route rather than waiting for a 150 m threshold. The route sheet labels the origin as approximate; the existing map status warns while GPS is weak. A genuinely missing position still waits for coordinates—no origin is fabricated.

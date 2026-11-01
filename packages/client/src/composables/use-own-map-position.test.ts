@@ -29,6 +29,20 @@ describe("private on-map GPS display", () => {
     expect(clear).toHaveBeenCalledOnce();
   });
 
+  it("retains valid movement heading without trusting invalid or stationary compass data", () => {
+    let emit!: (fix: { lat: number; lon: number; accuracy?: number; heading?: number | null; speed?: number | null }) => void;
+    const scope = effectScope();
+    const own = scope.run(() => useOwnMapPosition(ref("owner"), {
+      subscribe: (onFix) => { emit = onFix; return () => {}; }
+    }))!;
+    own.start();
+    emit({ lat: 35.7, lon: 51.4, accuracy: 8, heading: 90, speed: 4 });
+    expect(own.position.value).toMatchObject({ heading: 90, speed: 4 });
+    emit({ lat: 35.7, lon: 51.4, accuracy: 8, heading: 400, speed: -1 });
+    expect(own.position.value?.heading).toBeUndefined();
+    expect(own.position.value?.speed).toBeUndefined();
+    scope.stop();
+  });
   it("invalidates queued GPS callbacks synchronously on account switch and scope disposal", () => {
     const owner = ref<string | null>("user-1");
     const fixes: Array<(fix: { lat: number; lon: number }) => void> = [];

@@ -317,7 +317,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("paintPlayback")).toContain('if (journey.point.value || historySuppressedAfterRouteClear.value)');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
-    expect(body("syncOwnMarker")).toContain('routeBearing(fix, journey.routePoints.value)');
+    expect(body("syncOwnMarker")).toContain('navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value)');
     expect(view).toMatch(/watch\(\(\) => journey\.selectedRoute\.value, \(\) => \{ syncOwnMarker\(\);/);
     expect(view).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--walking');
@@ -339,7 +339,8 @@ describe("hold-to-select destination and map navigation", () => {
   it("keeps all three mode cameras within offline zoom/pitch limits and visible above route chrome", () => {
     const camera = body("followNavigationCamera");
     expect(camera).toContain('navigationCameraOffset(journey.profile.value');
-    expect(camera).toContain('Math.min(camera.zoom, instance.getMaxZoom())');
+    expect(camera).toContain('navigationFollowZoom(journey.profile.value');
+    expect(camera).toContain('instance.getMinZoom(), instance.getMaxZoom()');
     expect(camera).toContain('Math.min(camera.pitch, instance.getMaxPitch())');
     expect(camera).toContain('instance.easeTo({ ...camera, offset');
     expect(camera).toContain('map-point-route-sheet');
