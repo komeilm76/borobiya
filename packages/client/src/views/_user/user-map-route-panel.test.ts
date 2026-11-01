@@ -5,6 +5,8 @@ import { compileStyle, parse } from "vue/compiler-sfc";
 // Source and compiled CSS contracts only; never mount Vue SFCs in unit tests.
 const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
 const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
+const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
+const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
 const map = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
 const route = readFileSync(new URL("../../composables/use-point-route.ts", import.meta.url), "utf8");
 const css = (source: string, filename: string) => {
@@ -117,7 +119,8 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('گزینه‌های مقصد');
     expect(sheet).toContain('v-if="routesOpen" id="point-route-routes"');
     expect(sheet).toContain('v-if="!routesOpen" id="point-route-show-routes" variant="tonal"');
-    expect(sheet).toContain('نمایش مسیرها');
+    expect(sheet).toContain('جزئیات و وسیلهٔ حرکت');
+    expect(sheet).not.toContain('نمایش مسیرها');
     expect(sheet).toContain('شروع راهبری');
     expect(sheet).not.toContain('مبدأ این مسیر بر اساس GPS تقریبی است');
     expect(sheet).toContain('api.provisionalRoute.value ? "مبدأ تقریبی" : "مبدأ"');
@@ -288,6 +291,32 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('safe-area-inset-bottom');
   });
 
+  it("locates the route launcher in SOS's viewport context in idle and guidance states", () => {
+    expect(app).toContain('<span v-if="isMapRoute" id="map-route-choices-action-anchor" />');
+    expect(app.indexOf('id="map-route-choices-action-anchor"')).toBeLessThan(app.indexOf('<v-main class="app-main'));
+    expect(app).toContain('<SosTriggerButton v-if="showSosButton"');
+    expect(map).toContain('<Teleport to="#map-route-choices-action-anchor">');
+    const routeSelector = '.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle';
+    const base = shell.slice(shell.indexOf(`${routeSelector} {`), shell.indexOf('}', shell.indexOf(`${routeSelector} {`)));
+    expect(base).toContain('position: fixed;');
+    expect(base).toContain('z-index: 950;'); // SOS is 950; map is isolated.
+    expect(base).toContain('inset-inline-start: calc(1.25rem + 3.5rem)');
+    expect(base).toContain('inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px))');
+    const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf(`${routeSelector} {`)));
+    const phoneSos = phone.slice(phone.indexOf('.app-shell--map .sos-fab.sos-fab {'), phone.indexOf('}', phone.indexOf('.app-shell--map .sos-fab.sos-fab {')));
+    const phoneRoute = phone.slice(phone.indexOf(`${routeSelector} {`), phone.indexOf('}', phone.indexOf(`${routeSelector} {`)));
+    expect(phoneSos).toContain('inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px))');
+    expect(phoneRoute).toContain('inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px))');
+    expect(phoneRoute).toContain('inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
+    expect(phoneSos).toContain('inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px))');
+    const navigatingSos = phone.slice(phone.indexOf('.app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab {'));
+    const navigatingRoute = phone.slice(phone.indexOf(`.app-shell--map:has(.user-map-view--navigating) .user-map-view__route-choices-toggle`));
+    const offset = 'inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 0.5rem)';
+    expect(navigatingSos).toContain(offset);
+    expect(navigatingRoute).toContain(offset);
+    expect(map).not.toContain('.user-map-view--navigating .user-map-view__route-choices-toggle,'); // Teleported element is not a map descendant.
+  });
+
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
     const hold = map.slice(map.indexOf('function attachHold('), map.indexOf('const pointer = (event: PointerEvent)', map.indexOf('function attachHold(')));
     expect(hold).toContain('if (!auth.user?.id || journey.navigating.value || map.value !== instance) return;');
@@ -325,10 +354,10 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain('api.error.value');
     expect(choices).toContain('safe-area-inset-bottom');
     expect(css(choices, "PointRouteChoicesSheet.vue")).toContain('.point-route-choices__card[aria-pressed="true"]');
-    expect(css(map, "UserMapView.vue")).toContain('.user-map-view__route-choices-toggle');
+    expect(shell).toContain('.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle');
   });
 
-  it("reserves modes and alternatives for Show Routes, with direct car start and mid-trip editing", () => {
+  it("reserves mode and trip details for the planner, with alternatives in the separate sheet", () => {
     for (const label of ["زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "بازگشت", "شروع دوبارهٔ راهبری", "حذف مقصد"]) {
       expect(sheet).toContain(label);
     }

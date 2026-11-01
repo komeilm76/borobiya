@@ -61,14 +61,17 @@
       </v-layout>
     </div>
 
-    <!-- Route choices live in their own bottom sheet, not inside the compact planner.
-         Keep the 48px launcher beside SOS without covering map attribution. -->
-    <v-btn v-if="journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
-      icon="mdi-routes" variant="flat" color="primary" :aria-expanded="routeChoicesOpen"
-      aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"
-      :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
-      :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
-      @click="openRouteChoices" />
+    <!-- SOS is an App.vue sibling, outside this map's isolated stacking context.
+         Teleport the launcher into that same viewport context so both buttons
+         share an origin, safe-area offset and guidance-sheet height. -->
+    <Teleport to="#map-route-choices-action-anchor">
+      <v-btn v-if="journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
+        icon="mdi-routes" variant="flat" color="primary" :aria-expanded="routeChoicesOpen"
+        aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"
+        :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
+        :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
+        @click="openRouteChoices" />
+    </Teleport>
 
     <!-- Keep location a map feature, not a fourth panel. This is a private GPS
          watcher; opening the map never starts outgoing location sharing. -->
@@ -1802,14 +1805,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   pointer-events: none;
 }
 
-/* Route chooser sits beside SOS (not in the already crowded planner). */
-.user-map-view__route-choices-toggle {
-  position: fixed; z-index: 6;
-  inset-inline-start: calc(1.25rem + 3.5rem); inset-block-end: max(1.25rem, env(safe-area-inset-bottom, 0px));
-  width: 48px; height: 48px; min-width: 48px; border-radius: 50%; box-shadow: var(--bb-shadow-overlay);
-}
-.user-map-view__route-choices-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px; }
-
 /* One 48px map-action rail: sharing is opt-in and sits above the other map
  * controls, with the same 8px gap and RTL/safe-area alignment as SOS. */
 .user-map-view__recenter, .user-map-view__share {
@@ -2072,10 +2067,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view__recenter, .user-map-view__share {
     inset-inline-start: calc(0.75rem + env(safe-area-inset-right, 0px));
   }
-  .user-map-view__route-choices-toggle {
-    inset-inline-start: calc(0.75rem + 3.5rem + env(safe-area-inset-right, 0px));
-    inset-block-end: calc(5.5rem + env(safe-area-inset-bottom, 0px));
-  }
   .user-map-view__recenter { inset-block-end: calc(12.5rem + env(safe-area-inset-bottom, 0px)); }
   .user-map-view__share { inset-block-end: calc(9rem + env(safe-area-inset-bottom, 0px)); }
 
@@ -2161,7 +2152,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) {
   .user-map-view--navigating .user-map-view__recenter,
   .user-map-view--navigating .user-map-view__share,
-  .user-map-view--navigating .user-map-view__route-choices-toggle,
   .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
     bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }

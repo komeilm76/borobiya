@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-02 — Keep route-choice launcher physically beside SOS
+
+- The route-choice launcher previously lived inside the map's isolated stacking context, while SOS was an App.vue sibling; matching offsets there did not guarantee a shared positioning context or visibility. The map now teleports its launcher into an App-owned anchor alongside SOS, and both controls use paired viewport/safe-area and measured guidance-sheet offsets in one global stylesheet. The planner action formerly labeled **نمایش مسیرها** is now **جزئیات و وسیلهٔ حرکت**: it opens trip estimates and transport settings, not alternative selection (which remains in the separate card sheet). Source/layout contracts cover both phone and guidance offsets; rendered mobile behavior and physical devices remain to be verified.
+
 ### 2026-11-02 — Center held destinations and choose alternatives in their own sheet
 
 - A stationary map hold now animates the selected point into the map's geometric center without changing the user's zoom or bypassing account/offline-bound checks; GPS auto-focus and viewport-search pruning cannot undo the deliberate camera move. Alternative routes no longer cycle through one short planner button. A new 48px icon beside SOS opens a separate, height-bounded, scrollable route-choice sheet with one selectable card per route, distance, estimated duration and selected state; loading/unavailable routes are explained. Selecting a card or Back/Escape returns to the same route planner with the selected route, while a tap during active guidance explicitly pauses guidance before route editing (the launcher warns about this). Map preview fits the sheet in use, and route state is cleared on destination/account change. Source/style contracts, client tests/typecheck/build cover this flow; rendered map, touch/short-phone and screen-reader review remain open.

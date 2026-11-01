@@ -370,7 +370,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(sheet).toContain('گزینه‌های مقصد');
     expect(sheet).not.toContain('point-route-info');
     expect(sheet).not.toContain('<v-bottom-sheet');
-    expect(sheet).toContain('نمایش مسیرها');
+    expect(sheet).toContain('جزئیات و وسیلهٔ حرکت');
     expect(sheet).toContain('api.routes.value.length > 1');
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');

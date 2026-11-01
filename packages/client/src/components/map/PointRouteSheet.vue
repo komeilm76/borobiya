@@ -78,7 +78,7 @@
       </div>
       <div class="point-route__actions">
         <v-btn v-if="!routesOpen" id="point-route-show-routes" variant="tonal" color="primary" aria-controls="point-route-routes"
-          :aria-expanded="routesOpen" @click="showRoutes">{{ api.navigating.value ? 'ویرایش مسیرها' : 'نمایش مسیرها' }}</v-btn>
+          :aria-expanded="routesOpen" @click="showRoutes">{{ api.navigating.value ? 'ویرایش جزئیات مسیر' : 'جزئیات و وسیلهٔ حرکت' }}</v-btn>
         <v-btn v-else variant="text" @click="backToSummary">بازگشت</v-btn>
         <v-btn v-if="routesOpen && (api.error.value || (!api.routes.value.length && !api.loading.value))"
           variant="tonal" color="primary" :disabled="api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
