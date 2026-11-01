@@ -96,7 +96,7 @@ describe("UserMapView live overlay", () => {
     const marker = body("syncSelectedPlaceMarker");
     expect(view).toContain("placeSearch.selectedPlaceId.value");
     expect(view).toContain("placeSearch.results.value.find(");
-    expect(marker).toContain("const place = isSelectedSearchDestination.value ? null : selectedSearchPlace.value");
+    expect(marker).toContain("const place = journey.navigating.value ? null : isSelectedSearchDestination.value ? null : selectedSearchPlace.value");
     expect(marker).toContain("selectedPlaceMarker?.remove()");
     expect(marker).toContain("new markerConstructor(");
     expect(marker).toContain("setLngLat([place.lon, place.lat]).addTo(instance)");
@@ -136,7 +136,8 @@ describe("UserMapView live overlay", () => {
 
   it("offers return-to-track after a real map drag, wheel, keyboard move or zoom-control press", () => {
     const move = body("onMapMoveEnd");
-    expect(body("markUserCameraMove")).toContain("if (event.originalEvent) userControlledCamera.value = true;");
+    expect(body("markUserCameraMove")).toContain("if (event.originalEvent) {");
+    expect(body("markUserCameraMove")).toContain("userControlledCamera.value = true;");
     expect(body("onMapReady")).toContain('instance.on("movestart", markUserCameraMove)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("movestart", markUserCameraMove)');
     expect(move).toContain("markUserCameraMove(event)");
@@ -307,6 +308,25 @@ describe("hold-to-select destination and map navigation", () => {
     expect(view).toContain('transform: perspective(120px) rotateX(18deg)');
     expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
     expect(view).toContain('<PointRouteSheet :api="journey"');
+  });
+
+  it("does not refresh POI searches or leave unrelated POI pins on a GPS-following map", () => {
+    expect(body("onMapMoving")).toContain('if (journey.navigating.value) return;');
+    expect(body("onMapMoveEnd")).toContain('if (journey.navigating.value) return;');
+    expect(body("syncResultMarkers")).toContain('!journey.navigating.value');
+    expect(body("syncSelectedPlaceMarker")).toContain('journey.navigating.value ? null');
+    expect(view).toContain('placeSearch.pruneForViewport(showAllResultsOnMap.value, false)');
+  });
+
+  it("lets the user inspect the map during guidance and explicitly return to following", () => {
+    expect(view).toContain("journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر'");
+    expect(view).toContain("journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant'");
+    expect(body("markUserCameraMove")).toContain('navigationFollowEnabled.value = false');
+    expect(body("followNavigationCamera")).toContain('if (navigationFollowEnabled.value)');
+    expect(body("resumePointFollowing")).toContain('navigationFollowEnabled.value = true');
+    expect(body("resumePointFollowing")).toContain('journey.focus()');
+    expect(body("centerOnOwnLocation")).toContain('resumePointFollowing()');
+    expect(view).toContain('watch(() => journey.navigating.value');
   });
 
   it("presents titled address, travel modes, time, distance, alternatives, start and stop without implying live traffic", () => {

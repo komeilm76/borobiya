@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Navigation-follow bug audit and map interaction
+
+- Found and fixed several private point-navigation defects: a reroute could publish a new line and remaining distance from a GPS fix too coarse for guidance (81–150 m), and an accurate arrival during an in-flight reroute could be ignored. Guidance now hides the obsolete route/origin while recalculating, waits for a precise fix instead of treating GPS loss as a routing-server failure, resumes from that fix, and recognizes arrival immediately; stopping mid-reroute cannot offer the stale line for restart. Initial and off-route route requests time out after 15 seconds even if an adapter ignores cancellation; a failed reroute stops guidance safely. The new route bearing is applied as soon as a valid reroute arrives.
+- User-originated map movements now pause the follow camera instead of snapping the user's inspection away at the next GPS fix; the map's recenter control explicitly resumes following. The walking camera stays flat (and bicycle keeps its own pitch) instead of being forced to 50°. Navigation flights no longer issue repeated place-geocoder requests or leave unrelated search-result pins over the route. Pure race/timeout/camera tests and source-level view contracts cover these cases without mounting Vue; real GPS, browser rendering, audible alert, accessibility and routing-server acceptance remain open.
+
 ### 2026-11-01 — Always-accessible trip removal
 
 - Follow-up review found that **Remove destination** was rendered only when the route-review pane was expanded and guidance was stopped. The compact initial bar, active guidance and the minimized journey bar therefore left a selected route without a visible remove action. Removal is now available in both compact and expanded panels, including during navigation, and from the minimized journey bar. Clearing stops guidance, aborts in-flight planning/rerouting and removes the selected route and endpoint pins before the map's synchronous point watcher can repaint a ghost route; late replies cannot revive it. On narrow phones, footer actions use a two-row grid so the remove action stays visible rather than clipping beneath a short panel. Source/CSS and pure cancellation tests cover these states; physical-phone, live-map and screen-reader verification remain open.

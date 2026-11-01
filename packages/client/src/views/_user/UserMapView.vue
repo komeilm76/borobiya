@@ -65,10 +65,10 @@
     <v-btn
       class="user-map-view__recenter"
       v-show="!(isShortPhone && activeTool)"
-      :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : 'mdi-crosshairs-gps'"
+      :icon="own.error.value || recenterError ? 'mdi-crosshairs-question' : journey.navigating.value && !navigationFollowEnabled ? 'mdi-navigation-variant' : 'mdi-crosshairs-gps'"
       :color="own.error.value || recenterError ? 'warning' : 'primary'"
-      :aria-label="recenterLabel"
-      :title="recenterLabel"
+      :aria-label="journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر' : recenterLabel"
+      :title="journey.navigating.value && !navigationFollowEnabled ? 'بازگشت به دنبال‌کردن مسیر' : recenterLabel"
       :disabled="!map || !auth.user"
       variant="flat"
       @click="centerOnOwnLocation"
@@ -96,7 +96,8 @@
     <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
     <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar" role="status">
       <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-      <span>{{ journey.navigating.value ? (journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.remaining.value === null
+      <span>{{ journey.navigating.value ? (journey.replanning.value ? 'در حال محاسبهٔ مسیر تازه…' : journey.rerouteWaitingForFix.value
+        ? 'منتظر GPS دقیق برای مسیر تازه…' : journey.remaining.value === null
         ? (own.position.value ? 'GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است' : 'در انتظار GPS؛ موقعیت زنده در دسترس نیست')
         : `فاصلهٔ مستقیم تا مقصد: ${formatRouteDistance(journey.remaining.value)}`) : journey.title.value }}</span>
       <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
@@ -205,6 +206,7 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
+import type { NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -434,6 +436,7 @@ function centerOnOwnLocation(initiatedByUser = true): void {
   }
   recenterError.value = null;
   userControlledCamera.value = true; // A late history fetch must not pan away from the GPS fix.
+  if (journey.navigating.value) { resumePointFollowing(); return; }
   instance.flyTo({ center: [fix.lon, fix.lat], zoom: Math.min(16, instance.getMaxZoom()), duration: 700 });
 }
 function startOwnLocation(auto: boolean): void {
@@ -460,8 +463,12 @@ watch([map, () => auth.user?.id ?? null], ([instance, ownerId]) => {
 }, { immediate: true });
 const reverse = useReversePlace();
 const navigationAlert = createNavigationAlert();
+const navigationFollowEnabled = ref(true);
+function followNavigationCamera(camera: NavigationCamera): void {
+  if (navigationFollowEnabled.value) map.value?.easeTo(camera);
+}
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
-  (camera) => map.value?.easeTo(camera), undefined,
+  followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
 let destinationMarker: Marker | null = null;
 let routeOriginMarker: Marker | null = null;
@@ -499,7 +506,7 @@ function clearResultMarkers(): void {
 }
 function syncResultMarkers(): void {
   const instance = map.value;
-  const places = showAllResultsOnMap.value && instance && markerConstructor && auth.user?.id
+  const places = showAllResultsOnMap.value && !journey.navigating.value && instance && markerConstructor && auth.user?.id
     ? placeSearch.mapResults.value : [];
   const current = new Set(places.filter(place => place.placeId !== placeSearch.selectedPlaceId.value)
     .map(place => place.placeId));
@@ -577,7 +584,7 @@ function openSelectedPlaceRoute(): void {
 function syncSelectedPlaceMarker(): void {
   const instance = map.value;
   // The amber route pin owns this POI during navigation; do not stack two pins.
-  const place = isSelectedSearchDestination.value ? null : selectedSearchPlace.value;
+  const place = journey.navigating.value ? null : isSelectedSearchDestination.value ? null : selectedSearchPlace.value;
   if (!instance || !markerConstructor || !place) {
     selectedPlaceMarker?.remove();
     selectedPlaceMarker = null;
@@ -977,7 +984,8 @@ function syncDestinationMarker(): void {
 }
 function syncRouteOriginMarker(): void {
   const instance = map.value, first = journey.routePoints.value[0];
-  if (!instance || !markerConstructor || !first || !journey.routesVisible.value) {
+  if (!instance || !markerConstructor || !first || !journey.routesVisible.value ||
+    journey.replanning.value || journey.rerouteWaitingForFix.value) {
     routeOriginMarker?.remove(); routeOriginMarker = null; return;
   }
   if (!routeOriginMarker) {
@@ -999,7 +1007,8 @@ function paintPointRoute(): void {
     if (instance.getSource(ROUTE_SOURCE)) instance.removeSource(ROUTE_SOURCE);
     return;
   }
-  const features = pointRouteFeatures(geometries, journey.index.value, journey.navigating.value);
+  const features = journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :
+    pointRouteFeatures(geometries, journey.index.value, journey.navigating.value);
   const data = { type: "FeatureCollection", features } as const;
   const source = instance.getSource(ROUTE_SOURCE) as { setData(data: unknown): void } | undefined;
   if (source) source.setData(data);
@@ -1051,12 +1060,18 @@ function attachHold(instance: MapLibreMap): () => void {
     canvas.removeEventListener("contextmenu", context);
   };
 }
+function resumePointFollowing(): void {
+  if (!journey.navigating.value) return;
+  navigationFollowEnabled.value = true;
+  journey.focus();
+}
 function startPointNavigation(): void {
   const fix = own.position.value, bounds = map.value?.getMaxBounds();
   if (fix && bounds && !bounds.contains([fix.lon, fix.lat])) {
     journey.error.value = "موقعیت شما خارج از محدودهٔ نقشهٔ آفلاین است؛ راهبری روی این نقشه ممکن نیست.";
     return;
   }
+  navigationFollowEnabled.value = true;
   if (journey.start()) {
     navigationAlert.arm();
     userControlledCamera.value = true;
@@ -1083,22 +1098,38 @@ function fitPointRoute(): void {
 }
 watch(() => journey.selectedRoute.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
-watch(() => journey.navigating.value, () => { syncOwnMarker(); paintPointRoute(); });
+watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
+  () => { syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
+watch(() => journey.navigating.value, (active) => {
+  if (!active) {
+    navigationFollowEnabled.value = true;
+    // The camera may have travelled far while following GPS. Prune old POIs once,
+    // but never launch a geocoder request on every navigation frame.
+    if (showAllResultsOnMap.value) placeSearch.pruneForViewport(showAllResultsOnMap.value, false);
+  }
+  syncResultMarkers(); syncSelectedPlaceMarker();
+  syncOwnMarker(); paintPointRoute();
+});
 
 function markUserCameraMove(event: MapMovementEvent): void {
   // MapLibre forwards originalEvent from drag/wheel/keyboard gestures and its zoom controls,
   // but not from our fitBounds/easeTo. Mark intent at movestart so a history read that finishes
   // while the user is still dragging cannot snap the camera back to the track.
-  if (event.originalEvent) userControlledCamera.value = true;
+  if (event.originalEvent) {
+    userControlledCamera.value = true;
+    if (journey.navigating.value) navigationFollowEnabled.value = false;
+  }
 }
 
 function onMapMoving(event: MapMovementEvent): void {
+  if (journey.navigating.value) return; // GPS-follow flights must never trigger a geocoder read.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) return;
   placeSearch.pruneForViewport(!!event.originalEvent || showAllResultsOnMap.value);
 }
 
 function onMapMoveEnd(event: MapMovementEvent): void {
   markUserCameraMove(event); // Also cover gestures whose start preceded this listener.
+  if (journey.navigating.value) return;
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
   // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.
   if ("placeSearchSelection" in event && event.placeSearchSelection === true) {

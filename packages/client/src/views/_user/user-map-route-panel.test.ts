@@ -84,6 +84,9 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('@layout-change="fitPointRoute"');
     expect(map).toContain('جزئیات و تغییر مسیر');
     expect(map).toContain('journey.rerouteMessage.value');
+    expect(map).toContain('journey.rerouteWaitingForFix.value');
+    expect(map).toContain('journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :');
+    expect(map).toContain('watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value]');
     expect(map).toContain('navigationAlert.arm()');
     expect(map).toContain('navigationAlert.dispose()');
     expect(css(map, "UserMapView.vue")).toContain(".user-map-view--route-preview .user-map-view__canvas");
