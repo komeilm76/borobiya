@@ -4,10 +4,15 @@
 
 ---
 
+### 2026-11-01 — Calculate a provisional route from low-accuracy GPS
+
+- Follow-up correction: weak or unknown **accuracy** does not mean the latitude/longitude coordinates are absent. Route planning now requests alternatives from available coordinates regardless of their accuracy, so review and Start can use a provisional route rather than waiting for a 150 m threshold. The route sheet labels the origin as approximate; the existing map status warns while GPS is weak. A genuinely missing position still waits for coordinates—no origin is fabricated.
+- Coarse-fix drift no longer creates repeated routing requests. If a precise fix arrives during a provisional request, the stale reply is replaced before publishing; if it arrives later, the provisional route is hidden and recalculated once from that accurate origin before live camera-follow and remaining distance resume. Removal, Stop and account changes still cancel in-flight work; test coverage includes very coarse and unknown accuracy, noisy samples, GPS recovery and the existing stale-reply races. Physical GPS, rendered-map and screen-reader acceptance remain open.
+
 ### 2026-11-01 — Start navigation despite weak or unavailable GPS
 
 - Removed the GPS/selected-route gate on **Start Navigation**, including when route review is expanded and a retry control is shown. A start request now opens a stoppable navigation session even if the initial route is loading or no fix has arrived. The compact bar shows whether route calculation is pending; an accessible, persistent warning directly below it reports weak or unavailable GPS. The same status stack retains reroute alerts without overlapping the bar on narrow screens.
-- A route cannot be fabricated without a location: while the fix is absent or too coarse to calculate from, navigation waits for a usable GPS origin, then calculates and resumes automatically. A route already planned from a usable origin can be shown under weak GPS, but camera-follow, live remaining distance, directional marker and unsafe rerouting stay suspended until accuracy recovers. Stop/Remove cancel pending requests, and routing failures return to the editable sheet rather than claiming guidance is active. Pure composable race/GPS tests and source/CSS contracts cover these states; live GPS, rendered-device layout and screen-reader acceptance remain open.
+- A route cannot be fabricated without coordinates: when no fix exists, navigation waits for one. A route already planned from available coordinates can be shown under weak GPS, but camera-follow, live remaining distance, directional marker and unsafe rerouting stay suspended until accuracy recovers. Stop/Remove cancel pending requests, and routing failures return to the editable sheet rather than claiming guidance is active. Pure composable race/GPS tests and source/CSS contracts cover these states; live GPS, rendered-device layout and screen-reader acceptance remain open.
 
 ### 2026-11-01 — Route removal, review framing and exact start marker
 

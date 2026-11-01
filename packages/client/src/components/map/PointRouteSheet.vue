@@ -21,6 +21,9 @@
       </div>
       <p v-if="api.loading.value && !routesOpen" class="point-route__status" role="status">در حال آماده‌سازی مسیر {{ modeLabel }}…</p>
       <p v-else-if="api.error.value && !routesOpen" class="point-route__status point-route__error" role="alert">{{ api.error.value }}</p>
+      <p v-if="api.provisionalRoute.value && !api.navigating.value && !api.loading.value" class="point-route__status" role="status">
+        مبدأ این مسیر بر اساس GPS تقریبی است؛ با دریافت موقعیت دقیق، مسیر دوباره محاسبه می‌شود.
+      </p>
       <p v-if="api.arrived.value && !routesOpen" class="point-route__status" role="status">به نزدیکی مقصد رسیدید. محیط واقعی را بررسی کنید.</p>
       <div v-if="routesOpen" id="point-route-routes" class="point-route__body" tabindex="0" aria-label="مسیرها و وسیلهٔ حرکت">
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">

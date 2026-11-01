@@ -29,6 +29,8 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('v-if="!routesOpen" id="point-route-show-routes" variant="tonal"');
     expect(sheet).toContain('نمایش مسیرها');
     expect(sheet).toContain('شروع راهبری');
+    expect(sheet).toContain('api.provisionalRoute.value');
+    expect(sheet).toContain('مبدأ این مسیر بر اساس GPS تقریبی است');
     expect(sheet).toContain('v-if="!api.navigating.value" color="primary" variant="flat" :disabled="!api.point.value"');
     expect(sheet).not.toContain('v-else-if="!api.navigating.value"');
     expect(sheet).not.toContain(':disabled="!ownFix || !api.selectedRoute.value || api.loading.value"');
