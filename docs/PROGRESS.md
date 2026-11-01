@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Keep the route-review map visible on phones
+
+- Corrected the phone route planner's oversized bottom sheet: the former 60dvh **minimum** left empty space beneath the short summary, while Vuetify's `scrollable` dialog could flex the teleported overlay/card toward viewport height. The sheet now sizes to its content, caps summary and expanded review separately, and scrolls the details rather than shrinking the header, two address rows, 44px actions or safe-area footer. Short phone/landscape layouts retain a small allowance for the fixed controls. Route switching appears first in the review so it remains easy to reach while comparing the route lines on the visible, undimmed map; taps outside the sheet do not discard the review. Desktop/tablet and the map-tool dock are unchanged. Source/compiled CSS regressions and checks cover this fix; physical-device rendering, keyboard and safe-area acceptance remain open.
+
 ### 2026-11-01 — Restore manual SOS assignee discovery
 
 - Reproduced an SOS with active, free users who had no stored GPS or matching incident-category membership: the automatic nearest list and its username search returned nobody, although dispatch would accept those users. The admin search now explicitly opts into a manual mode that finds such accounts by username while keeping the automatic nearest/replacement rules unchanged. The list hides distances for every manual result (no arbitrary-account GPS disclosure) and labels missing specialty separately, and a second confirmation explains the limitations before a proposal is sent. Inactive, suspended, busy and self-dispatch exclusions remain enforced; the server still checks availability during dispatch, and the recipient must accept. PGlite integration, shared contract, store and source-level view tests cover the paths. No live responder/GPS or rendered-browser acceptance was performed.

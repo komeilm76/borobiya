@@ -2,7 +2,8 @@
   <!-- Desktop stays a nonmodal map panel; phones use the SOS-style bottom sheet. -->
   <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
-    :model-value="isPhone ? api.sheetOpen.value : undefined" :scrollable="isPhone" :close-on-back="false"
+    :model-value="isPhone ? api.sheetOpen.value : undefined" :scrim="isPhone ? false : undefined"
+    :persistent="isPhone" :close-on-back="false"
     aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
     @keydown.esc.stop.prevent="onEscape">
     <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl">
@@ -42,6 +43,13 @@
         <p v-else-if="!api.loading.value && !api.error.value" role="status">در انتظار مسیر…</p>
       </div>
       <div v-if="routesOpen" id="point-route-routes" class="point-route__body" tabindex="0" aria-label="مسیرها و وسیلهٔ حرکت">
+        <div v-if="api.routes.value.length" class="point-route__alternative">
+          <span>مسیر {{ (api.index.value + 1).toLocaleString('fa-IR') }} از {{ api.routes.value.length.toLocaleString('fa-IR') }}
+            <small>{{ api.index.value === 0 ? 'سریع‌ترین گزینهٔ دریافت‌شده' : 'مسیر جایگزین' }}</small>
+          </span>
+          <v-btn v-if="api.routes.value.length > 1" variant="tonal" color="primary"
+            @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
+        </div>
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">
           <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
           <div><span>مسافت مسیر</span><strong>{{ api.distanceLabel.value }}</strong></div>
@@ -55,13 +63,6 @@
         </fieldset>
         <p v-if="api.loading.value" role="status" class="point-route__message">در حال محاسبهٔ مسیرهای {{ modeLabel }}…</p>
         <p v-else-if="api.error.value" role="alert" class="point-route__message point-route__error">{{ api.error.value }}</p>
-        <div v-if="api.routes.value.length" class="point-route__alternative">
-          <span>مسیر {{ (api.index.value + 1).toLocaleString('fa-IR') }} از {{ api.routes.value.length.toLocaleString('fa-IR') }}
-            <small>{{ api.index.value === 0 ? 'سریع‌ترین گزینهٔ دریافت‌شده' : 'مسیر جایگزین' }}</small>
-          </span>
-          <v-btn v-if="api.routes.value.length > 1" variant="tonal" color="primary"
-            @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
-        </div>
         <p v-if="api.routes.value.length > 1" class="point-route__legend">خط سبز مسیر انتخابی و خط نارنجی جایگزین است؛ {{ isPhone ? 'با «مسیر دیگر» گزینه‌ها را عوض کنید.' : 'هر خط را روی نقشه هم می‌توانید لمس کنید.' }}</p>
         <p class="point-route__disclaimer">زمان و مسافت، برآورد آخرین موقعیت GPS هستند و ترافیک زنده یا رسیدن قطعی را نشان نمی‌دهند.</p>
       </div>
@@ -185,7 +186,8 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
 .point-route__mode-grid button[aria-pressed="true"] { border: 2px solid rgb(var(--v-theme-primary));
   color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); font-weight: 800; }
 .point-route__message { margin: .6rem 0 0; line-height: 1.55; }
-.point-route__alternative { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-top: .6rem; }
+.point-route__alternative { display: flex; justify-content: space-between; align-items: center; gap: .5rem; margin-bottom: .6rem; }
+.point-route__alternative :deep(.v-btn) { flex: 0 0 auto; min-height: 44px; }
 .point-route__alternative span { font-weight: 800; }
 .point-route__alternative small { display: block; font-weight: 500; opacity: .8; }
 .point-route__legend, .point-route__disclaimer { margin: .5rem 0 0; font-size: .8rem; line-height: 1.5; opacity: .84; }
@@ -203,17 +205,22 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
   .point-route-shell--expanded .point-route { max-height: min(65dvh, 36rem); }
 }
 @media (max-width: 599px) {
-  /* Vuetify teleports this overlay outside the map. Do not apply the desktop
-     fixed-panel width or positioning to the overlay root. */
+  /* Vuetify teleports the sheet outside the map. Its scrollable dialog flexes
+     the overlay/card to 100% height, even if the card has a smaller max-height.
+     Size both to their contents instead; only the details area scrolls. */
   :global(.point-route-shell.v-bottom-sheet > .v-overlay__content) {
     width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
+    flex: 0 1 auto !important; height: auto !important;
   }
   :global(.point-route-shell.v-bottom-sheet > .v-overlay__content > .point-route) {
     border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+    flex: 0 1 auto !important; height: auto !important; overflow: hidden !important;
   }
-  .point-route { width: 100%; min-height: min(60dvh, 26rem);
-    max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
-  .point-route-shell--expanded .point-route { max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
+  /* No viewport-height floor: the summary hugs its real content so the map
+     remains in view. Expanded review is capped and scrolls without shrinking
+     the header, endpoints, touch targets or safe-area footer. */
+  .point-route { width: 100%; min-height: 0; max-height: min(48dvh, 24rem); }
+  .point-route-shell--expanded .point-route { max-height: min(52dvh, 27rem); }
   .point-route__header { padding-inline: calc(.6rem + env(safe-area-inset-right, 0px)) calc(.6rem + env(safe-area-inset-left, 0px)); }
   .point-route__summary, .point-route__body, .point-route__endpoints {
     padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px));
@@ -231,7 +238,11 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
   .point-route__mode-grid button { flex-direction: column; font-size: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  /* Landscape keeps all three primary actions on one row when space allows. */
+  /* The fixed header/address/footer need ~14rem even on short phones. Keep
+     everything else scrollable; landscape fits three primary actions in a row. */
+  .point-route, .point-route-shell--expanded .point-route {
+    max-height: clamp(14rem, 60dvh, 17rem);
+  }
   .point-route__actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .point-route__clear { grid-column: auto; }
 }

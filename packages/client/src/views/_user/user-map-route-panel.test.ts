@@ -14,7 +14,7 @@ const css = (source: string, filename: string) => {
 };
 
 describe("progressive trip planning and editing", () => {
-  it("keeps desktop route review nonmodal and gives phones a full-width minimum-height bottom sheet", () => {
+  it("keeps desktop route review nonmodal and gives phones a content-sized map-visible bottom sheet", () => {
     expect(map).not.toContain('برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.');
     expect(sheet).toContain("isPhone ? VBottomSheet : 'section'");
     expect(sheet).toContain('import { VBottomSheet } from "vuetify/components"');
@@ -22,7 +22,9 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('@update:model-value="onVisible"');
     expect(sheet).toContain('@after-enter="emit(\'layout-change\')"');
     expect(sheet).toContain('id="map-point-route-sheet"');
-    expect(sheet).toContain('scrollable');
+    expect(sheet).not.toContain(':scrollable="isPhone"'); // Vuetify scrollable sets flex: 1 1 100% on the overlay.
+    expect(sheet).toContain(':scrim="isPhone ? false : undefined"'); // The map remains readable while reviewing routes.
+    expect(sheet).toContain(':persistent="isPhone"'); // Panning/selecting a line cannot dismiss the route controls.
     expect(sheet).toContain('function onVisible(visible: boolean)');
     expect(sheet).not.toContain('icon="mdi-alarm-light"');
     expect(sheet).not.toContain('openEmergencyForm');
@@ -34,8 +36,12 @@ describe("progressive trip planning and editing", () => {
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('.point-route-shell.v-bottom-sheet > .v-overlay__content');
     expect(styles).toContain('width: 100vw');
-    expect(styles).toContain('min-height: min(60dvh, 26rem)');
-    expect(styles).toContain('max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px))');
+    expect(styles).not.toContain('min-height: min(60dvh, 26rem)');
+    expect(styles).toContain('height: auto !important'); // Beat Vuetify's scrollable dialog flex sizing when teleported.
+    expect(styles).toContain('flex: 0 1 auto !important');
+    expect(styles).toContain('max-height: min(52dvh, 27rem)'); // Expanded review leaves almost half the map exposed.
+    expect(styles).toContain('min-height: 0; max-height: min(48dvh, 24rem)'); // Summary hugs its contents, not a viewport floor.
+    expect(styles).toContain('max-height: clamp(14rem, 60dvh, 17rem)'); // Short phones keep fixed controls reachable.
     expect(styles).toContain('overflow-y: auto');
     expect(styles).toContain('safe-area-inset-bottom');
     expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
@@ -92,7 +98,7 @@ describe("progressive trip planning and editing", () => {
     const styles = css(sheet, "PointRouteSheet.vue");
     for (const token of ["pointer-events: none", "pointer-events: auto", "overflow-y: auto",
       "min-height: 44px", "safe-area-inset-bottom", "(min-width: 600px) and (max-width: 1023px)",
-      "position: relative; order: 3", "min-height: min(60dvh, 26rem)", "max-height: calc(100dvh - 3rem"]) {
+      "position: relative; order: 3", "max-height: min(52dvh, 27rem)", "height: auto !important"]) {
       expect(styles).toContain(token);
     }
   });
@@ -150,6 +156,9 @@ describe("progressive trip planning and editing", () => {
       expect(sheet).toContain(label);
     }
     expect(sheet).toContain('api.choose((api.index.value + 1) % api.routes.value.length)');
+    const review = sheet.slice(sheet.indexOf('id="point-route-routes"'), sheet.indexOf('class="point-route__actions"'));
+    expect(review.indexOf('class="point-route__alternative"')).toBeLessThan(review.indexOf('class="point-route__metrics"'));
+    expect(css(sheet, "PointRouteSheet.vue")).toMatch(/\.point-route__alternative\[data-v-route-panel\] \.v-btn \{[^}]*min-height: 44px/);
     expect(route).toContain('const profile = ref<TransportProfile>("car")');
     expect(route).toContain('routesVisible.value = false');
     expect(route).toContain('routesVisible.value = true');
