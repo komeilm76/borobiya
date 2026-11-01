@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-02 — Compact route-planner header and destination copy
+
+- Moved **حذف مقصد** from the phone route sheet's footer to its header close icon (now clearly labeled **حذف مقصد و مسیر**). The summary/review footer keeps only primary actions; Escape/Back and the return-to-map action still dismiss without deleting. Removed the duplicate information/address disclosure; the existing start/end address rows remain single-line, while the header now opens a menu for **کپی مختصات مقصد** and **کپی نشانی مقصد**. The POI type remains available in this menu. Coordinates are latitude, longitude; the address action is disabled until a real address exists (never copy loading/error placeholder text), with reverse-geocoder retry on failure. On insecure HTTP LAN or denied clipboard permission, the menu keeps the actual text selectable for manual copy; success gives a brief visible confirmation. Late clipboard completions cannot show stale text after a destination/menu change. Pure copy tests and source/style contracts cover the change; rendered phone/keyboard/screen-reader and clipboard-permission acceptance are still open.
+
 ### 2026-11-01 — Navigation search and arrival-audio bug review
 
 - Reproduced a guidance-search contradiction: **نقشه** framed all results and paused follow, but the map marker renderer suppressed *every* POI pin while navigating. Explicit Show All now displays numbered, selectable pins during that overview; resuming GPS-follow, starting another trip or ending guidance hides the navigation-only pins. Normal search results still persist according to the existing viewport/query rules. A non-mounted view regression failed before the fix.

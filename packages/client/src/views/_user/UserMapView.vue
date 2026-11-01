@@ -679,7 +679,7 @@ let routePaintDeferred = false;
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
 function openPointRouteDetails(): void {
   journey.sheetOpen.value = true;
-  void nextTick(() => document.getElementById('point-route-info-button')?.focus());
+  void nextTick(() => document.getElementById('point-route-menu-button')?.focus());
 }
 function stopPointNavigation(): void { journey.stop(); openPointRouteDetails(); }
 function clearPointRoute(): void {

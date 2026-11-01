@@ -366,7 +366,8 @@ describe("hold-to-select destination and map navigation", () => {
     }
     expect(sheet).toContain('api.address.value');
     expect(sheet).toContain('api.knownPlace.value?.type');
-    expect(sheet).toContain('نمایش اطلاعات مکان');
+    expect(sheet).toContain('گزینه‌های مقصد');
+    expect(sheet).not.toContain('point-route-info');
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).toContain('نمایش مسیرها');
     expect(sheet).toContain('api.routes.value.length > 1');

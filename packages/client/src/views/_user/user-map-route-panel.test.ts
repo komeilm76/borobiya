@@ -100,17 +100,20 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).not.toContain('api.arrived.value'); // Arrival is no longer route editing.
   });
 
-  it("begins as a compact planner with a separate place-info toggle", () => {
+  it("keeps a compact planner with menu-based destination copying instead of duplicated place info", () => {
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain('role="dialog"');
     expect(sheet).toContain('v-if="api.point.value && api.sheetOpen.value"');
     expect(sheet).toContain('id="map-point-route-sheet"');
-    expect(sheet).toContain('v-if="infoOpen" id="point-route-info"');
-    expect(sheet).toContain('aria-controls="point-route-info"');
-    expect(sheet).toContain(':aria-expanded="infoOpen"');
+    expect(sheet).not.toContain('point-route-info');
+    expect(sheet).not.toContain('mdi-information');
+    expect(sheet).toContain('id="point-route-menu-button" icon="mdi-dots-vertical"');
+    expect(sheet).toContain(':aria-expanded="menuOpen"');
+    expect(sheet).toContain('کپی مختصات مقصد');
+    expect(sheet).toContain('کپی نشانی مقصد');
     expect(sheet).toContain('api.address.value');
     expect(sheet).toContain('api.knownPlace.value?.type');
-    expect(sheet).toContain('نمایش اطلاعات مکان');
+    expect(sheet).toContain('گزینه‌های مقصد');
     expect(sheet).toContain('v-if="routesOpen" id="point-route-routes"');
     expect(sheet).toContain('v-if="!routesOpen" id="point-route-show-routes" variant="tonal"');
     expect(sheet).toContain('نمایش مسیرها');
@@ -154,6 +157,29 @@ describe("progressive trip planning and editing", () => {
       "position: relative; order: 3", "max-height: min(52dvh, 27rem)", "height: auto !important"]) {
       expect(styles).toContain(token);
     }
+  });
+
+  it("copies only resolved destination details, with manual fallback and stale-response guards", () => {
+    const menu = sheet.slice(sheet.indexOf('<v-menu'), sheet.indexOf('</v-menu>'));
+    expect(menu).toContain('role="menu" aria-label="گزینه‌های مقصد"');
+    expect(menu).toContain('role="menuitem"');
+    expect(menu).toContain(':disabled="!api.address.value?.trim()"'); // No placeholder text in the clipboard.
+    expect(menu).toContain('v-if="reverse.failed.value && !api.address.value"');
+    expect(menu).toContain('reverse.load()');
+    expect(menu).toContain('id="point-route-copy-fallback"');
+    expect(menu).toContain('readonly dir="auto"');
+    expect(sheet).toContain('destinationCopyText(kind, point, props.api.address.value)');
+    expect(sheet).toContain('clipboard?.writeText?.bind(clipboard)');
+    expect(sheet).toContain('current !== copyGeneration');
+    expect(sheet).toContain('props.api.point.value !== point');
+    expect(sheet).toContain('copyToastOpen.value = true');
+    expect(sheet).toContain('if (menuOpen.value) { menuOpen.value = false;');
+    expect(sheet).toContain('else dismiss();'); // Escape dismisses review, not the destination.
+    expect(map).toContain("document.getElementById('point-route-menu-button')?.focus()");
+    const styles = css(sheet, "PointRouteSheet.vue");
+    expect(styles).toContain('.point-route__copy-menu');
+    expect(styles).toContain('max-height: min(60dvh, 17rem)');
+    expect(styles).toContain('min-height: 44px');
   });
 
   it("keeps only route facts and short pending state in the phone summary, not how-to paragraphs", () => {
@@ -205,9 +231,13 @@ describe("progressive trip planning and editing", () => {
   });
 
   it("keeps removal reachable in summary, route review, and the closed active/paused bar", () => {
-    const clearButton = sheet.match(/<v-btn[^>]*@click="clearDestination"[^>]*>حذف مقصد<\/v-btn>/s)?.[0];
-    expect(clearButton).toBeDefined();
+    const header = sheet.slice(sheet.indexOf('class="point-route__header"'), sheet.indexOf('class="point-route__endpoints"'));
+    const footer = sheet.slice(sheet.indexOf('class="point-route__actions"'), sheet.indexOf('</v-card>'));
+    const clearButton = header.match(/<v-btn icon="mdi-close"[^>]*@click="clearDestination"[^>]*\/>/s)?.[0];
+    expect(clearButton).toContain('aria-label="حذف مقصد و مسیر"');
     expect(clearButton).not.toMatch(/v-if|v-show|:disabled/);
+    expect(footer).not.toContain('clearDestination');
+    expect(footer).not.toContain('حذف مقصد');
     expect(sheet).toContain("function clearDestination(): void { props.api.clear(); emit('dismiss'); }");
     const bar = map.slice(map.indexOf('v-if="journey.point.value && !journey.sheetOpen.value"'),
       map.indexOf('<p v-if="journey.rerouteMessage.value'));
@@ -221,9 +251,9 @@ describe("progressive trip planning and editing", () => {
     expect(clear.indexOf('routesVisible.value = false; routes.value = []')).toBeGreaterThanOrEqual(0);
     expect(clear.indexOf('routesVisible.value = false; routes.value = []')).toBeLessThan(clear.indexOf('point.value = null'));
     const styles = css(sheet, "PointRouteSheet.vue");
-    expect(styles).toContain('grid-column: 1 / -1');
+    expect(styles).not.toContain('.point-route__clear');
     expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
-    expect(styles).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+    expect(styles).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
   });
 
   it("reserves modes and alternatives for Show Routes, with direct car start and mid-trip editing", () => {

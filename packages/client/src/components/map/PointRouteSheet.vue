@@ -10,18 +10,31 @@
       <div class="point-route__header">
         <v-icon class="point-route__pin" icon="mdi-map-marker" size="23" aria-hidden="true" />
         <div class="point-route__headings"><small>مقصد انتخاب‌شده</small><strong :title="api.title.value">{{ api.title.value }}</strong></div>
-        <v-btn id="point-route-info-button" :icon="infoOpen ? 'mdi-information' : 'mdi-information-outline'" variant="text"
-          :aria-label="infoOpen ? 'بستن اطلاعات مکان' : 'نمایش اطلاعات مکان'" :aria-expanded="infoOpen"
-          aria-controls="point-route-info" @click="toggleInfo" />
-        <v-btn icon="mdi-close" variant="text" aria-label="بستن برنامه‌ریزی مسیر" @click="dismiss" />
+        <v-menu v-model="menuOpen" :close-on-content-click="false" :close-on-back="false"
+          location="top" @update:model-value="onMenuVisibilityChange">
+          <template #activator="{ props: menuProps }">
+            <v-btn v-bind="menuProps" id="point-route-menu-button" icon="mdi-dots-vertical" variant="text"
+              aria-label="گزینه‌های مقصد" :aria-expanded="menuOpen" aria-haspopup="menu" />
+          </template>
+          <v-card class="point-route__copy-menu" rounded="xl" dir="rtl" role="menu" aria-label="گزینه‌های مقصد">
+            <span v-if="api.knownPlace.value?.type" class="point-route__place-type">نوع مکان: {{ api.knownPlace.value.type }}</span>
+            <v-btn role="menuitem" variant="text" prepend-icon="mdi-content-copy" :disabled="!api.point.value"
+              @click="copyDestination('coordinates')">کپی مختصات مقصد</v-btn>
+            <v-btn role="menuitem" variant="text" prepend-icon="mdi-content-copy" :disabled="!api.address.value?.trim()"
+              @click="copyDestination('address')">کپی نشانی مقصد</v-btn>
+            <v-btn v-if="reverse.failed.value && !api.address.value" role="menuitem" variant="text"
+              prepend-icon="mdi-refresh" @click="reverse.load()">تلاش دوباره برای نشانی</v-btn>
+            <p v-if="copyFallback" class="point-route__copy-hint" role="status">کپی خودکار ممکن نشد؛ متن زیر را انتخاب و کپی کنید.</p>
+            <textarea v-if="copyFallback" id="point-route-copy-fallback" class="point-route__copy-fallback"
+              :value="copyFallback" readonly dir="auto" aria-label="متن مقصد برای کپی دستی" @focus="selectFallback" />
+          </v-card>
+        </v-menu>
+        <v-btn icon="mdi-close" color="error" variant="text" aria-label="حذف مقصد و مسیر" title="حذف مقصد و مسیر"
+          @click="clearDestination" />
       </div>
-      <div v-if="infoOpen" id="point-route-info" class="point-route__info">
-        <p v-if="!api.address.value && reverse.loading.value" role="status">در حال یافتن نشانی…</p>
-        <p v-else-if="!api.address.value && reverse.failed.value">نشانی در دسترس نیست. <button type="button" @click="reverse.load()">تلاش دوباره</button></p>
-        <p v-else>{{ api.address.value ?? 'نشانی پیدا نشد؛ مختصات مقصد روی نقشه مشخص است.' }}</p>
-        <p v-if="api.knownPlace.value?.type">نوع مکان: {{ api.knownPlace.value.type }}</p>
-        <bdi v-if="api.point.value" dir="ltr">{{ api.point.value.lat.toFixed(5) }}, {{ api.point.value.lon.toFixed(5) }}</bdi>
-      </div>
+      <v-snackbar v-model="copyToastOpen" location="top" color="success" :timeout="2200" :z-index="2600">
+        {{ copyFeedback }}
+      </v-snackbar>
       <div class="point-route__endpoints" aria-label="مبدأ و مقصد مسیر">
         <div class="point-route__endpoint">
           <span class="point-route__endpoint-name">{{ api.provisionalRoute.value ? "مبدأ تقریبی" : "مبدأ" }}:</span>
@@ -74,7 +87,6 @@
         <v-btn v-if="!api.navigating.value" color="primary" variant="flat" :disabled="!api.point.value"
           @click="emit('start')">{{ pausedForEdit ? 'شروع دوبارهٔ راهبری' : 'شروع راهبری' }}</v-btn>
         <v-btn v-else variant="tonal" @click="dismiss">بازگشت به نقشه</v-btn>
-        <v-btn class="point-route__clear" variant="text" color="error" @click="clearDestination">حذف مقصد</v-btn>
       </div>
     </v-card>
   </component>
@@ -87,6 +99,7 @@ import { VBottomSheet } from "vuetify/components";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
+import { destinationCopyText, tryCopyDestination } from "@/map/point-route-copy";
 const props = defineProps<{
   api: ReturnType<typeof usePointRoute>;
   reverse: ReturnType<typeof useReversePlace>;
@@ -94,11 +107,46 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
 const isPhone = useMediaQuery("(max-width: 599px)");
-const infoOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
-watch(() => props.api.point.value, () => { infoOpen.value = false; routesOpen.value = false; pausedForEdit.value = false; });
-watch(() => props.api.sheetOpen.value, (open) => { if (open) { infoOpen.value = false; routesOpen.value = false; } });
-watch([infoOpen, routesOpen], async () => { await nextTick(); emit('layout-change'); });
-function toggleInfo(): void { infoOpen.value = !infoOpen.value; }
+const menuOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
+const copyFeedback = ref("");
+const copyToastOpen = ref(false);
+const copyFallback = ref<string | null>(null);
+let copyGeneration = 0;
+function resetMenu(): void {
+  ++copyGeneration; menuOpen.value = false; copyToastOpen.value = false;
+  copyFeedback.value = ""; copyFallback.value = null;
+}
+watch(() => props.api.point.value, () => { resetMenu(); routesOpen.value = false; pausedForEdit.value = false; });
+watch(() => props.api.sheetOpen.value, (open) => { if (open) { resetMenu(); routesOpen.value = false; } });
+watch(routesOpen, async () => { await nextTick(); emit('layout-change'); });
+function onMenuVisibilityChange(open: boolean): void {
+  ++copyGeneration; // A pending clipboard response cannot populate a reopened menu.
+  if (open) { copyToastOpen.value = false; copyFeedback.value = ""; copyFallback.value = null; }
+}
+async function copyDestination(kind: "coordinates" | "address"): Promise<void> {
+  const point = props.api.point.value;
+  const text = destinationCopyText(kind, point, props.api.address.value);
+  if (!text || !point) return;
+  const current = ++copyGeneration;
+  const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+  const copied = await tryCopyDestination(text, clipboard?.writeText?.bind(clipboard));
+  // An async clipboard result must never show a previous destination's private address.
+  if (props.api.point.value !== point || !menuOpen.value || current !== copyGeneration ||
+    destinationCopyText(kind, point, props.api.address.value) !== text) return;
+  if (copied) {
+    copyFeedback.value = kind === "coordinates" ? "مختصات مقصد کپی شد." : "نشانی مقصد کپی شد.";
+    menuOpen.value = false;
+    copyToastOpen.value = true;
+  } else {
+    copyFallback.value = text;
+    copyFeedback.value = "کپی خودکار ممکن نشد؛ متن را انتخاب و کپی کنید.";
+    await nextTick();
+    if (current === copyGeneration && menuOpen.value) document.getElementById("point-route-copy-fallback")?.focus();
+  }
+}
+function selectFallback(event: FocusEvent): void {
+  if (event.target instanceof HTMLTextAreaElement) event.target.select();
+}
 function showRoutes(): void {
   if (props.api.navigating.value) { props.api.editNavigation(); pausedForEdit.value = true; }
   routesOpen.value = true; props.api.routesVisible.value = true;
@@ -107,11 +155,11 @@ function backToSummary(): void {
   routesOpen.value = false;
   void nextTick(() => document.getElementById('point-route-show-routes')?.focus());
 }
-function dismiss(): void { props.api.sheetOpen.value = false; emit('dismiss'); }
+function dismiss(): void { resetMenu(); props.api.sheetOpen.value = false; emit('dismiss'); }
 function onVisible(visible: boolean): void { if (!visible) dismiss(); }
 function clearDestination(): void { props.api.clear(); emit('dismiss'); }
 function onEscape(): void {
-  if (infoOpen.value) { infoOpen.value = false; void nextTick(() => document.getElementById('point-route-info-button')?.focus()); }
+  if (menuOpen.value) { menuOpen.value = false; void nextTick(() => document.getElementById('point-route-menu-button')?.focus()); }
   else if (routesOpen.value) backToSummary();
   else dismiss();
 }
@@ -154,11 +202,17 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
 .point-route__header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; height: 44px; }
 .point-route__header :deep(.v-btn:focus-visible), .point-route button:focus-visible, .point-route__body:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: -3px; }
-.point-route__info { flex: 0 1 auto; overflow-y: auto; padding: .55rem .85rem; line-height: 1.55;
-  border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1); font-size: .85rem; }
-.point-route__info p { margin: 0 0 .25rem; overflow-wrap: anywhere; }
-.point-route__info bdi { color: rgb(var(--v-theme-on-surface)); opacity: .8; }
-.point-route__info button { color: rgb(var(--v-theme-primary)); font: inherit; font-weight: 800; text-decoration: underline; }
+/* Keep the copy menu outside the compact sheet's document flow. HTTP LAN clients
+ * can select the fallback text without a clipboard API or losing the route. */
+:global(.point-route__copy-menu) { display: grid; gap: .15rem; width: min(18rem, calc(100vw - 1.5rem));
+  max-height: min(60dvh, 17rem); overflow-y: auto;
+  padding: .45rem; color: rgb(var(--v-theme-on-surface)); }
+:global(.point-route__copy-menu .v-btn) { min-height: 44px; justify-content: flex-start; }
+:global(.point-route__place-type) { padding: .35rem .5rem; font-size: .8rem; }
+:global(.point-route__copy-hint) { margin: .25rem .5rem; font-size: .8rem; line-height: 1.5; }
+:global(.point-route__copy-fallback) { box-sizing: border-box; width: 100%; min-height: 3.5rem;
+  padding: .4rem; border: 1px solid currentColor; border-radius: .5rem; font: inherit; resize: vertical; }
+:global(.point-route__copy-fallback:focus-visible) { outline: 2px solid rgb(var(--v-theme-primary)); }
 /* Two compact, independent lines: long addresses never stretch the sheet or wrap. */
 .point-route__endpoints { display: grid; gap: .22rem; flex: 0 0 auto; min-width: 0;
   padding: .4rem .85rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1);
@@ -224,12 +278,11 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
   .point-route__summary, .point-route__body, .point-route__endpoints {
     padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px));
   }
-  /* The body scrolls; Start and Remove stay available above the home indicator. */
+  /* The body scrolls; the two primary actions stay above the home indicator. */
   .point-route__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: .4rem calc(.65rem + env(safe-area-inset-right, 0px))
       calc(.4rem + env(safe-area-inset-bottom, 0px)) calc(.65rem + env(safe-area-inset-left, 0px)); }
   .point-route__actions :deep(.v-btn) { width: 100%; min-width: 0; padding-inline: .25rem; }
-  .point-route__clear { grid-column: 1 / -1; }
 }
 @media (max-width: 400px) {
   .point-route__header { gap: .1rem; }
@@ -238,12 +291,10 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
 }
 @media (max-height: 430px) and (max-width: 599px) {
   /* The fixed header/address/footer need ~14rem even on short phones. Keep
-     everything else scrollable; landscape fits three primary actions in a row. */
+     everything else scrollable; landscape retains two primary actions. */
   .point-route, .point-route-shell--expanded .point-route {
     max-height: clamp(14rem, 60dvh, 17rem);
   }
-  .point-route__actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .point-route__clear { grid-column: auto; }
 }
 @media (forced-colors: active) { .point-route__mode-grid button[aria-pressed="true"] { outline: 2px solid Highlight; } }
 </style>

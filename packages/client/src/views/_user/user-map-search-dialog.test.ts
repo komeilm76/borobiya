@@ -51,13 +51,14 @@ describe("map place search handoff", () => {
     expect(view).not.toContain('openSelectedPlaceDetail');
     expect(view).not.toContain('can-show-place-details');
     const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    expect(sheet).toContain('نمایش اطلاعات مکان');
+    expect(sheet).toContain('گزینه‌های مقصد');
+    expect(sheet).not.toContain('point-route-info');
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain("emit('details')");
     expect(sheet).toContain('api.title.value');
     expect(sheet).toContain('api.address.value');
     expect(sheet).toContain('api.knownPlace.value?.type');
-    expect(sheet).toContain('api.point.value.lat.toFixed(5)');
+    expect(sheet).toContain('destinationCopyText(kind, point, props.api.address.value)');
     expect(sheet).toContain('api.durationLabel.value');
     expect(sheet).toContain('api.distanceLabel.value');
   });
