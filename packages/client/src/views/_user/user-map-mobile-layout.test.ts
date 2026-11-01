@@ -70,7 +70,7 @@ describe("mobile map viewport and overlay tools", () => {
 
   it("keeps full-size controls mounted and offers three accessible launchers with one scrollable panel", () => {
     expect(view).toContain('useMediaQuery("(max-width: 599px)")');
-    expect(view).toContain('<div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
+    expect(view).toContain('<div v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">');
     expect(view).toContain('<v-layout class="user-map-view__dock-layout">');
     expect(view).toContain('<v-bottom-navigation');
     expect(view).toContain('class="user-map-view__dock"');
@@ -147,7 +147,7 @@ describe("mobile map viewport and overlay tools", () => {
     expect(view).toContain('const phoneHistoryDialogProps = computed(() => ({');
     expect(view).toContain('v-bind="isPhone ? phoneHistoryDialogProps : {}"');
     expect(view).toContain('class="user-map-view__history-dialog"');
-    expect(view).not.toContain('VBottomSheet');
+    expect(history).not.toContain('VBottomSheet');
     expect(playbackPanel).toContain('watch(() => props.expanded, (expanded) => { if (expanded) isOpen.value = true; }, { immediate: true });');
     expect(playbackPanel).toContain('v-if="!expanded"'); // No "collapse" inside the full-screen modal.
     expect(view).toContain('.user-map-view__history-dialog .history-playback) { max-height: none !important; overflow: visible; }');
@@ -192,6 +192,17 @@ describe("mobile map viewport and overlay tools", () => {
     expect(phoneMap).toContain('min-width: 44px;');
     expect(phoneMap).toContain('.v-btn.v-btn--selected');
     expect(css(view, "UserMapView.vue")).toContain('.user-map-view__dock-frame[data-v-map-mobile]');
+  });
+
+  it("keeps the SOS and map action row above the measured guidance sheet", () => {
+    expect(shell).toContain('.app-shell--map:has(.user-map-view--navigating) .sos-fab.sos-fab');
+    expect(shell).toContain('inset-block-end: calc(var(--bb-map-navigation-sheet-height, 15rem) + 0.5rem);');
+    expect(view).toContain('document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height")');
+    expect(view).toContain('observer.observe(element)');
+    const styles = css(view, "UserMapView.vue");
+    expect(styles).toContain('.user-map-view--navigating');
+    expect(styles).toContain('right: calc(11.25rem + env(safe-area-inset-right, 0px))');
+    expect(styles).toContain('bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem)');
   });
 
   it("does not let compact navigation, SOS, dock or MapLibre attribution obscure each other", () => {

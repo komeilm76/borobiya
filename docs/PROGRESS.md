@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Guidance sheet and in-trip search on phones
+
+- While phone map guidance is active, the existing journey bar (including GPS warnings, speed/unknown legal limit/time, Details and Stop) sits in a content-sized, non-modal full-width Vuetify bottom sheet. The three-button phone tool dock is hidden only during guidance; tablet/desktop and the pre-navigation planner remain unchanged. A 44px Search toggle opens the **same** place-search widget/state inside the sheet, with a bounded scrollable result area. The eager full-screen Search dialog is unmounted during guidance so there are never two interactive forms; selecting a place still opens route planning and showing all results pauses camera follow until explicitly resumed. Escape and the first Android Back collapse the search rather than leaving the map. The measured sheet height positions SOS, sharing, recenter and compass in a row above it and reserves bottom camera space; safe-area padding and a short-screen scroll cap keep controls reachable. Non-mounted source/compiled CSS tests cover the paths, but real phone GPS, keyboard/screen-reader, attribution and expanded-search layout acceptance remain open; T4.4.1 stays partial.
+
 ### 2026-11-01 — Navigation speed and time-at-a-glance
 
 - Added a three-part glanceable widget **inside** the existing `/_user/map` guidance card after Start: current GPS speed (km/h), legal speed limit, and approximate time remaining along the selected route. Speed is shown only for a recent (<15 s), accurate GPS fix with an actual device-reported speed; missing or weak GPS displays `—`, never a speed derived from the route. ETA follows projected progress along the selected OSRM polyline multiplied by its duration estimate, not straight-line distance or current instantaneous speed. Pending routes, reroutes, off-route or imprecise/stale fixes show `—`; the time is explicitly labeled an estimate without live traffic. The ticker stops with navigation, and changing account clears the private GPS timestamp.

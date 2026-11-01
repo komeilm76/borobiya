@@ -47,6 +47,34 @@ describe("progressive trip planning and editing", () => {
     expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
   });
 
+  it("puts active phone guidance in a nonmodal bottom sheet with one shared search form", () => {
+    const styles = css(map, "UserMapView.vue");
+    expect(map).toContain("isPhone && journey.navigating.value ? VBottomSheet : 'div'");
+    expect(map).toContain('v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame"');
+    expect(map).toContain('v-if="!isPhone || !journey.navigating.value" class="user-map-view__search-dialog"');
+    expect(map).toContain('v-if="navigationSearchOpen" id="map-navigation-search"');
+    expect(map).toContain('aria-controls="map-navigation-search" :aria-expanded="navigationSearchOpen"');
+    expect(map.match(/<PlaceSearchPanel :api="placeSearch"/g)).toHaveLength(2); // Exclusive mount paths, one composable.
+    expect(map).toContain('aria-label="جست‌وجوی مکان در مسیر"');
+    expect(map).toContain('navigationSearchOpen.value = false;\n  removeSelectedCompanion();');
+    expect(map).toContain('if (navigationSearchOpen.value) closeNavigationSearch();');
+    expect(map).toContain('else if (navigationSearchOpen.value) closeNavigationSearch();'); // First Back closes search.
+    expect(map).toContain('@keydown.esc.stop="closeNavigationSearch"');
+    expect(map).toContain(':scrim="false" :persistent="true" :close-on-back="false" :retain-focus="false"');
+    expect(map).toContain(":scroll-strategy=\"isPhone && journey.navigating.value ? 'none' : undefined\"");
+    expect(map).toContain(":aria-modal=\"isPhone && journey.navigating.value ? 'false' : undefined\"");
+    expect(map).toContain('navigationFollowEnabled.value = false; // Keep the result overview');
+    expect(map).toContain('if (sheet) padding.bottom =');
+    expect(map).toContain("const navigationSheet = document.getElementById('map-navigation-sheet')");
+    expect(map).toContain('observer = new ResizeObserver(update)');
+    expect(styles).toContain('.user-map-view__journey-stack.v-bottom-sheet > .v-overlay__content');
+    expect(styles).toContain('max-height: min(72dvh, 36rem)');
+    expect(styles).toContain('max-height: 32dvh');
+    expect(styles).toContain('safe-area-inset-bottom');
+    expect(styles).toContain('var(--bb-map-navigation-sheet-height, 15rem)');
+    expect(map).toContain('aria-label="حد مجاز نامشخص"'); // Never invent a legal limit.
+  });
+
   it("begins as a compact planner with a separate place-info toggle", () => {
     expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain('role="dialog"');

@@ -1,5 +1,6 @@
 <template>
-  <section class="user-map-view" :class="{ 'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value }" aria-label="نقشهٔ تعاملی همراهان">
+  <section class="user-map-view" :class="{ 'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value,
+    'user-map-view--navigating': isPhone && journey.navigating.value && !journey.sheetOpen.value }" aria-label="نقشهٔ تعاملی همراهان">
     <MapCanvas
       class="user-map-view__canvas"
       :style-url="mapStyleUrl"
@@ -27,7 +28,7 @@
     </div>
 
     <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
-    <div v-if="isPhone" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
+    <div v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
       <v-layout class="user-map-view__dock-layout">
         <v-bottom-navigation
           class="user-map-view__dock"
@@ -93,48 +94,68 @@
       {{ recenterError ?? own.error.value }}
     </span>
 
-    <div v-if="journey.point.value" class="user-map-view__journey-stack">
-      <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar">
-        <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
-        <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
-        <dl v-if="journey.navigating.value" class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
-          <div class="user-map-view__telemetry-item">
-            <dt><v-icon icon="mdi-speedometer" size="16" aria-hidden="true" />سرعت فعلی</dt>
-            <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت`">
-              {{ liveSpeedKmh === null ? '—' : liveSpeedKmh.toLocaleString('fa-IR') }}
-            </dd>
-            <small>کیلومتر/ساعت · GPS</small>
+    <component :is="isPhone && journey.navigating.value ? VBottomSheet : 'div'"
+      v-if="journey.point.value && !(isPhone && journey.sheetOpen.value && journey.navigating.value)"
+      class="user-map-view__journey-stack" :model-value="isPhone && journey.navigating.value ? true : undefined"
+      :scrim="false" :persistent="true" :close-on-back="false" :retain-focus="false"
+      :scroll-strategy="isPhone && journey.navigating.value ? 'none' : undefined"
+      :aria-modal="isPhone && journey.navigating.value ? 'false' : undefined"
+      aria-label="راهبری فعال" @after-enter="onNavigationSheetLayoutChange"
+      @keydown.esc.stop="closeNavigationSearch">
+      <div id="map-navigation-sheet" class="user-map-view__journey-content">
+        <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar">
+          <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
+          <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+          <dl v-if="journey.navigating.value" class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
+            <div class="user-map-view__telemetry-item">
+              <dt><v-icon icon="mdi-speedometer" size="16" aria-hidden="true" />سرعت فعلی</dt>
+              <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت`">
+                {{ liveSpeedKmh === null ? '—' : liveSpeedKmh.toLocaleString('fa-IR') }}
+              </dd>
+              <small>کیلومتر/ساعت · GPS</small>
+            </div>
+            <div class="user-map-view__telemetry-item user-map-view__telemetry-item--unknown">
+              <dt><v-icon icon="mdi-road-variant" size="16" aria-hidden="true" />حد مجاز</dt>
+              <dd aria-label="حد مجاز نامشخص">—</dd>
+              <small title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">دادهٔ معتبر موجود نیست</small>
+            </div>
+            <div class="user-map-view__telemetry-item">
+              <dt><v-icon icon="mdi-timer-outline" size="16" aria-hidden="true" />زمان باقی‌مانده</dt>
+              <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}`">
+                {{ remainingSeconds === null ? '—' : formatRemainingTime(remainingSeconds) }}
+              </dd>
+              <small>برآورد مسیر · بدون ترافیک</small>
+            </div>
+          </dl>
+          <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های مسیر">
+            <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
+            <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
+            <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
+            <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
+              title="حذف مسیر و مقصد" @click="clearPointRoute" />
           </div>
-          <div class="user-map-view__telemetry-item user-map-view__telemetry-item--unknown">
-            <dt><v-icon icon="mdi-road-variant" size="16" aria-hidden="true" />حد مجاز</dt>
-            <dd aria-label="حد مجاز نامشخص">—</dd>
-            <small title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">دادهٔ معتبر موجود نیست</small>
+        </div>
+        <div v-if="journey.navigating.value && (journey.gpsWarning.value || journey.rerouteMessage.value)"
+          class="user-map-view__navigation-status">
+          <p v-if="journey.gpsWarning.value" class="user-map-view__gps-warning" role="status" aria-live="polite">
+            <v-icon icon="mdi-signal-off" aria-hidden="true" />{{ journey.gpsWarning.value }}
+          </p>
+          <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
+            role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
+        </div>
+        <div v-if="isPhone && journey.navigating.value" class="user-map-view__navigation-search">
+          <v-btn id="map-navigation-search-toggle" variant="text" prepend-icon="mdi-magnify"
+            aria-controls="map-navigation-search" :aria-expanded="navigationSearchOpen"
+            @click="navigationSearchOpen = !navigationSearchOpen">
+            {{ navigationSearchOpen ? 'بستن جست‌وجو' : 'جست‌وجوی مکان' }}
+          </v-btn>
+          <div v-if="navigationSearchOpen" id="map-navigation-search" role="region"
+            aria-label="جست‌وجوی مکان در مسیر" @keydown.esc.stop="closeNavigationSearch">
+            <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />
           </div>
-          <div class="user-map-view__telemetry-item">
-            <dt><v-icon icon="mdi-timer-outline" size="16" aria-hidden="true" />زمان باقی‌مانده</dt>
-            <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}`">
-              {{ remainingSeconds === null ? '—' : formatRemainingTime(remainingSeconds) }}
-            </dd>
-            <small>برآورد مسیر · بدون ترافیک</small>
-          </div>
-        </dl>
-        <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های مسیر">
-          <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
-          <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
-          <v-btn v-else variant="tonal" color="primary" @click="openPointRouteDetails">جزئیات مسیر</v-btn>
-          <v-btn icon="mdi-delete-outline" variant="tonal" color="error" aria-label="حذف مسیر و مقصد"
-            title="حذف مسیر و مقصد" @click="clearPointRoute" />
         </div>
       </div>
-      <div v-if="journey.navigating.value && (journey.gpsWarning.value || journey.rerouteMessage.value)"
-        class="user-map-view__navigation-status">
-        <p v-if="journey.gpsWarning.value" class="user-map-view__gps-warning" role="status" aria-live="polite">
-          <v-icon icon="mdi-signal-off" aria-hidden="true" />{{ journey.gpsWarning.value }}
-        </p>
-        <p v-if="journey.rerouteMessage.value && journey.navigating.value" class="user-map-view__reroute-status"
-          role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
-      </div>
-    </div>
+    </component>
     <PointRouteSheet :api="journey" :reverse="reverse" :origin-reverse="originReverse"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
@@ -144,7 +165,7 @@
 
     <!-- Phone search gets the same full-height dialog treatment as Companions;
          wider maps retain the existing in-flow/side search panel. -->
-    <component :is="isPhone ? VDialog : 'div'" class="user-map-view__search-dialog"
+    <component :is="isPhone ? VDialog : 'div'" v-if="!isPhone || !journey.navigating.value" class="user-map-view__search-dialog"
       v-bind="isPhone ? phoneSearchDialogProps : {}"
       @update:model-value="onSearchDialogVisibilityChange">
       <v-card class="user-map-view__search-surface" rounded="xl">
@@ -221,7 +242,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { onBeforeRouteLeave } from "vue-router";
 import { useMediaQuery } from "@vueuse/core";
-import { VDialog } from "vuetify/components";
+import { VBottomSheet, VDialog } from "vuetify/components";
 import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
@@ -278,6 +299,13 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
 const activeTool = ref<MapTool | null>(null);
+const navigationSearchOpen = ref(false);
+function closeNavigationSearch(event?: KeyboardEvent): void {
+  if (!navigationSearchOpen.value) return;
+  event?.preventDefault();
+  navigationSearchOpen.value = false;
+  void nextTick(() => document.getElementById("map-navigation-search-toggle")?.focus());
+}
 const shareOpen = ref(false);
 function onShareCreated(): void {
   // A new outgoing grant can change the device assigned to broadcast; do not start GPS here.
@@ -300,10 +328,11 @@ onMounted(() => {
 });
 onBeforeRouteLeave(() => {
   const position: unknown = window.history.state?.position;
-  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value) && typeof position === "number" &&
+  if (isPhone.value && (shareOpen.value || activeTool.value || selectedCompanionId.value || journey.sheetOpen.value || navigationSearchOpen.value) && typeof position === "number" &&
     mapEntryPosition !== undefined && position < mapEntryPosition) {
     if (shareOpen.value) shareOpen.value = false;
     else if (journey.sheetOpen.value) journey.sheetOpen.value = false;
+    else if (navigationSearchOpen.value) closeNavigationSearch();
     else if (selectedCompanionId.value) removeSelectedCompanion();
     else closeTool();
     return false;
@@ -521,11 +550,14 @@ function followNavigationCamera(camera: NavigationCamera): void {
     const bar = document.querySelector('.user-map-view__journey-bar')?.getBoundingClientRect();
     const status = document.querySelector('.user-map-view__navigation-status')?.getBoundingClientRect();
     const sheet = document.getElementById('map-point-route-sheet')?.getBoundingClientRect();
-    const top = Math.max(0, (bar?.bottom ?? 0) - canvas.top, (status?.bottom ?? 0) - canvas.top);
+    const top = isPhone.value && journey.navigating.value ? 0 :
+      Math.max(0, (bar?.bottom ?? 0) - canvas.top, (status?.bottom ?? 0) - canvas.top);
     // On wide screens the sheet is beside the GPS target, not over it.
     const centreX = canvas.left + canvas.width / 2;
-    const bottom = sheet && sheet.left <= centreX && sheet.right >= centreX && sheet.top < canvas.bottom
-      ? Math.max(56, canvas.bottom - sheet.top) : 56;
+    const navigationSheet = document.getElementById('map-navigation-sheet')?.getBoundingClientRect();
+    const overlay = sheet && sheet.left <= centreX && sheet.right >= centreX && sheet.top < canvas.bottom
+      ? sheet : isPhone.value && journey.navigating.value ? navigationSheet : null;
+    const bottom = overlay ? Math.max(56, canvas.bottom - overlay.top + (isPhone.value ? 60 : 0)) : 56;
     const offset = navigationCameraOffset(journey.profile.value, canvas.height, top, bottom);
     const pitch = Math.min(camera.pitch, instance.getMaxPitch());
     const zoom = navigationFollowZoom(journey.profile.value, camera.center[1], canvas.height, top, bottom,
@@ -536,6 +568,30 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+// Vuetify teleports the sheet outside the map shell. Share its measured height with
+// the map action rail and SOS (an App.vue sibling), including when results expand.
+watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => journey.sheetOpen.value],
+  async (_values, _previous, onCleanup) => {
+    let disposed = false;
+    let observer: ResizeObserver | undefined;
+    onCleanup(() => {
+      disposed = true; observer?.disconnect();
+      document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height");
+    });
+    if (!isPhone.value || !journey.navigating.value || journey.sheetOpen.value) return;
+    await nextTick();
+    if (disposed) return;
+    const element = document.getElementById("map-navigation-sheet");
+    if (!element) return;
+    const update = () => {
+      document.documentElement.style.setProperty(
+        "--bb-map-navigation-sheet-height", `${Math.ceil(element.getBoundingClientRect().height)}px`);
+      if (navigationFollowEnabled.value && journey.navigating.value) journey.focus();
+    };
+    update();
+    observer = new ResizeObserver(update);
+    observer.observe(element);
+  }, { flush: "post" });
 // Recheck freshness even when the device stops sending fixes silently. No persistent GPS
 // samples or speed-limit guesses; stopping guidance tears down the ticker.
 const telemetryNow = ref(Date.now());
@@ -655,7 +711,7 @@ function syncResultMarkers(): void {
     if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
   }
 }
-function showAllSearchResults(): void {
+async function showAllSearchResults(): Promise<void> {
   const instance = map.value;
   if (!instance || !markerConstructor || !auth.user?.id) return;
   const bounds = instance.getMaxBounds();
@@ -667,12 +723,25 @@ function showAllSearchResults(): void {
   if (!extent) return;
   syncResultMarkers();
   userControlledCamera.value = true;
+  if (journey.navigating.value) {
+    navigationFollowEnabled.value = false; // Keep the result overview until the user explicitly resumes following.
+    closeNavigationSearch();
+    await nextTick(); // Fit to the compact sheet, not the tall search-results surface.
+    if (map.value !== instance || !journey.navigating.value) return;
+  }
   const container = instance.getContainer();
+  const padding = resultCameraPadding(container.clientWidth, container.clientHeight, isPhone.value);
+  if (isPhone.value && journey.navigating.value) {
+    const sheet = document.getElementById("map-navigation-sheet")?.getBoundingClientRect();
+    if (sheet) padding.bottom = Math.min(container.clientHeight - padding.top - 32,
+      Math.max(padding.bottom, container.getBoundingClientRect().bottom - sheet.top + 60));
+  }
   instance.fitBounds(extent, {
-    padding: resultCameraPadding(container.clientWidth, container.clientHeight, isPhone.value),
+    padding,
     maxZoom: 15, duration: 700
   }, { placeSearchSelection: true }); // Framing must not requery its own viewport.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
+  if (navigationSearchOpen.value) closeNavigationSearch();
 }
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
@@ -749,6 +818,7 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   // Dismiss the full-screen search before opening route choices over the map.
   // Keep results mounted; a later query refresh must not change this destination.
   if (isPhone.value && activeTool.value === "search") closeTool(false);
+  navigationSearchOpen.value = false;
   removeSelectedCompanion();
   journey.select({ lat: place.lat, lon: place.lon }, place);
 }
@@ -1198,6 +1268,9 @@ watch(() => journey.point.value, (next, previous) => {
   syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute();
 }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
+function onNavigationSheetLayoutChange(): void {
+  if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
+}
 function onPointRouteLayoutChange(): void {
   if (journey.navigating.value) {
     if (navigationFollowEnabled.value) journey.focus();
@@ -1228,12 +1301,14 @@ watch(() => journey.sheetOpen.value, async () => {
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
 });
 watch(() => journey.navigating.value, (active) => {
+  navigationSearchOpen.value = false;
+  if (active && activeTool.value) closeTool(false);
   if (!active) {
     navigationFollowEnabled.value = true;
     // The camera may have travelled far while following GPS. Prune old POIs once,
     // but never launch a geocoder request on every navigation frame.
     if (showAllResultsOnMap.value) placeSearch.pruneForViewport(showAllResultsOnMap.value, false);
-  }
+  } else void nextTick(onNavigationSheetLayoutChange);
   syncResultMarkers(); syncSelectedPlaceMarker();
   syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute();
 });
@@ -1348,6 +1423,7 @@ watch(
 );
 
 onBeforeUnmount(() => {
+  document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height");
   // `map.value` is cleared first: Vue runs a parent's `beforeUnmount` before the child's, so the map is
   // still alive here and nothing else can paint after this point.
   const instance = map.value;
@@ -1437,11 +1513,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 
 /* Active journey stays compact; the map remains edge-to-edge. */
-.user-map-view__journey-stack {
+.user-map-view__journey-stack:not(.v-bottom-sheet) {
   position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
   top: calc(5rem + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 2rem);
 }
-.user-map-view__journey-stack { width: min(36rem, calc(100vw - 2rem)); display: grid; gap: .35rem; pointer-events: none; }
+.user-map-view__journey-stack:not(.v-bottom-sheet) { width: min(36rem, calc(100vw - 2rem)); pointer-events: none; }
+.user-map-view__journey-content { display: grid; gap: .35rem; }
 /* The label has a full line of its own; button widths cannot squeeze it into
  * several short lines. Keep the actual text intact for assistive technology. */
 .user-map-view__journey-bar { display: grid; grid-template-columns: 21px minmax(0, 1fr);
@@ -1687,6 +1764,53 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) {
   /* Leave the journey label a full row even on narrow phones; the controls wrap separately. */
   .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
+  /* Guidance is a non-modal standard sheet; the compact card hugs its content.
+     On short phones the sheet can scroll without blocking map interaction. */
+  :global(.user-map-view__journey-stack.v-bottom-sheet > .v-overlay__content) {
+    width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
+    flex: 0 1 auto !important; height: auto !important;
+  }
+  :global(.user-map-view__journey-stack.v-bottom-sheet > .v-overlay__content > .user-map-view__journey-content) {
+    display: flex; flex-direction: column; gap: .3rem; width: 100%; min-height: 0;
+    max-height: min(72dvh, 36rem); overflow-y: auto; overscroll-behavior: contain;
+    padding: .5rem calc(.75rem + env(safe-area-inset-right, 0px))
+      calc(.5rem + env(safe-area-inset-bottom, 0px)) calc(.75rem + env(safe-area-inset-left, 0px));
+    border-radius: 20px 20px 0 0; background: rgb(var(--v-theme-surface));
+    box-shadow: var(--bb-shadow-overlay);
+  }
+  :global(.user-map-view__journey-stack .user-map-view__navigation-search) {
+    min-height: 44px; display: flex; flex-direction: column; flex: 0 0 auto;
+  }
+  :global(.user-map-view__journey-stack .user-map-view__navigation-search > .v-btn) {
+    flex: 0 0 auto; min-height: 44px; align-self: stretch;
+  }
+  :global(.user-map-view__journey-stack #map-navigation-search) {
+    max-height: 32dvh; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  }
+  :global(.user-map-view__journey-stack #map-navigation-search .place-search) {
+    box-shadow: none; max-height: none; width: 100%;
+  }
+  :global(.user-map-view__journey-stack #map-navigation-search .place-search__results) {
+    max-height: none; overflow: visible;
+  }
+  :global(.user-map-view__journey-stack .user-map-view__navigation-status) {
+    overflow-y: auto; min-height: 0;
+  }
+  /* A horizontal 48px action row clears the sheet even on short phones. The
+     shared measured height also moves SOS, which lives outside this view. */
+  .user-map-view--navigating .user-map-view__share,
+  .user-map-view--navigating .user-map-view__recenter,
+  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    top: auto; bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
+  }
+  .user-map-view--navigating .user-map-view__share { right: calc(4.25rem + env(safe-area-inset-right, 0px)); left: auto; }
+  .user-map-view--navigating .user-map-view__recenter { right: calc(7.75rem + env(safe-area-inset-right, 0px)); left: auto; }
+  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    right: calc(11.25rem + env(safe-area-inset-right, 0px)); left: auto;
+  }
+  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
+    bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + 4rem);
+  }
   .user-map-view__search-map-actions {
     position: fixed; z-index: 6;
     top: calc(8rem + env(safe-area-inset-top, 0px)); left: calc(0.75rem + env(safe-area-inset-left, 0px));
@@ -1901,6 +2025,14 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   }
   .user-map-view__canvas :deep(.maplibregl-ctrl-bottom-left) {
     bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (max-width: 599px) {
+  .user-map-view--navigating .user-map-view__recenter,
+  .user-map-view--navigating .user-map-view__share,
+  .user-map-view--navigating .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
+    bottom: calc(var(--bb-map-navigation-sheet-height, 15rem) + .5rem);
   }
 }
 
