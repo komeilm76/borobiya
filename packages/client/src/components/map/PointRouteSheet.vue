@@ -1,11 +1,9 @@
 <template>
-  <!-- Desktop stays a nonmodal map panel; phones use the SOS-style bottom sheet. -->
-  <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
+  <!-- A standard, nonmodal map sheet. The selected route state alone controls
+       its visibility; no separate dialog/transition state can close it. -->
+  <section v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
-    :model-value="isPhone ? api.sheetOpen.value : undefined" :scrim="isPhone ? false : undefined"
-    :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"
-    :aria-modal="false" aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
-    @keydown.esc.stop.prevent="onEscape">
+    role="region" aria-label="برنامه‌ریزی مسیر" @keydown.esc.stop.prevent="onEscape">
     <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl" tabindex="-1">
       <div class="point-route__header">
         <v-icon class="point-route__pin" icon="mdi-map-marker" size="23" aria-hidden="true" />
@@ -87,7 +85,7 @@
         <v-btn v-else variant="tonal" @click="dismiss">بازگشت به نقشه</v-btn>
       </div>
     </v-card>
-  </component>
+  </section>
   <!-- The header X only requests deletion. The route remains intact until the
        explicit destructive choice; Escape/Back/outside cancel this dialog. -->
   <v-dialog v-model="confirmDeleteOpen" max-width="24rem" :close-on-back="false"
@@ -110,7 +108,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
-import { VBottomSheet } from "vuetify/components";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
@@ -183,7 +180,6 @@ function backToSummary(): void {
   void nextTick(() => document.getElementById('point-route-show-routes')?.focus());
 }
 function dismiss(): void { confirmDeleteOpen.value = false; resetMenu(); props.api.sheetOpen.value = false; emit('dismiss'); }
-function onVisible(visible: boolean): void { if (!visible && !props.choicesOpen) dismiss(); }
 function requestDelete(): void { menuOpen.value = false; confirmDeleteOpen.value = true; }
 function cancelDelete(): void { confirmDeleteOpen.value = false; }
 function focusCancelRemoval(): void { document.getElementById("point-route-cancel-remove")?.focus(); }
@@ -295,22 +291,16 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
     width: min(30rem, calc(100vw - 7.5rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))); }
 }
 @media (min-width: 600px) and (max-width: 1023px) {
-  .point-route-shell { position: relative; order: 3; left: auto; right: auto; bottom: auto; width: 100%; padding: 0; pointer-events: auto; }
+  section.point-route-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
+    width: min(30rem, calc(100vw - 7.5rem)); }
   .point-route { max-height: min(42dvh, 19rem); }
   .point-route-shell--expanded .point-route { max-height: min(65dvh, 36rem); }
 }
 @media (max-width: 599px) {
-  /* Vuetify teleports the sheet outside the map. Its scrollable dialog flexes
-     the overlay/card to 100% height, even if the card has a smaller max-height.
-     Size both to their contents instead; only the details area scrolls. */
-  :global(.point-route-shell.v-bottom-sheet > .v-overlay__content) {
-    width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
-    flex: 0 1 auto !important; height: auto !important;
-  }
-  :global(.point-route-shell.v-bottom-sheet > .v-overlay__content > .point-route) {
-    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
-    flex: 0 1 auto !important; height: auto !important; overflow: hidden !important;
-  }
+  /* Keep the standard sheet inside the map viewport, above the dock. The map
+     remains usable outside its content and the footer clears the home indicator. */
+  section.point-route-shell { left: 0; right: 0; bottom: 0; width: 100%; }
+  .point-route { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0; }
   /* No viewport-height floor: the summary hugs its real content so the map
      remains in view. Expanded review is capped and scrolls without shrinking
      the header, endpoints, touch targets or safe-area footer. */

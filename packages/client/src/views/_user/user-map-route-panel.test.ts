@@ -19,16 +19,11 @@ const css = (source: string, filename: string) => {
 describe("progressive trip planning and editing", () => {
   it("keeps desktop route review nonmodal and gives phones a content-sized map-visible bottom sheet", () => {
     expect(map).not.toContain('برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.');
-    expect(sheet).toContain("isPhone ? VBottomSheet : 'section'");
-    expect(sheet).toContain('import { VBottomSheet } from "vuetify/components"');
-    expect(sheet).toContain(':model-value="isPhone ? api.sheetOpen.value : undefined"');
-    expect(sheet).toContain('@update:model-value="onVisible"');
-    expect(sheet).toContain('@after-enter="emit(\'layout-change\')"');
+    expect(sheet).toContain('<section v-if="api.point.value && api.sheetOpen.value && !choicesOpen"');
+    expect(sheet).toContain('role="region" aria-label="برنامه‌ریزی مسیر"');
+    expect(sheet).not.toContain('import { VBottomSheet }');
+    expect(sheet).not.toContain('onVisible('); // No overlay model can close the newly selected point.
     expect(sheet).toContain('id="map-point-route-sheet"');
-    expect(sheet).not.toContain(':scrollable="isPhone"'); // Vuetify scrollable sets flex: 1 1 100% on the overlay.
-    expect(sheet).toContain(':scrim="isPhone ? false : undefined"'); // The map remains readable while reviewing routes.
-    expect(sheet).toContain(':persistent="isPhone"'); // Panning/selecting a line cannot dismiss the route controls.
-    expect(sheet).toContain('function onVisible(visible: boolean)');
     expect(sheet).not.toContain('icon="mdi-alarm-light"');
     expect(sheet).not.toContain('openEmergencyForm');
     expect(sheet).not.toContain('useSosSheetStore');
@@ -37,11 +32,10 @@ describe("progressive trip planning and editing", () => {
     expect(dock).not.toContain('SOS');
     expect(sheet).toContain('برای بررسی مسیرها از دکمهٔ انتخاب مسیر کنار SOS استفاده کنید.');
     const styles = css(sheet, "PointRouteSheet.vue");
-    expect(styles).toContain('.point-route-shell.v-bottom-sheet > .v-overlay__content');
-    expect(styles).toContain('width: 100vw');
+    expect(styles).toContain('section.point-route-shell[data-v-route-panel] { position: fixed; z-index: 7');
+    expect(styles).toContain('section.point-route-shell[data-v-route-panel] { left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(styles).toContain('border-radius: var(--bb-radius-card, 24px)');
     expect(styles).not.toContain('min-height: min(60dvh, 26rem)');
-    expect(styles).toContain('height: auto !important'); // Beat Vuetify's scrollable dialog flex sizing when teleported.
-    expect(styles).toContain('flex: 0 1 auto !important');
     expect(styles).toContain('max-height: min(52dvh, 27rem)'); // Expanded review leaves almost half the map exposed.
     expect(styles).toContain('min-height: 0; max-height: min(48dvh, 24rem)'); // Summary hugs its contents, not a viewport floor.
     expect(styles).toContain('max-height: clamp(14rem, 60dvh, 17rem)'); // Short phones keep fixed controls reachable.
@@ -158,7 +152,7 @@ describe("progressive trip planning and editing", () => {
     const styles = css(sheet, "PointRouteSheet.vue");
     for (const token of ["pointer-events: none", "pointer-events: auto", "overflow-y: auto",
       "min-height: 44px", "safe-area-inset-bottom", "(min-width: 600px) and (max-width: 1023px)",
-      "position: relative; order: 3", "max-height: min(52dvh, 27rem)", "height: auto !important"]) {
+      "width: min(30rem, calc(100vw - 7.5rem))", "max-height: min(52dvh, 27rem)"]) {
       expect(styles).toContain(token);
     }
   });
@@ -270,8 +264,9 @@ describe("progressive trip planning and editing", () => {
     expect(dialog).toContain('راهبری جاری متوقف می‌شود');
     expect(dialog).toContain('api.title.value');
     expect(dialog).not.toContain('persistent');
-    expect(sheet).toContain(':retain-focus="false" scroll-strategy="none"');
-    expect(sheet).toContain(':aria-modal="false"');
+    expect(sheet).toContain('role="region" aria-label="برنامه‌ریزی مسیر"');
+    expect(sheet).not.toContain('retain-focus'); // Only the deletion confirmation is modal.
+    expect(sheet).not.toContain('aria-modal="true"');
     expect(dialog).not.toContain('retain-focus="false"');
     const request = sheet.slice(sheet.indexOf('function requestDelete()'), sheet.indexOf('function cancelDelete()'));
     expect(request).not.toContain('props.api.clear()');
@@ -326,8 +321,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('new ResizeObserver(measurePointSheet)');
     expect(map).toContain('document.documentElement.style.removeProperty("--bb-map-point-sheet-height")');
     expect(map).toContain('function onPointRouteLayoutChange(): void {\n  measurePointSheet();');
-    expect(map).toContain('function onRouteChoicesLayoutChange(): void { measurePointSheet(); fitPointRoute(); }');
-    expect(map).toContain('@layout-change="onRouteChoicesLayoutChange"');
+    expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
     const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
     const rule = '.app-shell--map:has(.user-map-view--route-preview)';
     const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 0.5rem)';
@@ -343,7 +337,7 @@ describe("progressive trip planning and editing", () => {
     // Five 48px actions with >=4px gaps fit a 320px phone with 20px insets.
     const lastActionLeft = 320 - (12 + 13 * 16 + 20) - 48;
     expect(lastActionLeft).toBeGreaterThanOrEqual(20);
-    expect(sheet).toContain(':retain-focus="false"'); // The map and action row remain keyboard-reachable.
+    expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
   });
 
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
@@ -358,21 +352,26 @@ describe("progressive trip planning and editing", () => {
 
   it("moves alternative selection into a separate accessible sheet and returns to the planner", () => {
     expect(map).toContain('id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"');
-    expect(map).toContain('aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"');
+    expect(map).toContain('aria-controls="map-point-route-choices-sheet"');
+    expect(map).not.toContain('aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"');
     expect(map).toContain('ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود');
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return; }');
     expect(map).toContain('if (journey.navigating.value) journey.editNavigation();');
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return false; }');
     expect(map).toContain(':choices-open="routeChoicesOpen"');
-    expect(sheet).toContain('if (!visible && !props.choicesOpen) dismiss();');
+    expect(sheet).not.toContain('onVisible('); // A pending point hold cannot be dismissed by a dialog lifecycle event.
     expect(map).toContain('@choose="selectPointRoute" @close="closeRouteChoices"');
     expect(map).toContain('journey.choose(index);\n  closeRouteChoices();');
     expect(map).toContain("document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true })");
     expect(map).toContain('routeChoicesOpen.value = false;\n  journey.clear();');
     expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
     expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
-    expect(choices).toContain("isPhone ? VBottomSheet : 'section'");
-    expect(choices).toContain(':scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"');
+    expect(choices).toContain('<section v-if="open && api.point.value" class="point-route-choices-shell"');
+    expect(choices).toContain('role="region" aria-label="انتخاب مسیر"');
+    expect(choices).not.toContain('VBottomSheet');
+    const choiceStyles = css(choices, "PointRouteChoicesSheet.vue");
+    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(choiceStyles).toContain('width: min(30rem, calc(100vw - 7.5rem))');
     expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');
     expect(choices).toContain(':aria-pressed="index === api.index.value"');

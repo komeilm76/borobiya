@@ -67,7 +67,7 @@
     <Teleport to="#map-route-choices-action-anchor">
       <v-btn v-if="journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
         icon="mdi-routes" variant="flat" color="primary" :aria-expanded="routeChoicesOpen"
-        aria-controls="map-point-route-choices-sheet" aria-haspopup="dialog"
+        aria-controls="map-point-route-choices-sheet"
         :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
         :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
         @click="openRouteChoices" />
@@ -172,7 +172,7 @@
       :choices-open="routeChoicesOpen" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen"
-      @choose="selectPointRoute" @close="closeRouteChoices" @layout-change="onRouteChoicesLayoutChange" />
+      @choose="selectPointRoute" @close="closeRouteChoices" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -656,10 +656,10 @@ watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => jour
     observer = new ResizeObserver(update);
     observer.observe(element);
   }, { flush: "post" });
-// The compact planner and the alternative-card chooser are mutually exclusive.
-// Keep SOS and the route launcher ABOVE whichever phone sheet is visible, rather
-// than under Vuetify's teleported content. React to async route results, review
-// expansion and safe-area changes without guessing a fixed sheet height.
+// The compact planner and alternative-card chooser are mutually exclusive.
+// Keep SOS and the route launcher ABOVE whichever in-map phone sheet is visible.
+// React to async route results, review expansion and safe-area changes without
+// guessing a fixed sheet height.
 function measurePointSheet(): void {
   if (!isPhone.value || !journey.point.value || !journey.sheetOpen.value) return;
   const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
@@ -676,10 +676,12 @@ watch([isPhone, () => journey.point.value, () => journey.sheetOpen.value, routeC
     });
     if (!isPhone.value || !journey.point.value || !journey.sheetOpen.value) return;
     await nextTick();
-    await nextTick(); // Vuetify mounts its teleported overlay after the first render.
+    // The in-map standard sheet renders on the next Vue tick; a second tick
+    // also covers a same-frame swap from the planner to the route chooser.
+    await nextTick();
     if (disposed) return;
     const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
-    if (!element) return; // The sheet's after-enter callback is another measurement opportunity.
+    if (!element) return;
     measurePointSheet();
     observer = new ResizeObserver(measurePointSheet);
     observer.observe(element);
@@ -1417,7 +1419,6 @@ function onPointRouteLayoutChange(): void {
     if (navigationFollowEnabled.value) journey.focus();
   } else fitPointRoute();
 }
-function onRouteChoicesLayoutChange(): void { measurePointSheet(); fitPointRoute(); }
 function fitPointRoute(): void {
   const instance = map.value, to = journey.point.value;
   if (!instance || !to || !journey.selectedRoute.value || !journey.routesVisible.value || journey.navigating.value) return;

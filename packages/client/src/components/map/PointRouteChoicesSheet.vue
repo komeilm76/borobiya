@@ -1,10 +1,7 @@
 <template>
   <!-- A separate, scrollable route chooser; the map remains visible behind it. -->
-  <component :is="isPhone ? VBottomSheet : 'section'" v-if="open && api.point.value"
-    class="point-route-choices-shell" :model-value="isPhone ? true : undefined"
-    :scrim="false" :persistent="isPhone" :close-on-back="false" :retain-focus="false" scroll-strategy="none"
-    :aria-modal="false" aria-label="انتخاب مسیر" @update:model-value="onVisible"
-    @after-enter="emit('layout-change')" @keydown.esc.stop.prevent="emit('close')">
+  <section v-if="open && api.point.value" class="point-route-choices-shell"
+    role="region" aria-label="انتخاب مسیر" @keydown.esc.stop.prevent="emit('close')">
     <v-card id="map-point-route-choices-sheet" class="point-route-choices" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route-choices__header">
         <h2>انتخاب مسیر</h2>
@@ -31,18 +28,14 @@
         <v-btn variant="tonal" color="primary" @click="emit('close')">بازگشت به برنامه‌ریزی مسیر</v-btn>
       </footer>
     </v-card>
-  </component>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { useMediaQuery } from "@vueuse/core";
-import { VBottomSheet } from "vuetify/components";
 import type { usePointRoute } from "@/composables/use-point-route";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean }>();
-const emit = defineEmits<{ close: []; choose: [index: number]; 'layout-change': [] }>();
-const isPhone = useMediaQuery("(max-width: 599px)");
-function onVisible(visible: boolean): void { if (!visible) emit('close'); }
+const emit = defineEmits<{ close: []; choose: [index: number] }>();
 </script>
 
 <style scoped>
@@ -76,18 +69,12 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
 .point-route-choices__footer :deep(.v-btn) { min-height: 44px; height: auto; }
 .point-route-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
-  section.point-route-choices-shell { position: relative; order: 3; left: auto; right: auto; bottom: auto;
-    width: 100%; padding: 0; pointer-events: auto; }
+  section.point-route-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
+    width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  :global(.point-route-choices-shell.v-bottom-sheet > .v-overlay__content) {
-    width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
-    flex: 0 1 auto !important; height: auto !important;
-  }
-  :global(.point-route-choices-shell.v-bottom-sheet > .v-overlay__content > .point-route-choices) {
-    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
-    flex: 0 1 auto !important; height: auto !important; overflow: hidden !important;
-  }
+  section.point-route-choices-shell { left: 0; right: 0; bottom: 0; width: 100%; }
+  .point-route-choices { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0; }
   .point-route-choices { width: 100%; max-height: min(62dvh, 32rem); }
   .point-route-choices__list { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px))
     calc(.85rem + env(safe-area-inset-left, 0px)); }

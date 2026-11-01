@@ -30,6 +30,24 @@ function setup(routes: (from: { lat: number; lon: number }, to: { lat: number; l
 }
 
 describe("private point-to-point route", () => {
+  it("opens the planner synchronously for a held point even without GPS and keeps it open through routing", async () => {
+    const pending = deferred<RouteChoice[]>();
+    const { journey, fix, scope } = setup(() => pending.promise);
+    try {
+      fix.value = null;
+      journey.select({ lat: 40, lon: -120 });
+      expect(journey.point.value).toEqual({ lat: 40, lon: -120 });
+      expect(journey.sheetOpen.value).toBe(true);
+      expect(journey.error.value).toContain("GPS");
+      fix.value = { lat: 38.5, lon: -120.2, accuracy: 8 };
+      await settle();
+      expect(journey.loading.value).toBe(true);
+      expect(journey.sheetOpen.value).toBe(true);
+      pending.resolve([short]); await pending.promise; await settle();
+      expect(journey.selectedRoute.value).toEqual(short);
+      expect(journey.sheetOpen.value).toBe(true);
+    } finally { scope.stop(); }
+  });
   it("uses the fastest returned alternative, changes mode safely, and never reuses stale replies", async () => {
     const old = deferred<RouteChoice[]>(); const calls: AbortSignal[] = [];
     const get = vi.fn((_from, _to, _mode, signal) => { calls.push(signal!); return calls.length === 1 ? old.promise : Promise.resolve([short, fast]); });
