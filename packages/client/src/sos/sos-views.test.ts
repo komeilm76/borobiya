@@ -100,12 +100,32 @@ describe("Always-accessible SOS trigger and bottom-sheet UI (T3.2.4)", () => {
     expect(sheetSource).toMatch(/\.sos-sheet__subtitle\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/s);
   });
 
+  it("explains missing SOS fields before sending and never hides validation behind a disabled submit", () => {
+    expect(sheetSource).toContain('id="sos-request-form"');
+    expect(sheetSource).toContain('@click="submitFromSheet"');
+    expect(sheetSource).toContain('@submit.prevent="submitFromSheet"');
+    expect(sheetSource).toContain(':disabled="sos.submitting.value"');
+    expect(sheetSource).not.toContain(':disabled="!sos.canSubmit.value"');
+    expect(sheetSource).toContain('sos.issues.value');
+    expect(sheetSource).toContain('sosIssueMessage(');
+    expect(sheetSource).toContain('type="button"');
+    expect(sheetSource).toContain('درخواست تا تکمیل موارد بالا ارسال نمی‌شود');
+    expect(sheetSource).toContain('aria-describedby="sos-readiness"');
+    expect(sheetSource).toContain('showValidation.value = true');
+    expect(sheetSource).toContain('if (sos.issues.value.length)');
+    expect(sheetSource).toContain('void sos.submit()');
+    expect(sheetSource).toContain(':error-messages="showValidation && descriptionIssue');
+    expect(sheetSource).toContain(':error-messages="showValidation && incidentTypeIssue');
+    expect(sheetSource).toContain('id="sos-location-hint"');
+    expect(sheetSource).toContain('id="sos-readiness"');
+  });
+
   it("keeps cancel and emergency submit reachable in the narrow bottom-sheet footer", () => {
     expect(sheetSource).toContain("<v-bottom-sheet");
     expect(sheetSource).toContain("    scrollable\n");
     expect(sheetSource).toContain('class="sos-sheet__actions"');
     expect(sheetSource).toContain('data-test="sos-submit"');
-    expect(sheetSource).toContain('@click="sos.submit()"');
+    expect(sheetSource).toContain('@submit.prevent="submitFromSheet"');
     // Vuetify's v-card-actions does not wrap and v-btn defaults to flex-shrink: 0.
     // At 320px, two buttons plus a spacer can push the emergency action outside the clipped card.
     // The inset sheet drops to 70% width at 600px, so the footer needs the

@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — SOS form guidance and phone route-sheet layout
+
+- The SOS form already rejected incomplete drafts, but its Send button was disabled without explaining which field was missing. Send now remains actionable until an actual submission is in flight: a safe validation attempt shows field-level messages and focuses the first missing input, while the existing draft validator still prevents an incomplete or duplicate emergency request from reaching the server. A live readiness list and visible hints explain incident type, 10-character minimum description, and GPS/map/coordinate location choices; GPS/catalog retry, photo upload/retry, cancellation and account isolation remain intact.
+- Removed the map's unhelpful persistent hold-to-select instruction. On phones below 600px, the route planner now opens as a full-width Vuetify bottom sheet like SOS, with at least 60dvh (capped on tall phones) for route summary and controls. The details scroll within the bounded sheet and its actions clear the home indicator; route preview keeps the map framed above it. Desktop/tablet retain the nonmodal planner. Phone alternatives use the visible selector rather than promising taps on a map behind the modal; the header retains a direct SOS entry because the modal covers the global SOS trigger. Source/compiled-style and existing state-machine tests cover these paths; real phone/keyboard/screen-reader validation remains open.
+
 ### 2026-11-01 — Compact navigation card spacing
 
 - After starting navigation, the compact map card squeezed its title/status beside three buttons, causing narrow, multi-line text. The card now gives the label a dedicated full-width single line and puts the details, Stop and Remove actions in a separate wrapping row with their existing touch sizes. The full text remains in the DOM and native title for assistive access when a very narrow viewport requires truncation. The card can use more of a desktop map width without covering the phone map; the GPS warning remains below it. Source/compiled-style regression tests cover the layout without mounting Vue; rendered phone, desktop zoom and screen-reader acceptance remain open.

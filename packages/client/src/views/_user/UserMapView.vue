@@ -93,7 +93,6 @@
       {{ recenterError ?? own.error.value }}
     </span>
 
-    <p v-if="!journey.point.value && !activeTool" class="user-map-view__hold-hint">برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.</p>
     <div v-if="journey.point.value" class="user-map-view__journey-stack">
       <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar">
         <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
@@ -1387,14 +1386,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 :global(.user-map-view .user-map-view__peer-avatar--selected .user-map-view__peer-avatar-face) { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 1px; }
 :global(.user-map-view .user-map-view__peer-avatar:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
 
-/* Hold guidance and active journey remain compact; the map stays edge-to-edge. */
-.user-map-view__hold-hint, .user-map-view__journey-stack {
+/* Active journey stays compact; the map remains edge-to-edge. */
+.user-map-view__journey-stack {
   position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
   top: calc(5rem + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 2rem);
 }
-.user-map-view__hold-hint { width: max-content; margin: 0; padding: .55rem .85rem; text-align: center;
-  font-size: .82rem; pointer-events: none; border: 1px solid rgba(var(--v-theme-on-surface), .15);
-  border-radius: 16px; color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-surface), .96); box-shadow: var(--bb-shadow-overlay); }
 .user-map-view__journey-stack { width: min(36rem, calc(100vw - 2rem)); display: grid; gap: .35rem; pointer-events: none; }
 /* The label has a full line of its own; button widths cannot squeeze it into
  * several short lines. Keep the actual text intact for assistive technology. */

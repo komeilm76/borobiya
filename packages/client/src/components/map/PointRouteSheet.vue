@@ -1,15 +1,19 @@
 <template>
-  <!-- A standard map sheet: no scrim or focus trap; the map and both pins remain interactive. -->
-  <section v-if="api.point.value && api.sheetOpen.value" id="map-point-route-sheet" class="point-route-shell"
-    :class="{ 'point-route-shell--expanded': routesOpen }" aria-label="برنامه‌ریزی مسیر"
+  <!-- Desktop stays a nonmodal map panel; phones use the SOS-style bottom sheet. -->
+  <component :is="isPhone ? VBottomSheet : 'section'" v-if="api.point.value && api.sheetOpen.value"
+    class="point-route-shell" :class="{ 'point-route-shell--expanded': routesOpen }"
+    :model-value="isPhone ? api.sheetOpen.value : undefined" :scrollable="isPhone" :close-on-back="false"
+    aria-label="برنامه‌ریزی مسیر" @update:model-value="onVisible" @after-enter="emit('layout-change')"
     @keydown.esc.stop.prevent="onEscape">
-    <v-card class="point-route" rounded="xl" dir="rtl">
+    <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl">
       <div class="point-route__header">
         <v-icon class="point-route__pin" icon="mdi-map-marker" size="23" aria-hidden="true" />
-        <div class="point-route__headings"><small>مقصد انتخاب‌شده</small><strong>{{ api.title.value }}</strong></div>
+        <div class="point-route__headings"><small>مقصد انتخاب‌شده</small><strong :title="api.title.value">{{ api.title.value }}</strong></div>
         <v-btn id="point-route-info-button" :icon="infoOpen ? 'mdi-information' : 'mdi-information-outline'" variant="text"
           :aria-label="infoOpen ? 'بستن اطلاعات مکان' : 'نمایش اطلاعات مکان'" :aria-expanded="infoOpen"
           aria-controls="point-route-info" @click="toggleInfo" />
+        <v-btn v-if="isPhone" icon="mdi-alarm-light" variant="tonal" color="error"
+          aria-label="باز کردن فرم درخواست امداد فوری (SOS)" title="درخواست امداد فوری (SOS)" @click="openEmergencyForm" />
         <v-btn icon="mdi-close" variant="text" aria-label="بستن برنامه‌ریزی مسیر" @click="dismiss" />
       </div>
       <div v-if="infoOpen" id="point-route-info" class="point-route__info">
@@ -25,6 +29,15 @@
         مبدأ این مسیر بر اساس GPS تقریبی است؛ با دریافت موقعیت دقیق، مسیر دوباره محاسبه می‌شود.
       </p>
       <p v-if="api.arrived.value && !routesOpen" class="point-route__status" role="status">به نزدیکی مقصد رسیدید. محیط واقعی را بررسی کنید.</p>
+      <div v-if="isPhone && !routesOpen" class="point-route__summary" aria-label="خلاصهٔ مسیر">
+        <div v-if="api.selectedRoute.value" class="point-route__metrics" aria-label="برآورد مسیر انتخابی">
+          <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
+          <div><span>مسافت مسیر</span><strong>{{ api.distanceLabel.value }}</strong></div>
+        </div>
+        <p v-else>مسیر با دریافت موقعیت محاسبه می‌شود. برای انتخاب وسیلهٔ حرکت یا دیدن مسیرهای دیگر، «نمایش مسیرها» را باز کنید.</p>
+        <p v-if="api.navigating.value">برای تغییر مسیر «ویرایش مسیرها» را بزنید؛ برای ادامهٔ راهبری «بازگشت به نقشه» را انتخاب کنید.</p>
+        <p v-else>برای راهبری، «شروع راهبری» را بزنید. بدون موقعیت دقیق، هشدار GPS نمایش داده می‌شود و راهبری زنده منتظر می‌ماند.</p>
+      </div>
       <div v-if="routesOpen" id="point-route-routes" class="point-route__body" tabindex="0" aria-label="مسیرها و وسیلهٔ حرکت">
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">
           <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
@@ -46,7 +59,7 @@
           <v-btn v-if="api.routes.value.length > 1" variant="tonal" color="primary"
             @click="api.choose((api.index.value + 1) % api.routes.value.length)">مسیر دیگر</v-btn>
         </div>
-        <p v-if="api.routes.value.length > 1" class="point-route__legend">خط سبز مسیر انتخابی و خط نارنجی جایگزین است؛ هر خط را روی نقشه هم می‌توانید لمس کنید.</p>
+        <p v-if="api.routes.value.length > 1" class="point-route__legend">خط سبز مسیر انتخابی و خط نارنجی جایگزین است؛ {{ isPhone ? 'با «مسیر دیگر» گزینه‌ها را عوض کنید.' : 'هر خط را روی نقشه هم می‌توانید لمس کنید.' }}</p>
         <p class="point-route__disclaimer">زمان و مسافت، برآورد آخرین موقعیت GPS هستند و ترافیک زنده یا رسیدن قطعی را نشان نمی‌دهند.</p>
       </div>
       <div class="point-route__actions">
@@ -61,16 +74,21 @@
         <v-btn class="point-route__clear" variant="text" color="error" @click="clearDestination">حذف مقصد</v-btn>
       </div>
     </v-card>
-  </section>
+  </component>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import { useMediaQuery } from "@vueuse/core";
+import { VBottomSheet } from "vuetify/components";
+import { useSosSheetStore } from "@/stores/sos-sheet";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
 const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace> }>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
+const isPhone = useMediaQuery("(max-width: 599px)");
+const sosSheet = useSosSheetStore();
 const infoOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
 watch(() => props.api.point.value, () => { infoOpen.value = false; routesOpen.value = false; pausedForEdit.value = false; });
 watch(() => props.api.sheetOpen.value, (open) => { if (open) { infoOpen.value = false; routesOpen.value = false; } });
@@ -85,6 +103,12 @@ function backToSummary(): void {
   void nextTick(() => document.getElementById('point-route-show-routes')?.focus());
 }
 function dismiss(): void { props.api.sheetOpen.value = false; emit('dismiss'); }
+function onVisible(visible: boolean): void { if (!visible) dismiss(); }
+function openEmergencyForm(): void {
+  // The modal hides the global SOS trigger. Close it without focusing the map under SOS.
+  props.api.sheetOpen.value = false;
+  sosSheet.openSheet();
+}
 function clearDestination(): void { props.api.clear(); emit('dismiss'); }
 function onEscape(): void {
   if (infoOpen.value) { infoOpen.value = false; void nextTick(() => document.getElementById('point-route-info-button')?.focus()); }
@@ -100,7 +124,7 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
 </script>
 
 <style scoped>
-.point-route-shell { position: fixed; z-index: 7; pointer-events: none; right: calc(5.5rem + env(safe-area-inset-right, 0px));
+section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; right: calc(5.5rem + env(safe-area-inset-right, 0px));
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); width: min(36rem, calc(100vw - 34rem)); max-width: 100%; }
 .point-route { pointer-events: auto; display: flex; flex-direction: column; max-height: min(38dvh, 19rem); overflow: hidden;
   border: 1px solid rgba(var(--v-theme-on-surface), .14); color: rgb(var(--v-theme-on-surface));
@@ -123,6 +147,9 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
 .point-route__status { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: .4rem .85rem; font-size: .81rem; line-height: 1.45; }
 .point-route__error { color: rgb(var(--v-theme-error)); }
 .point-route__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .65rem .85rem; }
+.point-route__summary { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: .65rem .85rem; }
+.point-route__summary p { margin: .65rem 0 0; font-size: .86rem; line-height: 1.55; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; }
 .point-route__metrics > div { display: grid; gap: .1rem; padding: .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .14); border-radius: 12px; }
 .point-route__metrics span { font-size: .81rem; opacity: .8; }
@@ -153,27 +180,35 @@ const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.p
   .point-route-shell--expanded .point-route { max-height: min(65dvh, 36rem); }
 }
 @media (max-width: 599px) {
-  .point-route-shell { bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); }
-  /* Keep Clear visible even at 320px: two actions, then a full-width remove row.
-     The route details scroll independently, never the destructive action. */
-  .point-route__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-bottom: .4rem; }
+  /* Vuetify teleports this overlay outside the map. Do not apply the desktop
+     fixed-panel width or positioning to the overlay root. */
+  :global(.point-route-shell.v-bottom-sheet > .v-overlay__content) {
+    width: 100vw !important; max-width: 100vw !important; margin: 0 !important;
+  }
+  :global(.point-route-shell.v-bottom-sheet > .v-overlay__content > .point-route) {
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+  }
+  .point-route { width: 100%; min-height: min(60dvh, 26rem);
+    max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
+  .point-route-shell--expanded .point-route { max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
+  .point-route__header { padding-inline: calc(.6rem + env(safe-area-inset-right, 0px)) calc(.6rem + env(safe-area-inset-left, 0px)); }
+  .point-route__summary, .point-route__body { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px)); }
+  /* The body scrolls; Start and Remove stay available above the home indicator. */
+  .point-route__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: .4rem calc(.65rem + env(safe-area-inset-right, 0px))
+      calc(.4rem + env(safe-area-inset-bottom, 0px)) calc(.65rem + env(safe-area-inset-left, 0px)); }
   .point-route__actions :deep(.v-btn) { width: 100%; min-width: 0; padding-inline: .25rem; }
   .point-route__clear { grid-column: 1 / -1; }
-  .point-route { max-height: min(38dvh, 19rem); }
-  .point-route-shell--expanded .point-route { max-height: min(58dvh, 32rem); }
 }
 @media (max-width: 400px) {
-  .point-route-shell { width: calc(100vw - 6rem - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); }
-  .point-route__header { gap: .1rem; padding-inline: .3rem; }
+  .point-route__header { gap: .1rem; }
   .point-route__pin { display: none; }
   .point-route__mode-grid button { flex-direction: column; font-size: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  /* Landscape has room for three short, wrapping actions, but little map height. */
+  /* Landscape keeps all three primary actions on one row when space allows. */
   .point-route__actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .point-route__clear { grid-column: auto; }
-  .point-route { max-height: min(54dvh, 17rem); }
-  .point-route-shell--expanded .point-route { max-height: min(55dvh, 22rem); }
 }
 @media (forced-colors: active) { .point-route__mode-grid button[aria-pressed="true"] { outline: 2px solid Highlight; } }
 </style>

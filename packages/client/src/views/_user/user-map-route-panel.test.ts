@@ -14,8 +14,33 @@ const css = (source: string, filename: string) => {
 };
 
 describe("progressive trip planning and editing", () => {
-  it("begins as a compact nonmodal bottom bar with a separate place-info toggle", () => {
-    expect(sheet).not.toContain("<v-bottom-sheet");
+  it("keeps desktop route review nonmodal and gives phones a full-width minimum-height bottom sheet", () => {
+    expect(map).not.toContain('برای انتخاب مقصد، انگشت یا کلیک چپ را روی نقشه نگه دارید.');
+    expect(sheet).toContain("isPhone ? VBottomSheet : 'section'");
+    expect(sheet).toContain('import { VBottomSheet } from "vuetify/components"');
+    expect(sheet).toContain(':model-value="isPhone ? api.sheetOpen.value : undefined"');
+    expect(sheet).toContain('@update:model-value="onVisible"');
+    expect(sheet).toContain('@after-enter="emit(\'layout-change\')"');
+    expect(sheet).toContain('id="map-point-route-sheet"');
+    expect(sheet).toContain('scrollable');
+    expect(sheet).toContain('function onVisible(visible: boolean)');
+    expect(sheet).toContain('v-if="isPhone" icon="mdi-alarm-light"');
+    expect(sheet).toContain('aria-label="باز کردن فرم درخواست امداد فوری (SOS)"');
+    expect(sheet).toContain('function openEmergencyForm(): void {');
+    expect(sheet).toContain('sosSheet.openSheet()');
+    expect(sheet).toContain("'با «مسیر دیگر» گزینه‌ها را عوض کنید.'");
+    const styles = css(sheet, "PointRouteSheet.vue");
+    expect(styles).toContain('.point-route-shell.v-bottom-sheet > .v-overlay__content');
+    expect(styles).toContain('width: 100vw');
+    expect(styles).toContain('min-height: min(60dvh, 26rem)');
+    expect(styles).toContain('max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px))');
+    expect(styles).toContain('overflow-y: auto');
+    expect(styles).toContain('safe-area-inset-bottom');
+    expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
+  });
+
+  it("begins as a compact planner with a separate place-info toggle", () => {
+    expect(sheet).not.toContain('<v-bottom-sheet');
     expect(sheet).not.toContain('role="dialog"');
     expect(sheet).toContain('v-if="api.point.value && api.sheetOpen.value"');
     expect(sheet).toContain('id="map-point-route-sheet"');
@@ -50,7 +75,7 @@ describe("progressive trip planning and editing", () => {
     const styles = css(sheet, "PointRouteSheet.vue");
     for (const token of ["pointer-events: none", "pointer-events: auto", "overflow-y: auto",
       "min-height: 44px", "safe-area-inset-bottom", "(min-width: 600px) and (max-width: 1023px)",
-      "position: relative; order: 3", "max-height: min(38dvh, 19rem)", "max-height: min(58dvh, 32rem)"]) {
+      "position: relative; order: 3", "min-height: min(60dvh, 26rem)", "max-height: calc(100dvh - 3rem"]) {
       expect(styles).toContain(token);
     }
   });

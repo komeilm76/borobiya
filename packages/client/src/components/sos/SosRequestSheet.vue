@@ -107,7 +107,14 @@
           </div>
         </div>
 
-        <form v-else class="sos-sheet__form" @submit.prevent="sos.submit()">
+        <form v-else id="sos-request-form" ref="formElement" class="sos-sheet__form" @submit.prevent="submitFromSheet">
+          <div v-if="sos.issues.value.length" id="sos-readiness" class="sos-sheet__readiness"
+            :role="showValidation ? 'alert' : undefined">
+            <strong>برای ارسال، این موارد را کامل کنید:</strong>
+            <ul><li v-for="issue in sos.issues.value" :key="issue.field">{{ sosIssueMessage(issue.code) }}</li></ul>
+            <small>درخواست تا تکمیل موارد بالا ارسال نمی‌شود؛ برای دیدن خطاهای هر فیلد می‌توانید ارسال را بزنید.</small>
+          </div>
+          <p v-else id="sos-readiness" class="sos-sheet__ready">اطلاعات لازم کامل است؛ موقعیت و شرح حادثه را پیش از ارسال بررسی کنید.</p>
           <v-alert
             v-if="sos.submitError.value"
             type="error"
@@ -148,6 +155,7 @@
                 size="x-small"
                 color="primary"
                 :loading="sos.loadingCatalog.value"
+                data-test="sos-catalog-retry"
                 @click="sos.loadCatalog()"
               >
                 بارگذاری دوباره
@@ -185,10 +193,12 @@
               density="comfortable"
               rounded="lg"
               hide-details="auto"
+              :error-messages="showValidation && incidentTypeIssue ? [sosIssueMessage(incidentTypeIssue.code)] : []"
               :loading="sos.loadingCatalog.value"
               :disabled="sos.submitting.value || sos.incidentTypes.value.length === 0"
               data-test="sos-incident-type"
             />
+            <p class="sos-sheet__help">یک نوع متناسب با حادثه انتخاب کنید؛ اگر فهرست خالی یا ناموفق است، بارگذاری دوباره را امتحان کنید.</p>
           </div>
 
           <div class="sos-sheet__section">
@@ -203,9 +213,11 @@
               auto-grow
               counter="500"
               :maxlength="maxDescriptionLength"
+              :error-messages="showValidation && descriptionIssue ? [sosIssueMessage(descriptionIssue.code)] : []"
               :disabled="sos.submitting.value"
               data-test="sos-description"
             />
+            <p class="sos-sheet__help">حداقل ۱۰ نویسه دربارهٔ وضعیت، افراد و راه دسترسی بنویسید.</p>
           </div>
 
           <div class="sos-sheet__section">
@@ -219,6 +231,7 @@
                 prepend-icon="mdi-crosshairs-gps"
                 :loading="sos.locating.value"
                 :disabled="sos.submitting.value"
+                aria-describedby="sos-location-help"
                 data-test="sos-gps-btn"
                 @click="sos.requestGpsLocation()"
               >
@@ -226,8 +239,11 @@
               </v-btn>
             </div>
 
-            <p v-if="sos.locationHint.value" class="mb-2 text-xs text-warning" role="status">
+            <p v-if="sos.locationHint.value" id="sos-location-hint" class="sos-sheet__help mb-2 text-warning" role="status">
               {{ sos.locationHint.value }}
+            </p>
+            <p v-else-if="showValidation && locationIssue" id="sos-location-hint" class="sos-sheet__help mb-2 text-error" role="alert">
+              {{ sosIssueMessage(locationIssue.code) }}
             </p>
             <p v-else-if="sos.location.value" class="mb-2 text-xs opacity-80" role="status">
               <template v-if="sos.location.value.isManual">
@@ -251,8 +267,8 @@
                 @ready="onPickerMapReady"
               />
             </div>
-            <p class="mt-1 text-xs opacity-70">
-              در صورت خطای GPS، مستقیماً روی نقشه ضربه بزنید یا مختصات را در کادرهای زیر وارد کنید.
+            <p id="sos-location-help" class="sos-sheet__help mt-1">
+              موقعیت برای ارسال لازم است. در صورت خطای GPS، روی نقشه ضربه بزنید یا مختصات را در کادرهای زیر وارد کنید.
             </p>
 
             <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -354,10 +370,12 @@
           size="large"
           rounded="lg"
           prepend-icon="mdi-send-circle-outline"
+          type="button"
+          aria-describedby="sos-readiness"
           :loading="sos.submitting.value"
-          :disabled="!sos.canSubmit.value"
+          :disabled="sos.submitting.value"
           data-test="sos-submit"
-          @click="sos.submit()"
+          @click="submitFromSheet"
         >
           ارسال درخواست امداد فوری
         </v-btn>
@@ -375,7 +393,7 @@ import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { useSosRequest } from "@/composables/use-sos-request";
 import { useSosCancellation } from "@/composables/use-sos-cancellation";
 import SosCancellationDialog from "@/components/sos/SosCancellationDialog.vue";
-import { SOS_DESCRIPTION_MAX_LENGTH, SOS_SEVERITY_OPTIONS, shouldResetSosOnClose } from "@/sos/sos-form";
+import { SOS_DESCRIPTION_MAX_LENGTH, SOS_SEVERITY_OPTIONS, shouldResetSosOnClose, sosIssueMessage } from "@/sos/sos-form";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -398,6 +416,27 @@ const cancellation = useSosCancellation(computed(() => auth.accessToken), sos.cr
 const severityOptions = SOS_SEVERITY_OPTIONS;
 const maxDescriptionLength = SOS_DESCRIPTION_MAX_LENGTH;
 const mapStyleUrl = computed(() => mapStyleForTheme(theme.isDark));
+const showValidation = ref(false);
+const formElement = ref<HTMLFormElement | null>(null);
+const incidentTypeIssue = computed(() => sos.issues.value.find(issue => issue.field === "incidentTypeId"));
+const descriptionIssue = computed(() => sos.issues.value.find(issue => issue.field === "description"));
+const locationIssue = computed(() => sos.issues.value.find(issue => issue.field === "location"));
+
+function submitFromSheet(): void {
+  if (sos.submitting.value || sos.createdRequestId.value) return;
+  showValidation.value = true;
+  if (sos.issues.value.length) {
+    // Do not create a partial emergency request. Make the first missing input actionable.
+    const first = sos.issues.value[0]!.field;
+    const selector = first === "incidentTypeId"
+      ? sos.catalogError.value ? '[data-test="sos-catalog-retry"]' : '[data-test="sos-incident-type"] input'
+      : first === "description" ? '[data-test="sos-description"] textarea'
+      : first === "location" ? '[data-test="sos-gps-btn"]' : null;
+    if (selector) formElement.value?.querySelector<HTMLElement>(selector)?.focus();
+    return;
+  }
+  void sos.submit();
+}
 
 const cameraInput = ref<HTMLInputElement | null>(null);
 const galleryInput = ref<HTMLInputElement | null>(null);
@@ -462,6 +501,7 @@ function onFilePicked(event: Event): void {
 
 function startFresh(): void {
   if (sos.submitting.value || cancellation.submitting.value) return;
+  showValidation.value = false;
   cancellation.reset();
   sos.reset();
   sos.prepareForOpen();
@@ -493,6 +533,7 @@ watch(
       return;
     }
     if (cancellation.submitting.value) return;
+    showValidation.value = false;
     cancellation.dismiss();
     pinMarker.value?.remove();
     pinMarker.value = null;
@@ -575,6 +616,15 @@ onBeforeUnmount(() => {
   padding: 1.25rem;
 }
 
+.sos-sheet__readiness, .sos-sheet__ready { margin: 0 0 1rem; padding: .7rem .85rem; border-radius: 12px;
+  font-size: .86rem; line-height: 1.55; }
+.sos-sheet__readiness { border: 1px solid rgba(var(--v-theme-warning), .45);
+  background: rgba(var(--v-theme-warning), .1); color: rgb(var(--v-theme-on-surface)); }
+.sos-sheet__readiness ul { margin: .3rem 0; padding-inline-start: 1.2rem; }
+.sos-sheet__readiness small { font-size: .82rem; }
+.sos-sheet__ready { border: 1px solid rgba(var(--v-theme-success), .4);
+  background: rgba(var(--v-theme-success), .1); color: rgb(var(--v-theme-on-surface)); }
+.sos-sheet__help { margin: .3rem 0 0; font-size: .85rem; line-height: 1.55; }
 .sos-sheet__section + .sos-sheet__section {
   margin-top: 1.15rem;
 }
