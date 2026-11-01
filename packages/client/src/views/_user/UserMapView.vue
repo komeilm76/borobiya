@@ -114,7 +114,7 @@
           role="status" aria-live="assertive">{{ journey.rerouteMessage.value }}</p>
       </div>
     </div>
-    <PointRouteSheet :api="journey" :reverse="reverse"
+    <PointRouteSheet :api="journey" :reverse="reverse" :origin-reverse="originReverse"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -514,6 +514,15 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+// Reverse-geocode the exact request origin only while its route details are open.
+// Cancel old reads on reroute, dismissal or account clear; never display a stale origin.
+const originReverse = useReversePlace();
+watch([() => journey.plannedFrom.value, () => journey.sheetOpen.value], ([origin, open]) => {
+  if (!open || !origin) { originReverse.close(); return; }
+  const current = originReverse.point.value;
+  if (current?.lat === origin.lat && current.lon === origin.lon) return;
+  originReverse.select(origin.lat, origin.lon);
+}, { flush: "sync" });
 const journeyBarLabel = computed(() => {
   if (!journey.navigating.value) return journey.title.value;
   if (journey.navigationPending.value) return journey.loading.value

@@ -12,8 +12,6 @@
         <v-btn id="point-route-info-button" :icon="infoOpen ? 'mdi-information' : 'mdi-information-outline'" variant="text"
           :aria-label="infoOpen ? 'بستن اطلاعات مکان' : 'نمایش اطلاعات مکان'" :aria-expanded="infoOpen"
           aria-controls="point-route-info" @click="toggleInfo" />
-        <v-btn v-if="isPhone" icon="mdi-alarm-light" variant="tonal" color="error"
-          aria-label="باز کردن فرم درخواست امداد فوری (SOS)" title="درخواست امداد فوری (SOS)" @click="openEmergencyForm" />
         <v-btn icon="mdi-close" variant="text" aria-label="بستن برنامه‌ریزی مسیر" @click="dismiss" />
       </div>
       <div v-if="infoOpen" id="point-route-info" class="point-route__info">
@@ -23,11 +21,18 @@
         <p v-if="api.knownPlace.value?.type">نوع مکان: {{ api.knownPlace.value.type }}</p>
         <bdi v-if="api.point.value" dir="ltr">{{ api.point.value.lat.toFixed(5) }}, {{ api.point.value.lon.toFixed(5) }}</bdi>
       </div>
+      <div class="point-route__endpoints" aria-label="مبدأ و مقصد مسیر">
+        <div class="point-route__endpoint">
+          <span class="point-route__endpoint-name">{{ api.provisionalRoute.value ? "مبدأ تقریبی" : "مبدأ" }}:</span>
+          <bdi class="point-route__endpoint-address" dir="auto" :title="originAddress">{{ originAddress }}</bdi>
+        </div>
+        <div class="point-route__endpoint">
+          <span class="point-route__endpoint-name">مقصد:</span>
+          <bdi class="point-route__endpoint-address" dir="auto" :title="destinationAddress">{{ destinationAddress }}</bdi>
+        </div>
+      </div>
       <p v-if="api.loading.value && !routesOpen" class="point-route__status" role="status">در حال آماده‌سازی مسیر {{ modeLabel }}…</p>
       <p v-else-if="api.error.value && !routesOpen" class="point-route__status point-route__error" role="alert">{{ api.error.value }}</p>
-      <p v-if="api.provisionalRoute.value && !api.navigating.value && !api.loading.value" class="point-route__status" role="status">
-        مبدأ این مسیر بر اساس GPS تقریبی است؛ با دریافت موقعیت دقیق، مسیر دوباره محاسبه می‌شود.
-      </p>
       <p v-if="api.arrived.value && !routesOpen" class="point-route__status" role="status">به نزدیکی مقصد رسیدید. محیط واقعی را بررسی کنید.</p>
       <div v-if="isPhone && !routesOpen" class="point-route__summary" aria-label="خلاصهٔ مسیر">
         <div v-if="api.selectedRoute.value" class="point-route__metrics" aria-label="برآورد مسیر انتخابی">
@@ -81,14 +86,16 @@
 import { computed, nextTick, ref, watch } from "vue";
 import { useMediaQuery } from "@vueuse/core";
 import { VBottomSheet } from "vuetify/components";
-import { useSosSheetStore } from "@/stores/sos-sheet";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { TransportProfile } from "@/api/mission-routing";
-const props = defineProps<{ api: ReturnType<typeof usePointRoute>; reverse: ReturnType<typeof useReversePlace> }>();
+const props = defineProps<{
+  api: ReturnType<typeof usePointRoute>;
+  reverse: ReturnType<typeof useReversePlace>;
+  originReverse: ReturnType<typeof useReversePlace>;
+}>();
 const emit = defineEmits<{ start: []; dismiss: []; 'layout-change': [] }>();
 const isPhone = useMediaQuery("(max-width: 599px)");
-const sosSheet = useSosSheetStore();
 const infoOpen = ref(false), routesOpen = ref(false), pausedForEdit = ref(false);
 watch(() => props.api.point.value, () => { infoOpen.value = false; routesOpen.value = false; pausedForEdit.value = false; });
 watch(() => props.api.sheetOpen.value, (open) => { if (open) { infoOpen.value = false; routesOpen.value = false; } });
@@ -104,11 +111,6 @@ function backToSummary(): void {
 }
 function dismiss(): void { props.api.sheetOpen.value = false; emit('dismiss'); }
 function onVisible(visible: boolean): void { if (!visible) dismiss(); }
-function openEmergencyForm(): void {
-  // The modal hides the global SOS trigger. Close it without focusing the map under SOS.
-  props.api.sheetOpen.value = false;
-  sosSheet.openSheet();
-}
 function clearDestination(): void { props.api.clear(); emit('dismiss'); }
 function onEscape(): void {
   if (infoOpen.value) { infoOpen.value = false; void nextTick(() => document.getElementById('point-route-info-button')?.focus()); }
@@ -121,6 +123,21 @@ const modes: { value: TransportProfile; icon: string; label: string }[] = [
   { value: "foot", icon: "mdi-walk", label: "پیاده" }
 ];
 const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.profile.value)?.label ?? "انتخابی");
+// Never substitute the road-snapped polyline vertex for the GPS request origin.
+// An unavailable geocoder is not an address: show the exact coordinates instead.
+const originAddress = computed(() => {
+  const from = props.api.plannedFrom.value;
+  if (!from) return "در انتظار موقعیت مبدأ";
+  if (props.originReverse.address.value?.formattedAddress) return props.originReverse.address.value.formattedAddress;
+  if (props.originReverse.loading.value) return "در حال یافتن نشانی مبدأ…";
+  return `${from.lat.toFixed(5)}, ${from.lon.toFixed(5)} (نشانی در دسترس نیست)`;
+});
+const destinationAddress = computed(() => {
+  if (props.api.address.value) return props.api.address.value;
+  if (props.reverse.loading.value) return "در حال یافتن نشانی مقصد…";
+  const to = props.api.point.value;
+  return to ? `${to.lat.toFixed(5)}, ${to.lon.toFixed(5)} (نشانی در دسترس نیست)` : "مقصد انتخاب نشده است";
+});
 </script>
 
 <style scoped>
@@ -144,6 +161,14 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
 .point-route__info p { margin: 0 0 .25rem; overflow-wrap: anywhere; }
 .point-route__info bdi { color: rgb(var(--v-theme-on-surface)); opacity: .8; }
 .point-route__info button { color: rgb(var(--v-theme-primary)); font: inherit; font-weight: 800; text-decoration: underline; }
+/* Two compact, independent lines: long addresses never stretch the sheet or wrap. */
+.point-route__endpoints { display: grid; gap: .22rem; flex: 0 0 auto; min-width: 0;
+  padding: .4rem .85rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .1);
+  font-size: .8rem; line-height: 1.4; }
+.point-route__endpoint { display: flex; gap: .35rem; min-width: 0; overflow: hidden; white-space: nowrap; }
+.point-route__endpoint-name { flex: 0 0 auto; font-weight: 800; }
+.point-route__endpoint-address { display: block; flex: 1 1 auto; min-width: 0; overflow: hidden;
+  white-space: nowrap; text-overflow: ellipsis; text-align: start; }
 .point-route__status { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin: 0; padding: .4rem .85rem; font-size: .81rem; line-height: 1.45; }
 .point-route__error { color: rgb(var(--v-theme-error)); }
 .point-route__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: .65rem .85rem; }
@@ -192,7 +217,9 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
     max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
   .point-route-shell--expanded .point-route { max-height: calc(100dvh - 3rem - env(safe-area-inset-top, 0px)); }
   .point-route__header { padding-inline: calc(.6rem + env(safe-area-inset-right, 0px)) calc(.6rem + env(safe-area-inset-left, 0px)); }
-  .point-route__summary, .point-route__body { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px)); }
+  .point-route__summary, .point-route__body, .point-route__endpoints {
+    padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px));
+  }
   /* The body scrolls; Start and Remove stay available above the home indicator. */
   .point-route__actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
     padding: .4rem calc(.65rem + env(safe-area-inset-right, 0px))
