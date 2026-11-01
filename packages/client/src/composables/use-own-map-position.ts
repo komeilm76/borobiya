@@ -25,6 +25,7 @@ const browserRuntime: OwnMapPositionRuntime = {
 export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPositionRuntime = browserRuntime) {
   const active = ref(false);
   const position = ref<OwnMapFix | null>(null);
+  const lastFixAt = ref<number | null>(null);
   const error = ref<string | null>(null);
   let cleanup: (() => void) | null = null;
   let generation = 0;
@@ -33,6 +34,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
     generation++;
     active.value = false;
     position.value = null;
+    lastFixAt.value = null;
     error.value = null;
     const dispose = cleanup;
     cleanup = null;
@@ -52,6 +54,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
         const parsed = coordinatesSchema.safeParse({ lat: fix.lat, lon: fix.lon });
         if (!parsed.success || (fix.accuracy !== undefined &&
           (!Number.isFinite(fix.accuracy) || fix.accuracy < 0))) return;
+        lastFixAt.value = Date.now();
         position.value = { ...parsed.data, accuracy: fix.accuracy ?? null,
           ...(fix.heading != null && Number.isFinite(fix.heading) && fix.heading >= 0 && fix.heading < 360
             ? { heading: fix.heading } : {}),
@@ -60,7 +63,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
       }, (denied) => {
         if (current !== generation || owner.value !== account) return;
         if (denied) stop();
-        else position.value = null; // Do not label an old fix as live during a GPS outage.
+        else { position.value = null; lastFixAt.value = null; } // Do not label an old fix as live during a GPS outage.
         error.value = denied ? "دسترسی مکان قطع شد؛ نمایش موقعیت متوقف شد." :
           "موقعیت تازه دریافت نشد؛ اتصال GPS را بررسی کنید.";
       });
@@ -77,5 +80,5 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
 
   watch(owner, stop, { flush: "sync" });
   onScopeDispose(stop);
-  return { active, position, error, start, stop };
+  return { active, position, lastFixAt, error, start, stop };
 }

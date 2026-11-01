@@ -97,6 +97,27 @@
       <div v-if="journey.point.value && !journey.sheetOpen.value" class="user-map-view__journey-bar">
         <v-icon :icon="journey.navigating.value ? 'mdi-navigation-variant' : 'mdi-map-marker'" size="21" aria-hidden="true" />
         <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+        <dl v-if="journey.navigating.value" class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
+          <div class="user-map-view__telemetry-item">
+            <dt><v-icon icon="mdi-speedometer" size="16" aria-hidden="true" />سرعت فعلی</dt>
+            <dd :aria-label="liveSpeedKmh === null ? 'سرعت فعلی نامشخص' : `سرعت فعلی ${liveSpeedKmh} کیلومتر بر ساعت`">
+              {{ liveSpeedKmh === null ? '—' : liveSpeedKmh.toLocaleString('fa-IR') }}
+            </dd>
+            <small>کیلومتر/ساعت · GPS</small>
+          </div>
+          <div class="user-map-view__telemetry-item user-map-view__telemetry-item--unknown">
+            <dt><v-icon icon="mdi-road-variant" size="16" aria-hidden="true" />حد مجاز</dt>
+            <dd aria-label="حد مجاز نامشخص">—</dd>
+            <small title="مسیر آفلاین دادهٔ حد مجاز قانونی را ارائه نمی‌کند">دادهٔ معتبر موجود نیست</small>
+          </div>
+          <div class="user-map-view__telemetry-item">
+            <dt><v-icon icon="mdi-timer-outline" size="16" aria-hidden="true" />زمان باقی‌مانده</dt>
+            <dd :aria-label="remainingSeconds === null ? 'زمان باقی‌مانده نامشخص' : `زمان باقی‌ماندهٔ تقریبی ${formatRemainingTime(remainingSeconds)}`">
+              {{ remainingSeconds === null ? '—' : formatRemainingTime(remainingSeconds) }}
+            </dd>
+            <small>برآورد مسیر · بدون ترافیک</small>
+          </div>
+        </dl>
         <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های مسیر">
           <v-btn v-if="journey.navigating.value" variant="tonal" color="primary" @click="openPointRouteDetails">{{ isPhone ? 'جزئیات مسیر' : 'جزئیات و تغییر مسیر' }}</v-btn>
           <v-btn v-if="journey.navigating.value" variant="tonal" color="error" @click="stopPointNavigation">توقف</v-btn>
@@ -213,6 +234,7 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
+import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime } from "@/sos/navigation-telemetry";
 import { navigationArrowBearing, navigationCameraOffset, navigationFollowZoom, type NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
@@ -514,6 +536,25 @@ function followNavigationCamera(camera: NavigationCamera): void {
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
   followNavigationCamera, undefined,
   () => map.value?.easeTo({ pitch: 0, bearing: 0, duration: 450 }), () => navigationAlert.play());
+// Recheck freshness even when the device stops sending fixes silently. No persistent GPS
+// samples or speed-limit guesses; stopping guidance tears down the ticker.
+const telemetryNow = ref(Date.now());
+watch(() => journey.navigating.value, (active, _previous, onCleanup) => {
+  if (!active) return;
+  telemetryNow.value = Date.now();
+  const ticker = setInterval(() => { telemetryNow.value = Date.now(); }, 5_000);
+  onCleanup(() => clearInterval(ticker));
+}, { immediate: true });
+watch(() => own.lastFixAt.value, () => { telemetryNow.value = Date.now(); });
+const liveSpeedKmh = computed(() => currentSpeedKmh(own.position.value, own.lastFixAt.value, telemetryNow.value));
+const remainingSeconds = computed(() => {
+  if (!journey.navigating.value || journey.navigationPending.value || journey.replanning.value ||
+    journey.rerouteWaitingForFix.value || journey.gpsWarning.value || journey.remaining.value === null ||
+    !journey.selectedRoute.value || !own.position.value || own.lastFixAt.value === null ||
+    telemetryNow.value < own.lastFixAt.value || telemetryNow.value - own.lastFixAt.value > 15_000) return null;
+  return estimateRemainingRouteSeconds(own.position.value, journey.routePoints.value,
+    journey.selectedRoute.value.duration_s, journey.profile.value);
+});
 // Reverse-geocode the exact request origin only while its route details are open.
 // Cancel old reads on reroute, dismissal or account clear; never display a stale origin.
 const originReverse = useReversePlace();
@@ -1416,6 +1457,21 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__gps-warning .v-icon { flex: 0 0 auto; margin-top: .12rem; }
 .user-map-view__journey-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: .86rem; font-weight: 700; }
+/* One compact glanceable row inside the existing guidance card, not another map overlay.
+   Keep labels and unavailable states visible at 320px and with enlarged text. */
+.user-map-view__telemetry { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .35rem; margin: 0; }
+.user-map-view__telemetry-item { min-width: 0; display: flex; flex-direction: column; align-items: center;
+  gap: .05rem; padding: .4rem .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .13);
+  border-radius: 12px; background: rgba(var(--v-theme-primary), .07); text-align: center; }
+.user-map-view__telemetry-item dt { display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: .2rem; font-size: .8rem; line-height: 1.25; font-weight: 700; }
+.user-map-view__telemetry-item dt .v-icon { color: rgb(var(--v-theme-primary)); }
+.user-map-view__telemetry-item dd { margin: 0; font-size: 1.16rem; line-height: 1.3; font-weight: 900;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.user-map-view__telemetry-item small { font-size: .8rem; line-height: 1.25; opacity: .78; overflow-wrap: anywhere; }
+.user-map-view__telemetry-item--unknown { background: rgba(var(--v-theme-on-surface), .04); }
+.user-map-view__telemetry-item--unknown dd { opacity: .7; }
 .user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .4rem; }
 .user-map-view__journey-actions > :first-child { flex: 1 1 auto; }
 .user-map-view__journey-actions .v-btn { min-height: 44px; min-width: 44px; height: auto; }

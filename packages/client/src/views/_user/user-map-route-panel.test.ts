@@ -114,6 +114,28 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('api.distanceLabel.value');
   });
 
+  it("keeps speed and remaining-time telemetry inside active guidance without inventing a legal speed limit", () => {
+    const bar = map.slice(map.indexOf('class="user-map-view__journey-bar"'),
+      map.indexOf('class="user-map-view__navigation-status"'));
+    expect(bar).toContain('v-if="journey.navigating.value" class="user-map-view__telemetry"');
+    expect(bar).toContain('سرعت فعلی');
+    expect(bar).toContain('حد مجاز');
+    expect(bar).toContain('زمان باقی‌مانده');
+    expect(bar).toContain('دادهٔ معتبر موجود نیست');
+    expect(map).toContain('currentSpeedKmh(');
+    expect(map).toContain('estimateRemainingRouteSeconds(');
+    expect(map).toContain('own.lastFixAt.value');
+    expect(map).toContain('telemetryNow.value - own.lastFixAt.value > 15_000');
+    expect(map).toContain('onCleanup(() => clearInterval(ticker))');
+    expect(map).toContain('journey.navigationPending.value');
+    expect(map).toContain('journey.replanning.value');
+    expect(map).toContain('journey.rerouteWaitingForFix.value');
+    expect(map).toContain('const bar = document.querySelector(\'.user-map-view__journey-bar\')?.getBoundingClientRect()');
+    const styles = css(map, "UserMapView.vue");
+    expect(styles).toContain('.user-map-view__telemetry');
+    expect(styles).toContain('grid-template-columns: repeat(3, minmax(0, 1fr))');
+  });
+
   it("gives the active journey label its own full-width row without squeezing its controls", () => {
     const bar = map.slice(map.indexOf('class="user-map-view__journey-bar"'),
       map.indexOf('class="user-map-view__navigation-status"'));

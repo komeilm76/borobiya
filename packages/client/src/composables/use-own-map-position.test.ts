@@ -20,7 +20,9 @@ describe("private on-map GPS display", () => {
     expect(own.position.value).toBeNull();
     fixes[0]!({ lat: 35.7, lon: 51.4, accuracy: 12 });
     expect(own.position.value).toEqual({ lat: 35.7, lon: 51.4, accuracy: 12 });
+    expect(own.lastFixAt.value).toBeGreaterThan(0);
     own.stop();
+    expect(own.lastFixAt.value).toBeNull();
     expect(clear).toHaveBeenCalledOnce();
     expect(own.position.value).toBeNull();
     fixes[0]!({ lat: 35.8, lon: 51.5 });
@@ -77,6 +79,7 @@ describe("private on-map GPS display", () => {
     }))!;
     own.start();
     fail(false);
+    expect(own.lastFixAt.value).toBeNull();
     expect(own.error.value).toContain("GPS");
     own.stop();
     expect(own.active.value).toBe(false);
