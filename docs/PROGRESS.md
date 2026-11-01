@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Navigation search and arrival-audio bug review
+
+- Reproduced a guidance-search contradiction: **نقشه** framed all results and paused follow, but the map marker renderer suppressed *every* POI pin while navigating. Explicit Show All now displays numbered, selectable pins during that overview; resuming GPS-follow, starting another trip or ending guidance hides the navigation-only pins. Normal search results still persist according to the existing viewport/query rules. A non-mounted view regression failed before the fix.
+- Reproduced an immediate-arrival audio race: when Web Audio `resume()` was still pending after Start, the arrival dialog opened but the chime was dropped. Arrival now waits for a permitted unlock; closing the alert, changing trips or leaving the map cancels any queued chime, and a blocked/silent browser still has the visual dialog. Deferred-resume audio tests failed before the fix and now pass. Full client checks cover the increment; rendered phone, GPS, sound, keyboard and screen-reader acceptance remain open.
+
 ### 2026-11-01 — Arrival acknowledgement ends map guidance
 
 - Accurate GPS arrival near the selected destination now **stops guidance and hides the old route immediately** instead of opening the route-editing sheet. The map then clears the completed route and shows a focused acknowledgement dialog with the destination and a reminder to check the real surroundings. A short, ascending in-app arrival chime plays once using the audio context unlocked by Start; if browser audio is blocked or the device is silent, the visible alert still works. A second GPS fix cannot replay it. Dismiss with the button, Escape or Back (first phone Back closes the dialog). Logout or route changes cannot display an old destination. The existing conservative fix threshold (≤25 m distance with GPS accuracy ≤35 m) is unchanged; GPS proximity does not prove physical access or safe arrival. Pure route/audio and non-mounted view contracts pass; physical GPS, speaker/silent-mode, screen-reader and phone Back acceptance remain open.

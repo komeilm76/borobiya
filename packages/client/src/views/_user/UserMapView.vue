@@ -562,9 +562,10 @@ const reverse = useReversePlace();
 const navigationAlert = createNavigationAlert();
 const arrivalDialogOpen = ref(false);
 const arrivalDestination = ref<string | null>(null);
-function closeArrivalDialog(): void { arrivalDialogOpen.value = false; }
+function closeArrivalDialog(): void { navigationAlert.cancelArrival(); arrivalDialogOpen.value = false; }
 function focusArrivalDismiss(): void { document.getElementById("map-arrival-dismiss")?.focus(); }
 watch(arrivalDialogOpen, (open) => {
+  if (!open) navigationAlert.cancelArrival(); // Includes Escape and overlay dismissals.
   if (!open && auth.user?.id) void nextTick(() => {
     if (auth.user?.id) map.value?.getCanvas().focus({ preventScroll: true });
   });
@@ -702,15 +703,24 @@ const historySuppressedAfterRouteClear = ref(false);
 let selectedPlaceMarker: Marker | null = null;
 const resultMarkers = new Map<string, Marker>();
 const showAllResultsOnMap = placeSearch.mapActive;
+// Only an explicit Show All request during guidance exposes POI pins. A follow
+// restart hides them again so they cannot clutter the live route or linger.
+const showNavigationSearchResults = ref(false);
 function clearResultMarkers(): void {
   for (const marker of resultMarkers.values()) marker.remove();
   resultMarkers.clear();
 }
 function syncResultMarkers(): void {
   const instance = map.value;
-  const places = showAllResultsOnMap.value && !journey.navigating.value && instance && markerConstructor && auth.user?.id
+  const places = showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value) &&
+    instance && markerConstructor && auth.user?.id
     ? placeSearch.mapResults.value : [];
-  const current = new Set(places.filter(place => place.placeId !== placeSearch.selectedPlaceId.value)
+  // While following, the selected POI pin is suppressed. In an explicit
+  // overview show it as a numbered result unless the amber destination pin
+  // already represents that same place.
+  const excludedId = journey.navigating.value && showNavigationSearchResults.value && !isSelectedSearchDestination.value
+    ? null : placeSearch.selectedPlaceId.value;
+  const current = new Set(places.filter(place => place.placeId !== excludedId)
     .map(place => place.placeId));
   for (const [id, marker] of resultMarkers) {
     if (!current.has(id)) { marker.remove(); resultMarkers.delete(id); }
@@ -718,7 +728,7 @@ function syncResultMarkers(): void {
   if (!instance || !markerConstructor) return;
   const offsets = resultMarkerOffsets(places);
   for (const [index, place] of places.entries()) {
-    if (place.placeId === placeSearch.selectedPlaceId.value) continue; // The selected POI has its own purple pin.
+    if (place.placeId === excludedId) continue; // The selected POI or amber route pin already represents it.
     let marker = resultMarkers.get(place.placeId);
     if (!marker) {
       const button = document.createElement("button");
@@ -759,6 +769,7 @@ async function showAllSearchResults(): Promise<void> {
   if (bounds && places.some(place => !bounds.contains([place.lon, place.lat]))) return;
   const extent = resultExtent(places);
   if (!extent) return;
+  if (journey.navigating.value) showNavigationSearchResults.value = true;
   syncResultMarkers();
   userControlledCamera.value = true;
   if (journey.navigating.value) {
@@ -1284,6 +1295,8 @@ function attachHold(instance: MapLibreMap): () => void {
 }
 function resumePointFollowing(): void {
   if (!journey.navigating.value) return;
+  showNavigationSearchResults.value = false;
+  syncResultMarkers();
   navigationFollowEnabled.value = true;
   journey.focus();
 }
@@ -1295,6 +1308,7 @@ function startPointNavigation(): void {
   }
   navigationFollowEnabled.value = true;
   if (journey.start()) {
+    navigationAlert.cancelArrival(); // A new trip cannot inherit a queued chime.
     navigationAlert.arm();
     userControlledCamera.value = true;
     syncOwnMarker();
@@ -1340,6 +1354,7 @@ watch(() => journey.sheetOpen.value, async () => {
 });
 watch(() => journey.navigating.value, (active) => {
   navigationSearchOpen.value = false;
+  showNavigationSearchResults.value = false;
   if (active && activeTool.value) closeTool(false);
   if (!active) {
     navigationFollowEnabled.value = true;

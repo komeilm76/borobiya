@@ -75,6 +75,15 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('aria-label="حد مجاز نامشخص"'); // Never invent a legal limit.
   });
 
+  it("shows POI pins for an explicit search overview during guidance and hides them on follow", () => {
+    expect(map).toContain('showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value)');
+    expect(map).toContain('showNavigationSearchResults.value = true;');
+    expect(map).toContain('const excludedId = journey.navigating.value && showNavigationSearchResults.value && !isSelectedSearchDestination.value');
+    expect(map).toContain('? null : placeSearch.selectedPlaceId.value;');
+    expect(map).toContain('function resumePointFollowing(): void {\n  if (!journey.navigating.value) return;\n  showNavigationSearchResults.value = false;\n  syncResultMarkers();');
+    expect(map).toContain('watch(() => journey.navigating.value, (active) => {\n  navigationSearchOpen.value = false;\n  showNavigationSearchResults.value = false;');
+  });
+
   it("acknowledges accurate arrival once and removes guidance instead of opening the route planner", () => {
     expect(route).toContain('if (fix.accuracy <= 35 && directDistance <= 25)');
     expect(route).toContain('routesVisible.value = false; sheetOpen.value = false; arrived.value = true; return;');

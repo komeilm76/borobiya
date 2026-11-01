@@ -2,6 +2,9 @@
  * Browsers that forbid audio or devices in silent mode still receive visual alerts. */
 export function createNavigationAlert() {
   let context: AudioContext | null = null;
+  let unlock: Promise<void> | null = null;
+  let arrivalGeneration = 0;
+  let arrivalQueued = false;
   function playNotes(notes: readonly (readonly [number, number])[], volume: number): void {
     if (!context || context.state !== "running") return;
     try {
@@ -17,16 +20,37 @@ export function createNavigationAlert() {
       }
     } catch { /* A visible alert is always available if audio fails. */ }
   }
+  function cancelArrival(): void { arrivalGeneration++; arrivalQueued = false; }
   return {
     arm(): void {
       if (typeof AudioContext === "undefined") return;
       try {
         context ??= new AudioContext();
-        void context.resume().catch(() => { /* Autoplay may still be blocked. */ });
+        unlock = context.resume().catch(() => { /* Autoplay may still be blocked. */ });
       } catch { context = null; }
     },
     play(): void { playNotes([[0, 740], [0.18, 590]], 0.14); }, // Descending wrong-turn warning.
-    playArrival(): void { playNotes([[0, 523], [0.16, 659], [0.32, 784]], 0.12); }, // Ascending confirmation chime.
-    dispose(): void { const old = context; context = null; if (old) void old.close().catch(() => {}); }
+    playArrival(): void {
+      const notes = [[0, 523], [0.16, 659], [0.32, 784]] as const;
+      if (!context) return;
+      if (context.state === "running") { playNotes(notes, 0.12); return; }
+      // A just-started journey may arrive before resume() resolves on mobile.
+      // Do not drop that chime, or play it after acknowledgement was dismissed.
+      if (!unlock || arrivalQueued) return;
+      arrivalQueued = true;
+      const current = context, generation = arrivalGeneration;
+      void unlock.then(() => {
+        if (context === current && generation === arrivalGeneration) {
+          playNotes(notes, 0.12); // Still silent if the browser refused the unlock.
+          arrivalQueued = false;
+        }
+      });
+    },
+    cancelArrival,
+    dispose(): void {
+      cancelArrival();
+      const old = context; context = null; unlock = null;
+      if (old) void old.close().catch(() => {});
+    }
   };
 }
