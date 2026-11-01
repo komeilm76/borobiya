@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-01 — Remove redundant phone route instructions
+
+- Removed the phone route summary's how-to paragraphs for Start, route editing and Show Routes. It now shows route metrics, or a short pending status only when no route, loading message or error already explains the state. The existing GPS warnings, buttons and full-width sheet remain unchanged. Source-level regression covers the copy; rendered-phone acceptance remains open.
+
 ### 2026-11-01 — Compact route start/end addresses
 
 - Removed the phone route sheet's extra SOS shortcut as requested; the normal map SOS control is unchanged. Replaced the long provisional-GPS paragraph with two small, single-line start/end address rows, keeping a concise «مبدأ تقریبی» label for provisional routes. The start row reverse-geocodes the **actual route-request origin** (not a snapped polyline vertex) only while details are open; the destination uses its existing known POI/reverse result. Late or cancelled origin lookups cannot show an old start after rerouting, closing or account change. While a lookup is pending the row says so; if no address exists it shows the recorded coordinates (rounded for display) rather than fabricating one. Both lines ellipsize visually at narrow widths, retain full text for assistive technology and native title, and respect phone safe areas. Source/style and pure reverse-place regressions cover the handoff; real-device visual and live-geocoder acceptance remain open.

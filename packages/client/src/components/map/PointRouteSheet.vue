@@ -39,9 +39,7 @@
           <div><span>زمان تقریبی</span><strong>{{ api.durationLabel.value }}</strong></div>
           <div><span>مسافت مسیر</span><strong>{{ api.distanceLabel.value }}</strong></div>
         </div>
-        <p v-else>مسیر با دریافت موقعیت محاسبه می‌شود. برای انتخاب وسیلهٔ حرکت یا دیدن مسیرهای دیگر، «نمایش مسیرها» را باز کنید.</p>
-        <p v-if="api.navigating.value">برای تغییر مسیر «ویرایش مسیرها» را بزنید؛ برای ادامهٔ راهبری «بازگشت به نقشه» را انتخاب کنید.</p>
-        <p v-else>برای راهبری، «شروع راهبری» را بزنید. بدون موقعیت دقیق، هشدار GPS نمایش داده می‌شود و راهبری زنده منتظر می‌ماند.</p>
+        <p v-else-if="!api.loading.value && !api.error.value" role="status">در انتظار مسیر…</p>
       </div>
       <div v-if="routesOpen" id="point-route-routes" class="point-route__body" tabindex="0" aria-label="مسیرها و وسیلهٔ حرکت">
         <div class="point-route__metrics" aria-label="برآورد مسیر از موقعیت فعلی من">

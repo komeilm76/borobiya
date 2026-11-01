@@ -97,6 +97,17 @@ describe("progressive trip planning and editing", () => {
     }
   });
 
+  it("keeps only route facts and short pending state in the phone summary, not how-to paragraphs", () => {
+    expect(sheet).not.toContain('برای راهبری، «شروع راهبری» را بزنید. بدون موقعیت دقیق، هشدار GPS نمایش داده می‌شود و راهبری زنده منتظر می‌ماند.');
+    expect(sheet).not.toContain('برای تغییر مسیر «ویرایش مسیرها» را بزنید');
+    expect(sheet).not.toContain('برای انتخاب وسیلهٔ حرکت یا دیدن مسیرهای دیگر');
+    expect(sheet).toContain('class="point-route__summary"');
+    expect(sheet).toContain('api.selectedRoute.value');
+    expect(sheet).toContain('در انتظار مسیر…');
+    expect(sheet).toContain('api.durationLabel.value');
+    expect(sheet).toContain('api.distanceLabel.value');
+  });
+
   it("gives the active journey label its own full-width row without squeezing its controls", () => {
     const bar = map.slice(map.indexOf('class="user-map-view__journey-bar"'),
       map.indexOf('class="user-map-view__navigation-status"'));
