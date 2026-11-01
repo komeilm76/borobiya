@@ -43,13 +43,23 @@ describe("own and companion marker design", () => {
     expect(own).toContain('element.setAttribute("role", "img")');
     expect(own).toContain('element.setAttribute("aria-label", "موقعیت زندهٔ من")');
     expect(own).toContain('icon.className = "mdi mdi-crosshairs-gps user-map-view__own-marker-icon"');
-    expect(own).toContain('new markerConstructor({ element, anchor: "center" })');
+    expect(own).toContain('createElementNS("http://www.w3.org/2000/svg", "svg")');
+    expect(own).toContain('new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })');
+    expect(own).toContain('ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport")');
+    expect(own).toContain('ownMarker.setRotation(reliableHeading ? routeBearing(fix, journey.routePoints.value) : 0)');
+    expect(own).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
+    expect(own).toContain('fix.accuracy !== null && fix.accuracy <= 80');
+    expect(own).toContain('body.setAttribute("d", "M24 3 L43 41 L24 32 L5 41 Z")');
+    expect(own).not.toContain('getBearing()'); // MapLibre itself subtracts map bearing for map-aligned markers.
+    expect(own).not.toContain('mdi-navigation-variant');
     expect(own).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
     expect(own).not.toContain('new markerConstructor({ color:');
     expect(body("syncSelectedPlaceMarker")).toContain('new markerConstructor({ color: "#7c3aed" })');
     expect(body("onMapReady")).toContain('ownMarker?.remove(); ownMarker = null;');
     expect(rule(":global(.user-map-view .user-map-view__own-marker)")).toContain("width: 48px; height: 48px;");
-    expect(rule(":global(.user-map-view .user-map-view__own-marker-icon)")).toContain("background: #2563eb;");
+    expect(rule(":global(.user-map-view .user-map-view__own-marker-icon)")).toContain("background: rgb(var(--v-theme-primary));");
+    expect(rule(":global(.user-map-view .user-map-view__direction-arrow__body)")).toContain("fill: rgb(var(--v-theme-primary));");
+    expect(rule(":global(.user-map-view .user-map-view__direction-arrow__accent)")).toContain("fill: rgb(var(--v-theme-secondary));");
     expect(compiled.errors).toEqual([]);
     expect(compiled.code).toContain(".user-map-view__own-marker-icon");
   });

@@ -304,11 +304,14 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("repaintOverlays")).toContain('paintPointRoute()');
     expect(body("paintPlayback")).toContain('if (journey.point.value)');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
-    expect(body("syncOwnMarker")).toContain('mdi-navigation-variant');
-    expect(view).toContain('transform: perspective(120px) rotateX(18deg)');
+    expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
+    expect(body("syncOwnMarker")).toContain('routeBearing(fix, journey.routePoints.value)');
+    expect(view).toMatch(/watch\(\(\) => journey\.selectedRoute\.value, \(\) => \{ syncOwnMarker\(\);/);
+    expect(view).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--walking');
-    expect(view).toContain('user-map-view__own-marker--walking .user-map-view__own-marker-icon');
-    expect(view).toContain('transform: none; box-shadow:');
+    expect(view).toContain('user-map-view__own-marker--walking .user-map-view__direction-arrow');
+    expect(view).not.toContain('transform: perspective(120px) rotateX(18deg)');
+    expect(view).toContain('transform: none;');
     expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
     expect(view).toContain('<PointRouteSheet :api="journey"');
   });

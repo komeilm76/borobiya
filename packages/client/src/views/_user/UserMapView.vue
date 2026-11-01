@@ -206,7 +206,7 @@ import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
-import { navigationCameraOffset, type NavigationCamera } from "@/sos/navigation-follow";
+import { navigationCameraOffset, routeBearing, type NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -401,18 +401,35 @@ function syncOwnMarker(): void {
     const icon = document.createElement("span");
     icon.className = "mdi mdi-crosshairs-gps user-map-view__own-marker-icon";
     icon.setAttribute("aria-hidden", "true");
-    element.append(icon);
+    // The tip is at the top of this viewBox; MapLibre rotates the whole marker relative
+    // to the map, so a 90° eastbound segment points right on a north-up map.
+    const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    arrow.classList.add("user-map-view__direction-arrow");
+    arrow.setAttribute("viewBox", "0 0 48 48");
+    arrow.setAttribute("aria-hidden", "true");
+    const body = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    body.classList.add("user-map-view__direction-arrow__body");
+    body.setAttribute("d", "M24 3 L43 41 L24 32 L5 41 Z");
+    const accent = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    accent.classList.add("user-map-view__direction-arrow__accent");
+    accent.setAttribute("d", "M24 10 L32 30 L24 26 Z");
+    arrow.append(body, accent);
+    element.append(icon, arrow);
     element.addEventListener("click", (event) => event.stopPropagation());
-    ownMarker = new markerConstructor({ element, anchor: "center" })
+    ownMarker = new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })
       .setLngLat([fix.lon, fix.lat]).addTo(instance);
   } else ownMarker.setLngLat([fix.lon, fix.lat]);
+  const reliableHeading = journey.navigating.value && !journey.replanning.value && !journey.rerouteWaitingForFix.value &&
+    fix.accuracy !== null && fix.accuracy <= 80 && journey.routePoints.value.length >= 2;
+  // 'map' applies heading - map bearing on every camera move, including a manual compass
+  // turn. The static GPS crosshair instead remains upright outside reliable guidance.
+  ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport");
+  ownMarker.setRotation(reliableHeading ? routeBearing(fix, journey.routePoints.value) : 0);
   const element = ownMarker.getElement();
-  element.classList.toggle("user-map-view__own-marker--navigating", journey.navigating.value);
-  element.classList.toggle("user-map-view__own-marker--walking", journey.navigating.value && journey.profile.value === "foot");
-  element.setAttribute("aria-label", journey.navigating.value ? "موقعیت زندهٔ من؛ جهت راهبری" : "موقعیت زندهٔ من");
-  const icon = element.querySelector(".user-map-view__own-marker-icon");
-  icon?.classList.toggle("mdi-navigation-variant", journey.navigating.value);
-  icon?.classList.toggle("mdi-crosshairs-gps", !journey.navigating.value);
+  element.classList.toggle("user-map-view__own-marker--navigating", reliableHeading);
+  element.classList.toggle("user-map-view__own-marker--walking", reliableHeading && journey.profile.value === "foot");
+  element.setAttribute("aria-label", reliableHeading ? "موقعیت زندهٔ من؛ جهت راهبری" :
+    journey.navigating.value ? "موقعیت من؛ در انتظار مسیر و GPS دقیق" : "موقعیت زندهٔ من");
 }
 function centerOnOwnLocation(initiatedByUser = true): void {
   const instance = map.value;
@@ -1117,10 +1134,10 @@ function fitPointRoute(): void {
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }
-watch(() => journey.selectedRoute.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
+watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch([() => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
-  () => { syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
+  () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.sheetOpen.value, async () => {
   if (!journey.navigating.value || !navigationFollowEnabled.value) return;
   await nextTick(); // The compact bar and bottom sheet exchange DOM positions.
@@ -1347,35 +1364,41 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-bar > span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .86rem; font-weight: 700; }
 .user-map-view__journey-bar .v-btn { flex: 0 0 auto; min-height: 44px; min-width: 44px; }
 :global(.user-map-view__destination-marker:focus-visible) { outline: 3px solid #f0a127; outline-offset: 2px; }
-/* Blue private-GPS target with a decorative halo (not a GPS accuracy radius); unlike the purple search
- * pin or a route endpoint, it remains upright and moves with each fresh fix. */
+/* Private GPS halo is decorative, not an accuracy radius. The idle crosshair stays
+ * screen-upright; the SVG arrow is rotated by MapLibre against the route bearing. */
 :global(.user-map-view .user-map-view__own-marker) {
   display: grid; place-items: center; width: 48px; height: 48px;
-  border-radius: 50%; background: rgba(37, 99, 235, 0.18);
+  border-radius: 50%; background: rgba(var(--v-theme-primary), .22);
   cursor: default;
 }
 :global(.user-map-view .user-map-view__own-marker-icon) {
   display: grid; place-items: center; width: 32px; height: 32px;
-  border: 3px solid #fff; border-radius: 50%;
-  color: #fff; background: #2563eb;
-  box-shadow: 0 2px 8px rgba(13, 48, 106, 0.45); font-size: 18px;
+  border: 3px solid rgb(var(--v-theme-on-primary)); border-radius: 50%;
+  color: rgb(var(--v-theme-on-primary)); background: rgb(var(--v-theme-primary));
+  box-shadow: 0 2px 8px rgba(13, 48, 46, .4); font-size: 18px;
 }
-/* A raised directional arrow follows the private GPS fix while the camera pitches and bears
- * along the selected route. Never rotate the MapLibre marker itself (it would drift off its anchor). */
-:global(.user-map-view .user-map-view__own-marker--navigating) { width: 60px; height: 60px; border-radius: 20px; background: rgba(37, 99, 235, .24); }
-:global(.user-map-view .user-map-view__own-marker--navigating .user-map-view__own-marker-icon) {
-  width: 46px; height: 46px; border-radius: 14px; border-color: #e2efff;
-  background: linear-gradient(145deg, #4e9aff, #1745a9); font-size: 27px;
-  box-shadow: 0 8px 0 #122d70, 0 14px 20px rgba(10, 31, 83, .5);
-  transform: perspective(120px) rotateX(18deg);
+:global(.user-map-view .user-map-view__direction-arrow) { display: none; }
+:global(.user-map-view .user-map-view__own-marker--navigating) {
+  width: 60px; height: 60px; background: rgba(var(--v-theme-primary), .24);
 }
-/* Walking keeps a flat 2D view: the position arrow must not imitate a raised vehicle. */
-:global(.user-map-view .user-map-view__own-marker--walking .user-map-view__own-marker-icon) {
-  transform: none; box-shadow: 0 3px 10px rgba(10, 31, 83, .4);
+:global(.user-map-view .user-map-view__own-marker--navigating .user-map-view__own-marker-icon) { display: none; }
+:global(.user-map-view .user-map-view__own-marker--navigating .user-map-view__direction-arrow) {
+  display: block; width: 48px; height: 48px;
+  filter: drop-shadow(0 4px 3px rgba(13, 48, 46, .5));
 }
-:global(:root.dark .user-map-view .user-map-view__own-marker) { background: rgba(96, 165, 250, 0.26); }
+:global(.user-map-view .user-map-view__direction-arrow__body) {
+  fill: rgb(var(--v-theme-primary)); stroke: rgb(var(--v-theme-on-primary));
+  stroke-width: 2.5; stroke-linejoin: round;
+}
+:global(.user-map-view .user-map-view__direction-arrow__accent) { fill: rgb(var(--v-theme-secondary)); }
+/* Walking remains flat, without a vehicle-style raised shadow. */
+:global(.user-map-view .user-map-view__own-marker--walking .user-map-view__direction-arrow) {
+  transform: none; filter: drop-shadow(0 2px 2px rgba(13, 48, 46, .4));
+}
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__own-marker-icon) { border-color: CanvasText; background: Highlight; color: HighlightText; }
+  :global(.user-map-view .user-map-view__direction-arrow__body) { fill: Highlight; stroke: HighlightText; }
+  :global(.user-map-view .user-map-view__direction-arrow__accent) { fill: HighlightText; }
   :global(.user-map-view .user-map-view__peer-avatar-face) { border-color: CanvasText; background: Highlight; color: HighlightText; }
 }
 

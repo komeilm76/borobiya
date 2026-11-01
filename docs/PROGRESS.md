@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-01 — Navigation arrow bearing and brand marker
+
+- Corrected a navigation-marker angle mismatch: the former MDI arrow stayed upright in the viewport even when the map rotated, so panning/compass changes could make it point away from the selected route. A new SVG arrow has a north-facing tip, the shared route-segment bearing, MapLibre `rotationAlignment: map` and viewport pitch alignment; MapLibre subtracts the current map bearing so the marker stays aligned when the camera rotates. A reliable GPS fix and valid route are required to show directional guidance; uncertain fixes and rerouting show the non-directional private-GPS crosshair instead. Route replacements refresh the arrow without waiting for another GPS fix.
+- The custom arrow and idle GPS crosshair use the site's theme primary, on-primary and secondary colors (teal/gold, adapting to light/dark themes), with forced-colors support. Source/style tests cover the marker's geometry, orientation wiring, confidence guard and palette. Real-device visual/GPS acceptance is still open.
+
 ### 2026-11-01 — Car, bicycle and walking camera follow audit
 
 - Fixed a route-heading defect shared by all three modes: snapping to the nearest polyline **vertex** could rotate toward the next street before the actual corner, and GPS cross-track drift could tilt the bearing toward a distant point. The camera now follows the tangent of the nearest nondegenerate route **segment**; duplicate vertices no longer create a spurious north-up heading. Car remains 60°/zoom 17, bicycle 45°/zoom 16 and walking flat/zoom 17, subject to the map's installed zoom and pitch limits.
