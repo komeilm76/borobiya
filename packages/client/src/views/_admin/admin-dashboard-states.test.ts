@@ -18,8 +18,10 @@ describe("admin dashboard states", () => {
 
   it("keeps the last good numbers visible when the network drops", () => {
     expect(dashboard).toContain("v-if=\"!isOnline\" class=\"admin-banner admin-banner--offline\"");
-    expect(dashboard).toContain("window.addEventListener(\"offline\", updateConnectivity)");
-    expect(dashboard).toContain("window.removeEventListener(\"offline\", updateConnectivity)");
+    // Connectivity is the shared composable's job, so the dashboard and the dispatch board agree on "offline".
+    expect(dashboard).toContain('import { useOnlineStatus } from "../../composables/online-status";');
+    expect(dashboard).toContain("const { isOnline } = useOnlineStatus();");
+    expect(dashboard).not.toContain('window.addEventListener("offline"');
   });
 
   it("never fabricates data past the pages it actually read", () => {

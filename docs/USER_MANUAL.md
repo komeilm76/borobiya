@@ -259,6 +259,7 @@ In a native (Android) build the device column is filled from the platform: brand
 4. Each responder shows **distance, rating, category, last active**. Select multiple responders across searches; chosen usernames remain listed as removable chips until you switch SOS requests or dispatch.
 5. Select **one or more** → **Dispatch**.
 6. Rescuers receive **proposal** (bell icon) instantly.
+7. **If the connection drops** a warning bar sits above the board: the queue and responder states are not updating, and anything you send will not reach the server. An empty board then says the connection is down instead of “the queue is not confirmed”, and when the browser reports the network back the board re-reads the queue by itself if it had not been verified.
 
 [Screenshot: Admin alert + nearest responders list]
 

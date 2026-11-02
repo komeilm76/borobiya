@@ -79,6 +79,26 @@
     </template>
 
     <v-alert
+      v-if="!isOnline"
+      class="mb-4"
+      type="warning"
+      variant="tonal"
+      rounded="lg"
+      role="status"
+      icon="mdi-cloud-off-outline"
+    >
+      <div class="d-flex flex-wrap align-center justify-space-between ga-3">
+        <span>
+          اتصال اینترنت قطع است؛ صف درخواست‌ها و وضعیت امدادگران به‌روز نمی‌شود و هر عملیاتی که بفرستید به سرور
+          نمی‌رسد.
+        </span>
+        <v-btn size="small" variant="text" :loading="adminSos.loading" @click="adminSos.refreshRequests()">
+          تلاش دوباره
+        </v-btn>
+      </div>
+    </v-alert>
+
+    <v-alert
       v-if="adminSos.errorMessage"
       class="mb-4"
       closable
@@ -143,6 +163,11 @@
           <v-card-text v-if="adminSos.visibleRequests.length === 0 && adminSos.loading" class="py-8 text-center" role="status">
             <v-progress-circular indeterminate color="primary" size="28" class="me-2" />
             در حال بررسی صف درخواست‌های اضطراری…
+          </v-card-text>
+          <v-card-text v-else-if="adminSos.visibleRequests.length === 0 && !isOnline"
+            class="py-8 text-center" role="status">
+            اتصال قطع است؛ صف درخواست‌ها تا برگشتن اینترنت خوانده نمی‌شود.
+            <v-btn variant="text" size="small" :loading="adminSos.loading" @click="adminSos.refreshRequests()">تلاش دوباره</v-btn>
           </v-card-text>
           <v-card-text v-else-if="adminSos.visibleRequests.length === 0 && !adminSos.queueVerified"
             class="py-8 text-center" role="status">
@@ -604,6 +629,7 @@ import { listSosIncidentTypes } from "@/api/sos";
 import AdminShell from "@/components/admin/AdminShell.vue";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
+import { useOnlineStatus } from "@/composables/online-status";
 import {
   buildSosAlertsGeoJson,
   formatResponderDistance,
@@ -627,6 +653,14 @@ const SOS_CORE_LAYER_ID = "admin-sos-core";
 
 const route = useRoute();
 const adminSos = useAdminSosStore(pinia);
+const { isOnline } = useOnlineStatus();
+
+// A dead connection does not fix itself in the socket: when the browser reports the network back, re-read the
+// queue instead of leaving the board on the last snapshot until the admin presses refresh.
+watch(isOnline, (online) => {
+  if (!online || adminSos.queueVerified) return;
+  void adminSos.refreshRequests();
+});
 const dispatchFilters = [
   { title: "در انتظار رسیدگی", value: "pending" },
   { title: "اعزام‌شده", value: "dispatched" },

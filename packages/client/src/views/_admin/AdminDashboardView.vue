@@ -195,6 +195,7 @@ import AdminShell from "../../components/admin/AdminShell.vue";
 import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
 import { ApiError } from "../../api/http";
 import { friendlyErrorMessage } from "../../api/error-message";
+import { useOnlineStatus } from "../../composables/online-status";
 import { listAdminSosRequests } from "../../api/admin-sos";
 import { listAdminUsers } from "../../api/admin-users";
 import { listCategories, listIncidentTypes } from "../../api/admin-catalog";
@@ -227,7 +228,7 @@ const loading = ref(true);
 const error = ref<unknown>(null);
 const forbidden = ref(false);
 const truncated = ref(false);
-const isOnline = ref(true);
+const { isOnline } = useOnlineStatus();
 const liveConnected = ref(false);
 const lastLiveAt = ref<Date | null>(null);
 
@@ -474,26 +475,17 @@ function stopLive(): void {
   liveConnected.value = false;
 }
 
-function updateConnectivity(): void {
-  isOnline.value = navigator.onLine;
-}
-
 const lastEventLabel = computed(() =>
   lastLiveAt.value === null ? "" : timeFormatter.format(lastLiveAt.value)
 );
 
 onMounted(() => {
-  updateConnectivity();
-  window.addEventListener("online", updateConnectivity);
-  window.addEventListener("offline", updateConnectivity);
   void loadAll().then(() => startLive());
 });
 
 onBeforeUnmount(() => {
   controller?.abort();
   stopLive();
-  window.removeEventListener("online", updateConnectivity);
-  window.removeEventListener("offline", updateConnectivity);
 });
 </script>
 

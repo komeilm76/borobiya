@@ -4,6 +4,20 @@
 
 ---
 
+### 2026-11-02 — The dispatch board knows it is offline
+
+- The board had no idea. A dropped connection surfaced as either the generic red `errorMessage` banner or, worse,
+  as «صف هنوز تأیید نشده است» — the copy that means *the server answered but the list is not trustworthy* — while
+  the real cause was that nothing was reaching the server at all.
+- Connectivity now comes from `composables/online-status.ts`, which both the dashboard and the board consume: one
+  definition of "offline", listeners added once and dropped with the view. The dashboard's inline
+  `navigator.onLine` copy and its two `window` listeners are gone.
+- The board leads with a warning bar above the error banner, says the outage in the empty queue instead of blaming
+  the queue, and re-reads the queue by itself when the browser reports the network back — but only when the queue
+  had not already been verified, so a reconnect does not fire a redundant read.
+- Suite 1313/1313 (3 behavioural tests for the composable under a stubbed window, 4 source-pinned tests for the
+  board), typecheck clean.
+
 ### 2026-11-02 — The users table stops inventing its own states
 
 - The users screen carried its own spinner, its own red alert and its own empty box, which made it the last admin
