@@ -6,6 +6,11 @@
     :crumbs="['عملیات', 'نمای کلی']"
   >
     <template #actions>
+      <span class="admin-live" :class="{ 'admin-live--on': liveConnected }" role="status">
+        <i aria-hidden="true" />
+        <span>{{ liveConnected ? "جریان زنده" : "اتصال زنده برقرار نیست" }}</span>
+        <small v-if="lastLiveAt">{{ lastEventLabel }}</small>
+      </span>
       <v-btn
         class="admin-refresh"
         variant="tonal"
@@ -13,7 +18,7 @@
         rounded="lg"
         :loading="loading"
         :disabled="loading"
-        @click="loadAll"
+        @click="loadAll()"
       >
         <v-icon class="ms-2" icon="mdi-refresh" size="17" />
         به‌روزرسانی
@@ -29,7 +34,7 @@
       <span>
         اتصال به سرور قطع است؛ اعداد زیر از آخرین دریافت موفق هستند و به‌روزرسانی زنده متوقف شده است.
       </span>
-      <button type="button" class="admin-banner__action" @click="loadAll">تلاش دوباره</button>
+      <button type="button" class="admin-banner__action" @click="loadAll()">تلاش دوباره</button>
     </div>
 
     <AdminStatePanel
@@ -51,7 +56,7 @@
       :reference="errorReference"
       action-label="تلاش دوباره"
       action-icon="mdi-refresh"
-      @retry="loadAll"
+      @retry="loadAll()"
     />
 
     <template v-else>
@@ -193,6 +198,11 @@ import { friendlyErrorMessage } from "../../api/error-message";
 import { listAdminSosRequests } from "../../api/admin-sos";
 import { listAdminUsers } from "../../api/admin-users";
 import { listCategories, listIncidentTypes } from "../../api/admin-catalog";
+import {
+  MISSION_CANCELLED_BY_RESCUER_EVENT,
+  SOS_NEW_REQUEST_EVENT
+} from "../../services/socket-events";
+import type { RealtimeClient } from "../../services/socket";
 import { useAuthStore } from "../../stores/auth";
 import {
   dailySeries,
@@ -218,12 +228,19 @@ const error = ref<unknown>(null);
 const forbidden = ref(false);
 const truncated = ref(false);
 const isOnline = ref(true);
+const liveConnected = ref(false);
+const lastLiveAt = ref<Date | null>(null);
 
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 const timeFormatter = new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit" });
 const weekdayFormatter = new Intl.DateTimeFormat("fa-IR", { weekday: "short" });
 
 let controller: AbortController | null = null;
+let live: RealtimeClient | null = null;
+let liveTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Coalesces a burst of events into one refresh: ten arrivals are one read, not ten. */
+const LIVE_REFRESH_DELAY_MS = 1500;
 
 function toFa(value: number): string {
   return numberFormatter.format(value);
@@ -361,7 +378,7 @@ function groupLabel(state: "ready" | "thin" | "empty"): string {
   return { ready: "آماده", thin: "کمبود نیرو", empty: "بدون عضو" }[state];
 }
 
-async function loadAll(): Promise<void> {
+async function loadAll(options: { silent?: boolean } = {}): Promise<void> {
   try {
     await auth.ensureSession();
   } catch {
@@ -376,7 +393,9 @@ async function loadAll(): Promise<void> {
 
   controller?.abort();
   controller = new AbortController();
-  loading.value = true;
+  // A live refresh must not replace the screen with a skeleton; the previous numbers stay visible until
+  // the new ones land.
+  if (!options.silent) loading.value = true;
   error.value = null;
   forbidden.value = false;
 
@@ -408,25 +427,130 @@ async function loadAll(): Promise<void> {
   }
 }
 
+/**
+ * The dashboard is the screen an on-call admin leaves open, so it follows the same admin room the dispatch
+ * board uses: a new SOS or a rescuer cancellation refreshes it without a manual press. The socket library is
+ * imported lazily for the same reason the dispatch store does it — it must not join the first bundle for
+ * users who never open an admin page.
+ */
+async function startLive(): Promise<void> {
+  if (live || !auth.accessToken) return;
+  try {
+    const { createRealtimeClient } = await import("../../services/socket");
+    const client = createRealtimeClient(auth.accessToken);
+    client.socket.on("connect", () => {
+      liveConnected.value = true;
+    });
+    client.socket.on("disconnect", () => {
+      liveConnected.value = false;
+    });
+    client.socket.on(SOS_NEW_REQUEST_EVENT, scheduleLiveRefresh);
+    client.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, scheduleLiveRefresh);
+    client.connect();
+    live = client;
+    liveConnected.value = client.socket.connected;
+  } catch {
+    // A missing socket is a degraded dashboard, not a broken one: the manual refresh still works.
+    liveConnected.value = false;
+  }
+}
+
+function scheduleLiveRefresh(): void {
+  lastLiveAt.value = new Date();
+  if (liveTimer !== null) clearTimeout(liveTimer);
+  liveTimer = setTimeout(() => {
+    liveTimer = null;
+    void loadAll({ silent: true });
+  }, LIVE_REFRESH_DELAY_MS);
+}
+
+function stopLive(): void {
+  if (liveTimer !== null) {
+    clearTimeout(liveTimer);
+    liveTimer = null;
+  }
+  live?.close();
+  live = null;
+  liveConnected.value = false;
+}
+
 function updateConnectivity(): void {
   isOnline.value = navigator.onLine;
 }
+
+const lastEventLabel = computed(() =>
+  lastLiveAt.value === null ? "" : timeFormatter.format(lastLiveAt.value)
+);
 
 onMounted(() => {
   updateConnectivity();
   window.addEventListener("online", updateConnectivity);
   window.addEventListener("offline", updateConnectivity);
-  void loadAll();
+  void loadAll().then(() => startLive());
 });
 
 onBeforeUnmount(() => {
   controller?.abort();
+  stopLive();
   window.removeEventListener("online", updateConnectivity);
   window.removeEventListener("offline", updateConnectivity);
 });
 </script>
 
 <style scoped>
+.admin-live {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 999px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.admin-live i {
+  inline-size: 8px;
+  block-size: 8px;
+  border-radius: 50%;
+  background: rgba(var(--v-theme-on-surface), 0.35);
+}
+
+.admin-live--on {
+  border-color: rgba(var(--v-theme-success), 0.45);
+  color: rgb(var(--v-theme-success));
+}
+
+.admin-live--on i {
+  background: rgb(var(--v-theme-success));
+  box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.6);
+  animation: admin-live-pulse 2.4s ease-out infinite;
+}
+
+.admin-live small {
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes admin-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(var(--v-theme-success), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-live--on i {
+    animation: none;
+  }
+}
 .admin-banner {
   display: flex;
   align-items: center;

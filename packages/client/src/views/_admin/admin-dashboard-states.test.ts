@@ -13,7 +13,7 @@ describe("admin dashboard states", () => {
     expect(dashboard).toContain('v-else-if="state === \'forbidden\'"');
     expect(dashboard).toContain('v-else-if="state === \'error\'"');
     expect(dashboard).toContain(':reference="errorReference"');
-    expect(dashboard).toContain('@retry="loadAll"');
+    expect(dashboard).toContain('@retry="loadAll()"');
   });
 
   it("keeps the last good numbers visible when the network drops", () => {
@@ -26,6 +26,22 @@ describe("admin dashboard states", () => {
     expect(dashboard).toContain("const PAGES_TO_READ = 3;");
     expect(dashboard).toContain("truncated.value = firstPage.totalPages > PAGES_TO_READ;");
     expect(dashboard).toContain('v-if="truncated" class="admin-hint"');
+  });
+
+  it("follows the admin room and coalesces event bursts into one silent refresh", () => {
+    expect(dashboard).toContain("client.socket.on(SOS_NEW_REQUEST_EVENT, scheduleLiveRefresh);");
+    expect(dashboard).toContain("client.socket.on(MISSION_CANCELLED_BY_RESCUER_EVENT, scheduleLiveRefresh);");
+    expect(dashboard).toContain("const LIVE_REFRESH_DELAY_MS = 1500;");
+    expect(dashboard).toContain("void loadAll({ silent: true });");
+    // A live refresh keeps the previous numbers on screen instead of flashing a skeleton.
+    expect(dashboard).toContain("if (!options.silent) loading.value = true;");
+  });
+
+  it("tears the live socket down with the view", () => {
+    expect(dashboard).toContain("  stopLive();");
+    expect(dashboard).toContain("live?.close();");
+    expect(dashboard).toContain('class="admin-live"');
+    expect(dashboard).toContain("{{ liveConnected ? \"جریان زنده\" : \"اتصال زنده برقرار نیست\" }}");
   });
 
   it("treats a missing token as forbidden rather than showing an empty dashboard", () => {
