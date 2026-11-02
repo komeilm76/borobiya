@@ -11,6 +11,7 @@
 - **The users table could go blank.** When a filter change shrank the list below the page the admin stood on (deactivating the last rows of page 2, for instance), the view clamped the page number and returned without asking again. Both clamp branches now re-request the page that still exists.
 - **Two dead ends in navigation.** `/_admin` and `/_user` had no route of their own, so a typo in either root dropped a signed-in admin on the public not-found page; both now redirect to their section's home. And the floating SOS button rendered on `/_admin*`, where it sat directly over the rail's account/logout control and would have filed a request as whoever was signed in — it is suppressed in the panel.
 - **The off-canvas rail could be tabbed into while parked off-screen.** It is `visibility: hidden` until opened now, and Escape closes it (the scrim was the only way out before).
+- **Admins landed on the wrong home.** Post-login, onboarding and guest-only redirects all sent an admin to `/_admin/users`, while the rail's brand, its first nav item and the `/_admin` redirect all point at the dashboard. The guard now shares that one destination (`ADMIN_HOME_PATH`).
 - **Reports silently analysed a slice.** The window is capped at three pages of SOS records; the page now says how many of the total it covers instead of presenting partial numbers as the whole. A no-op `watch(range, …)` that did nothing was removed.
 - Client suite 1286/1286, server 589/589, typecheck clean.
 

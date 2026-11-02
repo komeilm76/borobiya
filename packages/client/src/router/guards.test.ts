@@ -47,7 +47,7 @@ describe("client auth navigation guard", () => {
     const auth = makeAuth({ isAuthenticated: true, user: ordinaryUser });
     expect(resolveAuthNavigation(location("/_user/complete-security-questions"), auth)).toBe("/_user/map");
     expect(resolveAuthNavigation(location("/_user/complete-security-questions"), makeAuth({ isAuthenticated: true, user: admin })))
-      .toBe("/_admin/users");
+      .toBe("/_admin/dashboard");
   });
 
   it("keeps authenticated users out of guest-only pages and accepts only safe return paths", () => {
@@ -65,13 +65,13 @@ describe("client auth navigation guard", () => {
   });
 
   it("requires an admin role for admin pages", () => {
-    expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: ordinaryUser })))
+    expect(resolveAuthNavigation(location("/_admin/dashboard"), makeAuth({ isAuthenticated: true, user: ordinaryUser })))
       .toBe("/_user/map");
-    expect(resolveAuthNavigation(location("/_admin/users"), makeAuth({ isAuthenticated: true, user: admin }))).toBe(true);
+    expect(resolveAuthNavigation(location("/_admin/dashboard"), makeAuth({ isAuthenticated: true, user: admin }))).toBe(true);
   });
 
   it("sends admins to user management after login and keeps user onboarding/default destinations", () => {
-    expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/users");
+    expect(resolvePostLoginDestination(undefined, makeAuth({ user: admin }))).toBe("/_admin/dashboard");
     expect(resolvePostLoginDestination(undefined, makeAuth({ user: ordinaryUser }))).toBe("/_user/map");
     expect(resolvePostLoginDestination(undefined, makeAuth({
       user: admin,
@@ -82,12 +82,12 @@ describe("client auth navigation guard", () => {
   it("preserves only safe post-login redirects", () => {
     const auth = makeAuth({ user: admin });
     expect(resolvePostLoginDestination("/_admin/dashboard?tab=overview", auth)).toBe("/_admin/dashboard?tab=overview");
-    expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/auth/register", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/_auth?registered=1", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination("/\\\\attacker.example", auth)).toBe("/_admin/users");
-    expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/users");
+    expect(resolvePostLoginDestination("//attacker.example", auth)).toBe("/_admin/dashboard");
+    expect(resolvePostLoginDestination("/_auth/register", auth)).toBe("/_admin/dashboard");
+    expect(resolvePostLoginDestination("/auth/register", auth)).toBe("/_admin/dashboard");
+    expect(resolvePostLoginDestination("/_auth?registered=1", auth)).toBe("/_admin/dashboard");
+    expect(resolvePostLoginDestination("/\\\\attacker.example", auth)).toBe("/_admin/dashboard");
+    expect(resolvePostLoginDestination(["/_user/map", "//attacker.example"], auth)).toBe("/_admin/dashboard");
   });
 
   it("restores auth state before navigating to a guest-only or protected page", async () => {

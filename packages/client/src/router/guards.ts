@@ -3,7 +3,9 @@ import type { RouteLocationRaw, RouteLocationNormalized } from "vue-router";
 
 const LOGIN_PATH = "/_auth/login";
 const USER_HOME_PATH = "/_user/map";
-const ADMIN_USERS_PATH = "/_admin/users";
+// The panel's home is its dashboard: the rail's first item, the brand link and the page `/_admin` itself
+// redirects to. Landing an admin on the user list after sign-in contradicted all three.
+const ADMIN_HOME_PATH = "/_admin/dashboard";
 const ONBOARDING_PATH = "/_user/complete-security-questions";
 
 export interface AuthGuardState {
@@ -48,7 +50,7 @@ export function resolvePostLoginDestination(
   const safeRedirect = safeRedirectPath(redirect);
   if (safeRedirect) return safeRedirect;
   if (auth.mustCompleteSecurityQuestions) return ONBOARDING_PATH;
-  return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
+  return auth.user?.role === "admin" ? ADMIN_HOME_PATH : USER_HOME_PATH;
 }
 
 export function resolveAuthNavigation(
@@ -71,7 +73,7 @@ export function resolveAuthNavigation(
     return ONBOARDING_PATH;
   }
   if (!auth.mustCompleteSecurityQuestions && to.path === ONBOARDING_PATH) {
-    return auth.user?.role === "admin" ? ADMIN_USERS_PATH : USER_HOME_PATH;
+    return auth.user?.role === "admin" ? ADMIN_HOME_PATH : USER_HOME_PATH;
   }
   if (isAdminPath(to.path) && auth.user?.role !== "admin") {
     return USER_HOME_PATH;

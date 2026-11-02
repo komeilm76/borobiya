@@ -17,6 +17,7 @@ vi.mock("@client/views/_user/CompleteSecurityQuestionsView.vue", () => ({ defaul
 vi.mock("@client/views/_user/UserMapView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_user/UserDevicesView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_admin/AdminUsersView.vue", () => ({ default: {} }));
+vi.mock("@client/views/_admin/AdminDashboardView.vue", () => ({ default: {} }));
 vi.mock("@client/views/_admin/AdminDispatchView.vue", () => ({ default: {} }));
 
 function authState(overrides: Partial<AuthGuardState> = {}): AuthGuardState {
@@ -183,7 +184,7 @@ describe("real router auth navigation (no Vue components mounted)", () => {
     const auth = authState({ isAuthenticated: true, user: admin });
     const router = setup(auth);
     await router.push("/_auth/register");
-    expect(router.currentRoute.value.path).toBe("/_admin/users");
+    expect(router.currentRoute.value.path).toBe("/_admin/dashboard");
     await router.push("/_admin/dispatch");
     expect(router.currentRoute.value.path).toBe("/_admin/dispatch");
     auth.user = user;

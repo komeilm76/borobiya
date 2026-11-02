@@ -15,7 +15,7 @@ const sidebar = readFileSync(new URL("../components/shell/MapProposalSidebar.vue
 describe("map as the rescuer's home and proposal workspace", () => {
   it("makes the map the post-login/onboarding default without changing the admin destination or explicit safe returns", () => {
     expect(resolvePostLoginDestination(undefined, { user: { role: "user" }, mustCompleteSecurityQuestions: false })).toBe("/_user/map");
-    expect(resolvePostLoginDestination(undefined, { user: { role: "admin" }, mustCompleteSecurityQuestions: false })).toBe("/_admin/users");
+    expect(resolvePostLoginDestination(undefined, { user: { role: "admin" }, mustCompleteSecurityQuestions: false })).toBe("/_admin/dashboard");
     expect(resolvePostLoginDestination("/_user/mission", { user: { role: "user" }, mustCompleteSecurityQuestions: false })).toBe("/_user/mission");
   });
 
