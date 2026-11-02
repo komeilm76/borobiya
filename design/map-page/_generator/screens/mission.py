@@ -165,13 +165,7 @@ def mission_offer_details() -> Screen:
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
 
-    # compact swipe indicator above the sheet (second of three offers)
-    for index in range(3):
-        active = index == 1
-        s.rect(196.5 - 26 + index * 18, 300, 14 if active else 8, 5,
-               fill=C.primary if active else "#FFFFFF", radius=3)
-
-    top = 316
+    top = 310
     s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
     s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
     s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
@@ -180,40 +174,45 @@ def mission_offer_details() -> Screen:
     y = sheet_header(s, top + 20, "جزئیات پیشنهاد", "پیشنهاد ۲ از ۳ · آتش‌سوزی تجاری",
                      icon="mdi-lifebuoy", tone="mission", title_style="title")
 
-    s.rect(16, y, 361, 96, fill=C.danger_soft, radius=18)
-    s.text(357, y + 12, "نوع حادثه", "caption", C.danger, align="right")
-    s.text(357, y + 30, "آتش‌سوزی انبار تجاری، طبقهٔ دوم", "title-sm", C.text, align="right",
+    s.rect(16, y, 361, 88, fill=C.danger_soft, radius=18)
+    s.text(357, y + 10, "نوع حادثه", "caption", C.danger, align="right")
+    s.text(357, y + 28, "آتش‌سوزی انبار تجاری، طبقهٔ دوم", "title-sm", C.text, align="right",
            max_width=320)
-    s.text(357, y + 58, "شدت بالا · نیاز به تیم دو نفره · احتمال گسترش", "caption", C.muted,
-           align="right", max_width=320)
-    s.chip(30, y + 62, "SOS فوری", None, "danger", h=24)
-    y += 110
+    s.text(357, y + 56, "شدت بالا · نیاز به تیم دو نفره", "caption", C.muted, align="right",
+           max_width=230)
+    s.chip(30, y + 56, "SOS فوری", None, "danger", h=24)
+    y += 100
 
     s.text(357, y, "اطلاعات محل", "caption-bold", C.muted, align="right")
-    y += 24
+    y += 22
     rows = [("نشانی", INCIDENT_ADDRESS), ("مسافت از موقعیت شما", "۱٫۲ کیلومتر"),
             ("زمان رسیدن تقریبی", "۴ دقیقه با خودرو"), ("درخواست‌کننده", REQUESTER),
-            ("گروه امدادی", "آتش‌نشانی · نیازی به پشتیبانی اضافه نیست")]
+            ("گروه امدادی", "آتش‌نشانی")]
     for index, (label, value) in enumerate(rows):
-        ry = y + index * 34
-        s.text(357, ry, label, "caption", C.muted, align="right")
-        s.text(250, ry, value, "caption-bold", C.text_2, align="right", max_width=250)
+        ry = y + index * 30
+        s.text(357, ry, label, "caption", C.muted, align="right", max_width=122)
+        s.text(228, ry, value, "caption-bold", C.text_2, align="right", max_width=200)
         if index < len(rows) - 1:
-            s.divider(30, ry + 27, 363)
-    y += len(rows) * 34 + 6
+            s.divider(30, ry + 24, 363)
+    y += len(rows) * 30 + 8
 
-    s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
-    s.i.draw_icon(357 - 20, y + 27, "mdi-clock-alert-outline", 18, C.warning)
-    s.text(357 - 44, y + 8, "اعتبار این پیشنهاد تا ۰:۳۸ دیگر", "caption-bold", C.warning,
+    s.rect(16, y, 361, 50, fill=C.surface_2, radius=14)
+    s.i.draw_icon(357 - 18, y + 25, "mdi-clock-alert-outline", 17, C.warning)
+    s.text(357 - 40, y + 7, "اعتبار این پیشنهاد تا ۰:۳۸ دیگر", "caption-bold", C.warning,
            align="right")
-    s.text(357 - 44, y + 26, "پس از پایان اعتبار، پیشنهاد به امدادگر دیگری ارسال می‌شود.", "caption",
-           C.muted, align="right", max_width=300)
-    y += 68
+    s.text(357 - 40, y + 25, "پس از پایان اعتبار به امدادگر دیگری ارسال می‌شود.", "caption",
+           C.muted, align="right", max_width=290)
+    y += 62
 
     s.button(201, y, 176, 50, "پذیرش مأموریت", icon="mdi-check", variant="filled")
     s.button(16, y, 176, 50, "رد مأموریت", icon="mdi-close", variant="tonal", color=C.muted)
     y += 62
-    s.text(196.5, y, "برای دیدن پیشنهاد بعدی، کارت را به چپ بکشید", "caption", C.muted_2,
+
+    for index in range(3):
+        active = index == 1
+        s.rect(196.5 - 19 + index * 16, y, 14 if active else 7, 4.5,
+               fill=C.primary if active else C.outline_strong, radius=2.5)
+    s.text(196.5, y + 14, "برای دیدن پیشنهاد بعدی، شیت را به چپ بکشید", "caption", C.muted_2,
            align="center")
     home_bar(s)
     return s
@@ -603,7 +602,7 @@ def support_pending() -> Screen:
     # animated pending indicator
     s.rect(16, y, 361, 86, fill=C.surface_2, radius=18)
     s.spinner(357 - 28, y + 43, 15, C.warning, 2.6)
-    s.text(357 - 56, y + 16, "در حال یافتن نیروی آماده…", "label", C.text, align="right")
+    s.text(357 - 56, y + 16, "در حال یافتن نیروی آماده", "label", C.text, align="right")
     s.text(357 - 56, y + 38, "میانگین زمان پاسخ در این منطقه: ۲ دقیقه", "caption", C.muted,
            align="right")
     s.rect(357 - 56 - 260, y + 60, 260, 6, fill=C.surface_3, radius=3)
@@ -623,9 +622,20 @@ def support_pending() -> Screen:
 
     s.button(16, y, 176, 46, "لغو درخواست", icon="mdi-close", variant="tonal", color=C.danger)
     s.button(201, y, 176, 46, "ادامهٔ رسیدگی", icon="mdi-fire", variant="filled")
-    y += 60
-    s.text(196.5, y, "با پذیرش هر نیرو، اعلان لحظه‌ای در همین صفحه نمایش داده می‌شود", "caption",
-           C.muted_2, align="center", max_width=340)
+    y += 62
+
+    # what the request actually asked for, so the pending card is self-explanatory
+    s.rect(16, y, 361, 62, fill=C.surface_2, radius=16)
+    s.text(357 - 12, y + 10, "درخواست ثبت‌شده", "caption-bold", C.muted, align="right")
+    s.chip(24, y + 30, "آتش‌نشانی", "mdi-fire-truck", "warning", h=24)
+    s.text(357 - 12, y + 32, "۲ نیرو · اولویت بالا · یادداشت برای سرپرست", "caption", C.text_2,
+           align="right", max_width=250)
+    y += 74
+
+    s.rect(16, y, 361, 46, fill=C.info_soft, radius=14)
+    s.i.draw_icon(357 - 18, y + 23, "mdi-bell-ring-outline", 16, C.info)
+    s.text(357 - 38, y + 14, "با پذیرش هر نیرو، اعلان لحظه‌ای همین‌جا نمایش داده می‌شود",
+           "caption", C.info, align="right", max_width=300)
     home_bar(s)
     return s
 
@@ -978,20 +988,22 @@ def mission_offline() -> Screen:
     chrome(s, tab=2)
     s.rect(0, 116, 393, 44, fill=C.warning)
     s.i.draw_icon(357 - 22, 138, "mdi-wifi-off", 17, "#FFFFFF")
-    s.text(357 - 40, 130, "اتصال قطع است · تلاش برای اتصال مجدد…", "caption-bold", "#FFFFFF",
+    s.text(357 - 40, 130, "اتصال قطع است · تلاش دوباره برای اتصال", "caption-bold", "#FFFFFF",
            align="right")
 
     top = 300
-    s.shadow(16, top, 361, 232, radius=26, blur=24, dy=10, alpha=60)
-    s.rect(16, top, 361, 232, fill="#FFFFFF", radius=26)
+    s.shadow(16, top, 361, 286, radius=26, blur=24, dy=10, alpha=60)
+    s.rect(16, top, 361, 286, fill="#FFFFFF", radius=26)
     s.circle(196.5, top + 44, 30, fill=C.warning_soft)
     s.i.draw_icon(196.5, top + 44, "mdi-cloud-off-outline", 30, C.warning)
     s.text(196.5, top + 84, "ارتباط با سرور امداد قطع است", "title", C.text, align="center")
-    s.para(40, top + 114, "پیشنهاد مأموریت دریافت نمی‌شود و موقعیت شما ارسال نمی‌شود. اطلاعات مأموریت فعلی از حافظهٔ دستگاه نمایش داده می‌شود.",
-           "body-sm", C.muted, align="center", max_width=310)
-    s.spinner(160, top + 176, 9, C.warning, 2)
-    s.text(196.5, top + 168, "تلاش دوباره در ۵ ثانیه", "caption-bold", C.warning, align="center")
-    s.button(40, top + 190, 313, 36, "تلاش دوباره", icon="mdi-refresh", variant="tonal")
+    # para() anchors at the block's left edge, so centre it on the card, not inside it
+    s.para(41.5, top + 114, "پیشنهاد مأموریت دریافت نمی‌شود و موقعیت شما ارسال نمی‌شود. "
+           "اطلاعات مأموریت فعلی از حافظهٔ دستگاه نمایش داده می‌شود.",
+           "body-sm", C.muted, align="center", max_width=310, line_height=21)
+    s.spinner(196.5, top + 192, 8, C.warning, 2)
+    s.text(196.5, top + 208, "تلاش خودکار در ۵ ثانیه", "caption-bold", C.warning, align="center")
+    s.button(40, top + 232, 313, 36, "تلاش دوباره", icon="mdi-refresh", variant="tonal")
 
     s.rect(24, 700, 345, 56, fill=C.surface_2, radius=16)
     s.i.draw_icon(345, 728, "mdi-database-outline", 17, C.muted)

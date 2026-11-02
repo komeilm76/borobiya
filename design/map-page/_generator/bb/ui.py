@@ -174,9 +174,16 @@ def metric_tiles(screen: Screen, x: float, y: float, w: float, items: Sequence[t
     for index, (label, value, icon) in enumerate(items):
         tx = x + index * (tw + gap)
         screen.rect(tx, y, tw, h, fill=surface, radius=R.sm)
-        screen.text(tx + tw - 10, y + 8, label, "caption", C.muted, align="right")
-        screen.text(tx + tw - 10, y + 26, value, "metric-sm", C.text, align="right",
+        screen.text(tx + tw - 10, y + 8, label, "caption", C.muted, align="right",
                     max_width=tw - 20)
+        # A metric that ends in "…" reads as a bug, so step the value down a size
+        # instead of ellipsizing it inside a narrow tile.
+        inner = tw - 20
+        style = next((candidate for candidate in ("metric-sm", "title-sm", "title")
+                      if screen.tw(value, candidate) <= inner), "title")
+        offset = {"metric-sm": 26, "title-sm": 30, "title": 30}[style]
+        screen.text(tx + tw - 10, y + offset, value, style, C.text, align="right",
+                    max_width=inner)
         if icon:
             screen.i.draw_icon(tx + 14, y + 20, icon, 15, C.muted_2)
 

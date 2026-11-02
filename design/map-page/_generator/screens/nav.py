@@ -302,11 +302,11 @@ def manual_origin() -> Screen:
     origin_marker(s, cam, *sc.USER, "مبدأ فعلی")
     destination_pin(s, cam, *sc.INCIDENT, None, icon="flag-variant")
 
-    cx, cy = 196, 500
-    s.circle(cx, cy + 30, 15, fill=(15, 40, 40, 30))
-    s.i.draw_icon(cx, cy, "mdi-map-marker", 50, C.primary)
-    s.circle(cx, cy - 16.5, 6.5, fill="#FFFFFF")
-    s.circle(cx, cy - 16.5, 3.6, fill=C.primary)
+    # fixed centre pin: the map moves under it, so it is the only marker with a shadow
+    cx, cy = 196, 470
+    with s.alpha_layer():
+        s.circle(cx, cy + 24, 17, fill=(15, 40, 40, 34))
+    s.i.draw_icon(cx, cy, "mdi-map-marker", 54, C.primary)
 
     s.shadow(12, 136, 369, 84, radius=22, blur=20, dy=6, alpha=46)
     s.rect(12, 136, 369, 84, fill="#FFFFFF", radius=22, outline=C.outline, outline_w=1)
@@ -536,8 +536,8 @@ def navigation_alternatives() -> Screen:
 # 11 — full route overview
 # --------------------------------------------------------------------------- #
 def navigation_full_route() -> Screen:
-    cam = sc.camera(20, 40, 0.105).aim_at(120, 40, 196, 470)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 700, 393, 152)))
+    cam = sc.camera(20, 40, 0.135).aim_at(120, 40, 196, 440)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 668, 393, 184)))
     s.top_scrim(190, start=240)
     chrome(s, tab=1)
     draw_route(s, cam, ROUTE_MAIN, width_m=17)
@@ -552,15 +552,20 @@ def navigation_full_route() -> Screen:
     s.icon_button(24, 136, 40, "mdi-arrow-collapse", 19, C.primary, fill=C.primary_soft, outline=None,
                   shadow=False, radius=13)
 
-    # route summary chips along the bottom
-    top = 692
+    # route summary panel along the bottom
+    top = 660
     s.shadow(0, top - 8, 393, 852 - top + 16, radius=26, blur=24, dy=-2, alpha=48)
     s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=26)
     s.rect(0, top + 26, 393, 852 - top - 26, fill="#FFFFFF")
-    s.text(377 - 14, top + 14, "۹ دقیقه · ۱٫۲ کیلومتر", "title-sm", C.text, align="right")
-    s.text(377 - 14, top + 40, "۹:۵۰ رسیدن · ترافیک روان", "caption", C.muted, align="right")
-    s.button(16, top + 14, 168, 52, "راهنمای زنده", icon="mdi-navigation-variant",
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+    s.text(377 - 14, top + 22, "۹ دقیقه · ۱٫۲ کیلومتر", "title", C.text, align="right")
+    s.text(377 - 14, top + 52, "رسیدن ۹:۵۰ · ترافیک روان · ۲ مانور", "caption", C.muted,
+           align="right")
+    s.divider(30, top + 76, 363)
+    s.button(16, top + 88, 176, 50, "راهنمای زنده", icon="mdi-navigation-variant",
              variant="filled", shadow=True)
+    s.button(201, top + 88, 176, 50, "مسیر جایگزین", icon="mdi-source-branch",
+             variant="tonal")
     home_bar(s)
     return s
 

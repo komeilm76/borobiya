@@ -336,7 +336,8 @@ class Screen:
 
     def avatar(self, x, y, d, initial, fill=C.primary_soft, color=C.primary, style="title"):
         self.circle(x + d / 2, y + d / 2, d / 2, fill=fill)
-        self.text(x + d / 2, y + d / 2, initial, style, color, align="center")
+        # text() anchors x,y at the line's top box, so centre it inside the disc.
+        self.text(x + d / 2, y + (d - TYPE[style][2]) / 2, initial, style, color, align="center")
 
     def toggle(self, x, y, w=44, h=26, on=True, on_color=C.primary, off_color="#CBD7D4"):
         r = h / 2
