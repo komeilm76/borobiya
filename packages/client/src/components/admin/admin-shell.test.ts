@@ -47,6 +47,18 @@ describe("admin shell", () => {
     expect(shell).toContain('@click="navOpen = false"');
   });
 
+  it("makes the toolbar controls real: a page palette and a bell that navigates", () => {
+    expect(shell).toContain('@click="paletteOpen = true"');
+    expect(shell).toContain("if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === \"k\") {");
+    expect(shell).toContain('onMounted(() => window.addEventListener("keydown", onKeydown));');
+    expect(shell).toContain('onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));');
+    // The palette searches the panel's own pages and says so; it does not pretend to search records.
+    expect(shell).toContain("return pages.value.filter((hit) => `${hit.label} ${hit.group}`.includes(term));");
+    expect(shell).toContain('to="/_admin/alerts" aria-label="هشدارها"');
+    expect(shell).not.toContain("$emit('search')");
+    expect(shell).not.toContain("$emit('alerts')");
+  });
+
   it("labels the breadcrumb trail and the account footer for screen readers", () => {
     expect(shell).toContain('aria-label="ناوبری پنل مدیریت"');
     expect(shell).toContain('aria-label="مسیر صفحه"');

@@ -56,19 +56,14 @@
         </nav>
 
         <div class="admin-shell__tools">
-          <button class="admin-search" type="button" :title="searchHint" @click="$emit('search')">
+          <button class="admin-search" type="button" :title="searchHint" @click="paletteOpen = true">
             <v-icon icon="mdi-magnify" size="17" />
             <span>جست‌وجو در پنل…</span>
             <kbd>Ctrl K</kbd>
           </button>
-          <v-btn
-            class="admin-tool"
-            icon="mdi-bell-outline"
-            variant="text"
-            size="small"
-            aria-label="هشدارها"
-            @click="$emit('alerts')"
-          />
+          <RouterLink class="admin-tool admin-tool--bell" to="/_admin/alerts" aria-label="هشدارها" title="هشدارها">
+            <v-icon icon="mdi-bell-outline" size="20" />
+          </RouterLink>
           <span class="admin-tool admin-tool--avatar" :title="accountName">{{ accountInitial }}</span>
         </div>
       </header>
@@ -86,12 +81,44 @@
         <slot />
       </main>
     </div>
+
+    <v-dialog v-model="paletteOpen" max-width="520" scrim="rgba(0,0,0,.45)">
+      <v-card class="admin-palette" rounded="xl" elevation="0">
+        <v-text-field
+          v-model="query"
+          class="admin-palette__input"
+          placeholder="جست‌وجوی بخش، صفحه یا اقدام…"
+          prepend-inner-icon="mdi-magnify"
+          variant="solo-filled"
+          density="comfortable"
+          hide-details
+          autofocus
+          clearable
+          @keydown.enter.prevent="openFirst"
+          @keydown.esc="paletteOpen = false"
+        />
+        <ul v-if="matches.length > 0" class="admin-palette__list" role="list">
+          <li v-for="hit in matches" :key="hit.key">
+            <button type="button" class="admin-palette__item" @click="open(hit.to)">
+              <v-icon :icon="hit.icon" size="18" />
+              <span class="admin-palette__label">{{ hit.label }}</span>
+              <small>{{ hit.group }}</small>
+            </button>
+          </li>
+        </ul>
+        <p v-else class="admin-palette__empty">بخشی با این نام پیدا نشد.</p>
+        <footer class="admin-palette__foot">
+          <span><kbd>↵</kbd> بازکردن</span>
+          <span><kbd>Esc</kbd> بستن</span>
+        </footer>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
 
 type NavKey =
@@ -119,14 +146,15 @@ const props = defineProps<{
   crumbs?: string[];
 }>();
 
-defineEmits<{ search: []; alerts: [] }>();
-
-const searchHint = "جست‌وجوی سراسری پنل پس از افزودن سرویس سرور فعال می‌شود";
+const searchHint = "جست‌وجوی سریع در بخش‌های پنل (Ctrl K)";
 
 const crumbList = computed(() => props.crumbs ?? []);
 const route = useRoute();
+const router = useRouter();
 const auth = useAuthStore();
 const navOpen = ref(false);
+const paletteOpen = ref(false);
+const query = ref("");
 
 const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
@@ -155,6 +183,43 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   }
 ];
 
+/**
+ * The palette searches the panel's own pages, not the database. A global record search would need a server
+ * endpoint that does not exist yet, and a control that silently searches nothing is worse than no control.
+ */
+const pages = computed(() =>
+  navGroups.flatMap((group) =>
+    group.items.map((item) => ({ key: item.key, label: item.label, icon: item.icon, to: item.to, group: group.label }))
+  )
+);
+
+const matches = computed(() => {
+  const term = query.value.trim();
+  if (term === "") return pages.value;
+  return pages.value.filter((hit) => `${hit.label} ${hit.group}`.includes(term));
+});
+
+function open(to: string): void {
+  paletteOpen.value = false;
+  query.value = "";
+  void router.push(to);
+}
+
+function openFirst(): void {
+  const [first] = matches.value;
+  if (first) open(first.to);
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    paletteOpen.value = !paletteOpen.value;
+  }
+}
+
+onMounted(() => window.addEventListener("keydown", onKeydown));
+onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+
 const accountName = computed(() => auth.user?.username ?? "مدیر سامانه");
 const accountInitial = computed(() => accountName.value.slice(0, 1));
 
@@ -162,6 +227,7 @@ watch(
   () => route.fullPath,
   () => {
     navOpen.value = false;
+    paletteOpen.value = false;
   }
 );
 </script>
@@ -366,6 +432,91 @@ watch(
   border: 1px solid var(--admin-line);
   border-radius: 6px;
   font-size: 0.8rem;
+}
+
+.admin-tool--bell {
+  display: grid;
+  place-items: center;
+  inline-size: 38px;
+  block-size: 38px;
+  border-radius: 50%;
+  color: rgba(var(--v-theme-on-surface), 0.72);
+  text-decoration: none;
+}
+
+.admin-tool--bell:hover {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+}
+
+.admin-palette {
+  overflow: hidden;
+}
+
+.admin-palette__input :deep(.v-field) {
+  border-radius: 16px 16px 0 0;
+}
+
+.admin-palette__list {
+  max-block-size: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.admin-palette__item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  inline-size: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.admin-palette__item:hover,
+.admin-palette__item:focus-visible {
+  background: rgba(var(--v-theme-primary), 0.09);
+  outline: none;
+}
+
+.admin-palette__label {
+  font-size: 0.92rem;
+}
+
+.admin-palette__item small {
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  font-size: 0.8rem;
+}
+
+.admin-palette__empty {
+  margin: 0;
+  padding: 22px 16px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.admin-palette__foot {
+  display: flex;
+  gap: 16px;
+  padding: 10px 16px;
+  border-block-start: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  color: rgba(var(--v-theme-on-surface), 0.5);
+  font-size: 0.8rem;
+}
+
+.admin-palette__foot kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
+  border-radius: 6px;
+  font-size: 0.78rem;
 }
 
 .admin-shell__content {
