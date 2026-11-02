@@ -60,6 +60,10 @@ describe("admin shell", () => {
     expect(shell).toContain(".admin-shell--nav-open .admin-shell__scrim {");
     // The scrim has to be dismissible with a click, not only with the menu button.
     expect(shell).toContain('@click="navOpen = false"');
+    // ...and the rail must leave the tab order while it is parked off-screen.
+    expect(shell).toContain("visibility: hidden;");
+    expect(shell).toContain(".admin-shell--nav-open .admin-shell__nav {");
+    expect(shell).toContain('if (event.key === "Escape" && navOpen.value) navOpen.value = false;');
   });
 
   it("makes the toolbar controls real: a page palette and a bell that navigates", () => {

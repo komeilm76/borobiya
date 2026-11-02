@@ -273,7 +273,10 @@ function onKeydown(event: KeyboardEvent): void {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
     event.preventDefault();
     paletteOpen.value = !paletteOpen.value;
+    return;
   }
+  // Escape is the only keyboard way out of the off-canvas rail on a phone.
+  if (event.key === "Escape" && navOpen.value) navOpen.value = false;
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
@@ -661,11 +664,14 @@ watch(
     z-index: 40;
     width: 264px;
     transform: translateX(100%);
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, visibility 0.2s;
+    /* A translated panel is still focusable: without this, Tab walks into a rail nobody can see. */
+    visibility: hidden;
   }
 
   .admin-shell--nav-open .admin-shell__nav {
     transform: translateX(0);
+    visibility: visible;
   }
 
   .admin-shell--nav-open .admin-shell__scrim {

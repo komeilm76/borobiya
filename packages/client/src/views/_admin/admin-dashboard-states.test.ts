@@ -56,6 +56,13 @@ describe("admin reports", () => {
     expect(reports).toContain("برای شاخص‌های زیرساختی مثل زمان پاسخ سرور، سرویس تجمیعی سرور لازم است.");
   });
 
+  it("says so when the window only covers the newest slice of records", () => {
+    // `MAX_PAGES` caps the fetched set; a report that silently analysed a slice would be a lie.
+    expect(reports).toContain("const truncated = computed(");
+    expect(reports).toContain("برای پوشش کامل، بازه یا فیلتر را محدودتر کنید.");
+    expect(reports).toContain('v-if="truncated" class="report-truncation" role="status"');
+  });
+
   it("offers an empty panel with a way out of the empty state", () => {
     expect(reports).toContain('state="empty"');
     expect(reports).toContain('action-label="بازهٔ ۳۰ روز"');

@@ -38,6 +38,14 @@ describe("client route records", () => {
     }
   });
 
+  it("sends the bare section roots to their own home instead of the public 404", () => {
+    const byPath = new Map(routeRecords.map((record) => [record.path, record]));
+    expect(byPath.get("/_user")?.redirect).toBe("/_user/map");
+    expect(byPath.get("/_admin")?.redirect).toBe("/_admin/dashboard");
+    // A redirect must not shadow the real pages underneath it.
+    expect(typeof byPath.get("/_admin/dashboard")?.component).toBe("function");
+  });
+
   it("uses the map as the only user home view and redirects legacy bookmarks", () => {
     expect(routeRecords.find((route) => route.path === "/_user/dashboard")?.redirect).toBe("/_user/map");
     expect(routeRecords.find((route) => route.path === "/_user/proposals")?.component).toBeUndefined();

@@ -4,6 +4,16 @@
 
 ---
 
+### 2026-11-02 — Admin bug sweep: session expiry, queue order, dead ends
+
+- **Session expiry turned writes into failures.** `AdminSettingsView` saved values and read its counters from a token captured when the page loaded, and `AdminAlertsView` resolved from the same snapshot; after the access token's 15 minutes every save answered 401 and the panel reported "save failed" even though the session could simply have been refreshed. All three now go through `adminSessionToken()` (`admin/admin-token.ts`), which refreshes before each request and lets the caller say plainly that the session ended.
+- **The alert queue's "all" filter listed reviewed work first.** The store ordered by `resolved_at` ascending, and PostgreSQL puts NULLs **last** on an ascending sort — so unresolved alerts sank below the ones an admin had already handled, the opposite of what the comment and the screen promised. `desc(resolved_at)` restores "unresolved first, then newest reviewed" and a new PGlite test (`db/admin-alerts.pglite.test.ts`) migrates the real schema, inserts one open and one resolved alert, and fails if the order ever flips back.
+- **The users table could go blank.** When a filter change shrank the list below the page the admin stood on (deactivating the last rows of page 2, for instance), the view clamped the page number and returned without asking again. Both clamp branches now re-request the page that still exists.
+- **Two dead ends in navigation.** `/_admin` and `/_user` had no route of their own, so a typo in either root dropped a signed-in admin on the public not-found page; both now redirect to their section's home. And the floating SOS button rendered on `/_admin*`, where it sat directly over the rail's account/logout control and would have filed a request as whoever was signed in — it is suppressed in the panel.
+- **The off-canvas rail could be tabbed into while parked off-screen.** It is `visibility: hidden` until opened now, and Escape closes it (the scrim was the only way out before).
+- **Reports silently analysed a slice.** The window is capped at three pages of SOS records; the page now says how many of the total it covers instead of presenting partial numbers as the whole. A no-op `watch(range, …)` that did nothing was removed.
+- Client suite 1286/1286, server 589/589, typecheck clean.
+
 ### 2026-11-02 — Bring the last admin screens onto one shell
 
 - Audited every admin view for layout drift. `AdminIncidentsView`, `AdminUsersView`, `AdminCategoriesView` and the SOS dispatch board still hand-rolled their own page header (eyebrow + `<h1>` + intro) while six other screens already rendered `AdminShell`; the four are wrapped in the shell now, so the whole panel shares one navigation rail, one page head with its `#actions` slot, one `Ctrl/⌘ K` palette and one headline scale (`clamp(1.5rem, 2.3vw, 1.95rem)` in `AdminShell.vue` instead of four copies). The dispatch board keeps its full-bleed map + queue two-column layout and its own responsive contract; only its chrome moved.

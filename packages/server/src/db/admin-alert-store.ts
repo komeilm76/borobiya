@@ -67,7 +67,9 @@ export function alertListQuery(db: Database, query: AdminAlertQuery) {
       .innerJoin(missions, eq(missions.id, adminAlerts.missionId))
       .where(where.length === 0 ? undefined : and(...where))
       // Unresolved first — the queue exists to be emptied — then newest.
-      .orderBy(adminAlerts.resolvedAt, desc(adminAlerts.createdAt), desc(adminAlerts.id))
+      // Postgres sorts NULLs last on ASC, so the unresolved rows (NULL `resolved_at`) have to come from a
+      // DESC: that is NULLS FIRST here, and it also puts the most recently reviewed row on top.
+      .orderBy(desc(adminAlerts.resolvedAt), desc(adminAlerts.createdAt), desc(adminAlerts.id))
       .limit(query.limit)
       .offset((query.page - 1) * query.limit),
     total: db

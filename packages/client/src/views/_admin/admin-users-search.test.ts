@@ -6,6 +6,12 @@ const view = readFileSync(new URL("./AdminUsersView.vue", import.meta.url), "utf
 const searchHandler = view.split("function updateSearch(value: unknown): void {")[1]?.split("\n}\n")[0];
 
 describe("admin user search feedback while typing", () => {
+  it("re-asks for a page that still exists when filters shrink the list", () => {
+    // Deactivating the last rows of page 2 used to leave an empty table until the admin touched a control.
+    expect(view).toContain("if (response.totalPages === 0 && page.value > 1) {\n      page.value = 1;\n      void loadUsers();");
+    expect(view).toContain("if (response.totalPages > 0 && page.value > response.totalPages) {\n      page.value = response.totalPages;\n      void loadUsers();");
+  });
+
   it("invalidates the old read and hides old rows before the debounced search", () => {
     expect(searchHandler).toBeDefined();
     expect(searchHandler).toMatch(/search\.value = next;[\s\S]*?\+\+listRequestVersion;[\s\S]*?activeListController\?\.abort\(\);/);

@@ -53,6 +53,12 @@
       />
 
       <template v-else>
+        <p v-if="truncated" class="report-truncation" role="status">
+          <v-icon icon="mdi-database-eye-outline" size="17" />
+          این گزارش بر پایهٔ جدیدترین {{ toFa(records.length) }} درخواست از {{ toFa(loadedTotal) }} ساخته شده است؛
+          برای پوشش کامل، بازه یا فیلتر را محدودتر کنید.
+        </p>
+
         <section class="report-kpis" aria-label="شاخص‌های بازه">
           <article v-for="item in kpis" :key="item.label" class="report-kpi">
             <p class="report-kpi__label">{{ item.label }}</p>
@@ -162,6 +168,8 @@ const ranges = [
 const auth = useAuthStore();
 const range = ref<number>(7);
 const records = ref<SosRequestRecord[]>([]);
+const loadedPages = ref(0);
+const loadedTotal = ref(0);
 const categories = ref<Category[]>([]);
 const incidentTypes = ref<IncidentType[]>([]);
 const loading = ref(true);
@@ -176,6 +184,9 @@ let controller: AbortController | null = null;
 function toFa(value: number): string {
   return numberFormatter.format(value);
 }
+
+/** The window is capped at `MAX_PAGES`; a report that silently analyses a slice would be a lie. */
+const truncated = computed(() => loadedPages.value > 0 && loadedTotal.value > loadedPages.value * PAGE_SIZE);
 
 const state = computed(() => {
   if (loading.value) return "loading" as const;
@@ -284,6 +295,8 @@ async function load(): Promise<void> {
       pages.push(await listAdminSosRequests(accessToken, { page, limit: PAGE_SIZE, signal: controller.signal }));
     }
     records.value = pages.flatMap((page) => page.items);
+    loadedPages.value = lastPage;
+    loadedTotal.value = firstPage.total;
     categories.value = categoryList;
     incidentTypes.value = typeList;
   } catch (caught) {
@@ -294,10 +307,6 @@ async function load(): Promise<void> {
     loading.value = false;
   }
 }
-
-watch(range, () => {
-  /* the range only re-slices the records already in memory */
-});
 
 onMounted(() => {
   void load();
@@ -574,4 +583,18 @@ onBeforeUnmount(() => {
     grid-column: span 1;
   }
 }
+.report-truncation {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0 0 0.9rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid rgba(var(--v-theme-warning), 0.35);
+  border-radius: 12px;
+  background: rgba(var(--v-theme-warning), 0.1);
+  color: rgb(var(--v-theme-on-surface));
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
 </style>

@@ -141,6 +141,7 @@ import { ApiError } from "../../api/http";
 import AdminShell from "../../components/admin/AdminShell.vue";
 import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
 import { useAuthStore } from "../../stores/auth";
+import { adminSessionToken } from "../../admin/admin-token";
 
 /**
  * A settings page is only honest if the server reads what it shows. These two keys are consumed by
@@ -254,8 +255,11 @@ async function loadSettings(accessToken: string, signal: AbortSignal): Promise<v
 }
 
 async function loadStats(): Promise<void> {
-  const accessToken = auth.accessToken;
-  if (!accessToken) return;
+  const accessToken = await adminSessionToken(auth);
+  if (!accessToken) {
+    statsState.value = "error";
+    return;
+  }
   statsState.value = "loading";
   try {
     stats.value = await getAdminStats(accessToken);
@@ -299,8 +303,13 @@ async function loadAll(): Promise<void> {
 }
 
 async function persist(key: AdminSettingKey, value: AdminSettingValue): Promise<boolean> {
-  const accessToken = auth.accessToken;
-  if (!accessToken) return false;
+  // Re-read the session on every write: the settings page is usually the last screen left open overnight.
+  const accessToken = await adminSessionToken(auth);
+  if (!accessToken) {
+    snackbarText.value = "نشست مدیر منقضی شده است؛ دوباره وارد شوید.";
+    snackbar.value = true;
+    return false;
+  }
   savingKey.value = key;
   try {
     // The server answers with the row it stored, so the page shows the authoritative value and author

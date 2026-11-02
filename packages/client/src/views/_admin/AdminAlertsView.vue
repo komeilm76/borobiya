@@ -139,6 +139,7 @@ import { ApiError } from "../../api/http";
 import AdminShell from "../../components/admin/AdminShell.vue";
 import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
 import { useAuthStore } from "../../stores/auth";
+import { adminSessionToken } from "../../admin/admin-token";
 
 /**
  * The queue is a decision surface, not a log: every open row has exactly one action (mark reviewed) and one
@@ -265,8 +266,13 @@ async function load(): Promise<void> {
 }
 
 async function resolve(alert: AdminAlert): Promise<void> {
-  const accessToken = auth.accessToken;
-  if (!accessToken || resolvingId.value !== null) return;
+  if (resolvingId.value !== null) return;
+  const accessToken = await adminSessionToken(auth);
+  if (!accessToken) {
+    snackbarText.value = "نشست مدیر منقضی شده است؛ دوباره وارد شوید.";
+    snackbar.value = true;
+    return;
+  }
   resolvingId.value = alert.id;
   try {
     const updated = await resolveAdminAlert(accessToken, alert.id);
@@ -275,7 +281,17 @@ async function resolve(alert: AdminAlert): Promise<void> {
     alerts.value = alerts.value.map((item) => (item.id === updated.id ? updated : item));
     snackbarText.value = "بررسی هشدار ثبت شد و در دفتر رویدادها ماندگار شد.";
     snackbar.value = true;
-    if (filter.value === "open") alerts.value = alerts.value.filter((item) => item.resolvedAt === null);
+    if (filter.value === "open") {
+      // The row leaves the "open" queue, so the counters and the page have to follow it: a pager that still
+      // claims three open alerts for two rows, or a last page emptied by the resolve, is a lie.
+      alerts.value = alerts.value.filter((item) => item.resolvedAt === null);
+      total.value = Math.max(0, total.value - 1);
+      totalPages.value = Math.max(1, Math.ceil(total.value / PAGE_SIZE));
+      if (alerts.value.length === 0 && page.value > 1) {
+        page.value -= 1;
+        void load();
+      }
+    }
   } catch (caught) {
     snackbarText.value = friendlyErrorMessage(caught, "ثبت بررسی ناموفق بود.");
     snackbar.value = true;

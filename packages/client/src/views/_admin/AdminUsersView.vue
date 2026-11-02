@@ -416,12 +416,16 @@ async function loadUsers(): Promise<void> {
     }, accessToken, controller.signal);
 
     if (requestVersion !== listRequestVersion) return;
+    // A filter change can shrink the list under the page the admin is standing on (deactivating the last
+    // rows of page 2, for instance). Re-ask for the page that still exists instead of leaving a blank table.
     if (response.totalPages === 0 && page.value > 1) {
       page.value = 1;
+      void loadUsers();
       return;
     }
     if (response.totalPages > 0 && page.value > response.totalPages) {
       page.value = response.totalPages;
+      void loadUsers();
       return;
     }
 

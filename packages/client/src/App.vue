@@ -281,8 +281,17 @@ const adminSos = useAdminSosStore(pinia);
 const proposalInbox = useProposalInboxStore(pinia);
 const sosSheet = useSosSheetStore(pinia);
 const appTheme = useThemeStore(pinia);
+const router = useRouter();
+const route = useRoute();
+const isMapRoute = computed(() => route.name === "user-map");
+const isAdminRoute = computed(() => route.path.startsWith("/_admin"));
+const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
+const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
+// The panel is an operations console: the floating SOS trigger would sit on top of the
+// rail's account menu (both are pinned to the inline-start edge) and file a request on
+// behalf of whoever is signed in. Admins keep the dispatch board for incoming work.
 const showSosButton = computed(
-  () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions
+  () => auth.isAuthenticated && !auth.mustCompleteSecurityQuestions && !isAdminRoute.value
 );
 
 watch(showSosButton, (visible) => {
@@ -320,12 +329,6 @@ const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustComp
   ? [{ to: "/_user/map", label: "نقشه", icon: "mdi-map-outline" }, ...navItems.value]
   : navItems.value
 );
-const router = useRouter();
-const route = useRoute();
-const isMapRoute = computed(() => route.name === "user-map");
-const isAdminRoute = computed(() => route.path.startsWith("/_admin"));
-const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
-const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutConfirmation = useLogoutConfirmation({
   isAuthenticated: computed(() => auth.isAuthenticated),
   logout: () => auth.logout(),

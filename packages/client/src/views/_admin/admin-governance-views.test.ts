@@ -48,8 +48,20 @@ describe("alerts queue view", () => {
 
   it("resolves in place and keeps the row out of the open filter", () => {
     expect(alerts).toContain("alerts.value = alerts.value.map((item) => (item.id === updated.id ? updated : item));");
-    expect(alerts).toContain('if (filter.value === "open") alerts.value = alerts.value.filter((item) => item.resolvedAt === null);');
+    expect(alerts).toContain('alerts.value = alerts.value.filter((item) => item.resolvedAt === null);');
     expect(alerts).toContain(":disabled=\"resolvingId !== null\"");
+  });
+
+  it("moves the counters and the page with a resolved row instead of lying about them", () => {
+    expect(alerts).toContain("total.value = Math.max(0, total.value - 1);");
+    expect(alerts).toContain("totalPages.value = Math.max(1, Math.ceil(total.value / PAGE_SIZE));");
+    expect(alerts).toContain("if (alerts.value.length === 0 && page.value > 1) {");
+  });
+
+  it("refreshes the session before the write, not only before the read", () => {
+    // A queue left open past the access token's 15 minutes used to answer every resolve with a 401.
+    expect(alerts).toContain("const accessToken = await adminSessionToken(auth);");
+    expect(alerts).toContain("نشست مدیر منقضی شده است؛ دوباره وارد شوید.");
   });
 
   it("reports failures without losing the queue", () => {
@@ -75,6 +87,18 @@ describe("settings view", () => {
     expect(settings).toContain("// The counters are supplementary: a failure here must not blank out editable settings.");
     expect(settings).toContain("statsState.value = \"error\";");
     expect(settings).toContain("v-if=\"statsState === 'error'\"");
+  });
+
+  it("refreshes the session before writing a setting or reading the counters", () => {
+    // Both used to read `auth.accessToken` directly: saving worked until the token expired, then silently
+    // reported a failed write.
+    expect((settings.match(/await adminSessionToken\(auth\)/g) ?? []).length).toBe(2);
+    expect(settings).not.toContain("const accessToken = auth.accessToken;\n  if (!accessToken) return false;");
+  });
+
+  it("passes the request-time token, never a stale one, into the API module", () => {
+    const persist = settings.slice(settings.indexOf("async function persist("), settings.indexOf("async function saveNumber("));
+    expect(persist.indexOf("adminSessionToken(auth)")).toBeLessThan(persist.indexOf("updateAdminSetting(accessToken"));
   });
 
   it("names who changed a value and when", () => {

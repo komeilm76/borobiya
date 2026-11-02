@@ -44,6 +44,9 @@ export const routeRecords: RouteRecordRaw[] = [
     name: "user-complete-security-questions",
     component: () => import("@client/views/_user/CompleteSecurityQuestionsView.vue")
   },
+  // Bare section roots land on the section's home instead of the public not-found page.
+  { path: "/_user", redirect: "/_user/map" },
+  { path: "/_admin", redirect: "/_admin/dashboard" },
   // Old bookmarks remain safe but no longer load separate dashboard/proposals pages.
   { path: "/_user/dashboard", redirect: "/_user/map" },
   { path: "/_user/proposals", redirect: (to) => ({
