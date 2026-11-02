@@ -91,7 +91,7 @@
 | `/_admin/dashboard` | `AdminDashboardView.vue` | پیاده‌سازی شد — KPI، صف باز، آمادگی گروه‌ها، نمودار ۷ روز |
 | `/_admin/dispatch` | `AdminDispatchView.vue` | موجود؛ تابلوی اعزام |
 | `/_admin/reports` | `AdminReportsView.vue` | پیاده‌سازی شد — بازهٔ ۷/۳۰ روز، رتبه‌بندی و بار کاری |
-| `/_admin/users` | `AdminUsersView.vue` | موجود؛ فهرست کاربران |
+| `/_admin/users` | `AdminUsersView.vue` | پیاده‌سازی شد — فهرست + کشوی جزئیات حساب (`?user=`) با دستگاه‌ها و مأموریت‌ها |
 | `/_admin/services` | `AdminServiceGroupsView.vue` | پیاده‌سازی شد — ساخت/ویرایش گروه و اعضا |
 | `/_admin/categories` | — (تغییرمسیر به `/_admin/services`) | صفحهٔ تکراری گروه‌ها حذف شد؛ مسیر قدیمی حفظ می‌شود |
 | `/_admin/incidents` | `AdminIncidentsView.vue` | موجود |

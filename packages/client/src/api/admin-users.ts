@@ -1,7 +1,9 @@
 import { z } from "zod";
 import {
   adminUserListQuerySchema,
+  devicesSchema,
   idParamsSchema,
+  missionSchema,
   paginatedResponseSchema,
   toggleActiveSchema,
   userProfileSchema,
@@ -12,6 +14,12 @@ import { apiRoutes } from "@shared/api";
 import { requestJson } from "./http";
 
 const adminUserListResponseSchema = paginatedResponseSchema(userProfileSchema);
+
+/** The detail route answers with the account, its signed-in devices and its missions in one read. */
+const adminUserDetailSchema = userProfileSchema.extend({
+  devices: devicesSchema,
+  missions: z.array(missionSchema)
+});
 
 export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
 export type AdminUserListOptions = Partial<AdminUserListQuery>;
@@ -51,4 +59,18 @@ export async function updateAdminUserStatus(
     accessToken
   });
   return userProfileSchema.parse(response);
+}
+
+export type AdminUserDetail = z.infer<typeof adminUserDetailSchema>;
+
+/** `GET /_admin/users/:id` — the list row cannot answer "which devices, which missions". */
+export async function getAdminUser(
+  userId: string,
+  accessToken: string,
+  signal?: AbortSignal
+): Promise<AdminUserDetail> {
+  const params = idParamsSchema.parse({ id: userId });
+  const path = apiRoutes.admin.getUser.url.replace(":id", encodeURIComponent(params.id));
+  const response = await requestJson<unknown>(path, { accessToken, signal });
+  return adminUserDetailSchema.parse(response);
 }

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { adminUserListQuerySchema } from "@shared/index";
 import { ApiError } from "./http";
-import { listAdminUsers, updateAdminUserStatus } from "./admin-users";
+import { getAdminUser, listAdminUsers, updateAdminUserStatus } from "./admin-users";
 
 const user = {
   id: "00000000-0000-4000-8000-000000000099",
@@ -75,6 +75,64 @@ describe("admin user API", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(updateAdminUserStatus("not-a-uuid", false, "admin-token")).rejects.toThrow();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("reads one account with its devices and missions from the detail route", async () => {
+    const detail = {
+      ...user,
+      devices: [
+        {
+          id: "00000000-0000-4000-8000-0000000000aa",
+          deviceId: "00000000-0000-4000-8000-0000000000bb",
+          deviceName: "iPhone 15",
+          ip: "192.0.2.10",
+          isCurrentDevice: false,
+          lastActiveAt: "2026-11-02T09:40:00.000Z",
+          isOnline: true
+        }
+      ],
+      missions: [
+        {
+          id: "00000000-0000-4000-8000-0000000000cc",
+          sosRequestId: "00000000-0000-4000-8000-0000000000dd",
+          rescuerId: user.id,
+          requesterId: "00000000-0000-4000-8000-0000000000ee",
+          status: "completed" as const,
+          cancelledBy: null,
+          cancellationReasonId: null,
+          cancellationCustomText: null,
+          cancelledAt: null,
+          createdAt: "2026-10-20T08:00:00.000Z",
+          updatedAt: "2026-10-20T09:00:00.000Z"
+        }
+      ]
+    };
+    const fetchMock = vi.fn(async () => jsonResponse(detail));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminUser(user.id, "admin-token")).resolves.toMatchObject({
+      username: "rescue_user1",
+      devices: [{ deviceName: "iPhone 15", isOnline: true }],
+      missions: [{ status: "completed" }]
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/_admin/users/${user.id}`);
+    expect(new Headers(init.headers).get("authorization")).toBe("Bearer admin-token");
+  });
+
+  it("refuses a malformed detail payload instead of rendering half an account", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ ...user, devices: "nope", missions: [] })));
+
+    await expect(getAdminUser(user.id, "admin-token")).rejects.toThrow();
+  });
+
+  it("validates the id before asking the detail route", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(getAdminUser("not-a-uuid", "admin-token")).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

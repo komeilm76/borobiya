@@ -117,7 +117,12 @@
               <tbody>
                 <tr v-for="user in users" :key="user.id">
                   <th scope="row">
-                    <div class="admin-user-cell">
+                    <button
+                      type="button"
+                      class="admin-user-cell admin-user-cell--button"
+                      :aria-label="`نمایش جزئیات حساب ${user.username}`"
+                      @click="openUserDetails(user)"
+                    >
                       <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
                       <span class="admin-user-copy">
                         <span class="admin-users-username" dir="ltr">{{ user.username }}</span>
@@ -125,7 +130,8 @@
                           {{ user.mustCompleteSecurityQuestions ? "نیازمند تکمیل راه‌اندازی حساب" : "حساب راه‌اندازی شده" }}
                         </small>
                       </span>
-                    </div>
+                      <v-icon class="admin-user-open" icon="mdi-chevron-left" size="17" />
+                    </button>
                   </th>
                   <td>
                     <span :class="['admin-role-pill', user.role === 'admin' ? 'is-admin' : '']">
@@ -205,6 +211,17 @@
                   {{ user.isActive ? "فعال" : "غیرفعال" }}
                 </span>
                 <div class="admin-mobile-action">
+                  <v-btn
+                    class="admin-mobile-details"
+                    variant="text"
+                    size="small"
+                    rounded="lg"
+                    :aria-label="`نمایش جزئیات حساب ${user.username}`"
+                    @click="openUserDetails(user)"
+                  >
+                    جزئیات
+                    <v-icon class="ms-1" icon="mdi-chevron-left" size="16" />
+                  </v-btn>
                   <v-switch
                     :model-value="user.isActive"
                     :aria-label="statusSwitchLabel(user)"
@@ -287,16 +304,26 @@
     <v-snackbar v-model="successVisible" color="success" location="bottom start" timeout="4000" rounded="lg">
       {{ successMessage }}
     </v-snackbar>
+
+    <AdminUserDrawer
+      v-model="detailOpen"
+      :user-id="detailUserId"
+      :version="detailVersion"
+      :self-id="auth.user?.id ?? null"
+      @request-status="requestStatusFromDrawer"
+    />
   </AdminShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import type { UserProfile } from "@shared/index";
 import { ApiError } from "../../api/http";
 import AdminShell from "../../components/admin/AdminShell.vue";
+import AdminUserDrawer from "../../components/admin/AdminUserDrawer.vue";
 import { friendlyErrorMessage } from "../../api/error-message";
-import { listAdminUsers, updateAdminUserStatus } from "../../api/admin-users";
+import { listAdminUsers, updateAdminUserStatus, type AdminUserDetail } from "../../api/admin-users";
 import { useAuthStore } from "../../stores/auth";
 
 const PAGE_SIZE = 20;
@@ -318,6 +345,8 @@ const categoryFilterOptions: Array<{ title: string; value: CategoryFilter }> = [
 ];
 
 const auth = useAuthStore();
+const route = useRoute();
+const router = useRouter();
 const users = ref<UserProfile[]>([]);
 const search = ref("");
 const statusFilter = ref<StatusFilter>("all");
@@ -332,6 +361,22 @@ const statusError = ref("");
 const statusChange = ref<{ user: UserProfile; nextIsActive: boolean } | null>(null);
 const successVisible = ref(false);
 const successMessage = ref("");
+/**
+ * `?user=<id>` is the single source of truth for the drawer: it survives a reload, the browser's back
+ * button and a link pasted into a chat. The dispatch board already works this way for `?request=`.
+ */
+const detailUserId = computed<string | null>(() => {
+  const value = route.query.user;
+  return typeof value === "string" && value.length > 0 ? value : null;
+});
+const detailOpen = computed<boolean>({
+  get: () => detailUserId.value !== null,
+  set: (open) => {
+    if (!open) closeUserDetails();
+  }
+});
+/** Bumped after a status change so an open drawer re-reads the account it is showing. */
+const detailVersion = ref(0);
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let activeListController: AbortController | null = null;
@@ -353,6 +398,24 @@ function userInitial(username: string): string {
 function formatDate(value: string): string {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
+}
+
+function openUserDetails(user: UserProfile): void {
+  if (detailUserId.value === user.id) return;
+  void router.replace({ query: { ...route.query, user: user.id } });
+}
+
+function closeUserDetails(): void {
+  if (detailUserId.value === null) return;
+  const query = { ...route.query };
+  delete query.user;
+  void router.replace({ query });
+}
+
+/** Reuses the list's confirmation dialog; the drawer must not grow a second, differently worded one. */
+function requestStatusFromDrawer(user: AdminUserDetail): void {
+  statusError.value = "";
+  statusChange.value = { user, nextIsActive: !user.isActive };
 }
 
 function isCurrentAdmin(user: UserProfile): boolean {
@@ -530,6 +593,7 @@ async function confirmStatusChange(): Promise<void> {
       : `حساب ${pendingChange.user.username} غیرفعال شد و نشست‌های آن لغو شدند.`;
     successVisible.value = true;
     await loadUsers();
+    if (detailUserId.value === pendingChange.user.id) detailVersion.value += 1;
   } catch (error) {
     statusError.value = friendlyAdminError(error, "تغییر وضعیت حساب انجام نشد. دوباره تلاش کنید.");
   } finally {
@@ -677,6 +741,32 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.7rem;
   text-align: start;
+}
+
+/* The identity cell is the drill-down; a whole-row click target would fight the status switch. */
+.admin-user-cell--button {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  margin: -0.35rem -0.45rem;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.admin-user-cell--button:hover {
+  background: rgba(var(--v-theme-primary), 0.07);
+}
+
+.admin-user-cell--button:focus-visible {
+  outline: 2px solid rgba(var(--v-theme-primary), 0.5);
+  outline-offset: 2px;
+}
+
+.admin-user-open {
+  margin-inline-start: auto;
+  color: rgba(var(--v-theme-on-surface), 0.35);
 }
 
 .admin-user-avatar {
@@ -878,7 +968,8 @@ onUnmounted(() => {
   .admin-mobile-meta dd { margin: 0.25rem 0 0; color: var(--bb-color-text); font-size: 0.82rem; overflow-wrap: anywhere; }
   .admin-mobile-categories { display: flex; flex-wrap: wrap; gap: 0.25rem; }
   .admin-mobile-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; padding-top: 0.7rem; border-top: 1px solid rgba(var(--v-theme-on-surface), 0.10); }
-  .admin-mobile-action { display: grid; justify-items: center; min-width: 48px; }
+  .admin-mobile-action { display: grid; justify-items: center; gap: 0.15rem; min-width: 48px; }
+  .admin-mobile-details { min-height: 36px; font-weight: 700; }
   .admin-mobile-action :deep(.v-selection-control) { min-height: 44px; }
 }
 

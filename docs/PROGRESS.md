@@ -4,6 +4,27 @@
 
 ---
 
+### 2026-11-02 — Admin accounts finally open: a drill-down the panel never had
+
+- `GET /_admin/users/:id` has returned the account, its signed-in devices and its missions since the users API
+  landed, and nothing in the panel ever called it. Every account was therefore a row: an admin investigating a
+  complaint could see `علی موسوی · امدادگر · فعال` and nothing else. The users screen now opens that account in a
+  drawer (identity, role, groups, join date, rating, setup state, devices with IP and last-seen, last five missions
+  linking back to `/_admin/dispatch?request=…`), with the same loading/error/offline/forbidden panels the newer
+  admin screens use.
+- **Linkable by construction.** The open account is `?user=<id>`, like the dispatch board's `?request=`. A reload,
+  the browser's back button and a link pasted into a chat all land on the same account instead of closing the
+  drawer, and the mobile card list carries the same `جزئیات` affordance the table row does.
+- **One dialog, not two.** The drawer does not grow its own PATCH: it raises the request into the existing
+  confirmation flow, which is where the audit trail, the snackbar and the list refresh already live. After it
+  commits, an open drawer re-reads the account (`version` bump) rather than showing the status it was opened with.
+  The button is disabled for the signed-in admin's own account, matching the list's switch.
+- Reads are fenced: switching accounts aborts the previous request and a late response cannot overwrite a newer
+  one; `401/403` renders the forbidden state while a dead connection renders the offline one, so "no internet" is
+  no longer reported as "access denied".
+- Client suite 1300/1300 (14 new tests over `api/admin-users.test.ts` and `views/_admin/admin-user-detail.test.ts`),
+  typecheck clean.
+
 ### 2026-11-02 — Admin bug sweep: session expiry, queue order, dead ends
 
 - **Session expiry turned writes into failures.** `AdminSettingsView` saved values and read its counters from a token captured when the page loaded, and `AdminAlertsView` resolved from the same snapshot; after the access token's 15 minutes every save answered 401 and the panel reported "save failed" even though the session could simply have been refreshed. All three now go through `adminSessionToken()` (`admin/admin-token.ts`), which refreshes before each request and lets the caller say plainly that the session ended.
