@@ -154,10 +154,18 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   async function onConnectError(error?: { data?: { code?: unknown } }): Promise<void> {
     const code = typeof error?.data?.code === "string" ? error.data.code : null;
+    // Socket.IO retries transport failures automatically. A lost network must not
+    // turn an explicitly started broadcast into a permanent rejection.
+    if (!code) return;
     const attempt = broadcastAttempt;
     const failingClient = client;
     if (await tryRecoverAuth()) return;
     if (attempt !== broadcastAttempt || client !== failingClient) return;
+    if (code === "INVALID_ACCESS_TOKEN" || code === "UNAUTHORIZED") {
+      // The cookie refresh may itself be offline. Auth recovery will rotate the
+      // bearer and the token watcher reconnects, without restarting GPS consent.
+      return;
+    }
     if (status.value === "connecting" || status.value === "broadcasting") {
       clearTicker();
       geolocation.pause?.();

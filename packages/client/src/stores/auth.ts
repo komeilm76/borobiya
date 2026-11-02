@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { computed, onScopeDispose, ref } from "vue";
 import { defineStore } from "pinia";
 import {
   authUserSchema,
@@ -26,6 +26,17 @@ import { decodeAccessTokenClaims } from "../composables/device-identity";
 
 const USER_STORAGE_KEY = "borobiya.auth-user";
 const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60_000;
+const MAX_RECOVERY_DELAY_MS = 30_000;
+
+function refreshWasRejected(error: unknown): boolean {
+  // These are the refresh endpoint's explicit revocation responses. A proxy's
+  // bare 401/403, a transport error or a server failure cannot prove the cookie
+  // is invalid, so keep the current login until we can check with the API.
+  return error instanceof ApiError && (
+    (error.status === 401 && error.code === "INVALID_REFRESH") ||
+    (error.status === 403 && (error.code === "ACCOUNT_INACTIVE" || error.code === "ACCOUNT_SUSPENDED"))
+  );
+}
 
 function readStoredUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
@@ -107,6 +118,105 @@ export const useAuthStore = defineStore("auth", () => {
   const sessionTokens = new Set<string>();
   let expiresAt: number | null = null;
   let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryNeeded = false;
+  let recoveryDelayMs = 1_000;
+  let profileRecoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingProfile: { token: string; generation: number } | null = null;
+  let profileRecoveryDelayMs = 1_000;
+
+  function clearProfileRecovery(): void {
+    if (profileRecoveryTimer !== null) clearTimeout(profileRecoveryTimer);
+    profileRecoveryTimer = null;
+    pendingProfile = null;
+    profileRecoveryDelayMs = 1_000;
+  }
+
+  function scheduleProfileRecovery(token: string, generation: number): void {
+    if (generation !== sessionGeneration || accessToken.value !== token) return;
+    if (pendingProfile?.token !== token || pendingProfile.generation !== generation) {
+      clearProfileRecovery();
+      pendingProfile = { token, generation };
+    }
+    if (profileRecoveryTimer !== null) return;
+    profileRecoveryTimer = setTimeout(() => {
+      profileRecoveryTimer = null;
+      void recoverProfile();
+    }, profileRecoveryDelayMs);
+    profileRecoveryTimer.unref?.();
+    profileRecoveryDelayMs = Math.min(profileRecoveryDelayMs * 2, MAX_RECOVERY_DELAY_MS);
+  }
+
+  async function recoverProfile(): Promise<void> {
+    const pending = pendingProfile;
+    if (!pending) return;
+    if (pending.generation !== sessionGeneration || accessToken.value !== pending.token) {
+      clearProfileRecovery();
+      return;
+    }
+    await loadCurrentUser(pending.token, pending.generation);
+  }
+
+  function clearRecovery(): void {
+    if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+    recoveryNeeded = false;
+    recoveryDelayMs = 1_000;
+  }
+
+  function scheduleRecovery(): void {
+    recoveryNeeded = true;
+    if (recoveryTimer !== null) return;
+    recoveryTimer = setTimeout(() => {
+      recoveryTimer = null;
+      void recoverSession();
+    }, recoveryDelayMs);
+    recoveryTimer.unref?.();
+    recoveryDelayMs = Math.min(recoveryDelayMs * 2, MAX_RECOVERY_DELAY_MS);
+  }
+
+  function onRefreshFailure(error: unknown, generation: number): void {
+    if (generation !== sessionGeneration) return;
+    if (refreshWasRejected(error)) clearSession();
+    else scheduleRecovery();
+  }
+
+  async function recoverSession(): Promise<void> {
+    if (!recoveryNeeded) return;
+    const generation = sessionGeneration;
+    try {
+      await refreshFromCookie();
+    } catch (error) {
+      onRefreshFailure(error, generation);
+    }
+  }
+
+  function onConnectivityRestored(): void {
+    if (recoveryNeeded) {
+      if (recoveryTimer !== null) clearTimeout(recoveryTimer);
+      recoveryTimer = null;
+      void recoverSession();
+    }
+    if (pendingProfile) {
+      if (profileRecoveryTimer !== null) clearTimeout(profileRecoveryTimer);
+      profileRecoveryTimer = null;
+      void recoverProfile();
+    }
+  }
+
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("online", onConnectivityRestored);
+    window.addEventListener("pageshow", onConnectivityRestored);
+  }
+  onScopeDispose(() => {
+    clearRecovery();
+    clearProfileRecovery();
+    clearProactiveRefresh();
+    if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+      window.removeEventListener("online", onConnectivityRestored);
+      window.removeEventListener("pageshow", onConnectivityRestored);
+    }
+  });
 
   function clearProactiveRefresh(): void {
     if (proactiveRefreshTimer !== null) {
@@ -122,14 +232,14 @@ export const useAuthStore = defineStore("auth", () => {
     if (delayMs <= 0) return;
     proactiveRefreshTimer = setTimeout(() => {
       proactiveRefreshTimer = null;
-      void refreshFromCookie().catch(() => {
-        // Leave reactive recovery to the next user operation or socket reconnect if offline.
-      });
+      void refreshSession();
     }, delayMs);
     proactiveRefreshTimer.unref?.();
   }
 
   function setAccessToken(token: string): void {
+    clearRecovery();
+    clearProfileRecovery();
     accessToken.value = token;
     sessionTokens.add(token);
     expiresAt = accessTokenExpiry(token);
@@ -144,6 +254,8 @@ export const useAuthStore = defineStore("auth", () => {
 
   function clearSession(): void {
     ++sessionGeneration;
+    clearRecovery();
+    clearProfileRecovery();
     sessionTokens.clear();
     clearProactiveRefresh();
     accessToken.value = null;
@@ -161,16 +273,28 @@ export const useAuthStore = defineStore("auth", () => {
         skipAuthRefresh: true
       }));
       if (generation !== sessionGeneration || accessToken.value !== token) return;
+      clearProfileRecovery();
       userCategories.value = profile.categories;
       setUser(userFromProfile(profile));
     } catch (error) {
       if (generation !== sessionGeneration || accessToken.value !== token) return;
       if (error instanceof ApiError && error.code === "SECURITY_QUESTIONS_REQUIRED") {
+        clearProfileRecovery();
         onboardingRequired.value = true;
         if (user.value) setUser({ ...user.value, mustCompleteSecurityQuestions: true });
         return;
       }
-      // Keep the cookie-refreshed token and any stored user snapshot on transient profile errors.
+      // Keep the bearer and matching snapshot, then rehydrate the profile when service returns.
+      if (!(error instanceof ApiError) || error.status >= 500 || error.status === 408 || error.status === 429) {
+        scheduleProfileRecovery(token, generation);
+      } else {
+        clearProfileRecovery();
+        // A protected read can return 401 after the bearer expires. Verify the
+        // cookie before deciding whether this login is gone or the token rotated.
+        if (error.status === 401 || error.code === "ACCOUNT_INACTIVE" || error.code === "ACCOUNT_SUSPENDED") {
+          scheduleRecovery();
+        }
+      }
     }
   }
 
@@ -221,8 +345,8 @@ export const useAuthStore = defineStore("auth", () => {
         }
         try {
           await refreshFromCookie();
-        } catch {
-          if (generation === sessionGeneration) clearSession();
+        } catch (error) {
+          onRefreshFailure(error, generation);
         } finally {
           initialized.value = true;
         }
@@ -239,8 +363,8 @@ export const useAuthStore = defineStore("auth", () => {
       const generation = sessionGeneration;
       try {
         await refreshFromCookie();
-      } catch {
-        if (generation === sessionGeneration) clearSession();
+      } catch (error) {
+        onRefreshFailure(error, generation);
       }
     }
   }
@@ -250,8 +374,8 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       await refreshFromCookie();
       return generation === sessionGeneration && accessToken.value !== null;
-    } catch {
-      if (generation === sessionGeneration) clearSession();
+    } catch (error) {
+      onRefreshFailure(error, generation);
       return false;
     }
   }

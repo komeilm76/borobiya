@@ -537,6 +537,56 @@ describe("useLiveLocationBroadcast", () => {
     }
   });
 
+  it("keeps live sharing in connecting state across transport failures and reconnects without new consent", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha"));
+    const transport = makeFakeSocket();
+    const resume = vi.fn();
+    const pause = vi.fn();
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId: ref("user-1"),
+      geolocation: { coords: ref(null), isSupported: ref(true), resume, pause },
+      openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      transport.client.socket.connected = false;
+      transport.fire("disconnect", "transport close");
+      transport.fire("connect_error", new Error("websocket unavailable"));
+      await flush();
+      expect(api.status.value).toBe("connecting");
+      expect(pause).not.toHaveBeenCalled();
+      transport.client.connect(); // Socket.IO's automatic reconnect after the outage
+      expect(api.status.value).toBe("broadcasting");
+      expect(resume).toHaveBeenCalledOnce();
+    } finally { scope.stop(); }
+  });
+
+  it("waits for auth recovery when the socket rejects an expired token while offline", async () => {
+    const token = ref<string | null>(makeJwt("device-alpha", 1));
+    const transport = makeFakeSocket();
+    const pause = vi.fn();
+    const ensureSession = vi.fn(async () => false); // the cookie refresh also failed offline
+    const scope = effectScope();
+    const api = scope.run(() => useLiveLocationBroadcast({
+      accessToken: token, ownerId: ref("user-1"), ensureSession,
+      geolocation: { coords: ref(null), isSupported: ref(true), pause },
+      openSocket: () => transport.client
+    }))!;
+    try {
+      await api.start();
+      transport.client.socket.connected = false;
+      transport.fire("disconnect", "transport close");
+      transport.fire("connect_error", { data: { code: "INVALID_ACCESS_TOKEN" } });
+      await flush();
+      expect(api.status.value).toBe("connecting");
+      expect(pause).not.toHaveBeenCalled();
+      token.value = makeJwt("device-alpha", 9999999999);
+      expect(transport.connectCalls).toBe(2);
+      expect(api.status.value).toBe("broadcasting");
+    } finally { scope.stop(); }
+  });
+
   it("refreshes an expired 15m access token via ensureSession and reconnects instead of sticking rejected", async () => {
     const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
     const token = ref<string | null>(makeJwt("device-alpha", 1));

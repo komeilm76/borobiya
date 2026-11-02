@@ -606,4 +606,281 @@ describe("client auth store", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps the current session after a proactive network failure and restores it on reconnect", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const bearer = (exp: number) => `e30.${Buffer.from(JSON.stringify({
+      sub: user.id, sessionId: "session-a", exp
+    })).toString("base64url")}.sig`;
+    const oldToken = bearer(Math.floor(Date.now() / 1000) + 61);
+    const nextToken = bearer(Math.floor(Date.now() / 1000) + 900);
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: oldToken, user }),
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      jsonResponse({ accessToken: nextToken }),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.accessToken).toBe(oldToken);
+      expect(auth.user).toEqual(user);
+      browser.dispatchEvent(new Event("online"));
+      // Join the in-flight refresh if the online handler has not completed yet.
+      await auth.refreshSession();
+      expect(auth.accessToken).toBe(nextToken);
+      expect(auth.user).toMatchObject({ id: user.id, mustCompleteSecurityQuestions: false });
+      expect(fetchMock.mock.calls.filter(([url]) => url === `/api${apiRoutes.auth.refresh.url}`)).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(fetchMock).toHaveBeenCalledTimes(4); // cancelled recovery timer
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("rehydrates an initially unavailable profile on reconnect without changing accounts", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      () => Promise.reject(new TypeError("profile offline")),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.ensureSession();
+      expect(auth.accessToken).toBe(accessToken);
+      expect(auth.user).toBeNull();
+      browser.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(auth.user).toMatchObject({ id: user.id, role: "user" });
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        `/api${apiRoutes.auth.refresh.url}`,
+        `/api${apiRoutes.user.me.url}`,
+        `/api${apiRoutes.user.me.url}`
+      ]);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("verifies the cookie when a restored profile read reports an invalid bearer", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      jsonResponse({ error: true, code: "INVALID_ACCESS_TOKEN" }, 401),
+      jsonResponse({ error: true, code: "INVALID_REFRESH" }, 401)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.ensureSession();
+      expect(auth.isAuthenticated).toBe(true); // do not trust the profile's 401 as cookie revocation
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.accessToken).toBeNull();
+      expect(auth.user).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("drops a pending profile retry if the user logs out before reconnect", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken }),
+      () => Promise.reject(new TypeError("profile offline")),
+      jsonResponse({ ok: true })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.ensureSession();
+      await auth.logout();
+      browser.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(auth.user).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("retries a cold cookie restore after an outage even without an online event", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      () => Promise.reject(new TypeError("offline")),
+      jsonResponse({ accessToken }),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.ensureSession();
+      expect(auth.initialized).toBe(true);
+      expect(auth.isAuthenticated).toBe(false);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.accessToken).toBe(accessToken);
+      expect(auth.user).toMatchObject({ id: user.id });
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it.each([503, 429])("retains a login after refresh HTTP %i and retries", async (status) => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      jsonResponse({ code: "TEMPORARILY_UNAVAILABLE" }, status),
+      jsonResponse({ accessToken: "rotated-token" }),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      expect(auth.accessToken).toBe(accessToken);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.accessToken).toBe("rotated-token");
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("does not treat an uncoded proxy 401 as proof the refresh cookie was revoked", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      jsonResponse({ message: "proxy unavailable" }, 401),
+      jsonResponse({ accessToken: "rotated-token" }),
+      jsonResponse(profile)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      expect(auth.accessToken).toBe(accessToken);
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(auth.accessToken).toBe("rotated-token");
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("clears a revoked refresh cookie and never retries it", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      jsonResponse({ error: true, code: "INVALID_REFRESH" }, 401)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      expect(auth.accessToken).toBeNull();
+      expect(auth.user).toBeNull();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("never replays a failed write after a later reconnect switches cookie accounts", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    const oldToken = bearer(user.id, "session-a");
+    const other = "00000000-0000-4000-8000-000000000088";
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: oldToken, user }),
+      jsonResponse({ error: true, code: "INVALID_ACCESS_TOKEN" }, 401),
+      () => Promise.reject(new TypeError("offline")),
+      jsonResponse({ accessToken: bearer(other, "session-b") }),
+      jsonResponse({ ...profile, id: other, username: "other" })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      await expect(requestJson("/_user/location/share", {
+        method: "POST", accessToken: oldToken, body: { note: "previous owner's write" }
+      })).rejects.toMatchObject({ status: 401 });
+      expect(auth.accessToken).toBe(oldToken);
+      browser.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(auth.user?.id).toBe(other);
+      expect(fetchMock.mock.calls.filter(([url]) => url === "/api/_user/location/share")).toHaveLength(1);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("clears a suspended account instead of retrying its rejected refresh cookie", async () => {
+    vi.useFakeTimers();
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      jsonResponse({ error: true, code: "ACCOUNT_SUSPENDED" }, 403)
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      expect(auth.accessToken).toBeNull();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("cannot resurrect a logged-out account from a pending reconnect", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    let finishRefresh!: (reply: Response) => void;
+    const pendingRefresh = new Promise<Response>((resolve) => { finishRefresh = resolve; });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => Promise.reject(new TypeError("offline")),
+      () => pendingRefresh,
+      jsonResponse({ ok: true })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      browser.dispatchEvent(new Event("online"));
+      await auth.logout();
+      finishRefresh(jsonResponse({ accessToken: "late-token" }));
+      await Promise.resolve();
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(auth.accessToken).toBeNull();
+      expect(auth.user).toBeNull();
+      expect(fetchMock).toHaveBeenCalledTimes(4);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("does not show the old profile when a reconnect restores a different cookie account", async () => {
+    vi.useFakeTimers();
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const bearer = (sub: string, sessionId: string) =>
+      `e30.${Buffer.from(JSON.stringify({ sub, sessionId })).toString("base64url")}.sig`;
+    const nextOwner = "00000000-0000-4000-8000-000000000088";
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken: bearer(user.id, "session-a"), user }),
+      () => Promise.reject(new TypeError("offline")),
+      jsonResponse({ accessToken: bearer(nextOwner, "session-b") }),
+      () => Promise.reject(new TypeError("new profile offline"))
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      expect(await auth.refreshSession()).toBe(false);
+      browser.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(auth.accessToken).toBe(bearer(nextOwner, "session-b"));
+      expect(auth.user).toBeNull();
+      expect(auth.userCategories).toEqual([]);
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
 });
