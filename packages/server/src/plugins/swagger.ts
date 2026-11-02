@@ -327,7 +327,7 @@ export async function registerSwagger(app: FastifyInstance, openApiServerPath = 
     openapi: {
       info: {
         title: "Borobiya API",
-        version: process.env.npm_package_version ?? "0.2.0",
+        version: process.env.npm_package_version ?? "0.3.0",
         description: describeOpenApiRuntimeStatus(paths)
       },
       servers: [

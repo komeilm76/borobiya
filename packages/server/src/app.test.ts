@@ -249,7 +249,7 @@ describe("Fastify server skeleton", () => {
     const response = await app.inject({ method: "GET", url: "/_public/health" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({ status: "ok", version: expect.any(String) });
+    expect(response.json()).toMatchObject({ status: "ok", version: process.env.npm_package_version ?? "0.3.0" });
     expect(response.json().uptime).toEqual(expect.any(Number));
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
@@ -506,6 +506,7 @@ describe("Fastify server skeleton", () => {
     const uploadPhoto = paths["/_user/sos/requests/{id}/photo"]?.post;
 
     expect(document.openapi).toBe("3.0.3");
+    expect(document.info.version).toBe(process.env.npm_package_version ?? "0.3.0");
     expect(document.servers).toEqual([{ url: "/" }]);
     expect(operationCount).toBe(allApiRoutes.length);
     expect(document.info.description).toContain("contract-only");

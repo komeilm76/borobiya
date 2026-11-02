@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-02 — Prepare v0.3.0 work-branch release after network review
+
+- Bumped all three workspace packages, the Bun lockfile and the API health/OpenAPI version fallbacks to 0.3.0. Curated release notes in `RELEASE_NOTES_v0.3.0.md` describe changes since v0.2.0, migrations 0013–0019 and outstanding acceptance work. This is a release **from the work branch**, not a merge to `main`, a production deploy, a signed Android APK or the still-open v1.0.0 sign-off (T4.7.3).
+- Reproduced a network-indicator bug: a health probe that ignored abort could leave its icon on “checking” indefinitely. After eight seconds the probe now visibly times out and fences any late success; the next check can still recover. The regression failed before the fix and passes after it without mounting a Vue component. Browser/device outage acceptance remains open.
+
 ### 2026-11-02 — Restore map tools and sharing while reviewing a selected point
 
 - A selected point opened the in-map planner directly over the phone's persistent Search/History/Companions dock. Its card had a higher stacking order, so those tools could not receive taps; the companion sharing form was unreachable through that dock. The planner and alternative-route sheet now end **above** the dock with a clear gap rather than covering it. The existing full-screen tools and sharing form remain mounted and return to the same selected route when dismissed. SOS, route-choice, sharing broadcast, recenter and compass controls move above the measured sheet **plus** its dock clearance, not into the covered area. On short landscape screens the card height is bounded to leave room for the dock and action row; card contents scroll without shrinking controls. Nonmounted structure/CSS checks cover both sheets and access to Search, History, Companions and sharing; browser/device hit testing and dialog stacking remain to be verified.
