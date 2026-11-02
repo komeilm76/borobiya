@@ -169,12 +169,14 @@ def members():
         ("نگار طاهری", "negar.t · امدادگر", False),
     ]
     ly = top + 94
+    row_x, row_w = mx + 24, mw - 48
+    cb = row_x + row_w - 14 - 24                # checkbox sits 14 px inside the row
     for name, meta, on in users:
-        s.rect(mx + 24, ly, mw - 48, 52, fill=C.primary_soft if on else C.surface_2, radius=10)
-        s.rect(mx + 24 + mw - 66, ly + 14, 24, 24, fill=C.primary if on else C.surface,
+        s.rect(row_x, ly, row_w, 52, fill=C.primary_soft if on else C.surface_2, radius=10)
+        s.rect(cb, ly + 14, 24, 24, fill=C.primary if on else C.surface,
                radius=7, outline=None if on else A.card_edge, outline_w=0 if on else 1.4)
         if on:
-            s.i.draw_icon(mx + 24 + mw - 54, ly + 26, "mdi-check", 15, "#FFFFFF")
+            s.i.draw_icon(cb + 12, ly + 26, "mdi-check", 17, "#FFFFFF")
         s.text(mx + mw - 92, ly + 8, name, "d-label", C.text, align="right")
         s.text(mx + mw - 92, ly + 28, meta, "d-caption", C.muted, align="right")
         ly += 60

@@ -48,7 +48,7 @@ class A:
     table_head = "#F7FAF9"
     row_line = "#EFF4F2"
     rail_bg = "#FBFDFC"
-    nav_active = "#E7F2F0"
+    nav_active = C.primary_soft
     shadow_soft = ("#193536", 20)     # (color, alpha)
     chart_grid = "#E8EEEC"
     series = ("#0E6666", "#B57A12", "#316D86", "#8A4B0F", "#2C7A57")

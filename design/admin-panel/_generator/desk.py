@@ -82,9 +82,10 @@ def _nav_item(s: Screen, x0: float, y: float, key: str, label: str, icon: str, a
 def topbar(s: Screen, crumbs: str, actions_left: bool = True):
     s.rect(0, 0, A0.CONTENT_W, TOPBAR, fill=C.surface)
     s.rect(0, TOPBAR - 1, A0.CONTENT_W, 1, fill=A.card_edge)
-    s.text(RAIL, 22, crumbs, "d-body", C.muted, align="right")
-    # global search
-    sx, sw = A0.CONTENT_W - 120 - 392, 392
+    # breadcrumbs own the start (right) edge of the bar and never grow into the search
+    s.text(RAIL, 22, crumbs, "d-body", C.muted, align="right", max_width=520)
+    # global search sits with the account cluster at the end (left) edge
+    sx, sw = 188, 392
     s.rect(sx, 16, sw, 36, fill=C.surface_2, radius=10, outline=A.card_edge, outline_w=1)
     s.i.draw_icon(sx + sw - 20, 34, "mdi-magnify", 17, C.muted_2)
     s.text(sx + sw - 36, 26, "جست‌وجوی کاربر، مأموریت یا حادثه…", "d-sm", C.muted_2,

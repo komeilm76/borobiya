@@ -5,15 +5,17 @@ import atheme  # noqa: F401
 from atheme import A, C, PAD, RAIL, TYPE
 import desk as D
 
+# (token, usage) — the hex is read from the live theme, so the card can never drift
+# from the colours the rest of the mockups are drawn with.
 SWATCHES = [
-    ("primary", "#0E6666", "کنش اصلی، لینک، سایدبار فعال"),
-    ("primary_soft", "#E7F2F0", "پس‌زمینهٔ چیپ و آیتم فعال"),
-    ("secondary", "#E9B35A", "هشدار عملیاتی، مأموریت"),
-    ("accent", "#D77A58", "تأکید ثانویه، نمودار"),
-    ("success", "#2C7A57", "آماده، پذیرفته‌شده"),
-    ("warning", "#B57A12", "دیرکرد، در انتظار"),
-    ("danger", "#B3383C", "لغو، خطا، غیرفعال"),
-    ("info", "#316D86", "اطلاع‌رسانی، راهنما"),
+    ("primary", "کنش اصلی، لینک، سایدبار فعال"),
+    ("primary_soft", "چیپ، آیتم انتخاب‌شده، آواتار"),
+    ("mission", "تأکید مأموریت امداد، نمودار"),
+    ("text", "متن اصلی، تیتر و جدول"),
+    ("success", "آماده، پذیرفته‌شده"),
+    ("warning", "دیرکرد، در انتظار"),
+    ("danger", "لغو، خطا، غیرفعال"),
+    ("info", "اطلاع‌رسانی، راهنما"),
 ]
 
 
@@ -27,10 +29,13 @@ def foundations():
     )
 
     # ---- palette ----------------------------------------------------------
-    D.card(s, PAD, y, 700, 336, "پالت رنگ", "mdi-palette-outline")
-    for index, (name, hexa, usage) in enumerate(SWATCHES):
+    palette_w, palette_pad = 700, 20
+    D.card(s, PAD, y, palette_w, 336, "پالت رنگ", "mdi-palette-outline")
+    swatch_right = PAD + palette_w - palette_pad        # inner right edge of the card
+    for index, (name, usage) in enumerate(SWATCHES):
+        hexa = getattr(C, name)
         col, row = index // 4, index % 4
-        sx = PAD + 680 - col * 330          # left edge of the swatch
+        sx = swatch_right - 40 - col * 330             # left edge of the swatch
         sy = y + 60 + row * 66
         s.rect(sx, sy, 40, 40, fill=hexa, radius=9, outline=A.card_edge, outline_w=1)
         s.text(sx - 12, sy + 2, name, "d-label", C.text, align="right")
@@ -97,16 +102,18 @@ def controls():
     bx0 = RAIL - 548
     br, bl = bx0 + 528, bx0 + 20
     D.card(s, bx0, y, 548, 300, "دکمه‌ها", "mdi-gesture-tap-button")
-    D._button(s, bl, y + 56, 170, 42, "ثبت اعزام", "mdi-send", "filled")
-    D._button(s, bl + 182, y + 56, 170, 42, "خروجی CSV", "mdi-download-outline", "outline")
-    D._button(s, bl + 364, y + 56, 164, 42, "بازخوانی", "mdi-refresh", "tonal")
+    # 162 + 12 + 162 + 12 + 160 = 508 = card inner width
+    bw1, bw2, bw3 = 162, 162, 160
+    D._button(s, bl, y + 56, bw1, 42, "ثبت اعزام", "mdi-send", "filled")
+    D._button(s, bl + 174, y + 56, bw2, 42, "خروجی CSV", "mdi-download-outline", "outline")
+    D._button(s, bl + 348, y + 56, bw3, 42, "بازخوانی", "mdi-refresh", "tonal")
     s.text(br, y + 110, "پر برای کنش اصلی، خط‌دار برای ثانویه، ملایم برای تکرارپذیر.",
            "d-caption", C.muted, align="right", max_width=508)
-    D._button(s, bl, y + 138, 170, 42, "لغو مأموریت", "mdi-close-circle-outline", "danger")
-    D._button(s, bl + 182, y + 138, 170, 42, "ذخیرهٔ پیش‌نویس", "mdi-content-save-outline",
+    D._button(s, bl, y + 138, bw1, 42, "لغو مأموریت", "mdi-close-circle-outline", "danger")
+    D._button(s, bl + 174, y + 138, bw2, 42, "ذخیرهٔ پیش‌نویس", "mdi-content-save-outline",
               "danger-outline")
-    s.rect(bl + 364, y + 138, 164, 42, fill=C.surface_3, radius=11)
-    s.text(bl + 364 + 82, y + 149, "غیرفعال", "d-label", C.muted_2, align="center")
+    s.rect(bl + 348, y + 138, bw3, 42, fill=C.surface_3, radius=11)
+    s.text(bl + 348 + bw3 / 2, y + 149, "غیرفعال", "d-label", C.muted_2, align="center")
     s.text(br, y + 192, "هر ناحیه فقط یک دکمهٔ پر دارد؛ دکمهٔ غیرفعال نه سایه دارد نه حاشیه.",
            "d-caption", C.muted, align="right", max_width=508)
     s.text(br, y + 236, "ارتفاع دکمه ۴۲، شعاع ۱۱، فاصلهٔ افقی ۱۲.",

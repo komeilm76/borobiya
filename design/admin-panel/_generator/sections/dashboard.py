@@ -9,7 +9,7 @@ from bb.map import draw_base, draw_labels, draw_pois, incident_marker, team_mark
 import desk as D
 
 # three columns of the content area
-MAIN_X, MAIN_W = 368, 780
+MAIN_X, MAIN_W = 356, 792
 RAIL_X, RAIL_W = PAD, 312
 TOP = 188
 
@@ -254,10 +254,10 @@ def reports():
         x = RAIL - kw - index * (kw + 16)
         D.kpi(s, x, y, kw, 104, label, value, delta, tone, icon)
 
-    y += 124
+    y += 120
 
     # trend
-    D.card(s, MAIN_X, y, MAIN_W, 250, "روند درخواست و مأموریت", "mdi-chart-timeline-variant",
+    D.card(s, MAIN_X, y, MAIN_W, 258, "روند درخواست و مأموریت", "mdi-chart-timeline-variant",
            "۷ روز آخر")
     D.chart_line(s, MAIN_X + 34, y + 58, MAIN_W - 66, 130,
                  [[42, 55, 48, 61, 58, 72, 66], [30, 38, 35, 44, 41, 52, 47]],
@@ -267,8 +267,8 @@ def reports():
                                                     ("مأموریت‌ها", C.warning)])
 
     # donut
-    D.card(s, RAIL_X, y, 340, 250, "سهم گروه‌ها", "mdi-chart-donut")
-    D.donut(s, RAIL_X + 170, y + 92, 54, [42, 28, 18, 12],
+    D.card(s, RAIL_X, y, RAIL_W, 258, "سهم گروه‌ها", "mdi-chart-donut")
+    D.donut(s, RAIL_X + RAIL_W / 2, y + 92, 54, [42, 28, 18, 12],
             [C.primary, C.warning, C.info, C.mission], 18, "۲٬۴۱۸", "درخواست")
     shares = [("آتش‌نشانی", "۴۲٪", C.primary), ("اورژانس", "۲۸٪", C.warning),
               ("هلال احمر", "۱۸٪", C.info), ("کوهستان", "۱۲٪", C.mission)]
@@ -276,15 +276,16 @@ def reports():
         ly = y + 160 + index * 21
         s.circle(RAIL_X + 30, ly + 7, 4.5, fill=color)
         s.text(RAIL_X + 44, ly, label, "d-caption", C.muted, align="left")
-        s.text(RAIL_X + 320, ly, value, "d-caption-bold", C.text_2, align="right")
+        s.text(RAIL_X + RAIL_W - 20, ly, value, "d-caption-bold", C.text_2, align="right")
 
-    y += 270
+    y += 274
 
     # bars
-    D.card(s, RAIL_X, y, 340, 286, "بر اساس نوع حادثه", "mdi-chart-bar")
-    D.chart_bars(s, RAIL_X + 22, y + 56, 296, 150, [58, 42, 30, 22, 14],
+    D.card(s, RAIL_X, y, RAIL_W, 286, "بر اساس نوع حادثه", "mdi-chart-bar")
+    D.chart_bars(s, RAIL_X + 22, y + 56, RAIL_W - 44, 150, [58, 42, 30, 22, 14],
                  ["آتش", "پزشکی", "غرق", "تصادف", "سایر"], C.primary, highlight=0)
-    s.text(RAIL_X + 318, y + 250, "بیشترین فراوانی: آتش‌سوزی", "d-caption", C.muted, align="right")
+    s.text(RAIL_X + RAIL_W - 20, y + 250, "بیشترین فراوانی: آتش‌سوزی", "d-caption", C.muted,
+           align="right")
 
     # group performance
     D.card(s, MAIN_X, y, MAIN_W, 286, "عملکرد گروه‌ها", "mdi-table-large", "خروجی")
