@@ -48,3 +48,7 @@ pnpm-debug.log*
 
 # Python tooling caches
 __pycache__/
+
+# Design mockup generator caches
+design/map-page/_generator/**/__pycache__/
+design/map-page/_generator/.venv/

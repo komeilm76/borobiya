@@ -1,0 +1,1023 @@
+"""Mission (rescue) section screens: availability, offers, dispatch, on-scene, team, reports."""
+from __future__ import annotations
+
+from typing import Callable
+
+from bb import scenario as sc
+from bb.map import Camera, draw_route, team_marker
+from bb.prims import Screen, scrim
+from bb.text import fa_digits
+from bb.theme import C, R, TYPE
+from bb.ui import (bottom_panel, chrome, empty_state, home_bar, map_tools, metric_tiles,
+                   nav_banner, notice, sheet_header, telemetry_strip)
+
+from ._base import (box, destination_pin, incident_marker, keepout, map_view, origin_marker,
+                    user_cone)
+
+INCIDENT_NAME = "حادثهٔ آتش‌سوزی · بازار قدیم"
+INCIDENT_ADDRESS = "خیابان شریعتی، بازار قدیم، پلاک ۱۴"
+SOS_TYPE = "آتش‌سوزی ساختمان"
+REQUESTER = "رضا محمدی"
+REQUESTER_ADDRESS = "خیابان شریعتی، بازار قدیم"
+
+MISSION_ROUTE = [sc.USER, (260, -120), (260, 240), sc.INCIDENT]
+
+
+def _mission_chip(s: Screen, x: float, y: float, label: str) -> float:
+    return s.chip(x, y, label, "mdi-lifebuoy", "mission", h=26)
+
+
+# --------------------------------------------------------------------------- #
+# 01/02 — availability
+# --------------------------------------------------------------------------- #
+def _availability(on: bool) -> Screen:
+    cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 90, 0.20)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 508, 393, 344)))
+    s.top_scrim(128)
+    chrome(s, tab=2)
+    map_tools(s, 128, angle=22)
+
+    user_cone(s, cam, *sc.USER, bearing=28, color=C.success if on else C.muted_2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=on)
+
+    top = 496
+    s.shadow(12, top, 369, 250, radius=26, blur=24, dy=8, alpha=44)
+    s.rect(12, top, 369, 250, fill="#FFFFFF", radius=26, outline=C.outline, outline_w=1)
+    s.rect(188, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    color = C.success if on else C.muted_2
+    s.circle(357 - 28, top + 46, 23, fill=C.success_soft if on else C.surface_3)
+    s.i.draw_icon(357 - 28, top + 46, "mdi-shield-check-outline" if on else "mdi-shield-off-outline",
+                  23, color)
+    s.text(357 - 60, top + 26, "وضعیت امدادگری", "caption", C.muted, align="right")
+    s.text(357 - 60, top + 42, "آمادهٔ دریافت مأموریت", "title-sm", C.text, align="right",
+           max_width=220)
+
+    # availability switch, full-width row (big touch target, unmistakable state)
+    s.rect(24, top + 82, 345, 58, fill=C.success_soft if on else C.surface_2, radius=16)
+    s.toggle(38, top + 96, 50, 30, on=on, on_color=C.success)
+    s.text(357, top + 92, "آماده دریافت مأموریت هستم" if on else "دریافت پیشنهاد متوقف است",
+           "label-lg", C.text if on else C.text_2, align="right", max_width=250)
+    s.text(357, top + 116, "برای مرکز امداد قابل مشاهده است" if on else "می‌توانید هر زمان فعال کنید",
+           "caption", C.muted, align="right", max_width=250)
+
+    body = ("پیشنهاد مأموریت‌های نزدیک برای شما ارسال می‌شود تا مرکز امداد بداند کدام امدادگر"
+            " آمادهٔ اعزام است." if on else
+            "پیشنهاد جدیدی ارسال نمی‌شود. در شرایط اضطراری، مرکز امداد می‌تواند حتی در این"
+            " وضعیت مأموریت ارسال کند.")
+    s.para(26, top + 152, body, "caption", C.muted, align="right", max_width=340, line_height=18)
+
+    s.rect(24, top + 202, 166, 38, fill=C.surface_2, radius=12)
+    s.i.draw_icon(24 + 18, top + 221, "mdi-account-group-outline", 16, C.text_2)
+    s.text(24 + 166 - 12, top + 212, "گروه: آتش‌نشانی", "caption-bold", C.text_2, align="right",
+           max_width=120)
+    s.rect(203, top + 202, 166, 38, fill=C.surface_2, radius=12)
+    s.i.draw_icon(203 + 18, top + 221, "mdi-map-marker-radius-outline", 16, C.text_2)
+    s.text(203 + 166 - 12, top + 212, "شعاع ۵ کیلومتر", "caption-bold", C.text_2, align="right",
+           max_width=120)
+    home_bar(s)
+    return s
+
+
+def mission_ready_on() -> Screen:
+    return _availability(True)
+
+
+def mission_ready_off() -> Screen:
+    return _availability(False)
+
+
+# --------------------------------------------------------------------------- #
+# 03 — mission offer card (first of three)
+# --------------------------------------------------------------------------- #
+def mission_offer() -> Screen:
+    cam = sc.camera(120, 40, 0.155).aim_at(*sc.INCIDENT, 230, 300)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 400, 393, 452)))
+    s.top_scrim(120)
+    chrome(s, tab=2, mission_badge="۳")
+    draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=12)
+    user_cone(s, cam, *sc.USER, bearing=28)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+
+    s.shadow(12, 122, 369, 46, radius=16, blur=12, dy=4, color=C.danger, alpha=60)
+    s.rect(12, 122, 369, 46, fill=C.danger, radius=16)
+    s.i.draw_icon(357 - 24, 145, "mdi-alarm-light", 20, "#FFFFFF")
+    s.text(357 - 44, 133, "۳ پیشنهاد فعال · اولویت فوری", "label", "#FFFFFF", align="right")
+    s.text(34, 136, "۰:۵۲", "title-sm", "#FFE0E0", align="left")
+
+    top = 392
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    # header: status chips first, then the incident title
+    _mission_chip(s, 16, top + 22, "آتش‌سوزی")
+    s.chip(16 + 84, top + 22, "SOS فوری", None, "danger", h=26)
+    s.text(377, top + 26, "پیشنهاد ۱ از ۳", "caption", C.muted, align="right")
+    s.text(377, top + 58, INCIDENT_NAME, "title", C.text, align="right", max_width=330)
+    s.text(377, top + 86, INCIDENT_ADDRESS, "caption", C.muted, align="right", max_width=330)
+
+    # requester
+    s.rect(16, top + 108, 361, 54, fill=C.surface_2, radius=14)
+    s.circle(377 - 26, top + 135, 16, fill=C.primary_soft)
+    s.text(377 - 26, top + 128, "ر", "label", C.primary, align="center")
+    s.text(377 - 50, top + 117, REQUESTER, "label", C.text, align="right")
+    s.text(377 - 50, top + 137, "درخواست‌کننده · ۱۲۵ متر از محل", "caption", C.muted,
+           align="right")
+    s.i.draw_icon(38, top + 135, "mdi-phone-outline", 18, C.primary)
+
+    metric_tiles(s, 16, top + 172, 361, [("فاصله", "۱٫۲ کیلومتر", "mdi-map-marker-distance"),
+                                         ("رسیدن", "۴ دقیقه", "mdi-clock-fast"),
+                                         ("گروه لازم", "۲ نفر", "mdi-account-group")], h=58)
+    s.text(377, top + 242, "ارسال‌شده ۹:۴۳ · اعتبار پیشنهاد ۲ دقیقه", "caption", C.muted_2,
+           align="right")
+
+    s.text(377, top + 272, "انتظار می‌رود", "caption-bold", C.muted, align="right")
+    s.text(377, top + 292, "حضور با تجهیزات ایمنی · هماهنگی با سرپرست عملیات · ثبت گزارش پایان",
+           "caption", C.muted, align="right", max_width=340)
+
+    s.button(16, top + 318, 176, 50, "رد مأموریت", icon="mdi-close", variant="tonal",
+             color=C.muted)
+    s.button(201, top + 318, 176, 50, "پذیرش مأموریت", icon="mdi-check", variant="filled")
+
+    # pagination: three offers, this is the first
+    for index in range(3):
+        active = index == 0
+        s.rect(196.5 - 19 + index * 16, top + 388, 14 if active else 7, 4.5,
+               fill=C.primary if active else C.outline_strong, radius=2.5)
+    s.text(196.5, top + 402, "برای پیشنهاد بعدی به چپ بکشید · برای جزئیات به بالا",
+           "caption", C.muted_2, align="center")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 04 — offer details + swipe pagination (#2 of 3)
+# --------------------------------------------------------------------------- #
+def mission_offer_details() -> Screen:
+    cam = sc.camera(140, 60, 0.165).aim_at(*sc.INCIDENT, 200, 240)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
+    s.top_scrim(120)
+    chrome(s, tab=2, mission_badge="۳")
+    draw_route(s, cam, sc.route_world([sc.USER, (0, -120), (0, 120), (260, 120), (260, 240),
+                                       sc.INCIDENT]), width_m=11, mute=0.4)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    # compact swipe indicator above the sheet (second of three offers)
+    for index in range(3):
+        active = index == 1
+        s.rect(196.5 - 26 + index * 18, 300, 14 if active else 8, 5,
+               fill=C.primary if active else "#FFFFFF", radius=3)
+
+    top = 316
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 20, "جزئیات پیشنهاد", "پیشنهاد ۲ از ۳ · آتش‌سوزی تجاری",
+                     icon="mdi-lifebuoy", tone="mission", title_style="title")
+
+    s.rect(16, y, 361, 96, fill=C.danger_soft, radius=18)
+    s.text(357, y + 12, "نوع حادثه", "caption", C.danger, align="right")
+    s.text(357, y + 30, "آتش‌سوزی انبار تجاری، طبقهٔ دوم", "title-sm", C.text, align="right",
+           max_width=320)
+    s.text(357, y + 58, "شدت بالا · نیاز به تیم دو نفره · احتمال گسترش", "caption", C.muted,
+           align="right", max_width=320)
+    s.chip(30, y + 62, "SOS فوری", None, "danger", h=24)
+    y += 110
+
+    s.text(357, y, "اطلاعات محل", "caption-bold", C.muted, align="right")
+    y += 24
+    rows = [("نشانی", INCIDENT_ADDRESS), ("مسافت از موقعیت شما", "۱٫۲ کیلومتر"),
+            ("زمان رسیدن تقریبی", "۴ دقیقه با خودرو"), ("درخواست‌کننده", REQUESTER),
+            ("گروه امدادی", "آتش‌نشانی · نیازی به پشتیبانی اضافه نیست")]
+    for index, (label, value) in enumerate(rows):
+        ry = y + index * 34
+        s.text(357, ry, label, "caption", C.muted, align="right")
+        s.text(250, ry, value, "caption-bold", C.text_2, align="right", max_width=250)
+        if index < len(rows) - 1:
+            s.divider(30, ry + 27, 363)
+    y += len(rows) * 34 + 6
+
+    s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
+    s.i.draw_icon(357 - 20, y + 27, "mdi-clock-alert-outline", 18, C.warning)
+    s.text(357 - 44, y + 8, "اعتبار این پیشنهاد تا ۰:۳۸ دیگر", "caption-bold", C.warning,
+           align="right")
+    s.text(357 - 44, y + 26, "پس از پایان اعتبار، پیشنهاد به امدادگر دیگری ارسال می‌شود.", "caption",
+           C.muted, align="right", max_width=300)
+    y += 68
+
+    s.button(201, y, 176, 50, "پذیرش مأموریت", icon="mdi-check", variant="filled")
+    s.button(16, y, 176, 50, "رد مأموریت", icon="mdi-close", variant="tonal", color=C.muted)
+    y += 62
+    s.text(196.5, y, "برای دیدن پیشنهاد بعدی، کارت را به چپ بکشید", "caption", C.muted_2,
+           align="center")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 05 — acceptance confirmation
+# --------------------------------------------------------------------------- #
+def mission_accept_confirm() -> Screen:
+    cam = sc.camera(sc.USER[0] + 30, sc.USER[1] - 40, 0.20)
+    s = map_view(cam, pois=False)
+    scrim(s, 108)
+    chrome(s, tab=2, mission_badge="۳")
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
+
+    top = 236
+    s.shadow(16, top, 361, 424, radius=28, blur=26, dy=10, alpha=64)
+    s.rect(16, top, 361, 424, fill="#FFFFFF", radius=28)
+    s.circle(196.5, top + 48, 30, fill=C.primary_soft)
+    s.i.draw_icon(196.5, top + 48, "mdi-shield-check", 32, C.primary)
+    s.text(196.5, top + 88, "پذیرش این مأموریت؟", "title-lg", C.text, align="center")
+    s.para(36, top + 118, "با پذیرش، این مأموریت به شما اختصاص می‌یابد و پیشنهادهای دیگر متوقف می‌شوند.",
+           "body-sm", C.muted, align="center", max_width=320)
+
+    s.rect(32, top + 178, 329, 82, fill=C.surface_2, radius=16)
+    s.text(347, top + 190, INCIDENT_NAME, "label", C.text, align="right", max_width=300)
+    s.text(347, top + 212, f"{INCIDENT_ADDRESS}", "caption", C.muted, align="right", max_width=300)
+    s.text(347, top + 236, "۱٫۲ کیلومتر · رسیدن تقریبی ۹:۵۲", "caption-bold", C.primary,
+           align="right")
+    s.chip(44, top + 232, "SOS فوری", None, "danger", h=24)
+
+    s.rect(32, top + 272, 329, 44, fill=C.warning_soft, radius=14)
+    s.i.draw_icon(347, top + 294, "mdi-information-outline", 17, C.warning)
+    s.text(329, top + 282, "پس از پذیرش، مسیریابی عادی و تاریخچه قفل می‌شوند.", "caption", C.warning,
+           align="right", max_width=280)
+
+    s.button(32, top + 330, 329, 52, "بله، مأموریت را می‌پذیرم", icon="mdi-check-bold",
+             variant="filled", shadow=True)
+    s.text(196.5, top + 392, "انصراف و بازگشت", "label", C.muted, align="center")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 06 — accepted, before dispatch
+# --------------------------------------------------------------------------- #
+def mission_accepted() -> Screen:
+    cam = sc.camera(140, 40, 0.175).aim_at(*sc.INCIDENT, 230, 250)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 430, 393, 422)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13, dashed=True, mute=0.35)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    top = 422
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 20
+    s.chip(24, y + 2, "مأموریت فعال", "mdi-lifebuoy", "mission", h=26)
+    s.text(357, y, "به محل حادثه اعزام شوید", "title", C.text, align="right", max_width=240)
+    s.text(357, y + 28, "این مأموریت به شما اختصاص یافت. لیدر تیم: شما", "caption", C.muted,
+           align="right", max_width=320)
+    y += 66
+
+    s.rect(16, y, 361, 92, fill=C.surface_2, radius=18)
+    s.text(357, y + 10, INCIDENT_NAME, "label", C.text, align="right", max_width=320)
+    s.text(357, y + 32, INCIDENT_ADDRESS, "caption", C.muted, align="right", max_width=320)
+    s.divider(30, y + 56, 363)
+    s.text(357, y + 62, "درخواست‌کننده: رضا محمدی", "caption", C.text_2, align="right")
+    s.text(240, y + 62, "۱٫۲ کیلومتر · ۴ دقیقه", "caption-bold", C.primary, align="right")
+    y += 106
+
+    # status progression ladder
+    s.text(357, y, "وضعیت مأموریت", "caption-bold", C.muted, align="right")
+    y += 22
+    steps = ["پذیرفته‌شده", "در مسیر", "رسیده", "در حال رسیدگی", "پایان"]
+    step_w = (361 - 8 * (len(steps) - 1)) / len(steps)
+    for index, label in enumerate(steps):
+        sx = 16 + index * (step_w + 8)
+        active = index == 0
+        s.rect(sx, y, step_w, 6, fill=C.primary if active else C.surface_3, radius=3)
+        s.text(sx + step_w / 2, y + 12, label, "caption", C.primary if active else C.muted_2,
+               align="center", max_width=step_w + 6)
+    y += 44
+
+    s.button(16, y, 361, 52, "شروع مسیر تا محل حادثه", icon="mdi-navigation-variant",
+             variant="filled", shadow=True)
+    y += 62
+    s.button(201, y, 176, 44, "درخواست پشتیبانی", icon="mdi-account-plus-outline",
+             variant="outline")
+    s.button(16, y, 176, 44, "جزئیات مأموریت", icon="mdi-information-outline", variant="text")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 07 — mission navigation active
+# --------------------------------------------------------------------------- #
+def mission_navigation() -> Screen:
+    cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 540)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 668, 393, 184)), pois=False)
+    s.top_scrim(200, start=240)
+    chrome(s, tab=2)
+
+    draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=14, color=C.primary)
+    user_cone(s, cam, *sc.USER, bearing=0)
+    nav_banner(s, "mdi-arrow-left", "۲۵۰ متر", "به خیابان شریعتی بپیچید", "سپس ۶۰۰ متر مستقیم",
+               top=116)
+
+    # mission status pill: this is a mission, not a normal trip
+    s.shadow(120, 240, 153, 32, radius=16, blur=10, dy=3, color=C.mission, alpha=60)
+    s.rect(120, 240, 153, 32, fill=C.mission, radius=16)
+    s.i.draw_icon(150, 256, "mdi-lifebuoy", 15, "#FFFFFF")
+    s.text(258, 248, "مأموریت فعال · لیدر", "caption-bold", "#FFFFFF", align="right", max_width=96)
+
+    s.icon_button(14, 288, 44, "mdi-volume-high", 20, C.primary, radius=15)
+    s.icon_button(14, 340, 44, "mdi-routes", 20, C.text_2, radius=15)
+    s.icon_button(14, 392, 44, "mdi-map-outline", 20, C.text_2, radius=15)
+    s.shadow(325, 452, 54, 54, radius=27, blur=16, dy=6, color=C.danger, alpha=92)
+    s.circle(352, 479, 27, fill=C.danger, outline="#FFFFFF", outline_w=2.2)
+    s.text(352, 483, "SOS", "caption-bold", "#FFFFFF", align="center")
+
+    top = 660
+    s.shadow(0, top - 8, 393, 852 - top + 16, radius=26, blur=24, dy=-2, alpha=48)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=26)
+    s.rect(0, top + 26, 393, 852 - top - 26, fill="#FFFFFF")
+    telemetry_strip(s, top + 8, [("۹:۵۲", "رسیدن", ""), ("۴ دقیقه", "زمان مانده", ""),
+                                 ("۸۵۰ متر", "مسافت مانده", ""), ("۴۲", "km/h", "")], h=54)
+    s.button(16, top + 70, 176, 46, "رسیدم", icon="mdi-map-marker-check", variant="filled")
+    s.button(201, top + 70, 176, 46, "پایان مأموریت", icon="mdi-stop-circle-outline",
+             variant="tonal", color=C.danger)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 08 — mission route alternatives
+# --------------------------------------------------------------------------- #
+def mission_alternatives() -> Screen:
+    cam = sc.camera(*sc.USER, 0.42).heading_up(28).aim_at(*sc.USER, 196, 330)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 430, 393, 422)), pois=False)
+    s.top_scrim(200, start=240)
+    chrome(s, tab=2)
+    draw_route(s, cam, sc.route_world([sc.USER, (0, -120), (0, 120), (260, 120), (260, 240),
+                                       sc.INCIDENT]), width_m=12, mute=0.42)
+    draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13)
+    user_cone(s, cam, *sc.USER, bearing=0)
+    nav_banner(s, "mdi-arrow-left", "۲۵۰ متر", "به خیابان شریعتی بپیچید", None, top=116)
+    scrim(s, 70, top=430, height=422)
+
+    top = 424
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=28, blur=26, dy=-2, alpha=56)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=28)
+    s.rect(0, top + 28, 393, 852 - top - 28, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+    y = sheet_header(s, top + 20, "مسیر جایگزین مأموریت", "پیشنهادها تا انتخاب شما معتبرند",
+                     icon="mdi-routes", title_style="title")
+
+    options = [("مسیر اصلی", "۴ دقیقه", "۸۵۰ متر", "روان", True),
+               ("از خیابان انقلاب", "۶ دقیقه", "۱٫۱ کیلومتر", "نیمه‌سنگین", False),
+               ("از بلوار چمران", "۷ دقیقه", "۱٫۴ کیلومتر", "روان", False)]
+    for index, (name, mins, dist, traffic, active) in enumerate(options):
+        ry = y + index * 72
+        s.rect(16, ry, 361, 64, fill=C.primary_soft if active else C.surface_2, radius=16,
+               outline=C.primary if active else None, outline_w=1.6 if active else 0)
+        s.text(357 - 12, ry + 10, name, "label-lg", C.text, align="right")
+        s.text(357 - 12, ry + 32, f"{mins} · {dist}", "caption", C.muted, align="right")
+        s.chip(24, ry + 20, traffic, None, "success" if traffic == "روان" else "warning", h=24)
+        if active:
+            s.circle(52, ry + 20, 9, fill=C.primary)
+            s.i.draw_icon(52, ry + 20, "mdi-check", 12, "#FFFFFF")
+    y += len(options) * 72 + 6
+    s.button(16, y, 361, 50, "ادامه با مسیر فعلی", icon="mdi-navigation", variant="filled")
+    y += 60
+    s.text(196.5, y, "مسیرها بر اساس موقعیت فعلی شما محاسبه شده‌اند", "caption", C.muted_2,
+           align="center")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 09 — arrived at incident
+# --------------------------------------------------------------------------- #
+def mission_arrived() -> Screen:
+    cam = sc.camera(140, 60, 0.24).aim_at(*sc.INCIDENT, 196, 360)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 470, 393, 382)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=12, mute=0.35)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    user_cone(s, cam, *sc.USER, bearing=28)
+    s.circle(196, 470, 10, fill="#FFFFFF", outline=C.success, outline_w=3)
+
+    top = 462
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 24
+    s.circle(357 - 22, y + 22, 22, fill=C.success_soft)
+    s.i.draw_icon(357 - 22, y + 22, "mdi-map-marker-check", 24, C.success)
+    s.text(357 - 52, y + 4, "به محل حادثه رسیدید", "title", C.text, align="right")
+    s.text(357 - 52, y + 32, "وضعیت مأموریت را به‌روز کنید تا مرکز امداد مطلع شود.", "caption",
+           C.muted, align="right", max_width=270)
+    y += 66
+
+    s.rect(16, y, 361, 66, fill=C.danger_soft, radius=16)
+    s.i.draw_icon(357 - 20, y + 20, "mdi-fire", 18, C.danger)
+    s.text(357 - 42, y + 10, INCIDENT_NAME, "label", C.text, align="right", max_width=290)
+    s.text(357 - 42, y + 32, "شدت بالا · درخواست‌کننده در محل حادثه حضور دارد", "caption", C.muted,
+           align="right", max_width=300)
+    y += 80
+
+    s.button(16, y, 361, 52, "شروع رسیدگی", icon="mdi-play-circle-outline", variant="filled",
+             shadow=True)
+    y += 62
+    s.button(201, y, 176, 46, "درخواست پشتیبانی", icon="mdi-account-plus-outline", variant="tonal")
+    s.button(16, y, 176, 46, "تماس با درخواست‌کننده", icon="mdi-phone", variant="outline")
+    y += 58
+    s.rect(16, y, 361, 48, fill=C.surface_2, radius=14)
+    s.i.draw_icon(357, y + 16, "mdi-timer-sand", 16, C.muted)
+    s.text(343, y + 6, "زمان رسیدن ثبت شد: ۹:۵۲ — مدت مسیر ۹ دقیقه", "caption", C.text_2,
+           align="right", max_width=310)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 10 — in progress (on scene)
+# --------------------------------------------------------------------------- #
+def mission_in_progress() -> Screen:
+    cam = sc.camera(140, 60, 0.235).aim_at(*sc.INCIDENT, 196, 300)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 372, 393, 480)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    team_marker(s, cam, 250, 200, "س", "success", "سعید")
+    team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    top = 366
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 20
+    s.chip(24, y + 4, "در حال رسیدگی", "mdi-fire", "danger", h=26)
+    s.text(357, y, "مأموریت در جریان", "title", C.text, align="right", max_width=240)
+    s.text(357, y + 28, "زمان شروع رسیدگی: ۹:۵۳ · ۱۴ دقیقه از پذیرش", "caption", C.muted,
+           align="right")
+    y += 58
+
+    statuses = [("م", "شما (لیدر)", "در محل حادثه", "success"),
+                ("س", "سعید کریمی", "در راه است · ۳ دقیقه", "warning"),
+                ("ز", "زهرا احمدی", "در محل حادثه", "success")]
+    for initial, name, state, tone in statuses:
+        s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
+        s.circle(357 - 22, y + 27, 15, fill=C.primary_soft)
+        s.text(357 - 22, y + 19, initial, "label", C.primary, align="center")
+        s.text(357 - 46, y + 8, name, "label", C.text, align="right")
+        s.text(357 - 46, y + 28, state, "caption",
+               C.success if tone == "success" else C.warning, align="right")
+        s.i.draw_icon(34, y + 27, "mdi-chevron-left", 18, C.muted_2)
+        y += 60
+    y += 4
+
+    s.text(357, y, "گزارش لحظه‌ای", "caption-bold", C.muted, align="right")
+    y += 22
+    s.rect(16, y, 361, 56, fill=C.surface_2, radius=14)
+    s.text(357 - 12, y + 8, "آخرین به‌روزرسانی: ۱۰:۰۵", "caption", C.muted, align="right")
+    s.text(357 - 12, y + 26, "تخلیهٔ طبقهٔ دوم انجام شد · در انتظار تیم پشتیبانی", "caption-bold",
+           C.text_2, align="right", max_width=320)
+    y += 70
+
+    s.button(16, y, 176, 48, "درخواست پشتیبانی", icon="mdi-account-plus-outline",
+             variant="tonal")
+    s.button(201, y, 176, 48, "ثبت گزارش و پایان", icon="mdi-clipboard-check-outline",
+             variant="filled")
+    y += 62
+    s.rect(16, y, 361, 44, fill=C.warning_soft, radius=12)
+    s.i.draw_icon(357 - 18, y + 22, "mdi-shield-alert-outline", 15, C.warning)
+    s.text(357 - 36, y + 12, "لغو مأموریت فقط از منوی «بیشتر» و با ثبت دلیل ممکن است", "caption",
+           C.warning, align="right", max_width=300)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 11 — support request composer
+# --------------------------------------------------------------------------- #
+def support_request() -> Screen:
+    cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 200)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
+    scrim(s, 60, top=250, height=602)
+
+    top = 258
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=56)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 20, "درخواست نیروی پشتیبان", "درخواست ۱ از ۲ امروز",
+                     icon="mdi-account-plus-outline", tone="primary", title_style="title")
+
+    s.text(357, y, "گروه امدادی", "caption-bold", C.muted, align="right")
+    y += 22
+    groups = [("آتش‌نشانی", "fire-truck", True), ("هلال‌احمر", "medical-bag", False),
+              ("امداد شهری", "police-badge", False)]
+    tile_w = (361 - 16) / 3
+    for index, (label, icon, active) in enumerate(groups):
+        tx = 16 + index * (tile_w + 8)
+        s.rect(tx, y, tile_w, 78, fill=C.primary_soft if active else C.surface_2, radius=R.md,
+               outline=C.primary if active else None, outline_w=1.6 if active else 0)
+        s.i.draw_icon(tx + tile_w / 2, y + 26, icon, 24, C.primary if active else C.muted)
+        s.text(tx + tile_w / 2, y + 48, label, "caption", C.primary if active else C.text_2,
+               align="center", max_width=tile_w)
+    y += 92
+
+    s.text(357, y, "تعداد نیرو", "caption-bold", C.muted, align="right")
+    y += 22
+    s.rect(16, y, 361, 56, fill=C.surface_2, radius=16)
+    s.circle(357 - 30, y + 28, 19, fill="#FFFFFF", outline=C.outline_strong, outline_w=1.2)
+    s.i.draw_icon(357 - 30, y + 28, "mdi-minus", 18, C.text_2)
+    s.text(357 - 96, y + 12, "۲", "metric-sm", C.text, align="center")
+    s.text(357 - 96, y + 38, "نفر", "caption", C.muted, align="center")
+    s.circle(357 - 160, y + 28, 19, fill=C.primary)
+    s.i.draw_icon(357 - 160, y + 28, "mdi-plus", 18, "#FFFFFF")
+    y += 70
+
+    s.text(357, y, "یادداشت برای تیم پشتیبان", "caption-bold", C.muted, align="right")
+    y += 22
+    s.rect(16, y, 361, 76, fill=C.surface_2, radius=16)
+    s.para(25, y + 10, "آتش‌سوزی در طبقهٔ دوم انبار؛ نیاز به نردبان و دو نیروی آموزش‌دیده.",
+           "body-sm", C.text_2, align="right", max_width=320)
+    s.text(357 - 12, y + 54, f"{fa_digits(44)}/{fa_digits(120)}", "caption", C.muted_2, align="left")
+    y += 90
+
+    # summary
+    s.rect(16, y, 361, 62, fill=C.info_soft, radius=16)
+    s.i.draw_icon(357 - 20, y + 31, "mdi-information-outline", 18, C.info)
+    s.text(357 - 42, y + 10, "خلاصهٔ درخواست", "caption-bold", C.info, align="right")
+    s.text(357 - 42, y + 30, "۲ نفر آتش‌نشانی · محل حادثه · نیاز فوری", "caption", C.text_2,
+           align="right", max_width=300)
+    y += 76
+
+    s.button(16, y, 361, 52, "ارسال درخواست پشتیبانی", icon="mdi-send-outline", variant="filled",
+             shadow=True)
+    y += 62
+    s.text(196.5, y, "درخواست به مرکز امداد و تیم‌های آمادهٔ نزدیک ارسال می‌شود", "caption",
+           C.muted_2, align="center", max_width=340)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 12 — support pending
+# --------------------------------------------------------------------------- #
+def support_pending() -> Screen:
+    cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 260)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 336, 393, 516)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    top = 330
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 20
+    s.chip(24, y + 6, "در انتظار پاسخ", None, "warning", h=26)
+    s.text(357, y, "درخواست پشتیبانی ارسال شد", "title", C.text, align="right", max_width=250)
+    s.text(357, y + 28, "۹:۵۵ · ۲ نیروی آتش‌نشانی · محل حادثه", "caption", C.muted, align="right")
+    y += 58
+
+    # animated pending indicator
+    s.rect(16, y, 361, 86, fill=C.surface_2, radius=18)
+    s.spinner(357 - 28, y + 43, 15, C.warning, 2.6)
+    s.text(357 - 56, y + 16, "در حال یافتن نیروی آماده…", "label", C.text, align="right")
+    s.text(357 - 56, y + 38, "میانگین زمان پاسخ در این منطقه: ۲ دقیقه", "caption", C.muted,
+           align="right")
+    s.rect(357 - 56 - 260, y + 60, 260, 6, fill=C.surface_3, radius=3)
+    s.rect(357 - 56 - 260, y + 60, 150, 6, fill=C.warning, radius=3)
+    y += 100
+
+    s.text(357, y, "وضعیت نیروهای درخواستی", "caption-bold", C.muted, align="right")
+    y += 22
+    rows = [("نیروی ۱", "پاسخ داده نشده", "warning"), ("نیروی ۲", "پاسخ داده نشده", "warning")]
+    for label, state, tone in rows:
+        s.rect(16, y, 361, 48, fill=C.surface_2, radius=14)
+        s.text(357 - 12, y + 14, label, "label", C.text_2, align="right")
+        s.text(240, y + 14, state, "caption", C.warning, align="right")
+        s.spinner(34, y + 24, 8, C.warning, 2)
+        y += 54
+    y += 2
+
+    s.button(16, y, 176, 46, "لغو درخواست", icon="mdi-close", variant="tonal", color=C.danger)
+    s.button(201, y, 176, 46, "ادامهٔ رسیدگی", icon="mdi-fire", variant="filled")
+    y += 60
+    s.text(196.5, y, "با پذیرش هر نیرو، اعلان لحظه‌ای در همین صفحه نمایش داده می‌شود", "caption",
+           C.muted_2, align="center", max_width=340)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 13 — support accepted notification
+# --------------------------------------------------------------------------- #
+def support_accepted() -> Screen:
+    cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 320)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 430, 393, 422)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    team_marker(s, cam, 250, 200, "س", "success", "سعید")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    # live notification toast (non-blocking, below the segmented control)
+    s.shadow(12, 122, 369, 86, radius=20, blur=18, dy=6, alpha=52)
+    s.rect(12, 122, 369, 86, fill="#FFFFFF", radius=20, outline=C.success, outline_w=1.4)
+    s.circle(357 - 26, 122 + 43, 21, fill=C.success_soft)
+    s.i.draw_icon(357 - 26, 122 + 43, "mdi-check-circle", 22, C.success)
+    s.text(357 - 56, 122 + 14, "یک نیروی آتش‌نشان درخواست را پذیرفت", "label", C.text,
+           align="right", max_width=280)
+    s.text(357 - 56, 122 + 38, "سعید کریمی · در راه محل حادثه · رسیدن ۳ دقیقه", "caption",
+           C.muted, align="right", max_width=290)
+    s.text(357 - 56, 122 + 62, "همین حالا", "caption", C.muted_2, align="right")
+    s.i.draw_icon(34, 122 + 22, "mdi-volume-high", 16, C.success)
+
+    top = 424
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 20
+    s.text(357, y, "تیم پشتیبانی", "title", C.text, align="right")
+    s.text(357, y + 30, "۱ از ۲ نیرو پذیرفت · یک نیرو در انتظار پاسخ", "caption", C.muted,
+           align="right", max_width=330)
+    y += 54
+
+    members = [("س", "سعید کریمی", "پذیرفته · در راه", "success", True),
+               ("ن", "نیروی دوم", "در انتظار پاسخ", "warning", False)]
+    for initial, name, state, tone, accepted in members:
+        s.rect(16, y, 361, 66, fill=C.success_soft if accepted else C.surface_2, radius=16)
+        s.circle(357 - 26, y + 33, 18, fill=C.primary_soft if accepted else C.surface_3)
+        s.text(357 - 26, y + 25, initial, "label", C.primary, align="center")
+        s.text(357 - 54, y + 10, name, "label", C.text, align="right")
+        s.text(357 - 54, y + 32, state, "caption", C.success if accepted else C.warning,
+               align="right")
+        s.i.draw_icon(34, y + 33, "mdi-check-circle" if accepted else "mdi-clock-outline", 18,
+                      C.success if accepted else C.warning)
+        y += 74
+
+    s.rect(16, y, 361, 62, fill=C.info_soft, radius=16)
+    s.i.draw_icon(357 - 20, y + 20, "mdi-information-outline", 17, C.info)
+    s.text(357 - 42, y + 10, "لیدر تیم شما هستید", "caption-bold", C.info, align="right")
+    s.text(357 - 42, y + 30, "می‌توانید وضعیت اعضای تیم را در داشبورد تیم ببینید.", "caption",
+           C.muted, align="right", max_width=300)
+    y += 66
+
+    s.rect(16, 782, 361, 54, fill=C.surface_2, radius=14)
+    s.i.draw_icon(357 - 20, 809, "mdi-bell-ring-outline", 17, C.primary)
+    s.text(357 - 42, 790, "اعلان صوتی پذیرش نیرو", "label", C.text_2, align="right",
+           max_width=190)
+    s.text(357 - 42, 811, "اعلان سیستمی هم ارسال می‌شود", "caption", C.muted_2,
+           align="right", max_width=200)
+    s.toggle(30, 796, 44, 26, on=True)
+
+    s.button(16, y, 176, 48, "داشبورد تیم", icon="mdi-account-group-outline", variant="tonal")
+    s.button(201, y, 176, 48, "ادامهٔ رسیدگی", icon="mdi-fire", variant="filled")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 14 — team leader dashboard
+# --------------------------------------------------------------------------- #
+def team_leader() -> Screen:
+    cam = sc.camera(140, 60, 0.21).aim_at(*sc.INCIDENT, 196, 240)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
+    team_marker(s, cam, 250, 200, "س", "success", "سعید")
+    team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    top = 292
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 22, "داشبورد تیم اعزامی", "مأموریت آتش‌سوزی · لیدر: شما",
+                     icon="mdi-account-group-outline", tone="mission", title_style="title")
+
+    s.rect(16, y, 361, 60, fill=C.mission_soft, radius=16)
+    s.text(357, y + 10, "۳ نفر در محل حادثه · ۱ نفر در راه", "label", C.mission, align="right")
+    s.text(357, y + 30, "زمان اعزام: ۹:۴۹ · حضور تیم: ۲ دقیقه پیش", "caption", C.muted,
+           align="right")
+    y += 72
+
+    s.text(357, y, "اعضای تیم", "caption-bold", C.muted, align="right")
+    s.text(300, y, "۴ عضو", "caption", C.muted_2, align="right")
+    y += 22
+    members = [("م", "شما", "در محل حادثه · لیدر", "success", "mdi-shield-star-outline"),
+               ("س", "سعید کریمی", "در راه است · ۳ دقیقه", "warning", "mdi-car"),
+               ("ز", "زهرا احمدی", "در محل حادثه · در حال امداد", "success", "mdi-fire"),
+               ("ع", "علی موسوی", "در محل حادثه · آماده", "success", "mdi-account-check")]
+    for initial, name, state, tone, icon in members:
+        s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
+        s.circle(357 - 22, y + 27, 15, fill=C.primary_soft)
+        s.text(357 - 22, y + 19, initial, "label", C.primary, align="center")
+        s.text(357 - 46, y + 7, name, "label", C.text, align="right")
+        s.text(357 - 46, y + 29, state, "caption",
+               C.success if tone == "success" else C.warning, align="right")
+        s.i.draw_icon(34, y + 27, icon, 18, C.muted)
+        s.i.draw_icon(60, y + 27, "mdi-chevron-left", 16, C.muted_2)
+        y += 60
+    y += 2
+
+    for bx, label, icon in ((16, "تماس گروهی", "mdi-phone-outline"),
+                            (201, "موقعیت تیم", "mdi-map-marker-path")):
+        right = bx + 176
+        s.rect(bx, y, 176, 46, fill=C.surface_2, radius=14)
+        s.i.draw_icon(right - 22, y + 23, icon, 17, C.primary)
+        s.text(right - 42, y + 13, label, "label", C.text_2, align="right", max_width=110)
+    y += 60
+
+    s.button(16, y, 361, 50, "ثبت گزارش و پایان مأموریت", icon="mdi-clipboard-check-outline",
+             variant="filled", shadow=True)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 15 — mission cancel
+# --------------------------------------------------------------------------- #
+def mission_cancel() -> Screen:
+    cam = sc.camera(140, 60, 0.21).aim_at(*sc.INCIDENT, 196, 280)
+    s = map_view(cam, pois=False)
+    s.top_scrim(150)
+    scrim(s, 130)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
+
+    top = 300
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=64)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = top + 22
+    s.circle(377 - 20, y + 20, 20, fill=C.danger_soft)
+    s.i.draw_icon(377 - 20, y + 20, "mdi-alert-outline", 22, C.danger)
+    s.text(377 - 50, y + 4, "لغو مأموریت", "title", C.text, align="right")
+    s.text(377 - 50, y + 30, "لغو، آخرین راه‌حل است و برای مرکز امداد ثبت می‌شود.", "caption",
+           C.muted, align="right", max_width=280)
+    y += 62
+
+    s.text(377, y, "دلیل لغو", "caption-bold", C.muted, align="right")
+    y += 22
+    reasons = ["دسترسی به محل ممکن نیست", "حادثه توسط تیم دیگری پوشش داده شد",
+               "خطر جانی برای امدادگر", "سایر دلایل"]
+    for index, reason in enumerate(reasons):
+        ry = y + index * 48
+        active = index == 0
+        s.rect(16, ry, 361, 42, fill=C.danger_soft if active else C.surface_2, radius=14,
+               outline=C.danger if active else None, outline_w=1.4 if active else 0)
+        s.circle(347, ry + 21, 9, fill=C.danger if active else "#FFFFFF",
+                 outline=None if active else C.outline_strong, outline_w=0 if active else 1.2)
+        if active:
+            s.i.draw_icon(347, ry + 21, "mdi-check", 12, "#FFFFFF")
+        s.text(325, ry + 10, reason, "body-sm", C.text if active else C.text_2, align="right",
+               max_width=270)
+    y += len(reasons) * 48 + 4
+
+    s.rect(16, y, 361, 66, fill=C.surface_2, radius=16)
+    s.text(345, y + 10, "توضیح تکمیلی (اختیاری)", "caption", C.muted, align="right")
+    s.text(345, y + 32, "مسیر بن‌بست است؛ نیروی جایگزین لازم است.", "body-sm", C.text_2,
+           align="right", max_width=320)
+    y += 80
+
+    s.rect(16, y, 361, 54, fill=C.warning_soft, radius=14)
+    s.i.draw_icon(357 - 20, y + 18, "mdi-alert-circle-outline", 17, C.warning)
+    s.text(357 - 42, y + 10, "پس از لغو، مأموریت از شما گرفته می‌شود", "caption-bold", C.warning,
+           align="right")
+    s.text(357 - 42, y + 30, "مرکز امداد برای یافتن جایگزین مطلع می‌شود.", "caption", C.muted,
+           align="right", max_width=290)
+    y += 70
+
+    s.button(201, y, 176, 50, "لغو مأموریت", variant="filled", color=C.danger)
+    s.button(16, y, 176, 50, "ادامهٔ مأموریت", variant="tonal", color=C.primary)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 16/17 — report + completed
+# --------------------------------------------------------------------------- #
+def mission_report() -> Screen:
+    cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 180)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 246, 393, 606)))
+    s.top_scrim(120)
+    chrome(s, tab=2)
+    incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
+    scrim(s, 60, top=236, height=616)
+
+    top = 240
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=56)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 20, "گزارش کوتاه مأموریت", "پس از پایان، مأموریت بسته می‌شود",
+                     icon="mdi-clipboard-check-outline", tone="success", title_style="title")
+
+    s.text(357, y, "نتیجهٔ مأموریت", "caption-bold", C.muted, align="right")
+    y += 22
+    for index, (label, icon, active) in enumerate([("انجام شد", "mdi-check-circle-outline", True),
+                                                   ("لغو شد", "mdi-close-circle-outline", False)]):
+        tw = (361 - 8) / 2
+        tx = 16 + index * (tw + 8)
+        s.rect(tx, y, tw, 48, fill=C.success_soft if active else C.surface_2, radius=14,
+               outline=C.success if active else None, outline_w=1.4 if active else 0)
+        s.i.draw_icon(tx + tw - 22, y + 24, icon, 19, C.success if active else C.muted)
+        s.text(tx + tw - 38, y + 14, label, "label", C.success if active else C.text_2,
+               align="right")
+    y += 62
+
+    s.text(357, y, "خلاصهٔ اقدام", "caption-bold", C.muted, align="right")
+    y += 22
+    s.rect(16, y, 361, 84, fill=C.surface_2, radius=16)
+    s.para(15, y + 10, "آتش‌سوزی انبار با کمک تیم پشتیبانی مهار شد؛ ساکنان تخلیه شدند و محل به آتش‌نشانی تحویل داده شد.",
+           "body-sm", C.text_2, align="right", max_width=330)
+    s.text(357 - 12, y + 64, f"{fa_digits(96)}/{fa_digits(300)}", "caption", C.muted_2,
+           align="left")
+    y += 98
+
+    s.text(357, y, "وضعیت درخواست‌کننده", "caption-bold", C.muted, align="right")
+    y += 22
+    chips = [("سالم", "success"), ("آسیب جزئی", "warning"), ("تحویل به مرکز درمانی", "info")]
+    cx = 357
+    for label, tone in chips:
+        width = s.tw(label, "caption-bold") + 22
+        s.chip(cx - width, y, label, None, tone, h=30)
+        cx -= width + 8
+    y += 44
+
+    s.text(357, y, "زمان صرف‌شده", "caption-bold", C.muted, align="right")
+    y += 22
+    s.rect(16, y, 361, 50, fill=C.surface_2, radius=14)
+    s.text(357 - 12, y + 14, "۲۳ دقیقه (۹:۴۹ تا ۱۰:۱۲)", "label", C.text, align="right")
+    y += 64
+
+    s.rect(16, y, 361, 44, fill=C.info_soft, radius=12)
+    s.i.draw_icon(357 - 20, y + 22, "mdi-lock-outline", 16, C.info)
+    s.text(357 - 40, y + 12, "امتیاز درخواست‌کننده پس از بسته‌شدن مأموریت ثبت می‌شود", "caption",
+           C.info, align="right", max_width=300)
+    y += 58
+
+    s.button(16, y, 361, 52, "ثبت گزارش و بستن مأموریت", icon="mdi-content-save-check-outline",
+             variant="filled", shadow=True)
+    home_bar(s)
+    return s
+
+
+def mission_completed() -> Screen:
+    s = Screen(background=C.background)
+    chrome(s, tab=2)
+
+    # celebration header over a light map
+    cam = sc.camera(140, 60, 0.16).aim_at(*sc.INCIDENT, 196, 190)
+    preview = Screen(background=C.map_land, width=393, height=300)
+    from bb.map import draw_base, draw_labels, Camera, to_world
+    cam_h = Camera(to_world(140, 60), 0.16)
+    draw_base(preview, cam_h)
+    draw_labels(preview, cam_h)
+    draw_route(preview, cam_h, sc.route_world(MISSION_ROUTE), width_m=12, mute=0.5)
+    preview.i.draw_icon(*cam_h.project_grid(*sc.INCIDENT, preview), "fire", 22, C.danger)
+    s.img.paste(preview.img, (0, 108 * s.s))
+    s.gradient(0, 108, 393, 90, "#F1F5F4", 240, 0)
+
+    y = 150
+    s.circle(196.5, y + 30, 34, fill=C.success_soft)
+    s.i.draw_icon(196.5, y + 30, "mdi-check-bold", 34, C.success)
+    s.text(196.5, y + 78, "مأموریت با موفقیت بسته شد", "title-lg", C.text, align="center")
+    s.text(196.5, y + 106, "گزارش شما در سوابق امدادگری ثبت شد", "caption", C.muted, align="center")
+    y += 138
+
+    card_y = y
+    s.shadow(16, card_y, 361, 210, radius=22, blur=18, dy=6, alpha=26)
+    s.rect(16, card_y, 361, 210, fill="#FFFFFF", radius=22, outline=C.outline, outline_w=1)
+    s.text(357, card_y + 14, "آتش‌سوزی انبار تجاری · بازار قدیم", "label", C.text, align="right",
+           max_width=320)
+    s.text(357, card_y + 36, "۹:۴۹ تا ۱۰:۱۲ · لیدر تیم: شما", "caption", C.muted, align="right")
+    s.divider(30, card_y + 58, 363)
+    metric_tiles(s, 28, card_y + 68, 337, [("مدت", "۲۳ دقیقه", ""), ("مسافت", "۱٫۳ کیلومتر", ""),
+                                           ("تیم", "۴ نفر", "")], h=60)
+    s.divider(30, card_y + 142, 363)
+    s.text(357, card_y + 152, "امتیاز درخواست‌کننده", "caption", C.muted, align="right")
+    s.stars(357 - 96, card_y + 172, 5)
+    s.text(250, card_y + 164, "۵ از ۵", "caption-bold", C.amber, align="right")
+    y = card_y + 224
+
+    s.rect(16, y, 361, 56, fill=C.surface_2, radius=16)
+    s.text(357, y + 10, "گزارش کوتاه شما", "caption-bold", C.muted, align="right")
+    s.text(357, y + 30, "آتش مهار و محل به آتش‌نشانی تحویل داده شد.", "caption", C.text_2,
+           align="right", max_width=320)
+    y += 70
+
+    s.button(201, y, 176, 50, "سوابق مأموریت", icon="mdi-history", variant="tonal")
+    s.button(16, y, 176, 50, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled")
+    y += 62
+    s.text(196.5, y, "وضعیت آمادگی شما برای مأموریت بعدی فعال است", "caption", C.muted_2,
+           align="center")
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 18/19 — extra states
+# --------------------------------------------------------------------------- #
+def mission_no_offer() -> Screen:
+    cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 80, 0.19)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 520, 393, 332)))
+    s.top_scrim(128)
+    chrome(s, tab=2)
+    map_tools(s, 128)
+    user_cone(s, cam, *sc.USER, bearing=28)
+
+    top = 512
+    s.shadow(12, top, 369, 220, radius=26, blur=24, dy=8, alpha=44)
+    s.rect(12, top, 369, 220, fill="#FFFFFF", radius=26, outline=C.outline, outline_w=1)
+    s.rect(188, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+    empty_state(s, top + 10, "mdi-lifebuoy", "پیشنهاد فعالی نیست",
+                "وقتی حادثه‌ای در محدودهٔ شما ثبت شود، پیشنهاد مأموریت روی همین نقشه نمایش داده می‌شود.",
+                None)
+    s.button(24, top + 172, 168, 42, "تازه‌سازی", icon="mdi-refresh", variant="tonal")
+    s.button(201, top + 172, 168, 42, "تغییر محدوده", icon="mdi-map-marker-radius-outline",
+             variant="outline")
+    home_bar(s)
+    return s
+
+
+def mission_offline() -> Screen:
+    cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 80, 0.19)
+    s = map_view(cam, pois=False)
+    scrim(s, 40)
+    chrome(s, tab=2)
+    s.rect(0, 116, 393, 44, fill=C.warning)
+    s.i.draw_icon(357 - 22, 138, "mdi-wifi-off", 17, "#FFFFFF")
+    s.text(357 - 40, 130, "اتصال قطع است · تلاش برای اتصال مجدد…", "caption-bold", "#FFFFFF",
+           align="right")
+
+    top = 300
+    s.shadow(16, top, 361, 232, radius=26, blur=24, dy=10, alpha=60)
+    s.rect(16, top, 361, 232, fill="#FFFFFF", radius=26)
+    s.circle(196.5, top + 44, 30, fill=C.warning_soft)
+    s.i.draw_icon(196.5, top + 44, "mdi-cloud-off-outline", 30, C.warning)
+    s.text(196.5, top + 84, "ارتباط با سرور امداد قطع است", "title", C.text, align="center")
+    s.para(40, top + 114, "پیشنهاد مأموریت دریافت نمی‌شود و موقعیت شما ارسال نمی‌شود. اطلاعات مأموریت فعلی از حافظهٔ دستگاه نمایش داده می‌شود.",
+           "body-sm", C.muted, align="center", max_width=310)
+    s.spinner(160, top + 176, 9, C.warning, 2)
+    s.text(196.5, top + 168, "تلاش دوباره در ۵ ثانیه", "caption-bold", C.warning, align="center")
+    s.button(40, top + 190, 313, 36, "تلاش دوباره", icon="mdi-refresh", variant="tonal")
+
+    s.rect(24, 700, 345, 56, fill=C.surface_2, radius=16)
+    s.i.draw_icon(345, 728, "mdi-database-outline", 17, C.muted)
+    s.text(323, 712, "آخرین همگام‌سازی موفق: ۹:۳۸", "caption", C.text_2, align="right")
+    home_bar(s)
+    return s
+
+
+SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
+    "m-01-ready-on": ("mission/01-mission-ready-on.png", mission_ready_on),
+    "m-02-ready-off": ("mission/02-mission-ready-off.png", mission_ready_off),
+    "m-03-offer": ("mission/03-mission-offer.png", mission_offer),
+    "m-04-offer-details": ("mission/04-mission-offer-details.png", mission_offer_details),
+    "m-05-accepted": ("mission/05-mission-accepted.png", mission_accept_confirm),
+    "m-06-dispatch": ("mission/06-mission-dispatch.png", mission_accepted),
+    "m-07-navigation": ("mission/07-mission-navigation-active.png", mission_navigation),
+    "m-08-alternatives": ("mission/08-mission-route-alternatives.png", mission_alternatives),
+    "m-09-arrived": ("mission/09-mission-arrived.png", mission_arrived),
+    "m-10-in-progress": ("mission/10-mission-in-progress.png", mission_in_progress),
+    "m-11-support": ("mission/11-support-request.png", support_request),
+    "m-12-support-pending": ("mission/12-support-pending.png", support_pending),
+    "m-13-support-accepted": ("mission/13-support-accepted-notification.png", support_accepted),
+    "m-14-team": ("mission/14-team-leader-dashboard.png", team_leader),
+    "m-15-cancel": ("mission/15-mission-cancel.png", mission_cancel),
+    "m-16-report": ("mission/16-mission-report.png", mission_report),
+    "m-17-completed": ("mission/17-mission-completed.png", mission_completed),
+    "m-18-no-offer": ("mission/18-mission-no-offer.png", mission_no_offer),
+    "m-19-offline": ("mission/19-mission-offline.png", mission_offline),
+}
