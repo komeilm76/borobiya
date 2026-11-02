@@ -242,7 +242,7 @@
         </nav>
       </div>
     </footer>
-    <footer v-if="!isAuthRoute && !isPublicRoute" class="app-footer">
+    <footer v-if="!isAuthRoute && !isPublicRoute && !isAdminRoute" class="app-footer">
       <span>بوروبیا، برای روزهایی که کنار هم بودن مهم است.</span>
       <a
         class="osm-attribution"

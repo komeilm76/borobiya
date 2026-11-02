@@ -28,13 +28,36 @@
         </template>
       </nav>
 
-      <div class="admin-account">
-        <span class="admin-account__avatar">{{ accountInitial }}</span>
-        <span class="admin-account__meta">
-          <strong>{{ accountName }}</strong>
-          <small>مدیر ارشد امداد</small>
-        </span>
-      </div>
+      <v-menu location="top start" :offset="10" max-width="260">
+        <template #activator="{ props: menuProps }">
+          <button v-bind="menuProps" class="admin-account" type="button" aria-label="حساب مدیر">
+            <span class="admin-account__avatar">{{ accountInitial }}</span>
+            <span class="admin-account__meta">
+              <strong>{{ accountName }}</strong>
+              <small>مدیر ارشد امداد</small>
+            </span>
+            <v-icon class="admin-account__chevron" icon="mdi-chevron-up" size="16" />
+          </button>
+        </template>
+        <v-list class="admin-account__menu" density="compact">
+          <v-list-item :title="accountName" subtitle="مدیر سامانه" prepend-icon="mdi-shield-account-outline" />
+          <v-divider />
+          <v-list-item
+            :prepend-icon="theme.isDark ? 'mdi-weather-sunny' : 'mdi-weather-night'"
+            :title="theme.isDark ? 'حالت روشن' : 'حالت تاریک'"
+            data-test="admin-theme"
+            @click="theme.toggleTheme()"
+          />
+          <v-list-item prepend-icon="mdi-map-outline" title="نقشه و نمای کاربری" @click="goToUserMap" />
+          <v-divider />
+          <v-list-item
+            prepend-icon="mdi-logout"
+            title="خروج از حساب"
+            data-test="admin-logout"
+            @click="logoutConfirmation.request()"
+          />
+        </v-list>
+      </v-menu>
     </aside>
 
     <div class="admin-shell__main">
@@ -113,6 +136,40 @@
         </footer>
       </v-card>
     </v-dialog>
+
+    <v-dialog
+      :model-value="logoutConfirmation.open.value"
+      max-width="420"
+      :persistent="logoutConfirmation.submitting.value"
+      aria-labelledby="admin-logout-title"
+      aria-describedby="admin-logout-description"
+      @update:model-value="(visible: boolean) => { if (!visible) logoutConfirmation.cancel(); }"
+    >
+      <v-card rounded="xl">
+        <v-card-title id="admin-logout-title">خروج از حساب کاربری؟</v-card-title>
+        <v-card-text id="admin-logout-description">
+          برای ادامه باید دوباره وارد شوید. درخواست‌های اضطراری در حال پیگیری از این پنجره از دست نمی‌روند،
+          اما این پنل بسته می‌شود.
+        </v-card-text>
+        <v-card-actions>
+          <v-btn variant="text" rounded="lg" :disabled="logoutConfirmation.submitting.value" @click="logoutConfirmation.cancel()">
+            انصراف
+          </v-btn>
+          <v-spacer />
+          <v-btn
+            color="error"
+            variant="flat"
+            rounded="lg"
+            :loading="logoutConfirmation.submitting.value"
+            :disabled="logoutConfirmation.submitting.value"
+            data-test="admin-logout-confirm"
+            @click="logoutConfirmation.confirm()"
+          >
+            خروج
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -120,6 +177,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
+import { useThemeStore } from "../../stores/theme";
+import { useLogoutConfirmation } from "../../composables/use-logout-confirmation";
 
 type NavKey =
   | "dashboard"
@@ -222,6 +281,18 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
 
 const accountName = computed(() => auth.user?.username ?? "مدیر سامانه");
 const accountInitial = computed(() => accountName.value.slice(0, 1));
+
+const theme = useThemeStore();
+// The global app bar and its account menu are suppressed on `/_admin*`, so the rail owns sign-out.
+const logoutConfirmation = useLogoutConfirmation({
+  isAuthenticated: computed(() => auth.isAuthenticated),
+  logout: () => auth.logout(),
+  onLoggedOut: () => router.replace("/_auth/login")
+});
+
+function goToUserMap(): void {
+  void router.push("/_user/map");
+}
 
 watch(
   () => route.fullPath,
@@ -332,9 +403,27 @@ watch(
   display: flex;
   align-items: center;
   gap: 0.6rem;
+  width: 100%;
   margin-top: auto;
-  padding-top: 0.9rem;
+  padding: 0.9rem 0.5rem 0.35rem;
+  border: 0;
   border-top: 1px solid var(--admin-line);
+  border-radius: 0 0 12px 12px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: start;
+}
+
+.admin-account:hover,
+.admin-account:focus-visible {
+  background: var(--admin-soft);
+}
+
+.admin-account__chevron {
+  margin-inline-start: auto;
+  color: var(--admin-muted);
 }
 
 .admin-account__avatar,

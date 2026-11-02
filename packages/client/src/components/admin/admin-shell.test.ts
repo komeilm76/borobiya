@@ -38,6 +38,21 @@ describe("admin shell", () => {
     }
   });
 
+  it("keeps sign-out reachable now that the global app bar is gone", () => {
+    // Hiding the app bar on `/_admin*` removed the only account menu an admin had. The rail owns it now:
+    // a real menu with theme, the user-facing map, and logout behind the same confirmation App.vue uses.
+    const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
+    expect(app).toContain("&& !isAdminRoute"); // no app bar above the shell
+    expect(app).toContain('!isAdminRoute" class="app-footer"'); // and no footer under it
+    expect(shell).toContain('class="admin-account"');
+    expect(shell).toContain('data-test="admin-logout"');
+    expect(shell).toContain('data-test="admin-logout-confirm"');
+    expect(shell).toContain("useLogoutConfirmation(");
+    expect(shell).toContain("logout: () => auth.logout()");
+    expect(shell).toContain('router.replace("/_auth/login")');
+    expect(shell).toContain("theme.toggleTheme()");
+  });
+
   it("collapses to an off-canvas drawer before the rail crowds the table", () => {
     expect(shell).toContain("@media (max-width: 1023px)");
     expect(shell).toContain("transform: translateX(100%);");

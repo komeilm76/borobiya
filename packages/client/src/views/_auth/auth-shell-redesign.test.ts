@@ -13,7 +13,7 @@ describe("standalone auth experience", () => {
     expect(app).toContain("route.name === \"auth-forgot-password\"");
     expect(app).toContain("'app-shell--auth': isAuthRoute");
     expect(app).toContain('v-if="!isMapRoute && !isAuthRoute && !isPublicRoute && !isAdminRoute" class="app-topbar');
-    expect(app).toContain('<footer v-if="!isAuthRoute && !isPublicRoute" class="app-footer">');
+    expect(app).toContain('<footer v-if="!isAuthRoute && !isPublicRoute && !isAdminRoute" class="app-footer">');
     expect(app).toContain('v-if="isAuthRoute" class="auth-chrome"');
     expect(app).toContain('to="/_public/landing"');
     expect(app).toContain('@click="appTheme.toggleTheme()"'); // No lost theme control after removing the app bar.

@@ -16,7 +16,7 @@ describe("guest-facing public experience", () => {
     expect(app).toContain('v-if="!isMapRoute && !isAuthRoute && !isPublicRoute && !isAdminRoute"');
     expect(app).toContain('v-if="isPublicRoute" class="public-chrome"');
     expect(app).toContain('v-if="isPublicRoute" class="public-footer"');
-    expect(app).toContain('<footer v-if="!isAuthRoute && !isPublicRoute" class="app-footer">');
+    expect(app).toContain('<footer v-if="!isAuthRoute && !isPublicRoute && !isAdminRoute" class="app-footer">');
     expect(app).toContain('route.name === "public-landing"');
     expect(app).toContain('route.name === "public-health"');
     expect(app).toContain('route.name === "not-found"');
