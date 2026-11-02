@@ -125,11 +125,9 @@ export const routeRecords: RouteRecordRaw[] = [
     name: "admin-users",
     component: () => import("@client/views/_admin/AdminUsersView.vue")
   },
-  {
-    path: "/_admin/categories",
-    name: "admin-categories",
-    component: () => import("@client/views/_admin/AdminCategoriesView.vue")
-  },
+  // Responder groups live on one screen: `/_admin/services` owns create/edit, incident-type
+  // coverage and membership. The older categories route keeps old bookmarks working.
+  { path: "/_admin/categories", redirect: "/_admin/services" },
   {
     path: "/_admin/incidents",
     name: "admin-incidents",

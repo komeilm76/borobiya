@@ -17,9 +17,13 @@ describe("user/admin workspace typography", () => {
     expect(read("views/_user/UserMissionView.vue")).toContain("clamp(1.65rem, 2.5vw, 2.2rem)");
     expect(read("views/_user/UserRescuerHistoryView.vue")).toContain("clamp(1.55rem,2.5vw,2.15rem)");
     expect(read("views/_user/UserSosHistoryView.vue")).toContain("clamp(1.55rem,2.5vw,2.2rem)");
-    const users = read("views/_admin/AdminUsersView.vue");
-    expect(users).toContain("clamp(1.5rem, 2.3vw, 1.95rem)");
-    expect(users).not.toContain("letter-spacing: -0.035em");
+    // Admin headlines come from one place now: the shell, not four hand-rolled <h1> blocks.
+    expect(read("components/admin/AdminShell.vue")).toContain("clamp(1.5rem, 2.3vw, 1.95rem)");
+    for (const view of ["AdminUsersView", "AdminIncidentsView", "AdminServiceGroupsView", "AdminDispatchView"]) {
+      const source = read(`views/_admin/${view}.vue`);
+      expect(source, view).toContain("<AdminShell");
+      expect(source, view).not.toContain("letter-spacing: -0.035em");
+    }
   });
 
   it("keeps Persian-first type on workspace routes and leaves public/auth routes alone", () => {

@@ -1,26 +1,19 @@
 <template>
-  <section class="admin-incidents-page mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="admin-incidents-header mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <p class="admin-incidents-eyebrow text-sm font-medium opacity-70">
-          <v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت
-        </p>
-        <h1 class="text-2xl font-bold">نوع رویدادها</h1>
-        <p class="admin-incidents-intro mt-1 max-w-prose opacity-80">
-          فهرست نوع رویداد همان چیزی است که هنگام ثبت SOS انتخاب می‌شود. چیزی به‌طور پیش‌فرض ساخته نشده؛
-          تا این فهرست خالی است، هیچ درخواستی نمی‌تواند ثبت شود.
-        </p>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <v-btn class="admin-incidents-refresh" variant="tonal" color="primary" rounded="lg" :loading="loading" :disabled="loading" @click="load">
-          <v-icon class="me-2" icon="mdi-refresh" />
-          به‌روزرسانی
-        </v-btn>
-        <v-btn class="admin-incidents-create" color="primary" rounded="lg" prepend-icon="mdi-plus" @click="openCreate">
-          نوع رویداد جدید
-        </v-btn>
-      </div>
-    </header>
+  <AdminShell
+    active="incidents"
+    title="نوع رویدادها"
+    description="فهرست نوع رویداد همان چیزی است که هنگام ثبت SOS انتخاب می‌شود؛ تا این فهرست خالی است، هیچ درخواستی نمی‌تواند ثبت شود."
+    :crumbs="['مدیریت', 'نوع رویدادها']"
+  >
+    <template #actions>
+      <v-btn class="admin-incidents-refresh" variant="tonal" color="primary" rounded="lg" :loading="loading" :disabled="loading" @click="load">
+        <v-icon class="me-2" icon="mdi-refresh" />
+        به‌روزرسانی
+      </v-btn>
+      <v-btn class="admin-incidents-create" color="primary" rounded="lg" prepend-icon="mdi-plus" @click="openCreate">
+        نوع رویداد جدید
+      </v-btn>
+    </template>
 
     <v-alert v-if="listError" class="mb-4" type="error" variant="tonal" rounded="lg" role="alert">{{ listError }}</v-alert>
     <v-alert v-if="listState === 'empty'" class="mb-4" type="info" variant="tonal" rounded="lg">
@@ -175,13 +168,14 @@
     <v-snackbar v-model="successVisible" color="success" location="bottom start" timeout="4000" rounded="lg">
       {{ successMessage }}
     </v-snackbar>
-  </section>
+  </AdminShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import type { IncidentType } from "@shared/index";
 import { friendlyErrorMessage } from "../../api/error-message";
+import AdminShell from "../../components/admin/AdminShell.vue";
 import { createIncidentType, listIncidentTypes, updateIncidentType } from "../../api/admin-catalog";
 import {
   EMPTY_INCIDENT_DRAFT,

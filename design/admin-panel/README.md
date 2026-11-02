@@ -93,7 +93,7 @@
 | `/_admin/reports` | `AdminReportsView.vue` | پیاده‌سازی شد — بازهٔ ۷/۳۰ روز، رتبه‌بندی و بار کاری |
 | `/_admin/users` | `AdminUsersView.vue` | موجود؛ فهرست کاربران |
 | `/_admin/services` | `AdminServiceGroupsView.vue` | پیاده‌سازی شد — ساخت/ویرایش گروه و اعضا |
-| `/_admin/categories` | `AdminCategoriesView.vue` | موجود؛ انواع حادثه |
+| `/_admin/categories` | — (تغییرمسیر به `/_admin/services`) | صفحهٔ تکراری گروه‌ها حذف شد؛ مسیر قدیمی حفظ می‌شود |
 | `/_admin/incidents` | `AdminIncidentsView.vue` | موجود |
 | `/_admin/audit` | `AdminAuditView.vue` | پیاده‌سازی شد — خواندن `admin_audit_log` + پالایه + CSV |
 | `/_admin/alerts` | `AdminAlertsView.vue` | پیاده‌سازی شد — صف بررسی + ثبت بررسی |

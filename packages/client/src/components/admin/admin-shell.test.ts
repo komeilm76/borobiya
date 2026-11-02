@@ -29,7 +29,7 @@ describe("admin shell", () => {
       "/_admin/reports",
       "/_admin/users",
       "/_admin/services",
-      "/_admin/categories",
+      "/_admin/incidents",
       "/_admin/audit",
       "/_admin/alerts",
       "/_admin/settings"

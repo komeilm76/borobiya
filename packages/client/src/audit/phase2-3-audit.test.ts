@@ -300,8 +300,8 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
       new URL("../components/sharing/ShareDialog.vue", import.meta.url),
       "utf8"
     );
-    const adminCategories = readFileSync(
-      new URL("../views/_admin/AdminCategoriesView.vue", import.meta.url),
+    const adminGroups = readFileSync(
+      new URL("../views/_admin/AdminServiceGroupsView.vue", import.meta.url),
       "utf8"
     );
 
@@ -317,9 +317,10 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     expect(shareDialog).toContain("(hasTerm || onlineFilter === 'online')");
 
     const memberSearch = readFileSync(new URL("../admin/use-category-member-search.ts", import.meta.url), "utf8");
-    expect(adminCategories).toContain("useCategoryMemberSearch(async (term) =>");
+    expect(adminGroups).toContain("useCategoryMemberSearch(");
+    expect(adminGroups).toContain("async (term) => {");
     expect(memberSearch).toContain("!assigned.has(row.id)");
-    expect(adminCategories).not.toContain("در مرحلهٔ بعدی پروژه است");
+    expect(adminGroups).not.toContain("در مرحلهٔ بعدی پروژه است");
 
     const devicePriorityPanel = readFileSync(
       new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url),

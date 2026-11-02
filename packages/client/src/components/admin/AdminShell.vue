@@ -127,7 +127,7 @@ type NavKey =
   | "reports"
   | "users"
   | "services"
-  | "categories"
+  | "incidents"
   | "audit"
   | "alerts"
   | "settings";
@@ -169,8 +169,8 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
     label: "مدیریت",
     items: [
       { key: "users", label: "کاربران", icon: "mdi-account-multiple-outline", to: "/_admin/users" },
-      { key: "services", label: "گروه‌های امداد", icon: "mdi-lifebuoy", to: "/_admin/services" },
-      { key: "categories", label: "انواع حادثه", icon: "mdi-shape-outline", to: "/_admin/categories" }
+      { key: "incidents", label: "نوع رویدادها", icon: "mdi-alert-rhombus-outline", to: "/_admin/incidents" },
+      { key: "services", label: "گروه‌های امداد", icon: "mdi-lifebuoy", to: "/_admin/services" }
     ]
   },
   {
@@ -536,9 +536,10 @@ watch(
 
 .admin-shell__head h1 {
   margin: 0;
-  font-size: 1.45rem;
-  font-weight: 700;
-  line-height: 1.35;
+  color: rgb(var(--v-theme-on-surface));
+  font-size: clamp(1.5rem, 2.3vw, 1.95rem);
+  font-weight: 750;
+  line-height: 1.4;
 }
 
 .admin-shell__head p {

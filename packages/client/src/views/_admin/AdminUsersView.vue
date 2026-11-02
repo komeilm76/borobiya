@@ -1,13 +1,11 @@
 <template>
-  <section class="admin-users-page mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 sm:py-10">
-    <header class="admin-users-header">
-      <div>
-        <p class="admin-users-eyebrow"><v-icon icon="mdi-shield-account-outline" size="17" /> پنل مدیریت</p>
-        <h1>مدیریت کاربران</h1>
-        <p class="admin-users-intro">
-          حساب‌ها را پیدا کنید و در صورت نیاز دسترسی ورود آن‌ها را فعال یا غیرفعال کنید.
-        </p>
-      </div>
+  <AdminShell
+    active="users"
+    title="مدیریت کاربران"
+    description="حساب‌ها را پیدا کنید و در صورت نیاز دسترسی ورود آن‌ها را فعال یا غیرفعال کنید."
+    :crumbs="['مدیریت', 'کاربران']"
+  >
+    <template #actions>
       <v-btn
         class="admin-refresh-button"
         variant="tonal"
@@ -20,7 +18,7 @@
         <v-icon class="me-2" icon="mdi-refresh" />
         به‌روزرسانی
       </v-btn>
-    </header>
+    </template>
 
     <v-card class="admin-users-card" elevation="0" rounded="xl">
       <div class="admin-users-toolbar">
@@ -289,13 +287,14 @@
     <v-snackbar v-model="successVisible" color="success" location="bottom start" timeout="4000" rounded="lg">
       {{ successMessage }}
     </v-snackbar>
-  </section>
+  </AdminShell>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import type { UserProfile } from "@shared/index";
 import { ApiError } from "../../api/http";
+import AdminShell from "../../components/admin/AdminShell.vue";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { listAdminUsers, updateAdminUserStatus } from "../../api/admin-users";
 import { useAuthStore } from "../../stores/auth";
@@ -553,46 +552,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.admin-users-page {
-  display: grid;
-  min-height: calc(100vh - 120px);
-  align-content: start;
-  gap: 1.35rem;
-}
-
-.admin-users-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.admin-users-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 0.55rem;
-  color: var(--bb-color-primary);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.admin-users-header h1 {
-  margin: 0;
-  color: var(--bb-color-text);
-  font-size: clamp(1.5rem, 2.3vw, 1.95rem);
-  font-weight: 850;
-  line-height: 1.45;
-}
-
-.admin-users-intro {
-  max-width: 45rem;
-  margin: 0.4rem 0 0;
-  color: var(--bb-color-muted);
-  font-size: 0.9rem;
-  line-height: 1.9;
-}
-
 .admin-refresh-button {
   flex: 0 0 auto;
   min-height: 44px;
@@ -920,14 +879,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
-  .admin-users-page {
-    padding-block: 1.3rem;
-  }
-
-  .admin-users-header {
-    align-items: flex-start;
-  }
-
   .admin-users-toolbar {
     grid-template-columns: minmax(0, 1fr);
     gap: 0.35rem;
@@ -940,19 +891,6 @@ onUnmounted(() => {
 }
 
 @media (max-width: 520px) {
-  .admin-users-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .admin-refresh-button {
-    align-self: flex-start;
-  }
-
-  .admin-users-intro {
-    font-size: 0.9rem;
-  }
-
   .admin-users-results-meta,
   .admin-users-pagination {
     align-items: flex-start;

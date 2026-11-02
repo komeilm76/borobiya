@@ -106,7 +106,7 @@ describe("client route records", () => {
     const appVue = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
     for (const target of [
       "/_admin/users",
-      "/_admin/categories",
+      "/_admin/services",
       "/_admin/incidents",
       "/_user/map",
       "/_user/mission",

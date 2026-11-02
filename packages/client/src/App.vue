@@ -1,6 +1,8 @@
 <template>
-  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute, 'app-shell--workspace': !isAuthRoute && !isPublicRoute }">
-    <v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute" class="app-topbar px-sm-6" flat height="64">
+  <v-app :class="{ 'app-shell--map': isMapRoute, 'app-shell--auth': isAuthRoute, 'app-shell--public': isPublicRoute, 'app-shell--admin': isAdminRoute, 'app-shell--workspace': !isAuthRoute && !isPublicRoute }">
+    <!-- The admin console carries its own chrome (sidebar, crumbs, page head): a second global bar above it
+         would stack two headers and two navigation models on the same screen. -->
+    <v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute && !isAdminRoute" class="app-topbar px-sm-6" flat height="64">
       <RouterLink class="brand-link" to="/_public/landing" aria-label="بازگشت به صفحهٔ اصلی بوروبیا">
         <span class="brand-mark" aria-hidden="true">
           <v-icon icon="mdi-plus" size="26" />
@@ -299,7 +301,7 @@ const navItems = computed<{ to: string; label: string; icon: string }[]>(() => {
     return [
       { to: "/_admin/dispatch", label: dispatchLabel, icon: "mdi-radar" },
       { to: "/_admin/users", label: "مدیریت کاربران", icon: "mdi-account-group-outline" },
-      { to: "/_admin/categories", label: "گروه‌های امدادگر", icon: "mdi-shape-outline" },
+      { to: "/_admin/services", label: "گروه‌های امداد", icon: "mdi-lifebuoy" },
       { to: "/_admin/incidents", label: "نوع رویدادها", icon: "mdi-alert-rhombus-outline" }
     ];
   }
@@ -321,6 +323,7 @@ const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustComp
 const router = useRouter();
 const route = useRoute();
 const isMapRoute = computed(() => route.name === "user-map");
+const isAdminRoute = computed(() => route.path.startsWith("/_admin"));
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutConfirmation = useLogoutConfirmation({

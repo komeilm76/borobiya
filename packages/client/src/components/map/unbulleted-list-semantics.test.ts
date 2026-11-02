@@ -18,7 +18,6 @@ describe("unbulleted lists retain screen-reader list semantics", () => {
   it("preserves the list role of responsive admin cards instead of silently flattening the rows", () => {
     for (const [path, klass] of [
       ["../../views/_admin/AdminUsersView.vue", "admin-users-mobile"],
-      ["../../views/_admin/AdminCategoriesView.vue", "admin-categories-mobile"],
       ["../../views/_admin/AdminIncidentsView.vue", "admin-incidents-mobile"]
     ]) {
       const view = source(path!);

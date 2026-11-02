@@ -93,6 +93,29 @@
           </div>
         </div>
       </section>
+
+      <ul class="groups-mobile" aria-label="گروه‌های امداد" role="list">
+        <li v-for="group in categories" :key="group.id" class="groups-mobile__card">
+          <div class="groups-mobile__head">
+            <strong>{{ group.name }}</strong>
+            <span class="groups-pill" :class="`groups-pill--${readiness(group)}`">
+              {{ readinessLabel(readiness(group)) }}
+            </span>
+          </div>
+          <p class="groups-mobile__desc">{{ group.description || "بدون توضیح" }}</p>
+          <div class="groups-mobile__types">
+            <span v-for="id in group.incidentTypeIds" :key="id" class="groups-chip">{{ typeName(id) }}</span>
+            <span v-if="group.incidentTypeIds.length === 0" class="groups-chip groups-chip--empty">بدون پوشش</span>
+          </div>
+          <div class="groups-mobile__foot">
+            <span>{{ toFa(group.members.length) }} عضو</span>
+            <span class="groups-mobile__actions">
+              <v-btn size="small" variant="tonal" color="primary" @click="openMembers(group)">اعضا</v-btn>
+              <v-btn size="small" variant="text" @click="openEdit(group)">ویرایش</v-btn>
+            </span>
+          </div>
+        </li>
+      </ul>
     </template>
 
     <!-- create / edit drawer -->
@@ -164,19 +187,25 @@
 
         <div class="groups-members__search">
           <v-text-field
-            v-model="memberQuery"
+            v-model="memberSearch"
             label="جست‌وجوی نام کاربری"
             variant="outlined"
             density="comfortable"
             prepend-inner-icon="mdi-magnify"
             hide-details
             clearable
-            @update:model-value="debouncedSearch"
+            @update:model-value="queueSearch"
           />
         </div>
 
         <div class="groups-members__body">
           <p v-if="searching" class="groups-members__hint">در حال جست‌وجو…</p>
+          <p v-else-if="searchError" class="groups-members__hint groups-members__hint--error" role="alert">
+            {{ searchError }}
+          </p>
+          <p v-else-if="!memberSearch.trim()" class="groups-members__hint">
+            برای دیدن امدادگران، نام کاربری را بنویسید.
+          </p>
           <p v-else-if="candidates.length === 0" class="groups-members__hint">
             کاربری پیدا نشد. نام کاربری را کامل‌تر بنویسید.
           </p>
@@ -231,8 +260,11 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import type { Category, CategoryMember, IncidentType, UserProfile } from "@shared/index";
 import AdminShell from "../../components/admin/AdminShell.vue";
 import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
-import { ApiError } from "../../api/http";
 import { friendlyErrorMessage } from "../../api/error-message";
+import { ApiError } from "../../api/http";
+import { withoutConfirmedMember } from "../../admin/category-members";
+import { unknownTargetLabels } from "../../admin/catalog-form";
+import { useCategoryMemberSearch } from "../../admin/use-category-member-search";
 import {
   assignCategoryUsers,
   createCategory,
@@ -266,11 +298,20 @@ const saving = ref(false);
 
 const membersOpen = ref(false);
 const activeGroup = ref<Category | null>(null);
-const memberQuery = ref("");
-const candidates = ref<UserProfile[]>([]);
-const searching = ref(false);
 const pendingUserId = ref<string | null>(null);
-let searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+// The picker's debounce, stale-response guard and close/unmount invalidation live in the composable
+// so the dialog cannot offer an account for a query the admin has already replaced.
+const { memberSearch, candidates, searching, searchError, queueSearch, reset: resetMemberSearch } =
+  useCategoryMemberSearch(
+    async (term) => {
+      const token = await withToken();
+      if (!token) return [];
+      const response = await listAdminUsers({ q: term, page: 1, limit: 8 }, token);
+      return response.items;
+    },
+    () => new Set(activeGroup.value?.members.map((member) => member.id) ?? [])
+  );
 
 const snackbar = ref(false);
 const snackbarText = ref("");
@@ -404,33 +445,12 @@ async function saveGroup(): Promise<void> {
 
 function openMembers(group: Category): void {
   activeGroup.value = group;
-  memberQuery.value = "";
-  candidates.value = [];
+  resetMemberSearch();
   membersOpen.value = true;
-  void searchUsers();
 }
 
 function isMember(userId: string): boolean {
   return activeGroup.value?.members.some((member) => member.id === userId) ?? false;
-}
-
-async function searchUsers(): Promise<void> {
-  const token = await withToken();
-  if (!token) return;
-  searching.value = true;
-  try {
-    const response = await listAdminUsers({ q: memberQuery.value.trim() || undefined, page: 1, limit: 8 }, token);
-    candidates.value = response.items;
-  } catch (caught) {
-    notify(friendlyErrorMessage(caught, "جست‌وجوی کاربران ناموفق بود."), "error");
-  } finally {
-    searching.value = false;
-  }
-}
-
-function debouncedSearch(): void {
-  if (searchTimer) clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => void searchUsers(), 320);
 }
 
 async function addMember(user: UserProfile): Promise<void> {
@@ -443,7 +463,14 @@ async function addMember(user: UserProfile): Promise<void> {
     await refreshActiveGroup(token);
     notify(`${user.username} به گروه اضافه شد.`);
   } catch (caught) {
-    notify(friendlyErrorMessage(caught, "افزودن عضو ناموفق بود."), "error");
+    // A refused assignment names the account the admin picked, not the index the server pointed at.
+    const refused = unknownTargetLabels(caught, [user.id], (id) => (id === user.id ? user.username : null));
+    notify(
+      refused.length > 0
+        ? `افزودن ${refused.join("، ")} انجام نشد؛ حساب در دسترس نیست.`
+        : friendlyErrorMessage(caught, "افزودن عضو ناموفق بود."),
+      "error"
+    );
   } finally {
     pendingUserId.value = null;
   }
@@ -455,7 +482,10 @@ async function removeMember(member: CategoryMember): Promise<void> {
   if (!token) return;
   pendingUserId.value = member.id;
   try {
-    await removeCategoryUser(activeGroup.value.id, member.id, token);
+    const groupId = activeGroup.value.id;
+    await removeCategoryUser(groupId, member.id, token);
+    // The DELETE is acknowledged, so drop the row now; the refresh below reconciles the roster.
+    activeGroup.value = withoutConfirmedMember(activeGroup.value, groupId, member.id);
     await refreshActiveGroup(token);
     notify(`${member.username} از گروه حذف شد.`);
   } catch (caught) {
@@ -476,7 +506,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  if (searchTimer) clearTimeout(searchTimer);
+  resetMemberSearch();
 });
 </script>
 
@@ -504,6 +534,58 @@ onBeforeUnmount(() => {
   border-radius: 18px;
   background: rgb(var(--v-theme-surface));
   overflow-x: auto;
+}
+
+.groups-mobile {
+  display: none;
+  margin: 0;
+  padding: 0;
+  gap: 0.7rem;
+  list-style: none;
+}
+
+.groups-mobile__card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 16px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: var(--bb-shadow-surface);
+}
+
+.groups-mobile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.groups-mobile__desc {
+  margin: 0;
+  color: rgba(var(--v-theme-on-surface), 0.66);
+  font-size: 0.82rem;
+  line-height: 1.8;
+}
+
+.groups-mobile__types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.groups-mobile__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  font-size: 0.8rem;
+}
+
+.groups-mobile__actions {
+  display: inline-flex;
+  gap: 0.35rem;
 }
 
 .groups-table {
@@ -710,4 +792,22 @@ onBeforeUnmount(() => {
   color: rgba(var(--v-theme-on-surface), 0.6);
   font-size: 0.82rem;
 }
+@media (max-width: 850px) {
+  .groups-table {
+    display: none;
+  }
+
+  .groups-card {
+    display: none;
+  }
+
+  .groups-mobile {
+    display: grid;
+  }
+}
+
+.groups-members__hint--error {
+  color: rgb(var(--v-theme-error));
+}
+
 </style>

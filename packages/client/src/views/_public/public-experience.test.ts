@@ -13,7 +13,7 @@ const notFound = source("./PublicNotFoundView.vue");
 describe("guest-facing public experience", () => {
   it("uses a distinct public shell instead of the user app bar/footer, with reachable theme and account links", () => {
     expect(app).toContain("'app-shell--public': isPublicRoute");
-    expect(app).toContain('v-if="!isMapRoute && !isAuthRoute && !isPublicRoute"');
+    expect(app).toContain('v-if="!isMapRoute && !isAuthRoute && !isPublicRoute && !isAdminRoute"');
     expect(app).toContain('v-if="isPublicRoute" class="public-chrome"');
     expect(app).toContain('v-if="isPublicRoute" class="public-footer"');
     expect(app).toContain('<footer v-if="!isAuthRoute && !isPublicRoute" class="app-footer">');

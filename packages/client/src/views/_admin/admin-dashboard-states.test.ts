@@ -72,10 +72,24 @@ describe("admin service groups", () => {
     expect(services).toContain("description: form.description.trim() || undefined,");
   });
 
-  it("debounces member search and disables already-assigned responders", () => {
-    expect(services).toContain("searchTimer = setTimeout(() => void searchUsers(), 320);");
-    expect(services).toContain(':disabled="isMember(user.id)"');
+  it("delegates member search to the tested picker instead of its own debounce", () => {
+    // One debounce/abort implementation for the whole panel; the dialog only renders its result.
+    expect(services).toContain("useCategoryMemberSearch(");
+    expect(services).toContain('v-model="memberSearch"');
+    expect(services).toContain('@update:model-value="queueSearch"');
+    expect(services).not.toContain("searchTimer");
     expect(services).toContain("{{ isMember(user.id) ? \"عضو است\" : \"افزودن\" }}");
+  });
+
+  it("gives the group table a card list on phones instead of a 720px scroll", () => {
+    expect(services).toContain('<ul class="groups-mobile" aria-label="گروه‌های امداد" role="list">');
+    expect(services).toContain(".groups-mobile {");
+    expect(services).toContain(".groups-mobile__card {");
+    const phone = services.split("@media (max-width: 850px) {")[1]?.split("\n}")[0];
+    expect(phone).toContain(".groups-table {");
+    expect(phone).toContain("display: none;");
+    expect(phone).toContain(".groups-mobile {");
+    expect(phone).toContain("display: grid;");
   });
 
   it("shows the coverage gap the dispatch board depends on", () => {

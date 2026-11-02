@@ -1,22 +1,19 @@
 <template>
-  <v-container class="admin-dispatch py-6" fluid>
-    <div class="d-flex flex-wrap align-center justify-space-between ga-3 mb-4">
-      <div>
-        <div class="d-flex align-center ga-2">
-          <v-icon color="error" icon="mdi-radar" size="28" />
-          <h1 class="text-h5 font-weight-bold mb-0">مرکز پایش و اعزام اضطراری (SOS)</h1>
-          <v-chip
-            :color="adminSos.connected ? 'success' : 'warning'"
-            size="small"
-            variant="tonal"
-          >
-            {{ adminSos.connected ? "متصل به اتاق زندهٔ ادمین" : "در حال اتصال زنده…" }}
-          </v-chip>
-        </div>
-        <p class="text-body-2 text-medium-emphasis mt-1 mb-0">
-          درخواست‌های SOS به‌صورت بلادرنگ دریافت می‌شوند؛ نزدیک‌ترین امدادگران هم‌تخصص را انتخاب و اعزام کنید.
-        </p>
-      </div>
+  <AdminShell
+    class="admin-dispatch"
+    active="dispatch"
+    title="مرکز پایش و اعزام اضطراری (SOS)"
+    description="درخواست‌های SOS به‌صورت بلادرنگ دریافت می‌شوند؛ نزدیک‌ترین امدادگران هم‌تخصص را انتخاب و اعزام کنید."
+    :crumbs="['عملیات', 'اعزام و امداد']"
+  >
+    <template #actions>
+      <v-chip
+        :color="adminSos.connected ? 'success' : 'warning'"
+        size="small"
+        variant="tonal"
+      >
+        {{ adminSos.connected ? "متصل به اتاق زندهٔ ادمین" : "در حال اتصال زنده…" }}
+      </v-chip>
 
       <div class="d-flex flex-wrap align-center ga-2">
         <v-select
@@ -79,7 +76,7 @@
           @click="adminSos.refreshRequests()"
         />
       </div>
-    </div>
+    </template>
 
     <v-alert
       v-if="adminSos.errorMessage"
@@ -595,7 +592,7 @@
       </v-col>
 
     </v-row>
-  </v-container>
+  </AdminShell>
 </template>
 
 <script setup lang="ts">
@@ -604,6 +601,7 @@ import { useRoute } from "vue-router";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent } from "maplibre-gl";
 import type { IncidentType, Severity, SosRequestRecord } from "@shared/index";
 import { listSosIncidentTypes } from "@/api/sos";
+import AdminShell from "@/components/admin/AdminShell.vue";
 import { getSosPhotoSrc } from "@/api/admin-sos";
 import { useAdminRequestMissions } from "@/composables/use-admin-request-missions";
 import {

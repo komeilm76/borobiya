@@ -66,7 +66,7 @@ describe("T4.4.5 design primitives", () => {
 
     const views = (name: string) => readFileSync(new URL(`../views/${name}.vue`, import.meta.url), "utf8");
     const users = views("_admin/AdminUsersView");
-    expect(users).toContain(".admin-users-header h1 {\n  margin: 0;\n  color: var(--bb-color-text);");
+    expect(users).toContain(".admin-users-card {\n  overflow: hidden;\n  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);\n  background: rgb(var(--v-theme-surface)) !important;");
     expect(users).toContain("background: rgb(var(--v-theme-surface)) !important;");
     expect(users).toContain(".admin-users-table :deep(th) {\n  height: 52px !important;\n  color: var(--bb-color-muted) !important;");
     expect(users).toContain(".admin-users-username {\n  color: var(--bb-color-text);");

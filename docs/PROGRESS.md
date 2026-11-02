@@ -4,6 +4,13 @@
 
 ---
 
+### 2026-11-02 — Bring the last admin screens onto one shell
+
+- Audited every admin view for layout drift. `AdminIncidentsView`, `AdminUsersView`, `AdminCategoriesView` and the SOS dispatch board still hand-rolled their own page header (eyebrow + `<h1>` + intro) while six other screens already rendered `AdminShell`; the four are wrapped in the shell now, so the whole panel shares one navigation rail, one page head with its `#actions` slot, one `Ctrl/⌘ K` palette and one headline scale (`clamp(1.5rem, 2.3vw, 1.95rem)` in `AdminShell.vue` instead of four copies). The dispatch board keeps its full-bleed map + queue two-column layout and its own responsive contract; only its chrome moved.
+- Removed the duplicate chrome that came with it: `/_admin*` no longer renders the global app bar on top of the shell's own toolbar (`app-shell--admin` + `isAdminRoute` in `App.vue`), which had been drawing two headers and two navigation models on every admin page.
+- Found a real duplication rather than a cosmetic one: `/_admin/categories` and `/_admin/services` edited the same responder groups through the same API. `/_admin/services` is the survivor — it owns create/edit, incident-type coverage and membership — and `/_admin/categories` now redirects there, with the 579-line duplicate view deleted. Its better-behaved member picker was not thrown away: `admin/use-category-member-search.ts` (debounce, stale-response fence, reset on close/unmount, no already-assigned or inactive candidates) is now what the surviving group screen uses, replacing its ad-hoc timer. The group screen also names a refused account instead of the index the server pointed at, drops a member row as soon as the `DELETE` is acknowledged, and got the mobile card list it was missing — it used to fall back to a 720px-wide horizontally scrolling table on phones.
+- The sidebar was pointing at the duplicate too, so `نوع رویدادها` (`/_admin/incidents`) is now in the nav where the second group screen used to be; the admin shortcut list in `App.vue` follows. Client suite 1276/1276, typecheck clean.
+
 ### 2026-11-02 — Prepare v0.3.0 work-branch release after network review
 
 - Bumped all three workspace packages, the Bun lockfile and the API health/OpenAPI version fallbacks to 0.3.0. Curated release notes in `RELEASE_NOTES_v0.3.0.md` describe changes since v0.2.0, migrations 0013–0019 and outstanding acceptance work. This is a release **from the work branch**, not a merge to `main`, a production deploy, a signed Android APK or the still-open v1.0.0 sign-off (T4.7.3).

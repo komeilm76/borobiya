@@ -26,7 +26,7 @@
 18. [Cancellation — Partially available](#18-cancellation--partially-available)
 19. [History & Rating](#19-history--rating)
 20. [Admin — User Management](#20-admin--user-management)
-21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
+21. [Admin — Responder Groups & Incident Types](#21-admin--responder-groups--incident-types)
 22. [Admin — Audit, Alerts & Settings](#22-admin--audit-alerts--settings)
 23. [Troubleshooting](#23-troubleshooting)
 24. [Quick Reference](#24-quick-reference)
@@ -379,15 +379,15 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 
 ---
 
-## 21. Admin — Categories & Incidents
+## 21. Admin — Responder groups & incident types
 
-*`/_admin/categories`, `/_admin/incidents`* — live since T3.1.5
+*`/_admin/services`, `/_admin/incidents`* — live since T3.1.5; the old `/_admin/categories` URL redirects to `/_admin/services`
 
 - **Incident Types:** Create `name, icon, color, description` (e.g., Fire 🔥 red) → used in SOS dropdown. The slug is derived from the name when the field is left empty; a name with nothing slug-shaped in it (a Persian-only label is normal here) has to be given one by hand, and the form says so before the server has to. Renaming is allowed, and a taken slug is refused with a `409` naming the type that holds it.
-- **Categories:** Create `name, description` + select **multiple incident types** it contains + **assign or remove users** in that category. Each category card lists its current members (`id`, `username`, `displayName`) with per-member removal, and re-assigning an existing member remains an idempotent `200` no-op.
+- **Responder groups** (`گروه‌های امداد`): create `name, description` + select **multiple incident types** it covers, then open **اعضا** to add or remove members. The member dialog searches by username, hides accounts that are already in the group or deactivated, lists the group's current members (`id`, `username`, `displayName`) with per-member removal, and re-assigning an existing member remains an idempotent `200` no-op. The list warns when an active incident type has no group covering it.
 - All users start **in no category**; admin assigns; user can be in **multiple categories**. An empty catalog is the shipped state: nothing is seeded, so the SOS form has no options until an admin adds them.
 
-[Screenshot: Category form with incident Type multi-select + user assignment]
+[Screenshot: Responder-group form with incident-type multi-select + member dialog]
 
 ---
 
@@ -438,7 +438,6 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 | Admin Reports | `/_admin/reports` |
 | Admin Service Groups | `/_admin/services` |
 | Admin Users | `/_admin/users` |
-| Admin Categories | `/_admin/categories` |
 | Admin Incidents | `/_admin/incidents` |
 | Admin Dispatch | `/_admin/dispatch` |
 | Admin Audit Trail | `/_admin/audit` |
