@@ -129,7 +129,7 @@
                       type="button"
                       class="admin-user-cell admin-user-cell--button"
                       :aria-label="`نمایش جزئیات حساب ${user.username}`"
-                      @click="openUserDetails(user)"
+                      @click="openUserDetails(user, $event)"
                     >
                       <span class="admin-user-avatar" aria-hidden="true">{{ userInitial(user.username) }}</span>
                       <span class="admin-user-copy">
@@ -225,7 +225,7 @@
                     size="small"
                     rounded="lg"
                     :aria-label="`نمایش جزئیات حساب ${user.username}`"
-                    @click="openUserDetails(user)"
+                    @click="openUserDetails(user, $event)"
                   >
                     جزئیات
                     <v-icon class="ms-1" icon="mdi-chevron-left" size="16" />
@@ -324,7 +324,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { UserProfile } from "@shared/index";
 import { ApiError } from "../../api/http";
@@ -425,7 +425,16 @@ function formatDate(value: string): string {
   return Number.isNaN(date.getTime()) ? "—" : dateFormatter.format(date);
 }
 
-function openUserDetails(user: UserProfile): void {
+/**
+ * The control that opened the drawer, so closing it can put the keyboard back where the admin left it. A
+ * `temporary` drawer traps focus while it is open; without this, closing it drops focus to the document body and the
+ * next Tab starts from the top of the page.
+ */
+let detailTrigger: HTMLElement | null = null;
+
+function openUserDetails(user: UserProfile, event?: Event): void {
+  const target = event?.currentTarget;
+  if (target instanceof HTMLElement) detailTrigger = target;
   if (detailUserId.value === user.id) return;
   void router.replace({ query: { ...route.query, user: user.id } });
 }
@@ -434,7 +443,14 @@ function closeUserDetails(): void {
   if (detailUserId.value === null) return;
   const query = { ...route.query };
   delete query.user;
-  void router.replace({ query });
+  void router.replace({ query }).then(() => {
+    void nextTick(() => {
+      const target = detailTrigger;
+      detailTrigger = null;
+      // The row may be gone — a status change can drop it from a filtered page — and focusing it would throw.
+      if (target?.isConnected) target.focus();
+    });
+  });
 }
 
 /** Reuses the list's confirmation dialog; the drawer must not grow a second, differently worded one. */

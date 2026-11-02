@@ -88,6 +88,9 @@ describe("admin account drill-down", () => {
   it("offers the same drill-down from the mobile card list", () => {
     expect(view).toContain('class="admin-user-cell admin-user-cell--button"');
     expect(view).toContain('class="admin-mobile-details"');
-    expect(view).toContain('@click="openUserDetails(user)"');
+    expect(view).toContain('@click="openUserDetails(user, $event)"');
+    // The event is what makes the drawer able to hand focus back to the exact control that opened it.
+    expect(view).toContain("const target = event?.currentTarget;");
+    expect(view).toContain("if (target?.isConnected) target.focus();");
   });
 });

@@ -1,6 +1,8 @@
 <template>
   <div class="admin-shell" dir="rtl" :class="{ 'admin-shell--nav-open': navOpen }">
-    <div v-if="navOpen" class="admin-shell__scrim" aria-hidden="true" @click="navOpen = false" />
+    <!-- Nine nav links sit before the content on every admin page; this is the way past them. -->
+    <a class="admin-skip" href="#admin-main-content">پرش به محتوای صفحه</a>
+    <div v-if="navOpen" class="admin-shell__scrim" aria-hidden="true" @click="closeNav()" />
 
     <aside class="admin-shell__nav" aria-label="ناوبری پنل مدیریت">
       <RouterLink class="admin-brand" to="/_admin/dashboard" @click="navOpen = false">
@@ -63,12 +65,13 @@
     <div class="admin-shell__main">
       <header class="admin-shell__topbar">
         <v-btn
+          ref="menuButton"
           class="admin-shell__menu"
           icon="mdi-menu"
           variant="text"
           size="small"
           aria-label="نمایش منو"
-          @click="navOpen = true"
+          @click="openNav()"
         />
         <nav class="admin-crumbs" aria-label="مسیر صفحه">
           <span class="admin-crumbs__root">پنل مدیریت</span>
@@ -101,7 +104,7 @@
         </div>
       </header>
 
-      <main class="admin-shell__content">
+      <main id="admin-main-content" tabindex="-1" class="admin-shell__content">
         <header class="admin-shell__head">
           <div>
             <h1>{{ title }}</h1>
@@ -303,6 +306,25 @@ const router = useRouter();
 const auth = useAuthStore();
 const { isOnline } = useOnlineStatus();
 const navOpen = ref(false);
+const menuButton = ref<{ $el?: HTMLElement } | null>(null);
+
+/**
+ * The phone rail is a drawer: opening it moves the keyboard into it, and closing it hands the keyboard back to the
+ * button that opened it. Without both halves, Tab walks the page behind the drawer, and closing drops focus to
+ * <body> so the next Tab restarts at the top of the app.
+ */
+function openNav(): void {
+  navOpen.value = true;
+  void nextTick(() => {
+    document.querySelector<HTMLElement>(".admin-shell__nav a, .admin-shell__nav button")?.focus();
+  });
+}
+
+function closeNav(): void {
+  if (!navOpen.value) return;
+  navOpen.value = false;
+  void nextTick(() => menuButton.value?.$el?.focus());
+}
 const paletteOpen = ref(false);
 const query = ref("");
 
@@ -544,7 +566,7 @@ function onKeydown(event: KeyboardEvent): void {
     return;
   }
   // Escape is the only keyboard way out of the off-canvas rail on a phone.
-  if (event.key === "Escape" && navOpen.value) navOpen.value = false;
+  if (event.key === "Escape" && navOpen.value) closeNav();
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
@@ -977,6 +999,30 @@ watch(
 
 .admin-shell__scrim {
   display: none;
+}
+
+/* Visible only while focused, and never a tab stop of its own beyond the first one. */
+.admin-skip {
+  position: absolute;
+  inset-block-start: -60px;
+  inset-inline-start: 16px;
+  z-index: 200;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-skip:focus-visible,
+.admin-skip:focus {
+  inset-block-start: 12px;
+}
+
+.admin-shell__content:focus {
+  outline: none;
 }
 
 @media (max-width: 1023px) {

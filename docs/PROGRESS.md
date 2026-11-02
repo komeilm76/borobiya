@@ -4,6 +4,22 @@
 
 ---
 
+### 2026-11-02 — Keyboard paths through the shell and the account drawer
+
+- Opening the phone rail left focus on the page *behind* it, and closing it dropped focus to `<body>`, so the next Tab
+  restarted at the top of the app. Opening now moves focus to the first rail link; `Esc`, the scrim and the menu button
+  all close through one function that hands focus back to the menu button. A rail link still closes the drawer without
+  stealing focus from the page it navigates to.
+- Nine rail links sat in front of the content on every admin page. A skip link (`پرش به محتوای صفحه`) is now the first
+  tab stop, and `<main>` carries `tabindex="-1"` so the jump lands somewhere a keyboard can continue from. It is
+  off-screen until focused.
+- The account drawer trapped focus while open but gave none back on close. It now remembers the control that opened it
+  (the row's identity button or the mobile `جزئیات`) and returns focus there after the URL settles — skipping the
+  restore when the row is gone, which a status change under an active filter can cause.
+- Suite 1326/1326 (2 new shell tests, updated drawer pins), typecheck clean.
+
+---
+
 ### 2026-11-02 — The palette works without a mouse
 
 - `Enter` always opened the first hit, and there was no way to reach the second one from the keyboard: a command

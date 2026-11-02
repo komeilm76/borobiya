@@ -59,11 +59,12 @@ describe("admin shell", () => {
     expect(shell).toContain(".admin-shell--nav-open .admin-shell__nav {");
     expect(shell).toContain(".admin-shell--nav-open .admin-shell__scrim {");
     // The scrim has to be dismissible with a click, not only with the menu button.
-    expect(shell).toContain('@click="navOpen = false"');
+    expect(shell).toContain('@click="closeNav()"');
     // ...and the rail must leave the tab order while it is parked off-screen.
     expect(shell).toContain("visibility: hidden;");
     expect(shell).toContain(".admin-shell--nav-open .admin-shell__nav {");
-    expect(shell).toContain('if (event.key === "Escape" && navOpen.value) navOpen.value = false;');
+    // Escape routes through the same close as the scrim, so the menu button gets focus back either way.
+    expect(shell).toContain('if (event.key === "Escape" && navOpen.value) closeNav();');
   });
 
   it("makes the toolbar controls real: a page palette and a bell that navigates", () => {
@@ -148,6 +149,28 @@ describe("admin shell", () => {
     expect(shell).toContain(':aria-selected="activeKey === `account-${hit.id}`"');
     // `role="option"` needs a listbox parent, and the grouped items are inside `role="presentation"` lists.
     expect(shell).toContain('<ul class="admin-palette__list" role="presentation">');
+  });
+
+  it("moves the keyboard into the phone drawer and gives it back on close", () => {
+    const opener = shell.slice(shell.indexOf("function openNav(): void {"), shell.indexOf("function closeNav(): void {"));
+    expect(opener).toContain('document.querySelector<HTMLElement>(".admin-shell__nav a, .admin-shell__nav button")?.focus();');
+    const closer = shell.slice(shell.indexOf("function closeNav(): void {"));
+    expect(closer).toContain("if (!navOpen.value) return;");
+    expect(closer).toContain("menuButton.value?.$el?.focus()");
+    expect(shell).toContain('ref="menuButton"');
+    // Navigating away closes the drawer without yanking focus back to the menu button.
+    expect(shell).toContain('<RouterLink class="admin-brand" to="/_admin/dashboard" @click="navOpen = false">');
+  });
+
+  it("offers a way past the nine rail links on every admin page", () => {
+    expect(shell).toContain('<a class="admin-skip" href="#admin-main-content">پرش به محتوای صفحه</a>');
+    expect(shell).toContain('<main id="admin-main-content" tabindex="-1" class="admin-shell__content">');
+    // First in the panel, before the rail it skips.
+    expect(shell.indexOf('class="admin-skip"')).toBeLessThan(shell.indexOf('class="admin-shell__nav"'));
+    // Off-screen until focused, then visible: a skip link nobody can see is not a skip link.
+    const skip = shell.slice(shell.indexOf(".admin-skip {"), shell.indexOf(".admin-shell__content:focus"));
+    expect(skip).toContain("inset-block-start: -60px;");
+    expect(skip).toContain("inset-block-start: 12px;");
   });
 
   it("labels the breadcrumb trail and the account footer for screen readers", () => {
