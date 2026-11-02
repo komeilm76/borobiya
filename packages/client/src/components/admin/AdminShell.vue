@@ -110,7 +110,7 @@
         <v-text-field
           v-model="query"
           class="admin-palette__input"
-          placeholder="جست‌وجوی بخش، صفحه یا اقدام…"
+          placeholder="جست‌وجوی بخش یا نام کاربری…"
           prepend-inner-icon="mdi-magnify"
           variant="solo-filled"
           density="comfortable"
@@ -120,7 +120,7 @@
           @keydown.enter.prevent="openFirst"
           @keydown.esc="paletteOpen = false"
         />
-        <ul v-if="matches.length > 0" class="admin-palette__list" role="list">
+        <ul v-if="matches.length > 0" class="admin-palette__list" role="list" aria-label="بخش‌های پنل">
           <li v-for="hit in matches" :key="hit.key">
             <button type="button" class="admin-palette__item" @click="open(hit.to)">
               <v-icon :icon="hit.icon" size="18" />
@@ -129,7 +129,30 @@
             </button>
           </li>
         </ul>
-        <p v-else class="admin-palette__empty">بخشی با این نام پیدا نشد.</p>
+
+        <p v-if="accountSearching" class="admin-palette__status" role="status">در حال جست‌وجوی حساب‌ها…</p>
+        <ul
+          v-else-if="accountMatches.length > 0"
+          class="admin-palette__list admin-palette__list--accounts"
+          role="list"
+          aria-label="حساب‌ها"
+        >
+          <li v-for="hit in accountMatches" :key="hit.id">
+            <button type="button" class="admin-palette__item" @click="openUser(hit.id)">
+              <v-icon icon="mdi-account-outline" size="18" />
+              <span class="admin-palette__label" dir="ltr">{{ hit.username }}</span>
+              <small>{{ hit.isActive ? "حساب فعال" : "حساب غیرفعال" }}</small>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="accountError !== ''" class="admin-palette__status" role="status">{{ accountError }}</p>
+
+        <p
+          v-if="matches.length === 0 && accountMatches.length === 0 && !accountSearching && accountError === ''"
+          class="admin-palette__empty"
+        >
+          بخش یا حسابی با این نام پیدا نشد.
+        </p>
         <footer class="admin-palette__foot">
           <span><kbd>↵</kbd> بازکردن</span>
           <span><kbd>Esc</kbd> بستن</span>
@@ -176,6 +199,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import type { UserProfile } from "@shared/index";
+import { listAdminUsers } from "../../api/admin-users";
 import { useAuthStore } from "../../stores/auth";
 import { useThemeStore } from "../../stores/theme";
 import { useLogoutConfirmation } from "../../composables/use-logout-confirmation";
@@ -205,7 +230,7 @@ const props = defineProps<{
   crumbs?: string[];
 }>();
 
-const searchHint = "جست‌وجوی سریع در بخش‌های پنل (Ctrl K)";
+const searchHint = "جست‌وجوی بخش‌های پنل و نام کاربری (Ctrl K)";
 
 const crumbList = computed(() => props.crumbs ?? []);
 const route = useRoute();
@@ -243,8 +268,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 /**
- * The palette searches the panel's own pages, not the database. A global record search would need a server
- * endpoint that does not exist yet, and a control that silently searches nothing is worse than no control.
+ * The palette searches the panel's own pages plus accounts, through the users list endpoint the panel already
+ * has. Requests and incident types still have no `q` on their list routes, so the field promises "بخش یا حساب"
+ * rather than a record search it cannot do.
  */
 const pages = computed(() =>
   navGroups.flatMap((group) =>
@@ -258,15 +284,97 @@ const matches = computed(() => {
   return pages.value.filter((hit) => `${hit.label} ${hit.group}`.includes(term));
 });
 
+const accountMatches = ref<UserProfile[]>([]);
+const accountSearching = ref(false);
+const accountError = ref("");
+let accountTimer: ReturnType<typeof setTimeout> | null = null;
+let accountController: AbortController | null = null;
+let accountRequest = 0;
+
+function clearAccountSearch(): void {
+  if (accountTimer !== null) clearTimeout(accountTimer);
+  accountTimer = null;
+  accountController?.abort();
+  accountController = null;
+  accountRequest += 1;
+  accountMatches.value = [];
+  accountSearching.value = false;
+  accountError.value = "";
+}
+
+async function searchAccounts(term: string): Promise<void> {
+  const current = ++accountRequest;
+  accountController?.abort();
+  const active = new AbortController();
+  accountController = active;
+  try {
+    await auth.ensureSession();
+    const accessToken = auth.accessToken;
+    if (!accessToken) {
+      if (current === accountRequest) {
+        accountSearching.value = false;
+        accountError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد شوید.";
+      }
+      return;
+    }
+    const result = await listAdminUsers({ q: term, page: 1, limit: 5 }, accessToken, active.signal);
+    if (current !== accountRequest) return;
+    accountMatches.value = result.items;
+  } catch (caught) {
+    if (caught instanceof DOMException && caught.name === "AbortError") return;
+    if (current !== accountRequest) return;
+    accountMatches.value = [];
+    accountError.value =
+      typeof navigator !== "undefined" && navigator.onLine === false
+        ? "برای جست‌وجوی حساب‌ها اتصال اینترنت لازم است."
+        : "جست‌وجوی حساب‌ها ممکن نشد.";
+  } finally {
+    if (current === accountRequest) {
+      accountSearching.value = false;
+      accountController = null;
+    }
+  }
+}
+
+watch(query, (value) => {
+  const term = value.trim();
+  if (accountTimer !== null) clearTimeout(accountTimer);
+  accountTimer = null;
+  accountError.value = "";
+  if (term.length < 2) {
+    clearAccountSearch();
+    return;
+  }
+  accountSearching.value = true;
+  accountTimer = setTimeout(() => void searchAccounts(term), 250);
+});
+
+watch(paletteOpen, (open) => {
+  if (open) return;
+  query.value = "";
+  clearAccountSearch();
+});
+
 function open(to: string): void {
   paletteOpen.value = false;
   query.value = "";
+  clearAccountSearch();
   void router.push(to);
 }
 
+/** Accounts open their drawer on the users screen, which owns the `?user=` state. */
+function openUser(id: string): void {
+  open(`/_admin/users?user=${encodeURIComponent(id)}`);
+}
+
 function openFirst(): void {
-  const [first] = matches.value;
-  if (first) open(first.to);
+  const [firstPage] = matches.value;
+  if (firstPage) {
+    open(firstPage.to);
+    return;
+  }
+  const [firstAccount] = accountMatches.value;
+  if (firstAccount) openUser(firstAccount.id);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -280,7 +388,10 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 onMounted(() => window.addEventListener("keydown", onKeydown));
-onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));
+onBeforeUnmount(() => {
+  window.removeEventListener("keydown", onKeydown);
+  clearAccountSearch();
+});
 
 const accountName = computed(() => auth.user?.username ?? "مدیر سامانه");
 const accountInitial = computed(() => accountName.value.slice(0, 1));
@@ -592,6 +703,21 @@ watch(
   padding: 22px 16px;
   color: rgba(var(--v-theme-on-surface), 0.6);
   font-size: 0.86rem;
+  text-align: center;
+}
+
+/* Accounts come after the pages; the rule keeps the two result kinds visually separate. */
+.admin-palette__list--accounts {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+.admin-palette__status {
+  margin: 0;
+  padding: 14px 16px;
+  color: rgba(var(--v-theme-on-surface), 0.6);
+  font-size: 0.82rem;
   text-align: center;
 }
 

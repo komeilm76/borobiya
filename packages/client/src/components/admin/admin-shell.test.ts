@@ -70,12 +70,28 @@ describe("admin shell", () => {
     expect(shell).toContain('@click="paletteOpen = true"');
     expect(shell).toContain("if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === \"k\") {");
     expect(shell).toContain('onMounted(() => window.addEventListener("keydown", onKeydown));');
-    expect(shell).toContain('onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown));');
-    // The palette searches the panel's own pages and says so; it does not pretend to search records.
+    expect(shell).toContain('window.removeEventListener("keydown", onKeydown);');
+    // The palette searches the panel's own pages and says so; records it cannot search are not promised.
     expect(shell).toContain("return pages.value.filter((hit) => `${hit.label} ${hit.group}`.includes(term));");
+    expect(shell).toContain('placeholder="جست‌وجوی بخش یا نام کاربری…"');
     expect(shell).toContain('to="/_admin/alerts" aria-label="هشدارها"');
     expect(shell).not.toContain("$emit('search')");
     expect(shell).not.toContain("$emit('alerts')");
+  });
+
+  it("searches accounts from the palette and opens them on the users screen", () => {
+    expect(shell).toContain('import { listAdminUsers } from "../../api/admin-users";');
+    expect(shell).toContain("const result = await listAdminUsers({ q: term, page: 1, limit: 5 }, accessToken, active.signal);");
+    // Two characters before a request: every palette keystroke must not become a query.
+    expect(shell).toContain("if (term.length < 2) {");
+    expect(shell).toContain("accountTimer = setTimeout(() => void searchAccounts(term), 250);");
+    // A slower reply for an older term must not replace the newer one.
+    expect(shell).toContain("if (current !== accountRequest) return;");
+    expect(shell).toContain('open(`/_admin/users?user=${encodeURIComponent(id)}`);');
+    expect(shell).toContain('aria-label="حساب‌ها"');
+    // Closing the palette drops the results and the pending timer, so the next open starts clean.
+    expect(shell).toContain("watch(paletteOpen, (open) => {");
+    expect(shell).toContain("clearAccountSearch();");
   });
 
   it("labels the breadcrumb trail and the account footer for screen readers", () => {

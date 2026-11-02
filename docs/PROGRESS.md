@@ -22,8 +22,15 @@
 - Reads are fenced: switching accounts aborts the previous request and a late response cannot overwrite a newer
   one; `401/403` renders the forbidden state while a dead connection renders the offline one, so "no internet" is
   no longer reported as "access denied".
-- Client suite 1300/1300 (14 new tests over `api/admin-users.test.ts` and `views/_admin/admin-user-detail.test.ts`),
-  typecheck clean.
+- **The Ctrl K palette can find a person now.** It only ever filtered the panel's nine page names — while the
+  toolbar it lives in is drawn as a search field over `جست‌وجوی کاربر، مأموریت یا حادثه…` in the reference
+  screens. It queries the users list from two characters on (250 ms debounce, the older reply discarded), lists the
+  matches under the page hits, marks each account active/inactive, and selecting one opens the new drawer. It
+  reports an ended session, a dead connection and an empty result differently, and the comment above it no longer
+  claims a record search is impossible — it now says exactly which records it cannot search (requests and incident
+  types have no `q` on their list routes).
+- Client suite 1301/1301 (15 new tests over `api/admin-users.test.ts`, `views/_admin/admin-user-detail.test.ts` and
+  `components/admin/admin-shell.test.ts`), typecheck clean.
 
 ### 2026-11-02 — Admin bug sweep: session expiry, queue order, dead ends
 
