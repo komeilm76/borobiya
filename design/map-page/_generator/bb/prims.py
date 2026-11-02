@@ -286,20 +286,24 @@ class Screen:
         if not label and icon:
             self.i.draw_icon(x + w / 2, y + h / 2, icon, icon_size, label_color)
             return
+        # RTL: the content group is centred, but it reads right-to-left — the
+        # leading icon sits on the right of the label, not on its left.
         gap = 8
         total = self._content_width(label, icon, style, icon_size, gap) + (
             (icon_size + gap) if trailing_icon else 0
         )
-        cursor = x + (w - total) / 2
+        right = x + (w + total) / 2
         cy = y + h / 2
         if icon:
-            self.i.draw_icon(cursor + icon_size / 2, cy, icon, icon_size, label_color)
-            cursor += icon_size + gap
+            self.i.draw_icon(right - icon_size / 2, cy, icon, icon_size, label_color)
+            right -= icon_size + gap
         if label:
-            self.text(cursor, y + (h - TYPE[style][2]) / 2, label, style, label_color, align="left")
-            cursor += text_width(label, style, self.s)
+            self.text(right, y + (h - TYPE[style][2]) / 2, label, style, label_color,
+                      align="right")
+            right -= text_width(label, style, self.s)
         if trailing_icon:
-            self.i.draw_icon(cursor + gap + icon_size / 2, cy, trailing_icon, icon_size, label_color)
+            self.i.draw_icon(right - gap - icon_size / 2, cy, trailing_icon, icon_size,
+                             label_color)
 
     def icon_button(self, x, y, d, icon, icon_size=21, color=C.text, fill=C.surface, outline=C.outline,
                     shadow=True, radius=None, badge_color=None, badge_text=None, label=None):
@@ -316,18 +320,20 @@ class Screen:
 
     def chip(self, x, y, label, icon=None, tone: str = "neutral", h: float = 28, style="caption-bold",
              fill=None, color=None, outline=None, radius=None) -> float:
+        """RTL pill: `x` is the LEFT edge, content reads icon-then-label from the right."""
         if fill is None:
             fill, color, outline = _tone(tone)
         icon_size = 15
         pad = 10
-        width = self._content_width(label, icon, style, icon_size, 5) + pad * 2
+        gap = 5
+        width = self._content_width(label, icon, style, icon_size, gap) + pad * 2
         r = radius if radius is not None else h / 2
         self.rect(x, y, width, h, fill=fill, radius=r, outline=outline, outline_w=1 if outline else 0)
-        cursor = x + pad
+        right = x + width - pad
         if icon:
-            self.i.draw_icon(cursor + icon_size / 2, y + h / 2, icon, icon_size, color)
-            cursor += icon_size + 5
-        self.text(cursor, y + (h - TYPE[style][2]) / 2, label, style, color, align="left")
+            self.i.draw_icon(right - icon_size / 2, y + h / 2, icon, icon_size, color)
+            right -= icon_size + gap
+        self.text(right, y + (h - TYPE[style][2]) / 2, label, style, color, align="right")
         return width
 
     def badge_dot(self, cx, cy, r=4.5, color=C.danger, ring="#FFFFFF"):
@@ -398,19 +404,23 @@ class Screen:
                 self.rect(sx, y + inner_pad, seg_w, h - inner_pad * 2, fill=C.primary, radius=(h - inner_pad * 2) / 2)
                 color = "#FFFFFF"
             else:
-                color = C.muted_2 if locked_here else C.text_2
+                # #63797A keeps locked sections at ~4.6:1 on white — still clearly disabled,
+                # but readable for users who need to know why the section will not open.
+                color = C.muted if locked_here else C.text_2
             label, icon = item
             icon_size = 17
             gap = 6
             total = self._content_width(label, icon, "label", icon_size, gap)
-            cursor = sx + (seg_w - total) / 2
+            # RTL: the icon leads from the right edge, the label trails to its left.
+            cursor = sx + (seg_w + total) / 2
             cy = y + h / 2
             if icon:
-                self.i.draw_icon(cursor + icon_size / 2, cy, icon, icon_size, color)
-                cursor += icon_size + gap
-            self.text(cursor, cy - TYPE["label"][2] / 2, label, "label", color, align="left")
+                self.i.draw_icon(cursor - icon_size / 2, cy, icon, icon_size, color)
+                cursor -= icon_size + gap
+            self.text(cursor, cy - TYPE["label"][2] / 2, label, "label", color, align="right")
             if locked_here:
-                self.i.draw_icon(sx + 13, cy, "lock", 11, C.muted_2)
+                # lock trails on the far left so it never collides with the leading icon
+                self.i.draw_icon(sx + 12, cy, "lock", 11, C.muted_2)
 
     def toast(self, y, text, icon="mdi-check-circle", tone="success", width=None):
         w = width or min(self.w - 32, self.tw(text, "body-sm") + 62)

@@ -4,12 +4,13 @@ from __future__ import annotations
 from typing import Callable
 
 from bb import scenario as sc
-from bb.map import Camera, draw_route, scale_bar
+from bb.map import Camera, draw_route, fit_camera, scale_bar
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
 from bb.ui import (bottom_panel, chrome, card_title_row, fab, home_bar, map_tools, metric_tiles,
-                   nav_banner, notice, quick_chips, search_pill, sheet_header, telemetry_strip)
+                   nav_banner, notice, quick_chips, search_pill, sheet_header, sos_button,
+                   telemetry_strip)
 
 from ._base import (box, destination_pin, incident_marker, keepout, map_view, origin_marker,
                     user_cone)
@@ -32,12 +33,10 @@ def map_idle() -> Screen:
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
 
     # SOS deliberately sits above the thumb zone: visible, hard to hit by accident.
-    s.shadow(321, 470, 58, 58, radius=29, blur=16, dy=6, color=C.danger, alpha=90)
-    s.circle(350, 499, 29, fill=C.danger, outline="#FFFFFF", outline_w=2.4)
-    s.text(350, 503, "SOS", "caption-bold", "#FFFFFF", align="center")
+    sos_button(s, 315, 492, r=28)
 
-    fab(s, 328, 546, 44, "mdi-crosshairs-gps")
-    fab(s, 328, 598, 44, "mdi-broadcast", C.success)
+    fab(s, 327, 552, 44, "mdi-crosshairs-gps")
+    fab(s, 327, 604, 44, "mdi-broadcast", C.success)
 
     quick_chips(s, 700, [("خانه", "mdi-home-outline"), ("محل کار", "mdi-briefcase-outline"),
                          ("آخرین مقصد", "mdi-history")])
@@ -65,8 +64,10 @@ def search_open() -> Screen:
     fy = top + 26
     s.rect(16, fy, 361, 54, fill=C.surface_2, radius=18, outline=C.primary, outline_w=1.6)
     s.i.draw_icon(357, fy + 27, "mdi-magnify", 22, C.primary)
-    s.text(335, fy + 12, "آتش", "title-sm", C.text, align="right")
-    s.rect(317, fy + 14, 1.6, 26, fill=C.primary)
+    # RTL caret: it sits immediately left of the typed run, not on top of it
+    query = "آتش"
+    s.text(335, fy + 12, query, "title-sm", C.text, align="right")
+    s.rect(335 - s.tw(query, "title-sm") - 4, fy + 15, 1.6, 24, fill=C.primary)
     s.icon_button(24, fy + 9, 36, "mdi-close", 18, C.muted_2, fill="#FFFFFF", outline=None,
                   radius=12, shadow=False)
 
@@ -180,7 +181,9 @@ def destination_details() -> Screen:
     s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
     s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
 
-    y = sheet_header(s, top + 22, sc.DEST_NAME, f"{sc.DEST_KIND} · {sc.DEST_ADDRESS}",
+    # The kind already has its own row below, and the full "kind · address" string
+    # ellipsized between the close button and the icon: keep the address only.
+    y = sheet_header(s, top + 22, sc.DEST_NAME, sc.DEST_ADDRESS,
                      icon="fire-truck", tone="danger", title_style="title-lg")
 
     # metric strip
@@ -380,8 +383,9 @@ def route_options() -> Screen:
                "success" if "روان" in traffic else ("warning" if "نیمه" in traffic else "danger"),
                h=22)
         if selected:
-            s.circle(357 - 20, ry + 20, 9, fill=C.primary)
-            s.i.draw_icon(357 - 20, ry + 20, "mdi-check", 12, "#FFFFFF")
+            # tick sits on the card's leading top corner, not on the route-name line
+            s.circle(16 + 20, ry + 19, 10, fill=C.primary)
+            s.i.draw_icon(16 + 20, ry + 19, "mdi-check", 13, "#FFFFFF")
         s.dividers_vertical(190, ry + 12, ry + 66, C.outline)
     y += len(options) * 86 + 4
 
@@ -462,9 +466,7 @@ def navigation_active() -> Screen:
     s.icon_button(14, 350, 44, "mdi-map-outline", 20, C.text_2, radius=15)
 
     # SOS: distinct, confirmed in two steps, clear of the controls
-    s.shadow(325, 452, 54, 54, radius=27, blur=16, dy=6, color=C.danger, alpha=92)
-    s.circle(352, 479, 27, fill=C.danger, outline="#FFFFFF", outline_w=2.2)
-    s.text(352, 483, "SOS", "caption-bold", "#FFFFFF", align="center")
+    sos_button(s, 344, 479, r=27, wide=False)
 
     top = 656
     s.shadow(0, top - 8, 393, 852 - top + 16, radius=26, blur=24, dy=-2, alpha=48)
@@ -512,16 +514,24 @@ def navigation_alternatives() -> Screen:
         ("از خیابان انقلاب", "+۳ دقیقه", "۱٫۱ کیلومتر مانده", "نیمه‌سنگین", False),
     ]
     for index, (name, time, distance, traffic, active) in enumerate(options):
-        ry = y + index * 76
-        s.rect(16, ry, 361, 68, fill=C.primary_soft if active else C.surface_2, radius=16,
+        ry = y + index * 88
+        s.rect(16, ry, 361, 80, fill=C.primary_soft if active else C.surface_2, radius=16,
                outline=C.primary if active else None, outline_w=1.6 if active else 0)
-        s.text(357 - 12, ry + 12, name, "label-lg", C.text, align="right")
-        s.text(357 - 12, ry + 34, f"{time} · {distance}", "caption", C.muted, align="right")
-        s.chip(24, ry + 22, traffic, None, "success" if traffic == "روان" else "warning", h=24)
+        # RTL card: selection disc on the left, name + meta on the right,
+        # traffic chip on its own line so nothing overlaps the border
         if active:
-            s.circle(48, ry + 22, 9, fill=C.primary)
-            s.i.draw_icon(48, ry + 22, "mdi-check", 12, "#FFFFFF")
-    y += len(options) * 76 + 6
+            s.circle(16 + 30, ry + 40, 13, fill=C.primary)
+            s.i.draw_icon(16 + 30, ry + 40, "mdi-check", 16, "#FFFFFF")
+        else:
+            s.circle(16 + 30, ry + 40, 13, fill=None, outline=C.outline_strong, outline_w=1.6)
+        s.text(357 - 14, ry + 12, name, "label-lg", C.text, align="right", max_width=250)
+        s.text(357 - 14, ry + 33, f"{time} · {distance}", "caption", C.muted, align="right",
+               max_width=250)
+        chip_w = s.chip(0, -100, traffic, None, "success" if traffic == "روان" else "warning",
+                        h=22)  # measure only, drawn below
+        s.chip(357 - 14 - chip_w, ry + 48, traffic, None,
+               "success" if traffic == "روان" else "warning", h=22)
+    y += len(options) * 88
 
     s.button(16, y, 361, 50, "بازگشت به مسیر فعلی", icon="mdi-arrow-u-right-bottom",
              variant="tonal")
@@ -597,11 +607,18 @@ def navigation_off_route() -> Screen:
     s.text(361, 196, "در اسرع وقت به مسیر بازگردید یا مسیر را بازمحاسبه کنید.", "caption",
            "#F7E4C8", align="right", max_width=330)
     s.rect(24, 224, 168, 38, fill="#FFFFFF", radius=19)
-    s.i.draw_icon(56, 243, "mdi-arrow-u-right-bottom", 17, "#8A5A10")
-    s.text(72, 233, "بازگشت به مسیر", "caption-bold", "#8A5A10", align="left")
+    # RTL: icon leads from the right edge of each pill, label trails to its left
+    _lbl = "بازگشت به مسیر"
+    _tot = 17 + 6 + s.tw(_lbl, "caption-bold")
+    _right = 24 + (168 + _tot) / 2
+    s.i.draw_icon(_right - 8.5, 243, "mdi-arrow-u-right-bottom", 17, "#8A5A10")
+    s.text(_right - 23, 233, _lbl, "caption-bold", "#8A5A10", align="right")
     s.rect(201, 224, 168, 38, fill=None, radius=19, outline="#F3D9A8", outline_w=1.4)
-    s.i.draw_icon(233, 243, "mdi-refresh", 17, "#FBEFD6")
-    s.text(249, 233, "بازمحاسبهٔ مسیر", "caption-bold", "#FBEFD6", align="left")
+    _lbl = "بازمحاسبهٔ مسیر"
+    _tot = 17 + 6 + s.tw(_lbl, "caption-bold")
+    _right = 201 + (168 + _tot) / 2
+    s.i.draw_icon(_right - 8.5, 243, "mdi-refresh", 17, "#FBEFD6")
+    s.text(_right - 23, 233, _lbl, "caption-bold", "#FBEFD6", align="right")
 
     s.icon_button(14, 290, 44, "mdi-volume-off", 20, C.muted, radius=15)
     s.shadow(96, 292, 200, 32, radius=16, blur=10, dy=3, alpha=30)
@@ -638,12 +655,16 @@ MULTI_ROUTE = [sc.USER, (260, -120), (260, 240), sc.INCIDENT, (-250, 200), (-250
 
 
 def multi_destination() -> Screen:
-    cam = sc.camera(0, 40, 0.15).aim_at(-160, 260, 196, 150)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
+    # The route must sit *between* the section control (y=118) and the sheet (y=286),
+    # so the camera is solved from the polyline instead of hand-tuned: a hand-tuned
+    # camera let the last leg run under the segmented control.
+    route_pts = sc.route_world(MULTI_ROUTE)
+    cam = fit_camera(route_pts, (30, 168, 363, 274), padding=1.0)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 128), box(0, 286, 393, 566)))
     s.top_scrim(120)
     chrome(s, tab=1)
 
-    draw_route(s, cam, sc.route_world(MULTI_ROUTE), width_m=15)
+    draw_route(s, cam, route_pts, width_m=13)
     for index, (u, v) in enumerate([sc.INCIDENT, (-250, 200), sc.HOME], start=1):
         x, y = cam.project_grid(u, v, s)
         if index == 3:
@@ -710,12 +731,21 @@ def multi_destination() -> Screen:
 # 14 — destination reordering
 # --------------------------------------------------------------------------- #
 def destination_reordering() -> Screen:
-    cam = sc.camera(80, 120, 0.20).aim_at(20, 120, 196, 200)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
+    # Same trip as screen 13 (before/after of a reorder), fitted to the map band so
+    # the line never runs under the section control or off into empty canvas.
+    reorder_pts = sc.route_world(MULTI_ROUTE)
+    cam = fit_camera(reorder_pts, (30, 168, 363, 274), padding=1.0)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 124), box(0, 286, 393, 566)))
     s.top_scrim(120)
     chrome(s, tab=1)
-    draw_route(s, cam, sc.route_world([sc.USER, (260, -120), (260, 240), sc.INCIDENT,
-                                       (-130, 240), (-130, -120), sc.HOME]), width_m=13)
+    draw_route(s, cam, reorder_pts, width_m=13)
+    for index, (u, v) in enumerate([sc.INCIDENT, (-250, 200), sc.HOME], start=1):
+        x, y = cam.project_grid(u, v, s)
+        if index == 3:
+            destination_pin(s, cam, u, v, None, icon="flag-checkered")
+        else:
+            s.circle(x, y, 14, fill=C.primary, outline="#FFFFFF", outline_w=2.4)
+            s.text(x, y - 8, fa_digits(index), "label", "#FFFFFF", align="center")
     user_cone(s, cam, *sc.USER, bearing=28)
     scrim(s, 40, top=290, height=562)
 
@@ -762,13 +792,13 @@ def destination_reordering() -> Screen:
            align="right")
     y += 60
 
-    s.rect(16, y, 361, 76, fill=C.warning_soft, radius=16)
-    s.i.draw_icon(357, y + 18, "mdi-alert-outline", 18, C.warning)
-    s.text(335, y + 8, "مسیر بازمحاسبه می‌شود", "caption-bold", C.warning, align="right")
-    s.text(335, y + 28, "با تغییر ترتیب، مسیر از موقعیت فعلی شما دوباره محاسبه و زمان‌ها",
-           "caption", C.muted, align="right", max_width=300)
-    s.text(335, y + 46, "به‌روزرسانی می‌شوند.", "caption", C.muted, align="right", max_width=300)
-    y += 92
+    s.rect(16, y, 361, 84, fill=C.warning_soft, radius=16)
+    s.i.draw_icon(357, y + 19, "mdi-alert-outline", 18, C.warning)
+    s.text(335, y + 9, "مسیر بازمحاسبه می‌شود", "caption-bold", C.warning, align="right")
+    s.para(39, y + 32, "با تغییر ترتیب، مسیر از موقعیت فعلی شما دوباره محاسبه و زمان‌ها "
+           "به‌روزرسانی می‌شوند.", "caption", C.muted, align="right", max_width=296,
+           line_height=18)
+    y += 98
 
     s.button(201, y, 176, 50, "ذخیرهٔ ترتیب", icon="mdi-check", variant="filled")
     s.button(16, y, 176, 50, "انصراف", variant="outline")
@@ -814,9 +844,10 @@ def sos_confirmation() -> Screen:
         tx = 347 - (index + 1) * (tw + 8) + 8
         s.rect(tx, types_y, tw, 46, fill=C.danger_soft if active else C.surface_2, radius=14,
                outline=C.danger if active else None, outline_w=1.6 if active else 0)
-        s.i.draw_icon(tx + 22, types_y + 23, icon, 18, C.danger if active else C.muted)
-        s.text(tx + tw - 12, types_y + 14, label, "caption-bold",
-               C.danger if active else C.text_2, align="right", max_width=58)
+        # RTL tile: icon leads from the right edge, label sits to its left
+        s.i.draw_icon(tx + tw - 20, types_y + 23, icon, 18, C.danger if active else C.muted)
+        s.text(tx + tw - 36, types_y + 14, label, "caption-bold",
+               C.danger if active else C.text_2, align="right", max_width=tw - 46)
 
     # hold to send
     btn_y = top + 376
@@ -917,6 +948,13 @@ def trip_completed() -> Screen:
     y += 52
     s.button(201, y, 176, 50, "پایان", icon="mdi-check", variant="filled")
     s.button(16, y, 176, 50, "اشتراک‌گذاری مسیر", icon="mdi-share-variant", variant="tonal")
+    # the sheet runs to the screen edge, so close it with a receipt line instead of
+    # leaving a slab of empty white under the buttons
+    y += 66
+    with s.alpha_layer():
+        s.rect(28, y, 337, 1, fill=(14, 102, 102, 24))
+    s.text(196.5, y + 14, "این سفر در تاریخچه و گزارش ماهانهٔ شما ذخیره شد", "caption",
+           C.muted_2, align="center")
     home_bar(s)
     return s
 

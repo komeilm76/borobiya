@@ -46,12 +46,13 @@ def _availability(on: bool) -> Screen:
     s.rect(188, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
 
     color = C.success if on else C.muted_2
-    s.circle(357 - 28, top + 46, 23, fill=C.success_soft if on else C.surface_3)
-    s.i.draw_icon(357 - 28, top + 46, "mdi-shield-check-outline" if on else "mdi-shield-off-outline",
-                  23, color)
-    s.text(357 - 60, top + 26, "وضعیت امدادگری", "caption", C.muted, align="right")
-    s.text(357 - 60, top + 42, "آمادهٔ دریافت مأموریت", "title-sm", C.text, align="right",
-           max_width=220)
+    # 22px badge, 14px gap to the text block: no longer touches the title
+    s.circle(357 - 24, top + 44, 22, fill=C.success_soft if on else C.surface_3)
+    s.i.draw_icon(357 - 24, top + 44, "mdi-shield-check-outline" if on else "mdi-shield-off-outline",
+                  21, color)
+    s.text(357 - 58, top + 24, "وضعیت امدادگری", "caption", C.muted, align="right")
+    s.text(357 - 58, top + 40, "آمادهٔ دریافت مأموریت", "title-sm", C.text, align="right",
+           max_width=215)
 
     # availability switch, full-width row (big touch target, unmistakable state)
     s.rect(24, top + 82, 345, 58, fill=C.success_soft if on else C.surface_2, radius=16)
@@ -67,14 +68,13 @@ def _availability(on: bool) -> Screen:
             " وضعیت مأموریت ارسال کند.")
     s.para(26, top + 152, body, "caption", C.muted, align="right", max_width=340, line_height=18)
 
-    s.rect(24, top + 202, 166, 38, fill=C.surface_2, radius=12)
-    s.i.draw_icon(24 + 18, top + 221, "mdi-account-group-outline", 16, C.text_2)
-    s.text(24 + 166 - 12, top + 212, "گروه: آتش‌نشانی", "caption-bold", C.text_2, align="right",
-           max_width=120)
-    s.rect(203, top + 202, 166, 38, fill=C.surface_2, radius=12)
-    s.i.draw_icon(203 + 18, top + 221, "mdi-map-marker-radius-outline", 16, C.text_2)
-    s.text(203 + 166 - 12, top + 212, "شعاع ۵ کیلومتر", "caption-bold", C.text_2, align="right",
-           max_width=120)
+    # meta chips: icon on the leading (right) edge, label to its left — RTL order
+    for bx, label, icon in ((24, "آتش‌نشانی", "mdi-account-group-outline"),
+                            (203, "شعاع ۵ کیلومتر", "mdi-map-marker-radius-outline")):
+        s.rect(bx, top + 202, 166, 38, fill=C.surface_2, radius=12)
+        s.i.draw_icon(bx + 166 - 22, top + 221, icon, 16, C.text_2)
+        s.text(bx + 166 - 40, top + 212, label, "caption-bold", C.text_2, align="right",
+               max_width=104)
     home_bar(s)
     return s
 
@@ -263,7 +263,7 @@ def mission_accepted() -> Screen:
     cam = sc.camera(140, 40, 0.175).aim_at(*sc.INCIDENT, 230, 250)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 430, 393, 422)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13, dashed=True, mute=0.35)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -292,14 +292,17 @@ def mission_accepted() -> Screen:
     # status progression ladder
     s.text(357, y, "وضعیت مأموریت", "caption-bold", C.muted, align="right")
     y += 22
-    steps = ["پذیرفته‌شده", "در مسیر", "رسیده", "در حال رسیدگی", "پایان"]
+    # short stage names: a five-step ladder gives each column ~66px, so
+    # "در حال رسیدگی" would ellipsize inside its own cell
+    steps = ["پذیرش", "در مسیر", "رسیده", "رسیدگی", "پایان"]
     step_w = (361 - 8 * (len(steps) - 1)) / len(steps)
     for index, label in enumerate(steps):
-        sx = 16 + index * (step_w + 8)
+        # RTL ladder: the first stage starts at the physical right edge (x = 377)
+        sx = 377 - step_w - index * (step_w + 8)
         active = index == 0
         s.rect(sx, y, step_w, 6, fill=C.primary if active else C.surface_3, radius=3)
         s.text(sx + step_w / 2, y + 12, label, "caption", C.primary if active else C.muted_2,
-               align="center", max_width=step_w + 6)
+               align="center", max_width=step_w - 1)
     y += 44
 
     s.button(16, y, 361, 52, "شروع مسیر تا محل حادثه", icon="mdi-navigation-variant",
@@ -319,7 +322,7 @@ def mission_navigation() -> Screen:
     cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 540)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 668, 393, 184)), pois=False)
     s.top_scrim(200, start=240)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
 
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=14, color=C.primary)
     user_cone(s, cam, *sc.USER, bearing=0)
@@ -329,8 +332,9 @@ def mission_navigation() -> Screen:
     # mission status pill: this is a mission, not a normal trip
     s.shadow(120, 240, 153, 32, radius=16, blur=10, dy=3, color=C.mission, alpha=60)
     s.rect(120, 240, 153, 32, fill=C.mission, radius=16)
-    s.i.draw_icon(150, 256, "mdi-lifebuoy", 15, "#FFFFFF")
-    s.text(258, 248, "مأموریت فعال · لیدر", "caption-bold", "#FFFFFF", align="right", max_width=96)
+    # RTL: glyph sits on the pill's right shoulder, label runs leftwards from it
+    s.i.draw_icon(258, 256, "mdi-lifebuoy", 15, "#FFFFFF")
+    s.text(245, 248, "مأموریت فعال · لیدر", "caption-bold", "#FFFFFF", align="right", max_width=112)
 
     s.icon_button(14, 288, 44, "mdi-volume-high", 20, C.primary, radius=15)
     s.icon_button(14, 340, 44, "mdi-routes", 20, C.text_2, radius=15)
@@ -359,7 +363,7 @@ def mission_alternatives() -> Screen:
     cam = sc.camera(*sc.USER, 0.42).heading_up(28).aim_at(*sc.USER, 196, 330)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 430, 393, 422)), pois=False)
     s.top_scrim(200, start=240)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     draw_route(s, cam, sc.route_world([sc.USER, (0, -120), (0, 120), (260, 120), (260, 240),
                                        sc.INCIDENT]), width_m=12, mute=0.42)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13)
@@ -404,7 +408,7 @@ def mission_arrived() -> Screen:
     cam = sc.camera(140, 60, 0.24).aim_at(*sc.INCIDENT, 196, 360)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 470, 393, 382)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=12, mute=0.35)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -452,7 +456,7 @@ def mission_in_progress() -> Screen:
     cam = sc.camera(140, 60, 0.235).aim_at(*sc.INCIDENT, 196, 300)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 372, 393, 480)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
@@ -513,7 +517,7 @@ def support_request() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 200)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
     scrim(s, 60, top=250, height=602)
 
@@ -543,12 +547,13 @@ def support_request() -> Screen:
     s.text(357, y, "تعداد نیرو", "caption-bold", C.muted, align="right")
     y += 22
     s.rect(16, y, 361, 56, fill=C.surface_2, radius=16)
-    s.circle(357 - 30, y + 28, 19, fill="#FFFFFF", outline=C.outline_strong, outline_w=1.2)
-    s.i.draw_icon(357 - 30, y + 28, "mdi-minus", 18, C.text_2)
-    s.text(357 - 96, y + 12, "۲", "metric-sm", C.text, align="center")
-    s.text(357 - 96, y + 38, "نفر", "caption", C.muted, align="center")
-    s.circle(357 - 160, y + 28, 19, fill=C.primary)
-    s.i.draw_icon(357 - 160, y + 28, "mdi-plus", 18, "#FFFFFF")
+    # RTL stepper: "+" on the leading (right) edge, "−" on the trailing edge
+    s.circle(357 - 30, y + 28, 20, fill=C.primary)
+    s.i.draw_icon(357 - 30, y + 28, "mdi-plus", 19, "#FFFFFF")
+    s.text(357 - 108, y + 12, "۲", "metric-sm", C.text, align="center")
+    s.text(357 - 108, y + 38, "نفر", "caption", C.muted, align="center")
+    s.circle(357 - 188, y + 28, 20, fill="#FFFFFF", outline=C.outline_strong, outline_w=1.2)
+    s.i.draw_icon(357 - 188, y + 28, "mdi-minus", 19, C.text_2)
     y += 70
 
     s.text(357, y, "یادداشت برای تیم پشتیبان", "caption-bold", C.muted, align="right")
@@ -583,7 +588,7 @@ def support_pending() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 260)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 336, 393, 516)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
 
@@ -647,7 +652,7 @@ def support_accepted() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 320)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 430, 393, 422)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -717,7 +722,7 @@ def team_leader() -> Screen:
     cam = sc.camera(140, 60, 0.21).aim_at(*sc.INCIDENT, 196, 240)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
@@ -732,40 +737,66 @@ def team_leader() -> Screen:
     y = sheet_header(s, top + 22, "داشبورد تیم اعزامی", "مأموریت آتش‌سوزی · لیدر: شما",
                      icon="mdi-account-group-outline", tone="mission", title_style="title")
 
-    s.rect(16, y, 361, 60, fill=C.mission_soft, radius=16)
-    s.text(357, y + 10, "۳ نفر در محل حادثه · ۱ نفر در راه", "label", C.mission, align="right")
+    s.rect(16, y, 361, 78, fill=C.mission_soft, radius=16)
+    s.text(357, y + 9, "۳ نفر در محل حادثه · ۱ نفر در راه", "label", C.mission, align="right")
     s.text(357, y + 30, "زمان اعزام: ۹:۴۹ · حضور تیم: ۲ دقیقه پیش", "caption", C.muted,
            align="right")
-    y += 72
+    # walkie-talkie status: the channel is open to the dispatched team only
+    s.chip(24, y + 48, "کانال بیسیم باز", "mdi-access-point", "success", h=22)
+    y += 90
 
+    # Section header doubles as the press-to-talk instruction, so no extra help card
+    # is needed: the gesture is explained where the control lives.
     s.text(357, y, "اعضای تیم", "caption-bold", C.muted, align="right")
     s.text(300, y, "۴ عضو", "caption", C.muted_2, align="right")
+    hint_w = s.tw("نگه دارید تا صحبت کنید", "caption")
+    s.text(26, y, "نگه دارید تا صحبت کنید", "caption", C.mission, align="left")
+    s.i.draw_icon(26 + hint_w + 11, y + 9, "mdi-gesture-tap-hold", 15, C.mission)
     y += 22
-    members = [("م", "شما", "در محل حادثه · لیدر", "success", "mdi-shield-star-outline"),
-               ("س", "سعید کریمی", "در راه است · ۳ دقیقه", "warning", "mdi-car"),
-               ("ز", "زهرا احمدی", "در محل حادثه · در حال امداد", "success", "mdi-fire"),
-               ("ع", "علی موسوی", "در محل حادثه · آماده", "success", "mdi-account-check")]
-    for initial, name, state, tone, icon in members:
-        s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
-        s.circle(357 - 22, y + 27, 15, fill=C.primary_soft)
-        s.text(357 - 22, y + 19, initial, "label", C.primary, align="center")
-        s.text(357 - 46, y + 7, name, "label", C.text, align="right")
-        s.text(357 - 46, y + 29, state, "caption",
-               C.success if tone == "success" else C.warning, align="right")
-        s.i.draw_icon(34, y + 27, icon, 18, C.muted)
-        s.i.draw_icon(60, y + 27, "mdi-chevron-left", 16, C.muted_2)
-        y += 60
+
+    # (initial, name, state, tone, role icon, transmitting, seconds)
+    members = [("م", "شما", "در محل حادثه · لیدر", "success", "mdi-shield-star-outline", False, ""),
+               ("س", "سعید کریمی", "در راه است · ۳ دقیقه", "warning", "mdi-car", True, "۰:۰۴"),
+               ("ز", "زهرا احمدی", "در محل حادثه · در حال امداد", "success", "mdi-fire", False, ""),
+               ("ع", "علی موسوی", "در محل حادثه · آماده", "success", "mdi-account-check", False, "")]
+    for initial, name, state, tone, icon, talking, timer in members:
+        h = 50
+        if talking:
+            # transmitting row: amber mission tone + waveform, never the red alert tone
+            s.rect(16, y, 361, h, fill=C.mission_soft, radius=14, outline=C.mission,
+                   outline_w=1.4)
+        else:
+            s.rect(16, y, 361, h, fill=C.surface_2, radius=14)
+        s.circle(357 - 20, y + 25, 14, fill=C.primary_soft)
+        s.text(357 - 20, y + 18, initial, "label", C.primary, align="center")
+        s.text(357 - 42, y + 6, name, "label", C.text, align="right")
+        state_color = C.success if tone == "success" else C.warning
+        s.text(357 - 42, y + 26, ("در حال صحبت…" if talking else state), "caption",
+               C.mission if talking else state_color, align="right")
+
+        if name == "شما":
+            # you are the sender's own row: no self-PTT, show the leader badge instead
+            s.rect(16 + 10, y + 25 - 11, 52, 22, fill=C.mission_soft, radius=11)
+            s.text(16 + 10 + 26, y + 19, "لیدر", "caption-bold", C.mission, align="center")
+        elif talking:
+            # live waveform + hold-to-talk button in its pressed state
+            for index, bar in enumerate((6, 12, 18, 10, 15, 7)):
+                s.rect(78 + index * 6, y + 25 - bar / 2, 3, bar,
+                       fill=C.mission if index % 2 == 0 else "#C08A52", radius=1.5)
+            s.text(120, y + 18, timer, "caption-bold", C.mission, align="left")
+            s.circle(16 + 26, y + 25, 17, fill=C.mission, outline="#FFFFFF", outline_w=1.6)
+            s.i.draw_icon(16 + 26, y + 25, "mdi-microphone", 18, "#FFFFFF")
+        else:
+            s.circle(16 + 26, y + 25, 17, fill="#FFFFFF", outline=C.outline, outline_w=1)
+            s.i.draw_icon(16 + 26, y + 25, "mdi-microphone-outline", 17, C.text_2)
+        y += h + 6
     y += 2
 
-    for bx, label, icon in ((16, "تماس گروهی", "mdi-phone-outline"),
-                            (201, "موقعیت تیم", "mdi-map-marker-path")):
-        right = bx + 176
-        s.rect(bx, y, 176, 46, fill=C.surface_2, radius=14)
-        s.i.draw_icon(right - 22, y + 23, icon, 17, C.primary)
-        s.text(right - 42, y + 13, label, "label", C.text_2, align="right", max_width=110)
-    y += 60
+    s.button(16, y, 361, 44, "نمایش موقعیت تیم روی نقشه", icon="mdi-map-marker-path",
+             variant="outline")
+    y += 54
 
-    s.button(16, y, 361, 50, "ثبت گزارش و پایان مأموریت", icon="mdi-clipboard-check-outline",
+    s.button(16, y, 361, 48, "ثبت گزارش و پایان مأموریت", icon="mdi-clipboard-check-outline",
              variant="filled", shadow=True)
     home_bar(s)
     return s
@@ -779,7 +810,7 @@ def mission_cancel() -> Screen:
     s = map_view(cam, pois=False)
     s.top_scrim(150)
     scrim(s, 130)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
 
     top = 300
@@ -840,7 +871,7 @@ def mission_report() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 180)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 246, 393, 606)))
     s.top_scrim(120)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
     scrim(s, 60, top=236, height=616)
 
@@ -985,7 +1016,7 @@ def mission_offline() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 80, 0.19)
     s = map_view(cam, pois=False)
     scrim(s, 40)
-    chrome(s, tab=2)
+    chrome(s, tab=2, locked=True)
     s.rect(0, 116, 393, 44, fill=C.warning)
     s.i.draw_icon(357 - 22, 138, "mdi-wifi-off", 17, "#FFFFFF")
     s.text(357 - 40, 130, "اتصال قطع است · تلاش دوباره برای اتصال", "caption-bold", "#FFFFFF",

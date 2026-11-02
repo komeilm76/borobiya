@@ -20,7 +20,7 @@ from PIL import Image, ImageFilter
 
 from .prims import Screen
 from .text import fa_digits, solid
-from .theme import C
+from .theme import C, VIEW_H, VIEW_W
 
 GRID_ANGLE = -13.0
 _ROT = math.radians(GRID_ANGLE)
@@ -71,6 +71,29 @@ class Camera:
         h = screen.h if screen is not None else 852
         sx, sy = self.project(x, y, screen)
         return -margin <= sx <= w + margin and -margin <= sy <= h + margin
+
+
+def fit_camera(points: Sequence[tuple[float, float]], box: tuple[float, float, float, float],
+               padding: float = 0.88, max_ppu: float = 0.55) -> Camera:
+    """Camera that frames a world polyline inside a screen box (x0, y0, x1, y1).
+
+    Used when a route must stay clear of fixed chrome: the header control and the
+    bottom sheet define a band, and the route is fitted to that band instead of
+    being drawn from a hand-tuned camera that can drift under the header.
+    """
+    x0, y0, x1, y1 = box
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    span_x = max(1e-6, max(xs) - min(xs))
+    span_y = max(1e-6, max(ys) - min(ys))
+    ppu = min((x1 - x0) / span_x, (y1 - y0) / span_y) * padding
+    ppu = min(ppu, max_ppu)
+    centre_x = (min(xs) + max(xs)) / 2
+    centre_y = (min(ys) + max(ys)) / 2
+    target_x = (x0 + x1) / 2
+    target_y = (y0 + y1) / 2
+    return Camera((centre_x - (target_x - VIEW_W / 2) / ppu,
+                   centre_y + (target_y - VIEW_H / 2) / ppu), ppu)
 
 
 @dataclass
@@ -379,6 +402,13 @@ def draw_labels(screen: Screen, cam: Camera, level: str = "auto", max_minor: int
     if cam.ppu < 0.085:
         return
     placed: list[tuple[float, float, float, float]] = list(exclude)
+    # POI pins are drawn after the labels, so reserve their boxes up front:
+    # otherwise a street name slides under a pin and reads as its caption.
+    if cam.ppu >= 0.11:
+        for poi in CITY["pois"]:
+            px, py = cam.project_grid(poi.u, poi.v, screen)
+            if -20 < px < screen.w + 20 and 40 < py < screen.h - 40:
+                placed.append((px - 13, py - 13, px + 13, py + 13))
     seen: set[str] = set()
     priority = {"motorway": 0, "primary": 1, "secondary": 2, "residential": 3}
     ordered = sorted(enumerate(CITY["roads"]), key=lambda pair: priority[pair[1].kind])
@@ -411,7 +441,17 @@ def draw_labels(screen: Screen, cam: Camera, level: str = "auto", max_minor: int
         style = "caption-bold" if road.kind in ("motorway", "primary") else "caption"
         color = "#5F6E66" if road.kind in ("motorway", "primary", "secondary") else "#7C8B84"
         box = _label_box(screen, x, y, road.name, style)
-        if _collides(box, placed):
+        # A pin or another name in the way? Slide the caption along the road before
+        # giving up — losing the street name entirely leaves a blank patch of map.
+        span = (box[2] - box[0]) * 0.62 + 18
+        for shift in (0.0, span, -span):
+            cand = (box[0] + shift, box[1], box[2] + shift, box[3] + shift - shift)
+            if not (8 < cand[0] and cand[2] < screen.w - 8):
+                continue
+            if not _collides(cand, placed):
+                box, x = cand, x + shift
+                break
+        else:
             continue
         placed.append(box)
         seen.add(road.name)

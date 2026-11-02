@@ -23,20 +23,23 @@ def _page(top: float) -> Screen:
 def _summary_card(s: Screen, y: float, headline: str, metrics):
     s.shadow(16, y, 361, 100, radius=20, blur=18, dy=6, alpha=26)
     s.rect(16, y, 361, 100, fill=C.primary, radius=20)
-    s.text(357, y + 16, headline, "caption", "#BFE0DC", align="right")
-    s.text(357, y + 34, "آبان ۱۴۰۵", "title-sm", "#FFFFFF", align="right")
-    s.text(357, y + 62, "۱۲ سفر ثبت‌شده", "caption", "#A9D2CD", align="right")
+    s.text(357, y + 14, headline, "caption", "#BFE0DC", align="right")
+    s.text(357, y + 32, "آبان ۱۴۰۵", "title-sm", "#FFFFFF", align="right")
+    s.text(40, y + 20, "۱۲ سفر ثبت‌شده", "caption", "#A9D2CD", align="left")
+    with s.alpha_layer():
+        s.rect(28, y + 56, 345, 1, fill=(255, 255, 255, 42))
     for index, (value, label) in enumerate(metrics):
-        # metrics grow from the physical left edge so they never collide with the
-        # right-aligned month label (RTL reading order still ends at the right).
-        cx = 40 + index * 78
-        s.text(cx, y + 28, value, "title-sm", "#FFFFFF", align="center")
-        s.text(cx, y + 56, label, "caption", "#A9D2CD", align="center")
+        # RTL: the first metric sits at the physical right edge and the row runs leftwards
+        cx = 16 + 361 - (361 / 3) * (index + 0.5)
+        s.text(cx, y + 64, value, "title-sm", "#FFFFFF", align="center")
+        s.text(cx, y + 82, label, "caption", "#A9D2CD", align="center")
     return y + 112
 
 
 def _trip_card(s: Screen, y: float, item: dict, selected: bool = False) -> float:
-    h = item.get("height", 132)
+    # 4 text lines (14 + 58 + 18) + rule + meta row need ~146px, else the divider
+    # cuts through the "to" address line.
+    h = item.get("height", 146)
     s.shadow(16, y, 361, h, radius=18, blur=14, dy=4, alpha=20)
     s.rect(16, y, 361, h, fill="#FFFFFF", radius=18,
            outline=C.primary if selected else C.outline, outline_w=1.6 if selected else 1)
@@ -68,8 +71,6 @@ def _trip_card(s: Screen, y: float, item: dict, selected: bool = False) -> float
             cx += 24
     else:
         s.i.draw_icon(30, y + h - 24, "mdi-account-outline", 15, C.muted_2)
-    s.i.draw_icon(357 - 8 - s.tw(f"{item['distance']} · {item['duration']} · {item['mode']}", "caption-bold") - 6,
-                  y + h - 24, "mdi-chevron-left", 16, C.muted_2)
     return y + h + 12
 
 
@@ -113,8 +114,8 @@ def history_user() -> Screen:
     s.i.draw_icon(16 + 265 - 22, y + 22, "mdi-magnify", 18, C.muted_2)
     s.text(16 + 265 - 40, y + 10, "جستجو در سوابق", "body-sm", C.muted_2, align="right")
     s.rect(289, y, 88, 44, fill=C.primary_soft, radius=14)
-    s.i.draw_icon(289 + 20, y + 22, "mdi-tune-variant", 18, C.primary)
-    s.text(289 + 66, y + 10, "فیلتر", "body-sm", C.primary, align="right")
+    s.i.draw_icon(289 + 88 - 20, y + 22, "mdi-tune-variant", 18, C.primary)
+    s.text(289 + 88 - 36, y + 10, "فیلتر", "body-sm", C.primary, align="right")
     y += 58
 
     y = _summary_card(s, y, "خلاصهٔ سفرهای این ماه", [("۱۲", "سفر"), ("۴۸٫۲", "کیلومتر"),
@@ -145,8 +146,8 @@ def history_companions() -> Screen:
     s.i.draw_icon(16 + 265 - 22, y + 22, "mdi-magnify", 18, C.muted_2)
     s.text(16 + 265 - 40, y + 10, "جستجوی همراه", "body-sm", C.muted_2, align="right")
     s.rect(289, y, 88, 44, fill=C.primary_soft, radius=14)
-    s.i.draw_icon(289 + 20, y + 22, "mdi-tune-variant", 18, C.primary)
-    s.text(289 + 66, y + 10, "فیلتر", "body-sm", C.primary, align="right")
+    s.i.draw_icon(289 + 88 - 20, y + 22, "mdi-tune-variant", 18, C.primary)
+    s.text(289 + 88 - 36, y + 10, "فیلتر", "body-sm", C.primary, align="right")
     y += 58
 
     s.text(377, y, "افراد همراه شما", "caption-bold", C.muted, align="right")
@@ -158,21 +159,22 @@ def history_companions() -> Screen:
               ("زهرا احمدی", "۳ سفر مشترک", "آخرین سفر: ۲۴ آبان", "ز", C.success),
               ("علی موسوی", "۲ سفر مشترک", "آخرین سفر: ۱۹ آبان", "ع", C.mission)]
     for name, count, last, initial, color in people:
-        s.shadow(16, y, 361, 68, radius=16, blur=12, dy=3, alpha=16)
-        s.rect(16, y, 361, 68, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
-        s.circle(357 - 34, y + 34, 22, fill=C.primary_soft)
-        s.text(357 - 34, y + 26, initial, "title-sm", C.primary, align="center")
-        s.text(357 - 66, y + 12, name, "label-lg", C.text, align="right")
-        s.text(357 - 66, y + 34, count, "caption", C.muted, align="right")
-        s.text(357 - 66, y + 50, last, "caption-bold", C.muted_2, align="right")
-        s.i.draw_icon(24, y + 34, "mdi-chevron-left", 18, C.muted_2)
-        y += 78
+        # three stacked lines need 72px: at 68 the last line's descenders were clipped
+        s.shadow(16, y, 361, 72, radius=16, blur=12, dy=3, alpha=16)
+        s.rect(16, y, 361, 72, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
+        s.circle(357 - 34, y + 36, 22, fill=C.primary_soft)
+        s.text(357 - 34, y + 27, initial, "title-sm", C.primary, align="center")
+        s.text(357 - 66, y + 7, name, "label-lg", C.text, align="right")
+        s.text(357 - 66, y + 28, count, "caption", C.muted, align="right")
+        s.text(357 - 66, y + 45, last, "caption-bold", C.muted_2, align="right")
+        s.i.draw_icon(22, y + 36, "mdi-chevron-left", 18, C.muted_2)
+        y += 81
 
-    s.rect(16, y, 361, 78, fill=C.surface_2, radius=16)
+    s.rect(16, y, 361, 96, fill=C.surface_2, radius=16)
     s.i.draw_icon(357, y + 20, "mdi-shield-account-outline", 18, C.muted)
     s.text(335, y + 10, "حریم خصوصی همراهان", "caption-bold", C.text_2, align="right")
     # paragraph() takes the block's LEFT edge, so a right-aligned block ends at 35 + 300.
-    s.para(35, y + 28, "فقط سفرهای مشترک با شما نمایش داده می‌شود؛ موقعیت زندهٔ آن‌ها در دسترس نیست.",
+    s.para(35, y + 30, "فقط سفرهای مشترک با شما نمایش داده می‌شود؛ موقعیت زندهٔ آن‌ها در دسترس نیست.",
            "caption", C.muted, align="right", max_width=300, line_height=17)
     home_bar(s)
     return s
@@ -382,8 +384,8 @@ def history_loading() -> Screen:
         s.rect(30, y0 + h - 30, 120, 10, fill=C.surface_3, radius=5)
 
     for index in range(3):
-        skeleton(y + index * 144, 132)
-    s.text(196.5, y + 3 * 144 + 6, "بارگذاری صفحهٔ ۱ از ۳", "caption", C.muted_2, align="center")
+        skeleton(y + index * 152, 146)
+    s.text(196.5, y + 3 * 152 + 8, "بارگذاری صفحهٔ ۱ از ۳", "caption", C.muted_2, align="center")
     home_bar(s)
     return s
 
@@ -395,13 +397,15 @@ def history_empty() -> Screen:
     s.text(377, y, "تاریخچه", "display", C.text, align="right")
     s.text(377, y + 38, "سوابق سفرها و همراهان شما", "caption", C.muted, align="right")
     y += 62
-    segmented_small(s, 16, y, 361, ["مسیرهای من", "همراهان"], active=0, counts=["۰", "۰"])
-    y += 70
+    # no counts here: a lone Persian zero renders as a dot and reads as a glitch
+    segmented_small(s, 16, y, 361, ["مسیرهای من", "همراهان"], active=0)
+    # the whole empty block is short, so push it down to sit optically centred
+    y += 130
 
-    # illustrative empty card with a dashed route
-    s.rect(16, y, 361, 150, fill="#FFFFFF", radius=20, outline=C.outline, outline_w=1)
-    s.dashed_route_illustration(196.5, y + 46, 250)
-    y += 172
+    # illustrative empty card with a dashed route (compact, so it does not read as a blank panel)
+    s.rect(16, y, 361, 104, fill="#FFFFFF", radius=20, outline=C.outline, outline_w=1)
+    s.dashed_route_illustration(196.5, y + 52, 250)
+    y += 126
 
     s.circle(196.5, y + 34, 32, fill=C.primary_soft)
     s.i.draw_icon(196.5, y + 34, "mdi-map-marker-path", 30, C.primary)
@@ -410,8 +414,6 @@ def history_empty() -> Screen:
            "body-sm", C.muted, align="center", max_width=280)
     s.button(96.5, y + 172, 200, 50, "شروع مسیریابی", icon="mdi-navigation-variant",
              variant="filled", shadow=True)
-    s.text(196.5, y + 238, "سوابق پیش از این تاریخ در دسترس نیستند", "caption", C.muted_2,
-           align="center")
     home_bar(s)
     return s
 

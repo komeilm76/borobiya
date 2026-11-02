@@ -38,4 +38,5 @@ Rendering is deterministic: no randomness outside the fixed city seed, so diffs 
 the PNGs always mean a real design change.
 
 `_preview-*.png` files next to this folder are quick contact sheets for review and
-are not part of the deliverable set.
+are not part of the deliverable set; regenerate them with
+`python render.py <section> --sheet`.

@@ -90,8 +90,8 @@ def quick_chips(screen: Screen, y: float, items: Sequence[tuple[str, str]], from
         cursor -= width
         screen.shadow(cursor, y, width, 36, radius=18, blur=12, dy=4, alpha=34)
         screen.rect(cursor, y, width, 36, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
-        screen.i.draw_icon(cursor + 20, y + 18, icon, 16, C.primary)
-        screen.text(cursor + 32, y + 9, label, "caption-bold", C.text_2)
+        screen.i.draw_icon(cursor + width - 18, y + 18, icon, 16, C.primary)
+        screen.text(cursor + width - 32, y + 9, label, "caption-bold", C.text_2, align="right")
         cursor -= 8
     return cursor
 
@@ -108,6 +108,42 @@ def fab(screen: Screen, x: float, y: float, d: float, icon: str, color: str = C.
         tw = screen.tw(label, "caption-bold") + 16
         screen.rect(x + d / 2 - tw / 2, y + d + 6, tw, 20, fill=C.text, radius=6)
         screen.text(x + d / 2, y + d + 9, label, "caption-bold", "#FFFFFF", align="center")
+
+
+def sos_button(screen: Screen, cx: float, cy: float, r: float = 30, wide: bool = True):
+    """Emergency control: a labelled alarm pill, never a bare red disc.
+
+    Anatomy, and why:
+      * a labelled pill (“SOS” + alarm-light glyph) is unmistakable next to the round
+        map fabs, and the icon carries the meaning for colour-blind users;
+      * a thin, dimmed halo ring separates it from the map without turning into a
+        glowing blob over street labels;
+      * a white rim keeps the shape crisp over roads;
+      * it stays above the thumb zone and is confirmed in a second step.
+    """
+    h = r * 2
+    w = h * 1.86 if wide else h
+    with screen.alpha_layer():
+        screen.rect(cx - w / 2 - 5, cy - h / 2 - 5, w + 10, h + 10, fill=(184, 63, 66, 30),
+                    radius=(h + 10) / 2)
+    screen.shadow(cx - w / 2, cy - h / 2 + 6, w, h, radius=h / 2, blur=18, dy=6,
+                  color=C.danger, alpha=96)
+    screen.rect(cx - w / 2, cy - h / 2, w, h, fill=C.danger, radius=h / 2,
+                outline="#FFFFFF", outline_w=2.4)
+    if wide:
+        # RTL: glyph on the right, label to its left, measured so the pair is centred
+        label = "SOS"
+        label_w = screen.tw(label, "label-lg")
+        glyph = r * 0.86
+        gap = 9
+        total = label_w + gap + glyph
+        left = cx - total / 2
+        screen.text(left, cy - 10, label, "label-lg", "#FFFFFF", align="left")
+        screen.i.draw_icon(left + label_w + gap + glyph / 2, cy, "mdi-alarm-light", glyph,
+                           "#FFFFFF")
+    else:
+        screen.i.draw_icon(cx, cy - h * 0.13, "mdi-alarm-light", r * 0.76, "#FFFFFF")
+        screen.text(cx, cy + h * 0.10, "SOS", "caption-bold", "#FFFFFF", align="center")
 
 
 def sheet_header(screen: Screen, top: float, title: str, subtitle: str | None = None,
@@ -140,12 +176,16 @@ def card_title_row(screen: Screen, x: float, y: float, w: float, title: str, sub
     """Icon + two-line title used by floating map cards (RTL: icon on the right)."""
     color = {"primary": C.primary, "danger": C.danger, "mission": C.mission,
              "success": C.success, "warning": C.warning}[tone]
-    screen.circle(x + w - 22, y + 20, 22, fill=_tint(color, 0.14))
-    screen.i.draw_icon(x + w - 22, y + 20, icon, 21, color)
-    right = x + w - 52
-    screen.text(right, y + 2, title, "title", C.text, align="right", max_width=right - x - 4)
-    screen.text(right, y + 30, subtitle, "caption", C.muted, align="right", max_width=right - x - 4)
-    return y + 52
+    # 10px inset from the card edge and 6px from its top: at a 26px corner radius a
+    # circle drawn closer than that visually collides with the rounded corner.
+    cx, cy, r = x + w - 10 - 20, y + 6 + 20, 20
+    screen.circle(cx, cy, r, fill=_tint(color, 0.14))
+    screen.i.draw_icon(cx, cy, icon, 20, color)
+    right = cx - r - 15
+    screen.text(right, y + 4, title, "title", C.text, align="right", max_width=right - x - 8)
+    screen.text(right, y + 32, subtitle, "caption", C.muted, align="right",
+                max_width=right - x - 8)
+    return y + 54
 
 
 def segmented_small(screen: Screen, x: float, y: float, w: float, items: Sequence[str], active: int,
@@ -174,7 +214,12 @@ def metric_tiles(screen: Screen, x: float, y: float, w: float, items: Sequence[t
     for index, (label, value, icon) in enumerate(items):
         tx = x + index * (tw + gap)
         screen.rect(tx, y, tw, h, fill=surface, radius=R.sm)
-        screen.text(tx + tw - 10, y + 8, label, "caption", C.muted, align="right",
+        # RTL: icon sits on the tile's right shoulder, caption ends just left of it
+        label_right = tx + tw - 10
+        if icon:
+            screen.i.draw_icon(tx + tw - 17, y + 20, icon, 15, C.muted_2)
+            label_right = tx + tw - 32
+        screen.text(label_right, y + 8, label, "caption", C.muted, align="right",
                     max_width=tw - 20)
         # A metric that ends in "…" reads as a bug, so step the value down a size
         # instead of ellipsizing it inside a narrow tile.
@@ -184,8 +229,6 @@ def metric_tiles(screen: Screen, x: float, y: float, w: float, items: Sequence[t
         offset = {"metric-sm": 26, "title-sm": 30, "title": 30}[style]
         screen.text(tx + tw - 10, y + offset, value, style, C.text, align="right",
                     max_width=inner)
-        if icon:
-            screen.i.draw_icon(tx + 14, y + 20, icon, 15, C.muted_2)
 
 
 def notice(screen: Screen, x: float, y: float, w: float, text: str, tone: str = "warning",
@@ -225,8 +268,10 @@ def key_row(screen: Screen, x: float, y: float, w: float, label: str, value: str
             icon: str | None = None, value_color: str = C.text, hint: str | None = None) -> float:
     """Right-aligned label/value row used in detail sheets."""
     if icon:
-        screen.i.draw_icon(x + 18, y + 10, icon, 17, C.muted_2)
-    screen.text(x + 34, y, label, "body-sm", C.muted, align="right", max_width=w - 100)
+        screen.i.draw_icon(x + w - 8, y + 10, icon, 17, C.muted_2)
+        screen.text(x + w - 26, y, label, "body-sm", C.muted, align="right", max_width=w - 120)
+    else:
+        screen.text(x + w, y, label, "body-sm", C.muted, align="right", max_width=w - 100)
     screen.text(x + w, y, value, "label", value_color, align="right", max_width=w * 0.56)
     if hint:
         screen.text(x + w, y + 20, hint, "caption", C.muted_2, align="right")
