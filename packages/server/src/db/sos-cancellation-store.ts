@@ -1,7 +1,8 @@
 import { and, asc, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
-import type { CancellationInput, CancellationReason } from "@borobiya/shared";
+import { readAdminSettingBoolean, readAdminSettingNumber, type CancellationInput, type CancellationReason } from "@borobiya/shared";
 import type { Database } from "./client";
 import { adminAlerts, cancellationReasons, missionProposals, missions, missionStatusHistory, sosRequests, users } from "./schema";
+import { defaultAppSettingsReader, type AppSettingsReader } from "./app-settings-store";
 
 export interface RequesterCancellationNotice {
   missionId: string;
@@ -38,7 +39,14 @@ export interface SosCancellationStore {
 }
 
 export class DrizzleSosCancellationStore implements SosCancellationStore {
-  constructor(private readonly db: Database) {}
+  /**
+   * `settings` defaults to the shared registry's defaults, so every existing construction (and every test)
+   * keeps the documented thresholds without knowing the settings table exists.
+   */
+  constructor(
+    private readonly db: Database,
+    private readonly settings: AppSettingsReader = defaultAppSettingsReader
+  ) {}
 
   async listReasons(type: "requester" | "rescuer"): Promise<CancellationReason[]> {
     return this.db.select().from(cancellationReasons)
@@ -111,6 +119,14 @@ export class DrizzleSosCancellationStore implements SosCancellationStore {
   }
 
   async cancelMissionAsRescuer(missionId: string, rescuerId: string, input: CancellationInput): Promise<RescuerCancellationResult> {
+    const threshold = readAdminSettingNumber(
+      "alerts.cancellation_daily_threshold",
+      await this.settings.readValue("alerts.cancellation_daily_threshold")
+    );
+    const notifyOtherReason = readAdminSettingBoolean(
+      "alerts.other_reason_notify",
+      await this.settings.readValue("alerts.other_reason_notify")
+    );
     return this.db.transaction(async (tx): Promise<RescuerCancellationResult> => {
       // Discover the request without locking the mission. Proposal acceptance and progress
       // both lock SOS → rescuer → mission; recheck identity and status under those locks.
@@ -163,12 +179,15 @@ export class DrizzleSosCancellationStore implements SosCancellationStore {
         eq(missions.rescuerId, rescuerId), eq(missions.status, "cancelled_by_rescuer"),
         gte(missions.cancelledAt, start), lt(missions.cancelledAt, end)
       ));
-      const reviewRequired = (daily?.total ?? 0) > 2 || reason.key === "other";
-      if ((daily?.total ?? 0) > 2) await tx.insert(adminAlerts).values({
+      // The threshold and the "other reason" switch are operational settings an admin owns; both default
+      // to the behaviour this store had when they were constants.
+      const overThreshold = (daily?.total ?? 0) > threshold;
+      const reviewRequired = overThreshold || reason.key === "other";
+      if (overThreshold) await tx.insert(adminAlerts).values({
         type: "rescuer_cancel_review", userId: rescuerId, missionId: mission.id,
-        details: { countToday: daily?.total, date: start.toISOString().slice(0, 10) }
+        details: { countToday: daily?.total, date: start.toISOString().slice(0, 10), threshold }
       }).onConflictDoNothing();
-      if (reason.key === "other") await tx.insert(adminAlerts).values({
+      if (reason.key === "other" && notifyOtherReason) await tx.insert(adminAlerts).values({
         type: "rescuer_other_reason_approval", userId: rescuerId, missionId: mission.id,
         details: { reasonId: reason.id }
       }).onConflictDoNothing();

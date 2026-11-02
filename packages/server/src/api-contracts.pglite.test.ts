@@ -33,6 +33,10 @@ import { DrizzleSyncStore } from "./db/sync-store";
 import { DrizzleSosCancellationStore } from "./db/sos-cancellation-store";
 import { DrizzleSosPhotoStore } from "./db/sos-photo-store";
 import { DrizzleSosRequestStore } from "./db/sos-request-store";
+import { DrizzleAdminAuditStore } from "./db/admin-audit-store";
+import { DrizzleAdminAlertStore } from "./db/admin-alert-store";
+import { DrizzleAdminStatsStore } from "./db/admin-stats-store";
+import { DrizzleAppSettingsStore } from "./db/app-settings-store";
 import { DrizzleUserSearchStore } from "./db/user-search-store";
 import { createPhotoStorage } from "./sos/photo-storage";
 import { signedPhotoPath } from "./sos/photo-access";
@@ -181,7 +185,11 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       sosDispatchStore: new DrizzleSosDispatchStore(db),
       missionProgressStore: new DrizzleMissionProgressStore(db),
       syncStore: new DrizzleSyncStore(db),
-      sosCancellationStore: new DrizzleSosCancellationStore(db),
+      sosCancellationStore: new DrizzleSosCancellationStore(db, new DrizzleAppSettingsStore(db)),
+      auditStore: new DrizzleAdminAuditStore(db),
+      alertStore: new DrizzleAdminAlertStore(db),
+      settingsStore: new DrizzleAppSettingsStore(db),
+      statsStore: new DrizzleAdminStatsStore(db),
       photoStore: new DrizzleSosPhotoStore(db),
       photoStorage: createPhotoStorage(uploadDir),
       hashPassword: fastTestHash,
@@ -1200,6 +1208,94 @@ describe("All implemented HTTP API contracts end-to-end against migrated PGlite"
       apiRoutes.user.devices, 200, { url: apiRoutes.user.devices.url, headers: requesterHeaders }
     );
     expect(sessionsAfter.map(row => row.id)).not.toContain(remoteSession.id);
+
+    // 22. Administrative governance: audit trail, alert queue, settings and aggregate counters.
+    // The audit page is read before the settings write below so it cannot be empty by construction.
+    const auditPage = await callContract<{
+      items: Array<{ id: string; action: string; adminUsername: string | null; createdAt: string }>;
+      total: number;
+      totalPages: number;
+    }>(apiRoutes.admin.listAudit, 200, {
+      url: `${apiRoutes.admin.listAudit.url}?limit=5`,
+      headers: adminHeaders
+    });
+    expect(auditPage.total).toBeGreaterThan(0);
+    expect(auditPage.items[0]?.action).toBeTruthy();
+    expect(auditPage.items[0]?.adminUsername).toBe("ops_admin");
+    // The filter narrows to actions that did not happen: an empty page, not an error.
+    const filteredAudit = await callContract<{ items: unknown[]; total: number }>(apiRoutes.admin.listAudit, 200, {
+      url: `${apiRoutes.admin.listAudit.url}?action=no_such_action`,
+      headers: adminHeaders
+    });
+    expect(filteredAudit.total).toBe(0);
+
+    const alertId = "99000000-0000-4000-8000-0000000000a1";
+    await pg.query(
+      `INSERT INTO admin_alerts (id,type,user_id,mission_id,details) VALUES ($1,'rescuer_cancel_review',$2,$3,$4::jsonb)`,
+      [alertId, createdResponder.id, accepted.missionId, JSON.stringify({ countToday: 3 })]
+    );
+    const openAlerts = await callContract<{ items: Array<{ id: string; resolvedAt: string | null; sosRequestId: string | null }>; total: number }>(
+      apiRoutes.admin.listAlerts, 200,
+      { url: `${apiRoutes.admin.listAlerts.url}?resolved=false`, headers: adminHeaders }
+    );
+    expect(openAlerts.items.map((alert) => alert.id)).toContain(alertId);
+    const resolvedAlert = await callContract<{ id: string; resolvedAt: string | null }>(
+      apiRoutes.admin.resolveAlert, 200,
+      { url: apiRoutes.admin.resolveAlert.url.replace(":id", alertId), headers: adminHeaders }
+    );
+    expect(resolvedAlert.id).toBe(alertId);
+    expect(resolvedAlert.resolvedAt).not.toBeNull();
+    // Re-resolving is a no-op, not a conflict: two admins on one queue is normal.
+    expect((await app.inject({
+      method: "POST",
+      url: apiRoutes.admin.resolveAlert.url.replace(":id", alertId),
+      headers: adminHeaders
+    })).statusCode).toBe(200);
+    expect((await app.inject({
+      method: "POST",
+      url: apiRoutes.admin.resolveAlert.url.replace(":id", "00000000-0000-4000-8000-000000000099"),
+      headers: adminHeaders
+    })).statusCode).toBe(404);
+    const resolvedAlerts = await callContract<{ items: Array<{ id: string }>; total: number }>(
+      apiRoutes.admin.listAlerts, 200,
+      { url: `${apiRoutes.admin.listAlerts.url}?resolved=true`, headers: adminHeaders }
+    );
+    expect(resolvedAlerts.items.map((alert) => alert.id)).toContain(alertId);
+
+    const settingsPage = await callContract<{ items: Array<{ key: string; value: boolean | number }> }>(
+      apiRoutes.admin.getSettings, 200, { url: apiRoutes.admin.getSettings.url, headers: adminHeaders }
+    );
+    expect(settingsPage.items.map((setting) => setting.key)).toContain("alerts.cancellation_daily_threshold");
+    const settingUrl = (key: string) => apiRoutes.admin.updateSetting.url.replace(":key", key);
+    const updatedSetting = await callContract<{ key: string; value: boolean | number; updatedByUsername: string | null }>(
+      apiRoutes.admin.updateSetting, 200,
+      { url: settingUrl("alerts.cancellation_daily_threshold"), headers: adminHeaders, payload: { value: 4 } }
+    );
+    expect(updatedSetting.value).toBe(4);
+    expect(updatedSetting.updatedByUsername).toBe("ops_admin");
+    // Out of range is refused by the registry, and an unknown key is a 404 rather than a silent write.
+    expect((await app.inject({
+      method: "PUT", url: settingUrl("alerts.cancellation_daily_threshold"), headers: adminHeaders, payload: { value: 999 }
+    })).json().code).toBe("SETTING_OUT_OF_RANGE");
+    expect((await app.inject({
+      method: "PUT", url: settingUrl("alerts.not_a_setting"), headers: adminHeaders, payload: { value: true }
+    })).statusCode).toBe(404);
+    // The write is audited under the key, so the trail answers "who changed the threshold".
+    const thresholdAudit = await callContract<{ items: Array<{ action: string; meta: Record<string, unknown> | null }> }>(
+      apiRoutes.admin.listAudit, 200,
+      { url: `${apiRoutes.admin.listAudit.url}?action=setting_updated`, headers: adminHeaders }
+    );
+    expect(thresholdAudit.items[0]?.meta).toMatchObject({ key: "alerts.cancellation_daily_threshold", value: 4 });
+
+    const stats = await callContract<{ counts: Record<string, number>; activeMissions: number; onlineUsers: number }>(
+      apiRoutes.admin.stats, 200, { url: apiRoutes.admin.stats.url, headers: adminHeaders }
+    );
+    expect(Object.keys(stats.counts).sort()).toEqual(
+      ["accepted", "cancelled_by_requester", "cancelled_by_rescuer", "completed", "dispatched", "expired", "pending"]
+    );
+    // The test's own fixture leaves at least one completed request behind, whatever else has expired.
+    expect(stats.counts.completed).toBeGreaterThanOrEqual(1);
+    expect(Number.isInteger(stats.activeMissions)).toBe(true);
 
     // Exhaustiveness proof: EVERY implemented API operation in @borobiya/shared was exercised & schema-validated!
     expect(verifiedOperationIds).toEqual(implementedOperationIds);

@@ -88,29 +88,35 @@
 
 | مسیر | نمای فعلی | وضعیت |
 |---|---|---|
-| `/_admin/dashboard` | `PlaceholderView.vue` | **جای خالی** — باید `AdminDashboardView` شود |
+| `/_admin/dashboard` | `AdminDashboardView.vue` | پیاده‌سازی شد — KPI، صف باز، آمادگی گروه‌ها، نمودار ۷ روز |
 | `/_admin/dispatch` | `AdminDispatchView.vue` | موجود؛ تابلوی اعزام |
+| `/_admin/reports` | `AdminReportsView.vue` | پیاده‌سازی شد — بازهٔ ۷/۳۰ روز، رتبه‌بندی و بار کاری |
 | `/_admin/users` | `AdminUsersView.vue` | موجود؛ فهرست کاربران |
+| `/_admin/services` | `AdminServiceGroupsView.vue` | پیاده‌سازی شد — ساخت/ویرایش گروه و اعضا |
 | `/_admin/categories` | `AdminCategoriesView.vue` | موجود؛ انواع حادثه |
 | `/_admin/incidents` | `AdminIncidentsView.vue` | موجود |
-| گزارش‌ها، گروه‌های امداد، گزارش رویدادها، هشدارها، تنظیمات، نقش‌ها | — | **مسیر و نما ندارند** |
+| `/_admin/audit` | `AdminAuditView.vue` | پیاده‌سازی شد — خواندن `admin_audit_log` + پالایه + CSV |
+| `/_admin/alerts` | `AdminAlertsView.vue` | پیاده‌سازی شد — صف بررسی + ثبت بررسی |
+| `/_admin/settings` | `AdminSettingsView.vue` | پیاده‌سازی شد — کلیدهای واقعی + وضعیت جاری |
+| نقش‌ها و دسترسی‌ها | — | بدون مسیر؛ فقط تصویر مرجع (`users/03`) |
 
-کلاینت: `packages/client/src/api/{admin-sos,admin-catalog,admin-users}.ts` و
-`views/_admin/` (۴ نمای واقعی + ۷ تست). سرور: `packages/server/src/admin/`
-(`users`, `categories`, `incidents`, `sos`, `authorize`, `normalize`).
+کلاینت: `packages/client/src/api/{admin-sos,admin-catalog,admin-users,admin-governance}.ts`،
+`components/admin/{AdminShell,AdminStatePanel}.vue` و `views/_admin/` (۹ نمای واقعی).
+سرور: `packages/server/src/admin/` (`users`, `categories`, `incidents`, `sos`, `governance`,
+`authorize`, `normalize`).
 
 ### شکاف‌های سرور که این تصاویر فرض می‌کنند
 
 | قابلیت | تصویر | نیاز سرور |
 |---|---|---|
-| مدل «گروه امداد» | `services/01–03` | جدول `service_groups` + `service_group_members`، CRUD، نقش داخل گروه |
-| پوشش نوع حادثه ↔ گروه | `services/01`, `04` | جدول واسط `incident_type_groups` |
-| گزارش‌ها و شاخص‌ها | `dashboard/03` | endpoint تجمیعی بازه‌ای (پاسخ، پذیرش، رضایت، روند روزانه) |
-| گزارش رویدادها | `system/01` | خواندن `admin_audit_log` + فیلتر + خروجی CSV |
-| هشدارها و اطلاعیه | `system/02` | خواندن/نوشتن `admin_alerts` + قاعده‌های هشدار + صف ارسال اطلاعیه |
-| تنظیمات سامانه | `system/03` | جدول `settings` (کلید/مقدار) + حالت تعمیرات + وضعیت پشتیبان |
-| نقش × مجوز | `users/03` | جدول `roles` + `role_permissions` (فعلاً فقط `authorize.ts` با نقش ثابت) |
-| نشست‌ها و دستگاه‌ها | `users/02` | فهرست نشست فعال + خروج از همه |
+| مدل «گروه امداد» | `services/01–03` | ✅ با `categories` + `category_incident_types` + `category_users` پیاده شد؛ **باقی‌مانده:** نقش داخل گروه، ظرفیت و رنگ/وضعیت گروه |
+| پوشش نوع حادثه ↔ گروه | `services/01`, `04` | ✅ همان pivot موجود؛ صفحه `/_admin/services` گروه‌های بدون پوشش را هشدار می‌دهد |
+| گزارش‌ها و شاخص‌ها | `dashboard/03` | **باقی‌مانده:** endpoint تجمیعی بازه‌ای؛ فعلاً از حداکثر ۳ صفحهٔ فهرست SOS محاسبه می‌شود و همین در نما نوشته شده |
+| گزارش رویدادها | `system/01` | ✅ `GET /_admin/audit` + پالایه + CSV در کلاینت |
+| هشدارها و اطلاعیه | `system/02` | ✅ خواندن + `POST /_admin/alerts/:id/resolve`؛ **باقی‌مانده:** قاعده‌های هشدار دلخواه و صف ارسال اطلاعیه |
+| تنظیمات سامانه | `system/03` | ✅ `app_settings` + `GET/PUT /_admin/settings` (دو کلید واقعی) و `GET /_admin/stats`؛ **باقی‌مانده:** حالت تعمیرات و وضعیت پشتیبان |
+| نقش × مجوز | `users/03` | **باقی‌مانده:** جدول `roles` + `role_permissions` (فعلاً فقط `authorize.ts` با نقش ثابت) |
+| نشست‌ها و دستگاه‌ها | `users/02` | جزئیات کاربر نشست‌ها را نشان می‌دهد؛ **باقی‌مانده:** «خروج از همه» |
 
 ---
 

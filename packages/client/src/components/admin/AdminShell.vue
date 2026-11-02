@@ -16,7 +16,6 @@
           <p class="admin-nav__label">{{ group.label }}</p>
           <template v-for="item in group.items" :key="item.key">
             <RouterLink
-              v-if="!item.pending"
               class="admin-nav__item"
               :class="{ 'admin-nav__item--active': item.key === active }"
               :to="item.to"
@@ -25,11 +24,6 @@
               <v-icon class="admin-nav__icon" :icon="item.icon" size="19" />
               <span>{{ item.label }}</span>
             </RouterLink>
-            <span v-else class="admin-nav__item admin-nav__item--pending" :title="pendingHint">
-              <v-icon class="admin-nav__icon" :icon="item.icon" size="19" />
-              <span>{{ item.label }}</span>
-              <em>به‌زودی</em>
-            </span>
           </template>
         </template>
       </nav>
@@ -116,7 +110,6 @@ interface NavItem {
   label: string;
   icon: string;
   to: string;
-  pending?: boolean;
 }
 
 const props = defineProps<{
@@ -128,7 +121,6 @@ const props = defineProps<{
 
 defineEmits<{ search: []; alerts: [] }>();
 
-const pendingHint = "این بخش در تصاویر طراحی شده و به سرویس سرور نیاز دارد";
 const searchHint = "جست‌وجوی سراسری پنل پس از افزودن سرویس سرور فعال می‌شود";
 
 const crumbList = computed(() => props.crumbs ?? []);
@@ -156,9 +148,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   {
     label: "سامانه",
     items: [
-      { key: "audit", label: "گزارش رویدادها", icon: "mdi-history", to: "/_admin/audit", pending: true },
-      { key: "alerts", label: "هشدارها", icon: "mdi-bell-alert-outline", to: "/_admin/alerts", pending: true },
-      { key: "settings", label: "تنظیمات", icon: "mdi-cog-outline", to: "/_admin/settings", pending: true }
+      { key: "audit", label: "گزارش رویدادها", icon: "mdi-history", to: "/_admin/audit" },
+      { key: "alerts", label: "هشدارها", icon: "mdi-bell-alert-outline", to: "/_admin/alerts" },
+      { key: "settings", label: "تنظیمات", icon: "mdi-cog-outline", to: "/_admin/settings" }
     ]
   }
 ];
@@ -264,20 +256,6 @@ watch(
   background: var(--admin-soft);
   color: rgb(var(--v-theme-primary));
   font-weight: 600;
-}
-
-.admin-nav__item--pending {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.admin-nav__item--pending em {
-  margin-inline-start: auto;
-  padding: 0.05rem 0.35rem;
-  border-radius: 999px;
-  background: rgba(var(--v-theme-on-surface), 0.08);
-  font-size: 0.8rem;
-  font-style: normal;
 }
 
 .admin-nav__icon {

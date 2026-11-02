@@ -11,7 +11,15 @@ import {
   incidentTypeCreateSchema,
   incidentTypeSchema,
   incidentTypeUpdateSchema,
-  toggleActiveSchema
+  toggleActiveSchema,
+  adminAlertQuerySchema,
+  adminAlertSchema,
+  adminAuditEntrySchema,
+  adminAuditQuerySchema,
+  adminSettingKeySchema,
+  adminSettingSchema,
+  adminSettingsResponseSchema,
+  adminSettingUpdateSchema
 } from "../schemas/admin";
 import {
   errorSchema,
@@ -373,6 +381,96 @@ export const adminRoutes = {
       operationId: "adminCreateCancellationReason",
       summary: "Create a cancellation reason",
       tags: ["admin", "cancellation-reasons"],
+      access: "admin"
+    }
+  }),
+  listAudit: defineRoute({
+    method: "GET",
+    url: "/_admin/audit",
+    schema: {
+      query: adminAuditQuerySchema,
+      responses: {
+        200: paginatedResponseSchema(adminAuditEntrySchema),
+        400: errorSchema,
+        401: errorSchema,
+        403: errorSchema
+      }
+    },
+    meta: {
+      operationId: "adminListAuditEntries",
+      summary: "List privileged actions recorded in the admin audit trail",
+      tags: ["admin", "audit"],
+      access: "admin"
+    }
+  }),
+  listAlerts: defineRoute({
+    method: "GET",
+    url: "/_admin/alerts",
+    schema: {
+      query: adminAlertQuerySchema,
+      responses: {
+        200: paginatedResponseSchema(adminAlertSchema),
+        400: errorSchema,
+        401: errorSchema,
+        403: errorSchema
+      }
+    },
+    meta: {
+      operationId: "adminListAlerts",
+      summary: "List review alerts raised by the cancellation workflow",
+      tags: ["admin", "alerts"],
+      access: "admin"
+    }
+  }),
+  resolveAlert: defineRoute({
+    method: "POST",
+    url: "/_admin/alerts/:id/resolve",
+    schema: {
+      params: uuidPathParamsSchema,
+      responses: {
+        200: adminAlertSchema,
+        401: errorSchema,
+        403: errorSchema,
+        404: errorSchema,
+        409: errorSchema
+      }
+    },
+    meta: {
+      operationId: "adminResolveAlert",
+      summary: "Mark an alert as reviewed",
+      tags: ["admin", "alerts"],
+      access: "admin"
+    }
+  }),
+  getSettings: defineRoute({
+    method: "GET",
+    url: "/_admin/settings",
+    schema: { responses: { 200: adminSettingsResponseSchema, 401: errorSchema, 403: errorSchema } },
+    meta: {
+      operationId: "adminGetSettings",
+      summary: "Read the operational settings the server honours",
+      tags: ["admin", "settings"],
+      access: "admin"
+    }
+  }),
+  updateSetting: defineRoute({
+    method: "PUT",
+    url: "/_admin/settings/:key",
+    schema: {
+      params: z.strictObject({ key: adminSettingKeySchema }),
+      body: adminSettingUpdateSchema,
+      responses: {
+        200: adminSettingSchema,
+        400: errorSchema,
+        401: errorSchema,
+        403: errorSchema,
+        404: errorSchema
+      }
+    },
+    meta: {
+      operationId: "adminUpdateSetting",
+      summary: "Update one operational setting",
+      tags: ["admin", "settings"],
       access: "admin"
     }
   })

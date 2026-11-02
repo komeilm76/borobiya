@@ -27,8 +27,9 @@
 19. [History & Rating](#19-history--rating)
 20. [Admin — User Management](#20-admin--user-management)
 21. [Admin — Categories & Incidents](#21-admin--categories--incidents)
-22. [Troubleshooting](#22-troubleshooting)
-23. [Quick Reference](#23-quick-reference)
+22. [Admin — Audit, Alerts & Settings](#22-admin--audit-alerts--settings)
+23. [Troubleshooting](#23-troubleshooting)
+24. [Quick Reference](#24-quick-reference)
 
 ---
 
@@ -390,7 +391,19 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 
 ---
 
-## 22. Troubleshooting
+## 22. Admin — Audit, Alerts & Settings
+
+*`/_admin/audit`, `/_admin/alerts`, `/_admin/settings`*
+
+- **Audit trail:** every privileged change the server makes (user status, groups, incident types, dispatches, alert reviews, settings) is listed newest-first with the admin who made it, the entity it touched and a short detail line. Filter by action or entity type; the page is paged and `خروجی CSV` exports exactly the rows on screen, with a BOM so Excel reads the Persian columns correctly. There is no edit or delete control — the trail is append-only on the server.
+- **Alerts:** the queue the cancellation workflow fills — *لغو مکرر مأموریت* once a rescuer passes the daily threshold, and *لغو با دلیل «سایر»* for every “other” reason. Each row names the rescuer, links to the request in the dispatch board (`دیدن در میز اعزام`), and offers one action, `ثبت بررسی`. Reviewing is recorded in the audit trail; pressing it twice is harmless.
+- **Settings:** shows the operational keys the server actually reads, with the default and who last changed each one. `آستانهٔ لغو روزانهٔ امدادگر` sets how many same-day cancellations raise a review alert; `هشدار برای دلیل «سایر»` switches the other-reason alert on or off. Out-of-range values are refused before they are stored. The counters below the form are a snapshot (`در انتظار اعزام`, `مأموریت‌های فعال`, `کاربران آنلاین`) and load independently, so a counter failure never blocks editing.
+
+[Screenshot: Audit table with filters + alerts queue + settings form]
+
+---
+
+## 23. Troubleshooting
 
 | Symptom | What to do |
 |---------|-----------|
@@ -404,7 +417,7 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 
 ---
 
-## 23. Quick Reference
+## 24. Quick Reference
 
 | Action | Where |
 |--------|-------|
@@ -427,6 +440,9 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 | Admin Categories | `/_admin/categories` |
 | Admin Incidents | `/_admin/incidents` |
 | Admin Dispatch | `/_admin/dispatch` |
+| Admin Audit Trail | `/_admin/audit` |
+| Admin Alerts | `/_admin/alerts` |
+| Admin Settings | `/_admin/settings` |
 
 Need help? Contact your Borobiya admin or open an issue at `github.com/komeilm76/borobiya` with steps & screenshot.
 

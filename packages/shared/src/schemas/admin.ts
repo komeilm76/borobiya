@@ -167,3 +167,122 @@ export const assignCategoryUsersSchema = z.strictObject({
   userIds: uniqueIdsSchema.min(1)
 });
 export type AssignCategoryUsersInput = z.infer<typeof assignCategoryUsersSchema>;
+
+/**
+ * The audit trail and the alert queue are the two administrative surfaces that read existing tables rather
+ * than invent new ones: `admin_audit_log` is already written by every privileged mutation, and `admin_alerts`
+ * by the cancellation workflow. This file only fixes their wire shapes and the settings the server reads.
+ */
+export const adminAuditEntrySchema = z.strictObject({
+  id: idSchema,
+  adminId: idSchema,
+  /** `null` only if the acting account was deleted; the id is kept either way. */
+  adminUsername: z.string().nullable(),
+  action: z.string().min(1).max(64),
+  targetType: z.string().max(32).nullable(),
+  targetId: idSchema.nullable(),
+  meta: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: timestampSchema
+});
+export type AdminAuditEntry = z.infer<typeof adminAuditEntrySchema>;
+
+export const adminAuditQuerySchema = z.strictObject({
+  action: z.string().trim().min(1).max(64).optional(),
+  targetType: z.string().trim().min(1).max(32).optional(),
+  adminId: idSchema.optional(),
+  from: timestampSchema.optional(),
+  to: timestampSchema.optional(),
+  ...paginationQuerySchema.shape
+});
+export type AdminAuditQuery = z.output<typeof adminAuditQuerySchema>;
+
+export const adminAlertSchema = z.strictObject({
+  id: idSchema,
+  type: z.string().min(1).max(64),
+  userId: idSchema,
+  username: z.string(),
+  missionId: idSchema,
+  /** The SOS the mission belongs to, so the queue can open dispatch without a second lookup. */
+  sosRequestId: idSchema.nullable(),
+  details: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: timestampSchema,
+  resolvedAt: timestampSchema.nullable()
+});
+export type AdminAlert = z.infer<typeof adminAlertSchema>;
+
+export const adminAlertQuerySchema = z.strictObject({
+  type: z.string().trim().min(1).max(64).optional(),
+  resolved: optionalBooleanQuerySchema,
+  ...paginationQuerySchema.shape
+});
+export type AdminAlertQuery = z.output<typeof adminAlertQuerySchema>;
+
+/**
+ * Settings the server actually reads back. A key that nothing consumes would be a switch that lies, so the
+ * registry is short on purpose: each entry names the code path that honours it.
+ *
+ * - `alerts.cancellation_daily_threshold` — `sos-cancellation-store` raises a review alert once a rescuer
+ *   passes this many same-day cancels (it was a hardcoded `> 2`).
+ * - `alerts.other_reason_notify` — the same store skips the `rescuer_other_reason_approval` alert when off.
+ */
+export const adminSettingDefinitions = {
+  "alerts.cancellation_daily_threshold": { kind: "number", min: 0, max: 50, defaultValue: 2 },
+  "alerts.other_reason_notify": { kind: "boolean", min: 0, max: 0, defaultValue: true }
+} as const satisfies Record<string, { kind: "number" | "boolean"; min: number; max: number; defaultValue: boolean | number }>;
+
+export type AdminSettingKey = keyof typeof adminSettingDefinitions;
+export const adminSettingKeys = Object.keys(adminSettingDefinitions) as [AdminSettingKey, ...AdminSettingKey[]];
+export const adminSettingKeySchema = z.enum(adminSettingKeys);
+export type AdminSettingValue = boolean | number;
+
+export const adminSettingValueSchema = z.union([z.boolean(), z.number().int()]);
+
+export const adminSettingSchema = z.strictObject({
+  key: adminSettingKeySchema,
+  value: adminSettingValueSchema,
+  defaultValue: adminSettingValueSchema,
+  updatedAt: timestampSchema.nullable(),
+  updatedByUsername: z.string().nullable()
+});
+export type AdminSetting = z.infer<typeof adminSettingSchema>;
+
+export const adminSettingsResponseSchema = z.strictObject({ items: z.array(adminSettingSchema) });
+export const adminSettingUpdateSchema = z.strictObject({ value: adminSettingValueSchema });
+export type AdminSettingUpdateInput = z.infer<typeof adminSettingUpdateSchema>;
+
+/** `null` when the value is acceptable, otherwise the message to show next to the field. */
+export function validateAdminSettingValue(key: AdminSettingKey, value: AdminSettingValue): string | null {
+  const definition = adminSettingDefinitions[key];
+  if (definition.kind === "boolean") {
+    return typeof value === "boolean" ? null : "This setting accepts true or false.";
+  }
+  if (typeof value !== "number" || !Number.isInteger(value)) return "This setting accepts whole numbers.";
+  if (value < definition.min || value > definition.max) {
+    return `This setting must be between ${definition.min} and ${definition.max}.`;
+  }
+  return null;
+}
+
+/**
+ * A stored value can be older than the registry (a key's kind changed, or a hand-edited row). Reading falls
+ * back to the default instead of failing the whole settings page, which is what an admin opens when they
+ * suspect exactly this kind of drift.
+ */
+export function coerceAdminSettingValue(key: AdminSettingKey, raw: unknown): AdminSettingValue {
+  const fallback = adminSettingDefinitions[key].defaultValue;
+  if (typeof raw === "boolean" || typeof raw === "number") {
+    return validateAdminSettingValue(key, raw) === null ? raw : fallback;
+  }
+  return fallback;
+}
+
+/** Typed reads for consumers: a key whose kind does not match falls back to its default instead of throwing. */
+export function readAdminSettingNumber(key: AdminSettingKey, raw: unknown): number {
+  const value = coerceAdminSettingValue(key, raw);
+  return typeof value === "number" ? value : (adminSettingDefinitions[key].defaultValue as number);
+}
+
+export function readAdminSettingBoolean(key: AdminSettingKey, raw: unknown): boolean {
+  const value = coerceAdminSettingValue(key, raw);
+  return typeof value === "boolean" ? value : (adminSettingDefinitions[key].defaultValue as boolean);
+}

@@ -11,14 +11,14 @@ describe("admin shell", () => {
     expect(shell).toContain("border-inline-start: 1px solid var(--admin-line);");
   });
 
-  it("groups the three sections and marks unserved pages as pending instead of linking them", () => {
+  it("groups the three sections and links every one of the nine pages", () => {
     expect(shell).toContain('label: "عملیات"');
     expect(shell).toContain('label: "مدیریت"');
     expect(shell).toContain('label: "سامانه"');
-    // Pending items render as a span with an explicit badge, never as a dead RouterLink.
-    expect(shell).toContain('v-else class="admin-nav__item admin-nav__item--pending"');
-    expect(shell).toContain("<em>به‌زودی</em>");
-    expect((shell.match(/pending: true/g) ?? []).length).toBe(3);
+    // Every section is served now: no dead span, no "coming soon" badge, no disabled entry.
+    expect(shell).not.toContain("admin-nav__item--pending");
+    expect(shell).not.toContain("به‌زودی");
+    expect((shell.match(/key: "/g) ?? []).length).toBe(9);
   });
 
   it("keeps the active route visible and wires every real admin route", () => {
@@ -29,7 +29,10 @@ describe("admin shell", () => {
       "/_admin/reports",
       "/_admin/users",
       "/_admin/services",
-      "/_admin/categories"
+      "/_admin/categories",
+      "/_admin/audit",
+      "/_admin/alerts",
+      "/_admin/settings"
     ]) {
       expect(shell).toContain(`to: "${path}"`);
     }

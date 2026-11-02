@@ -84,7 +84,7 @@ describe("client route records", () => {
     }
 
     const byPath = new Map(routeRecords.map((route) => [route.path, route]));
-    const quickRefSection = manual.split("## 23. Quick Reference")[1] ?? "";
+    const quickRefSection = manual.split("## 24. Quick Reference")[1] ?? "";
     const tableRows = quickRefSection
       .split("\n")
       .filter((line) => line.startsWith("| ") && !line.startsWith("| Action ") && !line.startsWith("|---"));

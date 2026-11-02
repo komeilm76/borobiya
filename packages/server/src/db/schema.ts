@@ -233,6 +233,18 @@ export const adminAuditLog = pgTable(
   ]
 );
 
+/**
+ * Operational settings the server reads back at runtime (currently the cancellation-alert thresholds).
+ * A key/value row rather than a column per knob: the registry in `@borobiya/shared` owns the known keys and
+ * their bounds, so adding one is a shared-schema change and not another migration. Unknown keys are inert.
+ */
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<boolean | number>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedBy: uuid("updated_by").references(() => users.id)
+});
+
 export const passwordResetChallenges = pgTable(
   "password_reset_challenges",
   {
@@ -535,6 +547,7 @@ export type NewLocationHistoryRow = typeof locationHistory.$inferInsert;
 export type LocationHistoryShareRow = typeof locationHistoryShares.$inferSelect;
 export type NewLocationHistoryShareRow = typeof locationHistoryShares.$inferInsert;
 export type AdminAuditLogRow = typeof adminAuditLog.$inferSelect;
+export type AppSettingRow = typeof appSettings.$inferSelect;
 export type PasswordResetChallengeRow = typeof passwordResetChallenges.$inferSelect;
 export type PasswordResetTokenRow = typeof passwordResetTokens.$inferSelect;
 export type CancellationReasonRow = typeof cancellationReasons.$inferSelect;

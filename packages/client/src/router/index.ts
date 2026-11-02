@@ -106,6 +106,21 @@ export const routeRecords: RouteRecordRaw[] = [
     component: () => import("@client/views/_admin/AdminServiceGroupsView.vue")
   },
   {
+    path: "/_admin/audit",
+    name: "admin-audit",
+    component: () => import("@client/views/_admin/AdminAuditView.vue")
+  },
+  {
+    path: "/_admin/alerts",
+    name: "admin-alerts",
+    component: () => import("@client/views/_admin/AdminAlertsView.vue")
+  },
+  {
+    path: "/_admin/settings",
+    name: "admin-settings",
+    component: () => import("@client/views/_admin/AdminSettingsView.vue")
+  },
+  {
     path: "/_admin/users",
     name: "admin-users",
     component: () => import("@client/views/_admin/AdminUsersView.vue")

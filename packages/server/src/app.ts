@@ -23,6 +23,16 @@ import { registerAdminIncidentRoutes } from "./admin/incidents";
 import { DrizzleCategoryStore, type CategoryStore } from "./db/category-store";
 import { registerAdminCategoryRoutes } from "./admin/categories";
 import { registerAdminSosRoutes } from "./admin/sos";
+import { registerAdminGovernanceRoutes } from "./admin/governance";
+import { DrizzleAdminAuditStore, type AdminAuditStore } from "./db/admin-audit-store";
+import { DrizzleAdminAlertStore, type AdminAlertStore } from "./db/admin-alert-store";
+import { DrizzleAdminStatsStore, type AdminStatsStore } from "./db/admin-stats-store";
+import {
+  DrizzleAppSettingsStore,
+  disabledAppSettingsStore,
+  type AppSettingsStore
+} from "./db/app-settings-store";
+import { emptyAdminStats } from "./db/admin-stats-store";
 import { DrizzleUserSearchStore, type UserSearchStore } from "./db/user-search-store";
 import { registerUserSearchRoute } from "./users/search";
 import { DrizzleSosRequestStore, type SosRequestStore } from "./db/sos-request-store";
@@ -103,6 +113,11 @@ export interface FastifyAppDependencies {
   syncStore?: SyncStore;
   /** Cancellation catalog and atomic requester cancellation. */
   sosCancellationStore?: SosCancellationStore;
+  /** Audit trail, alert queue, settings and aggregate counters. */
+  auditStore?: AdminAuditStore;
+  alertStore?: AdminAlertStore;
+  settingsStore?: AppSettingsStore;
+  statsStore?: AdminStatsStore;
   /** Override the photo attach write in tests. */
   photoStore?: SosPhotoStore;
   /** Override where uploaded photos are written in tests. */
@@ -180,8 +195,12 @@ export async function createFastifyApp(
       listMissions: async (_userId: string, _role: "requester" | "rescuer", page: number, limit: number) =>
         ({ items: [], total: 0, page, limit, totalPages: 0 })
     });
+  const settingsStore = dependencies.settingsStore ??
+    (database ? new DrizzleAppSettingsStore(database.db) : disabledAppSettingsStore);
+  // The cancellation workflow reads two settings (its review threshold and the "other reason" switch), so
+  // it is constructed with the same store the settings page writes through — not a second reader.
   const sosCancellationStore = dependencies.sosCancellationStore ??
-    (database ? new DrizzleSosCancellationStore(database.db) : {
+    (database ? new DrizzleSosCancellationStore(database.db, settingsStore) : {
       listReasons: async () => [],
       cancelRequestAsRequester: async () => ({ status: "not_found" as const }),
       cancelMissionAsRescuer: async () => ({ status: "not_found" as const })
@@ -243,6 +262,20 @@ export async function createFastifyApp(
   });
   await registerAdminCategoryRoutes(app, {
     store: categoryStore,
+    adminStore: adminUserStore,
+    jwtSecret: config.jwtSecret
+  });
+  await registerAdminGovernanceRoutes(app, {
+    auditStore: dependencies.auditStore ??
+      (database ? new DrizzleAdminAuditStore(database.db) : { listEntries: async () => ({ items: [], total: 0 }) }),
+    alertStore: dependencies.alertStore ??
+      (database ? new DrizzleAdminAlertStore(database.db) : {
+        listAlerts: async () => ({ items: [], total: 0 }),
+        resolveAlert: async () => ({ status: "not_found" as const })
+      }),
+    settingsStore,
+    statsStore: dependencies.statsStore ??
+      (database ? new DrizzleAdminStatsStore(database.db) : emptyAdminStats),
     adminStore: adminUserStore,
     jwtSecret: config.jwtSecret
   });
