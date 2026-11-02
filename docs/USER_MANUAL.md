@@ -420,7 +420,9 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 | SOS request history & cancellation | `/_user/sos-history` |
 | Rescuer mission history | `/_user/mission-history` |
 | Settings *(planned)* | `/_user/settings` |
-| Admin Dashboard *(planned)* | `/_admin/dashboard` |
+| Admin Dashboard | `/_admin/dashboard` |
+| Admin Reports | `/_admin/reports` |
+| Admin Service Groups | `/_admin/services` |
 | Admin Users | `/_admin/users` |
 | Admin Categories | `/_admin/categories` |
 | Admin Incidents | `/_admin/incidents` |

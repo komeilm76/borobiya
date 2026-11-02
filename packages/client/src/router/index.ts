@@ -93,12 +93,17 @@ export const routeRecords: RouteRecordRaw[] = [
   {
     path: "/_admin/dashboard",
     name: "admin-dashboard",
-    component: () => import("@client/views/_admin/PlaceholderView.vue"),
-    props: {
-      title: "پیشخوان مدیریت",
-      description: "نمای کلی کاربران، درخواست‌ها و وضعیت سامانه برای مدیران در این صفحه قرار می‌گیرد.",
-      icon: "mdi-view-dashboard"
-    }
+    component: () => import("@client/views/_admin/AdminDashboardView.vue")
+  },
+  {
+    path: "/_admin/reports",
+    name: "admin-reports",
+    component: () => import("@client/views/_admin/AdminReportsView.vue")
+  },
+  {
+    path: "/_admin/services",
+    name: "admin-services",
+    component: () => import("@client/views/_admin/AdminServiceGroupsView.vue")
   },
   {
     path: "/_admin/users",
