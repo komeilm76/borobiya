@@ -55,7 +55,16 @@ export function createNetworkStatusMonitor(options: MonitorOptions = {}) {
     const controller = new AbortController();
     request = controller;
     status.value = "checking";
-    timeout = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    timeout = setTimeout(() => {
+      // An abort is advisory: a service worker or injected transport may never
+      // settle its promise. End checking on time and fence any late response.
+      if (started && request === controller) {
+        request = null;
+        timeout = null;
+        status.value = isOnline() ? "unavailable" : "offline";
+      }
+      controller.abort();
+    }, PROBE_TIMEOUT_MS);
     try {
       const ok = await probe(controller.signal);
       if (started && request === controller) status.value = ok ? "reachable" : "unavailable";

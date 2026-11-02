@@ -86,6 +86,24 @@ describe("network status indicator", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("leaves checking after eight seconds even when a probe ignores abort", async () => {
+    vi.useFakeTimers();
+    let finish!: (ok: boolean) => void;
+    const probe = vi.fn().mockImplementationOnce(() => new Promise<boolean>((resolve) => { finish = resolve; }))
+      .mockResolvedValueOnce(true);
+    const monitor = createNetworkStatusMonitor({ isOnline: () => true, probe });
+    monitor.start();
+    try {
+      await vi.advanceTimersByTimeAsync(8_000);
+      expect(monitor.status.value).toBe("unavailable");
+      finish(true); // An old, non-cancellable result must not claim the API is reachable.
+      await settle();
+      expect(monitor.status.value).toBe("unavailable");
+      await vi.advanceTimersByTimeAsync(22_000);
+      expect(monitor.status.value).toBe("reachable");
+    } finally { monitor.stop(); }
+  });
+
   it("times out a stuck probe and checks again on the next interval", async () => {
     vi.useFakeTimers();
     const probe = vi.fn().mockImplementationOnce((signal: AbortSignal) => new Promise<boolean>((_resolve, reject) => {
