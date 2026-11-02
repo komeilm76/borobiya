@@ -94,6 +94,16 @@ describe("admin shell", () => {
     expect(shell).toContain("clearAccountSearch();");
   });
 
+  it("says the connection is down on every screen, not only where a page keeps a banner", () => {
+    expect(shell).toContain('import { useOnlineStatus } from "../../composables/online-status";');
+    expect(shell).toContain("const { isOnline } = useOnlineStatus();");
+    expect(shell).toContain('v-if="!isOnline"');
+    expect(shell).toContain('aria-label="اتصال به سرور برقرار نیست"');
+    // The word is decorative next to the icon's accessible name, and it is the first thing dropped on phones.
+    expect(shell).toContain('<span class="admin-tool--offline__label" aria-hidden="true">آفلاین</span>');
+    expect(shell).toContain(".admin-tool--offline__label {\n    display: none;\n  }");
+  });
+
   it("labels the breadcrumb trail and the account footer for screen readers", () => {
     expect(shell).toContain('aria-label="ناوبری پنل مدیریت"');
     expect(shell).toContain('aria-label="مسیر صفحه"');

@@ -15,8 +15,11 @@
 - The board leads with a warning bar above the error banner, says the outage in the empty queue instead of blaming
   the queue, and re-reads the queue by itself when the browser reports the network back — but only when the queue
   had not already been verified, so a reconnect does not fire a redundant read.
-- Suite 1313/1313 (3 behavioural tests for the composable under a stubbed window, 4 source-pinned tests for the
-  board), typecheck clean.
+- The shell carries the same fact in its top bar — a small `آفلاین` pill, icon only under 1024px — so every one of
+  the nine screens answers "is anything arriving?" even where no page keeps a banner. It states, it does not act: the
+  page owns the retry.
+- Suite 1314/1314 (3 behavioural tests for the composable under a stubbed window, 4 source-pinned tests for the
+  board, 1 for the shell pill), typecheck clean.
 
 ### 2026-11-02 — The users table stops inventing its own states
 

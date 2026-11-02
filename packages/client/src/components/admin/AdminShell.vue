@@ -79,6 +79,16 @@
         </nav>
 
         <div class="admin-shell__tools">
+          <span
+            v-if="!isOnline"
+            class="admin-tool admin-tool--offline"
+            role="status"
+            aria-label="اتصال به سرور برقرار نیست"
+            title="اتصال به سرور برقرار نیست؛ داده‌های این صفحه به‌روز نمی‌شوند."
+          >
+            <v-icon icon="mdi-cloud-off-outline" size="17" />
+            <span class="admin-tool--offline__label" aria-hidden="true">آفلاین</span>
+          </span>
           <button class="admin-search" type="button" :title="searchHint" @click="paletteOpen = true">
             <v-icon icon="mdi-magnify" size="17" />
             <span>جست‌وجو در پنل…</span>
@@ -201,6 +211,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { UserProfile } from "@shared/index";
 import { listAdminUsers } from "../../api/admin-users";
+import { useOnlineStatus } from "../../composables/online-status";
 import { useAuthStore } from "../../stores/auth";
 import { useThemeStore } from "../../stores/theme";
 import { useLogoutConfirmation } from "../../composables/use-logout-confirmation";
@@ -236,6 +247,7 @@ const crumbList = computed(() => props.crumbs ?? []);
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const { isOnline } = useOnlineStatus();
 const navOpen = ref(false);
 const paletteOpen = ref(false);
 const query = ref("");
@@ -651,6 +663,22 @@ watch(
   background: rgba(var(--v-theme-on-surface), 0.06);
 }
 
+/* The top bar answers "is anything arriving?" on every admin screen, not only where a page keeps a banner. */
+.admin-tool--offline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  block-size: 34px;
+  padding-inline: 0.6rem;
+  border: 1px solid rgba(var(--v-theme-warning), 0.35);
+  border-radius: 999px;
+  color: rgb(var(--v-theme-warning));
+  background: rgba(var(--v-theme-warning), 0.1);
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .admin-palette {
   overflow: hidden;
 }
@@ -781,6 +809,15 @@ watch(
 @media (max-width: 1023px) {
   .admin-shell {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Phones get the icon with its accessible name; the word would push the search field out of the bar. */
+  .admin-tool--offline {
+    padding-inline: 0.45rem;
+  }
+
+  .admin-tool--offline__label {
+    display: none;
   }
 
   .admin-shell__nav {
