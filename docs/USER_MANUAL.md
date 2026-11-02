@@ -370,7 +370,7 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 
 *`/_admin/users`*
 
-- **List:** Search by name, filter `active/suspended/has category`, pagination.
+- **List:** Search by name, filter `active/suspended/has category`, pagination. The table area shows one state at a time from the shared panel: skeleton rows while reading, a server-failure panel with `تلاش دوباره`, an offline panel that retries by itself the moment the browser reports the connection back, and an empty panel whose action clears the search and both filters. The empty panel only appears once nothing is loading and nothing failed, so an outage never masquerades as “no users”.
 - **Detail:** Click the account name (or `جزئیات` on the mobile card) and the account opens in a drawer: username, role, groups, join date, average rating, setup state, the devices/sessions signed in with their IP and last-seen time, and the last five missions with a link back to the request on the dispatch board. The drawer is `?user=<id>` in the URL, so it survives a reload, the back button and a shared link; an account with no session or no mission says so instead of showing an empty box. It reads `GET /_admin/users/:id` (the list row carries neither devices nor missions) and distinguishes a lost connection from an ended admin session before offering a retry.
 - **Activate/Deactivate:** Toggle → confirmation → audit log; deactivated user cannot login, tokens revoked, missions paused. The drawer raises the same confirmation dialog rather than a second copy, and an open drawer re-reads the account once it commits; the panel refuses to deactivate the signed-in admin's own account.
 - **No delete** — never exists; only activate toggle.

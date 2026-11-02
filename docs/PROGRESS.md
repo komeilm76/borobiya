@@ -4,6 +4,21 @@
 
 ---
 
+### 2026-11-02 — The users table stops inventing its own states
+
+- The users screen carried its own spinner, its own red alert and its own empty box, which made it the last admin
+  page whose loading and failure looked nothing like the rest of the panel — and it had no offline face at all: a
+  dropped connection printed the same «بارگذاری فهرست کاربران انجام نشد» a 500 does.
+- The table area now renders `AdminStatePanel` for loading, error, offline and empty. Offline is decided where the
+  failure happened, from `navigator.onLine`, never guessed from the message; the panel's action re-runs the read.
+- **Recovery without a second click.** An offline panel listens for the browser's `online` event and retries by
+  itself; the listener is removed on unmount with the rest of the request cleanup.
+- **An empty result is fixable where it is shown.** The empty panel's action clears the search and both filters,
+  firing one list request rather than two, instead of sending the admin back to the toolbar to find what is still
+  filtering. Empty can only win once nothing is loading and nothing failed, so an outage never reads as "no users".
+- Client suite 1306/1306 (5 new state tests in `views/_admin/admin-users-states.test.ts`; the old ad-hoc markup pin
+  in `admin-users-search.test.ts` now pins the shared panel), typecheck clean.
+
 ### 2026-11-02 — Admin accounts finally open: a drill-down the panel never had
 
 - `GET /_admin/users/:id` has returned the account, its signed-in devices and its missions since the users API

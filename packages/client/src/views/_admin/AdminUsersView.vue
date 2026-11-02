@@ -76,30 +76,38 @@
           </span>
         </div>
 
-        <div v-if="loading" class="admin-users-state" role="status" aria-live="polite">
-          <v-progress-circular indeterminate color="primary" size="32" />
-          <span>در حال دریافت فهرست کاربران…</span>
-        </div>
-
-        <v-alert
-          v-else-if="listError"
-          class="admin-users-state-alert"
-          type="error"
-          variant="tonal"
-          rounded="lg"
-          role="alert"
-        >
-          {{ listError }}
-          <template #append>
-            <v-btn variant="text" size="small" @click="loadUsers">تلاش دوباره</v-btn>
-          </template>
-        </v-alert>
-
-        <div v-else-if="users.length === 0" class="admin-users-state" role="status">
-          <span class="admin-users-empty-icon"><v-icon icon="mdi-account-search-outline" size="28" /></span>
-          <strong>{{ search.trim() || statusFilter !== "all" || categoryFilter !== "all" ? "کاربری با این مشخصات پیدا نشد" : "هنوز کاربری ثبت نشده است" }}</strong>
-          <span>عبارت جست‌وجو یا فیلترها را تغییر دهید.</span>
-        </div>
+        <AdminStatePanel v-if="listState === 'loading'" state="loading" title="در حال دریافت فهرست کاربران…" />
+        <AdminStatePanel
+          v-else-if="listState === 'offline'"
+          state="offline"
+          title="اتصال به سرور برقرار نیست"
+          description="فهرست حساب‌ها فقط از سرور خوانده می‌شود؛ به‌محض برگشتن اینترنت خودکار دوباره تلاش می‌شود."
+          action-label="تلاش دوباره"
+          action-icon="mdi-refresh"
+          @retry="loadUsers"
+        />
+        <AdminStatePanel
+          v-else-if="listState === 'error'"
+          state="error"
+          title="خواندن فهرست حساب‌ها ناموفق بود"
+          :description="listError"
+          action-label="تلاش دوباره"
+          action-icon="mdi-refresh"
+          @retry="loadUsers"
+        />
+        <AdminStatePanel
+          v-else-if="listState === 'empty'"
+          state="empty"
+          :title="hasActiveFilters ? 'حسابی با این مشخصات پیدا نشد' : 'هنوز کاربری ثبت نشده است'"
+          :description="
+            hasActiveFilters
+              ? 'عبارت جست‌وجو یا پالایه‌ها را تغییر دهید.'
+              : 'با ثبت اولین حساب کاربری، همین فهرست آن را نشان می‌دهد.'
+          "
+          :action-label="hasActiveFilters ? 'پاک‌کردن جست‌وجو و پالایه‌ها' : ''"
+          action-icon="mdi-filter-remove-outline"
+          @retry="clearFilters"
+        />
 
         <div v-else class="admin-users-results">
           <div class="admin-users-table-wrap">
@@ -321,6 +329,7 @@ import { useRoute, useRouter } from "vue-router";
 import type { UserProfile } from "@shared/index";
 import { ApiError } from "../../api/http";
 import AdminShell from "../../components/admin/AdminShell.vue";
+import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
 import AdminUserDrawer from "../../components/admin/AdminUserDrawer.vue";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { listAdminUsers, updateAdminUserStatus, type AdminUserDetail } from "../../api/admin-users";
@@ -356,6 +365,7 @@ const total = ref(0);
 const totalPages = ref(0);
 const loading = ref(true);
 const listError = ref("");
+const listOffline = ref(false);
 const statusSavingUserId = ref<string | null>(null);
 const statusError = ref("");
 const statusChange = ref<{ user: UserProfile; nextIsActive: boolean } | null>(null);
@@ -381,6 +391,21 @@ const detailVersion = ref(0);
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let activeListController: AbortController | null = null;
 let listRequestVersion = 0;
+
+const hasActiveFilters = computed(
+  () => search.value.trim() !== "" || statusFilter.value !== "all" || categoryFilter.value !== "all"
+);
+
+/**
+ * One state for the table area. `offline` is decided where the failure happened, from `navigator.onLine`, so a
+ * dead connection never wears the "server error" face — and the retry button under it actually re-runs the read.
+ */
+const listState = computed<"loading" | "offline" | "error" | "empty" | "ready">(() => {
+  if (loading.value) return "loading";
+  if (listError.value) return listOffline.value ? "offline" : "error";
+  if (users.value.length === 0) return "empty";
+  return "ready";
+});
 
 const resultsLabel = computed(() => {
   if (loading.value) return "در حال دریافت فهرست کاربران…";
@@ -448,6 +473,7 @@ async function loadUsers(): Promise<void> {
   activeListController?.abort();
   activeListController = null;
   listError.value = "";
+  listOffline.value = false;
   loading.value = true;
   let controller: AbortController | null = null;
 
@@ -500,6 +526,7 @@ async function loadUsers(): Promise<void> {
     users.value = [];
     total.value = 0;
     totalPages.value = 0;
+    listOffline.value = typeof navigator !== "undefined" && navigator.onLine === false;
     listError.value = friendlyAdminError(error, "بارگذاری فهرست کاربران انجام نشد. دوباره تلاش کنید.");
   } finally {
     if (requestVersion === listRequestVersion) {
@@ -523,6 +550,7 @@ function updateSearch(value: unknown): void {
   total.value = 0;
   totalPages.value = 0;
   listError.value = "";
+  listOffline.value = false;
   loading.value = true;
   if (page.value !== 1) page.value = 1;
   searchTimer = setTimeout(() => {
@@ -601,6 +629,20 @@ async function confirmStatusChange(): Promise<void> {
   }
 }
 
+function clearFilters(): void {
+  if (search.value !== "") search.value = "";
+  statusFilter.value = "all";
+  categoryFilter.value = "all";
+  clearSearchTimer();
+  if (page.value !== 1) page.value = 1;
+  else void loadUsers();
+}
+
+function retryWhenBackOnline(): void {
+  if (!listOffline.value) return;
+  void loadUsers();
+}
+
 watch(page, () => {
   // updateSearch already scheduled the query; resetting page must not bypass debounce.
   if (searchTimer !== null) return;
@@ -608,10 +650,12 @@ watch(page, () => {
 });
 
 onMounted(() => {
+  window.addEventListener("online", retryWhenBackOnline);
   void loadUsers();
 });
 
 onUnmounted(() => {
+  window.removeEventListener("online", retryWhenBackOnline);
   clearSearchTimer();
   listRequestVersion += 1;
   activeListController?.abort();
@@ -671,36 +715,7 @@ onUnmounted(() => {
 }
 
 .admin-users-state {
-  display: grid;
   min-height: 270px;
-  justify-items: center;
-  align-content: center;
-  gap: 0.8rem;
-  color: var(--bb-color-muted);
-  font-size: 0.85rem;
-  text-align: center;
-}
-
-.admin-users-state strong {
-  color: var(--bb-color-text);
-  font-size: 0.95rem;
-  font-weight: 800;
-}
-
-.admin-users-state-alert {
-  margin-block: 0.75rem 1rem;
-  font-size: 0.84rem;
-}
-
-.admin-users-empty-icon {
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  border: 1px solid rgba(14, 102, 102, 0.1);
-  border-radius: 19px;
-  color: var(--bb-color-primary);
-  background: rgba(var(--v-theme-primary), 0.12);
 }
 
 .admin-users-mobile { display: none; }

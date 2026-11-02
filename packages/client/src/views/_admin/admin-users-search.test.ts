@@ -23,7 +23,8 @@ describe("admin user search feedback while typing", () => {
     expect(searchHandler).toContain("loading.value = true;");
     expect(searchHandler).toContain("searchTimer = setTimeout(");
     expect(searchHandler!.indexOf("loading.value = true;")).toBeLessThan(searchHandler!.indexOf("searchTimer = setTimeout("));
-    expect(view).toContain('v-if="loading" class="admin-users-state" role="status"');
+    // Loading is the shared panel now, not a spinner of its own.
+    expect(view).toContain("<AdminStatePanel v-if=\"listState === 'loading'\" state=\"loading\"");
     const searchInput = view.split('class="admin-users-search"')[1]?.split("/>")[0];
     expect(searchInput).not.toContain(':disabled="loading && !users.length"');
     expect(view).toContain('if (loading.value) return "در حال دریافت فهرست کاربران…";');
