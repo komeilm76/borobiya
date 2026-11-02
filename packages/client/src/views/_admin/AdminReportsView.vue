@@ -80,7 +80,7 @@
             <header class="report-card__head">
               <h2>توزیع وضعیت</h2>
             </header>
-            <ul class="report-legend">
+            <ul class="report-legend" role="list" aria-label="سهم وضعیت‌ها">
               <li v-for="slice in statusSlices" :key="slice.label">
                 <span class="report-legend__dot" :class="`report-legend__dot--${slice.tone}`" />
                 <span class="report-legend__label">{{ slice.label }}</span>
@@ -94,7 +94,7 @@
             <header class="report-card__head">
               <h2>پرخواست‌ترین انواع حادثه</h2>
             </header>
-            <ul class="report-ranking">
+            <ul class="report-ranking" role="list" aria-label="رتبه‌بندی نوع رویداد">
               <li v-for="(row, index) in ranking" :key="row.id">
                 <span class="report-ranking__index">{{ toFa(index + 1) }}</span>
                 <span class="report-ranking__label">{{ row.label }}</span>

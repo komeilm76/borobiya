@@ -141,7 +141,7 @@
             action-icon="mdi-plus"
             @retry="router.push('/_admin/services')"
           />
-          <ul v-else class="admin-groups">
+          <ul v-else class="admin-groups" role="list" aria-label="آمادگی گروه‌های امداد">
             <li v-for="group in groups" :key="group.id" class="admin-groups__item">
               <span class="admin-groups__dot" :class="`admin-groups__dot--${group.state}`" />
               <span class="admin-groups__meta">

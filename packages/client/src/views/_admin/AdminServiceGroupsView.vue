@@ -209,7 +209,7 @@
           <p v-else-if="candidates.length === 0" class="groups-members__hint">
             کاربری پیدا نشد. نام کاربری را کامل‌تر بنویسید.
           </p>
-          <ul v-else class="groups-members__list">
+          <ul v-else class="groups-members__list" role="list" aria-label="نتایج جست‌وجوی امدادگر">
             <li v-for="user in candidates" :key="user.id">
               <span class="groups-members__avatar">{{ user.username.slice(0, 1) }}</span>
               <span class="groups-members__meta">
@@ -230,22 +230,24 @@
             </li>
           </ul>
 
-          <ul v-if="activeGroup && activeGroup.members.length > 0" class="groups-members__current">
+          <template v-if="activeGroup && activeGroup.members.length > 0">
             <p class="groups-members__label">اعضای فعلی</p>
-            <li v-for="member in activeGroup.members" :key="member.id">
-              <span class="groups-members__avatar">{{ member.username.slice(0, 1) }}</span>
-              <span class="groups-members__meta"><strong>{{ member.username }}</strong></span>
-              <v-btn
-                size="small"
-                variant="text"
-                color="error"
-                :loading="pendingUserId === member.id"
-                @click="removeMember(member)"
-              >
-                حذف
-              </v-btn>
-            </li>
-          </ul>
+            <ul class="groups-members__current" role="list" aria-label="اعضای فعلی">
+              <li v-for="member in activeGroup.members" :key="member.id">
+                <span class="groups-members__avatar">{{ member.username.slice(0, 1) }}</span>
+                <span class="groups-members__meta"><strong>{{ member.username }}</strong></span>
+                <v-btn
+                  size="small"
+                  variant="text"
+                  color="error"
+                  :loading="pendingUserId === member.id"
+                  @click="removeMember(member)"
+                >
+                  حذف
+                </v-btn>
+              </li>
+            </ul>
+          </template>
         </div>
         <footer class="groups-members__foot">
           <v-btn variant="text" @click="membersOpen = false">بستن</v-btn>

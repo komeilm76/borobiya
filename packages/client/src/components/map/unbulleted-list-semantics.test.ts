@@ -34,6 +34,20 @@ describe("unbulleted lists retain screen-reader list semantics", () => {
     }
   });
 
+  it("keeps the role on the admin lists that CSS flattens into cards and rows", () => {
+    for (const [path, klass] of [
+      ["../../views/_admin/AdminDashboardView.vue", "admin-groups"],
+      ["../../views/_admin/AdminReportsView.vue", "report-legend"],
+      ["../../views/_admin/AdminReportsView.vue", "report-ranking"],
+      ["../../views/_admin/AdminServiceGroupsView.vue", "groups-mobile"],
+      ["../../views/_admin/AdminServiceGroupsView.vue", "groups-members__list"]
+    ]) {
+      const view = source(path!);
+      expect(view, `${path} ${klass}`).toMatch(new RegExp(`<ul[^>]*class="${klass}"[^>]*role="list"[^>]*>`));
+      expect(view, `${path} ${klass}`).toMatch(new RegExp(`\\.${klass}[^{]*\\{[^}]*list-style: none;`));
+    }
+  });
+
   it("retains distinct lists for owned, received and history grants, within their named sections", () => {
     const shares = source("../sharing/ShareLists.vue");
     expect(shares.match(/<ul[^>]*class="share-lists__rows"[^>]*role="list"[^>]*>/g)).toHaveLength(3);
