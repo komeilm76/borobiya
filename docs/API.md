@@ -404,7 +404,7 @@ Nothing assigns membership by default: no trigger, no seed row, and no column de
 ### 6.3 SOS Dispatch
 
 ```
-GET   /_admin/sos/requests                    → paginated SOS queue, optional status filter
+GET   /_admin/sos/requests?status&q           → paginated SOS queue, optional status filter and text search over description + requester username
 GET   /_admin/sos/requests/:id                → single SOS request detail
 GET   /_admin/sos/requests/:id/nearest?search&excludeAssigned&mode=manual → { responders: [{ userId, username, distance, avgRating, categoryName, lastActiveAt }] }
 POST  /_admin/sos/requests/:id/dispatch       { rescuerIds: string[] } → 201 { proposals } + emits sos:proposal-received

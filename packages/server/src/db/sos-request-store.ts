@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import type { AdminSosListQuery } from "@borobiya/shared/api";
 import type { Severity, SosRequestStatus, CancellationReasonDetail } from "@borobiya/shared";
 import type { Database } from "./client";
 import { readCancellationReason } from "./cancellation-detail";
 import { geographyPointSql } from "./location-history-store";
 import { incidentTypes, sosRequests } from "./schema";
+import { containsPattern } from "./search-term";
 
 /**
  * The write behind `POST /_user/sos/requests` (T3.2.2).
@@ -118,6 +119,21 @@ export function availableIncidentTypeQuery(db: Database, incidentTypeId: string)
     .from(incidentTypes)
     .where(eq(incidentTypes.id, incidentTypeId))
     .limit(1);
+}
+
+/**
+ * The `q` filter of the admin request queue: the request's own description, or the username of whoever sent it.
+ *
+ * A rescuer's name is not part of this: the queue row does not carry one, and searching by "who is handling this"
+ * belongs to the mission list rather than to the request. Exported so the predicate is assertable without a live
+ * database, like the two builders around it.
+ */
+export function sosRequestSearchCondition(term: string): SQL {
+  const pattern = containsPattern(term);
+  return or(
+    ilike(sosRequests.description, pattern),
+    sql`exists (select 1 from "users" where "users"."id" = "sos_requests"."requester_id" and "users"."username" ilike ${pattern})`
+  )!;
 }
 
 /**
@@ -253,7 +269,10 @@ export class DrizzleSosRequestStore implements SosRequestStore {
   }
 
   async listRequests(query: AdminSosListQuery): Promise<SosRequestListResult> {
-    const where = query.status ? eq(sosRequests.status, query.status) : undefined;
+    const conditions: SQL[] = [];
+    if (query.status) conditions.push(eq(sosRequests.status, query.status));
+    if (query.q) conditions.push(sosRequestSearchCondition(query.q));
+    const where = and(...conditions);
     const [countRow] = await this.db
       .select({ total: count() })
       .from(sosRequests)

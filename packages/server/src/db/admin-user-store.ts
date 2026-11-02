@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, ilike, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import type { AdminUserListQuery, Mission, UserCategorySummary, UserRole } from "@borobiya/shared";
 import type { Database } from "./client";
+import { containsPattern } from "./search-term";
 import { adminAuditLog, categories, categoryUsers, userSessions, users } from "./schema";
 
 export interface AdminActorRecord {
@@ -71,10 +72,6 @@ const adminUserSelection = {
   createdAt: users.createdAt
 };
 
-function escapeLikeSearchTerm(value: string): string {
-  return value.replace(/[\\%_]/g, "\\$&");
-}
-
 async function readCategoriesByUserIds(
   db: Database,
   userIds: string[]
@@ -130,7 +127,7 @@ export class DrizzleAdminUserStore implements AdminUserStore {
   async listUsers(query: AdminUserListQuery): Promise<AdminUserListResult> {
     const conditions: SQL[] = [];
     if (query.q) {
-      conditions.push(ilike(users.username, `%${escapeLikeSearchTerm(query.q)}%`));
+      conditions.push(ilike(users.username, containsPattern(query.q)));
     }
     if (query.isActive !== undefined) {
       conditions.push(eq(users.isActive, query.isActive));

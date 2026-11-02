@@ -4,6 +4,22 @@
 
 ---
 
+### 2026-11-02 — The palette searches records, on the server
+
+- The Ctrl K field could only reach accounts, because `GET /_admin/sos/requests` had nothing but a status filter —
+  an admin who remembered a description or a requester's username had to page through the queue by hand. The queue
+  route now takes `q`: an escaped `ILIKE` over the request description **or** the requester's username, resolved by
+  `exists` in SQL so pagination counts the matches rather than one fetched page of them.
+- `%` and `_` are characters an admin types, not patterns: `escapeLikeSearchTerm` moved out of the users store into
+  `db/search-term.ts` and both list queries now share it, so `user_name` cannot quietly match `userXname`.
+- The palette runs both searches in one debounced round trip and keeps them independent with `Promise.allSettled`:
+  accounts failing does not erase request hits, and each list says for itself whether it failed or found nothing.
+  Request rows carry their status label and open `/_admin/dispatch?request=…`; `Enter` follows the drawn order.
+- Server suite green (`src/db` + `src/admin`, 233 tests) with 3 predicates pinned for the new filter and 3 for the
+  escaping; client suite 1317 with 2 API serialisation tests and 1 palette test. Typecheck ×3 clean.
+
+---
+
 ### 2026-11-02 — The dispatch board knows it is offline
 
 - The board had no idea. A dropped connection surfaced as either the generic red `errorMessage` banner or, worse,

@@ -28,6 +28,8 @@ export type PaginatedSosRequests = z.infer<typeof paginatedSosRequestsSchema>;
 
 export interface ListAdminSosRequestsParams {
   status?: SosRequestStatus;
+  /** Free text over the request description and the requester's username. */
+  q?: string;
   page?: number;
   limit?: number;
   signal?: AbortSignal;
@@ -40,6 +42,7 @@ export async function listAdminSosRequests(
 ): Promise<PaginatedSosRequests> {
   const search = new URLSearchParams();
   if (params.status) search.set("status", params.status);
+  if (params.q) search.set("q", params.q);
   if (params.page !== undefined) search.set("page", String(params.page));
   if (params.limit !== undefined) search.set("limit", String(params.limit));
 

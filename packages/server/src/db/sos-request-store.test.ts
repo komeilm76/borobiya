@@ -7,6 +7,7 @@ import {
   availableIncidentTypeQuery,
   DrizzleSosRequestStore,
   sosRequestInsertQuery,
+  sosRequestSearchCondition,
   SosIncidentTypeUnavailableError,
   type NewSosRequest
 } from "./sos-request-store";
@@ -170,4 +171,32 @@ describe("DrizzleSosRequestStore", () => {
       /did not come back from the insert/
     );
   });
+});
+
+describe("admin request search", () => {
+  it("matches the description and the requester's username in one condition", () => {
+    const { sql } = offlineDb
+      .select()
+      .from(sosRequests)
+      .where(sosRequestSearchCondition("آتش"))
+      .toSQL();
+
+    expect(sql).toContain('"sos_requests"."description" ilike');
+    expect(sql).toContain('from "users"');
+    expect(sql).toContain('"users"."username" ilike');
+    // One condition, so the queue cannot end up requiring both a description match and a username match.
+    expect(sql).toContain(" or exists (");
+  });
+
+  it("treats ILIKE wildcards in the typed term as characters, not patterns", () => {
+    const { params } = offlineDb
+      .select()
+      .from(sosRequests)
+      .where(sosRequestSearchCondition("50%_off"))
+      .toSQL();
+
+    // The same escaped pattern feeds both branches.
+    expect(params).toEqual(["%50\\%\\_off%", "%50\\%\\_off%"]);
+  });
+
 });

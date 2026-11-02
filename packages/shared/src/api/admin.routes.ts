@@ -52,6 +52,8 @@ const adminUserDetailSchema = userProfileSchema.extend({
 
 export const adminSosListQuerySchema = z.strictObject({
   status: sosRequestStatusSchema.optional(),
+  /** Free text over the request description and the requester's username. */
+  q: z.string().trim().max(60).optional(),
   ...paginationQuerySchema.shape
 });
 export type AdminSosListQuery = z.output<typeof adminSosListQuerySchema>;
@@ -258,7 +260,7 @@ export const adminRoutes = {
     },
     meta: {
       operationId: "adminListSosRequests",
-      summary: "List SOS requests for dispatch monitoring",
+      summary: "List SOS requests for dispatch monitoring, with an optional status filter and text search",
       tags: ["admin", "sos"],
       access: "admin"
     }

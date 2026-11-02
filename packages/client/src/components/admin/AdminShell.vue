@@ -120,7 +120,7 @@
         <v-text-field
           v-model="query"
           class="admin-palette__input"
-          placeholder="جست‌وجوی بخش یا نام کاربری…"
+          placeholder="جست‌وجوی بخش، حساب یا درخواست…"
           prepend-inner-icon="mdi-magnify"
           variant="solo-filled"
           density="comfortable"
@@ -140,9 +140,12 @@
           </li>
         </ul>
 
-        <p v-if="accountSearching" class="admin-palette__status" role="status">در حال جست‌وجوی حساب‌ها…</p>
+        <p v-if="recordSearching" class="admin-palette__status" role="status">
+          در حال جست‌وجوی حساب‌ها و درخواست‌ها…
+        </p>
+
         <ul
-          v-else-if="accountMatches.length > 0"
+          v-if="accountMatches.length > 0"
           class="admin-palette__list admin-palette__list--accounts"
           role="list"
           aria-label="حساب‌ها"
@@ -157,11 +160,24 @@
         </ul>
         <p v-else-if="accountError !== ''" class="admin-palette__status" role="status">{{ accountError }}</p>
 
-        <p
-          v-if="matches.length === 0 && accountMatches.length === 0 && !accountSearching && accountError === ''"
-          class="admin-palette__empty"
+        <ul
+          v-if="requestMatches.length > 0"
+          class="admin-palette__list admin-palette__list--requests"
+          role="list"
+          aria-label="درخواست‌های اضطراری"
         >
-          بخش یا حسابی با این نام پیدا نشد.
+          <li v-for="hit in requestMatches" :key="hit.id">
+            <button type="button" class="admin-palette__item" @click="openRequest(hit.id)">
+              <v-icon icon="mdi-alarm-light-outline" size="18" />
+              <span class="admin-palette__label admin-palette__label--clipped">{{ hit.description }}</span>
+              <small>{{ statusLabel(hit.status) }}</small>
+            </button>
+          </li>
+        </ul>
+        <p v-else-if="requestError !== ''" class="admin-palette__status" role="status">{{ requestError }}</p>
+
+        <p v-if="recordSearchEmpty" class="admin-palette__empty">
+          بخش، حساب یا درخواستی با این نام پیدا نشد.
         </p>
         <footer class="admin-palette__foot">
           <span><kbd>↵</kbd> بازکردن</span>
@@ -209,7 +225,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import type { UserProfile } from "@shared/index";
+import type { SosRequestRecord, UserProfile } from "@shared/index";
+import { SOS_STATUS_PRESENTATION } from "../../admin/sos-alerts";
+import { listAdminSosRequests } from "../../api/admin-sos";
 import { listAdminUsers } from "../../api/admin-users";
 import { useOnlineStatus } from "../../composables/online-status";
 import { useAuthStore } from "../../stores/auth";
@@ -241,7 +259,7 @@ const props = defineProps<{
   crumbs?: string[];
 }>();
 
-const searchHint = "جست‌وجوی بخش‌های پنل و نام کاربری (Ctrl K)";
+const searchHint = "جست‌وجوی بخش‌ها، حساب‌ها و درخواست‌ها (Ctrl K)";
 
 const crumbList = computed(() => props.crumbs ?? []);
 const route = useRoute();
@@ -280,9 +298,9 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
 ];
 
 /**
- * The palette searches the panel's own pages plus accounts, through the users list endpoint the panel already
- * has. Requests and incident types still have no `q` on their list routes, so the field promises "بخش یا حساب"
- * rather than a record search it cannot do.
+ * The palette searches the panel's own pages, then the two records an admin actually hunts for: accounts and SOS
+ * requests. Both list routes take `q`, so neither search is a client-side filter over one page of results.
+ * Incident types have no `q` yet, and the field does not claim them.
  */
 const pages = computed(() =>
   navGroups.flatMap((group) =>
@@ -297,80 +315,120 @@ const matches = computed(() => {
 });
 
 const accountMatches = ref<UserProfile[]>([]);
-const accountSearching = ref(false);
+const requestMatches = ref<SosRequestRecord[]>([]);
 const accountError = ref("");
-let accountTimer: ReturnType<typeof setTimeout> | null = null;
-let accountController: AbortController | null = null;
-let accountRequest = 0;
+const requestError = ref("");
+const recordSearching = ref(false);
+let recordTimer: ReturnType<typeof setTimeout> | null = null;
+let recordController: AbortController | null = null;
+let recordRequest = 0;
 
-function clearAccountSearch(): void {
-  if (accountTimer !== null) clearTimeout(accountTimer);
-  accountTimer = null;
-  accountController?.abort();
-  accountController = null;
-  accountRequest += 1;
+/** Nothing matched anywhere, and nothing is still arriving: that is an empty result, not a blank panel. */
+const recordSearchEmpty = computed(
+  () =>
+    matches.value.length === 0 &&
+    accountMatches.value.length === 0 &&
+    requestMatches.value.length === 0 &&
+    !recordSearching.value &&
+    accountError.value === "" &&
+    requestError.value === ""
+);
+
+function clearRecordSearch(): void {
+  if (recordTimer !== null) clearTimeout(recordTimer);
+  recordTimer = null;
+  recordController?.abort();
+  recordController = null;
+  recordRequest += 1;
   accountMatches.value = [];
-  accountSearching.value = false;
+  requestMatches.value = [];
   accountError.value = "";
+  requestError.value = "";
+  recordSearching.value = false;
 }
 
-async function searchAccounts(term: string): Promise<void> {
-  const current = ++accountRequest;
-  accountController?.abort();
+function statusLabel(status: SosRequestRecord["status"]): string {
+  return SOS_STATUS_PRESENTATION[status]?.label ?? status;
+}
+
+function isAbort(caught: unknown): boolean {
+  return caught instanceof DOMException && caught.name === "AbortError";
+}
+
+/**
+ * Every record search reports its own failure: the two endpoints can fail independently, and an admin who sees
+ * "no accounts" needs to know whether that was an answer or a broken request.
+ */
+function failureText(kind: "accounts" | "requests"): string {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return `برای جست‌وجوی ${kind === "accounts" ? "حساب‌ها" : "درخواست‌ها"} اتصال اینترنت لازم است.`;
+  }
+  return kind === "accounts" ? "جست‌وجوی حساب‌ها ممکن نشد." : "جست‌وجوی درخواست‌ها ممکن نشد.";
+}
+
+async function searchRecords(term: string): Promise<void> {
+  const current = ++recordRequest;
+  recordController?.abort();
   const active = new AbortController();
-  accountController = active;
+  recordController = active;
   try {
     await auth.ensureSession();
+    if (current !== recordRequest) return;
     const accessToken = auth.accessToken;
     if (!accessToken) {
-      if (current === accountRequest) {
-        accountSearching.value = false;
-        accountError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد شوید.";
-      }
+      accountError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد شوید.";
+      requestError.value = "";
       return;
     }
-    const result = await listAdminUsers({ q: term, page: 1, limit: 5 }, accessToken, active.signal);
-    if (current !== accountRequest) return;
-    accountMatches.value = result.items;
+
+    const [accounts, requests] = await Promise.allSettled([
+      listAdminUsers({ q: term, page: 1, limit: 5 }, accessToken, active.signal),
+      listAdminSosRequests(accessToken, { q: term, limit: 5, signal: active.signal })
+    ]);
+    if (current !== recordRequest) return;
+
+    if (accounts.status === "fulfilled") accountMatches.value = accounts.value.items;
+    else if (!isAbort(accounts.reason)) accountError.value = failureText("accounts");
+
+    if (requests.status === "fulfilled") requestMatches.value = requests.value.items;
+    else if (!isAbort(requests.reason)) requestError.value = failureText("requests");
   } catch (caught) {
-    if (caught instanceof DOMException && caught.name === "AbortError") return;
-    if (current !== accountRequest) return;
-    accountMatches.value = [];
-    accountError.value =
-      typeof navigator !== "undefined" && navigator.onLine === false
-        ? "برای جست‌وجوی حساب‌ها اتصال اینترنت لازم است."
-        : "جست‌وجوی حساب‌ها ممکن نشد.";
+    if (current !== recordRequest || isAbort(caught)) return;
+    accountError.value = failureText("accounts");
+    requestError.value = failureText("requests");
   } finally {
-    if (current === accountRequest) {
-      accountSearching.value = false;
-      accountController = null;
+    if (current === recordRequest) {
+      recordSearching.value = false;
+      recordController = null;
     }
   }
 }
 
 watch(query, (value) => {
   const term = value.trim();
-  if (accountTimer !== null) clearTimeout(accountTimer);
-  accountTimer = null;
+  if (recordTimer !== null) clearTimeout(recordTimer);
+  recordTimer = null;
   accountError.value = "";
+  requestError.value = "";
   if (term.length < 2) {
-    clearAccountSearch();
+    clearRecordSearch();
     return;
   }
-  accountSearching.value = true;
-  accountTimer = setTimeout(() => void searchAccounts(term), 250);
+  recordSearching.value = true;
+  // Same 250 ms rhythm the users screen uses: a username is typed, not pasted.
+  recordTimer = setTimeout(() => void searchRecords(term), 250);
 });
 
 watch(paletteOpen, (open) => {
   if (open) return;
   query.value = "";
-  clearAccountSearch();
+  clearRecordSearch();
 });
 
 function open(to: string): void {
   paletteOpen.value = false;
   query.value = "";
-  clearAccountSearch();
+  clearRecordSearch();
   void router.push(to);
 }
 
@@ -379,6 +437,12 @@ function openUser(id: string): void {
   open(`/_admin/users?user=${encodeURIComponent(id)}`);
 }
 
+/** Requests open on the dispatch board, which owns the `?request=` selection. */
+function openRequest(id: string): void {
+  open(`/_admin/dispatch?request=${encodeURIComponent(id)}`);
+}
+
+/** Enter follows the visual order of the three result lists. */
 function openFirst(): void {
   const [firstPage] = matches.value;
   if (firstPage) {
@@ -386,7 +450,12 @@ function openFirst(): void {
     return;
   }
   const [firstAccount] = accountMatches.value;
-  if (firstAccount) openUser(firstAccount.id);
+  if (firstAccount) {
+    openUser(firstAccount.id);
+    return;
+  }
+  const [firstRequest] = requestMatches.value;
+  if (firstRequest) openRequest(firstRequest.id);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -402,7 +471,7 @@ function onKeydown(event: KeyboardEvent): void {
 onMounted(() => window.addEventListener("keydown", onKeydown));
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
-  clearAccountSearch();
+  clearRecordSearch();
 });
 
 const accountName = computed(() => auth.user?.username ?? "مدیر سامانه");
@@ -739,6 +808,20 @@ watch(
   border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
   margin-top: 4px;
   padding-top: 4px;
+}
+
+.admin-palette__list--requests {
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.08);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+
+/* A description is a sentence; the row stays one line and the tooltip keeps the rest readable. */
+.admin-palette__label--clipped {
+  overflow: hidden;
+  max-width: 22ch;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-palette__status {
