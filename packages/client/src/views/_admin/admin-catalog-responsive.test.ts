@@ -7,8 +7,8 @@ const incidents = readFileSync(new URL("./AdminIncidentsView.vue", import.meta.u
 describe("admin catalog lists on narrow screens", () => {
   it("keeps incident details and editing reachable without scrolling a wide table", () => {
     expect(incidents).toContain('<v-table class="admin-incidents-table"');
-    expect(incidents).toContain('<ul v-if="types.length || listState === \'loading\'" class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">');
-    const cards = incidents.split('<ul v-if="types.length || listState === \'loading\'" class="admin-incidents-mobile"')[1]?.split("</ul>")[0];
+    expect(incidents).toContain('<ul class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">');
+    const cards = incidents.split('<ul class="admin-incidents-mobile"')[1]?.split("</ul>")[0];
     expect(cards).toContain('v-for="type in types"');
     expect(cards).toContain("{{ type.name }}");
     expect(cards).toContain("{{ type.slug }}");
@@ -17,10 +17,10 @@ describe("admin catalog lists on narrow screens", () => {
     expect(cards).toContain('v-if="type.icon"');
     expect(cards).toContain('@click="openEdit(type)"');
     expect(incidents.match(/@click="openEdit\(type\)"/g)).toHaveLength(2); // desktop + mobile, one handler
-    expect(cards).toContain('v-if="listState === \'loading\'"');
-    expect(cards).not.toContain('listState === \'empty\'');
-    expect(cards).not.toContain('listState === \'error\'');
-    expect(incidents).toContain('class="admin-incidents-mobile admin-incidents-mobile__card"');
+    // The mobile list only renders rows; loading, offline, error and empty live in the shared panel above it.
+    expect(cards).not.toContain("listState === 'loading'");
+    expect(cards).not.toContain("listState === 'empty'");
+    expect(cards).not.toContain("listState === 'error'");
     expect(incidents).toContain('@click="load"');
     const narrow = incidents.split("@media (max-width: 850px) {")[1]?.split("\n}")[0];
     expect(narrow).toContain(".admin-incidents-table { display: none; }");

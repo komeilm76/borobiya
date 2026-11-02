@@ -21,4 +21,15 @@ describe("admin catalog list presentation", () => {
   it("reports empty only after a successful read returned no rows", () => {
     expect(catalogListPresentation(false, 0, "")).toBe("empty");
   });
+
+  it("names the network when the network is what failed", () => {
+    expect(catalogListPresentation(false, 0, "دریافت انجام نشد", true)).toBe("offline");
+    // A known catalog stays on screen; the offline banner belongs to the page, not to the list's state.
+    expect(catalogListPresentation(false, 2, "دریافت انجام نشد", true)).toBe("rows");
+    // A restored connection must show the server error again, not a stale offline claim.
+    expect(catalogListPresentation(false, 0, "دریافت انجام نشد", false)).toBe("error");
+    // No failure yet means the browser's opinion about the network cannot invent one.
+    expect(catalogListPresentation(false, 0, "", true)).toBe("empty");
+    expect(catalogListPresentation(true, 0, "", true)).toBe("loading");
+  });
 });

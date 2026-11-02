@@ -4,6 +4,25 @@
 
 ---
 
+### 2026-11-02 — The catalog screens stop calling every failure a server fault
+
+- `/_admin/incidents` was the last admin screen drawing its own states: a skeleton row inside the table, an error row
+  inside the table, an empty row inside the table, and a red alert above all three — four dialects of one failure, and
+  no offline face at all. It now renders `AdminStatePanel` for loading, offline, error and empty, and keeps the one
+  case the panel cannot express: a *refresh* that fails leaves the known rows on screen under a banner that says they
+  are the last good read.
+- `catalogListPresentation` — the helper both catalog screens already shared — gained an `offline` branch, passed in by
+  the caller that saw the failure, so a dead connection stops wearing the "server error" face. A known catalog stays
+  visible through an outage; only an empty one switches panels.
+- `/_admin/services` already used the panel but had the same blind spot. Its state machine now has an `offline` branch
+  placed after `forbidden` (a `403` is the server answering, whatever the browser thinks of the network) and re-reads
+  the list by itself on reconnect, but only after an outage it actually recorded.
+- That closes the state-coverage gap across all nine admin screens. Suite 1322/1322 — 1 new state-machine case, 4 new
+  offline tests for the two catalog views, and the old inline-row pins in `catalog-views` / `admin-catalog-responsive`
+  replaced with pins on the shared panel — typecheck clean.
+
+---
+
 ### 2026-11-02 — The palette searches records, on the server
 
 - The Ctrl K field could only reach accounts, because `GET /_admin/sos/requests` had nothing but a status filter —

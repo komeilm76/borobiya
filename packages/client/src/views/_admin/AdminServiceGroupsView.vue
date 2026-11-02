@@ -28,6 +28,15 @@
       description="این بخش فقط برای مدیران سامانه باز است."
     />
     <AdminStatePanel
+      v-else-if="state === 'offline'"
+      state="offline"
+      title="اتصال به سرور برقرار نیست"
+      description="گروه‌ها و اعضا فقط از سرور خوانده می‌شوند؛ به‌محض برگشتن اینترنت خودکار دوباره تلاش می‌شود."
+      action-label="تلاش دوباره"
+      action-icon="mdi-refresh"
+      @retry="loadGroups"
+    />
+    <AdminStatePanel
       v-else-if="state === 'error'"
       state="error"
       title="دریافت گروه‌ها ناموفق بود"
@@ -258,10 +267,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import type { Category, CategoryMember, IncidentType, UserProfile } from "@shared/index";
 import AdminShell from "../../components/admin/AdminShell.vue";
 import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
+import { useOnlineStatus } from "../../composables/online-status";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { ApiError } from "../../api/http";
 import { withoutConfirmedMember } from "../../admin/category-members";
@@ -287,6 +297,8 @@ const incidentTypes = ref<IncidentType[]>([]);
 const loading = ref(true);
 const error = ref<unknown>(null);
 const forbidden = ref(false);
+const offline = ref(false);
+const { isOnline } = useOnlineStatus();
 
 const editorOpen = ref(false);
 const editing = ref<Category | null>(null);
@@ -329,9 +341,14 @@ function notify(text: string, tone: "success" | "error" = "success"): void {
   snackbar.value = true;
 }
 
+/**
+ * `offline` sits after `forbidden` — a 403 is the server telling us something, and that is true whether or not the
+ * browser also lost a probe — and before `error`, which is where a dead connection would otherwise land.
+ */
 const state = computed(() => {
   if (loading.value) return "loading" as const;
   if (forbidden.value) return "forbidden" as const;
+  if (error.value && offline.value) return "offline" as const;
   if (error.value) return "error" as const;
   return "ready" as const;
 });
@@ -380,6 +397,7 @@ async function loadGroups(): Promise<void> {
   loading.value = true;
   error.value = null;
   forbidden.value = false;
+  offline.value = false;
   const token = await withToken();
   if (!token) return;
   try {
@@ -388,7 +406,10 @@ async function loadGroups(): Promise<void> {
     incidentTypes.value = typeList;
   } catch (caught) {
     if (caught instanceof ApiError && caught.status === 403) forbidden.value = true;
-    else error.value = caught;
+    else {
+      error.value = caught;
+      offline.value = navigator.onLine === false;
+    }
   } finally {
     loading.value = false;
   }
@@ -502,6 +523,12 @@ async function refreshActiveGroup(token: string): Promise<void> {
   categories.value = list;
   activeGroup.value = list.find((category) => category.id === activeGroup.value?.id) ?? null;
 }
+
+watch(isOnline, (online) => {
+  // Same rule as the request board: a reconnect only re-reads what is actually missing.
+  if (!online || !offline.value) return;
+  void loadGroups();
+});
 
 onMounted(() => {
   void loadGroups();

@@ -15,14 +15,52 @@
       </v-btn>
     </template>
 
-    <v-alert v-if="listError" class="mb-4" type="error" variant="tonal" rounded="lg" role="alert">{{ listError }}</v-alert>
-    <v-alert v-if="listState === 'empty'" class="mb-4" type="info" variant="tonal" rounded="lg">
-      هنوز هیچ نوع رویدادی تعریف نشده است. برای اولین نوع، «نوع رویداد جدید» را بزنید.
-    </v-alert>
+    <AdminStatePanel v-if="listState === 'loading'" state="loading" title="در حال خواندن نوع رویدادها…" />
+    <AdminStatePanel
+      v-else-if="listState === 'offline'"
+      state="offline"
+      title="اتصال به سرور برقرار نیست"
+      description="فهرست نوع رویدادها از سرور خوانده می‌شود؛ به‌محض برگشتن اینترنت خودکار دوباره تلاش می‌شود."
+      action-label="تلاش دوباره"
+      action-icon="mdi-refresh"
+      @retry="load"
+    />
+    <AdminStatePanel
+      v-else-if="listState === 'error'"
+      state="error"
+      title="خواندن نوع رویدادها ناموفق بود"
+      :description="listError"
+      action-label="تلاش دوباره"
+      action-icon="mdi-refresh"
+      @retry="load"
+    />
+    <AdminStatePanel
+      v-else-if="listState === 'empty'"
+      state="empty"
+      title="هنوز هیچ نوع رویدادی تعریف نشده است"
+      description="نوع رویداد همان چیزی است که هنگام ثبت SOS انتخاب می‌شود؛ تا یکی ساخته نشود، هیچ درخواستی ثبت نمی‌شود."
+      action-label="ساخت اولین نوع رویداد"
+      action-icon="mdi-plus"
+      @retry="openCreate"
+    />
 
-    <v-card elevation="0" rounded="xl" class="overflow-hidden bb-surface-card">
-      <p v-if="listState === 'loading'" class="sr-only" role="status" aria-live="polite">در حال بارگذاری نوع رویدادها…</p>
+    <v-card v-else elevation="0" rounded="xl" class="overflow-hidden bb-surface-card">
+      <!-- A known list stays on screen while it refreshes, and a failed refresh says so without erasing it. -->
       <v-progress-linear v-if="listState === 'refreshing'" indeterminate color="primary" aria-label="در حال تازه‌سازی نوع رویدادها" />
+      <v-alert
+        v-if="listError"
+        class="ma-4 mb-0"
+        type="error"
+        variant="tonal"
+        rounded="lg"
+        role="alert"
+        density="comfortable"
+      >
+        فهرست نمایش‌داده‌شده از آخرین دریافت موفق است.
+        <template #append>
+          <v-btn size="small" variant="text" @click="load">تلاش دوباره</v-btn>
+        </template>
+      </v-alert>
       <v-table class="admin-incidents-table" :aria-busy="loading">
         <thead>
           <tr>
@@ -35,11 +73,6 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="listState === 'loading'">
-            <td colspan="6">
-              <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" aria-hidden="true" />
-            </td>
-          </tr>
           <tr v-for="type in types" :key="type.id" class="admin-incidents-row" :data-slug="type.slug">
             <td class="font-medium">{{ type.name }}</td>
             <td><code class="admin-incidents-slug">{{ type.slug }}</code></td>
@@ -53,21 +86,9 @@
               <v-btn size="small" variant="text" prepend-icon="mdi-pencil-outline" @click="openEdit(type)">ویرایش</v-btn>
             </td>
           </tr>
-          <tr v-if="listState === 'error'">
-            <td colspan="6" class="py-6 text-center">
-              دریافت نوع رویدادها انجام نشد.
-              <v-btn size="small" variant="text" color="primary" @click="load">تلاش دوباره</v-btn>
-            </td>
-          </tr>
-          <tr v-if="listState === 'empty'">
-            <td colspan="6" class="py-6 text-center opacity-60">موردی برای نمایش نیست.</td>
-          </tr>
         </tbody>
       </v-table>
-      <ul v-if="types.length || listState === 'loading'" class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">
-        <li v-if="listState === 'loading'" class="admin-incidents-mobile__card" aria-hidden="true">
-          <v-skeleton-loader v-for="row in 3" :key="row" type="list-item-two-line" />
-        </li>
+      <ul class="admin-incidents-mobile" aria-label="نوع رویدادها" :aria-busy="loading" role="list">
         <li v-for="type in types" :key="type.id" class="admin-incidents-mobile__card">
           <div class="admin-incidents-mobile__heading">
             <h2>{{ type.name }}</h2>
@@ -85,11 +106,6 @@
           </dl>
         </li>
       </ul>
-      <div v-if="listState === 'error'" class="admin-incidents-mobile admin-incidents-mobile__card">
-        دریافت نوع رویدادها انجام نشد.
-        <v-btn variant="tonal" color="primary" @click="load">تلاش دوباره</v-btn>
-      </div>
-      <p v-if="listState === 'empty'" class="admin-incidents-mobile admin-incidents-mobile__card" role="status">موردی برای نمایش نیست.</p>
     </v-card>
 
     <v-dialog v-model="formOpen" max-width="640" scrollable persistent>
@@ -190,6 +206,8 @@ import {
   type IncidentFormDraft
 } from "../../admin/catalog-form";
 import { catalogListPresentation } from "../../admin/catalog-list-presentation";
+import AdminStatePanel from "../../components/admin/AdminStatePanel.vue";
+import { useOnlineStatus } from "../../composables/online-status";
 import { useAuthStore } from "../../stores/auth";
 
 const auth = useAuthStore();
@@ -197,7 +215,10 @@ const auth = useAuthStore();
 const types = ref<IncidentType[]>([]);
 const loading = ref(true);
 const listError = ref("");
-const listState = computed(() => catalogListPresentation(loading.value, types.value.length, listError.value));
+const listOffline = ref(false);
+const listState = computed(() =>
+  catalogListPresentation(loading.value, types.value.length, listError.value, listOffline.value)
+);
 const formOpen = ref(false);
 const saving = ref(false);
 const editing = ref<IncidentType | null>(null);
@@ -226,6 +247,7 @@ async function load(): Promise<void> {
   const controller = new AbortController();
   activeController = controller;
   listError.value = "";
+  listOffline.value = false;
   loading.value = true;
   try {
     const accessToken = await adminToken();
@@ -239,6 +261,7 @@ async function load(): Promise<void> {
     types.value = records;
   } catch (error) {
     if (controller.signal.aborted || version !== requestVersion) return;
+    listOffline.value = typeof navigator !== "undefined" && navigator.onLine === false;
     listError.value = friendlyErrorMessage(error, "بارگذاری فهرست نوع رویدادها انجام نشد. دوباره تلاش کنید.");
   } finally {
     if (version === requestVersion) loading.value = false;
@@ -357,11 +380,19 @@ async function submit(): Promise<void> {
   }
 }
 
+/** The server is reachable again, so the panel that blamed the network should stop blaming it by itself. */
+function retryWhenBackOnline(): void {
+  if (!listOffline.value) return;
+  void load();
+}
+
 onMounted(() => {
+  window.addEventListener("online", retryWhenBackOnline);
   void load();
 });
 
 onUnmounted(() => {
+  window.removeEventListener("online", retryWhenBackOnline);
   requestVersion += 1;
   activeController?.abort();
 });

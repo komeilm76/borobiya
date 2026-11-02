@@ -32,25 +32,26 @@ describe("the admin catalog views' load-bearing markup", () => {
     expect(incidents).toContain("incidentSlugPreview");
   });
 
-  it("distinguishes first-load skeletons, failed reads, empty success and stale rows during refresh", () => {
-    for (const [source, rows, colspan] of [[incidents, "types", "6"]] as const) {
-      expect(source).toContain(`catalogListPresentation(loading.value, ${rows}.value.length, listError.value)`);
-      expect(source).toContain("const loading = ref(true)"); // no empty-state flash before onMounted
-      expect(source).toContain('v-progress-linear v-if="listState === \'refreshing\'"');
-      expect(source).toContain(':aria-busy="loading"');
-      expect(source).toMatch(/<p v-if="listState === 'loading'"[^>]*role="status"/);
-      const loadingRow = source.match(/<tr v-if="listState === 'loading'">([\s\S]*?)<\/tr>/)?.[1];
-      expect(loadingRow).toContain(`colspan="${colspan}"`);
-      expect(loadingRow).toContain('<v-skeleton-loader v-for="row in 3"');
-      expect(loadingRow).toContain('aria-hidden="true"');
-      const errorRow = source.match(/<tr v-if="listState === 'error'">([\s\S]*?)<\/tr>/)?.[1];
-      expect(errorRow).toContain(`colspan="${colspan}"`);
-      expect(errorRow).toContain('@click="load"');
-      expect(source).toContain('<tr v-if="listState === \'empty\'">');
-      expect(source).toContain(`v-for="${rows === "types" ? "type in types" : "category in categories"}"`);
-      expect(source).not.toContain(`v-if="!loading && ${rows}.length === 0"`);
-      expect(source).toContain('<v-snackbar v-model="successVisible"');
-    }
+  it("distinguishes a first load, a failed read, an empty catalog and a stale list during refresh", () => {
+    // The incidents list renders the shared state panel now, decided by the same presentation helper the services
+    // list uses — one definition of "empty" for both catalog screens.
+    expect(incidents).toContain("catalogListPresentation(loading.value, types.value.length, listError.value, listOffline.value)");
+    expect(incidents).toContain("const loading = ref(true)"); // no empty-state flash before onMounted
+    expect(incidents).toContain('<AdminStatePanel v-if="listState === \'loading\'" state="loading"');
+    expect(incidents).toContain('state="offline"');
+    expect(incidents).toContain('state="error"');
+    expect(incidents).toContain('state="empty"');
+    expect(incidents).toContain('@retry="load"');
+    // A refresh keeps the known rows, with a bar rather than skeletons.
+    expect(incidents).toContain('v-progress-linear v-if="listState === \'refreshing\'"');
+    expect(incidents).toContain(':aria-busy="loading"');
+    // A refresh that fails keeps the rows and says they are the last good ones.
+    expect(incidents).toContain("فهرست نمایش‌داده‌شده از آخرین دریافت موفق است.");
+    expect(incidents).toContain('v-for="type in types"');
+    // The old inline rows are gone; the page cannot grow a second dialect of the same state.
+    expect(incidents).not.toContain('<tr v-if="listState === \'loading\'">');
+    expect(incidents).not.toContain('<tr v-if="listState === \'error\'">');
+    expect(incidents).not.toContain('<tr v-if="listState === \'empty\'">');
   });
 
   it("aborts and ignores in-flight work when the page unmounts", () => {

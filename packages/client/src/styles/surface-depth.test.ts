@@ -22,7 +22,8 @@ describe("surface depth across light and dark UI", () => {
 
   it("gives previously flat top-level admin tables and share lists an explicit surface tier", () => {
     for (const path of ["../views/_admin/AdminIncidentsView.vue"]) {
-      expect(source(path)).toMatch(/<v-card\s+elevation="0"\s+rounded="xl"\s+class="overflow-hidden bb-surface-card"/);
+      // `v-else` because the card is now the "rows" branch under the shared state panel.
+      expect(source(path)).toMatch(/<v-card\s+v-else\s+elevation="0"\s+rounded="xl"\s+class="overflow-hidden bb-surface-card"/);
     }
     expect(source("../components/sharing/ShareLists.vue"))
       .toMatch(/<v-card class="share-lists bb-surface-card" elevation="0"/);

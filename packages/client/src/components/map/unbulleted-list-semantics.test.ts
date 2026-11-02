@@ -25,11 +25,13 @@ describe("unbulleted lists retain screen-reader list semantics", () => {
       expect(view, path).toContain(`.${klass} {`);
       expect(view, path).toMatch(new RegExp(`\\.${klass} \\{[^}]*list-style: none;`));
       if (klass !== "admin-users-mobile") {
-        const rows = view.split(`<ul v-if=`)[1]?.split("</ul>")[0];
+        // The incidents cards list now renders only rows; error and empty moved into the shared state panel, so the
+        // list must not have kept its own copies of them.
+        const rows = view.split(`<ul class="${klass}"`)[1]?.split("</ul>")[0];
+        expect(rows, path).toBeDefined();
         expect(rows, path).not.toContain("listState === 'error'");
         expect(rows, path).not.toContain("listState === 'empty'");
-        expect(view, path).toMatch(new RegExp(`<div v-if="listState === 'error'" class="${klass} ${klass}__card">`));
-        expect(view, path).toMatch(new RegExp(`<p v-if="listState === 'empty'" class="${klass} ${klass}__card" role="status">`));
+        expect(rows, path).not.toContain("listState === 'loading'");
       }
     }
   });
