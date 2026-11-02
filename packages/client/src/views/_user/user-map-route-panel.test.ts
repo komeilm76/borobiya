@@ -33,12 +33,12 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('برای بررسی مسیرها از دکمهٔ انتخاب مسیر کنار SOS استفاده کنید.');
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('section.point-route-shell[data-v-route-panel] { position: fixed; z-index: 7');
-    expect(styles).toContain('section.point-route-shell[data-v-route-panel] { left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(styles).toContain('section.point-route-shell[data-v-route-panel] { left: 0; right: 0;\n    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
     expect(styles).toContain('border-radius: var(--bb-radius-card, 24px)');
     expect(styles).not.toContain('min-height: min(60dvh, 26rem)');
     expect(styles).toContain('max-height: min(52dvh, 27rem)'); // Expanded review leaves almost half the map exposed.
     expect(styles).toContain('min-height: 0; max-height: min(48dvh, 24rem)'); // Summary hugs its contents, not a viewport floor.
-    expect(styles).toContain('max-height: clamp(14rem, 60dvh, 17rem)'); // Short phones keep fixed controls reachable.
+    expect(styles).toContain('max-height: max(7rem, calc(100dvh - 13rem'); // Short phones scroll without shrinking touch targets.
     expect(styles).toContain('overflow-y: auto');
     expect(styles).toContain('safe-area-inset-bottom');
     expect(styles).toContain('(max-height: 430px) and (max-width: 599px)');
@@ -324,7 +324,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
     const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
     const rule = '.app-shell--map:has(.user-map-view--route-preview)';
-    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 0.5rem)';
+    const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px))';
     for (const selector of ['.sos-fab.sos-fab', '.user-map-view__route-choices-toggle.user-map-view__route-choices-toggle']) {
       const start = phone.indexOf(`${rule} ${selector} {`);
       expect(start).toBeGreaterThan(0);
@@ -332,12 +332,34 @@ describe("progressive trip planning and editing", () => {
     }
     const rail = css(map, "UserMapView.vue");
     expect(rail).toContain('.user-map-view--route-preview');
-    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + .5rem');
+    expect(rail).toContain('var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px)');
     expect(rail).toContain('13rem + env(safe-area-inset-right, 0px)');
     // Five 48px actions with >=4px gaps fit a 320px phone with 20px insets.
     const lastActionLeft = 320 - (12 + 13 * 16 + 20) - 48;
     expect(lastActionLeft).toBeGreaterThanOrEqual(20);
     expect(sheet).toContain('role="region"'); // No overlay focus trap: the map and actions remain reachable.
+  });
+
+  it("keeps the Search/History/Companions dock clickable below a selected point and its route chooser", () => {
+    expect(map).toContain('v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame"');
+    expect(map).toContain('@update:model-value="selectTool"');
+    expect(map).toContain('modelValue: activeTool.value === "search"');
+    expect(map).toContain('modelValue: activeTool.value === "history"');
+    expect(map).toContain('modelValue: activeTool.value === "live"');
+    expect(map).toContain('@create-share="shareOpen = true"');
+    expect(map).toContain('<ShareDialog v-model="shareOpen" :fullscreen="isPhone"');
+    const planner = css(sheet, "PointRouteSheet.vue");
+    const chooser = css(choices, "PointRouteChoicesSheet.vue");
+    const dock = css(map, "UserMapView.vue");
+    for (const panel of [planner, chooser]) {
+      expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
+      expect(panel).toContain('pointer-events: auto');
+    }
+    expect(dock).toContain('inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px))');
+    expect(dock).toContain('height: 4rem');
+    // Dock top is 4.75rem above the viewport bottom; panels end at 5.5rem.
+    expect(5.5 - (0.75 + 4)).toBeGreaterThanOrEqual(0.5);
+    expect(planner).toContain('overflow-y: auto'); // Landscape keeps full-size buttons scrollable.
   });
 
   it("centers a held destination without recentering an invalid or out-of-bounds selection", () => {
@@ -370,7 +392,7 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain('role="region" aria-label="انتخاب مسیر"');
     expect(choices).not.toContain('VBottomSheet');
     const choiceStyles = css(choices, "PointRouteChoicesSheet.vue");
-    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: 0; right: 0; bottom: 0; width: 100%;');
+    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: 0; right: 0;\n    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
     expect(choiceStyles).toContain('width: min(30rem, calc(100vw - 7.5rem))');
     expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');

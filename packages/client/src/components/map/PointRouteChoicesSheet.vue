@@ -73,14 +73,15 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
     width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  section.point-route-choices-shell { left: 0; right: 0; bottom: 0; width: 100%; }
+  section.point-route-choices-shell { left: 0; right: 0;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
   .point-route-choices { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0; }
   .point-route-choices { width: 100%; max-height: min(62dvh, 32rem); }
   .point-route-choices__list { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px))
     calc(.85rem + env(safe-area-inset-left, 0px)); }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route-choices { max-height: min(72dvh, 17rem); }
+  .point-route-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 }
 @media (forced-colors: active) {
   .point-route-choices__card[aria-pressed="true"] { outline: 2px solid Highlight; }

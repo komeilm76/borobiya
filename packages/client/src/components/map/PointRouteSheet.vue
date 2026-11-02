@@ -297,9 +297,10 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
   .point-route-shell--expanded .point-route { max-height: min(65dvh, 36rem); }
 }
 @media (max-width: 599px) {
-  /* Keep the standard sheet inside the map viewport, above the dock. The map
-     remains usable outside its content and the footer clears the home indicator. */
-  section.point-route-shell { left: 0; right: 0; bottom: 0; width: 100%; }
+  /* Keep the persistent Search/History/Companions dock usable below the
+     planner. The gap separates their independent 44px+ touch targets. */
+  section.point-route-shell { left: 0; right: 0;
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
   .point-route { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0; }
   /* No viewport-height floor: the summary hugs its real content so the map
      remains in view. Expanded review is capped and scrolls without shrinking
@@ -322,10 +323,11 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none; r
   .point-route__mode-grid button { flex-direction: column; font-size: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  /* The fixed header/address/footer need ~14rem even on short phones. Keep
-     everything else scrollable; landscape retains two primary actions. */
+  /* The dock and action row must fit even in landscape. Scroll the whole
+     card instead of shrinking its header, address rows or primary buttons. */
   .point-route, .point-route-shell--expanded .point-route {
-    max-height: clamp(14rem, 60dvh, 17rem);
+    max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto;
   }
 }
 @media (forced-colors: active) { .point-route__mode-grid button[aria-pressed="true"] { outline: 2px solid Highlight; } }

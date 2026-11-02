@@ -2188,7 +2188,7 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   .user-map-view--route-preview .user-map-view__share,
   .user-map-view--route-preview .user-map-view__recenter,
   .user-map-view--route-preview .user-map-view__canvas :deep(.maplibregl-ctrl-top-right) {
-    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + .5rem);
+    top: auto; bottom: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px));
   }
   .user-map-view--route-preview .user-map-view__share {
     right: calc(.75rem + 6.5rem + env(safe-area-inset-right, 0px)); left: auto;
