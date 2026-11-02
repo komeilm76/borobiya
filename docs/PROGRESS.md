@@ -4,6 +4,21 @@
 
 ---
 
+### 2026-11-02 — The palette works without a mouse
+
+- `Enter` always opened the first hit, and there was no way to reach the second one from the keyboard: a command
+  palette that can only open its top answer is a palette for short lists. `↑`/`↓` now walk one flat list of every
+  result — pages, then accounts, then requests — wrapping at both ends, with `Home`/`End` for the edges.
+- The highlight is state, not a hint: the input is a `combobox` whose `aria-activedescendant` names the highlighted
+  row, the results are one `listbox` with a labelled `group` per kind, each row is an `option` carrying
+  `aria-selected`, and the wrappers are presentational so the listbox owns no listitems. `Enter` opens exactly the
+  row the highlight is on, and the highlight resets with the query and when the results shrink under it.
+- Because focus stays in the field, the active row is scrolled into view explicitly; the results area now owns its
+  own scroll height so a long result set cannot push the keyboard hints off the dialog.
+- Suite 1324/1324 (2 new palette tests), typecheck clean.
+
+---
+
 ### 2026-11-02 — The catalog screens stop calling every failure a server fault
 
 - `/_admin/incidents` was the last admin screen drawing its own states: a skeleton row inside the table, an error row

@@ -127,59 +127,95 @@
           hide-details
           autofocus
           clearable
+          role="combobox"
+          aria-label="جست‌وجوی پنل مدیریت"
+          aria-controls="admin-palette-results"
+          :aria-expanded="allHits.length > 0"
+          :aria-activedescendant="activeOptionId"
           @keydown.enter.prevent="openFirst"
+          @keydown.down.prevent="moveActive(1)"
+          @keydown.up.prevent="moveActive(-1)"
+          @keydown.home.prevent="activeIndex = 0"
+          @keydown.end.prevent="activeIndex = Math.max(allHits.length - 1, 0)"
           @keydown.esc="paletteOpen = false"
         />
-        <ul v-if="matches.length > 0" class="admin-palette__list" role="list" aria-label="بخش‌های پنل">
-          <li v-for="hit in matches" :key="hit.key">
-            <button type="button" class="admin-palette__item" @click="open(hit.to)">
-              <v-icon :icon="hit.icon" size="18" />
-              <span class="admin-palette__label">{{ hit.label }}</span>
-              <small>{{ hit.group }}</small>
-            </button>
-          </li>
-        </ul>
 
-        <p v-if="recordSearching" class="admin-palette__status" role="status">
-          در حال جست‌وجوی حساب‌ها و درخواست‌ها…
-        </p>
+        <div id="admin-palette-results" class="admin-palette__results" role="listbox" aria-label="نتایج">
+          <div v-if="matches.length > 0" role="group" aria-label="بخش‌های پنل">
+            <ul class="admin-palette__list" role="presentation">
+              <li v-for="hit in matches" :key="hit.key" role="presentation">
+                <button
+                  :id="optionId(`page-${hit.key}`)"
+                  type="button"
+                  class="admin-palette__item"
+                  :class="{ 'admin-palette__item--active': activeKey === `page-${hit.key}` }"
+                  role="option"
+                  :aria-selected="activeKey === `page-${hit.key}`"
+                  @click="open(hit.to)"
+                  @mouseenter="activate(`page-${hit.key}`)"
+                >
+                  <v-icon :icon="hit.icon" size="18" />
+                  <span class="admin-palette__label">{{ hit.label }}</span>
+                  <small>{{ hit.group }}</small>
+                </button>
+              </li>
+            </ul>
+          </div>
 
-        <ul
-          v-if="accountMatches.length > 0"
-          class="admin-palette__list admin-palette__list--accounts"
-          role="list"
-          aria-label="حساب‌ها"
-        >
-          <li v-for="hit in accountMatches" :key="hit.id">
-            <button type="button" class="admin-palette__item" @click="openUser(hit.id)">
-              <v-icon icon="mdi-account-outline" size="18" />
-              <span class="admin-palette__label" dir="ltr">{{ hit.username }}</span>
-              <small>{{ hit.isActive ? "حساب فعال" : "حساب غیرفعال" }}</small>
-            </button>
-          </li>
-        </ul>
-        <p v-else-if="accountError !== ''" class="admin-palette__status" role="status">{{ accountError }}</p>
+          <p v-if="recordSearching" class="admin-palette__status" role="status">
+            در حال جست‌وجوی حساب‌ها و درخواست‌ها…
+          </p>
 
-        <ul
-          v-if="requestMatches.length > 0"
-          class="admin-palette__list admin-palette__list--requests"
-          role="list"
-          aria-label="درخواست‌های اضطراری"
-        >
-          <li v-for="hit in requestMatches" :key="hit.id">
-            <button type="button" class="admin-palette__item" @click="openRequest(hit.id)">
-              <v-icon icon="mdi-alarm-light-outline" size="18" />
-              <span class="admin-palette__label admin-palette__label--clipped">{{ hit.description }}</span>
-              <small>{{ statusLabel(hit.status) }}</small>
-            </button>
-          </li>
-        </ul>
-        <p v-else-if="requestError !== ''" class="admin-palette__status" role="status">{{ requestError }}</p>
+          <div v-if="accountMatches.length > 0" role="group" aria-label="حساب‌ها">
+            <ul class="admin-palette__list admin-palette__list--accounts" role="presentation">
+              <li v-for="hit in accountMatches" :key="hit.id" role="presentation">
+                <button
+                  :id="optionId(`account-${hit.id}`)"
+                  type="button"
+                  class="admin-palette__item"
+                  :class="{ 'admin-palette__item--active': activeKey === `account-${hit.id}` }"
+                  role="option"
+                  :aria-selected="activeKey === `account-${hit.id}`"
+                  @click="openUser(hit.id)"
+                  @mouseenter="activate(`account-${hit.id}`)"
+                >
+                  <v-icon icon="mdi-account-outline" size="18" />
+                  <span class="admin-palette__label" dir="ltr">{{ hit.username }}</span>
+                  <small>{{ hit.isActive ? "حساب فعال" : "حساب غیرفعال" }}</small>
+                </button>
+              </li>
+            </ul>
+          </div>
+          <p v-else-if="accountError !== ''" class="admin-palette__status" role="status">{{ accountError }}</p>
 
-        <p v-if="recordSearchEmpty" class="admin-palette__empty">
-          بخش، حساب یا درخواستی با این نام پیدا نشد.
-        </p>
+          <div v-if="requestMatches.length > 0" role="group" aria-label="درخواست‌های اضطراری">
+            <ul class="admin-palette__list admin-palette__list--requests" role="presentation">
+              <li v-for="hit in requestMatches" :key="hit.id" role="presentation">
+                <button
+                  :id="optionId(`request-${hit.id}`)"
+                  type="button"
+                  class="admin-palette__item"
+                  :class="{ 'admin-palette__item--active': activeKey === `request-${hit.id}` }"
+                  role="option"
+                  :aria-selected="activeKey === `request-${hit.id}`"
+                  @click="openRequest(hit.id)"
+                  @mouseenter="activate(`request-${hit.id}`)"
+                >
+                  <v-icon icon="mdi-alarm-light-outline" size="18" />
+                  <span class="admin-palette__label admin-palette__label--clipped">{{ hit.description }}</span>
+                  <small>{{ statusLabel(hit.status) }}</small>
+                </button>
+              </li>
+            </ul>
+          </div>
+          <p v-else-if="requestError !== ''" class="admin-palette__status" role="status">{{ requestError }}</p>
+
+          <p v-if="recordSearchEmpty" class="admin-palette__empty">
+            بخش، حساب یا درخواستی با این نام پیدا نشد.
+          </p>
+        </div>
         <footer class="admin-palette__foot">
+          <span><kbd>↑</kbd><kbd>↓</kbd> جابه‌جایی</span>
           <span><kbd>↵</kbd> بازکردن</span>
           <span><kbd>Esc</kbd> بستن</span>
         </footer>
@@ -223,7 +259,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import type { SosRequestRecord, UserProfile } from "@shared/index";
 import { SOS_STATUS_PRESENTATION } from "../../admin/sos-alerts";
@@ -335,6 +371,7 @@ const recordSearchEmpty = computed(
 );
 
 function clearRecordSearch(): void {
+  activeIndex.value = 0;
   if (recordTimer !== null) clearTimeout(recordTimer);
   recordTimer = null;
   recordController?.abort();
@@ -442,20 +479,62 @@ function openRequest(id: string): void {
   open(`/_admin/dispatch?request=${encodeURIComponent(id)}`);
 }
 
-/** Enter follows the visual order of the three result lists. */
+/**
+ * One flat list of everything the palette is showing, in the order it is drawn. The arrow keys, `Enter` and
+ * `aria-activedescendant` all read from it, so "the highlighted row" and "the row Enter opens" cannot disagree.
+ */
+type PaletteHit = { key: string; kind: "page" | "account" | "request"; id: string };
+
+const allHits = computed<PaletteHit[]>(() => [
+  ...matches.value.map((hit) => ({ key: `page-${hit.key}`, kind: "page" as const, id: hit.key })),
+  ...accountMatches.value.map((user) => ({ key: `account-${user.id}`, kind: "account" as const, id: user.id })),
+  ...requestMatches.value.map((row) => ({ key: `request-${row.id}`, kind: "request" as const, id: row.id }))
+]);
+
+const activeIndex = ref(0);
+const activeKey = computed(() => allHits.value[activeIndex.value]?.key ?? "");
+const activeOptionId = computed(() => (activeKey.value ? optionId(activeKey.value) : undefined));
+
+function optionId(key: string): string {
+  return `admin-palette-option-${key}`;
+}
+
+/** The highlight follows the list it lives in; a shrinking list must not leave it past the end. */
+watch(
+  () => allHits.value.map((hit) => hit.key).join("|"),
+  () => {
+    if (activeIndex.value >= allHits.value.length) activeIndex.value = 0;
+  }
+);
+
+function activate(key: string): void {
+  const index = allHits.value.findIndex((hit) => hit.key === key);
+  if (index >= 0) activeIndex.value = index;
+}
+
+/** Wraps in both directions, the way a command palette is expected to. */
+function moveActive(delta: number): void {
+  const total = allHits.value.length;
+  if (total === 0) return;
+  activeIndex.value = (activeIndex.value + delta + total) % total;
+  // The field keeps focus, so the browser will not scroll for us.
+  void nextTick(() => {
+    const id = activeOptionId.value;
+    if (id) document.getElementById(id)?.scrollIntoView({ block: "nearest" });
+  });
+}
+
+/** `Enter` opens the highlighted row — which is the first hit until an arrow key says otherwise. */
 function openFirst(): void {
-  const [firstPage] = matches.value;
-  if (firstPage) {
-    open(firstPage.to);
+  const hit = allHits.value[activeIndex.value];
+  if (!hit) return;
+  if (hit.kind === "page") {
+    const page = matches.value.find((candidate) => candidate.key === hit.id);
+    if (page) open(page.to);
     return;
   }
-  const [firstAccount] = accountMatches.value;
-  if (firstAccount) {
-    openUser(firstAccount.id);
-    return;
-  }
-  const [firstRequest] = requestMatches.value;
-  if (firstRequest) openRequest(firstRequest.id);
+  if (hit.kind === "account") openUser(hit.id);
+  else openRequest(hit.id);
 }
 
 function onKeydown(event: KeyboardEvent): void {
@@ -801,6 +880,17 @@ watch(
   color: rgba(var(--v-theme-on-surface), 0.6);
   font-size: 0.86rem;
   text-align: center;
+}
+
+/* The palette owns its scroll, so a long result set never pushes the footer off the dialog. */
+.admin-palette__results {
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+}
+
+.admin-palette__item--active {
+  background: rgba(var(--v-theme-primary), 0.1);
+  box-shadow: inset 3px 0 0 rgb(var(--v-theme-primary));
 }
 
 /* Accounts come after the pages; the rule keeps the two result kinds visually separate. */

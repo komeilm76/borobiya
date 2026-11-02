@@ -107,9 +107,11 @@ describe("admin shell", () => {
     expect(shell).toContain('if (accounts.status === "fulfilled") accountMatches.value = accounts.value.items;');
     expect(shell).toContain('if (requests.status === "fulfilled") requestMatches.value = requests.value.items;');
     expect(shell).toContain('else if (!isAbort(requests.reason)) requestError.value = failureText("requests");');
-    // Enter walks the lists in the order they are drawn.
-    const openFirst = shell.slice(shell.indexOf("function openFirst(): void {"));
-    expect(openFirst.indexOf("openUser(firstAccount.id)")).toBeLessThan(openFirst.indexOf("openRequest(firstRequest.id)"));
+    // Enter opens the highlighted row, and the flat hit list is in the order the three lists are drawn.
+    const hits = shell.slice(shell.indexOf("const allHits = computed<PaletteHit[]>"), shell.indexOf("const activeIndex"));
+    expect(hits.indexOf("...matches.value")).toBeLessThan(hits.indexOf("...accountMatches.value"));
+    expect(hits.indexOf("...accountMatches.value")).toBeLessThan(hits.indexOf("...requestMatches.value"));
+    expect(shell).toContain('if (hit.kind === "account") openUser(hit.id);\n  else openRequest(hit.id);');
   });
 
   it("says the connection is down on every screen, not only where a page keeps a banner", () => {
@@ -120,6 +122,32 @@ describe("admin shell", () => {
     // The word is decorative next to the icon's accessible name, and it is the first thing dropped on phones.
     expect(shell).toContain('<span class="admin-tool--offline__label" aria-hidden="true">آفلاین</span>');
     expect(shell).toContain(".admin-tool--offline__label {\n    display: none;\n  }");
+  });
+
+  it("lets the arrow keys walk the palette instead of forcing Enter on the first hit", () => {
+    expect(shell).toContain('@keydown.down.prevent="moveActive(1)"');
+    expect(shell).toContain('@keydown.up.prevent="moveActive(-1)"');
+    expect(shell).toContain('@keydown.home.prevent="activeIndex = 0"');
+    // Wrapping, so the last row's Down reaches the first one; an empty palette must not divide by zero.
+    const mover = shell.slice(shell.indexOf("function moveActive(delta: number): void {"), shell.indexOf("/** `Enter` opens the highlighted row"));
+    expect(mover).toContain("if (total === 0) return;");
+    expect(mover).toContain("activeIndex.value = (activeIndex.value + delta + total) % total;");
+    // The input keeps focus, so the browser will not bring the highlighted row into view on its own.
+    expect(mover).toContain('document.getElementById(id)?.scrollIntoView({ block: "nearest" });');
+    // A shrinking list must not leave the highlight past the end.
+    expect(shell).toContain("if (activeIndex.value >= allHits.value.length) activeIndex.value = 0;");
+  });
+
+  it("tells assistive technology which row is highlighted", () => {
+    expect(shell).toContain('role="combobox"');
+    expect(shell).toContain('aria-controls="admin-palette-results"');
+    expect(shell).toContain(':aria-activedescendant="activeOptionId"');
+    expect(shell).toContain('<div id="admin-palette-results" class="admin-palette__results" role="listbox" aria-label="نتایج">');
+    expect(shell).toContain('role="group" aria-label="حساب‌ها"');
+    expect(shell).toContain('role="option"');
+    expect(shell).toContain(':aria-selected="activeKey === `account-${hit.id}`"');
+    // `role="option"` needs a listbox parent, and the grouped items are inside `role="presentation"` lists.
+    expect(shell).toContain('<ul class="admin-palette__list" role="presentation">');
   });
 
   it("labels the breadcrumb trail and the account footer for screen readers", () => {
