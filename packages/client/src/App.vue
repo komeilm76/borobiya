@@ -14,6 +14,7 @@
       <v-spacer />
 
       <nav class="top-nav" aria-label="پیمایش اصلی">
+        <NetworkStatusIcon />
         <v-menu v-if="auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions" location="bottom end">
           <template #activator="{ props: inboxProps }">
             <v-btn v-bind="inboxProps" icon variant="text" aria-label="پیشنهادهای مأموریت" @click="proposalInbox.refresh()">
@@ -90,6 +91,7 @@
       </nav>
     </v-app-bar>
 
+    <NetworkStatusIcon v-if="isMapRoute" floating />
     <MapSidebar
       v-if="isMapRoute"
       :items="mapNavItems"
@@ -260,6 +262,7 @@ import { computed, onMounted, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
 import MapSidebar from "./components/shell/MapSidebar.vue";
+import NetworkStatusIcon from "./components/shell/NetworkStatusIcon.vue";
 import MapProposalSidebar from "./components/shell/MapProposalSidebar.vue";
 import SosRequestSheet from "./components/sos/SosRequestSheet.vue";
 import SosTriggerButton from "./components/sos/SosTriggerButton.vue";
