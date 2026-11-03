@@ -4,6 +4,29 @@
 
 ---
 
+### 2026-11-03 — Every icon the product draws now lives in the design folder
+
+- The design folder showed screens, not the parts they are made of. All 146 icons the client renders — 375 usages
+  across 51 files — existed only as `mdi-*` strings inside `.vue` files, so nobody could answer "which icon means
+  reload here?" or "how big is a card-title glyph?" without grepping.
+- `design/icons/` now holds the catalogue: `icons.json` (name, role, every role, use count, files) and eight 1440×900
+  pages — an overview with the eight roles and the size ramp, then one tile per icon with its glyph, name, count and
+  first file. Cadastre is generated, never written by hand: `_generator/inventory.py` reads the client with a tag
+  stack, so an icon is classified by the element and slot that carries it (`<v-btn prepend-icon>`, a field's
+  `prepend-inner-icon`, a state panel's `action-icon`), not by its own name.
+- **It found a real bug.** `mdi-sparkles` on the placeholder page is not in the vendored Material Design Icons
+  webfont, so it has always rendered as a blank box; it is now `mdi-creation-outline`. Names have no compile step,
+  which is why the catalogue validates every one of them against the shipped CSS.
+- Three guards keep it true: a client test comparing the committed catalogue with the source and with the font, and
+  Python tests for the same two facts plus page coverage. Both guards were verified to fail on a deliberately added
+  icon before being trusted.
+- The admin design-system controls page gained an icon specimen strip — one glyph per allowed size (16/18/20/22/26) —
+  drawn by the library's own `glyph_box()`, so the size a component author copies and the sizes the library lists
+  cannot drift apart.
+- Client suite 1330/1330 (4 new catalogue tests), Python catalogue tests 4/4, typecheck clean.
+
+---
+
 ### 2026-11-02 — Keyboard paths through the shell and the account drawer
 
 - Opening the phone rail left focus on the page *behind* it, and closing it dropped focus to `<body>`, so the next Tab

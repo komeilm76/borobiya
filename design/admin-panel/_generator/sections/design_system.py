@@ -5,6 +5,21 @@ import atheme  # noqa: F401
 from atheme import A, C, PAD, RAIL, TYPE
 import desk as D
 
+# The icon library owns how a specimen is drawn; this page borrows it rather than inventing a second tile.
+import os
+import sys
+_ICONS = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+                                      "icons", "_generator"))
+if _ICONS not in sys.path:
+    sys.path.insert(0, _ICONS)
+from render import glyph_box  # noqa: E402
+
+
+def load_inventory():  # noqa: D103 - the library's own JSON is the count of record
+    import json
+    with open(os.path.join(_ICONS, "..", "icons.json"), encoding="utf-8") as handle:
+        return json.load(handle)
+
 # (token, usage) — the hex is read from the live theme, so the card can never drift
 # from the colours the rest of the mockups are drawn with.
 SWATCHES = [
@@ -101,7 +116,7 @@ def controls():
     # ---- buttons (right card) --------------------------------------------
     bx0 = RAIL - 548
     br, bl = bx0 + 528, bx0 + 20
-    D.card(s, bx0, y, 548, 300, "دکمه‌ها", "mdi-gesture-tap-button")
+    D.card(s, bx0, y, 548, 272, "دکمه‌ها", "mdi-gesture-tap-button")
     # 162 + 12 + 162 + 12 + 160 = 508 = card inner width
     bw1, bw2, bw3 = 162, 162, 160
     D._button(s, bl, y + 56, bw1, 42, "ثبت اعزام", "mdi-send", "filled")
@@ -122,7 +137,7 @@ def controls():
     # ---- fields (left card) ----------------------------------------------
     fx0 = PAD
     fr, fl = fx0 + 528, fx0 + 20
-    D.card(s, fx0, y, 548, 300, "فیلد و انتخاب", "mdi-form-textbox")
+    D.card(s, fx0, y, 548, 272, "فیلد و انتخاب", "mdi-form-textbox")
     D.field(s, fl, y + 56, 508, "جست‌وجوی کاربر یا مأموریت", h=44)
     D.select(s, fl, y + 112, 248, "همهٔ وضعیت‌ها")
     D.select(s, fl + 260, y + 112, 248, "۷ روز گذشته")
@@ -132,44 +147,71 @@ def controls():
     s.text(fr, y + 248, "همهٔ فیلدها ارتفاع ۴۴ و شعاع ۱۰ دارند؛ خطا با پس‌زمینهٔ صورتی و متن سرخ.",
            "d-caption", C.muted, align="right", max_width=508)
 
-    y += 380
+    y += 296
 
     # ---- pills (right card) ----------------------------------------------
-    D.card(s, RAIL - 548, y, 548, 220, "چیپ وضعیت", "mdi-tag-outline")
+    # Row 2 sits directly under the row-1 cards; the icon card gets row 3 to itself.
+    row2 = y
+    D.card(s, RAIL - 548, row2, 548, 176, "چیپ وضعیت", "mdi-tag-outline")
     pills = [("فعال", "success"), ("در مأموریت", "warning"), ("غیرفعال", "danger"),
              ("پیش‌نویس", "neutral"), ("مدیر سامانه", "info"), ("امدادگر", "primary")]
-    px, py = RAIL - 20, y + 58
+    px, py = RAIL - 20, row2 + 56
     for label, tone in pills:
         w = D.pill(s, px, py, label, tone, None, 24, right=True)
         px -= w + 10
         if px < RAIL - 508:
             px, py = RAIL - 20, py + 36
-    s.text(RAIL - 20, y + 156, "هر وضعیت یک رنگ ثابت دارد و رنگ‌ها در کل پنل تکرار می‌شوند.",
+    s.text(RAIL - 20, row2 + 138, "هر وضعیت یک رنگ ثابت دارد و رنگ‌ها در کل پنل تکرار می‌شوند.",
            "d-caption", C.muted, align="right", max_width=508)
 
     # ---- toggles / tabs / avatars (left card) ----------------------------
     gx0 = PAD
     gr, gl = gx0 + 528, gx0 + 20
-    D.card(s, gx0, y, 548, 220, "سوییچ، تب و آواتار", "mdi-toggle-switch-outline")
-    s.text(gr, y + 54, "اعلان صوتی برای درخواست بحرانی", "d-sm", C.text_2, align="right")
-    s.toggle(gl, y + 50, 44, 26, True)
-    s.text(gr, y + 94, "ایمیل روزانهٔ گزارش", "d-sm", C.text_2, align="right")
-    s.toggle(gl, y + 90, 44, 26, False)
+    D.card(s, gx0, row2, 548, 176, "سوییچ، تب و آواتار", "mdi-toggle-switch-outline")
+    s.text(gr, row2 + 50, "اعلان صوتی برای درخواست بحرانی", "d-sm", C.text_2, align="right")
+    s.toggle(gl, row2 + 46, 44, 26, True)
+    s.text(gr, row2 + 84, "ایمیل روزانهٔ گزارش", "d-sm", C.text_2, align="right")
+    s.toggle(gl, row2 + 80, 44, 26, False)
     tabs = [("همه", True), ("امدادگران", False), ("مدیران", False)]
     tx = gr
     for label, on in tabs:
         tw = s.tw(label, "d-label") + 30
         tx -= tw
-        s.rect(tx, y + 138, tw, 34, fill=C.primary if on else C.surface, radius=10,
+        s.rect(tx, row2 + 112, tw, 32, fill=C.primary if on else C.surface, radius=10,
                outline=None if on else A.card_edge, outline_w=0 if on else 1)
-        s.text(tx + tw - 14, y + 147, label, "d-label", "#FFFFFF" if on else C.text_2,
+        s.text(tx + tw - 14, row2 + 120, label, "d-label", "#FFFFFF" if on else C.text_2,
                align="right")
         tx -= 8
     for index, (ini, name) in enumerate([("س", "سعید کریمی"), ("ز", "زهرا احمدی")]):
-        ax = gl + index * 200
-        s.circle(ax + 17, y + 186, 17, fill=C.primary_soft)
-        s.text(ax + 17, y + 178, ini, "d-label", C.primary, align="center")
-        s.text(ax + 44, y + 178, name, "d-sm", C.text_2, align="left")
+        ax = gl + index * 190
+        s.circle(ax + 16, row2 + 146, 16, fill=C.primary_soft)
+        s.text(ax + 16, row2 + 139, ini, "d-label", C.primary, align="center")
+        s.text(ax + 42, row2 + 139, name, "d-sm", C.text_2, align="left")
+
+    # ---- icons (full width, row 3) ---------------------------------------
+    # One specimen per size the panel actually uses, plus a pointer to the full library. An author should never have
+    # to guess which glyph belongs to "reload" or which size a toolbar icon takes.
+    icon_y = row2 + 176 + 20
+    D.card(s, PAD, icon_y, 1120, 126, "آیکن‌ها", "mdi-shape-outline")
+    ramps = [
+        ("۱۶", "درون‌متنی", "mdi-clock-outline", 16),
+        ("۱۸", "دکمه", "mdi-refresh", 18),
+        ("۲۰", "نوار بالا", "mdi-bell-outline", 20),
+        ("۲۲", "عنوان کارت", "mdi-chart-box-outline", 22),
+        ("۲۶", "حالت خالی", "mdi-cloud-off-outline", 26),
+    ]
+    gx = RAIL - 20 - 42
+    for size_label, slot, icon, size in ramps:
+        glyph_box(s, gx, icon_y + 42, icon, box=42, size=size, radius=13)
+        s.text(gx - 10, icon_y + 42, size_label, "d-label", C.text, align="right")
+        s.text(gx - 10, icon_y + 60, slot, "d-caption", C.muted, align="right")
+        gx -= 132
+    # Left of the ramp, so the caption never runs under a specimen.
+    # Counted from the library itself, so a new icon cannot leave this caption lying.
+    icon_count = load_inventory()["totals"]["icons"]
+    s.text(PAD + 20, icon_y + 48, "کتابخانهٔ کامل: design/icons", "d-label", C.text_2, align="left")
+    s.text(PAD + 20, icon_y + 70, f"۸ صفحه · {D.fa(icon_count)} آیکن با نقش و محل استفاده",
+           "d-caption", C.muted, align="left", max_width=380)
     return s
 
 

@@ -567,6 +567,15 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 
 ### 4.7 Docs & Cleanup
 
+  - **Icon library follow-up 2026-11-03:** Every `mdi-*` the client renders is inventoried from the source into
+    `design/icons/icons.json` and drawn as an eight-page catalog (`design/icons/`), grouped by role (actions, fields,
+    navigation, status, cards, map, media, account) with use counts, files and an allowed size ramp. The admin
+    design-system controls page gained a specimen strip drawn by the library's own `glyph_box()`. Three guards keep
+    it true: a Python test that the committed JSON matches the client, a Python test that every name exists in the
+    shipped Material Design Icons webfont, and a client test doing both comparisons. That font check found a real
+    defect — `mdi-sparkles` on the placeholder page is not in the vendored font and rendered blank; it is now
+    `mdi-creation-outline`. Icons inside `<script>` data blocks are inventoried but classified by name and file
+    rather than by markup, so a data-table glyph's role can be approximate.
 - [ ] **T4.7.1** Fill `USER_MANUAL.md` screenshots, `PROGRESS.md` 100%, `DIAGRAMS/*` rendered
 - [x] **T4.7.2** `SECURITY.md` audit, `API.md` links to live Swagger, `ROADMAP.md` Future section ✅ 2026-10-26
   - **Delivered:** Source-reviewed credential/session, HTTP/Socket, photo and proxy boundaries against the actual handlers. Corrected false security claims about bcrypt, automatic suspension, unsuspend, HTML sanitization, TLS/HSTS, unsupported timeout env keys and GPS-vs-session presence. Added an explicit findings/remaining-validation table without claiming a penetration test or live VM result. `API.md` links running Swagger UI/JSON under direct and Compose URLs, explains the runtime-status marker, and corrects the mission-transition 409 and admin `/_user` guard. `ROADMAP.md` scopes post-MVP privacy, suspension and offline-device proposals to separate future contracts, not Phase 2 TODO work; live operational acceptance remains P1-G1/P1-A1/P1-A2/P2-A1/P2-A2 and T3.5.5.

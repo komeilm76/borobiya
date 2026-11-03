@@ -46,7 +46,7 @@
     </div>
 
     <div class="skeleton-note">
-      <span class="note-icon"><v-icon icon="mdi-sparkles" size="20" /></span>
+      <span class="note-icon"><v-icon icon="mdi-creation-outline" size="20" /></span>
       <span>
         <strong>اسکلت رابط کاربری</strong>
         <span class="note-copy">مسیرها، پوستهٔ برنامه و سامانهٔ طراحی پایه راه‌اندازی شده‌اند.</span>
