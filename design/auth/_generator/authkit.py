@@ -15,15 +15,19 @@ caption.
 """
 from __future__ import annotations
 
+import contextlib
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GEOM = os.path.abspath(os.path.join(HERE, "..", "..", "map-page", "_generator"))
 ADMIN = os.path.abspath(os.path.join(HERE, "..", "..", "admin-panel", "_generator"))
+# Appended, not inserted: `design/admin-panel/_generator` also contains a package named `sections`, and
+# putting it at the front of sys.path shadowed this folder's own `sections` package whenever something imported
+# `sections.system` first.
 for _path in (GEOM, ADMIN):
     if _path not in sys.path:
-        sys.path.insert(0, _path)
+        sys.path.append(_path)
 
 import atheme  # noqa: F401,E402  (registers the desktop type ramp on bb.theme.TYPE)
 from atheme import A, C  # noqa: E402
@@ -46,22 +50,147 @@ CARD_X_PAD = 64        # clamp(2rem, 5vw, 4rem)
 INTRO = ("#0C5154", "#164C4B", "#193C42")
 
 
+# --- themes ------------------------------------------------------------------
+# `:root.dark` swaps a handful of tokens and nothing else, so the dark plate must not be a second, hand-copied
+# drawing of the login page: that copy drifts (it lost the divider gap and the 24px radius within one round).
+# Instead a context rebinds the token class the widgets already read at call time, and the *same* functions
+# draw the dark screen.  Only tokens that the CSS actually swaps are listed.
+# Tokens the auth pages use that the shared palette does not name yet. They are registered on `C` so a widget
+# never holds a literal colour, which is what made the first dark plate drift from the light one.
+LIGHT_TOKENS = {
+    "page": "#EEF5F1",         # `.app-shell--auth .app-main`
+    "brand_tile": "#0E6666",
+    "frame_edge": "#CFE1DC",
+    "field_fill": "#FFFFFF",
+    "field_fill_2": "#FBFDFC",
+    "field_edge": "#C9D6D2",
+    "field_edge_off": "#E4EBE8",
+    "tile_fill": "#EDF6F2",
+    "tile_edge": "#DCEBE5",
+    "ink": "#1A3B3C",
+    "ink_quiet": "#748887",
+    "line": "#DCE5E2",
+    "line_ink": "#9AA9A7",
+    "switch_lead": "#758989",
+    "dot": "#B7C6C2",
+    "cta_busy": "#3C8481",
+    "cta_off": "#E3EBE8",
+    "cta_off_ink": "#9AA9A6",
+}
+for _name, _value in LIGHT_TOKENS.items():
+    setattr(C, _name, _value)
+
+DARK_TOKENS = {
+    "surface": "#101D1E",
+    "surface_2": "#16252A",
+    "surface_3": "#1B292A",
+    "background": "#0C1617",
+    "outline": "#2C403D",
+    "outline_strong": "#46615D",
+    "text": "#EDF5F2",
+    "text_2": "#C6DAD6",
+    "muted": "#9DB4B0",
+    "muted_2": "#7E9490",
+    "primary": "#71C7BE",
+    "primary_deep": "#8FD8D0",
+    "primary_press": "#A5E2DB",
+    "primary_soft": "#1C3334",
+    "primary_soft_2": "#24403F",
+    "on_primary": "#08211F",
+    "success_soft": "#142A22",
+    "warning_soft": "#2A2113",
+    "danger_soft": "#2A1719",
+    "info_soft": "#15242A",
+    # auth-only tokens
+    "page": "#0C1617",
+    "brand_tile": "#0E6666",     # the brand mark keeps its colour in both themes
+    "frame_edge": "#46615D",
+    "field_fill": "#16252A",
+    "field_fill_2": "#131F20",
+    "field_edge": "#405B57",
+    "field_edge_off": "#243635",
+    "tile_fill": "#1C3334",
+    "tile_edge": "#2C4744",
+    "ink": "#EDF5F2",
+    "ink_quiet": "#9DB4B0",
+    "line": "#33494A",
+    "line_ink": "#7E9490",
+    "switch_lead": "#A8BFBB",
+    "dot": "#4A615E",
+    "cta_busy": "#3C8481",
+    "cta_off": "#243635",
+    "cta_off_ink": "#6B807C",
+}
+
+
+@contextlib.contextmanager
+def theme(dark: bool = False):
+    """Draw with the light or the dark token set, then put every token back."""
+    saved = {}
+    table = DARK_TOKENS if dark else LIGHT_TOKENS
+    for key, value in table.items():
+        saved[key] = getattr(C, key)
+        setattr(C, key, value)
+    globals()["_DARK"] = dark
+    try:
+        yield C
+    finally:
+        for key, value in saved.items():
+            setattr(C, key, value)
+        globals()["_DARK"] = False
+
+
+def is_dark() -> bool:
+    return globals().get("_DARK", False)
+
+
 def fa(value) -> str:
     """Latin digits -> Persian digits; every number on these screens is Persian."""
     return fa_digits(str(value))
 
 
+# Standard plate heights. A page asks for what its content needs and gets the next size up, so the folder
+# reads as one set of plates instead of sixteen arbitrary crops. 900 is the desktop viewport.
+LADDER = (900, 1000, 1100, 1200, 1400)
+
+
+def snap(height: float) -> int:
+    """Round a requested canvas height up to the ladder."""
+    for step in LADDER:
+        if height <= step:
+            return step
+    return int(-(-height // 100) * 100)
+
+
 def screen(height: int = 900, background: str | None = None, width: int | None = None) -> Screen:
-    """Page canvas: the two soft radial washes from `.app-shell--auth .app-main` over #EEF5F1."""
+    """Page canvas: the two soft radial washes from `.app-shell--auth .app-main` over #EEF5F1.
+
+    Drawn as a stack of concentric discs in ONE alpha layer. Three opaque discs (the first attempt) leave a
+    hard circular edge at every radius, and drawing the accent as a single huge disc leaves a straight
+    vertical seam where it is clipped by the canvas edge; stepping the alpha over 40 rings removes both.
+    """
     width = width or W
-    s = Screen(background=background or "#EEF5F1", width=width, height=height, scale=1)
-    # radial washes, drawn as concentric translucent discs into one alpha layer
-    with s.alpha_layer():
-        for radius, alpha in ((760, 26), (620, 20), (480, 14)):
-            s.circle(90, 120, radius, fill=(233, 179, 90, alpha // 6))
-        for radius, alpha in ((720, 24), (560, 18), (400, 12)):
-            s.circle(width - 110, height - 90, radius, fill=(14, 102, 102, alpha // 6))
+    height = snap(height)
+    # In dark mode `.app-main` is one flat #0C1617 with no washes, so the same call draws the same page
+    # and the only difference is the token table.
+    s = Screen(background=background or C.page, width=width, height=height, scale=1)
+    if not is_dark():
+        with s.alpha_layer():
+            _radial(s, 90, 120, 780, (233, 179, 90), 34)
+            _radial(s, width - 110, height - 90, 760, (14, 102, 102), 30)
     return s
+
+
+def _radial(s: Screen, cx: float, cy: float, r_max: float, color: tuple[int, int, int],
+            peak: int, rings: int = 40):
+    """One soft wash: alpha ramps from 0 at the rim to `peak` at the centre."""
+    for index in range(rings):
+        t = (index + 1) / rings
+        radius = r_max * (1 - t * 0.94)
+        alpha = int(peak * t ** 1.7)
+        if alpha <= 0:
+            continue
+        s.circle(cx, cy, radius, fill=(*color, alpha))
 
 
 def gradient_v(s: Screen, x: float, y: float, w: float, h: float, stops, steps: int = 96):
@@ -129,19 +258,20 @@ def _blend(a: str, b: str, t: float) -> str:
 # --------------------------------------------------------------------------- #
 # chrome
 # --------------------------------------------------------------------------- #
-def chrome(s: Screen, y: float = 0, dark: bool = False):
+def chrome(s: Screen, y: float = 0, dark: bool | None = None):
     """`auth-chrome`: brand at the reading-start (right) edge, actions at the left.
 
     `dark` swaps the four colours the client's `:root.dark` block swaps. Drawing the light chrome on a
     dark page left the brand name #173B3C on #101D1E — invisible.
     """
+    dark = is_dark() if dark is None else dark
     brand = "#EDF5F2" if dark else "#173B3C"
     pill_fill = "#203536" if dark else "#FFFFFF"
     pill_edge = "#49615D" if dark else "#B9D1CA"
     pill_ink = "#EDF5F2" if dark else "#214C49"
 
     right = FRAME_X + FRAME_W - 40
-    s.rect(right - 42, y + 23, 42, 42, fill=C.primary, radius=13)
+    s.rect(right - 42, y + 23, 42, 42, fill=C.brand_tile, radius=13)
     s.i.draw_icon(right - 21, y + 44, "mdi-plus", 24, "#FFFFFF")
     s.text(right - 54, y + 22, "بوروبیا", "d-h2", brand, align="right")
 
@@ -171,10 +301,10 @@ def frame(s: Screen, top: float, height: float, intro_w: float, decor_cy: float 
     """Bordered split panel. Returns (intro_x, card_x, card_w)."""
     x, w = FRAME_X, FRAME_W
     s.shadow(x, top, w, height, radius=RADIUS, blur=44, dy=12, alpha=40)
-    s.rect(x, top, w, height, fill="#FFFFFF", radius=RADIUS, outline="#CFE1DC", outline_w=1)
+    s.rect(x, top, w, height, fill=C.surface, radius=RADIUS, outline=C.frame_edge, outline_w=1)
     intro_x = x + w - intro_w
     with s.clip_rounded(x, top, w, height, RADIUS):
-        s.rect(x, top, w, height, fill="#FFFFFF")
+        s.rect(x, top, w, height, fill=C.surface)
         diagonal_panel(s, intro_x, top, intro_w, height, decor_cy=decor_cy, decor=decor)
     return intro_x, x, w - intro_w
 
@@ -210,21 +340,26 @@ def intro(s: Screen, x: float, y: float, w: float, h: float, kicker: str, title:
         _step_rail(s, x + pad, rail_y, inner, steps)
 
     if items:
-        # features stack from the bottom so the panel never looks top-heavy
-        fy = y + h - pad - 24 - len(items) * 62
-        for number, head, body in items:
+        # Features stack from the bottom so the panel never looks top-heavy. The number badge only decorates
+        # the head line; the body keeps the full column width, and any body that still needs two lines pushes
+        # the block up instead of being cut off — a body indented by the badge lost 48px and ellipsized at
+        # "…نه به شکل م.". Measured, never guessed.
+        lines = [_line_count(body, "d-caption", inner) for _, _, body in items]
+        height = sum(22 + count * 17 + 16 for count in lines) - 16
+        fy = y + h - pad - 24 - height
+        for (number, head, body), count in zip(items, lines):
             if number:
                 with translucent(s):
                     s.rect(right - 34, fy, 34, 34, fill=(255, 255, 255, 31), radius=11)
                 s.text(right - 17, fy + 8, number, "d-caption-bold", "#FFDFA1", align="center")
-                indent = 48
+                head_right, head_width = right - 48, inner - 48
             else:
-                indent = 0
-            s.text(right - indent, fy - 2, head, "d-label-lg", "#FFFFFF", align="right",
-                   max_width=inner - indent)
-            s.text(right - indent, fy + 20, body, "d-caption", "#D4E9E4", align="right",
-                   max_width=inner - indent)
-            fy += 62
+                head_right, head_width = right, inner
+            s.text(head_right, fy - 2, head, "d-label-lg", "#FFFFFF", align="right",
+                   max_width=head_width)
+            s.para(x + pad, fy + 22, body, "d-caption", "#D4E9E4", align="right", max_width=inner,
+                   max_lines=2)
+            fy += 22 + count * 17 + 16
 
 
 def trust_row(s: Screen, x: float, y: float, w: float, title: str, body: str, icon: str):
@@ -303,17 +438,17 @@ def progress(s: Screen, x: float, y: float, w: float, h: float, value: float, co
 
 def intro_copy(s: Screen, x: float, y: float, w: float, text: str, style: str = "d-body"):
     """`.auth-form-intro`: the one quiet sentence that explains what this step asks for."""
-    s.para(x, y, text, style, "#748887", align="right", max_width=w, max_lines=2)
+    s.para(x, y, text, style, C.ink_quiet, align="right", max_width=w, max_lines=2)
     return y + 54
 
 
 def card_head(s: Screen, x: float, y: float, w: float, eyebrow: str, title: str, icon: str):
     """52px icon tile + eyebrow + card title, drawn from the reading-start edge."""
     right = x + w
-    s.rect(right - 52, y, 52, 52, fill="#EDF6F2", radius=17, outline="#DCEBE5", outline_w=1)
+    s.rect(right - 52, y, 52, 52, fill=C.tile_fill, radius=17, outline=C.tile_edge, outline_w=1)
     s.i.draw_icon(right - 26, y + 26, icon, 25, C.primary)
-    s.text(right - 68, y + 2, eyebrow, "d-sm", "#6D8985", align="right", max_width=w - 80)
-    s.text(right - 68, y + 22, title, "d-h2", "#1A3B3C", align="right", max_width=w - 80)
+    s.text(right - 68, y + 2, eyebrow, "d-sm", C.muted, align="right", max_width=w - 80)
+    s.text(right - 68, y + 22, title, "d-h2", C.ink, align="right", max_width=w - 80)
     return y + 52 + 26
 
 
@@ -324,8 +459,8 @@ def field(s: Screen, x: float, y: float, w: float, label: str, value: str = "", 
 
     state: idle | focus | error | disabled
     """
-    edge = {"idle": "#C9D6D2", "focus": C.primary, "error": C.danger, "disabled": "#E4EBE8"}[state]
-    fill = "#FBFDFC" if state == "disabled" else "#FFFFFF"
+    edge = {"idle": C.field_edge, "focus": C.primary, "error": C.danger, "disabled": C.field_edge_off}[state]
+    fill = C.field_fill_2 if state == "disabled" else C.field_fill
     s.rect(x, y, w, h, fill=fill, radius=FIELD_R, outline=edge, outline_w=2 if state == "focus" else 1)
     right = x + w - 14
     if icon:
@@ -356,14 +491,14 @@ def floating_label(s: Screen, x: float, y: float, w: float, label: str, filled: 
         return
     tw = s.tw(label, "d-caption")
     right = x + w - 16
-    s.rect(right - tw - 6, y - 8, tw + 12, 16, fill="#FFFFFF")
+    s.rect(right - tw - 6, y - 8, tw + 12, 16, fill=C.field_fill)
     s.text(right, y - 9, label, "d-caption", color, align="right")
 
 
 def checkbox(s: Screen, right: float, y: float, label: str, checked: bool = False):
     """`right` is the box's reading-start edge: the box sits at the right, the label to its left."""
-    s.rect(right - 18, y, 18, 18, radius=4, fill=C.primary if checked else "#FFFFFF",
-           outline=None if checked else "#B7C6C2", outline_w=1)
+    s.rect(right - 18, y, 18, 18, radius=4, fill=C.primary if checked else C.field_fill,
+           outline=None if checked else C.dot, outline_w=1)
     if checked:
         s.i.draw_icon(right - 9, y + 9, "mdi-check", 13, "#FFFFFF")
     s.text(right - 28, y - 2, label, "d-sm", C.text_2, align="right", max_width=260)
@@ -391,8 +526,8 @@ def alert(s: Screen, x: float, y: float, w: float, text: str, tone: str = "error
 def submit(s: Screen, x: float, y: float, w: float, label: str, icon: str = "mdi-arrow-left",
            state: str = "idle", h: float = 52):
     """Primary CTA. state: idle | loading | disabled"""
-    fill = {"idle": C.primary, "loading": "#3C8481", "disabled": "#E3EBE8"}[state]
-    color = "#FFFFFF" if state != "disabled" else "#9AA9A6"
+    fill = {"idle": C.primary, "loading": C.cta_busy, "disabled": C.cta_off}[state]
+    color = C.on_primary if state != "disabled" else C.cta_off_ink
     if state == "idle":
         s.shadow(x, y, w, h, radius=10, blur=18, dy=6, color=C.primary, alpha=54)
     s.rect(x, y, w, h, fill=fill, radius=10)
@@ -409,29 +544,29 @@ def submit(s: Screen, x: float, y: float, w: float, label: str, icon: str = "mdi
 
 def divider(s: Screen, x: float, y: float, w: float, label: str = "یا"):
     mid = x + w / 2
-    s.rect(x, y, w / 2 - 20, 1, fill="#DCE5E2")
-    s.rect(mid + 20, y, w / 2 - 20, 1, fill="#DCE5E2")
-    s.text(mid, y - 9, label, "d-caption", "#9AA9A7", align="center")
+    s.rect(x, y, w / 2 - 20, 1, fill=C.line)
+    s.rect(mid + 20, y, w / 2 - 20, 1, fill=C.line)
+    s.text(mid, y - 9, label, "d-caption", C.line_ink, align="center")
 
 
 def switch_copy(s: Screen, x: float, y: float, w: float, lead: str, link: str):
     total = s.tw(lead + " ", "d-sm") + s.tw(link, "d-label")
     right = x + (w + total) / 2
     s.text(right, y, link, "d-label", C.primary, align="right")
-    s.text(right - s.tw(link, "d-label") - 6, y, lead, "d-sm", "#758989", align="right")
+    s.text(right - s.tw(link, "d-label") - 6, y, lead, "d-sm", C.switch_lead, align="right")
 
 
 def privacy_note(s: Screen, x: float, y: float, w: float, text: str):
     icon_w = 18
     total = s.tw(text, "d-caption") + icon_w + 8
     right = x + (w + total) / 2
-    s.i.draw_icon(right - 8, y + 8, "mdi-lock-check-outline", 16, "#8A9A99")
-    s.text(right - 26, y, text, "d-caption", "#8A9A99", align="right", max_width=w - 20)
+    s.i.draw_icon(right - 8, y + 8, "mdi-lock-check-outline", 16, C.muted_2)
+    s.text(right - 26, y, text, "d-caption", C.muted_2, align="right", max_width=w - 20)
 
 
-__all__ = [
+__all__ = ["theme", "is_dark", "DARK_TOKENS", "LIGHT_TOKENS",
     "W", "CHROME_H", "FRAME_W", "FRAME_X", "FRAME_H", "RADIUS", "FIELD_H", "FIELD_R", "CARD_X_PAD",
-    "INTRO", "fa", "screen", "gradient_v", "diagonal_panel", "chrome", "frame", "intro",
+    "INTRO", "fa", "screen", "snap", "LADDER", "gradient_v", "diagonal_panel", "chrome", "frame", "intro",
     "card_head", "intro_copy", "skeleton", "progress", "field", "floating_label", "checkbox", "alert", "submit", "divider",
     "trust_row", "translucent",
     "switch_copy", "privacy_note", "C", "A", "Screen",

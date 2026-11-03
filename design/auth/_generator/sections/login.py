@@ -111,6 +111,14 @@ def login_smoke():
     y += K.FIELD_H + 8
     s.text(right, y, "تا وقتی هر دو فیلد پر نشده، دکمه غیرفعال می‌ماند.", "d-caption", C.muted,
            align="right", max_width=FORM_W)
+    # The rest of the column stays: a first visit still offers the way to registration, and plate 02 has to be
+    # comparable with 01 line for line.
+    y += 40
+    K.divider(s, left, y, FORM_W)
+    y += 30
+    K.switch_copy(s, left, y, FORM_W, "هنوز حساب ندارید؟", "ساخت حساب جدید")
+    y += 28
+    K.privacy_note(s, left, y, FORM_W, "اطلاعات حساب شما محرمانه می‌ماند.")
     return s
 
 

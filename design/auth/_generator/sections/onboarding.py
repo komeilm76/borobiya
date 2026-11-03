@@ -22,8 +22,8 @@ QUESTIONS = [
 
 
 def onboarding():
-    canvas = FRAME_H + 300
-    s = K.screen(canvas)
+    s = K.screen(FRAME_H + 300)
+    canvas = s.h
     K.chrome(s)
     top = (canvas - FRAME_H) / 2 + 4
     intro_x, card_x, card_w = K.frame(s, top, FRAME_H, INTRO_W)
@@ -32,7 +32,7 @@ def onboarding():
         s, intro_x, top, INTRO_W, FRAME_H,
         kicker="یک مرحلهٔ ضروری",
         title=["از حساب‌تان", "بهتر محافظت کنید."],
-        copy="برای ادامه، پنج پرسش امنیتی متفاوت انتخاب کنید و پاسخ‌هایی بنویسید که بعداً به یاد می‌آورید.",
+        copy="برای ادامه، پنج پرسش انتخاب کنید و پاسخ‌هایی بنویسید که فراموش نمی‌کنید.",
     )
     K.trust_row(s, intro_x + 56, top + FRAME_H - 56 - 78, INTRO_W - 112,
                 "پاسخ‌ها رمزنگاری می‌شوند",
@@ -85,8 +85,8 @@ def onboarding():
 
 def onboarding_loading():
     """The question catalog is fetched; the form is visible but inert rather than blank."""
-    canvas = FRAME_H + 300
-    s = K.screen(canvas)
+    s = K.screen(FRAME_H + 300)
+    canvas = s.h
     K.chrome(s)
     top = (canvas - FRAME_H) / 2 + 4
     intro_x, card_x, card_w = K.frame(s, top, FRAME_H, INTRO_W)
@@ -95,7 +95,7 @@ def onboarding_loading():
         s, intro_x, top, INTRO_W, FRAME_H,
         kicker="یک مرحلهٔ ضروری",
         title=["از حساب‌تان", "بهتر محافظت کنید."],
-        copy="برای ادامه، پنج پرسش امنیتی متفاوت انتخاب کنید و پاسخ‌هایی بنویسید که بعداً به یاد می‌آورید.",
+        copy="برای ادامه، پنج پرسش انتخاب کنید و پاسخ‌هایی بنویسید که فراموش نمی‌کنید.",
     )
     K.trust_row(s, intro_x + 56, top + FRAME_H - 56 - 78, INTRO_W - 112,
                 "پاسخ‌ها رمزنگاری می‌شوند",

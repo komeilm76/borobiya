@@ -23,7 +23,7 @@ def _intro(s: Screen, x: float, y: float, w: float, h: float):
         s, x, y, w, h,
         kicker="یک قدم تا همراهی",
         title=["حسابی امن،", "همراهی نزدیک."],
-        copy="با ساخت حساب، به شبکه‌ای از همراهان محلی می‌پیوندید. پرسش‌های امنیتی را طوری انتخاب کنید که پاسخ‌شان را به‌خاطر بسپارید.",
+        copy="با ساخت حساب به شبکه‌ای از همراهان محلی می‌پیوندید. پرسش‌ها را طوری انتخاب کنید که پاسخ‌شان را به‌خاطر بسپارید.",
         items=[
             ("۰۱", "پاسخ‌ها محرمانه می‌مانند", "به‌صورت امن ذخیره می‌شوند، نه به شکل متن."),
             ("۰۲", "پنج پرسش متفاوت", "پاسخ‌هایی که فراموش نمی‌کنید."),
@@ -61,45 +61,48 @@ def _question_row(s: Screen, x: float, y: float, w: float, index: int, question:
     return y + 44
 
 
-def register():
-    s = K.screen(CANVAS_H)
+def _page(draw) -> Screen:
+    """Draw the card once on a throwaway canvas to learn its height, then lay the real plate out.
+
+    Both register pages used to hard-code `FRAME_H = 924`. The error page adds an alert *and* a hint to the
+    same column, so its privacy line printed straight through the frame's bottom edge. Measure, then size.
+    """
+    scratch = K.screen(1800)
+    content_h = draw(scratch, 60.0, 40.0) - 40
+
+    frame_h = max(820, content_h + 72 + 56)
+    s = K.screen(frame_h + 300)      # snaps up to the plate ladder
+    canvas = s.h
     K.chrome(s)
-    top = (CANVAS_H - FRAME_H) / 2 + 10
-    intro_x, card_x, card_w = K.frame(s, top, FRAME_H, INTRO_W, decor_cy=FRAME_H * 0.50)
-    _intro(s, intro_x, top, INTRO_W, FRAME_H)
+    top = (canvas - frame_h) / 2 + 10
 
-    right = card_x + card_w - 64
-    left = right - FORM_W
-    y = top + 64
+    intro_x, card_x, card_w = K.frame(s, top, frame_h, INTRO_W, decor_cy=frame_h * 0.50)
+    _intro(s, intro_x, top, INTRO_W, frame_h)
+    draw(s, card_x + card_w - 64 - FORM_W, top + 72)
+    return s
 
+
+def _register_body(s: Screen, left: float, y: float) -> float:
+    right = left + FORM_W
     y = K.card_head(s, left, y, FORM_W, "شروع همراهی", "ساخت حساب جدید",
                     "mdi-account-plus-outline")
     y += 10
 
-    # username
     y = K.field(s, left, y, FORM_W, "نام کاربری", "saeed.karimi", "mdi-at",
                 hint="۳ تا ۳۰ نویسه؛ فقط حروف کوچک انگلیسی، عدد و زیرخط")
     y += 18
 
-    # password pair — one row, as `.auth-password-grid`
     pair = (FORM_W - 14) / 2
     K.field(s, left + pair + 14, y, pair, "گذرواژه", "••••••••••", "mdi-lock-outline")
     K.field(s, left, y, pair, "تکرار گذرواژه", "••••••••••", "mdi-lock-check-outline")
     s.text(left + FORM_W, y + K.FIELD_H + 6, "حداقل ۸ نویسه، شامل یک حرف و یک عدد",
            "d-caption", C.muted, align="right", max_width=FORM_W)
-    y += K.FIELD_H + 36   # the hint's own line is 17px tall; 26 put the checkbox on top of it
+    y += K.FIELD_H + 36
 
     K.checkbox(s, left + FORM_W, y, "نمایش گذرواژه‌ها", checked=False)
     y += 44
 
-    # question section
-    s.text(right, y, "برای امنیت و بازیابی حساب", "d-sm", "#6D8985", align="right")
-    s.text(right, y + 20, "پنج پرسش امنیتی", "d-h2", "#244748", align="right")
-    chip_w = s.tw("۲ از ۵", "d-caption-bold") + 34
-    s.rect(left, y + 22, chip_w, 26, fill=C.primary_soft, radius=13)
-    s.text(left + chip_w - 12, y + 26, "۲ از ۵", "d-caption-bold", C.primary, align="right")
-    y += 58
-
+    y = _questions_head(s, left, right, y, "۲ از ۵")
     for index, (question, answer) in enumerate(QUESTIONS, start=1):
         _question_row(s, left, y, FORM_W, index, question, answer)
         y += 56
@@ -107,29 +110,14 @@ def register():
     y += 14
     K.submit(s, left, y, FORM_W, "ساخت حساب امن")
     y += K.FIELD_H + 34
-
     K.switch_copy(s, left, y, FORM_W, "قبلاً حساب ساخته‌اید؟", "وارد شوید")
     y += 28
     K.privacy_note(s, left, y, FORM_W, "پاسخ‌ها را کسی جز شما نمی‌بیند.")
-    return s
+    return y + 24
 
 
-def register_error():
-    """`USERNAME_TAKEN`: the server rejects the account after the form is complete.
-
-    This is the real failure path — everything is filled in, the CTA is live, and the only thing wrong
-    is the name. Showing it with half-empty questions (an earlier draft) misrepresented what the user
-    actually sees at that moment.
-    """
-    s = K.screen(CANVAS_H)
-    K.chrome(s)
-    top = (CANVAS_H - FRAME_H) / 2 + 10
-    intro_x, card_x, card_w = K.frame(s, top, FRAME_H, INTRO_W, decor_cy=FRAME_H * 0.50)
-    _intro(s, intro_x, top, INTRO_W, FRAME_H)
-
-    right = card_x + card_w - 64
-    left = right - FORM_W
-    y = top + 64
+def _register_error_body(s: Screen, left: float, y: float) -> float:
+    right = left + FORM_W
     y = K.card_head(s, left, y, FORM_W, "شروع همراهی", "ساخت حساب جدید",
                     "mdi-account-plus-outline")
     y += 10
@@ -149,13 +137,7 @@ def register_error():
     K.checkbox(s, left + FORM_W, y, "نمایش گذرواژه‌ها", checked=False)
     y += 42
 
-    s.text(right, y, "برای امنیت و بازیابی حساب", "d-sm", "#6D8985", align="right")
-    s.text(right, y + 20, "پنج پرسش امنیتی", "d-h2", "#244748", align="right")
-    chip_w = s.tw("۵ از ۵", "d-caption-bold") + 34
-    s.rect(left, y + 22, chip_w, 26, fill=C.primary_soft, radius=13)
-    s.text(left + chip_w - 12, y + 26, "۵ از ۵", "d-caption-bold", C.primary, align="right")
-    y += 58
-
+    y = _questions_head(s, left, right, y, "۵ از ۵")
     answered = [("نام نخستین معلم شما چه بود؟", "آقای رضایی"),
                 ("نام خیابانی که در آن بزرگ شدید؟", "شهید بهشتی"),
                 ("نام نخستین حیوان خانگی‌تان؟", "پیشی"),
@@ -171,7 +153,29 @@ def register_error():
     K.switch_copy(s, left, y, FORM_W, "قبلاً حساب ساخته‌اید؟", "وارد شوید")
     y += 28
     K.privacy_note(s, left, y, FORM_W, "پاسخ‌ها را کسی جز شما نمی‌بیند.")
-    return s
+    return y + 24
+
+
+def _questions_head(s: Screen, left: float, right: float, y: float, counter: str) -> float:
+    s.text(right, y, "برای امنیت و بازیابی حساب", "d-sm", "#6D8985", align="right")
+    s.text(right, y + 20, "پنج پرسش امنیتی", "d-h2", "#244748", align="right")
+    chip_w = s.tw(counter, "d-caption-bold") + 34
+    s.rect(left, y + 22, chip_w, 26, fill=C.primary_soft, radius=13)
+    s.text(left + chip_w - 12, y + 26, counter, "d-caption-bold", C.primary, align="right")
+    return y + 58
+
+
+def register():
+    return _page(_register_body)
+
+
+def register_error():
+    """`USERNAME_TAKEN`: the server rejects the account after the form is complete.
+
+    This is the real failure path — everything is filled in, the CTA is live, and the only thing wrong is
+    the name. Showing it with half-empty questions (an earlier draft) misrepresented that moment.
+    """
+    return _page(_register_error_body)
 
 
 SCREENS = {

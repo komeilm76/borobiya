@@ -61,6 +61,20 @@ def test_page_count_matches_the_registry():
     )
 
 
+def test_readme_image_index_matches_the_files():
+    """The index table is what a reader trusts, and it drifted silently the first time the plates were resized."""
+    from PIL import Image
+
+    rows = re.findall(r"^\| (\d\d) \| [^|]+ \| (\d+)×(\d+) \|$", readme(), re.MULTILINE)
+    assert len(rows) == len(screens()), "every page needs a row in the image index"
+    for number, width, height in rows:
+        name = next(n for n in page_files() if n.startswith(f"{number}-"))
+        with Image.open(os.path.join(DESIGN, name)) as image:
+            assert image.size == (int(width), int(height)), (
+                f"README says {name} is {width}×{height}; the file is {image.size[0]}×{image.size[1]}"
+            )
+
+
 def test_icons_used_in_the_generator_exist_in_the_font():
     """A name the font does not carry draws as an empty box; nothing else catches it before a reader does."""
     with open(CSS, encoding="utf-8") as handle:

@@ -57,8 +57,16 @@ fields on the recovery pages keep the word «پاسخ شما» instead of turnin
 **States.** Success and failure are the same layout: an alert above the form, the failing field outlined in danger,
 the CTA flat when it cannot be pressed. `14-states.png` is the contract — six states, one grid.
 
-**Dark mode.** Only the tokens change: page `#101D1E`, panel `#1B292A`, hairline `#46615D`, text `#EDF5F2`, brand
-accent `#71C7BE`. The intro gradient and the trust card keep their structure.
+**Dark mode.** Only the tokens change: page `#0C1617`, panel `#101D1E`, field `#16252A`, hairline `#46615D`, text
+`#EDF5F2`, brand accent `#71C7BE`. `15-dark.png` is the *same* drawing code as `01-login.png` run inside
+`authkit.theme(dark=True)` — a second hand-written dark page drifted from the light one within a single round (the
+divider lost its gap, the frame lost its corners), so the plate is now produced by swapping a token table.
+
+**Widths.** `16-responsive.png` renders each viewport through `_auth_viewport(w, h)`, which encodes the two
+breakpoints in `auth.css`: at ≤900px `.auth-layout` becomes one column and the intro stacks above the form with
+`min-height: 0`; at ≤560px the paddings tighten, the hero title drops to `clamp(1.75rem, 5vw, 1.95rem)`, the
+decoration is hidden and the chrome collapses to the brand mark. Device heights are real viewports (844 / 900 /
+768), so the plate shows what the stylesheet actually does, not what a diagram claims.
 
 ## Where these are implemented
 
@@ -92,20 +100,23 @@ As rendered on 2026-11-03, in the order a visitor meets them:
 |---|---|---|
 | 01 | login | 1440×900 |
 | 02 | login, first visit | 1440×900 |
-| 03 | registration | 1440×1120 |
-| 04 | registration, username taken | 1440×1120 |
-| 05 | recovery: account | 1440×820 |
-| 06 | recovery: account, invalid | 1440×846 |
-| 07 | recovery: questions | 1440×1030 |
-| 08 | recovery: questions, wrong answer | 1440×1000 |
-| 09 | recovery: new password | 1440×906 |
+| 03 | registration | 1440×1400 |
+| 04 | registration, username taken | 1440×1400 |
+| 05 | recovery: account | 1440×900 |
+| 06 | recovery: account, invalid | 1440×900 |
+| 07 | recovery: questions | 1440×1100 |
+| 08 | recovery: questions, wrong answer | 1440×1100 |
+| 09 | recovery: new password | 1440×1000 |
 | 10 | recovery: done | 1440×900 |
-| 11 | onboarding | 1440×920 |
-| 12 | onboarding, loading | 1440×920 |
-| 13 | anatomy | 1440×1080 |
-| 14 | six card states | 1440×1090 |
+| 11 | onboarding | 1440×1000 |
+| 12 | onboarding, loading | 1440×1000 |
+| 13 | anatomy | 1440×900 |
+| 14 | six card states | 1440×1100 |
 | 15 | dark mode | 1440×900 |
-| 16 | three widths | 2718×1020 |
+| 16 | three widths | 2878×1200 |
 
-Heights differ on purpose: the reference shows each page whole, without scroll. Page 16 is wide because it
-compares three viewports side by side at their real widths.
+Heights come from one ladder — 900, 1000, 1100, 1200, 1400 — and a page is given the first rung its content fits
+(`snap()` in `authkit.py`). Sixteen hand-tuned crops read as sixteen unrelated files; five sizes read as one set.
+Pages 03/04 sit on the top rung because the registration column really is that tall, and the error page adds an
+alert *and* a hint, so it is measured rather than assumed. Page 16 is wide because it compares three viewports side
+by side at 1:1; nothing on it is scaled.

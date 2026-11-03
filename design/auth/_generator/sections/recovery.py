@@ -81,8 +81,8 @@ def _measure_bottom(step: int, title: str, icon: str, body, form_error: str | No
 def _page(step: int, title: str, icon: str, body, form_error: str | None = None):
     """Page height follows the step: the question step is three fields tall, the others are not."""
     frame_h = max(520, _measure_bottom(step, title, icon, body, form_error) + 72 + 150)
-    canvas = int(frame_h + 300)
-    s = K.screen(canvas)
+    s = K.screen(frame_h + 300)      # snapped up to the plate ladder
+    canvas = s.h                      # use the real height, not the requested one
     K.chrome(s)
     top = (canvas - frame_h) / 2 + 4
     intro_x, card_x, card_w = K.frame(s, top, frame_h, INTRO_W, decor=False)
@@ -97,11 +97,13 @@ def _page(step: int, title: str, icon: str, body, form_error: str | None = None)
     y = K.card_head(s, left, top + 72, FORM_W, f"مرحلهٔ {K.fa(step)} از ۳", title, icon)
     if form_error:
         y = K.alert(s, left, y, FORM_W, form_error, "error")
-    body(s, left, right, y, FORM_W)
+    content_end = body(s, left, right, y, FORM_W)
 
-    K.switch_copy(s, left, top + frame_h - 96, FORM_W, "گذرواژه را به یاد آوردید؟",
-                  "بازگشت به ورود")
-    K.privacy_note(s, left, top + frame_h - 62, FORM_W,
+    # The footer follows the content when the step is short and stays pinned when it is tall. Pinned
+    # unconditionally left 100px of dead air under a one-field step.
+    footer = min(content_end + 48, top + frame_h - 96)
+    K.switch_copy(s, left, footer, FORM_W, "گذرواژه را به یاد آوردید؟", "بازگشت به ورود")
+    K.privacy_note(s, left, footer + 34, FORM_W,
                    "بوروبیا پاسخ‌های ثبت‌شدهٔ شما نمایش نمی‌دهد.")
     return s
 
@@ -123,35 +125,18 @@ def recovery_step_three():
     return _page(3, "گذرواژهٔ تازه", "mdi-lock-reset", _step_three)
 
 
-def recovery_step_two_error():
-    """A wrong answer, and the counter that tells people how many attempts are left."""
-    frame_h = 700
-    canvas = int(frame_h + 300)
-    s = K.screen(canvas)
-    K.chrome(s)
-    top = (canvas - frame_h) / 2 + 4
-    intro_x, card_x, card_w = K.frame(s, top, frame_h, INTRO_W, decor=False)
-    _intro_panel(s, intro_x, top, INTRO_W, frame_h, 2, "بازیابی امن حساب",
-                 ["دوباره به", "حساب‌تان برسید."],
-                 "با پاسخ به پرسش‌هایی که هنگام ساخت حساب انتخاب کرده‌اید، گذرواژهٔ تازه‌ای تنظیم کنید.")
-
-    left = card_x + (card_w - FORM_W) / 2
-    right = left + FORM_W
-    y = K.card_head(s, left, top + 72, FORM_W, "مرحلهٔ ۲ از ۳", "پاسخ پرسش‌ها",
-                    "mdi-shield-key-outline")
-    y = K.alert(s, left, y, FORM_W, "دو پاسخ درست نبود. یک تلاش دیگر باقی است.", "error")
-
+def _step_two_error(s: Screen, left: float, right: float, y: float, w: float):
     s.para(left + 46, y, "نام نخستین معلم شما چه بود؟", "d-sm", C.muted, align="right",
-           max_width=FORM_W - 46, max_lines=2)
+           max_width=w - 46, max_lines=2)
     y += 40
-    y = K.field(s, left, y, FORM_W, "پاسخ شما", "آقای رضایی", "mdi-comment-question-outline",
+    y = K.field(s, left, y, w, "پاسخ شما", "آقای رضایی", "mdi-comment-question-outline",
                 state="error")
     y += 14
     for question in ("نام خیابانی که در آن بزرگ شدید؟", "نام نخستین حیوان خانگی‌تان؟"):
-        s.para(left + 46, y, question, "d-sm", C.muted, align="right", max_width=FORM_W - 46,
+        s.para(left + 46, y, question, "d-sm", C.muted, align="right", max_width=w - 46,
                max_lines=2)
         y += 40
-        y = K.field(s, left, y, FORM_W, "پاسخ شما", "شهید بهشتی", "mdi-comment-question-outline")
+        y = K.field(s, left, y, w, "پاسخ شما", "شهید بهشتی", "mdi-comment-question-outline")
         y += 14
 
     y += 6
@@ -159,13 +144,14 @@ def recovery_step_two_error():
     s.rect(left, y, back_w, K.FIELD_H, fill="#E7F0EC", radius=10)
     s.text(left + back_w - 17, y + (K.FIELD_H - 20) / 2, "بازگشت", "d-label", C.primary,
            align="right")
-    K.submit(s, left + back_w + 12, y, FORM_W - back_w - 12, "بررسی پاسخ‌ها")
+    K.submit(s, left + back_w + 12, y, w - back_w - 12, "بررسی پاسخ‌ها")
+    return y + K.FIELD_H
 
-    K.switch_copy(s, left, top + frame_h - 96, FORM_W, "گذرواژه را به یاد آوردید؟",
-                  "بازگشت به ورود")
-    K.privacy_note(s, left, top + frame_h - 62, FORM_W,
-                   "بوروبیا پاسخ‌های ثبت‌شدهٔ شما را نمایش نمی‌دهد.")
-    return s
+
+def recovery_step_two_error():
+    """A wrong answer, and the counter that tells people how many attempts are left."""
+    return _page(2, "پاسخ پرسش‌ها", "mdi-shield-key-outline", _step_two_error,
+                 form_error="دو پاسخ درست نبود. یک تلاش دیگر باقی است.")
 
 
 def recovery_done():

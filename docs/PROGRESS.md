@@ -4,6 +4,29 @@
 
 ---
 
+### 2026-11-03 — Audit pass over the authentication plates
+
+- Read all sixteen images instead of trusting the generator, and fixed what the reading turned up. The
+  background wash was three stacked opaque discs: a hard rim and a straight vertical clip line ran through every
+  page. It is now one 40-ring alpha ramp per wash, and a pixel step-scan verifies no edge exceeds one value.
+- Page heights were sixteen arbitrary crops (820/846/906/1020/1030/1080/1090/1120). `authkit.LADDER` +
+  `snap()` give five: 900, 1000, 1100, 1200, 1400, and every page takes the first rung its content fits.
+- `15-dark.png` was a second, hand-written drawing of the login page and had already drifted: the divider lost
+  its 20px gap, the frame lost its left corners, the form sat 40px off. Dark is now the same `login()` code run
+  inside `authkit.theme(dark=True)`; the only difference between plates 01 and 15 is the token table.
+- `16-responsive.png` was three hand-drawn miniature devices claiming layouts the stylesheet does not produce.
+  It is now one parametric `_auth_viewport(w, h)` that encodes both `auth.css` breakpoints (900 and 560) and is
+  rendered at 420×844, 900×900 and 1366×768 at 1:1.
+- `13-anatomy` had marker 3 sitting on the trust card it was supposed to point at, markers 6/8/9 clipped by the
+  grey panel, and the annotation column starting on top of the panel edge.
+- Register and recovery pages now measure their column before sizing the frame: the error page's privacy line
+  printed through the frame's bottom edge, and the register intro's two feature bullets were ellipsized at
+  «…نه به شکل م.» because the body was indented under the number badge.
+- `test_reference.py` (22 tests) gained a check on the README's own size table — the table had gone stale in
+  both previous rounds and nothing caught it.
+
+---
+
 ### 2026-11-03 — The authentication screens now have reference images
 
 - The four auth screens (`login`, `register`, `forgot-password`, and the mandatory security-question onboarding) had
