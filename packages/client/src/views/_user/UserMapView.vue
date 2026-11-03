@@ -64,9 +64,12 @@
     <!-- SOS is an App.vue sibling, outside this map's isolated stacking context.
          Teleport the launcher into that same viewport context so both buttons
          share an origin, safe-area offset and guidance-sheet height. -->
-    <Teleport to="#map-route-choices-action-anchor">
-      <v-btn v-if="journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
-        icon="mdi-routes" variant="flat" color="primary" :aria-expanded="routeChoicesOpen"
+    <Teleport defer to="#map-route-choices-action-anchor">
+      <!-- Keep the teleported button vnode stable while point selection and
+           reverse geocoding trigger consecutive updates; its target is kept
+           mounted in App.vue to prevent patching an unmounted vnode. -->
+      <v-btn v-show="!!journey.point.value" id="map-route-choices-toggle" class="user-map-view__route-choices-toggle"
+        icon="mdi-routes" variant="flat" color="primary" :disabled="!journey.point.value" :aria-expanded="routeChoicesOpen"
         aria-controls="map-point-route-choices-sheet"
         :aria-label="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"
         :title="journey.navigating.value ? 'ویرایش و انتخاب مسیر؛ راهبری متوقف می‌شود' : 'انتخاب مسیر'"

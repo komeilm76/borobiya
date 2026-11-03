@@ -145,7 +145,9 @@
 
     <!-- Route choices are owned by the map but share SOS's viewport positioning
          context; the map itself isolates its stacking context for map layers. -->
-    <span v-if="isMapRoute" id="map-route-choices-action-anchor" />
+    <!-- Keep the Teleport target mounted across auth and route transitions. A
+         disappearing target can leave an unmounted button vnode in Vue's block. -->
+    <span v-show="isMapRoute" id="map-route-choices-action-anchor" />
 
     <v-main class="app-main dark:text-slate-100">
       <header v-if="isPublicRoute" class="public-chrome">

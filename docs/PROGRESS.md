@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-03 — Stabilize the map's teleported route-choice launcher
+
+- Investigated the Chrome `shouldUpdateComponent`/`emitsOptions` exception after selecting a point. An isolated Vue renderer probe reproduced **the exact TypeError**: mounting a Teleport when its target is absent leaves a component vnode without an instance, and its next update tries to patch that vnode. The route launcher was the map's only direct Teleport and its App-owned target was conditionally mounted. The target now stays mounted (hidden outside map routes), the Teleport defers target resolution to the end of the render, and the launcher stays mounted but hidden/disabled until a point is selected. A second renderer probe with a persistent target and hidden/disabled child updated successfully through point selection, address resolution and point removal. This preserves the SOS-adjacent viewport positioning without changing the planner or dock. A failing-before source/compiled-template regression checks the actual target and child lifecycles without mounting `.vue` files. The framework failure was reproduced, **not** the user's complete browser/map interaction; verify the chooser on device. This change is after the v0.3.0 prerelease.
+
 ### 2026-11-03 — Post-v0.3.0 logout and route recovery review
 
 - A logout fetch could wait indefinitely on a half-open connection, leaving the confirmation spinner and modal blocking the map. Logout now has an eight-second deadline even if abort is ignored, clears only the session that initiated it, and blocks silent cookie restoration in that tab after explicit sign-out until a new login. An unconfirmed server revocation is **not** reported as a successful server logout: the app warns the user to revoke the old session from Devices after reconnecting. A map route-choice/deletion overlay can no longer cancel navigation to Login once auth is cleared; normal Back/overlay dismissal remains. Pure store/composable and source-level regressions cover the races without mounting Vue components.

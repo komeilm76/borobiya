@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { compileStyle, parse } from "vue/compiler-sfc";
+import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
 
 // Source and compiled CSS contracts only; never mount Vue SFCs in unit tests.
 const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
@@ -296,10 +296,24 @@ describe("progressive trip planning and editing", () => {
   });
 
   it("locates the route launcher in SOS's viewport context in idle and guidance states", () => {
-    expect(app).toContain('<span v-if="isMapRoute" id="map-route-choices-action-anchor" />');
+    // Keep the target and its teleported child stable while point selection and
+    // reverse geocoding trigger back-to-back render updates.
+    expect(app).toContain('<span v-show="isMapRoute" id="map-route-choices-action-anchor" />');
+    expect(app).not.toContain('<span v-if="isMapRoute" id="map-route-choices-action-anchor" />');
     expect(app.indexOf('id="map-route-choices-action-anchor"')).toBeLessThan(app.indexOf('<v-main class="app-main'));
     expect(app).toContain('<SosTriggerButton v-if="showSosButton"');
-    expect(map).toContain('<Teleport to="#map-route-choices-action-anchor">');
+    expect(map).toContain('<Teleport defer to="#map-route-choices-action-anchor">');
+    expect(map).toContain('<v-btn v-show="!!journey.point.value" id="map-route-choices-toggle"');
+    expect(map).not.toContain('<v-btn v-if="journey.point.value" id="map-route-choices-toggle"');
+    const { descriptor } = parse(map, { filename: "UserMapView.vue" });
+    const rendered = compileTemplate({
+      source: descriptor.template!.content, filename: "UserMapView.vue", id: "route-launcher",
+    });
+    expect(rendered.errors).toEqual([]);
+    const teleport = rendered.code.slice(rendered.code.indexOf('_createBlock(_Teleport'), rendered.code.indexOf('Keep location a map feature'));
+    expect(teleport).toContain('_withDirectives(_createVNode(_component_v_btn');
+    expect(teleport).toContain('[_vShow, !!_ctx.journey.point.value]');
+    expect(teleport).not.toContain('_ctx.journey.point.value)\n        ?'); // No conditional component vnode in the Teleport block.
     const routeSelector = '.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle';
     const base = shell.slice(shell.indexOf(`${routeSelector} {`), shell.indexOf('}', shell.indexOf(`${routeSelector} {`)));
     expect(base).toContain('position: fixed;');
