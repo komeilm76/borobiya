@@ -48,6 +48,28 @@ describe("private point-to-point route", () => {
       expect(journey.sheetOpen.value).toBe(true);
     } finally { scope.stop(); }
   });
+  it("refreshes the current point's alternatives on reconnection without logging out", async () => {
+    const browser = new EventTarget();
+    vi.stubGlobal("window", browser);
+    const old = deferred<RouteChoice[]>();
+    const get = vi.fn().mockImplementationOnce(() => old.promise).mockResolvedValueOnce([short, fast]);
+    const { journey, owner, scope } = setup(get);
+    try {
+      journey.select({ lat: 40, lon: -120 });
+      expect(journey.loading.value).toBe(true);
+      browser.dispatchEvent(new Event("online"));
+      await settle();
+      expect(get).toHaveBeenCalledTimes(2);
+      expect(journey.routes.value).toHaveLength(2);
+      expect(journey.point.value).toEqual({ lat: 40, lon: -120 });
+      old.resolve([short]); await settle();
+      expect(journey.routes.value).toHaveLength(2); // old transport cannot overwrite new routes
+      owner.value = null;
+      browser.dispatchEvent(new Event("online"));
+      expect(get).toHaveBeenCalledTimes(2);
+    } finally { old.resolve([short]); scope.stop(); vi.unstubAllGlobals(); }
+  });
+
   it("uses the fastest returned alternative, changes mode safely, and never reuses stale replies", async () => {
     const old = deferred<RouteChoice[]>(); const calls: AbortSignal[] = [];
     const get = vi.fn((_from, _to, _mode, signal) => { calls.push(signal!); return calls.length === 1 ? old.promise : Promise.resolve([short, fast]); });

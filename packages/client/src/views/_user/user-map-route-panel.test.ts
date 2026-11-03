@@ -72,6 +72,13 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('aria-label="حد مجاز نامشخص"'); // Never invent a legal limit.
   });
 
+  it("does not trap a signed-out user on the map behind route-choice or delete overlays", () => {
+    const guard = map.slice(map.indexOf('onBeforeRouteLeave(() => {'), map.indexOf('// The desktop hosts are boxless divs'));
+    expect(guard).toContain('if (!auth.isAuthenticated) return;');
+    expect(guard.indexOf('if (!auth.isAuthenticated) return;')).toBeLessThan(guard.indexOf('if (routeDeleteConfirmOpen.value)'));
+    expect(guard.indexOf('if (!auth.isAuthenticated) return;')).toBeLessThan(guard.indexOf('if (routeChoicesOpen.value)'));
+  });
+
   it("shows POI pins for an explicit search overview during guidance and hides them on follow", () => {
     expect(map).toContain('showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value)');
     expect(map).toContain('showNavigationSearchResults.value = true;');

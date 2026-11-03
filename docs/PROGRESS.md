@@ -4,6 +4,11 @@
 
 ---
 
+### 2026-11-03 — Post-v0.3.0 logout and route recovery review
+
+- A logout fetch could wait indefinitely on a half-open connection, leaving the confirmation spinner and modal blocking the map. Logout now has an eight-second deadline even if abort is ignored, clears only the session that initiated it, and blocks silent cookie restoration in that tab after explicit sign-out until a new login. An unconfirmed server revocation is **not** reported as a successful server logout: the app warns the user to revoke the old session from Devices after reconnecting. A map route-choice/deletion overlay can no longer cancel navigation to Login once auth is cleared; normal Back/overlay dismissal remains. Pure store/composable and source-level regressions cover the races without mounting Vue components.
+- The current point's unavailable or draining route request is cancelled and recalculated on an online event without changing the destination or replaying account-bound writes; a stale route reply cannot replace recovered alternatives. This improves recovery of the chooser's contents, but the exact reported on-device absence of its sheet has not been reproduced in a browser. Reconnect without a browser online event, rendered map geometry, and remote session revocation still require live verification. These fixes are **after** the v0.3.0 tag, not part of that prerelease.
+
 ### 2026-11-02 — Prepare v0.3.0 work-branch release after network review
 
 - Bumped all three workspace packages, the Bun lockfile and the API health/OpenAPI version fallbacks to 0.3.0. Curated release notes in `RELEASE_NOTES_v0.3.0.md` describe changes since v0.2.0, migrations 0013–0019 and outstanding acceptance work. This is a release **from the work branch**, not a merge to `main`, a production deploy, a signed Android APK or the still-open v1.0.0 sign-off (T4.7.3).

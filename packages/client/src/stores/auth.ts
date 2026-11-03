@@ -25,6 +25,22 @@ import {
 import { decodeAccessTokenClaims } from "../composables/device-identity";
 
 const USER_STORAGE_KEY = "borobiya.auth-user";
+const LOCAL_SIGNOUT_KEY = "borobiya.local-signout";
+const LOGOUT_TIMEOUT_MS = 8_000;
+
+function localSignoutStored(): boolean {
+  if (typeof window === "undefined") return false;
+  try { return window.sessionStorage.getItem(LOCAL_SIGNOUT_KEY) === "1"; }
+  catch { return false; }
+}
+
+function saveLocalSignout(blocked: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (blocked) window.sessionStorage.setItem(LOCAL_SIGNOUT_KEY, "1");
+    else window.sessionStorage.removeItem(LOCAL_SIGNOUT_KEY);
+  } catch { /* In-memory fencing still applies if storage is unavailable. */ }
+}
 const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MAX_RECOVERY_DELAY_MS = 30_000;
 
@@ -113,6 +129,9 @@ export const useAuthStore = defineStore("auth", () => {
   // Async refreshes/profile reads must not write into a session that has since signed out or
   // switched accounts. Token equality alone cannot detect a late refresh response.
   let sessionGeneration = 0;
+  // A cookie can survive an offline logout or a racing refresh response. Never
+  // silently restore this tab after an explicit sign-out; only a new login lifts it.
+  let locallySignedOut = localSignoutStored();
   // Keep tokens issued in this session so staggered 401s can reuse a rotated bearer, but a
   // request from a *previous* account cannot be retried as the account now signed in.
   const sessionTokens = new Set<string>();
@@ -334,6 +353,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function ensureSession(): Promise<void> {
+    if (locallySignedOut && !accessToken.value) { initialized.value = true; return; }
     if (initializationPromise) return initializationPromise;
     if (!initialized.value) {
       initializationPromise = (async () => {
@@ -370,6 +390,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function refreshSession(): Promise<boolean> {
+    if (locallySignedOut && !accessToken.value) return false;
     const generation = sessionGeneration;
     try {
       await refreshFromCookie();
@@ -393,6 +414,8 @@ export const useAuthStore = defineStore("auth", () => {
 
   function acceptLogin(response: unknown): void {
     const parsed = loginResponseSchema.parse(response);
+    locallySignedOut = false;
+    saveLocalSignout(false);
     ++sessionGeneration;
     sessionTokens.clear();
     userCategories.value = [];
@@ -436,11 +459,29 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function logout(): Promise<void> {
+    const generation = sessionGeneration;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const deadline = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("Logout could not be confirmed before the timeout."));
+      }, LOGOUT_TIMEOUT_MS);
+    });
     try {
-      const response = await requestJson<unknown>(authApiRoutes.logout.url, { method: "POST", body: {} });
+      const response = await Promise.race([
+        requestJson<unknown>(authApiRoutes.logout.url, { method: "POST", body: {}, signal: controller.signal }),
+        deadline
+      ]);
       logoutResponseSchema.parse(response);
     } finally {
-      clearSession();
+      if (timer !== null) clearTimeout(timer);
+      controller.abort();
+      if (generation === sessionGeneration) {
+        locallySignedOut = true;
+        saveLocalSignout(true);
+        clearSession();
+      }
     }
   }
 

@@ -65,6 +65,24 @@ describe("logout confirmation", () => {
     scope.stop();
   });
 
+  it("warns when server revocation cannot be confirmed but still leaves the private page", async () => {
+    const authenticated = ref(true);
+    const warn = vi.fn();
+    const navigate = vi.fn(async () => {});
+    const scope = effectScope();
+    let confirmation!: ReturnType<typeof useLogoutConfirmation>;
+    scope.run(() => { confirmation = useLogoutConfirmation({
+      isAuthenticated: authenticated,
+      logout: async () => { authenticated.value = false; throw new Error("timeout"); },
+      onLoggedOut: navigate, onLogoutFailed: warn
+    }); });
+    confirmation.request();
+    await confirmation.confirm();
+    expect(warn).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledOnce();
+    scope.stop();
+  });
+
   it("dismisses the prompt when the account signs out elsewhere", () => {
     const logout = vi.fn(async () => {});
     const navigate = vi.fn(async () => {});
@@ -87,5 +105,6 @@ describe("logout confirmation", () => {
     expect(view).toContain('@click="logoutConfirmation.cancel()"');
     expect(view).toContain('@click="logoutConfirmation.confirm()"');
     expect(view).not.toContain('@click="logout"');
+    expect(view).toContain('v-model="logoutUnconfirmed"');
   });
 });

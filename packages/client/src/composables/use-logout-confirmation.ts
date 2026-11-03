@@ -4,6 +4,7 @@ export interface LogoutConfirmationOptions {
   isAuthenticated: ComputedRef<boolean> | Ref<boolean>;
   logout: () => Promise<void>;
   onLoggedOut: () => Promise<unknown>;
+  onLogoutFailed?: () => void;
 }
 
 /** Keep leaving the app behind an explicit choice, including while logout is in flight. */
@@ -25,7 +26,8 @@ export function useLogoutConfirmation(options: LogoutConfirmationOptions) {
     try {
       await options.logout();
     } catch {
-      // The auth store clears the local session even when the server cannot be reached.
+      // Local sign-out is fenced, but the server may still hold the session.
+      if (!options.isAuthenticated.value) options.onLogoutFailed?.();
     } finally {
       open.value = false;
       try {

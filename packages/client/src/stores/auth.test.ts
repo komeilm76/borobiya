@@ -857,6 +857,94 @@ describe("client auth store", () => {
     } finally { auth.$dispose(); vi.useRealTimers(); }
   });
 
+  it("bounds a hung logout, fences cookie restoration and permits an explicit new login", async () => {
+    vi.useFakeTimers();
+    const stored = new Map<string, string>();
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => { stored.set(key, value); },
+      removeItem: (key: string) => { stored.delete(key); }
+    } });
+    const fetchMock = fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => new Promise<Response>(() => {}), // a half-open network connection ignores abort
+      jsonResponse({ accessToken: "new-session", user })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    try {
+      await auth.login({ username: user.username, password: "safePass123" });
+      const pending = auth.logout();
+      const failed = expect(pending).rejects.toThrow("timeout");
+      await vi.advanceTimersByTimeAsync(8_000);
+      await failed;
+      expect(auth.isAuthenticated).toBe(false);
+      expect(auth.user).toBeNull();
+      expect(stored.get("borobiya.local-signout")).toBe("1");
+      expect((fetchMock.mock.calls[1]?.[1] as RequestInit).signal?.aborted).toBe(true);
+
+      auth.$dispose();
+      setActivePinia(createPinia());
+      const reloaded = useAuthStore();
+      await reloaded.ensureSession();
+      expect(reloaded.isAuthenticated).toBe(false);
+      expect(await reloaded.refreshSession()).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2); // never exchange the old cookie
+      await reloaded.login({ username: user.username, password: "safePass123" });
+      expect(reloaded.accessToken).toBe("new-session");
+      expect(stored.has("borobiya.local-signout")).toBe(false);
+      reloaded.$dispose();
+    } finally { auth.$dispose(); vi.useRealTimers(); }
+  });
+
+  it("does not clear a newer account when an older logout finishes late", async () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => { stored.set(key, value); },
+      removeItem: (key: string) => { stored.delete(key); }
+    } });
+    let failOld!: (reason: Error) => void;
+    const oldLogout = new Promise<Response>((_resolve, reject) => { failOld = reject; });
+    const newUser = { ...user, id: "00000000-0000-4000-8000-000000000088" };
+    vi.stubGlobal("fetch", fakeFetch(
+      jsonResponse({ accessToken, user }),
+      () => oldLogout,
+      jsonResponse({ accessToken: "new-token", user: newUser })
+    ));
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    const oldAttempt = auth.logout();
+    await auth.login({ username: user.username, password: "safePass123" });
+    failOld(new TypeError("offline"));
+    await expect(oldAttempt).rejects.toThrow("offline");
+    expect(auth.accessToken).toBe("new-token");
+    expect(auth.user?.id).toBe(newUser.id);
+    expect(stored.has("borobiya.local-signout")).toBe(false);
+    auth.$dispose();
+  });
+
+  it("keeps an explicitly signed-out tab signed out on reload even after a successful server logout", async () => {
+    const stored = new Map<string, string>();
+    vi.stubGlobal("window", { sessionStorage: {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => { stored.set(key, value); },
+      removeItem: (key: string) => { stored.delete(key); }
+    } });
+    const fetchMock = fakeFetch(jsonResponse({ accessToken, user }), jsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+    const auth = useAuthStore();
+    await auth.login({ username: user.username, password: "safePass123" });
+    await auth.logout();
+    auth.$dispose();
+    setActivePinia(createPinia());
+    const reloaded = useAuthStore();
+    await reloaded.ensureSession();
+    expect(reloaded.user).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    reloaded.$dispose();
+  });
+
   it("does not show the old profile when a reconnect restores a different cookie account", async () => {
     vi.useFakeTimers();
     const browser = new EventTarget();

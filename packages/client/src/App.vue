@@ -138,6 +138,11 @@
       </v-card>
     </v-dialog>
 
+    <v-snackbar v-model="logoutUnconfirmed" color="warning" location="top" :timeout="-1" multi-line>
+      <span role="alert">خروج محلی انجام شد، اما لغو نشست در سرور تأیید نشد. پس از اتصال، دوباره وارد شوید و نشست قبلی را از بخش دستگاه‌ها لغو کنید.</span>
+      <template #actions><v-btn variant="text" @click="logoutUnconfirmed = false">متوجه شدم</v-btn></template>
+    </v-snackbar>
+
     <!-- Route choices are owned by the map but share SOS's viewport positioning
          context; the map itself isolates its stacking context for map layers. -->
     <span v-if="isMapRoute" id="map-route-choices-action-anchor" />
@@ -258,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
 import AccountProfileMenu from "./components/shell/AccountProfileMenu.vue";
 import MapSidebar from "./components/shell/MapSidebar.vue";
@@ -323,10 +328,12 @@ const route = useRoute();
 const isMapRoute = computed(() => route.name === "user-map");
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
+const logoutUnconfirmed = ref(false);
 const logoutConfirmation = useLogoutConfirmation({
   isAuthenticated: computed(() => auth.isAuthenticated),
   logout: () => auth.logout(),
-  onLoggedOut: () => router.replace("/_auth/login")
+  onLoggedOut: () => router.replace("/_auth/login"),
+  onLogoutFailed: () => { logoutUnconfirmed.value = true; }
 });
 
 function restoreLogoutFocus(): void {

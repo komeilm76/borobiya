@@ -364,6 +364,9 @@ onMounted(() => {
   void broadcast.refreshPriority();
 });
 onBeforeRouteLeave(() => {
+  // Signing out must always leave the private map. In particular, a route
+  // chooser or delete prompt cannot cancel the login redirect after auth clears.
+  if (!auth.isAuthenticated) return;
   // Never abandon a pending destructive choice through a link or browser Back,
   // even when the map was the first history entry or the screen is not a phone.
   if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }

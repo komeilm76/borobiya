@@ -339,8 +339,25 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       stop(); error.value = message; sheetOpen.value = true;
     }
   }, { flush: "sync" });
+  // A route request may fail (or still be draining) when connectivity returns.
+  // Recalculate only the current owner's unplanned point; never resume guidance,
+  // replay a write, or reuse a result from before the outage.
+  const onOnline = () => {
+    if (!owner.value || !point.value || !position.value || navigating.value || selectedRoute.value ||
+        (!loading.value && !error.value)) return;
+    invalidate();
+    void findRoutes();
+  };
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("online", onOnline);
+  }
   watch(owner, clear, { flush: "sync" });
-  onScopeDispose(clear);
+  onScopeDispose(() => {
+    if (typeof window !== "undefined" && typeof window.removeEventListener === "function") {
+      window.removeEventListener("online", onOnline);
+    }
+    clear();
+  });
   return { point, sheetOpen, routesVisible, profile, routes, index, loading, error, navigating, navigationPending, gpsWarning, arrived,
     replanning, rerouteWaitingForFix, rerouteMessage,
     remaining, selectedRoute, routePoints, plannedFrom, provisionalRoute, title, address, knownPlace, select, findRoutes, changeProfile, choose, start, stop, focus, editNavigation, clear,
