@@ -170,21 +170,26 @@ def overview(inventory: dict, total: int):
           "هر اندازه یک جای مشخص دارد؛ آیکن بزرگ‌تر از متن کنارش، همان چیزی است که پنل را بی‌نظم نشان می‌دهد.",
           "d-caption", C.muted, align="right", max_width=900)
 
+    # Captions stay plain Persian: a `<v-btn>` token inside a bidi paragraph scatters (the `<` was dropped and
+    # `prepend-icon` fell to a second line). The one code reference is drawn as an LTR run instead.
     steps = (
-        ("۱۶", "درون‌متنی", "mdi-clock-outline", "کنار جمله یا داخل سلول جدول"),
-        ("۱۸", "دکمه", "mdi-refresh", "پیش‌فرض `<v-btn prepend-icon>`"),
-        ("۲۰", "نوار ابزار", "mdi-bell-outline", "کنش آیکنی و نوار بالا"),
-        ("۲۲", "عنوان کارت", "mdi-chart-box-outline", "کنار تیتر کارت"),
-        ("۲۶", "پنل وضعیت", "mdi-cloud-off-outline", "آیکن بزرگ حالت خالی/خطا"),
+        ("۱۶", "درون‌متنی", "mdi-clock-outline", "کنار جمله، در جدول", None),
+        ("۱۸", "دکمه", "mdi-refresh", "کنش اصلی یا فرعی", "<v-btn prepend-icon>"),
+        ("۲۰", "نوار ابزار", "mdi-bell-outline", "کنش فقط-آیکن", None),
+        ("۲۲", "عنوان", "mdi-chart-box-outline", "تیتر کارت و بخش", None),
+        ("۲۶", "پنل وضعیت", "mdi-cloud-off-outline", "حالت خالی یا خطا", None),
     )
     col_w = (W - 2 * PAD - 40) / len(steps)
-    for index, (size, label, icon, note) in enumerate(steps):
+    for index, (size, label, icon, note, code) in enumerate(steps):
         cx = W - PAD - 20 - col_w * (index + 1)
         glyph_box(s, cx + col_w - 12 - 44, y + 64, icon, box=44, size=24, radius=14)
         text_x = cx + col_w - 12 - 44 - 12
         _text(s, text_x, y + 64, f"{size}px", "d-label", C.text, align="right")
         s.para(cx + 10, y + 84, f"{label} · {note}", "d-caption", C.muted, align="right",
                max_width=text_x - cx - 10, max_lines=2)
+        if code:
+            s.ltr(text_x, y + 104, code, "d-caption", C.muted_2, align="right",
+                  max_width=text_x - cx - 10)
         if index < len(steps) - 1:
             s.rect(cx, y + 64, 1, 56, fill=A.row_line)
 
@@ -193,12 +198,13 @@ def overview(inventory: dict, total: int):
     why_h = 156
     s.rect(PAD, y, W - 2 * PAD, why_h, fill=C.surface, radius=16, outline=A.card_edge, outline_w=1)
     _text(s, W - PAD - 20, y + 14, "چرا این فایل وجود دارد", "d-title", C.text, align="right")
+    # No backticks: paragraphs are drawn, not parsed, so markdown markers would print as literal noise.
     notes_left = [
-        "هر آیکن تازه در کد، بلافاصله اینجا دیده می‌شود: `icons.json` از همان `mdi-*` هایی ساخته می‌شود که کامپوننت‌ها رندر می‌کنند.",
+        "هر آیکن تازه در کد، بلافاصله اینجا دیده می‌شود: icons.json از همان نام‌های mdi در کامپوننت‌ها ساخته می‌شود.",
         "یک آیکن می‌تواند چند نقش داشته باشد (دکمه، منو، وضعیت)؛ نقش اصلی نمایش داده می‌شود و همهٔ کاربردها در JSON ثبت است.",
     ]
     notes_right = [
-        "تست `icon-inventory.test.ts` مجموعهٔ آیکن‌های کد را با این فایل مقایسه می‌کند؛ آیکن ثبت‌نشده تست را می‌شکند.",
+        "تست icon-inventory.test.ts مجموعهٔ آیکن‌های کد را با این فایل مقایسه می‌کند؛ آیکن ثبت‌نشده تست را می‌شکند.",
         "همان تست بررسی می‌کند هر آیکن در فونت Material Design Icons وجود داشته باشد؛ نام اختراعی، گلیف خالی می‌شود.",
     ]
     for column, notes in enumerate((notes_right, notes_left)):
