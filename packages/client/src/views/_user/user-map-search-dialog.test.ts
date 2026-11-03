@@ -12,6 +12,20 @@ function body(name: string): string {
 }
 
 describe("map place search handoff", () => {
+  it("shows navigation search icons only when the wide-screen search widget is absent", () => {
+    const point = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
+    expect(view).toContain('v-show="!isPhone || activeTool === \'search\'"'); // Persistent tablet/desktop widget.
+    expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
+    expect(view).toContain(':choices-open="routeChoicesOpen" :show-search="isPhone"');
+    expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"');
+    expect(point).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
+    expect(choices).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
+    expect(view).toContain('<v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify"');
+    expect(view).toContain('navigationSearchOpen.value = false;\n    if (wasSearching)'); // Resize clears stale inline search.
+    expect(view).toContain("document.getElementById('map-search-panel')?.focus({ preventScroll: true })");
+  });
+
   it("opens a real full-screen, scrollable search dialog on phones without changing history or desktop panels", () => {
     expect(view).toContain(':is="isPhone ? VDialog : \'div\'"');
     expect(view).toContain('class="user-map-view__search-dialog"');

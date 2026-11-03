@@ -5,7 +5,7 @@
     <v-card id="map-point-route-choices-sheet" class="point-route-choices" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route-choices__header">
         <h2>انتخاب مسیر</h2>
-        <v-btn icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
+        <v-btn v-if="showSearch" icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
           @click="emit('search')" />
         <v-btn icon="mdi-arrow-right" variant="text" aria-label="بازگشت به برنامه‌ریزی مسیر"
           @click="emit('close')" />
@@ -38,7 +38,7 @@
 <script setup lang="ts">
 import type { usePointRoute } from "@/composables/use-point-route";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
-defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean }>();
+defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean; showSearch: boolean }>();
 const emit = defineEmits<{ close: []; choose: [index: number]; confirm: []; search: [] }>();
 </script>
 

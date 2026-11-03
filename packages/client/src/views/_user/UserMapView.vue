@@ -115,7 +115,7 @@
         <div class="user-map-view__journey-bar">
           <v-icon icon="mdi-navigation-variant" size="21" aria-hidden="true" />
           <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
-          <v-btn id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
+          <v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
             aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-navigation-search"
             :aria-expanded="navigationSearchOpen" @click="navigationSearchOpen = !navigationSearchOpen" />
           <dl class="user-map-view__telemetry" aria-label="سرعت و زمان مسیر">
@@ -158,10 +158,10 @@
       </div>
     </div>
     <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
-      :choices-open="routeChoicesOpen" v-model:confirm-delete-open="routeDeleteConfirmOpen"
+      :choices-open="routeChoicesOpen" :show-search="isPhone" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
-    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen"
+    <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"
       @choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices" @search="openRouteSearch" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
@@ -454,7 +454,14 @@ function onPanelEscape(event: KeyboardEvent): void {
 }
 
 watch(isPhone, (phone) => {
-  if (!phone) activeTool.value = null;
+  if (!phone) {
+    activeTool.value = null;
+    // The permanent wide-screen search widget replaces the phone's in-trip
+    // search; do not leave an extra expanded search panel without its toggle.
+    const wasSearching = navigationSearchOpen.value;
+    navigationSearchOpen.value = false;
+    if (wasSearching) void nextTick(() => document.getElementById('map-search-panel')?.focus({ preventScroll: true }));
+  }
   fittedFor = null;
   frameCamera(); // A phone/tablet switch changes both the canvas and its reserved camera edges.
 });
@@ -1724,6 +1731,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-actions > :first-child { flex: 1 1 auto; }
 .user-map-view__journey-actions .v-btn { min-height: 44px; min-width: 44px; height: auto; }
 .user-map-view__journey-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+@media (min-width: 600px) {
+  /* The desktop/tablet search widget is already on the map. Do not reserve a
+     blank icon column after hiding the redundant header launcher. */
+  .user-map-view__journey-bar { grid-template-columns: 21px minmax(0, 1fr); }
+}
 @media (min-width: 600px) and (max-width: 1023px) {
   /* The same card, parked beside rather than over the SOS/route action rail. */
   .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px)); transform: none;

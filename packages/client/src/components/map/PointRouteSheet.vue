@@ -8,7 +8,7 @@
         <v-icon icon="mdi-map-marker" size="23" aria-hidden="true" />
         <div class="point-route__headings"><small>{{ step === 'plan' ? 'برنامه‌ریزی سفر' : 'مقصد انتخاب‌شده' }}</small>
           <strong :title="api.title.value">{{ api.title.value }}</strong></div>
-        <v-btn icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
+        <v-btn v-if="showSearch" icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
           @click="emit('search')" />
         <v-btn id="point-route-remove-button" icon="mdi-close" color="error" variant="text"
           aria-label="حذف مقصد و مسیر" title="حذف مقصد و مسیر" @click="requestDelete" />
@@ -106,6 +106,7 @@ const props = defineProps<{
   originReverse: ReturnType<typeof useReversePlace>;
   ownPosition: OwnMapFix | null;
   choicesOpen: boolean;
+  showSearch: boolean;
 }>();
 const emit = defineEmits<{ start: []; dismiss: []; search: []; 'choose-route': []; 'layout-change': [] }>();
 const confirmDeleteOpen = defineModel<boolean>("confirmDeleteOpen", { default: false });
