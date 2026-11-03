@@ -4,6 +4,27 @@
 
 ---
 
+### 2026-11-03 — The authentication screens now have reference images
+
+- The four auth screens (`login`, `register`, `forgot-password`, and the mandatory security-question onboarding) had
+  no picture in `design/`, so any change to them started from reading 889 lines of `auth.css`.
+- `design/auth/` now holds **16 pages**: login (filled + first visit), registration (+ `USERNAME_TAKEN`), the three
+  recovery steps and their failures, the done state, onboarding (+ its loading state), ten numbered parts with real
+  measurements, the six card states in one grid, the dark theme, and 420/900/1366px side by side.
+- They are generated, not drawn by hand. `_generator/authkit.py` owns the frame, the chrome bar, fields, alerts and
+  the CTA; every page composes it, so the same field is 52px on sixteen pages or none. Tokens and fonts come from
+  `design/map-page/_generator/bb`, the type ramp from the admin generator.
+- Four defects the images exposed in their own generator: `Screen.alpha_layer` did not route text and icons through
+  the layer (now fixed in `bb/prims.py`, so every translucent panel in every design folder composites correctly),
+  the intro's decoration was drawn underneath the copy it was meant to sit beside, the recovery footer was printed
+  over the submit button because the frame height was guessed rather than measured, and the drop shadow helper
+  painted a lighter band along the bottom of the panel.
+- `_generator/test_reference.py` (21 tests) fails on a missing page, an undocumented page, a stale render whose size
+  disagrees with its generator, an icon name the webfont does not carry, and a client colour the mockups no longer
+  match.
+
+---
+
 ### 2026-11-03 — Every icon the product draws now lives in the design folder
 
 - The design folder showed screens, not the parts they are made of. All 146 icons the client renders — 375 usages

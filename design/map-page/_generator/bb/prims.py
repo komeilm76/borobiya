@@ -65,14 +65,20 @@ class Screen:
     def alpha_layer(self):
         """Draw into a transparent layer and composite it, so RGBA fills blend."""
         base_img, base_draw = self.img, self.d
+        base_text, base_icons = self.t, self.i
         layer = Image.new("RGBA", base_img.size, (0, 0, 0, 0))
-        self.img = layer
-        self.d = ImageDraw.Draw(layer)
+        draw = ImageDraw.Draw(layer)
+        self.img, self.d = layer, draw
+        # Text and Icons cache their own ImageDraw; without this they would keep painting
+        # opaque straight onto the base image and a translucent wash would not cover them.
+        self.t = Text(draw, self.s)
+        self.i = Icons(draw, self.s)
         try:
             yield self
         finally:
             self.img = base_img
             self.d = base_draw
+            self.t, self.i = base_text, base_icons
             base_img.alpha_composite(layer)
 
     # --- geometry -----------------------------------------------------------
