@@ -175,7 +175,7 @@
       :choices-open="routeChoicesOpen" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen"
-      @choose="selectPointRoute" @close="closeRouteChoices" />
+      @choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -287,6 +287,7 @@ import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/se
 import { pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
+import { previousRouteIndex } from "@/map/route-choice-snapshot";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import PointRouteChoicesSheet from "@/components/map/PointRouteChoicesSheet.vue";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
@@ -739,6 +740,12 @@ const ROUTE_LAYER = "user-selected-destination-route-line";
 const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
 let routePaintDeferred = false;
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
+let routeChoiceSnapshot: { routes: typeof journey.routes.value; index: number } | null = null;
+watch(() => journey.routes.value, (routes) => {
+  // A newly calculated batch has its own default route. Treat that as the
+  // cancel baseline before previewing alternatives from the fresh response.
+  if (routeChoicesOpen.value) routeChoiceSnapshot = { routes, index: journey.index.value };
+}, { flush: "post" });
 function openRouteChoices(): void {
   if (routeChoicesOpen.value) { closeRouteChoices(); return; }
   if (!journey.point.value || routeDeleteConfirmOpen.value) return;
@@ -746,16 +753,23 @@ function openRouteChoices(): void {
   if (journey.navigating.value) journey.editNavigation();
   journey.sheetOpen.value = true;
   journey.routesVisible.value = true;
+  routeChoiceSnapshot = { routes: journey.routes.value, index: journey.index.value };
   routeChoicesOpen.value = true;
   void nextTick(() => {
-    const first = document.querySelector<HTMLElement>('.point-route-choices__card') ??
+    const selected = document.querySelector<HTMLElement>('.point-route-choices__card[aria-pressed="true"]') ??
+      document.querySelector<HTMLElement>('.point-route-choices__card') ??
       document.getElementById('map-point-route-choices-sheet');
-    first?.focus({ preventScroll: true });
+    selected?.focus({ preventScroll: true });
   });
 }
 function closeRouteChoices(): void {
   if (!routeChoicesOpen.value) return;
   routeChoicesOpen.value = false;
+  // Back/close cancels the preview, but never restores an old index into a
+  // replaced route batch (e.g. after GPS or connection recovery).
+  const previous = previousRouteIndex(routeChoiceSnapshot, journey.routes.value);
+  routeChoiceSnapshot = null;
+  if (previous !== null) journey.choose(previous);
   if (!journey.point.value) return;
   journey.sheetOpen.value = true;
   void nextTick(() => document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true }));
@@ -763,7 +777,12 @@ function closeRouteChoices(): void {
 function selectPointRoute(index: number): void {
   if (!routeChoicesOpen.value || !journey.point.value || !journey.routes.value[index] ||
     !Number.isInteger(index)) return;
-  journey.choose(index);
+  journey.choose(index); // Preview the green line and metrics without dismissing the chooser.
+}
+function confirmPointRoute(): void {
+  if (!routeChoicesOpen.value || !journey.point.value || !journey.selectedRoute.value ||
+    journey.loading.value) return;
+  routeChoiceSnapshot = null; // Accept the preview; close without restoring the old index.
   closeRouteChoices();
 }
 function openPointRouteDetails(): void {
@@ -773,6 +792,7 @@ function openPointRouteDetails(): void {
 function stopPointNavigation(): void { journey.stop(); openPointRouteDetails(); }
 function clearPointRoute(): void {
   routeChoicesOpen.value = false;
+  routeChoiceSnapshot = null;
   journey.clear(); // Also cancels any in-flight route/replan and removes both endpoint pins.
   focusDestinationMarker();
 }
@@ -1346,8 +1366,11 @@ function paintPointRoute(): void {
 function onAlternativeRouteClick(event: { features?: Array<{ properties?: { index?: unknown } }> }): void {
   if (journey.navigating.value || !journey.sheetOpen.value || !journey.routesVisible.value) return;
   const index = Number(event.features?.[0]?.properties?.index);
-  if (routeChoicesOpen.value) selectPointRoute(index);
-  else journey.choose(index);
+  if (!Number.isInteger(index) || !journey.routes.value[index]) return;
+  // A map-line tap previews the alternative through the same explicit
+  // confirmation flow as a card tap; it must not silently commit a new route.
+  if (!routeChoicesOpen.value) openRouteChoices();
+  selectPointRoute(index);
 }
 
 function attachHold(instance: MapLibreMap): () => void {
@@ -1412,7 +1435,7 @@ function startPointNavigation(): void {
 }
 watch(() => journey.point.value, (next, previous) => {
   if (!next && previous) historySuppressedAfterRouteClear.value = true;
-  if (next !== previous) routeChoicesOpen.value = false;
+  if (next !== previous) { routeChoicesOpen.value = false; routeChoiceSnapshot = null; }
   syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute();
 }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);

@@ -403,10 +403,20 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return false; }');
     expect(map).toContain(':choices-open="routeChoicesOpen"');
     expect(sheet).not.toContain('onVisible('); // A pending point hold cannot be dismissed by a dialog lifecycle event.
-    expect(map).toContain('@choose="selectPointRoute" @close="closeRouteChoices"');
-    expect(map).toContain('journey.choose(index);\n  closeRouteChoices();');
+    expect(map).toContain('@choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices"');
+    const preview = map.slice(map.indexOf('function selectPointRoute('), map.indexOf('function confirmPointRoute('));
+    expect(preview).toContain('journey.choose(index)');
+    expect(preview).not.toContain('closeRouteChoices()'); // A card/map tap previews without closing.
+    expect(map).toContain('routeChoiceSnapshot = { routes: journey.routes.value, index: journey.index.value }');
+    expect(map).toContain('if (routeChoicesOpen.value) routeChoiceSnapshot = { routes, index: journey.index.value }');
+    expect(map).toContain('previousRouteIndex(routeChoiceSnapshot, journey.routes.value)');
+    expect(map).toContain('if (previous !== null) journey.choose(previous)');
+    expect(map).toContain('routeChoiceSnapshot = null; // Accept the preview; close without restoring the old index.\n  closeRouteChoices();');
+    const mapLine = map.slice(map.indexOf('function onAlternativeRouteClick('), map.indexOf('function attachHold('));
+    expect(mapLine).toContain('if (!routeChoicesOpen.value) openRouteChoices();\n  selectPointRoute(index);');
+    expect(mapLine).not.toContain('journey.choose(index)');
     expect(map).toContain("document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true })");
-    expect(map).toContain('routeChoicesOpen.value = false;\n  journey.clear();');
+    expect(map).toContain('routeChoicesOpen.value = false;\n  routeChoiceSnapshot = null;\n  journey.clear();');
     expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
     expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
     expect(choices).toContain('<section v-if="open && api.point.value" class="point-route-choices-shell"');
@@ -421,6 +431,9 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain("formatRouteDuration(route.duration_s)");
     expect(choices).toContain("formatRouteDistance(route.distance_m)");
     expect(choices).toContain("@click=\"emit('choose', index)\"");
+    expect(choices).toContain("@click=\"emit('confirm')\">تأیید مسیر انتخابی");
+    expect(choices).toContain('بازگشت بدون تغییر');
+    expect(choices).toContain(':disabled="!api.selectedRoute.value || api.loading.value"');
     expect(choices).toContain('api.loading.value');
     expect(choices).toContain('api.error.value');
     expect(choices).toContain('safe-area-inset-bottom');

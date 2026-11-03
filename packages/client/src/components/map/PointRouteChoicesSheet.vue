@@ -8,7 +8,7 @@
         <v-btn icon="mdi-arrow-right" variant="text" aria-label="بازگشت به برنامه‌ریزی مسیر"
           @click="emit('close')" />
       </header>
-      <p class="point-route-choices__hint">مسیر مورد نظر را انتخاب کنید تا به برنامه‌ریزی مسیر برگردید. زمان‌ها برآوردی و بدون ترافیک زنده‌اند.</p>
+      <p class="point-route-choices__hint">برای پیش‌نمایش، مسیر را انتخاب کنید؛ سپس دکمهٔ تأیید را بزنید. زمان‌ها برآوردی و بدون ترافیک زنده‌اند.</p>
       <div class="point-route-choices__list" role="group" aria-label="مسیرهای پیشنهادی">
         <button v-for="(route, index) in api.routes.value" :key="index" type="button"
           class="point-route-choices__card" :aria-pressed="index === api.index.value"
@@ -25,7 +25,9 @@
         <p v-else-if="!api.routes.value.length" role="status">هنوز مسیری آماده نیست.</p>
       </div>
       <footer class="point-route-choices__footer">
-        <v-btn variant="tonal" color="primary" @click="emit('close')">بازگشت به برنامه‌ریزی مسیر</v-btn>
+        <v-btn variant="text" @click="emit('close')">بازگشت بدون تغییر</v-btn>
+        <v-btn color="primary" variant="flat" :disabled="!api.selectedRoute.value || api.loading.value"
+          @click="emit('confirm')">تأیید مسیر انتخابی</v-btn>
       </footer>
     </v-card>
   </section>
@@ -35,7 +37,7 @@
 import type { usePointRoute } from "@/composables/use-point-route";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean }>();
-const emit = defineEmits<{ close: []; choose: [index: number] }>();
+const emit = defineEmits<{ close: []; choose: [index: number]; confirm: [] }>();
 </script>
 
 <style scoped>
@@ -64,9 +66,10 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
 .point-route-choices__selected { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
 .point-route-choices__card:focus-visible, .point-route-choices__header :deep(.v-btn:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
-.point-route-choices__footer { padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
+.point-route-choices__footer { display: flex; flex-wrap: wrap; gap: .5rem;
+  padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-route-choices__footer :deep(.v-btn) { min-height: 44px; height: auto; }
+.point-route-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto; }
 .point-route-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
   section.point-route-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
@@ -81,7 +84,10 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
     calc(.85rem + env(safe-area-inset-left, 0px)); }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .point-route-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+    overflow-y: auto; } /* Allow the complete footer to scroll into view on short landscape phones. */
+  .point-route-choices__header, .point-route-choices__hint, .point-route-choices__footer { flex-shrink: 0; }
+  .point-route-choices__list { flex: none; overflow-y: visible; }
 }
 @media (forced-colors: active) {
   .point-route-choices__card[aria-pressed="true"] { outline: 2px solid Highlight; }
