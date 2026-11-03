@@ -362,13 +362,14 @@ describe("hold-to-select destination and map navigation", () => {
 
   it("presents selected-point sharing, travel planning and accessible guidance without a guessed speed limit", () => {
     const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی سفر", "مسافت", "خودرو", "دوچرخه", "پیاده",
-      "ارسال", "سفر", "شروع سفر", "انتخاب مسیر دیگر", "حذف مقصد"]) expect(sheet).toContain(label);
+    const transport = readFileSync(new URL("../../components/map/PointTransportChoicesSheet.vue", import.meta.url), "utf8");
+    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی سفر", "مسافت", "ارسال", "سفر", "شروع سفر", "انتخاب وسیلهٔ دیگر", "انتخاب مسیر دیگر", "حذف مقصد"]) expect(sheet).toContain(label);
+    expect(transport).toContain("transportOptions");
     expect(sheet).toContain('api.address.value');
     expect(sheet).toContain('useShare()');
     expect(sheet).not.toContain('زمان و مسافت، برآورد آخرین موقعیت GPS هستند');
     expect(sheet).not.toContain('<v-bottom-sheet');
-    expect(sheet).toContain('aria-pressed');
+    expect(transport).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');
     expect(view).toContain('GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است');
     expect(view).toContain('aria-label="حد مجاز نامشخص"');

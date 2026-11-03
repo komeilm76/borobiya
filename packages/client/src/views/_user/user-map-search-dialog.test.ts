@@ -17,7 +17,7 @@ describe("map place search handoff", () => {
     const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
     expect(view).toContain('v-show="!isPhone || activeTool === \'search\'"'); // Persistent tablet/desktop widget.
     expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
-    expect(view).toContain(':choices-open="routeChoicesOpen" :show-search="isPhone"');
+    expect(view).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"');
     expect(view).toContain('<PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"');
     expect(point).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');
     expect(choices).toContain('<v-btn v-if="showSearch" icon="mdi-magnify"');

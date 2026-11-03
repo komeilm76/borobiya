@@ -158,11 +158,13 @@
       </div>
     </div>
     <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
-      :choices-open="routeChoicesOpen" :show-search="isPhone" v-model:confirm-delete-open="routeDeleteConfirmOpen"
-      @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices"
+      :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone" v-model:confirm-delete-open="routeDeleteConfirmOpen"
+      @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices" @choose-transport="openTransportChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"
       @choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices" @search="openRouteSearch" />
+    <PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen" :show-search="isPhone"
+      @confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch" />
     <CompanionDetailSheet :peer="selectedCompanion" :observed-at-ms="selectedObservedAtMs"
       :profile="selectedProfile" :profile-loading="profileLoading" :profile-failed="profileFailed"
       :place="selectedPlace" :place-loading="placeLoading" :place-failed="placeFailed"
@@ -275,8 +277,11 @@ import { pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverlayNeedsSyn
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
 import { previousRouteIndex } from "@/map/route-choice-snapshot";
+import { transportOptions } from "@/map/transport-options";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import PointRouteChoicesSheet from "@/components/map/PointRouteChoicesSheet.vue";
+import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
+import type { TransportProfile } from "@/api/mission-routing";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
@@ -327,6 +332,7 @@ const activeTool = ref<MapTool | null>(null);
 const navigationSearchOpen = ref(false);
 const routeDeleteConfirmOpen = ref(false);
 const routeChoicesOpen = ref(false);
+const transportChoicesOpen = ref(false);
 const pointSheetRef = ref<InstanceType<typeof PointRouteSheet> | null>(null);
 function closeNavigationSearch(event?: KeyboardEvent): void {
   if (!navigationSearchOpen.value) return;
@@ -363,6 +369,7 @@ onBeforeRouteLeave(() => {
   // even when the map was the first history entry or the screen is not a phone.
   if (routeDeleteConfirmOpen.value) { routeDeleteConfirmOpen.value = false; return false; }
   if (routeChoicesOpen.value) { closeRouteChoices(); return false; }
+  if (transportChoicesOpen.value) { closeTransportChoices(); return false; }
   const position: unknown = window.history.state?.position;
   if (isPhone.value &&
     (arrivalDialogOpen.value || shareOpen.value || activeTool.value ||
@@ -660,17 +667,20 @@ watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => jour
     observer = new ResizeObserver(update);
     observer.observe(element);
   }, { flush: "post" });
-// The compact planner and alternative-card chooser are mutually exclusive.
+// The planner and the route/vehicle choice sheets are mutually exclusive.
 // Keep SOS and the route launcher ABOVE whichever in-map phone sheet is visible.
-// React to async route results, review expansion and safe-area changes without
-// guessing a fixed sheet height.
+// React to async route results and safe-area changes without guessing a height.
+function pointSheetId(): string {
+  return transportChoicesOpen.value ? "map-point-transport-choices-sheet"
+    : routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet";
+}
 function measurePointSheet(): void {
   if (!isPhone.value || !journey.point.value || !journey.sheetOpen.value) return;
-  const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
+  const element = document.getElementById(pointSheetId());
   if (element) document.documentElement.style.setProperty("--bb-map-point-sheet-height",
     `${Math.ceil(element.getBoundingClientRect().height)}px`);
 }
-watch([isPhone, () => journey.point.value, () => journey.sheetOpen.value, routeChoicesOpen],
+watch([isPhone, () => journey.point.value, () => journey.sheetOpen.value, routeChoicesOpen, transportChoicesOpen],
   async (_values, _previous, onCleanup) => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
@@ -684,7 +694,7 @@ watch([isPhone, () => journey.point.value, () => journey.sheetOpen.value, routeC
     // also covers a same-frame swap from the planner to the route chooser.
     await nextTick();
     if (disposed) return;
-    const element = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet");
+    const element = document.getElementById(pointSheetId());
     if (!element) return;
     measurePointSheet();
     observer = new ResizeObserver(measurePointSheet);
@@ -746,6 +756,7 @@ watch(() => journey.routes.value, (routes) => {
 function openRouteChoices(): void {
   if (routeChoicesOpen.value) { closeRouteChoices(); return; }
   if (!journey.point.value || routeDeleteConfirmOpen.value) return;
+  transportChoicesOpen.value = false; // Only one nonmodal choice sheet may cover the planner.
   // Editing an active route pauses guidance explicitly; no mid-trip silent switch.
   if (journey.navigating.value) journey.editNavigation();
   journey.sheetOpen.value = true;
@@ -782,6 +793,31 @@ function confirmPointRoute(): void {
   routeChoiceSnapshot = null; // Accept the preview; close without restoring the old index.
   closeRouteChoices();
 }
+function openTransportChoices(): void {
+  if (!journey.point.value || !journey.sheetOpen.value || routeDeleteConfirmOpen.value) return;
+  if (routeChoicesOpen.value) closeRouteChoices();
+  transportChoicesOpen.value = true;
+  void nextTick(() => {
+    const selected = document.querySelector<HTMLElement>('.point-transport-choices__card[aria-pressed="true"]') ??
+      document.getElementById('map-point-transport-choices-sheet');
+    selected?.focus({ preventScroll: true });
+  });
+}
+function closeTransportChoices(): void {
+  if (!transportChoicesOpen.value) return;
+  transportChoicesOpen.value = false;
+  if (!journey.point.value) return;
+  journey.sheetOpen.value = true;
+  void nextTick(() => document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true }));
+}
+function confirmTransportChoice(mode: TransportProfile): void {
+  if (!transportChoicesOpen.value || !journey.point.value ||
+    !transportOptions.some((option) => option.value === mode)) return;
+  // A draft never starts a routing request. Accepting a different mode cancels
+  // the old route and calculates new alternatives through usePointRoute.
+  if (mode !== journey.profile.value) journey.changeProfile(mode);
+  closeTransportChoices();
+}
 function openRouteSearch(): void { void selectTool("search"); }
 function backToTravelPlan(): void {
   closeNavigationSearch();
@@ -790,6 +826,7 @@ function backToTravelPlan(): void {
 }
 function clearPointRoute(): void {
   routeChoicesOpen.value = false;
+  transportChoicesOpen.value = false;
   routeChoiceSnapshot = null;
   journey.clear(); // Also cancels any in-flight route/replan and removes both endpoint pins.
   focusDestinationMarker();
@@ -1433,7 +1470,7 @@ function startPointNavigation(): void {
 }
 watch(() => journey.point.value, (next, previous) => {
   if (!next && previous) historySuppressedAfterRouteClear.value = true;
-  if (next !== previous) { routeChoicesOpen.value = false; routeChoiceSnapshot = null; }
+  if (next !== previous) { routeChoicesOpen.value = false; transportChoicesOpen.value = false; routeChoiceSnapshot = null; }
   syncDestinationMarker(); syncRouteOriginMarker(); paintPlayback(); paintPointRoute();
 }, { flush: "sync" });
 watch(() => journey.title.value, syncDestinationMarker);
@@ -1454,15 +1491,14 @@ function fitPointRoute(): void {
     from ? [from.lon, from.lat] : null, [to.lon, to.lat]);
   if (!extent) return;
   const canvas = instance.getContainer().getBoundingClientRect();
-  const sheet = document.getElementById(routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet")
-    ?.getBoundingClientRect() ?? null;
+  const sheet = document.getElementById(pointSheetId())?.getBoundingClientRect() ?? null;
   const bottom = pointRouteOverviewBottom(canvas, sheet);
   instance.fitBounds(extent,
     { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: instance.getMaxZoom(), duration: 500 },
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }
-watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });
+watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });
 watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch([() => journey.navigationPending.value, () => journey.replanning.value, () => journey.rerouteWaitingForFix.value],

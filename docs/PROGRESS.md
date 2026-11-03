@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-03 — Choose travel vehicle in a separate sheet
+
+- The travel card's «انتخاب وسیلهٔ دیگر» now opens its own nonmodal, scrollable choice sheet with car/bicycle/walking cards, matching the alternative-route sheet's placement, 44px+ actions, safe areas, accessible pressed state, Back/Escape cancellation and explicit confirmation. A tap only changes a local draft; the actual route is recalculated **after** confirming a different vehicle. Cancel does not mutate the current route. One shared transport-option list supplies both the planner label and the chooser, preserving car as the default. The planner/route/vehicle sheets are mutually exclusive, measured with the same phone action-rail clearance and map camera padding; point removal, account navigation and map Back close stale choices. Tablet/desktop continue using their persistent search widget while mobile choice sheets retain a search icon. Source/compiled-style regressions and typechecks cover this; on-device scroll, focus and route-request acceptance remain open.
+
 ### 2026-11-03 — Hide duplicate navigation search on wider maps
 
 - Tablet/desktop already keep the map's search widget visible, so the point, travel, alternative-route and guidance headers now omit their redundant magnifier icons at those widths. Phones retain the header launchers because their search tool is not persistently on the map. Resizing from phone to tablet/desktop also closes an open in-guidance search panel and transfers focus to the persistent search widget, preventing a second invisible-toggle search panel. The wide guidance header no longer reserves an empty icon column. Nonmounted source contracts cover the three navigation headers and the responsive handoff; rendered viewport/keyboard behavior still requires device acceptance.

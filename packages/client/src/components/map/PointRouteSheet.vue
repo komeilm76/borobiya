@@ -39,18 +39,12 @@
 
         <template v-else>
           <div class="point-route__choices" role="group" aria-label="تنظیمات سفر">
-            <button type="button" class="point-route__choice" :aria-expanded="modeOpen" aria-controls="point-route-modes"
-              @click="modeOpen = !modeOpen">
+            <button type="button" class="point-route__choice" aria-controls="map-point-transport-choices-sheet"
+              @click="emit('choose-transport')">
               <v-icon icon="mdi-car-multiple" aria-hidden="true" />
               <span><strong>انتخاب وسیلهٔ دیگر</strong><small>وسیلهٔ فعلی: {{ modeLabel }}</small></span>
-              <v-icon icon="mdi-chevron-down" aria-hidden="true" />
+              <v-icon icon="mdi-chevron-left" aria-hidden="true" />
             </button>
-            <div v-if="modeOpen" id="point-route-modes" class="point-route__modes" role="group" aria-label="وسیلهٔ حرکت">
-              <button v-for="mode in modes" :key="mode.value" type="button" :aria-pressed="api.profile.value === mode.value"
-                @click="api.changeProfile(mode.value); modeOpen = false">
-                <v-icon :icon="mode.icon" size="21" aria-hidden="true" />{{ mode.label }}
-              </button>
-            </div>
             <button type="button" class="point-route__choice" :disabled="!api.routes.value.length"
               @click="emit('choose-route')">
               <v-icon icon="mdi-routes" aria-hidden="true" />
@@ -98,8 +92,8 @@ import { useShare } from "@vueuse/core";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { OwnMapFix } from "@/composables/use-own-map-position";
-import type { TransportProfile } from "@/api/mission-routing";
 import { selectedPointShare } from "@/map/selected-point-share";
+import { transportLabel } from "@/map/transport-options";
 const props = defineProps<{
   api: ReturnType<typeof usePointRoute>;
   reverse: ReturnType<typeof useReversePlace>;
@@ -108,29 +102,28 @@ const props = defineProps<{
   choicesOpen: boolean;
   showSearch: boolean;
 }>();
-const emit = defineEmits<{ start: []; dismiss: []; search: []; 'choose-route': []; 'layout-change': [] }>();
+const emit = defineEmits<{ start: []; dismiss: []; search: []; 'choose-route': []; 'choose-transport': []; 'layout-change': [] }>();
 const confirmDeleteOpen = defineModel<boolean>("confirmDeleteOpen", { default: false });
 const step = ref<"point" | "plan">("point");
-const modeOpen = ref(false);
 const shareFeedback = ref("");
 const shareFallback = ref("");
 const { isSupported, share } = useShare();
 watch(() => props.api.point.value, () => {
-  step.value = "point"; modeOpen.value = false; shareFeedback.value = ""; shareFallback.value = "";
+  step.value = "point"; shareFeedback.value = ""; shareFallback.value = "";
   confirmDeleteOpen.value = false;
 });
-watch(() => props.api.sheetOpen.value, (open) => { if (!open) { confirmDeleteOpen.value = false; modeOpen.value = false; } });
+watch(() => props.api.sheetOpen.value, (open) => { if (!open) confirmDeleteOpen.value = false; });
 watch(confirmDeleteOpen, (open, previous) => {
   if (!open && previous && props.api.point.value && props.api.sheetOpen.value)
     void nextTick(() => document.getElementById("point-route-remove-button")?.focus());
 });
-watch([step, modeOpen], async () => { await nextTick(); emit("layout-change"); });
+watch(step, async () => { await nextTick(); emit("layout-change"); });
 function showPlan(): void {
   step.value = "plan";
   props.api.routesVisible.value = true;
 }
 function backToPoint(): void {
-  step.value = "point"; modeOpen.value = false;
+  step.value = "point";
   props.api.routesVisible.value = false;
   void nextTick(() => document.getElementById("map-point-route-sheet")?.focus());
 }
@@ -172,16 +165,10 @@ function confirmDelete(): void {
 }
 function onEscape(): void {
   if (confirmDeleteOpen.value) confirmDeleteOpen.value = false;
-  else if (modeOpen.value) modeOpen.value = false;
   else if (step.value === "plan") backToPoint();
   else { props.api.sheetOpen.value = false; emit("dismiss"); }
 }
-const modes: { value: TransportProfile; icon: string; label: string }[] = [
-  { value: "car", icon: "mdi-car", label: "خودرو" },
-  { value: "bicycle", icon: "mdi-bicycle", label: "دوچرخه" },
-  { value: "foot", icon: "mdi-walk", label: "پیاده" }
-];
-const modeLabel = computed(() => modes.find((mode) => mode.value === props.api.profile.value)?.label ?? "خودرو");
+const modeLabel = computed(() => transportLabel(props.api.profile.value));
 // Never substitute a snapped route vertex for the origin. Before routing,
 // the live fix is approximate and we show coordinates rather than invent an address.
 const originAddress = computed(() => {
@@ -226,10 +213,6 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route__choice > span { flex: 1; min-width: 0; display: grid; }
 .point-route__choice strong { font-size: .9rem; }
 .point-route__choice small { font-size: .8rem; opacity: .8; }
-.point-route__modes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .4rem; }
-.point-route__modes button { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: .2rem;
-  padding: .4rem; border: 1px solid rgba(var(--v-theme-on-surface), .2); border-radius: 12px; font: inherit; cursor: pointer; }
-.point-route__modes button[aria-pressed="true"] { border: 2px solid rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; padding: .25rem .85rem .7rem; }
 .point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .14); border-radius: 12px; }
 .point-route__metrics span { font-size: .81rem; opacity: .8; }
@@ -263,5 +246,4 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 @media (max-height: 430px) and (max-width: 599px) {
   .point-route { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 }
-@media (forced-colors: active) { .point-route__modes button[aria-pressed="true"] { outline: 2px solid Highlight; } }
 </style>

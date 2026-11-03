@@ -1,10 +1,12 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, compileTemplate, parse } from "vue/compiler-sfc";
+import { transportOptions, transportLabel } from "../../map/transport-options";
 
 // Source and compiled CSS contracts only; never mount Vue SFCs in unit tests.
 const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
 const choices = readFileSync(new URL("../../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
+const transport = readFileSync(new URL("../../components/map/PointTransportChoicesSheet.vue", import.meta.url), "utf8");
 const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
 const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
 const map = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
@@ -163,11 +165,11 @@ describe("progressive trip planning and editing", () => {
   it("keeps SOS and route choices reachable above whichever phone route sheet is open", () => {
     expect(map).toContain("'user-map-view--route-preview': journey.sheetOpen.value && !!journey.point.value");
     expect(map).toContain('function measurePointSheet(): void {');
-    expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
+    expect(map).toContain('function pointSheetId(): string {');
     expect(map).toContain('new ResizeObserver(measurePointSheet)');
     expect(map).toContain('document.documentElement.style.removeProperty("--bb-map-point-sheet-height")');
     expect(map).toContain('function onPointRouteLayoutChange(): void {\n  measurePointSheet();');
-    expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
+    expect(map).toContain('watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });');
     const phone = shell.slice(shell.indexOf('@media (max-width: 599px) {', shell.indexOf('/* Both actions are App.vue siblings')));
     const rule = '.app-shell--map:has(.user-map-view--route-preview)';
     const bottom = 'inset-block-end: calc(var(--bb-map-point-sheet-height, 48dvh) + 6rem + env(safe-area-inset-bottom, 0px))';
@@ -197,7 +199,7 @@ describe("progressive trip planning and editing", () => {
     const planner = css(sheet, "PointRouteSheet.vue");
     const chooser = css(choices, "PointRouteChoicesSheet.vue");
     const dock = css(map, "UserMapView.vue");
-    for (const panel of [planner, chooser]) {
+    for (const panel of [planner, chooser, css(transport, "PointTransportChoicesSheet.vue")]) {
       expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
       expect(panel).toContain('pointer-events: auto');
     }
@@ -226,7 +228,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return; }');
     expect(map).toContain('if (journey.navigating.value) journey.editNavigation();');
     expect(map).toContain('if (routeChoicesOpen.value) { closeRouteChoices(); return false; }');
-    expect(map).toContain(':choices-open="routeChoicesOpen"');
+    expect(map).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen"');
     expect(sheet).not.toContain('onVisible('); // A pending point hold cannot be dismissed by a dialog lifecycle event.
     expect(map).toContain('@choose="selectPointRoute" @confirm="confirmPointRoute" @close="closeRouteChoices"');
     const preview = map.slice(map.indexOf('function selectPointRoute('), map.indexOf('function confirmPointRoute('));
@@ -241,9 +243,9 @@ describe("progressive trip planning and editing", () => {
     expect(mapLine).toContain('if (!routeChoicesOpen.value) openRouteChoices();\n  selectPointRoute(index);');
     expect(mapLine).not.toContain('journey.choose(index)');
     expect(map).toContain("document.getElementById('map-point-route-sheet')?.focus({ preventScroll: true })");
-    expect(map).toContain('routeChoicesOpen.value = false;\n  routeChoiceSnapshot = null;\n  journey.clear();');
-    expect(map).toContain('watch(routeChoicesOpen, async () => { await nextTick(); fitPointRoute(); });');
-    expect(map).toContain('routeChoicesOpen.value ? "map-point-route-choices-sheet" : "map-point-route-sheet"');
+    expect(map).toContain('routeChoicesOpen.value = false;\n  transportChoicesOpen.value = false;\n  routeChoiceSnapshot = null;\n  journey.clear();');
+    expect(map).toContain('watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });');
+    expect(map).toContain('function pointSheetId(): string {');
     expect(choices).toContain('<section v-if="open && api.point.value" class="point-route-choices-shell"');
     expect(choices).toContain('role="region" aria-label="انتخاب مسیر"');
     expect(choices).not.toContain('VBottomSheet');
@@ -266,12 +268,49 @@ describe("progressive trip planning and editing", () => {
     expect(shell).toContain('.app-shell--map .user-map-view__route-choices-toggle.user-map-view__route-choices-toggle');
   });
 
+  it("opens a separate vehicle chooser and applies a draft only after explicit confirmation", () => {
+    expect(sheet).toContain('aria-controls="map-point-transport-choices-sheet"');
+    expect(sheet).toContain("@click=\"emit('choose-transport')\"");
+    expect(sheet).not.toContain('modeOpen');
+    expect(sheet).not.toContain('api.changeProfile('); // No inline picker/recalculation.
+    expect(map).toContain('@choose-transport="openTransportChoices"');
+    expect(map).toContain(':choices-open="routeChoicesOpen || transportChoicesOpen"');
+    expect(map).toContain('<PointTransportChoicesSheet :api="journey" :open="transportChoicesOpen" :show-search="isPhone"');
+    expect(map).toContain('@confirm="confirmTransportChoice" @close="closeTransportChoices" @search="openRouteSearch"');
+    expect(transport).toContain('role="region" aria-label="انتخاب وسیلهٔ حرکت"');
+    expect(transport).toContain('v-for="mode in transportOptions"');
+    expect(transport).toContain(':aria-pressed="selected === mode.value" @click="selected = mode.value"');
+    expect(transport).toContain('const selected = ref<TransportProfile>(props.api.profile.value)');
+    expect(transport).toContain('selected.value = props.api.profile.value;'); // Reopen/new point resets the draft.
+    expect(transport).toContain("@click=\"emit('confirm', selected)\"");
+    expect(transport).toContain('بازگشت بدون تغییر');
+    expect(transport).toContain('تأیید وسیلهٔ انتخابی');
+    expect(transport).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
+    expect(transport).not.toContain('changeProfile('); // The child never starts a route request.
+    const accept = map.slice(map.indexOf('function confirmTransportChoice('), map.indexOf('function openRouteSearch('));
+    expect(accept).toContain('!transportChoicesOpen.value || !journey.point.value');
+    expect(accept).toContain('!transportOptions.some((option) => option.value === mode)');
+    expect(accept).toContain('if (mode !== journey.profile.value) journey.changeProfile(mode);');
+    expect(accept).toContain('closeTransportChoices()');
+    expect(map).toContain('if (transportChoicesOpen.value) { closeTransportChoices(); return false; }');
+    expect(map).toContain('if (next !== previous) { routeChoicesOpen.value = false; transportChoicesOpen.value = false; routeChoiceSnapshot = null; }');
+    expect(map).toContain('transportChoicesOpen.value = false;\n  routeChoiceSnapshot = null;\n  journey.clear()');
+    const styles = css(transport, "PointTransportChoicesSheet.vue");
+    expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel] { left: 0; right: 0;');
+    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%');
+    expect(styles).toContain('max-height: min(62dvh, 32rem)');
+    expect(styles).toContain('overflow-y: auto'); // Full-size footer is reachable on short phones.
+  });
+
   it("keeps car as the default and alternatives behind the explicit route chooser", () => {
-    for (const label of ["زمان تقریبی سفر", "مسافت", "خودرو", "دوچرخه", "پیاده", "انتخاب وسیلهٔ دیگر", "انتخاب مسیر دیگر", "شروع سفر"]) {
+    for (const label of ["زمان تقریبی سفر", "مسافت", "انتخاب وسیلهٔ دیگر", "انتخاب مسیر دیگر", "شروع سفر"]) {
       expect(sheet).toContain(label);
     }
+    expect(transportOptions.map((mode) => mode.label)).toEqual(["خودرو", "دوچرخه", "پیاده"]);
+    expect(transportOptions.map((mode) => mode.value)).toEqual(["car", "bicycle", "foot"]);
+    expect(transportLabel("car")).toBe("خودرو");
     expect(sheet).not.toContain('api.choose((api.index.value + 1) % api.routes.value.length)');
-    expect(sheet).toContain('role="group" aria-label="وسیلهٔ حرکت"');
+    expect(transport).toContain('role="group" aria-label="وسیله‌های سفر"');
     expect(sheet).toContain('role="group" aria-label="تنظیمات سفر"');
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');
     expect(route).toContain('const profile = ref<TransportProfile>("car")');
