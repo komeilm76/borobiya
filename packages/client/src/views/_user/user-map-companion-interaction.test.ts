@@ -14,7 +14,7 @@ function functionBody(name: string): string {
 
 describe("map companions tool", () => {
   it("opens a real fullscreen, scrollable, dismissible Vuetify dialog on phones instead of a bottom sheet", () => {
-    expect(view).toContain('VBottomSheet, VDialog } from "vuetify/components"'); // Guidance uses a sheet; Companions still use VDialog.
+    expect(view).toContain('import { VDialog } from "vuetify/components"'); // Guidance is now a cross-device nonmodal card; Companions still use VDialog.
     expect(view).toContain(`:is="isPhone ? VDialog : 'div'"`);
     expect(view).toContain('class="user-map-view__live-dialog"');
     expect(view).toContain('fullscreen: true');

@@ -326,7 +326,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(view).not.toContain('transform: perspective(120px) rotateX(18deg)');
     expect(view).toContain('transform: none;');
     expect(body("startPointNavigation")).toContain('bounds.contains([fix.lon, fix.lat])');
-    expect(view).toContain('<PointRouteSheet :api="journey"');
+    expect(view).toContain('<PointRouteSheet ref="pointSheetRef" :api="journey"');
   });
 
   it("does not refresh POI searches or leave unrelated POI pins on a GPS-following map", () => {
@@ -360,23 +360,20 @@ describe("hold-to-select destination and map navigation", () => {
     expect(view).toContain('watch(() => journey.navigating.value');
   });
 
-  it("presents titled address, travel modes, time, distance, alternatives, start and stop without implying live traffic", () => {
+  it("presents selected-point sharing, travel planning and accessible guidance without a guessed speed limit", () => {
     const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی", "مسافت مسیر", "خودرو", "دوچرخه", "پیاده", "شروع راهبری", "حذف مقصد", "ترافیک زنده"]) {
-      expect(sheet).toContain(label);
-    }
+    for (const label of ["مقصد انتخاب‌شده", "زمان تقریبی سفر", "مسافت", "خودرو", "دوچرخه", "پیاده",
+      "ارسال", "سفر", "شروع سفر", "انتخاب مسیر دیگر", "حذف مقصد"]) expect(sheet).toContain(label);
     expect(sheet).toContain('api.address.value');
-    expect(sheet).toContain('api.knownPlace.value?.type');
-    expect(sheet).toContain('گزینه‌های مقصد');
-    expect(sheet).not.toContain('point-route-info');
+    expect(sheet).toContain('useShare()');
+    expect(sheet).not.toContain('زمان و مسافت، برآورد آخرین موقعیت GPS هستند');
     expect(sheet).not.toContain('<v-bottom-sheet');
-    expect(sheet).toContain('جزئیات و وسیلهٔ حرکت');
-    expect(sheet).toContain('api.routes.value.length > 1');
     expect(sheet).toContain('aria-pressed');
     expect(sheet).toContain('overflow-y: auto');
-    expect(view).toContain('journey.navigating.value');
     expect(view).toContain('GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است');
-    expect(view).toContain('stopPointNavigation');
+    expect(view).toContain('aria-label="حد مجاز نامشخص"');
+    expect(view).toContain('backToTravelPlan');
+    expect(view).toContain('توقف و پایان سفر');
   });
 });
 

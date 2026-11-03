@@ -5,6 +5,8 @@
     <v-card id="map-point-route-choices-sheet" class="point-route-choices" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route-choices__header">
         <h2>انتخاب مسیر</h2>
+        <v-btn icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
+          @click="emit('search')" />
         <v-btn icon="mdi-arrow-right" variant="text" aria-label="بازگشت به برنامه‌ریزی مسیر"
           @click="emit('close')" />
       </header>
@@ -37,7 +39,7 @@
 import type { usePointRoute } from "@/composables/use-point-route";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 defineProps<{ api: ReturnType<typeof usePointRoute>; open: boolean }>();
-const emit = defineEmits<{ close: []; choose: [index: number]; confirm: [] }>();
+const emit = defineEmits<{ close: []; choose: [index: number]; confirm: []; search: [] }>();
 </script>
 
 <style scoped>
@@ -48,7 +50,7 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
   max-height: min(66dvh, 30rem); overflow: hidden; color: rgb(var(--v-theme-on-surface)); }
 .point-route-choices__header { display: flex; align-items: center; justify-content: space-between;
   padding: .25rem .75rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-route-choices__header h2 { margin: 0; font-size: 1.05rem; }
+.point-route-choices__header h2 { flex: 1; min-width: 0; margin: 0; font-size: 1.05rem; }
 .point-route-choices__header :deep(.v-btn) { flex: 0 0 auto; min-width: 44px; height: 44px; }
 .point-route-choices__hint { margin: 0; padding: .5rem .85rem; font-size: .82rem; line-height: 1.5; }
 .point-route-choices__list { display: grid; gap: .5rem; min-height: 0; overflow-y: auto;
