@@ -273,7 +273,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
-import { pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverlayNeedsSync,
+import { pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
 import { previousRouteIndex } from "@/map/route-choice-snapshot";
@@ -1492,9 +1492,9 @@ function fitPointRoute(): void {
   if (!extent) return;
   const canvas = instance.getContainer().getBoundingClientRect();
   const sheet = document.getElementById(pointSheetId())?.getBoundingClientRect() ?? null;
-  const bottom = pointRouteOverviewBottom(canvas, sheet);
+  const padding = pointRouteOverviewPadding(canvas, sheet);
   instance.fitBounds(extent,
-    { padding: { top: 48, bottom, left: 36, right: 36 }, maxZoom: instance.getMaxZoom(), duration: 500 },
+    { padding, maxZoom: instance.getMaxZoom(), duration: 500 },
     { placeSearchSelection: true });
   userControlledCamera.value = true;
 }

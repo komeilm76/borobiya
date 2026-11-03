@@ -335,7 +335,8 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('new markerConstructor({ element, anchor: "center" })');
     expect(map).toContain('setLngLat([origin.lon, origin.lat])');
     expect(map).not.toContain('offset: [-14, 0]');
-    expect(map).toContain('pointRouteOverviewBottom(canvas, sheet)');
+    expect(map).toContain('const padding = pointRouteOverviewPadding(canvas, sheet)');
+    expect(map).toContain('{ padding, maxZoom: instance.getMaxZoom()');
     expect(map).toContain('@layout-change="onPointRouteLayoutChange"');
     expect(map).toContain('if (navigationFollowEnabled.value) journey.focus()');
     expect(map).toContain('بازگشت به برنامهٔ سفر');

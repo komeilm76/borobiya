@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { pointRouteExtent, pointRouteFeatures, pointRouteOverviewBottom, pointRouteSelectionExtent,
-  pointRouteOverlayNeedsSync } from "./point-route-preview";
+import { pointRouteExtent, pointRouteFeatures, pointRouteOverviewBottom, pointRouteOverviewPadding,
+  pointRouteSelectionExtent, pointRouteOverlayNeedsSync } from "./point-route-preview";
 
 const routes = [
   [[51, 35], [51.2, 35.2]] as const,
@@ -41,5 +41,33 @@ describe("nonmodal route preview", () => {
     expect(pointRouteOverviewBottom({ top: 0, bottom: 640, height: 640 }, { top: 390, bottom: 550 })).toBe(266);
     expect(pointRouteOverviewBottom({ top: 0, bottom: 640, height: 640 }, { top: 680, bottom: 900 })).toBe(56);
     expect(pointRouteOverviewBottom({ top: 0, bottom: 320, height: 320 }, { top: 22, bottom: 320 })).toBe(208);
+  });
+
+  it("reserves horizontal rather than vertical space for side-positioned desktop and tablet sheets", () => {
+    const desktop = { left: 0, right: 1366, width: 1366, top: 0, bottom: 768, height: 768 };
+    expect(pointRouteOverviewPadding(desktop, { left: 702, right: 1278, top: 240, bottom: 752 })).toEqual({
+      top: 48, bottom: 56, left: 36, right: 680
+    });
+    const tablet = { left: 0, right: 900, width: 900, top: 0, bottom: 700, height: 700 };
+    expect(pointRouteOverviewPadding(tablet, { left: 12, right: 492, top: 220, bottom: 680 })).toEqual({
+      top: 48, bottom: 56, left: 508, right: 36
+    });
+  });
+
+  it("keeps bottom padding for phone or wide sheets and ignores sheets outside the map", () => {
+    const phone = { left: 0, right: 390, width: 390, top: 0, bottom: 640, height: 640 };
+    expect(pointRouteOverviewPadding(phone, { left: 0, right: 390, top: 390, bottom: 550 })).toEqual({
+      top: 48, bottom: 266, left: 36, right: 36
+    });
+    expect(pointRouteOverviewPadding(phone, { left: 0, right: 390, top: 680, bottom: 900 })).toEqual({
+      top: 48, bottom: 56, left: 36, right: 36
+    });
+    expect(pointRouteOverviewPadding(phone, { left: 450, right: 800, top: 390, bottom: 600 })).toEqual({
+      top: 48, bottom: 56, left: 36, right: 36
+    });
+    const narrow = { left: 0, right: 680, width: 680, top: 0, bottom: 640, height: 640 };
+    expect(pointRouteOverviewPadding(narrow, { left: 12, right: 492, top: 390, bottom: 600 })).toEqual({
+      top: 48, bottom: 266, left: 36, right: 36
+    });
   });
 });

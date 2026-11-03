@@ -41,3 +41,21 @@ export function pointRouteOverviewBottom(map: { top: number; bottom: number; hei
     ? Math.max(0, map.bottom - Math.max(sheet.top, map.top)) : 0;
   return Math.min(Math.max(48, map.height - 112), Math.max(56, covered + 16));
 }
+
+/** Fit around the measured sheet: side cards should not compress the route vertically.
+ * Only treat it as a side card if at least 30% / 240px of the map remains beside it. */
+export function pointRouteOverviewPadding(map: { left: number; right: number; width: number; top: number; bottom: number; height: number },
+  sheet: { left: number; right: number; top: number; bottom: number } | null) {
+  const base = { top: 48, bottom: pointRouteOverviewBottom(map, sheet), left: 36, right: 36 };
+  if (!sheet || sheet.top >= map.bottom || sheet.bottom <= map.top ||
+    sheet.left >= map.right || sheet.right <= map.left) return { ...base, bottom: 56 };
+  const sideRoom = Math.max(240, map.width * .3);
+  const freeLeft = sheet.left - map.left;
+  const freeRight = map.right - sheet.right;
+  const maxSidePadding = Math.max(48, map.width - 112);
+  if (freeLeft >= sideRoom)
+    return { ...base, bottom: 56, right: Math.min(maxSidePadding, Math.max(36, map.right - sheet.left + 16)) };
+  if (freeRight >= sideRoom)
+    return { ...base, bottom: 56, left: Math.min(maxSidePadding, Math.max(36, sheet.right - map.left + 16)) };
+  return base;
+}

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-03 — Fit route previews beside desktop and tablet sheets
+
+- A map route fit previously treated every visible sheet as a bottom occlusion, even when the desktop or wider-tablet sheet sits to one side. Tall side cards could squeeze the selected route into a thin horizontal band. Preview padding now uses the measured rectangle: when sufficient map remains beside a sheet, reserve that side instead of the bottom; phone/full-width and narrow-map sheets keep bottom clearance. Geometry regressions and a nonmounted map call-site check cover both layouts; browser/physical-device camera framing remains to be verified.
+
 ### 2026-11-03 — Fence duplicate and stale destination shares
 
 - Audited the Send action and found that rapid taps could start overlapping native-share/clipboard attempts. A late result could overwrite a newer fallback message, and a pending result could surface after closing the sheet or moving to Travel. Send now admits only one pending attempt, disables its button during that attempt, and discards old results after destination, sheet or step changes. Native sharing still starts synchronously in the user click gesture. A pure attempt-fence regression and a nonmounted sheet contract cover duplicate and stale completions; native browser sharing and clipboard permission behavior still need device acceptance.
