@@ -1,5 +1,22 @@
 import type { RoutePoint } from "@/api/mission-routing";
 
+/** Ignore duplicate sends and results from a dismissed/replaced share attempt. */
+export function createShareAttemptFence() {
+  let generation = 0;
+  let busy = false;
+  return {
+    get busy() { return busy; },
+    begin(): number | null {
+      if (busy) return null;
+      busy = true;
+      return ++generation;
+    },
+    isCurrent(attempt: number): boolean { return busy && generation === attempt; },
+    finish(attempt: number): void { if (generation === attempt) busy = false; },
+    reset(): void { generation++; busy = false; },
+  };
+}
+
 /** Share the selected destination only. Never include the user's live GPS origin. */
 export function selectedPointShare(point: RoutePoint | null): { title: string; text: string; url: string } | null {
   if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lon) ||

@@ -32,7 +32,7 @@
             <textarea :value="shareFallback" readonly dir="ltr" @focus="selectShareFallback" />
           </label>
           <div class="point-route__actions point-route__actions--initial">
-            <v-btn variant="tonal" color="primary" prepend-icon="mdi-share-variant" @click="sendPoint">ارسال</v-btn>
+            <v-btn variant="tonal" color="primary" prepend-icon="mdi-share-variant" :disabled="sharePending" @click="sendPoint">ارسال</v-btn>
             <v-btn color="primary" variant="flat" prepend-icon="mdi-navigation-variant" @click="showPlan">سفر</v-btn>
           </div>
         </template>
@@ -92,7 +92,7 @@ import { useShare } from "@vueuse/core";
 import type { useReversePlace } from "@/composables/use-reverse-place";
 import type { usePointRoute } from "@/composables/use-point-route";
 import type { OwnMapFix } from "@/composables/use-own-map-position";
-import { selectedPointShare } from "@/map/selected-point-share";
+import { createShareAttemptFence, selectedPointShare } from "@/map/selected-point-share";
 import { transportLabel } from "@/map/transport-options";
 const props = defineProps<{
   api: ReturnType<typeof usePointRoute>;
@@ -107,18 +107,30 @@ const confirmDeleteOpen = defineModel<boolean>("confirmDeleteOpen", { default: f
 const step = ref<"point" | "plan">("point");
 const shareFeedback = ref("");
 const shareFallback = ref("");
+const sharePending = ref(false);
+const shareFence = createShareAttemptFence();
 const { isSupported, share } = useShare();
+function resetShare(): void {
+  shareFence.reset();
+  sharePending.value = false;
+  shareFeedback.value = "";
+  shareFallback.value = "";
+}
 watch(() => props.api.point.value, () => {
-  step.value = "point"; shareFeedback.value = ""; shareFallback.value = "";
+  resetShare(); step.value = "point";
   confirmDeleteOpen.value = false;
-});
-watch(() => props.api.sheetOpen.value, (open) => { if (!open) confirmDeleteOpen.value = false; });
+}, { flush: "sync" });
+watch(() => props.api.sheetOpen.value, (open) => {
+  if (!open) { resetShare(); confirmDeleteOpen.value = false; }
+}, { flush: "sync" });
+watch(() => props.choicesOpen, (open) => { if (open) resetShare(); }, { flush: "sync" });
 watch(confirmDeleteOpen, (open, previous) => {
   if (!open && previous && props.api.point.value && props.api.sheetOpen.value)
     void nextTick(() => document.getElementById("point-route-remove-button")?.focus());
 });
 watch(step, async () => { await nextTick(); emit("layout-change"); });
 function showPlan(): void {
+  resetShare();
   step.value = "plan";
   props.api.routesVisible.value = true;
 }
@@ -139,22 +151,32 @@ async function sendPoint(): Promise<void> {
   const point = props.api.point.value;
   const payload = selectedPointShare(point);
   if (!point || !payload) return;
+  const attempt = shareFence.begin();
+  if (attempt === null) return;
+  sharePending.value = true;
   shareFeedback.value = ""; shareFallback.value = "";
-  if (isSupported.value) {
-    try { await share(payload); return; } // Called from the click gesture, not after an async lookup.
-    catch (error) { if ((error as { name?: string })?.name === "AbortError") return; }
-  }
-  if (props.api.point.value !== point) return; // Never show feedback for a different destination.
   try {
-    if (!navigator.clipboard?.writeText) throw new Error("NO_CLIPBOARD");
-    await navigator.clipboard.writeText(payload.url);
-    if (props.api.point.value === point) shareFeedback.value = "پیوند موقعیت انتخاب‌شده کپی شد؛ آن را برای مخاطب بفرستید.";
-  } catch {
-    if (props.api.point.value !== point) return;
-    shareFallback.value = payload.url;
-    shareFeedback.value = "اشتراک‌گذاری خودکار در این مرورگر ممکن نیست.";
-    await nextTick();
-    if (props.api.point.value === point) document.querySelector<HTMLTextAreaElement>(".point-route__fallback textarea")?.focus();
+    if (isSupported.value) {
+      try { await share(payload); return; } // Called directly from the click gesture, before any await.
+      catch (error) { if ((error as { name?: string })?.name === "AbortError") return; }
+    }
+    if (!shareFence.isCurrent(attempt) || props.api.point.value !== point) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("NO_CLIPBOARD");
+      await navigator.clipboard.writeText(payload.url);
+      if (shareFence.isCurrent(attempt) && props.api.point.value === point)
+        shareFeedback.value = "پیوند موقعیت انتخاب‌شده کپی شد؛ آن را برای مخاطب بفرستید.";
+    } catch {
+      if (!shareFence.isCurrent(attempt) || props.api.point.value !== point) return;
+      shareFallback.value = payload.url;
+      shareFeedback.value = "اشتراک‌گذاری خودکار در این مرورگر ممکن نیست.";
+      await nextTick();
+      if (shareFence.isCurrent(attempt) && props.api.point.value === point)
+        document.querySelector<HTMLTextAreaElement>(".point-route__fallback textarea")?.focus();
+    }
+  } finally {
+    shareFence.finish(attempt);
+    sharePending.value = shareFence.busy;
   }
 }
 function requestDelete(): void { confirmDeleteOpen.value = true; }

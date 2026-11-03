@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-03 — Fence duplicate and stale destination shares
+
+- Audited the Send action and found that rapid taps could start overlapping native-share/clipboard attempts. A late result could overwrite a newer fallback message, and a pending result could surface after closing the sheet or moving to Travel. Send now admits only one pending attempt, disables its button during that attempt, and discards old results after destination, sheet or step changes. Native sharing still starts synchronously in the user click gesture. A pure attempt-fence regression and a nonmounted sheet contract cover duplicate and stale completions; native browser sharing and clipboard permission behavior still need device acceptance.
+
 ### 2026-11-03 — Choose travel vehicle in a separate sheet
 
 - The travel card's «انتخاب وسیلهٔ دیگر» now opens its own nonmodal, scrollable choice sheet with car/bicycle/walking cards, matching the alternative-route sheet's placement, 44px+ actions, safe areas, accessible pressed state, Back/Escape cancellation and explicit confirmation. A tap only changes a local draft; the actual route is recalculated **after** confirming a different vehicle. Cancel does not mutate the current route. One shared transport-option list supplies both the planner label and the chooser, preserving car as the default. The planner/route/vehicle sheets are mutually exclusive, measured with the same phone action-rail clearance and map camera padding; point removal, account navigation and map Back close stale choices. Tablet/desktop continue using their persistent search widget while mobile choice sheets retain a search icon. Source/compiled-style regressions and typechecks cover this; on-device scroll, focus and route-request acceptance remain open.

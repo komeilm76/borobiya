@@ -58,6 +58,13 @@ describe("progressive trip planning and editing", () => {
     expect(sheet).toContain('import { useShare } from "@vueuse/core"');
     expect(sheet).toContain('const { isSupported, share } = useShare()');
     expect(sheet).toContain('selectedPointShare(point)');
+    expect(sheet).toContain('const attempt = shareFence.begin();');
+    expect(sheet).toContain('if (attempt === null) return;');
+    expect(sheet).toContain(':disabled="sharePending"');
+    expect(sheet).toContain('shareFence.reset();');
+    expect(sheet).toContain('watch(() => props.choicesOpen, (open) => { if (open) resetShare(); }, { flush: "sync" });');
+    expect(sheet).toContain('shareFence.isCurrent(attempt)');
+    expect(sheet).toContain('shareFence.finish(attempt);');
     expect(sheet).toContain('if (isSupported.value)');
     expect(sheet).toContain('await share(payload)');
     expect(sheet).toContain('name === "AbortError"');
