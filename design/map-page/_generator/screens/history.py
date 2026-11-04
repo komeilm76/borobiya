@@ -279,28 +279,68 @@ def history_filter() -> Screen:
 # --------------------------------------------------------------------------- #
 # 04 — record details
 # --------------------------------------------------------------------------- #
+def _fit_preview(points, box_, height: float, padding: float = 0.84) -> "Camera":
+    """`fit_camera` for a short preview strip: it assumes the full 393×852 viewport, this one doesn't."""
+    from bb.map import Camera
+    x0, y0, x1, y1 = box_
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    ppu = min((x1 - x0) / max(1e-6, max(xs) - min(xs)),
+              (y1 - y0) / max(1e-6, max(ys) - min(ys))) * padding
+    centre = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2)
+    return Camera((centre[0] - ((x0 + x1) / 2 - 393 / 2) / ppu,
+                   centre[1] + ((y0 + y1) / 2 - height / 2) / ppu), ppu)
+
+
+def _legend(screen: Screen, x: float, y: float, w: float,
+            items: list[tuple[str, str, bool]]) -> float:
+    """(label, colour, dashed) keys on a white card: a recorded trip needs four line meanings."""
+    rows = (len(items) + 1) // 2
+    h = 12 + rows * 22
+    screen.rect(x, y, w, h, fill="#FFFFFF", radius=12, outline=C.outline, outline_w=1)
+    for index, (label, color, dashed) in enumerate(items):
+        row, col = divmod(index, 2)
+        # RTL: first key top-right; the swatch sits at the *end* of each cell, the label left of it
+        right = x + w - 12 - col * (w / 2)
+        cy = y + 19 + row * 22
+        if dashed:
+            for k in range(3):
+                screen.rect(right - 26 + k * 10, cy - 1.5, 6, 3, fill=color, radius=1.5)
+        else:
+            screen.rect(right - 26, cy - 1.5, 26, 3, fill=color, radius=1.5)
+        screen.text(right - 34, cy - 8, label, "caption", C.text_2, align="right")
+    return y + h
+
+
 def history_details() -> Screen:
     s = Screen(background=C.background)
     chrome(s, tab=0, map_mode=False)
 
-    # compact map preview of the recorded trip
-    preview_h = 238
-    cam = sc.camera(60, 70, 0.185)
+    # the record is a *comparison*: what was suggested, where I left it, what was suggested next
+    from bb.map import Camera, draw_base, draw_labels, draw_trace, deviation_marker, \
+        destination_pin, origin_marker, to_world
+    preview_h = 300
+    pts = sc.route_world(sc.TRIP_PLAN) + sc.route_world(sc.TRIP_ACTUAL)
+    cam = _fit_preview(pts, (26, 12, 367, 224), preview_h)
     preview = Screen(background=C.map_land, width=393, height=preview_h)
-    from bb.map import draw_base, draw_labels
-    from bb.theme import VIEW_H
-    cam.aim = None  # type: ignore[attr-defined]
-    # project with a viewport matching the preview height
-    from bb.map import Camera, to_world
-    from bb.prims import Screen as _Screen
-    cam_h = Camera(to_world(60, 70), 0.185)
-    draw_base(preview, cam_h)
-    draw_labels(preview, cam_h)
-    draw_route(preview, cam_h, sc.route_world(sc.ROUTE_MAIN), width_m=14)
-    preview.circle(*cam_h.project_grid(*sc.USER, preview), 8, fill="#FFFFFF", outline=C.origin,
-                   outline_w=3)
-    preview.i.draw_icon(*cam_h.project_grid(*sc.INCIDENT, preview), "flag-checkered", 20,
-                        C.destination)
+    draw_base(preview, cam)
+    draw_labels(preview, cam)
+
+    draw_route(preview, cam, sc.route_world(sc.TRIP_PLAN), color=C.route_alt, width_m=9,
+               opacity=120, dashed=True)
+    draw_route(preview, cam, sc.route_world(sc.TRIP_ACTUAL), color=C.primary, width_m=11)
+    draw_trace(preview, cam, sc.route_world(sc.TRIP_OFFROUTE), color=C.warning, width_px=4.2,
+               opacity=210, dashed=True)
+    reroute = sc.route_world([sc.TRIP_REALISED_AT, (390, 240), sc.TRIP_REJOIN_AT])
+    draw_route(preview, cam, reroute, color=C.info, width_m=5, opacity=230, dashed=True)
+
+    origin_marker(preview, cam, *sc.USER)
+    destination_pin(preview, cam, *sc.INCIDENT, label=None)
+    deviation_marker(preview, cam, *sc.TRIP_DEVIATION_AT, label="انحراف", label_side="above")
+    _legend(preview, 16, preview_h - 54, 361,
+            [("مسیر شما", C.primary, False), ("مسیر پیشنهادی", C.route_alt, True),
+             ("اشتباه در مسیر", C.warning, True), ("مسیر جدید", C.info, True)])
+
     s.img.paste(preview.img, (0, 118 * s.s))
     s.rect(0, 118 + preview_h, 393, 1, fill=C.outline)
 
@@ -308,52 +348,47 @@ def history_details() -> Screen:
     s.rect(14, 136, 44, 44, fill="#FFFFFF", radius=15, outline=C.outline, outline_w=1)
     s.i.draw_icon(36, 158, "mdi-arrow-right", 20, C.text_2)
 
-    top = 356
+    top = 428
     s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=44)
     s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
     s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
     s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
 
-    y = top + 20
-    s.text(377, y, "سفر به آتش‌نشانی مرکزی", "title", C.text, align="right", max_width=280)
-    s.text(377, y + 28, "امروز · ۹:۴۱ تا ۹:۵۲ · خودرو", "caption", C.muted, align="right")
-    s.chip(24, y + 4, "تکمیل‌شده", None, "success", h=26)
-    y += 58
+    y = top + 18
+    s.text(357, y, "سفر به آتش‌نشانی مرکزی", "title", C.text, align="right", max_width=250)
+    s.text(357, y + 28, "امروز · ۹:۴۱ تا ۹:۵۲ · ۱٫۴ کیلومتر", "caption", C.muted, align="right")
+    s.chip(24, y + 2, "تکمیل‌شده", "mdi-check", "success", h=24)
+    y += 54
 
-    metric_tiles(s, 16, y, 361, [("مسافت", "۱٫۳ کیلومتر", "mdi-map-marker-distance"),
-                                 ("مدت", "۱۱ دقیقه", "mdi-clock-outline"),
-                                 ("میانگین", "۱۹ km/h", "mdi-speedometer")], h=68)
-    y += 78
+    metric_tiles(s, 16, y, 361, [("مدت", "۱۱ دقیقه", "mdi-clock-outline"),
+                                 ("توقف", "۲ دقیقه", "mdi-pause-circle-outline"),
+                                 ("انحراف", "۱ بار", "mdi-map-marker-alert")], h=58)
+    y += 70
 
     s.text(377, y, "سیر سفر", "caption-bold", C.muted, align="right")
-    y += 26
-    steps = [("شروع سفر", "خیابان دانشگاه، بین ولیعصر و طالقانی", "۹:۴۱", "mdi-play"),
-             ("عبور از خیابان شریعتی", "۶۰۰ متر · بدون توقف", "۹:۴۵", "mdi-map-marker-path"),
-             ("رسیدن به مقصد", "آتش‌نشانی مرکزی · خیابان شریعتی", "۹:۵۲", "mdi-flag-checkered")]
-    for index, (title, detail, time, icon) in enumerate(steps):
-        ry = y + index * 48
-        line_bottom = ry + 48 if index < len(steps) - 1 else ry + 18
-        s.dividers_vertical(357 - 12, ry + 18, line_bottom, C.outline)
-        s.circle(357 - 12, ry + 13, 9, fill=C.primary_soft, outline=C.primary, outline_w=1.4)
-        s.i.draw_icon(357 - 12, ry + 13, icon, 11, C.primary)
-        s.text(357 - 32, ry + 2, title, "label", C.text, align="right")
-        s.text(357 - 32, ry + 22, detail, "caption", C.muted, align="right", max_width=240)
-        s.text(16, ry + 3, time, "caption-bold", C.muted_2, align="left")
-    y += len(steps) * 48
+    y += 24
+    steps = [("شروع سفر", "خیابان دانشگاه · مسیر پیشنهادی پذیرفته شد", "۹:۴۱", "mdi-play",
+              C.primary, C.primary_soft),
+             ("انحراف از مسیر", "پیچ اشتباه؛ مسیر پیشنهادی رد شد", "۹:۴۶", "mdi-alert-outline",
+              C.warning, C.warning_soft),
+             ("مسیر جدید پیشنهاد شد", "۱٫۱ کیلومتر دوباره محاسبه شد", "۹:۴۷", "mdi-routes",
+              C.info, C.info_soft),
+             ("رسیدن به مقصد", "آتش‌نشانی مرکزی · خیابان شریعتی", "۹:۵۲", "mdi-flag-checkered",
+              C.success, C.success_soft)]
+    for index, (head, detail, when, icon, tone, soft) in enumerate(steps):
+        ry = y + index * 46
+        line_bottom = ry + 46 if index < len(steps) - 1 else ry + 16
+        s.dividers_vertical(357 - 12, ry + 17, line_bottom, C.outline)
+        s.circle(357 - 12, ry + 12, 9, fill=soft, outline=tone, outline_w=1.4)
+        s.i.draw_icon(357 - 12, ry + 12, icon, 11, tone)
+        s.text(357 - 32, ry + 1, head, "label", C.text, align="right")
+        s.text(357 - 32, ry + 21, detail, "caption", C.muted, align="right", max_width=250)
+        s.text(16, ry + 2, when, "caption-bold", C.muted_2, align="left")
+    y += len(steps) * 46 + 6
 
-    s.rect(16, y, 361, 70, fill=C.surface_2, radius=16)
-    s.text(357, y + 10, "همراهان این سفر", "caption-bold", C.muted, align="right")
-    cursor = 357
-    for initial, name in (("م", "مریم رضایی"), ("س", "سعید کریمی")):
-        width = s.tw(name, "caption") + 42
-        s.circle(cursor - 14, y + 46, 13, fill=C.primary_soft)
-        s.text(cursor - 14, y + 39, initial, "caption-bold", C.primary, align="center")
-        s.text(cursor - 34, y + 39, name, "caption", C.text_2, align="right")
-        cursor -= width
-    y += 84
-
-    s.button(201, y, 176, 48, "تکرار این سفر", icon="mdi-restore", variant="filled")
-    s.button(16, y, 176, 48, "اشتراک‌گذاری", icon="mdi-share-variant", variant="tonal")
+    s.button(201, y, 176, 46, "تکرار این سفر", icon="mdi-restore", variant="filled")
+    s.button(16, y, 176, 46, "اشتراک‌گذاری", icon="mdi-share-variant", variant="tonal")
+    assert y + 46 < 838, f"detail sheet overflows (ends at {y + 46:.0f})"
     home_bar(s)
     return s
 

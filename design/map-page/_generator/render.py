@@ -20,13 +20,15 @@ sys.path.insert(0, ROOT)
 SECTIONS = {
     "design-system": "screens.design_system",
     "history": "screens.history",
+    "companions": "screens.companions",
     "navigation": "screens.nav",
     "mission": "screens.mission",
 }
 
 
 SECTION_PREFIX = {"design-system": "design-system", "history": "history",
-                  "navigation": "navigation", "mission": "mission"}
+                  "navigation": "navigation", "mission": "mission",
+                  "companions": "companions"}
 
 
 def registry():

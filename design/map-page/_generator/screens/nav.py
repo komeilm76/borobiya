@@ -915,7 +915,7 @@ def trip_cancel() -> Screen:
 # 17 — trip completed
 # --------------------------------------------------------------------------- #
 def trip_completed() -> Screen:
-    cam = sc.camera(150, 150, 0.17).aim_at(*sc.INCIDENT, 196, 300)
+    cam = sc.camera(150, 150, 0.17).aim_at(*sc.INCIDENT, 196, 216)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
     s.top_scrim(120)
     chrome(s, tab=1)
@@ -943,18 +943,23 @@ def trip_completed() -> Screen:
            align="right")
 
     y += 80
-    s.text(357, y, "این سفر چطور بود؟", "caption-bold", C.muted, align="right")
-    s.stars(357 - 82, y + 22, 5)
-    y += 52
-    s.button(201, y, 176, 50, "پایان", icon="mdi-check", variant="filled")
-    s.button(16, y, 176, 50, "اشتراک‌گذاری مسیر", icon="mdi-share-variant", variant="tonal")
-    # the sheet runs to the screen edge, so close it with a receipt line instead of
-    # leaving a slab of empty white under the buttons
-    y += 66
+    # the trip ends with a decision: an ordinary trip is only kept if the driver says so
+    with s.alpha_layer():
+        s.rect(28, y - 8, 337, 1, fill=(14, 102, 102, 24))
+    s.text(357, y + 4, "این سفر در تاریخچه ذخیره شود؟", "label-lg", C.text, align="right")
+    s.text(357, y + 30, "اگر ذخیره نکنید، مسیر، آمار و همراهان این سفر از بین می‌رود.",
+           "caption", C.muted, align="right", max_width=330)
+    y += 60
+    s.button(201, y, 176, 48, "ذخیره در تاریخچه", icon="mdi-content-save-outline", variant="filled")
+    s.button(16, y, 176, 48, "بدون ذخیره", variant="surface", color=C.text_2)
+    y += 62
+    s.button(16, y, 361, 46, "اشتراک‌گذاری این مسیر", icon="mdi-share-variant", variant="tonal")
+    y += 60
     with s.alpha_layer():
         s.rect(28, y, 337, 1, fill=(14, 102, 102, 24))
-    s.text(196.5, y + 14, "این سفر در تاریخچه و گزارش ماهانهٔ شما ذخیره شد", "caption",
+    s.text(196.5, y + 12, "مأموریت‌های امداد همیشه ثبت می‌شوند و انتخاب ذخیره ندارند.", "caption",
            C.muted_2, align="center")
+    assert y + 26 < 838, f"trip-completed sheet overflows (ends at {y + 26:.0f})"
     home_bar(s)
     return s
 

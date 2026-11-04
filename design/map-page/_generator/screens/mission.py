@@ -8,7 +8,7 @@ from bb.map import Camera, draw_route, team_marker
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
-from bb.ui import (bottom_panel, chrome, empty_state, home_bar, map_tools, metric_tiles,
+from bb.ui import (MISSION_TAB, bottom_panel, chrome, empty_state, home_bar, map_tools, metric_tiles,
                    nav_banner, notice, sheet_header, telemetry_strip)
 
 from ._base import (box, destination_pin, incident_marker, keepout, map_view, origin_marker,
@@ -34,7 +34,7 @@ def _availability(on: bool) -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 90, 0.20)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 508, 393, 344)))
     s.top_scrim(128)
-    chrome(s, tab=2)
+    chrome(s, tab=MISSION_TAB)
     map_tools(s, 128, angle=22)
 
     user_cone(s, cam, *sc.USER, bearing=28, color=C.success if on else C.muted_2)
@@ -94,7 +94,7 @@ def mission_offer() -> Screen:
     cam = sc.camera(120, 40, 0.155).aim_at(*sc.INCIDENT, 230, 300)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 400, 393, 452)))
     s.top_scrim(120)
-    chrome(s, tab=2, mission_badge="۳")
+    chrome(s, tab=MISSION_TAB, mission_badge="۳")
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=12)
     user_cone(s, cam, *sc.USER, bearing=28)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
@@ -159,7 +159,7 @@ def mission_offer_details() -> Screen:
     cam = sc.camera(140, 60, 0.165).aim_at(*sc.INCIDENT, 200, 240)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
     s.top_scrim(120)
-    chrome(s, tab=2, mission_badge="۳")
+    chrome(s, tab=MISSION_TAB, mission_badge="۳")
     draw_route(s, cam, sc.route_world([sc.USER, (0, -120), (0, 120), (260, 120), (260, 240),
                                        sc.INCIDENT]), width_m=11, mute=0.4)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
@@ -225,7 +225,7 @@ def mission_accept_confirm() -> Screen:
     cam = sc.camera(sc.USER[0] + 30, sc.USER[1] - 40, 0.20)
     s = map_view(cam, pois=False)
     scrim(s, 108)
-    chrome(s, tab=2, mission_badge="۳")
+    chrome(s, tab=MISSION_TAB, mission_badge="۳")
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
 
     top = 236
@@ -263,7 +263,7 @@ def mission_accepted() -> Screen:
     cam = sc.camera(140, 40, 0.175).aim_at(*sc.INCIDENT, 230, 250)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 430, 393, 422)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13, dashed=True, mute=0.35)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -322,7 +322,7 @@ def mission_navigation() -> Screen:
     cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 540)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 668, 393, 184)), pois=False)
     s.top_scrim(200, start=240)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
 
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=14, color=C.primary)
     user_cone(s, cam, *sc.USER, bearing=0)
@@ -363,7 +363,7 @@ def mission_alternatives() -> Screen:
     cam = sc.camera(*sc.USER, 0.42).heading_up(28).aim_at(*sc.USER, 196, 330)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 430, 393, 422)), pois=False)
     s.top_scrim(200, start=240)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     draw_route(s, cam, sc.route_world([sc.USER, (0, -120), (0, 120), (260, 120), (260, 240),
                                        sc.INCIDENT]), width_m=12, mute=0.42)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=13)
@@ -408,7 +408,7 @@ def mission_arrived() -> Screen:
     cam = sc.camera(140, 60, 0.24).aim_at(*sc.INCIDENT, 196, 360)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 470, 393, 382)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     draw_route(s, cam, sc.route_world(MISSION_ROUTE), width_m=12, mute=0.35)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -456,7 +456,7 @@ def mission_in_progress() -> Screen:
     cam = sc.camera(140, 60, 0.235).aim_at(*sc.INCIDENT, 196, 300)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 372, 393, 480)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
@@ -517,7 +517,7 @@ def support_request() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 200)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
     scrim(s, 60, top=250, height=602)
 
@@ -588,7 +588,7 @@ def support_pending() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 260)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 336, 393, 516)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     user_cone(s, cam, *sc.USER, bearing=28)
 
@@ -652,7 +652,7 @@ def support_accepted() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 320)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 430, 393, 422)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     user_cone(s, cam, *sc.USER, bearing=28)
@@ -722,7 +722,7 @@ def team_leader() -> Screen:
     cam = sc.camera(140, 60, 0.21).aim_at(*sc.INCIDENT, 196, 240)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire")
     team_marker(s, cam, 250, 200, "س", "success", "سعید")
     team_marker(s, cam, 120, 180, "ز", "success", "زهرا")
@@ -810,7 +810,7 @@ def mission_cancel() -> Screen:
     s = map_view(cam, pois=False)
     s.top_scrim(150)
     scrim(s, 130)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
 
     top = 300
@@ -871,7 +871,7 @@ def mission_report() -> Screen:
     cam = sc.camera(140, 60, 0.20).aim_at(*sc.INCIDENT, 196, 180)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 246, 393, 606)))
     s.top_scrim(120)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
     scrim(s, 60, top=236, height=616)
 
@@ -936,7 +936,7 @@ def mission_report() -> Screen:
 
 def mission_completed() -> Screen:
     s = Screen(background=C.background)
-    chrome(s, tab=2)
+    chrome(s, tab=MISSION_TAB)
 
     # celebration header over a light map
     cam = sc.camera(140, 60, 0.16).aim_at(*sc.INCIDENT, 196, 190)
@@ -948,14 +948,16 @@ def mission_completed() -> Screen:
     draw_route(preview, cam_h, sc.route_world(MISSION_ROUTE), width_m=12, mute=0.5)
     preview.i.draw_icon(*cam_h.project_grid(*sc.INCIDENT, preview), "fire", 22, C.danger)
     s.img.paste(preview.img, (0, 108 * s.s))
-    s.gradient(0, 108, 393, 90, "#F1F5F4", 240, 0)
+    s.gradient(0, 108, 393, 84, "#F1F5F4", 230, 0)
 
-    y = 150
-    s.circle(196.5, y + 30, 34, fill=C.success_soft)
-    s.i.draw_icon(196.5, y + 30, "mdi-check-bold", 34, C.success)
-    s.text(196.5, y + 78, "مأموریت با موفقیت بسته شد", "title-lg", C.text, align="center")
-    s.text(196.5, y + 106, "گزارش شما در سوابق امدادگری ثبت شد", "caption", C.muted, align="center")
-    y += 138
+    # the celebration gets its own card: drawn straight on the map the headline sat on street names
+    s.shadow(16, 138, 361, 136, radius=24, blur=20, dy=6, alpha=28)
+    s.rect(16, 138, 361, 136, fill="#FFFFFF", radius=24)
+    s.circle(196.5, 172, 27, fill=C.success_soft)
+    s.i.draw_icon(196.5, 172, "mdi-check-bold", 27, C.success)
+    s.text(196.5, 200, "مأموریت با موفقیت بسته شد", "title-lg", C.text, align="center")
+    s.text(196.5, 232, "گزارش شما همیشه در سوابق امدادگری می‌ماند", "caption", C.muted, align="center")
+    y = 288
 
     card_y = y
     s.shadow(16, card_y, 361, 210, radius=22, blur=18, dy=6, alpha=26)
@@ -978,6 +980,19 @@ def mission_completed() -> Screen:
            align="right", max_width=320)
     y += 70
 
+    # the report is a timeline, not a paragraph: request → arrival → close, with the gaps that matter
+    s.rect(16, y, 361, 70, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
+    marks = [("۹:۴۹", "درخواست"), ("۱۰:۰۵", "رسیدن"), ("۱۰:۱۲", "پایان")]
+    for index, (when, what) in enumerate(marks):
+        cx = 357 - 52 - index * 122
+        if index:
+            s.rect(cx + 26, y + 30, 96, 1.4, fill=C.outline)
+        s.circle(cx, y + 30, 5, fill=C.primary if index == 2 else C.primary_soft,
+                 outline=C.primary, outline_w=1.4)
+        s.text(cx, y + 12, when, "caption-bold", C.text_2, align="center")
+        s.text(cx, y + 40, what, "caption", C.muted, align="center")
+    y += 84
+
     s.button(201, y, 176, 50, "سوابق مأموریت", icon="mdi-history", variant="tonal")
     s.button(16, y, 176, 50, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled")
     y += 62
@@ -994,7 +1009,7 @@ def mission_no_offer() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 80, 0.19)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 520, 393, 332)))
     s.top_scrim(128)
-    chrome(s, tab=2)
+    chrome(s, tab=MISSION_TAB)
     map_tools(s, 128)
     user_cone(s, cam, *sc.USER, bearing=28)
 
@@ -1016,7 +1031,7 @@ def mission_offline() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 80, 0.19)
     s = map_view(cam, pois=False)
     scrim(s, 40)
-    chrome(s, tab=2, locked=True)
+    chrome(s, tab=MISSION_TAB, locked=True)
     s.rect(0, 116, 393, 44, fill=C.warning)
     s.i.draw_icon(357 - 22, 138, "mdi-wifi-off", 17, "#FFFFFF")
     s.text(357 - 40, 130, "اتصال قطع است · تلاش دوباره برای اتصال", "caption-bold", "#FFFFFF",

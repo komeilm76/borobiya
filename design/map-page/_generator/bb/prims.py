@@ -342,6 +342,13 @@ class Screen:
         self.text(right, y + (h - TYPE[style][2]) / 2, label, style, color, align="right")
         return width
 
+    def arc_badge(self, cx, cy, fill, icon, size=11):
+        """A small round status dot with a white ring, used on top of avatars and traces."""
+        self.circle(cx, cy, size / 2 + 2, fill="#FFFFFF")
+        self.circle(cx, cy, size / 2, fill=fill)
+        if icon:
+            self.i.draw_icon(cx, cy, icon, size * 0.62, "#FFFFFF")
+
     def badge_dot(self, cx, cy, r=4.5, color=C.danger, ring="#FFFFFF"):
         self.circle(cx, cy, r + 2, fill=ring)
         self.circle(cx, cy, r, fill=color)
@@ -414,8 +421,10 @@ class Screen:
                 # but readable for users who need to know why the section will not open.
                 color = C.muted if locked_here else C.text_2
             label, icon = item
-            icon_size = 17
-            gap = 6
+            # Four labels at 13px are 41–48px wide; 17px glyphs plus a 6px gap leave only ~9px of
+            # padding per side, so the denser control steps the glyph down and tightens the gap.
+            icon_size = 17 if len(items) <= 3 else 14
+            gap = 6 if len(items) <= 3 else 4
             total = self._content_width(label, icon, "label", icon_size, gap)
             # RTL: the icon leads from the right edge, the label trails to its left.
             cursor = sx + (seg_w + total) / 2

@@ -706,3 +706,93 @@ def scale_bar(screen: Screen, cam: Camera, x: float, y: float, width_px: float =
 def _nice_distance(metres: float) -> float:
     targets = (25, 50, 100, 200, 250, 500, 1000, 2000, 5000)
     return min(targets, key=lambda t: abs(t - metres))
+
+
+# --- companions --------------------------------------------------------------
+#
+# A fellow traveller is a different animal from a team member: nothing about them is dispatched, they
+# joined a trip by invitation, and the thing they need to see is *each other* moving. So their marker is
+# round, carries the freshness of its last fix in the ring, and can say "talking" without a badge.
+
+
+def draw_trace(screen: Screen, cam: Camera, points: Sequence[tuple[float, float]],
+               color: str = C.route, width_px: float = 5.0, opacity: int = 150,
+               dashed: bool = False, casing: bool = True):
+    """A travelled path: thinner and softer than a planned route, and it is the *only* thing
+    on the live map that is translucent — two traces crossing must stay readable."""
+    from PIL import ImageColor
+    pts = [cam.project(x, y, screen) for x, y in points]
+    if len(pts) < 2:
+        return
+    rgb = ImageColor.getrgb(color)[:3]
+    with screen.alpha_layer():
+        if casing:
+            screen.line(pts, (255, 255, 255, min(255, opacity + 40)), width_px + 3.2)
+        if dashed:
+            _dashed_line(screen, pts, rgb + (opacity,), width_px, dash=7, gap=5)
+        else:
+            screen.line(pts, rgb + (opacity,), width_px)
+
+
+def label_fits(screen: Screen, label: str, cx: float, top: float, placed: list,
+               style: str = "caption-bold") -> bool:
+    """True when a caption drawn under (or over) a marker overlaps nothing already placed."""
+    w = screen.tw(label, style) + 18
+    box = (cx - w / 2, top, cx + w / 2, top + 21)
+    for other in placed:
+        if not (box[2] < other[0] or box[0] > other[2] or box[3] < other[1] or box[1] > other[3]):
+            return False
+    return 0 <= box[0] and box[2] <= screen.w
+
+
+def companion_marker(screen: Screen, cam: Camera, u: float, v: float, initial: str,
+                     label: str | None = None, tone: str = "live", talking: bool = False,
+                     accuracy_m: float | None = None, label_side: str = "below"):
+    """Live fellow traveller. `tone`: live | stale | waiting | me.
+
+    The ring is the freshness — teal for a fix from the last 45s, amber for an old one, dashed grey
+    while we have never received a position — so the label never has to spell "probably stale" out.
+    """
+    x, y = cam.project_grid(u, v, screen)
+    edge = {"live": C.primary, "stale": C.warning, "waiting": C.muted_2, "me": C.origin}[tone]
+    fill = {"live": C.primary_deep, "stale": "#5C6B68", "waiting": C.surface_3, "me": C.origin}[tone]
+    ink = "#FFFFFF" if tone != "waiting" else C.muted
+    if accuracy_m:
+        radius = max(18, accuracy_m * cam.ppu)
+        with screen.alpha_layer():
+            screen.circle(x, y, radius, fill=(14, 102, 102, 22), outline=(14, 102, 102, 46),
+                          outline_w=1)
+    if talking:
+        with screen.alpha_layer():
+            screen.circle(x, y, 26, fill=(233, 179, 90, 40))
+            screen.circle(x, y, 21, fill=(233, 179, 90, 64))
+    screen.circle(x, y, 15.5, fill="#FFFFFF", outline=edge, outline_w=2.6)
+    screen.circle(x, y, 12.4, fill=fill)
+    screen.text(x, y - 7, initial, "caption-bold", ink, align="center")
+    if talking:
+        screen.arc_badge(x + 12, y - 12, "#E9B35A", "mdi-microphone", 11)
+    if label:
+        text_w = screen.tw(label, "caption-bold") + 18
+        ly = y - 42 if label_side == "above" else y + 19
+        # a marker near the edge pushes its own name off the plate; clamp the pill, not the marker
+        x = min(max(x, text_w / 2 + 6), screen.w - text_w / 2 - 6)
+        screen.rect(x - text_w / 2, ly, text_w, 21, fill="#FFFFFF", radius=7,
+                    outline=C.outline, outline_w=1)
+        screen.text(x, ly + 3, label, "caption-bold", C.text_2, align="center",
+                    max_width=text_w - 6)
+
+
+def deviation_marker(screen: Screen, cam: Camera, u: float, v: float, label: str | None = None,
+                     label_side: str = "below"):
+    """Where the driver left the plan. A ring, not a pin: the point is the road, not a place."""
+    x, y = cam.project_grid(u, v, screen)
+    with screen.alpha_layer():
+        screen.circle(x, y, 17, fill=(169, 105, 11, 30), outline=(169, 105, 11, 170), outline_w=2)
+    screen.circle(x, y, 3.6, fill=C.warning)
+    if label:
+        text_w = screen.tw(label, "caption-bold") + 18
+        ly = y - 42 if label_side == "above" else y + 22
+        screen.rect(x - text_w / 2, ly, text_w, 21, fill="#FFF7E8", radius=7,
+                    outline="#E8D3AC", outline_w=1)
+        screen.text(x, ly + 3, label, "caption-bold", C.warning, align="center",
+                    max_width=text_w - 6)

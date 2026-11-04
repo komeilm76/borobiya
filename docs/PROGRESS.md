@@ -4,6 +4,39 @@
 
 ---
 
+### 2026-11-04 — Companions, live trips, and a history that records the wrong turns
+
+- The map page's top control is **four segments** now (تاریخچه / مسیریابی / همراهان / مأموریت). Companions were
+  being crammed into the history tab; they are their own area, so `bb/ui.py` grows a `MISSION_TAB` constant and
+  `prims.segmented` steps its icon and gap down past three items so four Persian labels still fit an 89px slot.
+- **`design/map-page/companions/` is new: ten plates.** Hub, add-by-username with the invitation card and a
+  pending invite, the live shared trip, press-and-hold to talk to one person, a companion's status sheet,
+  location sharing (unlimited or timed), history sharing for a date range, the receiving side, empty, offline.
+  Forty-seven plates became fifty-seven.
+- **Hold-to-talk is one-to-one and there is no group call.** The plate shows the amber ring, the mic badge and a
+  pulse line between exactly two markers; the sheet prints who, how long, and that the third companion cannot
+  hear it.
+- **Companions and location sharing are two doors, not one.** Adding someone to the trip and granting a
+  stand-alone timed location share are separate flows, and `06`/`07` show the sharing side with its own search
+  and duration chips.
+- **The trip ends with a decision**: `navigation/17` asks whether to keep the trip and spells out what is lost
+  if not, while `mission/17` states that rescue missions are always recorded. Missions have no discard button
+  anywhere in the set.
+- **History records the comparison, not just the line**: `history/04` draws the suggested route, the driven
+  path, the wrong turn (amber, dashed), the re-planned stretch (blue, dashed), the deviation ring and a
+  four-key legend, then a timeline of start → deviation → new route → arrival.
+- **`segmented_small` was laid out left-to-right**, so on every history plate «مسیرهای من» sat left of
+  «همراهان». The primitive now places the first item on the right, and the fix covers all six history plates.
+- **The shared-trip camera was rewritten three times.** Fitting the whole ۱٫۳km squeezed three markers into a
+  corner; cropping did not help because the leg runs horizontally. It now rotates to the driver's heading and
+  solves zoom and centre from the projection, then asserts every marker is inside the safe box and no two are
+  closer than a marker's width. The sheet's «۱۹۰ متر جلوتر» is computed from the same route as the marker.
+- **`_generator/test_reference.py` (9 tests, new)** pins registry ↔ disk ↔ README, the 786×1704 phone size, the
+  MDI names the plates draw, and the live plate's distance copy — the sheet had claimed a companion was ۲۰۰m
+  ahead while her marker was ۳۷۰m behind.
+
+---
+
 ### 2026-11-03 — Audit pass over the authentication plates
 
 - Read all sixteen images instead of trusting the generator, and fixed what the reading turned up. The

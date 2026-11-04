@@ -8,11 +8,16 @@ from .prims import Screen, _tint
 from .text import fa_digits, shape, text_width
 from .theme import C, R, SAFE_BOTTOM, SAFE_TOP, TYPE, VIEW_H, VIEW_W
 
+# The four sections of /_user/map. Companions left the history tabs on 2026-11-04: sharing a
+# position and travelling together are people problems, not records, and burying them inside
+# "history" made both sections read as one long list.
 SEGMENTS = [
     ("تاریخچه", "mdi-history"),
     ("مسیریابی", "mdi-map-marker-path"),
+    ("همراهان", "mdi-account-multiple-outline"),
     ("مأموریت", "mdi-lifebuoy"),
 ]
+MISSION_TAB = 3
 
 
 def chrome(screen: Screen, tab: int = 1, locked: bool = False, map_mode: bool = True,
@@ -20,12 +25,8 @@ def chrome(screen: Screen, tab: int = 1, locked: bool = False, map_mode: bool = 
     """Status bar + the three-way section control that owns the top of the page."""
     screen.status_bar()
     top = 60
-    if show_menu:
-        x = 14
-        w = screen.w - 28
-    else:
-        x = 14
-        w = screen.w - 28
+    x = 14
+    w = screen.w - 28
     screen.segmented(x, top, w, SEGMENTS, active=tab, h=46,
                      locked=[0, 1] if locked else (), on_map=map_mode)
     if mission_badge:
@@ -192,8 +193,10 @@ def segmented_small(screen: Screen, x: float, y: float, w: float, items: Sequenc
                     h: float = 38, counts: Sequence[str] | None = None) -> None:
     screen.rect(x, y, w, h, fill=C.surface_3, radius=h / 2)
     seg = w / len(items)
+    # RTL: the first item of a Persian segment pair sits on the *right*. Laying them out left-to-right
+    # put «مسیرهای من» on the left of «همراهان» on every history plate.
     for index, label in enumerate(items):
-        sx = x + index * seg
+        sx = x + (len(items) - 1 - index) * seg
         if index == active:
             screen.shadow(sx + 3, y + 3, seg - 6, h - 6, radius=(h - 6) / 2, blur=8, dy=2, alpha=40)
             screen.rect(sx + 3, y + 3, seg - 6, h - 6, fill="#FFFFFF", radius=(h - 6) / 2)
