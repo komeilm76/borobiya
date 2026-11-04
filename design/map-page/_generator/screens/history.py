@@ -106,7 +106,7 @@ def history_user() -> Screen:
     y += 62
 
     segmented_small(s, 16, y, 361, ["مسیرهای من", "همراهان"], active=0,
-                    counts=["۱۲", "۳۴"])
+                    counts=["۱۲", "۶"])
     y += 50
 
     # search + filter row
@@ -139,7 +139,7 @@ def history_companions() -> Screen:
     s.text(377, y + 38, "سوابق سفرها و همراهان شما", "caption", C.muted, align="right")
     y += 62
     segmented_small(s, 16, y, 361, ["مسیرهای من", "همراهان"], active=1,
-                    counts=["۱۲", "۳۴"])
+                    counts=["۱۲", "۶"])
     y += 50
 
     s.rect(16, y, 265, 44, fill="#FFFFFF", radius=14, outline=C.outline, outline_w=1)
@@ -191,7 +191,7 @@ def history_filter() -> Screen:
     s.text(377, y + 38, "سوابق سفرها و همراهان شما", "caption", C.muted, align="right")
     y += 62
     segmented_small(s, 16, y, 361, ["مسیرهای من", "همراهان"], active=0,
-                    counts=["۱۲", "۳۴"])
+                    counts=["۱۲", "۶"])
     y += 50
     s.rect(16, y, 265, 44, fill="#FFFFFF", radius=14, outline=C.outline, outline_w=1)
     s.i.draw_icon(24, y + 22, "mdi-magnify", 18, C.muted_2)
@@ -200,6 +200,7 @@ def history_filter() -> Screen:
         _trip_card(s, y, item)
     scrim(s, 120, top=0, height=852)
 
+    # the sheet starts below the segmented control: covering it half-way read as a broken plate
     top = 236
     s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=60)
     s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
@@ -215,7 +216,7 @@ def history_filter() -> Screen:
     periods = ["امروز", "۷ روز", "۳۰ روز", "سفارشی"]
     tile_w = (361 - 24) / 4
     for index, label in enumerate(periods):
-        tx = 16 + index * (tile_w + 8)
+        tx = 16 + (len(periods) - 1 - index) * (tile_w + 8)
         active = index == 2
         s.rect(tx, y, tile_w, 40, fill=C.primary if active else C.surface_2, radius=12)
         s.text(tx + tile_w / 2, y + 10, label, "label", "#FFFFFF" if active else C.text_2,
@@ -223,27 +224,28 @@ def history_filter() -> Screen:
     y += 52
 
     # date inputs
-    s.rect(16, y, 176, 52, fill=C.surface_2, radius=14)
-    s.text(357 - 6, y + 8, "از تاریخ", "caption", C.muted, align="right")
-    s.text(357 - 6, y + 26, "۲ آبان ۱۴۰۵", "label", C.text, align="right")
+    # RTL: "from" is the right-hand field
     s.rect(201, y, 176, 52, fill=C.surface_2, radius=14)
-    s.text(196 - 6, y + 8, "تا تاریخ", "caption", C.muted, align="right")
-    s.text(196 - 6, y + 26, "۲ آذر ۱۴۰۵", "label", C.text, align="right")
-    y += 68
+    s.text(377 - 14, y + 8, "از تاریخ", "caption", C.muted, align="right")
+    s.text(377 - 14, y + 26, "۲ آبان ۱۴۰۵", "label", C.text, align="right")
+    s.rect(16, y, 176, 52, fill=C.surface_2, radius=14)
+    s.text(192 - 14, y + 8, "تا تاریخ", "caption", C.muted, align="right")
+    s.text(192 - 14, y + 26, "۲ آذر ۱۴۰۵", "label", C.text, align="right")
+    y += 64
 
     s.text(377, y, "وضعیت سفر", "caption-bold", C.muted, align="right")
     y += 22
     for index, (label, count, active) in enumerate([("تکمیل‌شده", "۹", True), ("لغوشده", "۲", False),
                                                     ("در جریان", "۱", False)]):
-        ry = y + index * 44
-        s.rect(16, ry, 361, 38, fill=C.primary_soft if active else C.surface_2, radius=12)
-        s.circle(347, ry + 19, 9, fill=C.primary if active else "#FFFFFF",
+        ry = y + index * 40
+        s.rect(16, ry, 361, 36, fill=C.primary_soft if active else C.surface_2, radius=12)
+        s.circle(347, ry + 18, 9, fill=C.primary if active else "#FFFFFF",
                  outline=None if active else C.outline_strong, outline_w=0 if active else 1.2)
         if active:
-            s.i.draw_icon(347, ry + 19, "mdi-check", 11, "#FFFFFF")
-        s.text(325, ry + 9, label, "body-sm", C.text if active else C.text_2, align="right")
-        s.text(60, ry + 9, count, "caption-bold", C.muted, align="right")
-    y += 3 * 44 + 8
+            s.i.draw_icon(347, ry + 18, "mdi-check", 11, "#FFFFFF")
+        s.text(325, ry + 8, label, "body-sm", C.text if active else C.text_2, align="right")
+        s.text(60, ry + 8, count, "caption-bold", C.muted, align="right")
+    y += 3 * 40 + 8
 
     s.text(377, y, "وسیلهٔ حرکت", "caption-bold", C.muted, align="right")
     y += 22
@@ -269,9 +271,10 @@ def history_filter() -> Screen:
     s.rect(cx - 32, y, 30, 28, fill=C.surface_2, radius=14)
     s.i.draw_icon(cx - 17, y + 14, "mdi-plus", 15, C.muted_2)
 
-    s.shadow(16, 742, 176, 50, radius=16, blur=14, dy=5, color=C.primary, alpha=70)
-    s.button(201, 742, 176, 50, "اعمال فیلتر", icon="mdi-check", variant="filled")
-    s.button(16, 742, 176, 50, "پاک‌کردن", icon="mdi-filter-remove-outline", variant="tonal")
+    assert y + 30 < 756, f"filter sheet content runs into the action bar (ends at {y + 30:.0f})"
+    s.shadow(16, 762, 176, 50, radius=16, blur=14, dy=5, color=C.primary, alpha=70)
+    s.button(201, 762, 176, 50, "اعمال فیلتر", icon="mdi-check", variant="filled")
+    s.button(16, 762, 176, 50, "پاک‌کردن", icon="mdi-filter-remove-outline", variant="tonal")
     home_bar(s)
     return s
 
