@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-04 — Recheck route origin after a weak-GPS trip start
+
+- A trip could start against an earlier accurate route while GPS was weak; when the first reliable fix later appeared more than 150 m from that route's original start, guidance could briefly follow the stale bearing before deviation detection rerouted. Starting with weak GPS remains allowed, but that first reliable fix now checks the planned origin and recalculates before publishing a camera bearing when it moved. A nearby recovery follows the existing route without a redundant request; subsequent normal movement does not trigger a fresh route just because it is far from the original start. Composable regressions reproduced the far-origin defect before the fix. Physical GPS recovery and route rendering remain to be verified on device.
+
 ### 2026-11-03 — Fit route previews beside desktop and tablet sheets
 
 - A map route fit previously treated every visible sheet as a bottom occlusion, even when the desktop or wider-tablet sheet sits to one side. Tall side cards could squeeze the selected route into a thin horizontal band. Preview padding now uses the measured rectangle: when sufficient map remains beside a sheet, reserve that side instead of the bottom; phone/full-width and narrow-map sheets keep bottom clearance. Geometry regressions and a nonmounted map call-site check cover both layouts; browser/physical-device camera framing remains to be verified.

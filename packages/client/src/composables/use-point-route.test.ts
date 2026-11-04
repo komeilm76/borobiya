@@ -354,6 +354,45 @@ describe("private point-to-point route", () => {
     expect(journey.error.value).toContain("مسیری پیدا نشد");
     scope.stop();
   });
+  it("follows the existing route without a duplicate request if weak GPS improves near its origin", async () => {
+    const get = vi.fn(async () => [short]);
+    const { journey, fix, follow, scope } = setup(get);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await settle();
+      fix.value = { lat: 38.5002, lon: -120.2, accuracy: 300 };
+      expect(journey.start()).toBe(true);
+      follow.mockClear();
+      fix.value = { lat: 38.5002, lon: -120.2, accuracy: 8 };
+      expect(journey.navigationPending.value).toBe(false);
+      expect(get).toHaveBeenCalledTimes(1);
+      expect(follow).toHaveBeenCalled();
+      fix.value = { lat: 38.51, lon: -120.2, accuracy: 8 };
+      expect(get).toHaveBeenCalledTimes(1); // Ordinary guidance movement is not a new Start.
+    } finally { scope.stop(); }
+  });
+  it("replans before following when the first precise fix after a weak-GPS Start is far from the route origin", async () => {
+    const fresh = deferred<RouteChoice[]>();
+    const get = vi.fn().mockResolvedValueOnce([short]).mockImplementationOnce(() => fresh.promise);
+    const { journey, fix, follow, scope } = setup(get);
+    try {
+      journey.select({ lat: 40, lon: -120 }); await settle();
+      expect(journey.plannedFrom.value).toEqual({ lat: 38.5, lon: -120.2 });
+      fix.value = { lat: 38.51, lon: -120.2, accuracy: 500 };
+      follow.mockClear();
+      expect(journey.start()).toBe(true); // Do not disable Start because GPS is weak.
+      expect(journey.navigationPending.value).toBe(false);
+      expect(follow).not.toHaveBeenCalled();
+      fix.value = { lat: 38.51, lon: -120.2, accuracy: 8 };
+      expect(journey.navigationPending.value).toBe(true);
+      expect(follow).not.toHaveBeenCalled(); // The old bearing must never flash.
+      expect(get).toHaveBeenCalledTimes(2);
+      expect(get.mock.calls[1]?.[0]).toEqual({ lat: 38.51, lon: -120.2 });
+      fresh.resolve([fast]); await fresh.promise; await settle();
+      expect(journey.navigationPending.value).toBe(false);
+      expect(journey.plannedFrom.value).toEqual({ lat: 38.51, lon: -120.2 });
+      expect(follow).toHaveBeenCalled();
+    } finally { fresh.resolve([fast]); scope.stop(); }
+  });
   it("accepts weak GPS while refusing to follow an obsolete route origin", async () => {
     const get = vi.fn(async () => [fast]);
     const { journey, fix, scope } = setup(get);

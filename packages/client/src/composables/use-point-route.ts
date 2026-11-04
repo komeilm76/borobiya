@@ -63,6 +63,9 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
   let controller: AbortController | null = null;
   let generation = 0;
   let waitingForFix = false;
+  // Start may be allowed from a previously planned route while GPS is weak.
+  // Its first reliable fix must be compared with that route's origin before following.
+  let awaitingFirstPreciseFix = false;
   const plannedFrom = ref<RoutePoint | null>(null);
   // A route requested from coordinates with poor/unknown accuracy is only a preview.
   // Recalculate once from a precise fix before publishing live camera guidance.
@@ -114,6 +117,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     }
     navigating.value = false;
     navigationPending.value = false;
+    awaitingFirstPreciseFix = false;
     replanning.value = false; rerouteWaitingForFix.value = false;
     firstDeviationAt = null; rerouteMessage.value = null;
     if (statusTimer) clearTimeout(statusTimer); statusTimer = null;
@@ -186,7 +190,9 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     if (current === generation && navigating.value && navigationPending.value) {
       if (selectedRoute.value) {
         navigationPending.value = false;
-        updateFix(position.value); // The warning stays until GPS becomes reliable.
+        const latest = position.value;
+        if (latest && latest.accuracy !== null && latest.accuracy <= 80) awaitingFirstPreciseFix = false;
+        updateFix(latest); // The warning stays until GPS becomes reliable.
       } else if (error.value) {
         const failure = error.value;
         stop(); error.value = failure; sheetOpen.value = true;
@@ -212,6 +218,7 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
       !!fix && !!plannedFrom.value && (fix.accuracy === null || fix.accuracy > 80 ||
         pointDistance(fix, plannedFrom.value) <= 150);
     navigationPending.value = !usable;
+    awaitingFirstPreciseFix = !fix || fix.accuracy === null || fix.accuracy > 80;
     error.value = null; arrived.value = false; navigating.value = true; sheetOpen.value = false;
     firstDeviationAt = null; rerouteWaitingForFix.value = false;
     rerouteMessage.value = null; routesVisible.value = true;
@@ -323,10 +330,17 @@ export function usePointRoute(owner: Ref<string | null>, position: Ref<OwnMapFix
     if (navigating.value && navigationPending.value) {
       if (!loading.value && fix) void findRoutes();
     } else if (navigating.value) {
-      if (provisionalRoute.value && fix && fix.accuracy !== null && fix.accuracy <= 80) {
-        navigationPending.value = true; remaining.value = null;
-        void findRoutes(); // Replace the coarse-origin route before following the camera.
-      } else updateFix(fix);
+      if (fix && fix.accuracy !== null && fix.accuracy <= 80) {
+        const originMovedWhileWeak = awaitingFirstPreciseFix && !!plannedFrom.value &&
+          pointDistance(fix, plannedFrom.value) > 150;
+        awaitingFirstPreciseFix = false;
+        if (provisionalRoute.value || originMovedWhileWeak) {
+          navigationPending.value = true; remaining.value = null;
+          void findRoutes(); // Replace an obsolete origin before following the camera.
+          return;
+        }
+      }
+      updateFix(fix);
     } else if (waitingForFix && point.value && fix) void findRoutes();
     else if (point.value && plannedFrom.value && !loading.value && fix &&
              (provisionalRoute.value && fix.accuracy !== null && fix.accuracy <= 80 ||
