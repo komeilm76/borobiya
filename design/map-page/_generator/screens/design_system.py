@@ -6,7 +6,8 @@ from typing import Callable
 from bb.prims import Screen
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
-from bb.ui import SEGMENTS, chrome, segmented_small
+from bb.ui import (MISSION_STAGES, SEGMENTS, chrome, mission_pill, mission_rail,
+                   mission_steps, segmented_small)
 
 BOARD_W = 760
 BOARD_H = 960
@@ -26,7 +27,7 @@ def _head(s: Screen, kicker: str, title: str, body: str) -> float:
 def tokens_board() -> Screen:
     """Colour + shape tokens: brand, semantic, surface and map palette with usage notes."""
     s = _board()
-    y = _head(s, "DESIGN SYSTEM · 1/4", "رنگ‌ها و معنا",
+    y = _head(s, "DESIGN SYSTEM · 1/5", "رنگ‌ها و معنا",
               "هر رنگ یک نقش ثابت دارد؛ رنگ بدون برچسب و آیکن برای انتقال معنا کافی نیست.")
 
     groups = [
@@ -93,7 +94,7 @@ def tokens_board() -> Screen:
 def type_board() -> Screen:
     """Typography scale on the 8px grid."""
     s = _board()
-    y = _head(s, "DESIGN SYSTEM · 2/4", "تایپوگرافی",
+    y = _head(s, "DESIGN SYSTEM · 2/5", "تایپوگرافی",
               "وزیرمتن با اعداد فارسی؛ اندازه‌ها روی شبکهٔ ۸ پیکسلی و برای خواندن در حرکت انتخاب شده‌اند.")
     rows = [
         ("display", "۲۵۰ متر", "عنوان صفحه و فاصلهٔ مانور"),
@@ -126,7 +127,7 @@ def type_board() -> Screen:
 def controls_board() -> Screen:
     """Buttons, segmented control, chips, toggles, fields and map controls."""
     s = _board()
-    y = _head(s, "DESIGN SYSTEM · 3/4", "کنترل‌ها",
+    y = _head(s, "DESIGN SYSTEM · 3/5", "کنترل‌ها",
               "همهٔ کنترل‌ها حداقل ۴۴ پیکسل ارتفاع دارند؛ اکشن اصلی همیشه پررنگ‌ترین عنصر است.")
 
     s.text(BOARD_W - 40, y, "دکمه‌ها", "title-sm", C.text, align="right")
@@ -190,7 +191,7 @@ def controls_board() -> Screen:
 def sheet_board() -> Screen:
     """Bottom-sheet anatomy: collapsed, half and expanded, plus anatomy labels."""
     s = _board()
-    y = _head(s, "DESIGN SYSTEM · 4/4", "شیت پایین صفحه",
+    y = _head(s, "DESIGN SYSTEM · 4/5", "شیت پایین صفحه",
               "شیت‌ها سلسله‌مراتب ثابتی دارند: دستگیره، عنوان، محتوا، اکشن اصلی.")
 
     # three mini states side by side, each frame clipped like a phone screen
@@ -246,9 +247,65 @@ def sheet_board() -> Screen:
     return s
 
 
+def mission_state_board() -> Screen:
+    """The mission-state trio: rail (full), steps (slim), pill (overlay) — one contract, three sizes."""
+    s = _board()
+    y = _head(s, "DESIGN SYSTEM · 5/5", "وضعیت مأموریت",
+              "هر صفحهٔ مأموریت باید بگوید مأموریت کجاست. سه اندازه از یک قرارداد: ریل کامل، "
+              "خط فشرده، و پیل روی نقشه.")
+
+    # 1 — the rail (running, then finished)
+    s.rect(40, y, BOARD_W - 80, 262, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "ریل کامل · mission_rail", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "شیت‌هایی که جا دارند: جزئیات، رسیدن، گزارش، پایان.",
+           "caption", C.muted, align="right")
+    mission_rail(s, 58, y + 64, BOARD_W - 116, 2, timestamps=("۹:۴۹", "۹:۵۰", "۹:۵۳"),
+                 tone="mission")
+    mission_rail(s, 58, y + 160, BOARD_W - 116, 4,
+                 timestamps=("۹:۴۹", "۹:۵۰", "۹:۵۳", "۹:۵۴", "۱۰:۱۲"), tone="success")
+    y += 278
+
+    # 2 — the slim line
+    s.rect(40, y, BOARD_W - 80, 176, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "خط فشرده · mission_steps", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "فرم‌ها و شیت‌های پر: پیشنهاد، مسیر جایگزین، پشتیبانی.",
+           "caption", C.muted, align="right")
+    mission_steps(s, 58, y + 64, BOARD_W - 116, -1, note="هنوز پذیرفته نشده")
+    mission_steps(s, 58, y + 98, BOARD_W - 116, 1, note="همین مأموریت")
+    mission_steps(s, 58, y + 132, BOARD_W - 116, 3, note="درخواست پشتیبانی ۹:۵۵")
+    y += 192
+
+    # 3 — the pill, on a map overlay
+    s.rect(40, y, BOARD_W - 80, 190, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "پیل روی نقشه · mission_pill", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "در مسیریابی، جایی که شیت باز است و فقط یک خط جا هست.",
+           "caption", C.muted, align="right")
+    w1 = mission_pill(s, None, y + 66, 1, label="در مسیر", h=32)
+    mission_pill(s, BOARD_W - 58 - w1, y + 66, 1, label="در مسیر", h=32)
+    w2 = mission_pill(s, None, y + 110, 4, label="بسته شد", tone="primary")
+    mission_pill(s, BOARD_W - 58 - w2, y + 110, 4, label="بسته شد", tone="primary")
+    w3 = mission_pill(s, None, y + 154, 3, style="soft")
+    mission_pill(s, BOARD_W - 58 - w3, y + 154, 3, style="soft")
+    y += 206
+
+    # 4 — the rules
+    s.rect(40, y, BOARD_W - 80, 136, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 10, "قواعد وضعیت", "label-lg", C.text, align="right")
+    rules = [
+        "پنج مرحله، همیشه و همه‌جا، از راست: پذیرش، در مسیر، رسیده، رسیدگی، پایان.",
+        "مرحلهٔ جاری حلقه می‌شود نه نقطهٔ بزرگ‌تر؛ زمان مرحله‌های آینده چاپ نمی‌شود.",
+        "ساعت نوار وضعیت همان لحظهٔ صفحه است؛ ۹:۴۱ روی صفحه‌ای با «۱۰:۱۲» خطاست.",
+        "یک داده یک‌جا: اگر ریل زمان را می‌گوید، جعبهٔ «زمان صرف‌شده» تکرار است.",
+    ]
+    for i, rule in enumerate(rules):
+        s.text(BOARD_W - 58, y + 34 + i * 25, "• " + rule, "body-sm", C.muted, align="right")
+    return s
+
+
 SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
     "ds-colors": ("design-system/colors.png", tokens_board),
     "ds-typography": ("design-system/typography.png", type_board),
     "ds-controls": ("design-system/controls.png", controls_board),
     "ds-bottom-sheet": ("design-system/bottom-sheet.png", sheet_board),
+    "ds-mission-state": ("design-system/mission-state.png", mission_state_board),
 }

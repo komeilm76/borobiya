@@ -42,6 +42,12 @@ def fa_digits(value: object) -> str:
     return str(value).translate(_FA_DIGITS)
 
 
+def fa_number(value: float | int, decimals: int = 1) -> str:
+    """A measurement in Persian: 1.2 -> «۱٫۲», 14 -> «۱۴», with a Persian decimal separator."""
+    text = f"{value:.{decimals}f}".rstrip("0").rstrip(".") if isinstance(value, float) else str(value)
+    return fa_digits(text.replace(".", "\u066b"))
+
+
 def _has_arabic(text: str) -> bool:
     return any("\u0600" <= ch <= "\u06FF" or "\uFB50" <= ch <= "\uFEFF" for ch in text)
 

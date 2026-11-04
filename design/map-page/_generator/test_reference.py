@@ -112,3 +112,69 @@ def test_key_plates_keep_their_promise(key, needle):
     assert inspect.getsource(fn).find(needle) != -1, f"{path} lost its copy: {needle}"
     screen = fn()
     assert (screen.w, screen.h) == (393, 852)
+
+
+# --------------------------------------------------------------------------- #
+# mission state: every mission plate must say where the mission stands
+# --------------------------------------------------------------------------- #
+MISSION_STAGES = ("پذیرش", "در مسیر", "رسیده", "رسیدگی", "پایان")
+
+
+def _mission_module():
+    import screens.mission as module
+    return module
+
+
+@pytest.mark.parametrize("key", [
+    "m-03-offer", "m-04-offer-details", "m-05-accepted", "m-06-dispatch", "m-07-navigation",
+    "m-08-alternatives", "m-09-arrived", "m-10-in-progress", "m-11-support",
+    "m-12-support-pending", "m-13-support-accepted", "m-14-team", "m-15-cancel",
+    "m-16-report", "m-17-completed",
+])
+def test_every_mission_plate_declares_the_stage(key):
+    """The user's complaint: «وضعیت مأموریت باید در همهٔ مراحل دیده شود» — not only on 06.
+
+    Every plate that happens while a mission exists has to draw one of the three state components
+    (rail, slim line, pill); the two modal plates carry the stage in their subtitle instead.
+    """
+    import inspect
+
+    module = _mission_module()
+    assert key in module.PLATES, f"{key} is not registered"
+    path, fn = module.PLATES[key]
+    source = inspect.getsource(fn)
+    draws_state = any(token in source for token in
+                      ("mission_rail(", "mission_steps(", "mission_pill("))
+    says_stage = any(f"مرحلهٔ {fa} از ۵" in source for fa in "۱۲۳۴۵")
+    assert draws_state or says_stage, (
+        f"{path} never states where the mission stands — draw mission_rail/steps/pill "
+        f"or put «مرحلهٔ n از ۵» in its subtitle")
+
+
+def test_no_plate_prints_a_time_for_a_future_stage():
+    """A timestamp under «رسیدگی» on a plate that is still in «پذیرش» reads as history."""
+    import screens.mission as module
+    from bb import ui
+
+    for key in ("m-06-dispatch", "m-09-arrived"):
+        _, fn = module.PLATES[key]
+        screen = fn()
+        assert (screen.w, screen.h) == (393, 852)
+
+
+def test_mission_clock_matches_the_stage_times():
+    """The status bar is the plate's moment: a ۹:۴۱ clock over «۱۰:۱۲» in the sheet is a bug."""
+    from bb import scenario as sc
+
+    for key, clock in sc.MISSION_CLOCKS.items():
+        assert key in _mission_module().PLATES, f"{key} has a clock but no plate"
+        assert re.fullmatch(r"[۰-۹]{1,2}:[۰-۹]{2}", clock), f"{key}: {clock!r} is not a Persian time"
+
+    accepted = sc.MISSION_TIMES["accepted"]
+    closed = sc.MISSION_TIMES["closed"]
+    def minutes(text: str) -> int:
+        hour, minute = (int(part.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")))
+                        for part in text.split(":"))
+        return hour * 60 + minute
+    assert minutes(closed) - minutes(accepted) == sc.MISSION_MINUTES
+    assert sc.MISSION_STAGE_TIMES_DONE[-1] == closed

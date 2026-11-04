@@ -796,3 +796,48 @@ def deviation_marker(screen: Screen, cam: Camera, u: float, v: float, label: str
                     outline="#E8D3AC", outline_w=1)
         screen.text(x, ly + 3, label, "caption-bold", C.warning, align="center",
                     max_width=text_w - 6)
+
+
+def team_cluster(screen: Screen, cam: Camera, u: float, v: float, initials: Sequence[str],
+                 caption: str | None = None, extra: int = 0,
+                 offset: tuple[float, float] = (0.0, 0.0)):
+    """Several responders standing in the same square metre, as one marker.
+
+    A scene-level map is zoomed to the building, so three rescuers are 15px apart and three square
+    markers become a blob. The cluster keeps the map honest — one dot where the people are — and the
+    sheet carries their individual states. `extra` counts members whose initials are not drawn.
+    """
+    gx, gy = cam.project_grid(u, v, screen)
+    x, y = gx + offset[0], gy + offset[1]
+    d, step = 21, 17
+    if offset != (0.0, 0.0):
+        # a leader line, not a nudge: the pill is *pinned* to this square metre, and the line says so
+        screen.line([(gx, gy), (x, y)], "#FFFFFF", 3.4)
+        for k in range(2, 9):
+            t0, t1 = (k - 0.4) / 9, k / 9
+            screen.line([(gx + (x - gx) * t0, gy + (y - gy) * t0),
+                         (gx + (x - gx) * t1, gy + (y - gy) * t1)], C.primary, 1.6)
+    shown = list(initials)[:3]
+    width = 24 + (len(shown) - 1) * step + d + (24 if extra else 0)
+    h = 38
+    screen.shadow(x - width / 2, y - h / 2, width, h, radius=h / 2, blur=10, dy=3, alpha=38)
+    screen.rect(x - width / 2, y - h / 2, width, h, fill="#FFFFFF", radius=h / 2,
+                outline=C.outline, outline_w=1)
+    # RTL stack: the first responder sits rightmost, and is painted last so it laps over the rest
+    right = x + width / 2 - 12 - d / 2
+    for index, initial in reversed(list(enumerate(shown))):
+        cursor = right - index * step
+        screen.circle(cursor, y, d / 2 + 1.5, fill="#FFFFFF")
+        screen.circle(cursor, y, d / 2, fill=[C.primary, C.success, C.mission][index % 3])
+        screen.text(cursor, y - 8, initial, "caption-bold", "#FFFFFF", align="center")
+    if extra:
+        screen.circle(x - width / 2 + 14, y, 9, fill=C.surface_3, outline="#FFFFFF", outline_w=1.4)
+        screen.text(x - width / 2 + 14, y - 6, f"+{fa_digits(extra)}", "caption-bold", C.text_2,
+                    align="center")
+    if caption:
+        text_w = screen.tw(caption, "caption-bold") + 16
+        screen.rect(x - text_w / 2, y + h / 2 + 4, text_w, 20, fill="#FFFFFF", radius=7,
+                    outline=C.outline, outline_w=1)
+        screen.text(x, y + h / 2 + 7, caption, "caption-bold", C.text_2, align="center",
+                    max_width=text_w - 6)
+    return x, y

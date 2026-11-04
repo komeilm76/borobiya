@@ -425,17 +425,18 @@ class Screen:
             # padding per side, so the denser control steps the glyph down and tightens the gap.
             icon_size = 17 if len(items) <= 3 else 14
             gap = 6 if len(items) <= 3 else 4
-            total = self._content_width(label, icon, "label", icon_size, gap)
-            # RTL: the icon leads from the right edge, the label trails to its left.
+            # A locked section swaps its icon for a lock instead of gaining a second glyph: at four
+            # items a segment is 89px wide, and a trailing lock drawn at the edge landed on top of
+            # the label on every locked mission plate.
+            glyph = "lock" if locked_here else icon
+            total = self._content_width(label, glyph, "label", icon_size, gap)
+            # RTL: the glyph leads from the right edge, the label trails to its left.
             cursor = sx + (seg_w + total) / 2
             cy = y + h / 2
-            if icon:
-                self.i.draw_icon(cursor - icon_size / 2, cy, icon, icon_size, color)
+            if glyph:
+                self.i.draw_icon(cursor - icon_size / 2, cy, glyph, icon_size, color)
                 cursor -= icon_size + gap
             self.text(cursor, cy - TYPE["label"][2] / 2, label, "label", color, align="right")
-            if locked_here:
-                # lock trails on the far left so it never collides with the leading icon
-                self.i.draw_icon(sx + 12, cy, "lock", 11, C.muted_2)
 
     def toast(self, y, text, icon="mdi-check-circle", tone="success", width=None):
         w = width or min(self.w - 32, self.tw(text, "body-sm") + 62)

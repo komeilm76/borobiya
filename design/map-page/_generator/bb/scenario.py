@@ -132,3 +132,49 @@ def slice_world(points, lo: float, hi: float):
     _, tail = along(points, hi)
     cut = head + [p for p in tail[len(head):]]
     return route_world(cut)
+
+
+# --- the rescue mission, as one clock ---------------------------------------
+#
+# Seventeen plates show the same mission at different moments. Before this table every plate carried
+# its own hand-typed times, and they contradicted each other: the driver "arrived" 9 minutes after
+# leaving when the status bars said 3, and a mission that started at ۹:۴۹ was 23 minutes old at ۱۰:۱۲
+# on one plate and 14 minutes old on another. One table, read by every plate:
+#
+#   offered 9:43 → accepted 9:49 → en route 9:50 → on scene 9:53 → response 9:54 → closed 10:12
+#
+MISSION_TIMES = {
+    "offer": "۹:۴۳",
+    "accepted": "۹:۴۹",
+    "en_route": "۹:۵۰",
+    "arrived": "۹:۵۳",
+    "responding": "۹:۵۴",
+    "backup": "۹:۵۵",
+    "closed": "۱۰:۱۲",
+}
+MISSION_DISTANCE_KM = 1.2
+MISSION_ETA = "۹:۵۳"
+MISSION_MINUTES = 23            # ۹:۴۹ → ۱۰:۱۲
+MISSION_STAGE_TIMES = (MISSION_TIMES["accepted"], MISSION_TIMES["en_route"],
+                       MISSION_TIMES["arrived"], MISSION_TIMES["responding"], None)
+MISSION_STAGE_TIMES_DONE = MISSION_STAGE_TIMES[:4] + (MISSION_TIMES["closed"],)
+
+# the status-bar clock of each plate: a screen is a *moment* of the same run, so the clock has to
+# agree with the timestamps printed inside the sheet (a ۹:۴۱ status bar over «۱۰:۱۲» is a bug)
+MISSION_CLOCKS = {
+    "m-03-offer": "۹:۴۳",
+    "m-04-offer-details": "۹:۴۴",
+    "m-05-accepted": "۹:۴۸",
+    "m-06-dispatch": "۹:۴۹",
+    "m-07-navigation": "۹:۵۰",
+    "m-08-alternatives": "۹:۵۱",
+    "m-09-arrived": "۹:۵۳",
+    "m-10-in-progress": "۱۰:۰۵",
+    "m-11-support": "۱۰:۰۲",
+    "m-12-support-pending": "۱۰:۰۳",
+    "m-13-support-accepted": "۱۰:۰۴",
+    "m-14-team": "۱۰:۰۵",
+    "m-15-cancel": "۱۰:۰۸",
+    "m-16-report": "۱۰:۱۲",
+    "m-17-completed": "۱۰:۱۳",
+}

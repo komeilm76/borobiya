@@ -20,21 +20,31 @@ SEGMENTS = [
 MISSION_TAB = 3
 
 
+# set by `screens/mission.py` before each plate so a status bar always matches the sheet timestamps
+MOMENT: str | None = None
+
+
 def chrome(screen: Screen, tab: int = 1, locked: bool = False, map_mode: bool = True,
-           mission_badge: str | None = None, show_menu: bool = True):
-    """Status bar + the three-way section control that owns the top of the page."""
-    screen.status_bar()
+           mission_badge: str | None = None, show_menu: bool = True, clock: str | None = None):
+    """Status bar + the section control that owns the top of the page.
+
+    `clock` exists because a plate is a *moment*: the mission plates print ۹:۴۹–۱۰:۱۲ in their
+    timestamps, and a status bar that insists it is ۹:۴۱ makes every one of them read as a mistake.
+    """
+    clock = clock if clock is not None else MOMENT
+    screen.status_bar(clock) if clock else screen.status_bar()
     top = 60
     x = 14
     w = screen.w - 28
     screen.segmented(x, top, w, SEGMENTS, active=tab, h=46,
                      locked=[0, 1] if locked else (), on_map=map_mode)
     if mission_badge:
-        # Sections read right-to-left, so the active pill owns the physical left slot;
-        # pin the count bubble to that pill's outer corner instead of the control edge.
+        # Sections read right-to-left, so the active pill owns the physical left slot. The bubble
+        # sits on the pill's *right* shoulder: on the left one it was half outside the screen once
+        # the control grew to four segments.
         inner_pad, seg_w = 4, (w - 8) / len(SEGMENTS)
-        pill_left = x + w - inner_pad - (tab + 1) * seg_w
-        bx, by = pill_left + 3, top + 3
+        pill_right = x + w - inner_pad - tab * seg_w
+        bx, by = pill_right - 4, top + 4
         screen.circle(bx, by, 10.5, fill=C.danger, outline="#FFFFFF", outline_w=2)
         screen.text(bx, by - 1, mission_badge, "caption-bold", "#FFFFFF", align="center")
 
@@ -311,6 +321,145 @@ def nav_banner(screen: Screen, maneuver_icon: str, distance: str, street: str, t
         screen.text(x + w - 52, top + 86, then, "caption", "#C9E2DE", align="right",
                     max_width=w - 84)
     return top + h
+
+
+# --- mission state ----------------------------------------------------------
+#
+# A rescue mission is a five-stage process, and every plate that shows a live mission has to say
+# where in that process the user is. Before this, only 06 (the dispatch plate) had a status ladder;
+# a driver halfway there (07), on scene (10) or accepting backup (13) had no idea what stage the
+# system thought they were in. One vocabulary, two sizes:
+#
+#   mission_rail  — labelled five-step rail for sheets that have ~70px to spare
+#   mission_pill  — one-line stage badge for map overlays and tight sheets
+#
+# Both read right-to-left like the rest of the product: پذیرش is the rightmost stage.
+MISSION_STAGES = ("پذیرش", "در مسیر", "رسیده", "رسیدگی", "پایان")
+
+
+def mission_rail(screen: Screen, x: float, y: float, w: float, stage: int,
+                 timestamps: Sequence[str] | None = None, caption: str = "وضعیت مأموریت",
+                 tone: str = "primary") -> float:
+    """Five-stage rail; returns the y below it. `stage` is the index running right now."""
+    color = {"primary": C.primary, "mission": C.mission, "success": C.success,
+             "danger": C.danger}[tone]
+    soft = {"primary": C.primary_soft, "mission": C.mission_soft, "success": C.success_soft,
+            "danger": C.danger_soft}[tone]
+    count = len(MISSION_STAGES)
+
+    screen.text(x + w, y, caption, "caption-bold", C.muted, align="right")
+    screen.text(x, y, f"مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(count)}", "caption-bold",
+                color, align="left")
+
+    step = w / count
+    dot_y = y + 34
+    # the connector first, so the dots sit on top of it
+    for index in range(count - 1):
+        right_edge = x + w - (index + 0.5) * step - 8.5
+        left_edge = x + w - (index + 1.5) * step + 8.5
+        screen.rect(left_edge, dot_y - 1.1, max(0, right_edge - left_edge), 2.2,
+                    fill=color if index < stage else C.outline, radius=1.1)
+
+    for index, label in enumerate(MISSION_STAGES):
+        cx = x + w - (index + 0.5) * step
+        done, current = index < stage, index == stage
+        if current:
+            # a halo, so the running stage is legible even when the rail is scaled down
+            screen.circle(cx, dot_y, 11, fill=soft)
+            screen.circle(cx, dot_y, 8.5, fill="#FFFFFF", outline=color, outline_w=2.4)
+            screen.circle(cx, dot_y, 3.6, fill=color)
+        elif done:
+            screen.circle(cx, dot_y, 8.5, fill=color)
+            screen.i.draw_icon(cx, dot_y, "mdi-check", 11, "#FFFFFF")
+        else:
+            screen.circle(cx, dot_y, 8.5, fill="#FFFFFF", outline=C.outline_strong, outline_w=1.4)
+        screen.text(cx, dot_y + 15, label, "caption-bold" if current else "caption",
+                    color if current else (C.text_2 if done else C.muted_2), align="center",
+                    max_width=step - 2)
+        # a stage that has not happened yet must not print a time: the planned times live in the
+        # ETA line, and a timestamp under «رسیدگی» would read as history
+        if timestamps and index <= stage and timestamps[index]:
+            screen.text(cx, dot_y + 31, timestamps[index], "caption",
+                        C.muted_2 if not current else color, align="center", max_width=step - 2)
+
+    height = 34 + 15 + 16 + (17 if timestamps else 0)
+    return y + height
+
+
+def _mix(a: str, b: str, t: float) -> str:
+    """`t` of colour `b` over colour `a`, as an opaque hex — PIL fills do not blend."""
+    pa = [int(a.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    pb = [int(b.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)]
+    return "#" + "".join(f"{int(round(x + (y - x) * t)):02X}" for x, y in zip(pa, pb))
+
+
+def mission_steps(screen: Screen, x: float, y: float, w: float, stage: int,
+                  label: str | None = None, note: str | None = None) -> float:
+    """The slimmest form of the same state: five dots and one sentence, 22px tall.
+
+    Sheets that are already full (an offer, a support composer) still have to say where the mission
+    stands, and they cannot afford the labelled rail. This is the rail's contract at a third of the
+    height: dots right-to-left, filled up to `stage`, the current one ringed.
+    """
+    text = label or (MISSION_STAGES[stage] if stage >= 0 else "پیش از پذیرش")
+    pretty = f"{text} · مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(len(MISSION_STAGES))}" \
+        if stage >= 0 else text
+    screen.text(x + w, y, pretty, "caption-bold", C.mission if stage >= 0 else C.muted,
+                align="right")
+    if note:
+        screen.text(x, y, note, "caption", C.muted_2, align="left")
+    cursor = x + w - screen.tw(pretty, "caption-bold") - 14
+    for index in range(len(MISSION_STAGES)):
+        if stage < 0:
+            fill = C.outline_strong
+        elif index < stage:
+            fill = C.mission
+        elif index == stage:
+            fill = C.mission
+        else:
+            fill = C.outline
+        if index == stage:
+            screen.circle(cursor, y + 8, 5.2, fill=C.mission_soft)
+            screen.circle(cursor, y + 8, 3.2, fill=C.mission)
+        else:
+            screen.circle(cursor, y + 8, 3.2, fill=fill)
+        cursor -= 10
+    return y + 22
+
+
+def mission_pill(screen: Screen, x: float | None, y: float, stage: int, label: str | None = None,
+                 style: str = "solid", tone: str = "mission", h: float = 30) -> float:
+    """One-line stage badge for overlays and tight sheets. `x` is the LEFT edge, like `chip`.
+
+    `x=None` measures without drawing, so a plate can centre the pill before placing it.
+    """
+    color = {"mission": C.mission, "primary": C.primary, "danger": C.danger}[tone]
+    soft = {"mission": C.mission_soft, "primary": C.primary_soft, "danger": C.danger_soft}[tone]
+    text = f"{label or MISSION_STAGES[stage]} · {fa_digits(stage + 1)} از {fa_digits(len(MISSION_STAGES))}"
+    text_w = screen.tw(text, "caption-bold")
+    dots_w = 4 * 9 + 4                      # four gaps plus one dot
+    pad = 12
+    width = pad + text_w + 8 + dots_w + pad
+    if x is None:
+        return width
+    if style == "solid":
+        screen.rect(x, y, width, h, fill=color, radius=h / 2)
+        ink, dot_on, dot_off = "#FFFFFF", "#FFFFFF", _mix(color, "#FFFFFF", 0.66)
+    else:
+        screen.rect(x, y, width, h, fill=soft, radius=h / 2)
+        ink, dot_on, dot_off = color, color, _mix(soft, color, 0.34)
+    screen.text(x + width - pad, y + (h - 16) / 2, text, "caption-bold", ink, align="right")
+    cursor = x + width - pad - text_w - 8
+    for index in range(len(MISSION_STAGES)):
+        cy = y + h / 2
+        if index == stage:
+            # a ring, not a bigger dot: five white dots in a row read as "all done"
+            screen.circle(cursor, cy, 4.6, fill=dot_on)
+            screen.circle(cursor, cy, 2.2, fill=color if style == "solid" else "#FFFFFF")
+        else:
+            screen.circle(cursor, cy, 2.6, fill=dot_on if index < stage else dot_off)
+        cursor -= 9
+    return width
 
 
 def bottom_panel(screen: Screen, top: float, radius: float = 28, fill: str = "#FFFFFF") -> float:
