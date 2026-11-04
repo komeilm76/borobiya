@@ -147,8 +147,10 @@ def controls_board() -> Screen:
     s.divider(40, y + 30, BOARD_W - 40)
     y += 30
     s.segmented(40, y, 360, SEGMENTS, active=1, on_map=False)
-    s.text(BOARD_W - 40, y + 6, "سه بخش مستقل؛ مسیریابی پیش‌فرض.", "caption", C.muted, align="right")
-    s.text(BOARD_W - 40, y + 26, "در مأموریت فعال، تاریخچه و مسیریابی قفل می‌شوند.", "caption", C.muted, align="right")
+    s.text(BOARD_W - 40, y + 6, "چهار بخش مستقل؛ مسیریابی پیش‌فرض.", "caption", C.muted,
+           align="right")
+    s.text(BOARD_W - 40, y + 26, "در مأموریت فعال، سه بخش دیگر قفل می‌شوند.", "caption", C.muted,
+           align="right")
     y += 68
 
     s.text(BOARD_W - 40, y, "چیپ‌ها و وضعیت", "title-sm", C.text, align="right")
