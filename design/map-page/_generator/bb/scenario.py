@@ -159,6 +159,15 @@ MISSION_STAGE_TIMES = (MISSION_TIMES["accepted"], MISSION_TIMES["en_route"],
                        MISSION_TIMES["arrived"], MISSION_TIMES["responding"], None)
 MISSION_STAGE_TIMES_DONE = MISSION_STAGE_TIMES[:4] + (MISSION_TIMES["closed"],)
 
+
+def minutes_between(start: str, end: str) -> int:
+    """Persian «۹:۵۴» minus «۱۰:۰۵» in minutes — so a sheet never invents an elapsed time."""
+    def parse(value: str) -> int:
+        hour, minute = (int(part.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")))
+                        for part in value.split(":"))
+        return hour * 60 + minute
+    return parse(end) - parse(start)
+
 # the status-bar clock of each plate: a screen is a *moment* of the same run, so the clock has to
 # agree with the timestamps printed inside the sheet (a ۹:۴۱ status bar over «۱۰:۱۲» is a bug)
 MISSION_CLOCKS = {

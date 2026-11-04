@@ -744,7 +744,9 @@ def team_leader() -> Screen:
             s.circle(cursor, y + 60, 2.9, fill=C.mission if index < 3 else "#E3C9A6")
         cursor -= 10
     # the wall-clock pair already sits two lines up; this line says what operators actually ask
-    s.text(26, y + 84, "مدت رسیدگی تا این لحظه: ۱۸ دقیقه", "caption", C.muted_2, align="left")
+    s.text(26, y + 84, f"مدت رسیدگی تا این لحظه: "
+           f"{fa_digits(sc.minutes_between(sc.MISSION_TIMES['responding'], sc.MISSION_CLOCKS['m-14-team']))}"
+           " دقیقه", "caption", C.muted_2, align="left")
     y += 116
 
     # Section header doubles as the press-to-talk instruction, so no extra help card
