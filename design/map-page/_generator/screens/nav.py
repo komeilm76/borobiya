@@ -10,7 +10,7 @@ from bb.text import fa_digits
 from bb.theme import C, R, TYPE
 from bb.ui import (bottom_panel, chrome, card_title_row, fab, home_bar, map_tools, metric_tiles,
                    nav_banner, notice, quick_chips, search_pill, sheet_header, sos_button,
-                   telemetry_strip)
+                   sos_dock, telemetry_strip)
 
 from ._base import (box, destination_pin, incident_marker, keepout, map_view, origin_marker,
                     user_cone)
@@ -24,7 +24,8 @@ ROUTE_ALT = sc.route_world(sc.ROUTE_ALT)
 # --------------------------------------------------------------------------- #
 def map_idle() -> Screen:
     cam = sc.camera(sc.USER[0] + 90, sc.USER[1] - 130, 0.185)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 690, 393, 162)))
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 690, 393, 162),
+                                      box(0, 594, 132, 80), box(258, 646, 135, 40)))
     s.top_scrim(128)
     chrome(s, tab=1)
     map_tools(s, 128, angle=22)
@@ -32,16 +33,18 @@ def map_idle() -> Screen:
     user_cone(s, cam, *sc.USER, bearing=28)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
 
-    # SOS deliberately sits above the thumb zone: visible, hard to hit by accident.
-    sos_button(s, 315, 492, r=28)
-
     fab(s, 327, 552, 44, "mdi-crosshairs-gps")
     fab(s, 327, 604, 44, "mdi-broadcast", C.success)
+
+    # SOS is docked to the map's trailing edge, in line with the sheet's 16px inset, never
+    # floating over the streets where the eye has to hunt for it
+    sos_box = sos_dock(s, 606)
 
     quick_chips(s, 700, [("خانه", "mdi-home-outline"), ("محل کار", "mdi-briefcase-outline"),
                          ("آخرین مقصد", "mdi-history")])
     search_pill(s, 14, 752, 365, h=58, placeholder="کجا می‌روی؟")
-    scale_bar(s, cam, 20, 664)
+    # the scale bar moved off the corner the SOS pill now owns: single line, under the fabs
+    scale_bar(s, cam, 268, 660)
     home_bar(s)
     return s
 
@@ -450,8 +453,9 @@ def route_selected() -> Screen:
 # --------------------------------------------------------------------------- #
 def navigation_active() -> Screen:
     # Heading-up: the road ahead points to the top of the screen, like a real navigator.
-    cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 560)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 664, 393, 188)), pois=False)
+    cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 520)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 664, 393, 188),
+                                      box(0, 574, 140, 84)), pois=False)
     s.top_scrim(200, start=240)
     chrome(s, tab=1)
 
@@ -465,8 +469,9 @@ def navigation_active() -> Screen:
     s.icon_button(14, 298, 44, "mdi-routes", 20, C.text_2, radius=15)
     s.icon_button(14, 350, 44, "mdi-map-outline", 20, C.text_2, radius=15)
 
-    # SOS: distinct, confirmed in two steps, clear of the controls
-    sos_button(s, 344, 479, r=27, wide=False)
+    # the same dock as every other map page: trailing edge, just above the sheet. The old round
+    # disc hung in the middle of the map, over a street label and inside the thumb's reach
+    sos_dock(s, 584)
 
     top = 656
     s.shadow(0, top - 8, 393, 852 - top + 16, radius=26, blur=24, dy=-2, alpha=48)

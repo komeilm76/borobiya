@@ -7,7 +7,8 @@ from bb.prims import Screen
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
 from bb.ui import (MISSION_STAGES, SEGMENTS, chrome, mission_pill, mission_rail,
-                   mission_steps, segmented_small)
+                   mission_steps, segmented_small, sos_button, sos_dock, sos_pill, sos_rail,
+                   sos_steps)
 
 BOARD_W = 760
 BOARD_H = 960
@@ -302,10 +303,111 @@ def mission_state_board() -> Screen:
     return s
 
 
+def sos_parts_board() -> Screen:
+    """The SOS request's own parts: its rail, its button, and the tiles the form uses."""
+    from screens.sos import incident_tiles, severity_cards
+
+    s = _board()
+    class _Shift:
+        """Left-inset proxy: the form helpers are laid out for a 393px sheet, the board is 760."""
+
+        def __init__(self, screen, dx):
+            self.screen, self.dx = screen, dx
+
+        def __getattr__(self, name):
+            attr = getattr(self.screen, name)
+            if name == "i":                      # the icon canvas draws at absolute x too
+                canvas, dx = attr, self.dx
+
+                class _Icons:
+                    def __getattr__(self, inner):
+                        fn = getattr(canvas, inner)
+                        if inner == "draw_icon":
+                            def wrapped(x, *args, **kwargs):
+                                return fn(x + dx, *args, **kwargs)
+                            return wrapped
+                        return fn
+
+                return _Icons()
+            if name in ("rect", "circle", "text", "icon", "button", "chip"):
+                def wrapped(x, *args, **kwargs):
+                    return attr(x + self.dx, *args, **kwargs)
+                return wrapped
+            return attr
+
+    y = _head(s, "DESIGN SYSTEM · 6/6", "اجزای درخواست امداد",
+              "درخواست SOS ریل و دکمهٔ خودش را دارد، اما از همان توکن‌ها و همان قواعد RTL "
+              "می‌آید: پنج مرحله، قرمز تا پیش از پایان، و یک دکمهٔ ثابت روی نقشه.")
+
+    # 1 — the SOS rail, running then finished
+    s.rect(40, y, BOARD_W - 80, 232, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "ریل · sos_rail", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "ثبت → اعزام → پذیرش → رسیدگی → پایان؛ قرمز تا پایان، "
+           "سبز پس از بسته‌شدن.", "caption", C.muted, align="right", max_width=BOARD_W - 140)
+    sos_rail(s, 58, y + 62, BOARD_W - 116, 2, timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹"))
+    sos_rail(s, 58, y + 148, BOARD_W - 116, 4,
+             timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹", "۹:۵۳", "۱۰:۱۲"), ended="انجام شد")
+    y += 248
+
+    # 2 — the slim line, for the form sheets
+    s.rect(40, y, BOARD_W - 80, 120, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "خط فشرده · sos_steps / sos_pill", "label-lg", C.text,
+           align="right")
+    s.text(BOARD_W - 58, y + 36, "برای فرم‌ها و شیت‌های پر؛ پیل همان قرارداد با ارتفاع ۳۰ است.",
+           "caption", C.muted, align="right")
+    sos_steps(s, 58, y + 58, BOARD_W - 116, -1, note="پیش‌نویس")
+    sos_steps(s, 58, y + 88, BOARD_W - 116, 3, note="در حال رسیدگی")
+    y += 136
+
+    # 3 — the docked button, its wide form and the hold state
+    s.rect(40, y, BOARD_W - 80, 150, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "دکمهٔ SOS · ui.sos_button / ui.sos_dock", "label-lg", C.text,
+           align="right")
+    s.text(BOARD_W - 58, y + 36, "همیشه در گوشهٔ نقشه (x=16) و همیشه قرمز پر؛ نگه‌داشتن "
+           "۰٫۸ ثانیه فرم را باز می‌کند و رها کردن چیزی نمی‌فرستد.",
+           "caption", C.muted, align="right", max_width=BOARD_W - 160)
+    import math as _math
+    sos_button(s, 58 + 56, y + 96, r=24, wide=False)
+    s.text(58 + 56, y + 124, "فشرده", "caption", C.muted_2, align="center")
+    sos_button(s, 58 + 200, y + 96, r=26, wide=True)
+    s.text(58 + 200, y + 124, "روی نقشه", "caption", C.muted_2, align="center")
+    hx = 58 + 372
+    for step in range(18):
+        a = _math.radians(-90 + step * 12)
+        s.circle(hx + 34 * _math.cos(a), y + 96 + 34 * _math.sin(a), 2.4,
+                 fill=C.danger if step > 8 else C.danger_soft)
+    s.circle(hx, y + 96, 20, fill=C.danger)
+    s.text(hx, y + 124, "در حال نگه‌داشتن", "caption", C.muted_2, align="center")
+    y += 166
+
+    # 4 — severity tiles (the one control that is *always* on the form) and the rules
+    s.rect(40, y, BOARD_W - 80, 136, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "شدت حادثه · severity_cards", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "سه مقدار مجاز قرارداد (low/medium/high)؛ انتخاب‌شده رنگِ خودش را "
+           "پر می‌کند.", "caption", C.muted, align="right", max_width=BOARD_W - 160)
+    shift = _Shift(s, 40)
+    severity_cards(shift, y + 54, "high")
+    y += 150
+
+    s.rect(40, y, BOARD_W - 80, 118, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 10, "قواعد درخواست امداد", "label-lg", C.text, align="right")
+    rules = [
+        "یک درخواست = یک شناسهٔ پیگیری؛ همان شماره در سوابق، پرونده و پشتیبانی.",
+        "نوع حادثه از فهرست سرور می‌آید؛ اگر نیامد، «بارگذاری دوباره» جای فهرست می‌نشیند.",
+        "شرح ۱۰ تا ۵۰۰ نویسه با شمارنده؛ کمتر از ۱۰ نویسه اجازهٔ ارسال نمی‌دهد.",
+        "عکس اختیاری است (≤ ۵ مگابایت)؛ اگر نرفت، درخواست باطل نمی‌شود: «ادامه بدون تصویر».",
+    ]
+    for i, rule in enumerate(rules):
+        s.text(BOARD_W - 58, y + 32 + i * 20, "• " + rule, "body-sm", C.muted, align="right",
+               max_width=BOARD_W - 120)
+    return s
+
+
 SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
     "ds-colors": ("design-system/colors.png", tokens_board),
     "ds-typography": ("design-system/typography.png", type_board),
     "ds-controls": ("design-system/controls.png", controls_board),
     "ds-bottom-sheet": ("design-system/bottom-sheet.png", sheet_board),
     "ds-mission-state": ("design-system/mission-state.png", mission_state_board),
+    "ds-sos-parts": ("design-system/sos-parts.png", sos_parts_board),
 }

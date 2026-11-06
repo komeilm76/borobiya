@@ -377,12 +377,17 @@ def mission_alternatives() -> Screen:
         ry = y + index * 72
         s.rect(16, ry, 361, 64, fill=C.primary_soft if active else C.surface_2, radius=16,
                outline=C.primary if active else None, outline_w=1.6 if active else 0)
-        s.text(357 - 12, ry + 10, name, "label-lg", C.text, align="right")
-        s.text(357 - 12, ry + 32, f"{mins} · {dist}", "caption", C.muted, align="right")
-        s.chip(24, ry + 20, traffic, None, "success" if traffic == "روان" else "warning", h=24)
+        # the choice control sits on the RTL leading edge, as a radio the eye can scan down the
+        # list; the old floating check hung over the traffic chip at the other end of the card
+        cy = ry + 32
         if active:
-            s.circle(52, ry + 20, 9, fill=C.primary)
-            s.i.draw_icon(52, ry + 20, "mdi-check", 12, "#FFFFFF")
+            s.circle(345, cy, 10, fill=C.primary)
+            s.i.draw_icon(345, cy, "mdi-check", 12, "#FFFFFF")
+        else:
+            s.circle(345, cy, 9.5, fill="#FFFFFF", outline=C.outline_strong, outline_w=1.6)
+        s.text(323, ry + 9, name, "label-lg", C.text, align="right", max_width=200)
+        s.text(323, ry + 31, f"{mins} · {dist}", "caption", C.muted, align="right", max_width=190)
+        s.chip(24, ry + 20, traffic, None, "success" if traffic == "روان" else "warning", h=24)
     y += len(options) * 72 + 2
     s.button(16, y, 361, 50, "ادامه با مسیر فعلی", icon="mdi-navigation", variant="filled")
     home_bar(s)

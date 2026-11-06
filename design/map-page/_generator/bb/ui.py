@@ -157,6 +157,23 @@ def sos_button(screen: Screen, cx: float, cy: float, r: float = 30, wide: bool =
         screen.text(cx, cy + h * 0.10, "SOS", "caption-bold", "#FFFFFF", align="center")
 
 
+SOS_W = 104.0          # width of the labelled SOS pill at r=28
+SOS_H = 56.0
+
+
+def sos_dock(screen: Screen, y: float, x: float = 16.0, r: float = 28) -> tuple[float, float, float, float]:
+    """Dock the emergency control to the trailing edge of the map, above the sheet.
+
+    The rule exists because the button used to float wherever the plate had room: once over a
+    street label, once half under the manoeuvre banner. A control that is only needed in an
+    emergency must be found where it *always* is — the same corner as the other map controls —
+    so the hand goes there without looking. Returns the box it occupied, for the label keepout.
+    """
+    w = SOS_W if r >= 26 else 76.0
+    sos_button(screen, x + w / 2, y + 28, r=r, wide=True)
+    return (x - 4, y - 6, x + w + 4, y + SOS_H + 6)
+
+
 def sheet_header(screen: Screen, top: float, title: str, subtitle: str | None = None,
                  icon: str | None = None, close: bool = True, trailing_icon: str | None = None,
                  tone: str = "primary", title_style: str = "title") -> float:
@@ -336,20 +353,33 @@ def nav_banner(screen: Screen, maneuver_icon: str, distance: str, street: str, t
 # Both read right-to-left like the rest of the product: پذیرش is the rightmost stage.
 MISSION_STAGES = ("پذیرش", "در مسیر", "رسیده", "رسیدگی", "پایان")
 
+# The requester's own track. It is deliberately *not* the rescuer's vocabulary: a citizen does not
+# care that a mission moved from «در مسیر» to «رسیده», they care that someone was assigned, that the
+# person accepted, and that help is now happening. «رسیدگی» therefore covers en route + on scene.
+SOS_STAGES = ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")
+
 
 def mission_rail(screen: Screen, x: float, y: float, w: float, stage: int,
                  timestamps: Sequence[str] | None = None, caption: str = "وضعیت مأموریت",
-                 tone: str = "primary") -> float:
-    """Five-stage rail; returns the y below it. `stage` is the index running right now."""
+                 tone: str = "primary", stages: Sequence[str] = MISSION_STAGES,
+                 ended: str | None = None) -> float:
+    """Five-stage rail; returns the y below it. `stage` is the index running right now.
+
+    `stage=-1` draws an un-started track (an offer, a draft); `ended` replaces the "مرحلهٔ n از m"
+    counter with a verdict, which is how a cancelled request is drawn without inventing stage 0.
+    """
     color = {"primary": C.primary, "mission": C.mission, "success": C.success,
              "danger": C.danger}[tone]
     soft = {"primary": C.primary_soft, "mission": C.mission_soft, "success": C.success_soft,
             "danger": C.danger_soft}[tone]
-    count = len(MISSION_STAGES)
+    count = len(stages)
 
     screen.text(x + w, y, caption, "caption-bold", C.muted, align="right")
-    screen.text(x, y, f"مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(count)}", "caption-bold",
-                color, align="left")
+    if ended:
+        screen.text(x, y, ended, "caption-bold", color, align="left")
+    elif stage >= 0:
+        screen.text(x, y, f"مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(count)}", "caption-bold",
+                    color, align="left")
 
     step = w / count
     dot_y = y + 34
@@ -360,7 +390,7 @@ def mission_rail(screen: Screen, x: float, y: float, w: float, stage: int,
         screen.rect(left_edge, dot_y - 1.1, max(0, right_edge - left_edge), 2.2,
                     fill=color if index < stage else C.outline, radius=1.1)
 
-    for index, label in enumerate(MISSION_STAGES):
+    for index, label in enumerate(stages):
         cx = x + w - (index + 0.5) * step
         done, current = index < stage, index == stage
         if current:
@@ -394,33 +424,39 @@ def _mix(a: str, b: str, t: float) -> str:
 
 
 def mission_steps(screen: Screen, x: float, y: float, w: float, stage: int,
-                  label: str | None = None, note: str | None = None) -> float:
+                  label: str | None = None, note: str | None = None,
+                  stages: Sequence[str] = MISSION_STAGES, tone: str = "mission",
+                  pre_label: str = "پیش از پذیرش") -> float:
     """The slimmest form of the same state: five dots and one sentence, 22px tall.
 
     Sheets that are already full (an offer, a support composer) still have to say where the mission
     stands, and they cannot afford the labelled rail. This is the rail's contract at a third of the
     height: dots right-to-left, filled up to `stage`, the current one ringed.
     """
-    text = label or (MISSION_STAGES[stage] if stage >= 0 else "پیش از پذیرش")
-    pretty = f"{text} · مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(len(MISSION_STAGES))}" \
+    color = {"mission": C.mission, "primary": C.primary, "danger": C.danger,
+             "success": C.success}[tone]
+    soft = {"mission": C.mission_soft, "primary": C.primary_soft, "danger": C.danger_soft,
+            "success": C.success_soft}[tone]
+    text = label or (stages[stage] if stage >= 0 else pre_label)
+    pretty = f"{text} · مرحلهٔ {fa_digits(stage + 1)} از {fa_digits(len(stages))}" \
         if stage >= 0 else text
-    screen.text(x + w, y, pretty, "caption-bold", C.mission if stage >= 0 else C.muted,
+    screen.text(x + w, y, pretty, "caption-bold", color if stage >= 0 else C.muted,
                 align="right")
     if note:
         screen.text(x, y, note, "caption", C.muted_2, align="left")
     cursor = x + w - screen.tw(pretty, "caption-bold") - 14
-    for index in range(len(MISSION_STAGES)):
+    for index in range(len(stages)):
         if stage < 0:
             fill = C.outline_strong
         elif index < stage:
-            fill = C.mission
+            fill = color
         elif index == stage:
-            fill = C.mission
+            fill = color
         else:
             fill = C.outline
         if index == stage:
-            screen.circle(cursor, y + 8, 5.2, fill=C.mission_soft)
-            screen.circle(cursor, y + 8, 3.2, fill=C.mission)
+            screen.circle(cursor, y + 8, 5.2, fill=soft)
+            screen.circle(cursor, y + 8, 3.2, fill=color)
         else:
             screen.circle(cursor, y + 8, 3.2, fill=fill)
         cursor -= 10
@@ -428,14 +464,15 @@ def mission_steps(screen: Screen, x: float, y: float, w: float, stage: int,
 
 
 def mission_pill(screen: Screen, x: float | None, y: float, stage: int, label: str | None = None,
-                 style: str = "solid", tone: str = "mission", h: float = 30) -> float:
+                 style: str = "solid", tone: str = "mission", h: float = 30,
+                 stages: Sequence[str] = MISSION_STAGES) -> float:
     """One-line stage badge for overlays and tight sheets. `x` is the LEFT edge, like `chip`.
 
     `x=None` measures without drawing, so a plate can centre the pill before placing it.
     """
     color = {"mission": C.mission, "primary": C.primary, "danger": C.danger}[tone]
     soft = {"mission": C.mission_soft, "primary": C.primary_soft, "danger": C.danger_soft}[tone]
-    text = f"{label or MISSION_STAGES[stage]} · {fa_digits(stage + 1)} از {fa_digits(len(MISSION_STAGES))}"
+    text = f"{label or stages[stage]} · {fa_digits(stage + 1)} از {fa_digits(len(stages))}"
     text_w = screen.tw(text, "caption-bold")
     dots_w = 4 * 9 + 4                      # four gaps plus one dot
     pad = 12
@@ -450,7 +487,7 @@ def mission_pill(screen: Screen, x: float | None, y: float, stage: int, label: s
         ink, dot_on, dot_off = color, color, _mix(soft, color, 0.34)
     screen.text(x + width - pad, y + (h - 16) / 2, text, "caption-bold", ink, align="right")
     cursor = x + width - pad - text_w - 8
-    for index in range(len(MISSION_STAGES)):
+    for index in range(len(stages)):
         cy = y + h / 2
         if index == stage:
             # a ring, not a bigger dot: five white dots in a row read as "all done"
@@ -460,6 +497,28 @@ def mission_pill(screen: Screen, x: float | None, y: float, stage: int, label: s
             screen.circle(cursor, cy, 2.6, fill=dot_on if index < stage else dot_off)
         cursor -= 9
     return width
+
+
+# --- the requester's SOS track ----------------------------------------------
+# Same three shapes as the mission track, one vocabulary difference (see `SOS_STAGES`), and its own
+# colour: red belongs to the emergency the citizen is inside, not to the rescue team's brown.
+def sos_rail(screen: Screen, x: float, y: float, w: float, stage: int,
+             timestamps: Sequence[str] | None = None, ended: str | None = None,
+             caption: str = "وضعیت درخواست") -> float:
+    tone = "success" if (stage >= 4) else "danger"
+    return mission_rail(screen, x, y, w, stage, timestamps=timestamps, caption=caption,
+                        tone=tone, stages=SOS_STAGES, ended=ended)
+
+
+def sos_steps(screen: Screen, x: float, y: float, w: float, stage: int,
+              note: str | None = None, tone: str = "danger") -> float:
+    return mission_steps(screen, x, y, w, stage, note=note, stages=SOS_STAGES, tone=tone,
+                         pre_label="پیش از ثبت")
+
+
+def sos_pill(screen: Screen, x: float | None, y: float, stage: int,
+             h: float = 30, style: str = "solid") -> float:
+    return mission_pill(screen, x, y, stage, style=style, tone="danger", h=h, stages=SOS_STAGES)
 
 
 def bottom_panel(screen: Screen, top: float, radius: float = 28, fill: str = "#FFFFFF") -> float:

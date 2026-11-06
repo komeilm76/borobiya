@@ -465,6 +465,8 @@ _TONES = {
     "danger": (C.danger_soft, C.danger, None),
     "info": (C.info_soft, C.info, None),
     "mission": (C.mission_soft, C.mission, None),
+    # neutral *and* quiet: a finished/lapsed record should not borrow a semantic colour
+    "muted": ("#EDF1F0", C.muted, None),
 }
 
 

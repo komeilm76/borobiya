@@ -40,7 +40,7 @@ def readme() -> str:
 def test_registry_and_disk_agree():
     registered = {path for path, _ in screens().values()}
     on_disk = set()
-    for folder in ("design-system", "history", "navigation", "mission", "companions"):
+    for folder in ("design-system", "history", "navigation", "mission", "companions", "sos"):
         directory = os.path.join(DESIGN, folder)
         for name in sorted(os.listdir(directory)):
             if name.endswith(".png"):
@@ -178,3 +178,74 @@ def test_mission_clock_matches_the_stage_times():
         return hour * 60 + minute
     assert minutes(closed) - minutes(accepted) == sc.MISSION_MINUTES
     assert sc.MISSION_STAGE_TIMES_DONE[-1] == closed
+
+
+# --------------------------------------------------------------------------- #
+# SOS request flow: one request, one set of numbers, on every plate
+# --------------------------------------------------------------------------- #
+def _sos_module():
+    import screens.sos as module
+    return module
+
+
+def test_sos_has_a_plate_for_every_requested_state():
+    """The user asked for «all steps and pages»: every state the API can report is drawn.
+
+    A status may be carried by a plate of its own (pending) or by a row/record on the list
+    plate (cancelled_by_requester, expired), so the map is status → plate, not status → filename.
+    """
+    plates = _sos_module().PLATES
+    status_to_plate = {
+        "pending": "s-08-pending",
+        "dispatched": "s-09-dispatched",
+        "accepted": "s-10-accepted",
+        "completed": "s-12-completed",
+        "cancelled_by_requester": "s-14-cancelled",
+        "expired": "s-17-history",
+    }
+    missing = [status for status, key in status_to_plate.items() if key not in plates]
+    assert not missing, f"no plate for: {missing}"
+    # and the flow's own steps each exist
+    for key in ("s-01-entry", "s-02-hold", "s-03-compose", "s-04-location", "s-05-photo",
+                "s-06-review", "s-07-sending", "s-11-arrived", "s-13-cancel",
+                "s-15-photo-retry", "s-16-offline", "s-18-history-detail",
+                "s-19-validation", "s-20-history-empty"):
+        assert key in plates, f"missing plate: {key}"
+
+
+def test_sos_clock_matches_the_request_times():
+    """Same rule as the mission plates: the status bar is the plate's own moment."""
+    from bb import scenario as sc
+
+    plates = _sos_module().PLATES
+    for key, clock in sc.SOS_CLOCKS.items():
+        assert key in plates, f"{key} has a clock but no plate"
+        assert re.fullmatch(r"[۰-۹]{1,2}:[۰-۹]{2}", clock), f"{key}: {clock!r}"
+
+    def minutes(text: str) -> int:
+        hour, minute = (int(part.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")))
+                        for part in text.split(":"))
+        return hour * 60 + minute
+
+    assert minutes(sc.SOS_TIMES["completed"]) - minutes(sc.SOS_TIMES["submitted"]) == 36
+    assert sc.SOS_STAGE_TIMES[3] == sc.SOS_TIMES["arrived"], (
+        "the fourth rail stage is «رسیدگی»: its stamp must be the arrival, not «در راه»")
+    assert sc.SOS_STAGE_TIMES_DONE[-1] == sc.SOS_TIMES["completed"]
+    # the status bar may never be earlier than the last event the plate prints
+    assert minutes(sc.SOS_CLOCKS["s-09-dispatched"]) >= minutes(sc.SOS_TIMES["dispatched"])
+    assert minutes(sc.SOS_CLOCKS["s-10-accepted"]) >= minutes(sc.SOS_TIMES["accepted"])
+    assert minutes(sc.SOS_CLOCKS["s-11-arrived"]) >= minutes(sc.SOS_TIMES["arrived"])
+
+
+def test_sos_manual_pin_is_near_but_not_on_the_gps_fix():
+    """Plate 04 prints the distance between the two: it has to be a real, walkable offset."""
+    from bb import scenario as sc
+
+    assert 40 <= sc.SOS_MANUAL_OFFSET_M <= 400, sc.SOS_MANUAL_OFFSET_M
+    assert sc.SOS_MANUAL != sc.SOS_POINT
+
+
+def test_sos_stages_are_the_client_stages():
+    from bb import ui
+
+    assert ui.SOS_STAGES == ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")

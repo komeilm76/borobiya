@@ -96,6 +96,22 @@ def fit_camera(points: Sequence[tuple[float, float]], box: tuple[float, float, f
                    centre_y + (target_y - VIEW_H / 2) / ppu), ppu)
 
 
+def fit_camera_rotated(points: Sequence[tuple[float, float]], box: tuple[float, float, float, float],
+                       angle: float, padding: float = 0.88, max_ppu: float = 0.55) -> Camera:
+    """Fit a polyline to a box with the map rotated, for wide, short bands.
+
+    A status sheet takes the bottom half of the plate, so the strip above it is wide and
+    not tall. Rotating the map lets a north-south approach run across that strip instead
+    of being shrunk to fit its height.
+    """
+    rad = math.radians(angle)
+    cos_a, sin_a = math.cos(rad), math.sin(rad)
+    rotated = [(x * cos_a - y * sin_a, x * sin_a + y * cos_a) for x, y in points]
+    cam = fit_camera(rotated, box, padding=padding, max_ppu=max_ppu)
+    rx, ry = cam.center
+    return Camera((rx * cos_a + ry * sin_a, -rx * sin_a + ry * cos_a), cam.ppu, angle)
+
+
 @dataclass
 class Road:
     kind: str                 # motorway | primary | secondary | residential | service

@@ -187,3 +187,92 @@ MISSION_CLOCKS = {
     "m-16-report": "۱۰:۱۲",
     "m-17-completed": "۱۰:۱۳",
 }
+
+
+# --- SOS: the citizen side of the same incident -------------------------------
+#
+# The mission plates tell the rescuer's half of this call (offer ۹:۴۳ → closed ۱۰:۱۲). The SOS
+# plates tell the other half: the requester sends at ۹:۳۶, a rescuer is assigned at ۹:۴۳, and the
+# request closes with the same mission at ۱۰:۱۲. One incident, two phones, one clock.
+
+SOS_POINT = USER                 # the emergency is wherever the requester is standing
+SOS_MANUAL = (-120, 30)          # …unless they drop the pin on the map by hand
+SOS_ROUTE = list(reversed(ROUTE_STEP))   # fire station → the requester, along streets
+
+SOS_TIMES = {
+    "submitted": "۹:۳۶",
+    "dispatched": "۹:۴۳",
+    "accepted": "۹:۴۹",
+    "en_route": "۹:۵۰",
+    "arrived": "۹:۵۳",
+    "completed": "۱۰:۱۲",
+    "cancel": "۹:۴۱",               # the requester withdrew before a rescuer was assigned
+}
+# one stamp per rail stage (ثبت، اعزام، پذیرش، رسیدگی، پایان) — "en_route" is not a stage,
+# it is the minute between پذیرش and رسیدگی and only ever appears in prose
+SOS_STAGE_TIMES = (SOS_TIMES["submitted"], SOS_TIMES["dispatched"], SOS_TIMES["accepted"],
+                   SOS_TIMES["arrived"], None)
+SOS_STAGE_TIMES_DONE = SOS_STAGE_TIMES[:4] + (SOS_TIMES["completed"],)
+
+# the status bar of each plate: a moment of this one request
+SOS_CLOCKS = {
+    "s-01-entry": "۹:۳۴",
+    "s-02-hold": "۹:۳۴",
+    "s-03-compose": "۹:۳۵",
+    "s-04-location": "۹:۳۵",
+    "s-05-photo": "۹:۳۶",
+    "s-06-review": "۹:۳۶",
+    "s-07-sending": "۹:۳۶",
+    "s-08-pending": "۹:۳۸",
+    "s-09-dispatched": "۹:۴۳",
+    "s-10-accepted": "۹:۵۱",
+    "s-11-arrived": "۹:۵۷",
+    "s-12-completed": "۱۰:۱۳",
+    "s-13-cancel": "۹:۴۱",
+    "s-14-cancelled": "۹:۴۲",
+    "s-15-photo-retry": "۹:۳۷",
+    "s-16-offline": "۹:۴۰",
+    "s-17-history": "۱۰:۲۰",
+    "s-18-history-detail": "۱۰:۲۱",
+    "s-19-validation": "۹:۳۵",
+    "s-20-history-empty": "۱۰:۲۲",
+}
+
+SOS_ID = 4127
+SOS_REQUESTER = "رضا محمدی"
+SOS_DESCRIPTION = ("آتش‌سوزی در طبقهٔ دوم انبار؛ دود غلیظ و دو نفر در طبقهٔ بالا گیر افتاده‌اند. "
+                   "راه‌پله دودگرفته و آسانسور از کار افتاده است.")
+SOS_ADDRESS = "خیابان شریعتی، بازار قدیم، پلاک ۱۴ · طبقهٔ دوم"
+SOS_ETA = "۴ دقیقه"
+SOS_ETA_ENROUTE = "۲ دقیقه"            # six minutes later the truck is close
+SOS_DISTANCE_ENROUTE = "۳۰۰ متر"
+SOS_DISTANCE = "۸۵۰ متر"
+SOS_ACCURACY = 12                # metres, GPS
+
+SOS_RESCUER = {
+    "name": "زهرا احمدی",
+    "initial": "ز",
+    "role": "امدادگر آتش‌نشانی · تیم ۲",
+    "vehicle": "خودروی امداد ۱۲",
+}
+
+# The five incident types the picker offers (`incidentSlugSchema` + the admin-added «سایر»).
+SOS_INCIDENT_TYPES = [
+    ("آتش‌سوزی", "mdi-fire"),
+    ("اورژانس پزشکی", "mdi-medical-bag"),
+    ("تصادف", "mdi-car-wrench"),
+    ("سیل و آبگرفتگی", "mdi-home-flood"),
+    ("سایر", "mdi-dots-horizontal"),
+]
+
+# Exactly the requester reasons the server seeds (`cancellationReasonSeeds`, type = requester).
+SOS_CANCEL_REASONS = [
+    "دیگر نیازی به کمک نیست",
+    "مشکل را خودم حل کردم",
+    "فرد دیگری به من کمک کرد",
+    "درخواست به‌اشتباه ارسال شد",
+    "سایر",
+]
+
+# distance between the GPS fix and a hand-placed pin, in metres (85 m for the manual point above)
+SOS_MANUAL_OFFSET_M = round(length_m([SOS_POINT, SOS_MANUAL]))
