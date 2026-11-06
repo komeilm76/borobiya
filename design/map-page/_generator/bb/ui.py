@@ -66,19 +66,19 @@ def map_menu_button(screen: Screen, y: float):
 
 
 def map_avatar_button(screen: Screen, y: float, initial: str = "R", online: bool = True,
-                      active: bool = False):
+                      active: bool = False, x: float = 14):
     """The account's door on the map.
 
     The account has no uploaded avatar (`PATCH /_user/me` takes only `username`), so the button shows
     the username's initial — the same identity the profile plate prints — plus a live-session dot.
     """
-    screen.shadow(14, y, 44, 44, radius=15, blur=14, dy=5, alpha=48)
-    screen.rect(14, y, 44, 44, fill=C.primary_soft, radius=15,
+    screen.shadow(x, y, 44, 44, radius=15, blur=14, dy=5, alpha=48)
+    screen.rect(x, y, 44, 44, fill=C.primary_soft, radius=15,
                 outline=C.primary if active else C.outline_strong,
                 outline_w=1.6 if active else 1)
-    screen.text(36, y + 11, initial, "title-sm", C.primary, align="center")
+    screen.text(x + 22, y + 11, initial, "title-sm", C.primary, align="center")
     if online:
-        screen.circle(50, y + 34, 6, fill=C.success, outline="#FFFFFF", outline_w=2)
+        screen.circle(x + 36, y + 34, 6, fill=C.success, outline="#FFFFFF", outline_w=2)
 
 
 def map_tools(screen: Screen, y: float, layers=True, compass=True, angle=22):

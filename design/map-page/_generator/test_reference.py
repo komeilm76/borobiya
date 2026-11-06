@@ -143,6 +143,23 @@ def test_history_groups_add_up():
             f"{day['title']}: rows add up to {total}, the header says {stated.group(1)}")
 
 
+def test_history_keeps_three_records():
+    """Trips, missions (from both sides) and companions — not one list with a filter."""
+    from screens import history
+
+    assert history.TABS == ["سفرها", "مأموریت‌ها", "همراهان"]
+    assert history.REQUEST_DAYS and history.AGENT_DAYS
+    sos = {"pending", "dispatched", "accepted", "cancelled_by_requester",
+           "cancelled_by_rescuer", "expired", "completed"}
+    mission = {"pending", "on_the_way", "arrived", "in_progress", "completed",
+               "cancelled_by_requester", "cancelled_by_rescuer", "expired"}
+    assert set(history.SOS_STATUS) == sos, "the requester rows must speak the API's statuses"
+    assert set(history.MISSION_STATUS) == mission
+    for day in history.REQUEST_DAYS + history.AGENT_DAYS:
+        assert day["rows"], day["title"]
+        assert day["summary"].startswith(history.fa_digits(str(len(day["rows"])))), day["title"]
+
+
 def test_history_rows_stay_compact():
     """The whole point of the rebuild: a day fits on one screen, so rows are ~84px, not 146."""
     from screens import history
@@ -155,22 +172,42 @@ def test_history_rows_stay_compact():
 # --------------------------------------------------------------------------- #
 # profile: one account, described the same way on every plate
 # --------------------------------------------------------------------------- #
-def test_profile_sessions_and_devices_agree():
+def test_profile_logins_and_devices_agree():
+    """A diary of sign-ins and a list of live sessions, about the same account.
+
+    Four sign-ins, three open sessions: the device page may only show what is still signed in,
+    and both pages have to name those devices the same way.
+    """
     from screens import profile
 
-    sessions, devices = profile.SESSIONS, profile.DEVICES
-    assert len(sessions) == len(devices) == 3
-    assert {item["device"] for item in sessions} == {item["device"] for item in devices}
-    assert sum(1 for item in sessions if item["current"]) == 1
-    assert sum(1 for item in devices if item["current"]) == 1
-    # the plate's clock is the current session's last activity: ۹:۵۲ everywhere
-    current = next(item for item in sessions if item["current"])
-    assert current["when"] == "۹:۵۲", current["when"]
-    # and a device's age has to agree with its session stamp
-    iphone_session = next(item for item in sessions if item["device"].startswith("Safari"))
-    iphone_device = next(item for item in devices if item["device"].startswith("Safari"))
-    assert iphone_session["when"] in iphone_device["when"], (
-        iphone_session["when"], iphone_device["when"])
+    logins, devices = profile.SESSIONS, profile.DEVICES
+    assert len(logins) == 4 and len(devices) == 3
+    assert {row["device"] for row in logins} == {row["device"] for row in devices}
+    assert sum(1 for row in logins if row["current"]) == 1
+    assert sum(1 for row in devices if row["current"]) == 1
+    # the plate's clock is the current session's last activity
+    current = next(row for row in logins if row["current"])
+    assert current["time"] == "۹:۵۲", current["time"]
+    # two sign-ins from the desktop, one open session on it: a page of entries is not a page of
+    # devices, which is exactly why the two plates exist
+    assert sum(1 for row in logins if row["device"].startswith("Chrome")) == 2
+    assert sum(1 for row in devices if row["device"].startswith("Chrome")) == 1
+    # a login clock has to land inside the device's age («دیروز ۲۱:۴۰»)
+    safari_login = next(row for row in logins if row["device"].startswith("Safari"))
+    safari_device = next(row for row in devices if row["device"].startswith("Safari"))
+    assert safari_login["time"] in safari_device["when"], (
+        safari_login["time"], safari_device["when"])
+
+
+def test_ending_a_session_only_lives_on_the_device_page():
+    """The revoke control belongs to the page about sessions, never to the diary."""
+    import inspect
+
+    from screens import profile
+
+    assert "پایان دسترسی" in inspect.getsource(profile.profile_devices)
+    assert "پایان دسترسی" not in inspect.getsource(profile.profile_sessions)
+    assert "پایان" not in inspect.getsource(profile._login_row)
 
 
 def test_profile_ips_are_latin_runs():
@@ -328,20 +365,152 @@ def test_sos_stages_are_the_client_stages():
     assert ui.SOS_STAGES == ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")
 
 
-def test_the_account_has_one_door_to_its_sessions():
-    """«ورودها و دستگاهها» و «دستگاههای فعال» یک صفحه با دو تب‌اند، نه دو درِ موازی.
-
-    The hub must offer the pair once; both tabs must draw the same tab bar, and the destructive
-    bulk action must not be the filled button it used to be.
-    """
+def test_the_account_has_two_doors_for_two_questions():
+    """Sign-ins and sessions are two pages, so the hub needs two doors and neither page tabs."""
     import inspect
 
     from screens import profile
 
     hub = inspect.getsource(profile.profile_home)
-    assert hub.count('"ورودها و دستگاه‌ها"') == 1
-    assert "دستگاه‌های فعال" not in hub
-    for tab in (profile.profile_sessions, profile.profile_devices):
-        source = inspect.getsource(tab)
-        assert "_tabs(" in source
-        assert "_danger_bar(" in source
+    assert '"ورودها"' in hub and '"دستگاه‌ها"' in hub
+    for page in (profile.profile_sessions, profile.profile_devices):
+        assert "_tabs(" not in inspect.getsource(page)
+    # the bulk revoke belongs to the page that owns sessions
+    assert "_danger_bar(" in inspect.getsource(profile.profile_devices)
+
+
+# --------------------------------------------------------------------------- #
+# mission state: every mission plate must say where the mission stands
+# --------------------------------------------------------------------------- #
+MISSION_STAGES = ("پذیرش", "در مسیر", "رسیده", "رسیدگی", "پایان")
+
+
+def _mission_module():
+    import screens.mission as module
+    return module
+
+
+@pytest.mark.parametrize("key", [
+    "m-03-offer", "m-04-offer-details", "m-05-accepted", "m-06-dispatch", "m-07-navigation",
+    "m-08-alternatives", "m-09-arrived", "m-10-in-progress", "m-11-support",
+    "m-12-support-pending", "m-13-support-accepted", "m-14-team", "m-15-cancel",
+    "m-16-report", "m-17-completed",
+])
+def test_every_mission_plate_declares_the_stage(key):
+    """The user's complaint: «وضعیت مأموریت باید در همهٔ مراحل دیده شود» — not only on 06.
+
+    Every plate that happens while a mission exists has to draw one of the three state components
+    (rail, slim line, pill); the two modal plates carry the stage in their subtitle instead.
+    """
+    import inspect
+
+    module = _mission_module()
+    assert key in module.PLATES, f"{key} is not registered"
+    path, fn = module.PLATES[key]
+    source = inspect.getsource(fn)
+    draws_state = any(token in source for token in
+                      ("mission_rail(", "mission_steps(", "mission_pill("))
+    says_stage = any(f"مرحلهٔ {fa} از ۵" in source for fa in "۱۲۳۴۵")
+    assert draws_state or says_stage, (
+        f"{path} never states where the mission stands — draw mission_rail/steps/pill "
+        f"or put «مرحلهٔ n از ۵» in its subtitle")
+
+
+def test_no_plate_prints_a_time_for_a_future_stage():
+    """A timestamp under «رسیدگی» on a plate that is still in «پذیرش» reads as history."""
+    import screens.mission as module
+    from bb import ui
+
+    for key in ("m-06-dispatch", "m-09-arrived"):
+        _, fn = module.PLATES[key]
+        screen = fn()
+        assert (screen.w, screen.h) == (393, 852)
+
+
+def test_mission_clock_matches_the_stage_times():
+    """The status bar is the plate's moment: a ۹:۴۱ clock over «۱۰:۱۲» in the sheet is a bug."""
+    from bb import scenario as sc
+
+    for key, clock in sc.MISSION_CLOCKS.items():
+        assert key in _mission_module().PLATES, f"{key} has a clock but no plate"
+        assert re.fullmatch(r"[۰-۹]{1,2}:[۰-۹]{2}", clock), f"{key}: {clock!r} is not a Persian time"
+
+    accepted = sc.MISSION_TIMES["accepted"]
+    closed = sc.MISSION_TIMES["closed"]
+    def minutes(text: str) -> int:
+        hour, minute = (int(part.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")))
+                        for part in text.split(":"))
+        return hour * 60 + minute
+    assert minutes(closed) - minutes(accepted) == sc.MISSION_MINUTES
+    assert sc.MISSION_STAGE_TIMES_DONE[-1] == closed
+
+
+# --------------------------------------------------------------------------- #
+# SOS request flow: one request, one set of numbers, on every plate
+# --------------------------------------------------------------------------- #
+def _sos_module():
+    import screens.sos as module
+    return module
+
+
+def test_sos_has_a_plate_for_every_requested_state():
+    """The user asked for «all steps and pages»: every state the API can report is drawn.
+
+    A status may be carried by a plate of its own (pending) or by a row/record on the list
+    plate (cancelled_by_requester, expired), so the map is status → plate, not status → filename.
+    """
+    plates = _sos_module().PLATES
+    status_to_plate = {
+        "pending": "s-08-pending",
+        "dispatched": "s-09-dispatched",
+        "accepted": "s-10-accepted",
+        "completed": "s-12-completed",
+        "cancelled_by_requester": "s-14-cancelled",
+        "expired": "s-17-history",
+    }
+    missing = [status for status, key in status_to_plate.items() if key not in plates]
+    assert not missing, f"no plate for: {missing}"
+    # and the flow's own steps each exist
+    for key in ("s-01-entry", "s-02-hold", "s-03-compose", "s-04-location", "s-05-photo",
+                "s-06-review", "s-07-sending", "s-11-arrived", "s-13-cancel",
+                "s-15-photo-retry", "s-16-offline", "s-18-history-detail",
+                "s-19-validation", "s-20-history-empty"):
+        assert key in plates, f"missing plate: {key}"
+
+
+def test_sos_clock_matches_the_request_times():
+    """Same rule as the mission plates: the status bar is the plate's own moment."""
+    from bb import scenario as sc
+
+    plates = _sos_module().PLATES
+    for key, clock in sc.SOS_CLOCKS.items():
+        assert key in plates, f"{key} has a clock but no plate"
+        assert re.fullmatch(r"[۰-۹]{1,2}:[۰-۹]{2}", clock), f"{key}: {clock!r}"
+
+    def minutes(text: str) -> int:
+        hour, minute = (int(part.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")))
+                        for part in text.split(":"))
+        return hour * 60 + minute
+
+    assert minutes(sc.SOS_TIMES["completed"]) - minutes(sc.SOS_TIMES["submitted"]) == 36
+    assert sc.SOS_STAGE_TIMES[3] == sc.SOS_TIMES["arrived"], (
+        "the fourth rail stage is «رسیدگی»: its stamp must be the arrival, not «در راه»")
+    assert sc.SOS_STAGE_TIMES_DONE[-1] == sc.SOS_TIMES["completed"]
+    # the status bar may never be earlier than the last event the plate prints
+    assert minutes(sc.SOS_CLOCKS["s-09-dispatched"]) >= minutes(sc.SOS_TIMES["dispatched"])
+    assert minutes(sc.SOS_CLOCKS["s-10-accepted"]) >= minutes(sc.SOS_TIMES["accepted"])
+    assert minutes(sc.SOS_CLOCKS["s-11-arrived"]) >= minutes(sc.SOS_TIMES["arrived"])
+
+
+def test_sos_manual_pin_is_near_but_not_on_the_gps_fix():
+    """Plate 04 prints the distance between the two: it has to be a real, walkable offset."""
+    from bb import scenario as sc
+
+    assert 40 <= sc.SOS_MANUAL_OFFSET_M <= 400, sc.SOS_MANUAL_OFFSET_M
+    assert sc.SOS_MANUAL != sc.SOS_POINT
+
+
+def test_sos_stages_are_the_client_stages():
+    from bb import ui
+
+    assert ui.SOS_STAGES == ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")

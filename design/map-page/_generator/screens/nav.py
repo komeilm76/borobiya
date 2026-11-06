@@ -28,9 +28,10 @@ def map_idle() -> Screen:
                                       box(0, 594, 132, 80), box(258, 646, 135, 40)))
     s.top_scrim(128)
     chrome(s, tab=1)
-    # the account sits above the map tools: it is the one control here that is not about the map
-    map_avatar_button(s, 128)
-    map_tools(s, 180, angle=22)
+    # the account owns the map's trailing corner, opposite the tools: top-left is where a thumb
+    # reaches the layers control, and the avatar sitting above it read as a fifth map tool
+    map_avatar_button(s, 128, x=335)
+    map_tools(s, 128, angle=22)
 
     user_cone(s, cam, *sc.USER, bearing=28)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)

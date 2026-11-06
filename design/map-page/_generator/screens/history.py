@@ -36,9 +36,9 @@ from bb.ui import chrome, home_bar, metric_tiles, segmented_small, sheet_header
 
 from ._base import box, keepout, map_view
 
-SEGMENTS = ["سفرها", "همسفران"]
-SEGMENT_COUNTS = ["۱۲", "۶"]
-SUBTITLE = "سوابق سفرها، امداد و همسفران شما"
+TABS = ["سفرها", "مأموریت‌ها", "همراهان"]
+TAB_COUNTS = ["۱۲", "۳", "۶"]
+SUBTITLE = "سفرها، مأموریت‌های امدادی و همراهان شما"
 
 ROW_H = 84
 
@@ -52,8 +52,25 @@ def _header(s: Screen, subtitle: str = SUBTITLE, clock: str | None = None) -> fl
     else:
         chrome(s, tab=0, map_mode=False)
     s.text(377, 124, "تاریخچه", "display", C.text, align="right")
-    s.text(377, 162, subtitle, "caption", C.muted, align="right", max_width=330)
+    s.text(377, 162, subtitle, "caption", C.muted, align="right", max_width=340)
     return 186
+
+
+def _tabs(s: Screen, y: float, active: int, counts: bool = True) -> float:
+    """The record has three subjects, not one list with a filter.
+
+    A trip is not a mission: the creator of an SOS and the responder who accepted it keep two
+    different records of the same incident, and a companion is a person the record was shared with.
+    One tab per subject keeps every row honest about what it is.
+    """
+    segmented_small(s, 16, y, 361, TABS, active=active, counts=TAB_COUNTS if counts else None)
+    return y + 46
+
+
+def _sub_tabs(s: Screen, y: float, active: int) -> float:
+    """Inside «مأموریتها»: the two sides of the same incident."""
+    segmented_small(s, 16, y, 361, ["درخواست‌های من", "مأموریت‌های من"], active=active, h=34)
+    return y + 44
 
 
 def _search_row(s: Screen, y: float, placeholder: str) -> float:
@@ -117,19 +134,6 @@ def _trip_row(s: Screen, y: float, item: dict, h: float = ROW_H, selected: bool 
     return y + h + 8
 
 
-def _emergency_link(s: Screen, y: float, h: float = 48) -> float:
-    """The emergency half of the record lives in the SOS section; this is the door to it."""
-    s.rect(16, y, 361, h, fill=C.danger_soft, radius=16)
-    s.circle(377 - 32, y + h / 2, 15, fill="#FFFFFF")
-    s.i.draw_icon(377 - 32, y + h / 2, "mdi-alarm-light-outline", 17, C.danger)
-    s.text(377 - 56, y + 7, "درخواست‌ها و مأموریت‌های امدادی", "label", C.danger, align="right",
-           max_width=270)
-    s.text(377 - 56, y + 26, "۳ درخواست · ۱ مأموریت · آخرین امروز ۹:۳۶", "caption", C.muted,
-           align="right", max_width=280)
-    s.i.draw_icon(28, y + h / 2, "mdi-chevron-left", 18, C.danger)
-    return y + h + 12
-
-
 # --------------------------------------------------------------------------- #
 # 01 — the record, grouped by day
 # --------------------------------------------------------------------------- #
@@ -163,13 +167,22 @@ DAYS = (
 ALL_TRIPS = tuple(trip for day in DAYS for trip in day["trips"])
 
 
+def _month_strip(s: Screen, y: float, h: float = 54) -> float:
+    """The month the list is cut from: the one aggregate a calendar can state without a guess."""
+    s.rect(16, y, 361, h, fill=C.primary_soft, radius=16)
+    s.i.draw_icon(377 - 26, y + h / 2, "mdi-calendar-month-outline", 20, C.primary)
+    s.text(377 - 52, y + 9, "آبان ۱۴۰۵", "label", C.primary, align="right")
+    s.text(377 - 52, y + 30, "۱۲ سفر · ۳۸٫۴ کیلومتر · ۲ سفر امدادی", "caption", C.muted,
+           align="right", max_width=290)
+    return y + h + 12
+
+
 def history_user() -> Screen:
     s = Screen(background=C.background)
     y = _header(s, SUBTITLE, clock="۹:۵۳")
-    segmented_small(s, 16, y, 361, SEGMENTS, active=0, counts=SEGMENT_COUNTS)
-    y += 46
+    y = _tabs(s, y, 0)
     y = _search_row(s, y, "جستجو در سفرها")
-    y = _emergency_link(s, y)
+    y = _month_strip(s, y)
 
     for day in DAYS:
         y = _day_header(s, y, day["title"], day["summary"])
@@ -177,8 +190,154 @@ def history_user() -> Screen:
             y = _trip_row(s, y, trip)
         y += 2
 
-    s.text(196.5, y, "۴ سفر از ۱۲ سفر · آبان ۱۴۰۵ · برای دیدن بقیه اسکرول کنید",
+    s.text(196.5, y + 6, "۴ سفر از ۱۲ سفر · برای دیدن بقیه اسکرول کنید",
            "caption", C.muted_2, align="center", max_width=350)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 02/03 — emergency missions, from both sides of the same incident
+# --------------------------------------------------------------------------- #
+# The creator and the responder keep two different records of one incident: the creator sees who
+# is coming and how it ended, the responder sees the distance they covered and the rating they got.
+# Both are served by `/sos/requests` and `/sos/missions`; nothing here invents a third entity.
+SOS_STATUS = {
+    "pending": ("در انتظار امدادگر", "warning"),
+    "dispatched": ("در انتظار پذیرش", "warning"),
+    "accepted": ("امدادگر در راه", "info"),
+    "completed": ("تکمیل‌شده", "success"),
+    "cancelled_by_requester": ("لغوشده", "muted"),
+    "cancelled_by_rescuer": ("لغو توسط امدادگر", "warning"),
+    "expired": ("منقضی", "muted"),
+}
+
+MISSION_STATUS = {
+    "pending": ("در انتظار شروع", "warning"),
+    "on_the_way": ("در راه", "info"),
+    "arrived": ("رسیده", "info"),
+    "in_progress": ("در حال رسیدگی", "mission"),
+    "completed": ("تکمیل‌شده", "success"),
+    "cancelled_by_requester": ("لغو توسط درخواست‌کننده", "muted"),
+    "cancelled_by_rescuer": ("لغو توسط شما", "muted"),
+    "expired": ("منقضی", "muted"),
+}
+
+REQUEST_DAYS = (
+    {"title": "امروز", "summary": "۱ درخواست", "rows": (
+        {"icon": "mdi-fire", "title": "آتش‌سوزی آشپزخانه",
+         "address": "خیابان دانشگاه، پلاک ۱۲", "note": "سعید کریمی · ۱٫۲ کیلومتر تا شما",
+         "time": "۹:۳۶", "status": "accepted"},
+    )},
+    {"title": "دیروز", "summary": "۱ درخواست", "rows": (
+        {"icon": "mdi-bike-fast", "title": "تصادف دوچرخه",
+         "address": "خیابان طالقانی، نبش کوچهٔ ۴", "note": "تکمیل در ۴۲ دقیقه · امتیاز شما ۵",
+         "time": "۱۸:۱۲", "status": "completed"},
+    )},
+    {"title": "۲۹ آبان", "summary": "۱ درخواست", "rows": (
+        {"icon": "mdi-home-flood", "title": "آب‌گرفتگی حیاط",
+         "address": "کوچهٔ لاله، پلاک ۸", "note": "لغو با درخواست شما، پیش از اعزام",
+         "time": "۱۳:۰۵", "status": "cancelled_by_requester"},
+    )},
+)
+
+AGENT_DAYS = (
+    {"title": "امروز", "summary": "۱ مأموریت", "rows": (
+        {"icon": "mdi-fire", "title": "آتش‌سوزی آشپزخانه",
+         "address": "خیابان دانشگاه، پلاک ۱۲", "note": "۴٫۲ کیلومتر تا محل · ۶ دقیقه در راه",
+         "time": "۹:۳۸", "status": "on_the_way"},
+    )},
+    {"title": "۲۷ آبان", "summary": "۱ مأموریت", "rows": (
+        {"icon": "mdi-hospital-box-outline", "title": "مصدومیت در پارک",
+         "address": "بوستان شریعتی، درب شمالی", "note": "۲۳ دقیقه رسیدگی · امتیاز ۵ از ۵",
+         "time": "۲۰:۱۰", "status": "completed"},
+    )},
+    {"title": "۲۴ آبان", "summary": "۱ مأموریت", "rows": (
+        {"icon": "mdi-home-flood", "title": "آب‌گرفتگی حیاط",
+         "address": "کوچهٔ لاله، پلاک ۸", "note": "لغو توسط شما، پیش از حرکت",
+         "time": "۰۸:۴۰", "status": "cancelled_by_rescuer"},
+    )},
+)
+
+
+def _mission_row(s: Screen, y: float, item: dict,*, side: str, h: float = 80) -> float:
+    """One row per incident: what it was, where, what happened, and one status."""
+    s.rect(16, y, 361, h, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
+    soft = C.danger_soft if side == "requester" else C.mission_soft
+    tone = C.danger if side == "requester" else C.mission
+    s.circle(377 - 32, y + 24, 16, fill=soft)
+    s.i.draw_icon(377 - 32, y + 24, item["icon"], 18, tone)
+    s.text(377 - 58, y + 8, item["title"], "label-lg", C.text, align="right", max_width=215)
+    s.text(377 - 58, y + 30, item["address"], "caption", C.muted, align="right", max_width=215)
+    s.text(377 - 58, y + 50, item["note"], "caption", C.muted_2, align="right", max_width=215)
+    table = SOS_STATUS if side == "requester" else MISSION_STATUS
+    label, chip_tone = table[item["status"]]
+    s.chip(24, y + 12, label, None, chip_tone, h=22)
+    s.text(24, y + 44, item["time"], "caption-bold", C.muted_2, align="left")
+    return y + h + 8
+
+
+def _mission_summary(s: Screen, y: float, headline: str, parts: str, hint: str, *,
+                     icon: str, tone: str, soft: str, h: float = 74) -> float:
+    s.rect(16, y, 361, h, fill=soft, radius=18)
+    s.circle(377 - 30, y + 26, 16, fill="#FFFFFF")
+    s.i.draw_icon(377 - 30, y + 26, icon, 18, tone)
+    s.text(377 - 56, y + 10, headline, "label-lg", tone, align="right", max_width=250)
+    s.text(377 - 56, y + 32, parts, "caption", C.muted, align="right", max_width=250)
+    s.text(377 - 56, y + 50, hint, "caption", C.muted_2, align="right", max_width=250)
+    return y + h + 12
+
+
+def history_missions() -> Screen:
+    """SOS creator side: «I asked for help — who came, and how did it end?»"""
+    s = Screen(background=C.background)
+    y = _header(s, "درخواست‌های امدادی که ثبت کرده‌اید", clock="۹:۵۳")
+    y = _tabs(s, y, 1)
+    y = _sub_tabs(s, y, 0)
+    y = _mission_summary(
+        s, y, "۳ درخواست امداد", "۱ در جریان · ۱ تکمیل‌شده · ۱ لغوشده",
+        "آخرین درخواست: امروز ۹:۳۶", icon="mdi-alarm-light-outline", tone=C.danger,
+        soft=C.danger_soft)
+
+    for day in REQUEST_DAYS:
+        y = _day_header(s, y, day["title"], day["summary"])
+        for row in day["rows"]:
+            y = _mission_row(s, y, row, side="requester")
+        y += 2
+
+    s.rect(16, y + 4, 361, 56, fill=C.surface_2, radius=14)
+    s.i.draw_icon(377 - 26, y + 26, "mdi-file-document-outline", 17, C.muted)
+    s.text(377 - 50, y + 12, "پروندهٔ کامل هر درخواست در بخش امداد است", "caption-bold",
+           C.text_2, align="right", max_width=300)
+    s.text(377 - 50, y + 32, "شرح، عکس و زمان رسیدن امدادگر آنجاست.",
+           "caption", C.muted, align="right", max_width=300)
+    home_bar(s)
+    return s
+
+
+def history_missions_agent() -> Screen:
+    """Responder side: «I accepted a mission — what did it cost me, and how was I rated?»"""
+    s = Screen(background=C.background)
+    y = _header(s, "مأموریت‌هایی که پذیرفته‌اید", clock="۹:۵۳")
+    y = _tabs(s, y, 1)
+    y = _sub_tabs(s, y, 1)
+    y = _mission_summary(
+        s, y, "۳ مأموریت امدادی", "۱ در راه · ۱ تکمیل‌شده · ۱ لغوشده",
+        "امتیاز مأموریت‌های تکمیل‌شده: ۵ از ۵", icon="mdi-shield-account-outline",
+        tone=C.mission, soft=C.mission_soft)
+
+    for day in AGENT_DAYS:
+        y = _day_header(s, y, day["title"], day["summary"])
+        for row in day["rows"]:
+            y = _mission_row(s, y, row, side="agent")
+        y += 2
+
+    s.rect(16, y + 4, 361, 56, fill=C.surface_2, radius=14)
+    s.i.draw_icon(377 - 26, y + 26, "mdi-star-outline", 17, C.muted)
+    s.text(377 - 50, y + 12, "امتیاز فقط بعد از «تکمیل‌شده» ثبت می‌شود", "caption-bold",
+           C.text_2, align="right", max_width=300)
+    s.text(377 - 50, y + 32, "مأموریت لغوشده در سابقه می‌ماند، بدون امتیاز.",
+           "caption", C.muted, align="right", max_width=300)
     home_bar(s)
     return s
 
@@ -210,9 +369,8 @@ def _sort_chips(s: Screen, y: float, items, active: int) -> float:
 
 def history_companions() -> Screen:
     s = Screen(background=C.background)
-    y = _header(s, "سوابق سفرها، امداد و همسفران شما", clock="۹:۵۳")
-    segmented_small(s, 16, y, 361, SEGMENTS, active=1, counts=SEGMENT_COUNTS)
-    y += 46
+    y = _header(s, "همراهانی که سفرها با آن‌ها ثبت شده", clock="۹:۵۳")
+    y = _tabs(s, y, 2)
     y = _search_row(s, y, "جستجوی همسفر")
     y = _sort_chips(s, y, ["بیشترین سفر", "آخرین سفر", "نام"], active=0)
 
@@ -223,10 +381,11 @@ def history_companions() -> Screen:
         s.rect(16, y, 361, 76, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
         s.circle(377 - 40, y + 38, 22, fill=C.primary_soft)
         s.text(377 - 40, y + 28, initial, "title-sm", color, align="center")
-        s.text(377 - 72, y + 12, name, "label-lg", C.text, align="right", max_width=190)
-        s.text(377 - 72, y + 34, count, "caption", C.muted, align="right")
-        s.text(377 - 72, y + 51, last, "caption-bold", C.muted_2, align="right")
-        s.i.draw_icon(28, y + 38, "mdi-chevron-left", 18, C.muted_2)
+        s.text(377 - 72, y + 16, name, "label-lg", C.text, align="right", max_width=190)
+        s.text(377 - 72, y + 40, last, "caption", C.muted, align="right", max_width=190)
+        # the count is the reason the row is sorted where it is, so it gets the left column
+        s.chip(44, y + 25, count.split(" ")[0] + " سفر", None, "primary", h=26)
+        s.i.draw_icon(30, y + 38, "mdi-chevron-left", 18, C.muted_2)
         y += 84
 
     # the list is a sample of the record, and says so
@@ -256,6 +415,7 @@ def _toggle_row(s: Screen, y: float, title: str, note: str, on: bool, h: float =
 def history_filter() -> Screen:
     s = Screen(background=C.background)
     y = _header(s, SUBTITLE, clock="۹:۵۴")
+    y = _tabs(s, y, 0)
     y = _search_row(s, y, "جستجو در سفرها")
     scrim(s, 120, top=0, height=852)
 
@@ -635,8 +795,7 @@ def history_companion() -> Screen:
 def history_loading() -> Screen:
     s = Screen(background=C.background)
     y = _header(s, SUBTITLE, clock="۹:۵۳")
-    segmented_small(s, 16, y, 361, SEGMENTS, active=0)
-    y += 54
+    y = _tabs(s, y, 0) + 8
     s.spinner(196.5, y + 14, 15, C.primary)
     s.text(196.5, y + 40, "در حال دریافت سوابق سفر…", "caption", C.muted, align="center")
     y += 64
@@ -668,8 +827,7 @@ def history_empty() -> Screen:
     s = Screen(background=C.background)
     y = _header(s, SUBTITLE, clock="۹:۵۳")
     # no counts here: a lone Persian zero renders as a dot and reads as a glitch
-    segmented_small(s, 16, y, 361, SEGMENTS, active=0)
-    y += 130
+    y = _tabs(s, y, 0, counts=False) + 84
 
     # illustrative empty card with a dashed route (compact, so it does not read as a blank panel)
     s.rect(16, y, 361, 104, fill="#FFFFFF", radius=20, outline=C.outline, outline_w=1)
@@ -690,8 +848,7 @@ def history_empty() -> Screen:
 def history_error() -> Screen:
     s = Screen(background=C.background)
     y = _header(s, SUBTITLE, clock="۹:۵۳")
-    segmented_small(s, 16, y, 361, SEGMENTS, active=0, counts=SEGMENT_COUNTS)
-    y += 58
+    y = _tabs(s, y, 0) + 12
 
     s.rect(16, y, 361, 96, fill=C.danger_soft, radius=18)
     s.i.draw_icon(377 - 22, y + 28, "mdi-cloud-alert-outline", 22, C.danger)
@@ -702,7 +859,7 @@ def history_error() -> Screen:
     s.text(72, y + 66, "تلاش دوباره", "caption-bold", C.danger, align="center")
     y += 112
 
-    s.chip(16, y, "نمایش آخرین نسخهٔ ذخیره‌شده", "mdi-database-outline", "neutral", h=28)
+    s.chip(16, y, "نسخهٔ ذخیره‌شده", "mdi-database-outline", "neutral", h=28)
     y += 40
     y = _day_header(s, y, "امروز", "۲ سفر · ۵٫۱ کیلومتر")
     for trip in DAYS[0]["trips"]:
@@ -721,13 +878,15 @@ def history_error() -> Screen:
 
 
 SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
-    "h-01-user": ("history/01-history-user.png", history_user),
-    "h-02-companions": ("history/02-history-companions.png", history_companions),
-    "h-03-filter": ("history/03-history-filter.png", history_filter),
-    "h-04-details": ("history/04-history-details.png", history_details),
-    "h-05-loading": ("history/05-history-loading.png", history_loading),
-    "h-06-empty": ("history/06-history-empty.png", history_empty),
-    "h-07-error": ("history/07-history-error.png", history_error),
-    "h-08-playback": ("history/08-history-playback.png", history_playback),
-    "h-09-companion": ("history/09-history-companion.png", history_companion),
+    "h-01-trips": ("history/01-history-trips.png", history_user),
+    "h-02-missions": ("history/02-history-missions.png", history_missions),
+    "h-03-missions-agent": ("history/03-history-missions-agent.png", history_missions_agent),
+    "h-04-companions": ("history/04-history-companions.png", history_companions),
+    "h-05-filter": ("history/05-history-filter.png", history_filter),
+    "h-06-details": ("history/06-history-details.png", history_details),
+    "h-07-playback": ("history/07-history-playback.png", history_playback),
+    "h-08-companion": ("history/08-history-companion.png", history_companion),
+    "h-09-loading": ("history/09-history-loading.png", history_loading),
+    "h-10-empty": ("history/10-history-empty.png", history_empty),
+    "h-11-error": ("history/11-history-error.png", history_error),
 }
