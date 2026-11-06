@@ -40,7 +40,8 @@ def readme() -> str:
 def test_registry_and_disk_agree():
     registered = {path for path, _ in screens().values()}
     on_disk = set()
-    for folder in ("design-system", "history", "navigation", "mission", "companions", "sos"):
+    for folder in ("design-system", "history", "navigation", "mission", "companions", "sos",
+                   "profile"):
         directory = os.path.join(DESIGN, folder)
         for name in sorted(os.listdir(directory)):
             if name.endswith(".png"):
@@ -112,6 +113,82 @@ def test_key_plates_keep_their_promise(key, needle):
     assert inspect.getsource(fn).find(needle) != -1, f"{path} lost its copy: {needle}"
     screen = fn()
     assert (screen.w, screen.h) == (393, 852)
+
+
+# --------------------------------------------------------------------------- #
+# history: a calendar whose per-day totals have to match its own rows
+# --------------------------------------------------------------------------- #
+def _fa_number(text: str) -> float:
+    return float(text.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹", "0123456789")).replace("٫", "."))
+
+
+def test_history_groups_add_up():
+    """«۲ سفر · ۵٫۱ کیلومتر» has to be the sum of the two rows printed under it."""
+    from screens import history
+
+    assert len(history.DAYS) >= 2, "a grouped record needs more than one day"
+    for day in history.DAYS:
+        trips = day["trips"]
+        assert trips, day["title"]
+        assert day["summary"].startswith(history.fa_digits(str(len(trips)))), (
+            f"{day['title']}: «{day['summary']}» does not start with the row count {len(trips)}")
+        total = 0.0
+        for trip in trips:
+            match = re.match(r"([۰-۹]+(?:٫[۰-۹]+)?) کیلومتر", trip["meta"])
+            assert match, f"{day['title']}: no distance in «{trip['meta']}»"
+            total += _fa_number(match.group(1))
+        stated = re.search(r"([۰-۹]+(?:٫[۰-۹]+)?) کیلومتر", day["summary"])
+        assert stated, day["summary"]
+        assert abs(total - _fa_number(stated.group(1))) < 0.05, (
+            f"{day['title']}: rows add up to {total}, the header says {stated.group(1)}")
+
+
+def test_history_rows_stay_compact():
+    """The whole point of the rebuild: a day fits on one screen, so rows are ~84px, not 146."""
+    from screens import history
+
+    assert history.ROW_H <= 90, history.ROW_H
+    tallest = history.DAYS[0]["trips"][0]
+    assert tallest["status"] in history._STATUS
+
+
+# --------------------------------------------------------------------------- #
+# profile: one account, described the same way on every plate
+# --------------------------------------------------------------------------- #
+def test_profile_sessions_and_devices_agree():
+    from screens import profile
+
+    sessions, devices = profile.SESSIONS, profile.DEVICES
+    assert len(sessions) == len(devices) == 3
+    assert {item["device"] for item in sessions} == {item["device"] for item in devices}
+    assert sum(1 for item in sessions if item["current"]) == 1
+    assert sum(1 for item in devices if item["current"]) == 1
+    # the plate's clock is the current session's last activity: ۹:۵۲ everywhere
+    current = next(item for item in sessions if item["current"])
+    assert current["when"] == "۹:۵۲", current["when"]
+    # and a device's age has to agree with its session stamp
+    iphone_session = next(item for item in sessions if item["device"].startswith("Safari"))
+    iphone_device = next(item for item in devices if item["device"].startswith("Safari"))
+    assert iphone_session["when"] in iphone_device["when"], (
+        iphone_session["when"], iphone_device["when"])
+
+
+def test_profile_ips_are_latin_runs():
+    """A Persian-digit IP next to Persian text reorders itself into «۹۱٠٠٠۵/۲۳۸/»."""
+    from screens import profile
+
+    for item in profile.SESSIONS + profile.DEVICES:
+        assert re.fullmatch(r"[0-9.•]+", item["ip"]), item["ip"]
+
+
+def test_the_account_has_a_door_on_the_map():
+    import inspect
+
+    from screens import nav, profile
+
+    assert "p-07-entry" in profile.SCREENS
+    assert "map_avatar_button(" in inspect.getsource(nav.map_idle), (
+        "the map entry plate shows an account button the idle map must also carry")
 
 
 # --------------------------------------------------------------------------- #

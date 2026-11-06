@@ -8,7 +8,7 @@ from bb.map import Camera, draw_route, fit_camera, scale_bar
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
-from bb.ui import (bottom_panel, chrome, card_title_row, fab, home_bar, map_tools, metric_tiles,
+from bb.ui import (bottom_panel, chrome, card_title_row, fab, home_bar, map_avatar_button, map_tools, metric_tiles,
                    nav_banner, notice, quick_chips, search_pill, sheet_header, sos_button,
                    sos_dock, telemetry_strip)
 
@@ -28,7 +28,9 @@ def map_idle() -> Screen:
                                       box(0, 594, 132, 80), box(258, 646, 135, 40)))
     s.top_scrim(128)
     chrome(s, tab=1)
-    map_tools(s, 128, angle=22)
+    # the account sits above the map tools: it is the one control here that is not about the map
+    map_avatar_button(s, 128)
+    map_tools(s, 180, angle=22)
 
     user_cone(s, cam, *sc.USER, bearing=28)
     incident_marker(s, cam, *sc.INCIDENT, None, icon="fire", rings=False)
