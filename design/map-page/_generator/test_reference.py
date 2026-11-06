@@ -326,3 +326,22 @@ def test_sos_stages_are_the_client_stages():
     from bb import ui
 
     assert ui.SOS_STAGES == ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")
+
+
+def test_the_account_has_one_door_to_its_sessions():
+    """«ورودها و دستگاهها» و «دستگاههای فعال» یک صفحه با دو تب‌اند، نه دو درِ موازی.
+
+    The hub must offer the pair once; both tabs must draw the same tab bar, and the destructive
+    bulk action must not be the filled button it used to be.
+    """
+    import inspect
+
+    from screens import profile
+
+    hub = inspect.getsource(profile.profile_home)
+    assert hub.count('"ورودها و دستگاه‌ها"') == 1
+    assert "دستگاه‌های فعال" not in hub
+    for tab in (profile.profile_sessions, profile.profile_devices):
+        source = inspect.getsource(tab)
+        assert "_tabs(" in source
+        assert "_danger_bar(" in source

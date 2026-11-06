@@ -140,19 +140,19 @@ def profile_home() -> Screen:
              "نام کاربری و مشخصات ثابت حساب", h=54)
     y = _row(s, y, "mdi-login-variant", "ورودها و دستگاه‌ها", "۳ نشست فعال · آخرین امروز ۹:۵۲",
              h=54)
-    y = _row(s, y, "mdi-devices", "دستگاه‌های فعال", "قطع دسترسی نشست‌ها، دستگاه پخش اشتراک",
-             h=54)
     y = _row(s, y, "mdi-shield-lock-outline", "امنیت حساب",
              "پرسش‌های امنیتی، گذرواژه و نشست‌ها", h=54)
     y = _row(s, y, "mdi-palette-outline", "تنظیمات و ظاهر", "پوستهٔ روشن/تیره و ترجیحات", h=54)
-    y += 4
+    # the sessions and the devices are one page with two tabs, so the hub has one door for both
+    assert y < 700, y
 
-    # leaving is a real destination, not a footer footnote
+    # leaving is a real destination, not a footer footnote — but it follows the list instead of
+    # floating alone at the foot of a half-empty page
     s.button(16, y, 361, 46, "خروج از حساب", icon="mdi-exit-to-app", variant="outline",
              color=C.danger)
     # the account has no display name (`PATCH /_user/me` takes only `username`), so the footer
     # does not print one
-    s.text(196.5, y + 56, "نسخهٔ ۰٫۳٫۰ · حساب کاربری", "caption", C.muted_2, align="center")
+    s.text(196.5, y + 58, "نسخهٔ ۰٫۳٫۰ · حساب کاربری", "caption", C.muted_2, align="center")
     home_bar(s)
     return s
 
@@ -223,35 +223,58 @@ SESSIONS = (
 )
 
 
+def _tabs(s: Screen, y: float, active: int) -> float:
+    """The two readings of one subject: what is signed in, and what those sessions play.
+
+    Same page, same title, same back button — the tab is a lens, not a second destination. That is
+    why the account hub has a single door for both.
+    """
+    s.rect(16, y, 361, 38, fill=C.surface_3, radius=19)
+    half = 361 / 2
+    pill_x = 16 + 3 if active else 16 + 361 - 3 - half
+    s.rect(pill_x, y + 3, half - 3, 32, fill="#FFFFFF", radius=16)
+    labels = ("ورودها", "دستگاه‌ها")
+    for index, label in enumerate(labels):
+        cx = 16 + (361 / 4) + 1.5 if index else 16 + 361 - (361 / 4) - 1.5
+        s.text(cx, y + 11, label, "label", C.primary if index == active else C.muted,
+               align="center")
+    return y + 48
+
+
 def _session_row(s: Screen, y: float, item: dict, h: float = 74) -> float:
     _card(s, y, h)
     icon = _device_icon(item["device"])
     s.circle(357 - 30, y + h / 2, 17, fill=C.primary_soft if item["current"] else C.surface_3)
     s.i.draw_icon(357 - 30, y + h / 2, icon, 18, C.primary if item["current"] else C.text_2)
-    s.text(357 - 58, y + 12, item["device"], "label-lg", C.text, align="right", max_width=200)
-    s.text(357 - 58, y + 34, item["when"], "caption", C.muted, align="right")
+    # one rhythm per row: the text block is centred in the card, and both the status chip and the
+    # revoke chip sit on the same centre line (they are 22 and 32 tall, so their tops differ)
+    s.text(357 - 58, y + 19, item["device"], "label-lg", C.text, align="right", max_width=200)
+    s.text(357 - 58, y + 41, item["when"], "caption", C.muted, align="right")
     # IPs are Latin digits in their own LTR run: inside an RTL line the separators reorder them
-    s.ltr(140, y + 34, item["ip"], "caption", C.muted_2)
+    s.ltr(140, y + 41, item["ip"], "caption", C.muted_2)
     if item["current"]:
-        s.chip(28, y + 12, "همین دستگاه", None, "primary", h=22)
+        s.chip(24, y + h / 2 - 11, "همین دستگاه", None, "primary", h=22)
     else:
-        s.chip(24, y + 22, "پایان", "mdi-close", h=32, fill="#FFFFFF", color=C.danger,
+        s.chip(24, y + h / 2 - 16, "پایان", "mdi-close", h=32, fill="#FFFFFF", color=C.danger,
                outline=C.outline_strong)
     if item["online"]:
-        s.circle(357 - 20, y + 14, 3.4, fill=C.success)
+        s.circle(357 - 20, y + h / 2 - 20, 3.4, fill=C.success)
     return y + h + 8
+
+
+def _danger_bar(s: Screen, y: float, label: str, icon: str = "mdi-close-circle-outline",
+                h: float = 48) -> None:
+    """A destructive control that does not out-shout the content: outline, not a filled pill."""
+    s.rect(16, y, 361, h, fill="#FFFFFF", radius=14, outline=C.outline_strong, outline_w=1)
+    s.text(196.5, y + h / 2 - 10, label, "label", C.danger, align="center", max_width=280)
+    s.i.draw_icon(357 - 24, y + h / 2, icon, 18, C.danger)
 
 
 def profile_sessions() -> Screen:
     s = _page("۹:۵۲")
     y = _header(s, "ورودها و دستگاه‌ها", "هر دستگاهِ هنوز واردشده یک ردیف دارد")
 
-    # the two tabs of the same subject: what signed in, and what it plays
-    s.rect(16, y, 361, 38, fill=C.surface_3, radius=19)
-    s.rect(16 + 361 - 3 - (361 / 2), y + 3, 361 / 2 - 3, 32, fill="#FFFFFF", radius=16)
-    s.text(16 + 361 - (361 / 4) - 1.5, y + 11, "ورودها", "label", C.primary, align="center")
-    s.text(16 + (361 / 4) + 1.5, y + 11, "دستگاه‌ها", "label", C.muted, align="center")
-    y += 48
+    y = _tabs(s, y, active=0)
 
     cursor = 377
     for label, on in (("۷ روز", True), ("۳۰ روز", False), ("همه", False)):
@@ -276,19 +299,17 @@ def profile_sessions() -> Screen:
     y = _session_row(s, y, SESSIONS[2]) + 14
 
     # the honest boundary of this list — no invented login history
-    s.rect(16, y, 361, 78, fill=C.warning_soft, radius=14)
-    s.i.draw_icon(357 - 20, y + 20, "mdi-information-outline", 15, C.warning)
-    s.text(357 - 40, y + 10, "نشستی که خارج شده باشد اینجا نیست.", "caption-bold", C.warning,
+    assert y + 96 < 740, y
+    s.rect(16, y, 361, 96, fill=C.warning_soft, radius=14)
+    s.i.draw_icon(357 - 20, y + 27, "mdi-information-outline", 15, C.warning)
+    s.text(357 - 40, y + 19, "نشستی که خارج شده باشد اینجا نیست.", "caption-bold", C.warning,
            align="right", max_width=300)
-    s.text(357 - 40, y + 30, "این فهرست نشست‌های زنده است و زمان فعالیت هر کدام را", "caption",
+    s.text(357 - 40, y + 41, "این فهرست نشست‌های زنده است و زمان فعالیت هر کدام را", "caption",
            C.muted, align="right", max_width=300)
-    s.text(357 - 40, y + 48, "می‌گوید؛ زمان ورود را سرور جداگانه نگه می‌دارد.", "caption",
+    s.text(357 - 40, y + 61, "می‌گوید؛ زمان ورود را سرور جداگانه نگه می‌دارد.", "caption",
            C.muted, align="right", max_width=300)
 
-    s.button(16, 694, 361, 46, "پایان دادن به نشست‌های دیگر", icon="mdi-close-circle-outline",
-             variant="tonal", color=C.danger)
-    s.button(16, 750, 361, 48, "مدیریت دستگاه‌ها", icon="mdi-devices", variant="filled",
-             shadow=True)
+    _danger_bar(s, 740, "پایان دادن به نشست‌های دیگر")
     home_bar(s)
     return s
 
@@ -309,55 +330,60 @@ DEVICES = (
 
 def profile_devices() -> Screen:
     s = _page("۹:۵۲")
-    y = _header(s, "دستگاه‌های فعال", "۳ نشست · همه از حساب شما")
-    y += 2
+    y = _header(s, "ورودها و دستگاه‌ها", "هر دستگاهی که هنوز واردشده یک ردیف دارد")
+    y = _tabs(s, y, active=1) + 10
 
+    revoke = {"label": "پایان دسترسی", "icon": "mdi-close"}
     for item in DEVICES:
-        _card(s, y, 84)
-        s.circle(357 - 30, y + 30, 18, fill=C.primary_soft if item["current"] else C.surface_3)
-        s.i.draw_icon(357 - 30, y + 30, _device_icon(item["device"]), 19,
+        _card(s, y, 76)
+        s.circle(357 - 30, y + 38, 18, fill=C.primary_soft if item["current"] else C.surface_3)
+        s.i.draw_icon(357 - 30, y + 38, _device_icon(item["device"]), 19,
                       C.primary if item["current"] else C.text_2)
-        s.text(357 - 58, y + 12, item["device"], "label-lg", C.text, align="right",
+        s.text(357 - 58, y + 18, item["device"], "label-lg", C.text, align="right",
                max_width=195)
-        s.text(357 - 58, y + 34, item["when"], "caption", C.muted, align="right")
-        s.ltr(140, y + 34, item["ip"], "caption", C.muted_2)
+        s.text(357 - 58, y + 40, item["when"], "caption", C.muted, align="right")
+        s.ltr(140, y + 40, item["ip"], "caption", C.muted_2)
+        # one control per row, on the same centre line as the device icon: the revoke chip for a
+        # session you can end, the status chip for the one you are holding right now
         if item["current"]:
-            s.chip(28, y + 12, "همین دستگاه", None, "primary", h=24)
-            s.text(28, y + 44, "بدون قطع دسترسی", "caption", C.muted_2, align="left")
+            s.chip(24, y + 38 - 12, "همین دستگاه", None, "primary", h=24)
         else:
-            s.chip(28, y + 8, item["label"], None, "muted", h=22)
-            s.chip(24, y + 40, "پایان دسترسی", "mdi-close", h=32, fill="#FFFFFF",
+            s.chip(24, y + 38 - 16, revoke["label"], revoke["icon"], h=32, fill="#FFFFFF",
                    color=C.danger, outline=C.outline_strong)
         if item["online"]:
-            s.circle(357 - 20, y + 14, 3.4, fill=C.success)
-        y += 94
-    y += 2
+            s.circle(357 - 20, y + 18, 3.4, fill=C.success)
+        y += 86
 
+    y += 12
     s.text(377, y, "پخش‌کنندهٔ اشتراک موقعیت", "caption-bold", C.muted, align="right")
     y += 22
-    _card(s, y, 112)
+    _card(s, y, 122)
     s.text(353, y + 8, "کدام دستگاه موقعیت اشتراکی را نشان دهد؟", "label", C.text, align="right")
-    s.text(353, y + 28, "پین هر اشتراک جداست؛ این انتخاب همه را به این دستگاه می‌برد.",
-           "caption", C.muted, align="right", max_width=330)
+    s.text(353, y + 30, "پین هر اشتراک جداست؛ این انتخاب همه را جابه‌جا می‌کند.", "caption",
+           C.muted, align="right", max_width=330)
+    s.text(353, y + 48, "فقط نشست‌های زنده در این فهرست هستند.", "caption", C.muted_2,
+           align="right", max_width=330)
     for index, (name, on) in enumerate((("Chrome · ویندوز ۱۱ (همین دستگاه)", True),
                                         ("Samsung S23", False))):
-        ry = y + 52 + index * 28
+        ry = y + 70 + index * 28
         s.circle(357 - 18, ry + 9, 8, fill=C.primary if on else "#FFFFFF",
                  outline=None if on else C.outline_strong, outline_w=0 if on else 1.6)
         if on:
             s.i.draw_icon(357 - 18, ry + 9, "mdi-check", 10, "#FFFFFF")
         s.text(357 - 38, ry, name, "caption", C.text if on else C.text_2, align="right")
-    y += 124
 
-    s.rect(16, y, 361, 60, fill=C.info_soft, radius=14)
-    s.i.draw_icon(357 - 20, y + 18, "mdi-shield-key-outline", 15, C.info)
-    s.text(357 - 40, y + 8, "پایان دسترسی، آن دستگاه را از حساب خارج می‌کند.", "caption-bold",
-           C.info, align="right", max_width=300)
-    s.text(357 - 40, y + 28, "همین دستگاه را با «خروج از حساب» ببندید تا نشست پاک شود.",
+    # the honest boundary: what revoking does, and what an IP is not
+    note_y = 658
+    s.rect(16, note_y, 361, 80, fill=C.info_soft, radius=14)
+    s.i.draw_icon(357 - 20, note_y + 20, "mdi-shield-key-outline", 15, C.info)
+    s.text(357 - 40, note_y + 10, "پایان دسترسی، آن دستگاه را از حساب خارج می‌کند.",
+           "caption-bold", C.info, align="right", max_width=300)
+    s.text(357 - 40, note_y + 32, "همین دستگاه را با «خروج از حساب» ببندید تا نشست پاک شود.",
            "caption", C.muted, align="right", max_width=300)
+    s.text(357 - 40, note_y + 54, "نشانی IP، محل تقریبی نیست.", "caption", C.muted,
+           align="right", max_width=300)
 
-    s.button(16, 700, 361, 48, "نمایش ورودها و نشست‌ها", icon="mdi-history",
-             variant="outline")
+    _danger_bar(s, 758, "پایان دادن به نشست‌های دیگر")
     home_bar(s)
     return s
 
@@ -380,27 +406,27 @@ def profile_security() -> Screen:
            C.muted_2, align="right")
     y += 106
 
-    y = _row(s, y, "mdi-lock-reset", "گذرواژه", "تغییر با مسیر بازیابی و پاسخ پرسش‌ها",
-             trailing=None, value="تغییر")
+    # no chevron and no «تغییر»: the client has no in-account password endpoint, so this card is a
+    # statement about the only path that exists, not a door
+    y = _row(s, y, "mdi-lock-reset", "گذرواژه", "تغییر فقط با «فراموشی گذرواژه»",
+             trailing=None)
     y = _row(s, y, "mdi-login-variant", "ورودهای اخیر", "۳ نشست فعال در ۳ دستگاه",
              trailing=None, value="مشاهده")
     y = _row(s, y, "mdi-devices", "دستگاه‌ها", "قطع دسترسی نشست‌های دیگر",
              trailing=None, value="مدیریت")
-    y += 2
-
     # the gate in the client: an incomplete account cannot reach the map
-    s.rect(16, y, 361, 74, fill=C.warning_soft, radius=14)
+    y = 560
+    s.rect(16, y, 361, 82, fill=C.warning_soft, radius=14)
     s.i.draw_icon(357 - 20, y + 20, "mdi-alert-outline", 15, C.warning)
     s.text(357 - 40, y + 10, "اگر پرسش‌ها کامل نباشند، برنامه پیش از نقشه", "caption-bold",
            C.warning, align="right", max_width=300)
     s.text(357 - 40, y + 30, "شما را به تکمیل آن‌ها می‌برد؛ این وضعیت در نوار بالای", "caption",
            C.muted, align="right", max_width=300)
-    s.text(357 - 40, y + 48, "همان صفحه هم هشدار داده می‌شود.", "caption", C.muted,
+    s.text(357 - 40, y + 50, "همان صفحه هم هشدار داده می‌شود.", "caption", C.muted,
            align="right", max_width=300)
-    y += 88
 
-    s.text(377, y, "خطر", "caption-bold", C.danger, align="right")
-    y += 22
+    s.text(377, 700, "خطر", "caption-bold", C.danger, align="right")
+    y = 722
     _card(s, y, 62)
     s.circle(357 - 28, y + 31, 15, fill=C.danger_soft)
     s.i.draw_icon(357 - 28, y + 31, "mdi-close-circle-outline", 17, C.danger)
@@ -409,8 +435,6 @@ def profile_security() -> Screen:
            align="right")
     s.i.draw_icon(30, y + 31, "mdi-chevron-left", 18, C.muted_2)
 
-    s.text(196.5, 790, "تغییر گذرواژه از مسیر «فراموشی گذرواژه» انجام می‌شود", "caption",
-           C.muted_2, align="center")
     home_bar(s)
     return s
 
