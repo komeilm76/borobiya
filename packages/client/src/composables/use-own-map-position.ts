@@ -29,9 +29,18 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
   const error = ref<string | null>(null);
   let cleanup: (() => void) | null = null;
   let generation = 0;
+  // Some geolocation bridges stop delivering fixes without an error callback.
+  // A coordinate older than the telemetry freshness window must not look live.
+  const FIX_STALE_AFTER_MS = 20_000;
+  let freshnessTimer: ReturnType<typeof setTimeout> | null = null;
+  function clearFreshnessTimer(): void {
+    if (freshnessTimer !== null) clearTimeout(freshnessTimer);
+    freshnessTimer = null;
+  }
 
   function stop(): void {
     generation++;
+    clearFreshnessTimer();
     active.value = false;
     position.value = null;
     lastFixAt.value = null;
@@ -54,16 +63,27 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
         const parsed = coordinatesSchema.safeParse({ lat: fix.lat, lon: fix.lon });
         if (!parsed.success || (fix.accuracy !== undefined &&
           (!Number.isFinite(fix.accuracy) || fix.accuracy < 0))) return;
-        lastFixAt.value = Date.now();
+        const observedAt = Date.now();
+        clearFreshnessTimer();
+        lastFixAt.value = observedAt;
         position.value = { ...parsed.data, accuracy: fix.accuracy ?? null,
           ...(fix.heading != null && Number.isFinite(fix.heading) && fix.heading >= 0 && fix.heading < 360
             ? { heading: fix.heading } : {}),
           ...(fix.speed != null && Number.isFinite(fix.speed) && fix.speed >= 0 ? { speed: fix.speed } : {}) };
         error.value = null;
+        // Keep the watch active: the next good GPS sample can recover without a user action.
+        if (current !== generation || !active.value) return;
+        freshnessTimer = setTimeout(() => {
+          freshnessTimer = null;
+          if (current !== generation || owner.value !== account || lastFixAt.value !== observedAt) return;
+          position.value = null;
+          lastFixAt.value = null;
+          error.value = "دادهٔ GPS تازه دریافت نشد؛ موقعیت قبلی دیگر زنده نیست.";
+        }, FIX_STALE_AFTER_MS);
       }, (denied) => {
         if (current !== generation || owner.value !== account) return;
         if (denied) stop();
-        else { position.value = null; lastFixAt.value = null; } // Do not label an old fix as live during a GPS outage.
+        else { clearFreshnessTimer(); position.value = null; lastFixAt.value = null; } // Do not label an old fix as live during a GPS outage.
         error.value = denied ? "دسترسی مکان قطع شد؛ نمایش موقعیت متوقف شد." :
           "موقعیت تازه دریافت نشد؛ اتصال GPS را بررسی کنید.";
       });

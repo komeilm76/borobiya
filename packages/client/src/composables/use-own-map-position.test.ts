@@ -71,6 +71,61 @@ describe("private on-map GPS display", () => {
     expect(own.position.value).toBeNull();
   });
 
+  it("expires a silently stale fix without stopping GPS, then accepts recovery and clears its timer on stop", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    let emit!: (fix: { lat: number; lon: number; accuracy?: number }) => void;
+    const clear = vi.fn();
+    const scope = effectScope();
+    try {
+      const own = scope.run(() => useOwnMapPosition(ref("owner"), {
+        subscribe: (onFix) => { emit = onFix; return clear; }
+      }))!;
+      expect(own.start()).toBe(true);
+      emit({ lat: 35.7, lon: 51.4, accuracy: 8 });
+      vi.advanceTimersByTime(19_999);
+      expect(own.position.value?.lat).toBe(35.7);
+      vi.advanceTimersByTime(1);
+      expect(own.position.value).toBeNull();
+      expect(own.lastFixAt.value).toBeNull();
+      expect(own.error.value).toContain("GPS");
+      expect(own.active.value).toBe(true); // Keep the watch so the next fix can recover.
+      expect(clear).not.toHaveBeenCalled();
+      emit({ lat: 35.8, lon: 51.5, accuracy: 8 });
+      expect(own.position.value?.lat).toBe(35.8);
+      expect(own.error.value).toBeNull();
+      own.stop();
+      vi.advanceTimersByTime(21_000);
+      expect(own.error.value).toBeNull();
+      expect(clear).toHaveBeenCalledOnce();
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("renews GPS freshness only for valid fixes and revokes the timer on account change", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(200_000);
+    const owner = ref<string | null>("user-1");
+    let emit!: (fix: { lat: number; lon: number; accuracy?: number }) => void;
+    const scope = effectScope();
+    try {
+      const own = scope.run(() => useOwnMapPosition(owner, {
+        subscribe: (onFix) => { emit = onFix; return () => {}; }
+      }))!;
+      own.start();
+      emit({ lat: 35.7, lon: 51.4, accuracy: 8 });
+      vi.advanceTimersByTime(10_000);
+      emit({ lat: 35.8, lon: 51.5, accuracy: -1 }); // Rejected samples cannot extend stale GPS.
+      vi.advanceTimersByTime(5_000);
+      emit({ lat: 35.9, lon: 51.6, accuracy: 8 });
+      vi.advanceTimersByTime(5_000);
+      expect(own.position.value?.lat).toBe(35.9); // First fix's timeout was canceled.
+      owner.value = null;
+      vi.advanceTimersByTime(21_000);
+      expect(own.position.value).toBeNull();
+      expect(own.error.value).toBeNull(); // Never emit a stale warning for a signed-out account.
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("clears a transient GPS error when the user explicitly stops watching", () => {
     let fail!: (denied: boolean) => void;
     const scope = effectScope();

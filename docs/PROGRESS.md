@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-04 — Expire silent GPS outages on the private map
+
+- The map previously invalidated speed/ETA after a stale GPS sample, but retained the blue own-position marker and last distance/warning state indefinitely if a browser or native geolocation bridge silently stopped sending fixes without an error callback. A valid fix now arms a 20-second freshness deadline; if it expires, the private position and timestamp are cleared so guidance reports missing GPS instead of presenting the old coordinate as live. The watch stays active and a later valid fix recovers automatically. New fixes renew the deadline; invalid samples do not, and stop, transient errors, account changes and disposal cancel it. Fake-timer composable regressions reproduced silent staleness before the fix. Physical GPS bridge timing still needs device acceptance.
+
 ### 2026-11-04 — Recheck route origin after a weak-GPS trip start
 
 - A trip could start against an earlier accurate route while GPS was weak; when the first reliable fix later appeared more than 150 m from that route's original start, guidance could briefly follow the stale bearing before deviation detection rerouted. Starting with weak GPS remains allowed, but that first reliable fix now checks the planned origin and recalculates before publishing a camera bearing when it moved. A nearby recovery follows the existing route without a redundant request; subsequent normal movement does not trigger a fresh route just because it is far from the original start. Composable regressions reproduced the far-origin defect before the fix. Physical GPS recovery and route rendering remain to be verified on device.
