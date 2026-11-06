@@ -23,8 +23,7 @@ from bb.map import Camera, draw_route, fit_camera, fit_camera_rotated
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R
-from bb.ui import (chrome, home_bar, map_tools, metric_tiles, sheet_header, sos_button, sos_rail,
-                   sos_steps)
+from bb.ui import chrome, form_step, home_bar, map_tools, metric_tiles, sheet_header, sos_rail
 
 from ._base import box, destination_pin, keepout, map_view, user_cone
 
@@ -49,12 +48,20 @@ def section_label(s: Screen, y: float, text: str, note: str | None = None) -> fl
 
 def field(s: Screen, x: float, y: float, w: float, h: float, label: str, value: str | None = None,
           placeholder: str | None = None, icon: str | None = None, error: str | None = None,
-          tone: str = "neutral") -> float:
+          tone: str = "neutral", thumb: bool = False, note: str | None = None) -> float:
     """A read-only input shell: what the field holds, or what it is waiting for."""
     edge = C.danger if error else (C.outline if tone == "neutral" else C.primary)
     s.rect(x, y, w, h, fill=C.surface_2 if not error else C.danger_soft, radius=14,
            outline=edge, outline_w=1.4 if (error or tone != "neutral") else 1)
     right = x + w - 12
+    if thumb:
+        _photo_thumb(s, x + 12, y + (h - 36) / 2, 48, 36, radius=8)
+        s.text(right, y + 5, label, "caption", C.muted, align="right")
+        if value:
+            s.text(right, y + 23, value, "label", C.text, align="right", max_width=w - 90)
+        if note:
+            s.text(right, y + 43, note, "caption", C.muted, align="right", max_width=w - 90)
+        return y + h
     if icon:
         s.i.draw_icon(right - 8, y + 18, icon, 16, C.danger if error else C.muted)
         right -= 26
@@ -112,24 +119,51 @@ def _incident_tile(s: Screen, x: float, y: float, w: float, h: float, label: str
            align="right", max_width=w - 26)
 
 
+def _dim(s: Screen, tab: int = 1, alpha: int = 150) -> None:
+    """Chrome, then one scrim, then a white status bar.
+
+    The three dialog plates used to stack two scrims (190 + 150) over a chrome drawn in between,
+    which left the clock as dark text on a near-black map. One pass dims the page; the status bar
+    is re-drawn on top because a phone never hides the time.
+    """
+    chrome(s, tab=tab)
+    scrim(s, alpha)
+    s.status_bar(ui.MOMENT or "۹:۴۱", color="#FFFFFF")
+
+
+def _arc(s: Screen, cx: float, cy: float, r_in: float, r_out: float, a0: float, a1: float,
+         color: str) -> None:
+    """A filled annular sector with round caps — a progress ring that reads as one gesture."""
+    steps = max(10, int(abs(a1 - a0) / math.radians(3)))
+    outer = [(cx + math.cos(a0 + (a1 - a0) * i / steps) * r_out,
+              cy + math.sin(a0 + (a1 - a0) * i / steps) * r_out) for i in range(steps + 1)]
+    inner = [(cx + math.cos(a0 + (a1 - a0) * i / steps) * r_in,
+              cy + math.sin(a0 + (a1 - a0) * i / steps) * r_in) for i in range(steps, -1, -1)]
+    s.polygon(outer + inner, fill=color)
+    for angle in (a0, a1):
+        s.circle(cx + math.cos(angle) * (r_in + r_out) / 2,
+                 cy + math.sin(angle) * (r_in + r_out) / 2, (r_out - r_in) / 2, fill=color)
+
+
 def hold_button(s: Screen, cx: float, cy: float, r: float = 46, progress: float = 0.64):
-    """Press-and-hold control: a red disc inside a progress ring drawn as a dot arc.
+    """Press-and-hold control: a red disc inside a solid progress ring.
 
     A tap that is released early simply does nothing, which is why the destructive action is a hold
-    and not a button: the emergency is one gesture away, but not one pocket-dial away.
+    and not a button: the emergency is one gesture away, but not one pocket-dial away. The ring is a
+    continuous arc: forty-four separate dots read as a decorative pattern, not as how far you are.
     """
     s.shadow(cx - r, cy - r + 6, r * 2, r * 2, radius=r, blur=20, dy=8, color=C.danger, alpha=90)
+    r_in, r_out = r + 6, r + 13
+    s.circle(cx, cy, (r_in + r_out) / 2, fill=None, outline=C.danger_soft,
+             outline_w=r_out - r_in)
+    _arc(s, cx, cy, r_in, r_out, -math.pi / 2, -math.pi / 2 + 2 * math.pi * progress, C.danger)
     s.circle(cx, cy, r, fill=C.danger, outline="#FFFFFF", outline_w=3)
-    s.circle(cx, cy, r - 12, fill=None, outline="#FFFFFF", outline_w=0)
-    dots = 44
-    for index in range(dots):
-        angle = -math.pi / 2 + (2 * math.pi) * index / dots
-        on = index / dots <= progress
-        rr = r + 10
-        s.circle(cx + math.cos(angle) * rr, cy + math.sin(angle) * rr,
-                 3.4 if on else 2.6, fill=C.danger if on else C.outline_strong)
-    s.i.draw_icon(cx, cy - 14, "mdi-alarm-light", 26, "#FFFFFF")
-    s.text(cx, cy + 8, "نگه دارید", "label", "#FFFFFF", align="center")
+    if r < 38:
+        # a small instance is an icon, not a squeezed sentence
+        s.i.draw_icon(cx, cy, "mdi-alarm-light", 22, "#FFFFFF")
+    else:
+        s.i.draw_icon(cx, cy - 18, "mdi-alarm-light", 26, "#FFFFFF")
+        s.text(cx, cy + 6, "نگه دارید", "label", "#FFFFFF", align="center")
 
 
 def rail_sheet(s: Screen, top: float, title: str, subtitle: str, icon: str, stage: int,
@@ -140,8 +174,42 @@ def rail_sheet(s: Screen, top: float, title: str, subtitle: str, icon: str, stag
     return sos_rail(s, 16, y, 361, stage, timestamps=timestamps) + 12
 
 
-def rescuer_row(s: Screen, y: float, note: str | None = None, action: str = "mdi-phone") -> float:
-    """The assigned rescuer, as the requester needs them: face, name, team, one-tap call."""
+def _photo_thumb(s: Screen, x: float, y: float, w: float, h: float, radius: float = 12) -> None:
+    """A stand-in for the attached photo.
+
+    A fire icon in a pale tile reads as a button, not as a picture: the requester is checking
+    *what* they attached, so the row needs something that looks like a frame — dark room, smoke
+    under the ceiling, flame along the sill.
+    """
+    with s.clip_rounded(x, y, w, h, radius):
+        # a dark room, not a landscape: ceiling, a lit doorway, smoke and glow at the sill
+        s.rect(x, y, w, h, fill="#4A4E56")
+        s.rect(x, y + h * 0.46, w, h * 0.54, fill="#3E424A")
+        s.rect(x + w * 0.58, y + h * 0.26, w * 0.28, h * 0.42, fill="#D8C8A2", radius=2)
+        s.rect(x + w * 0.58, y + h * 0.26, w * 0.28, h * 0.12, fill="#B9A883", radius=2)
+        for cx, cy, r in ((0.16, 0.12, 0.17), (0.38, 0.07, 0.19), (0.66, 0.10, 0.16),
+                          (0.88, 0.16, 0.13)):
+            s.circle(x + w * cx, y + h * cy, w * r, fill="#7E838B")
+        # glow: wide and low, so it reads as firelight rather than as peaks
+        s.rect(x, y + h * 0.78, w, h * 0.22, fill="#8C3B27")
+        s.rect(x, y + h * 0.86, w, h * 0.14, fill="#C4622C")
+        s.rect(x + w * 0.10, y + h * 0.93, w * 0.80, h * 0.07, fill="#EE9A3C")
+        # two tongues of flame, tallest at the left
+        s.polygon([(x + w * 0.16, y + h), (x + w * 0.26, y + h * 0.60),
+                   (x + w * 0.36, y + h)], fill="#E2702F")
+        s.polygon([(x + w * 0.24, y + h), (x + w * 0.30, y + h * 0.76),
+                   (x + w * 0.36, y + h)], fill="#F5B65A")
+        s.polygon([(x + w * 0.52, y + h), (x + w * 0.59, y + h * 0.72),
+                   (x + w * 0.66, y + h)], fill="#E2702F")
+
+
+def rescuer_row(s: Screen, y: float, note: str | None = None, action: str = "mdi-phone",
+                status: str | None = None) -> float:
+    """The assigned rescuer, as the requester needs them: face, name, team, one-tap call.
+
+    `status` swaps the round action for a state pill: before the rescuer accepts there is nobody
+    to call yet, and a primary circle around a clock read as a button that did nothing.
+    """
     s.rect(16, y, 361, 66, fill=C.surface_2, radius=16)
     s.circle(357 - 26, y + 33, 21, fill=C.primary_soft)
     s.text(357 - 26, y + 24, sc.SOS_RESCUER["initial"], "title-sm", C.primary, align="center")
@@ -149,8 +217,11 @@ def rescuer_row(s: Screen, y: float, note: str | None = None, action: str = "mdi
            max_width=180)
     s.text(357 - 56, y + 30, note or sc.SOS_RESCUER["role"], "caption", C.muted, align="right",
            max_width=210)
-    s.circle(16 + 27, y + 33, 20, fill=C.primary)
-    s.i.draw_icon(16 + 27, y + 33, action, 19, "#FFFFFF")
+    if status:
+        s.chip(30, y + 20, status, "mdi-timer-sand", "warning", h=26)
+    else:
+        s.circle(16 + 27, y + 33, 20, fill=C.primary)
+        s.i.draw_icon(16 + 27, y + 33, action, 19, "#FFFFFF")
     return y + 66
 
 
@@ -159,35 +230,51 @@ def rescuer_row(s: Screen, y: float, note: str | None = None, action: str = "mdi
 # --------------------------------------------------------------------------- #
 def sos_entry() -> Screen:
     cam = sc.camera(sc.SOS_POINT[0] + 60, sc.SOS_POINT[1] - 110, 0.19)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 512, 393, 340)))
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 452, 393, 400)))
     s.top_scrim(128)
     chrome(s, tab=1)
     map_tools(s, 128, angle=22)
     user_cone(s, cam, *sc.SOS_POINT, bearing=28)
 
-    top = 512
+    # the control itself stays on the map, at the corner it will always occupy; the card explains,
+    # the map shows. A copy of the pill inside the card taught a position that did not exist.
+    s.rect(16, 336, 104, 26, fill="#FFFFFF", radius=9, outline=C.outline, outline_w=1)
+    s.text(68, 341, "همیشه اینجا", "caption-bold", C.text_2, align="center")
+    ui.sos_dock(s, 372)
+
+    top = 452
     sheet(s, top, radius=28)
-    s.text(377, top + 26, "امداد فوری، در دو مرحله", "title", C.text, align="right")
-    s.text(377, top + 54, "با یک ضربهٔ اشتباه چیزی ارسال نمی‌شود.", "caption", C.muted,
+    s.text(377, top + 24, "امداد فوری، در دو مرحله", "title", C.text, align="right")
+    s.text(377, top + 52, "با یک ضربهٔ اشتباه چیزی ارسال نمی‌شود.", "caption", C.muted,
            align="right")
 
     for index, text in enumerate(("دکمهٔ SOS را نگه دارید تا فرم باز شود.",
                                   "محل حادثه و شرح را تأیید کنید؛ سپس ارسال.")):
-        y = top + 80 + index * 30
+        y = top + 82 + index * 32
         s.circle(357 - 12, y + 8, 10, fill=C.danger_soft)
         s.text(357 - 12, y, fa_digits(index + 1), "caption-bold", C.danger, align="center")
         s.text(357 - 32, y, text, "caption", C.text_2, align="right", max_width=290)
 
-    # the same dock the button occupies on every map page, shown once inside the coach card
-    s.rect(16, top + 148, 361, 96, fill=C.surface_2, radius=18)
-    sos_drawn = ui.sos_button(s, 16 + 56, top + 196, r=24, wide=False)
-    s.text(357 - 14, top + 158, "این دکمه همیشه در همین گوشهٔ نقشه است", "caption-bold", C.text_2,
-           align="right", max_width=250)
-    s.text(357 - 14, top + 180, "نگه دارید تا فرم باز شود؛", "caption", C.muted, align="right",
-           max_width=250)
-    s.text(357 - 14, top + 200, "رها کردن، چیزی ارسال نمی‌کند.", "caption", C.muted,
-           align="right", max_width=250)
-    s.text(196.5, top + 258, "سوابق درخواست‌ها در بخش «تاریخچه» است", "caption", C.muted_2,
+    s.text(377, top + 152, "برای چه چیزی؟", "caption-bold", C.muted, align="right")
+    cursor = 361
+    for label, icon, tone in (("آتش و دود", "mdi-fire", "danger"),
+                              ("خطر جانی", "mdi-alert-outline", "warning"),
+                              ("مصدومیت", "mdi-medical-bag", "neutral")):
+        w = s.tw(label, "caption") + 44
+        cursor -= w
+        s.chip(cursor, top + 172, label, icon, tone, h=30)
+        cursor -= 8
+
+    s.rect(16, top + 212, 361, 1, fill=C.outline)
+    s.i.draw_icon(357 - 10, top + 233, "mdi-phone-alert-outline", 15, C.warning)
+    s.text(357 - 30, top + 222, "خطر جانی؟ منتظر فرم نمانید.", "caption-bold", C.text_2,
+           align="right")
+    s.text(357 - 30, top + 240, "با ۱۲۵ تماس بگیرید و همین دکمه را هم نگه دارید.", "caption",
+           C.muted, align="right")
+
+    # a coach card needs a way out, pinned where a sheet's action always is
+    s.button(16, top + 274, 361, 48, "متوجه شدم", variant="outline")
+    s.text(196.5, top + 340, "سوابق درخواست‌ها در بخش «تاریخچه» است", "caption", C.muted_2,
            align="center")
     home_bar(s)
     return s
@@ -199,9 +286,7 @@ def sos_entry() -> Screen:
 def sos_hold() -> Screen:
     cam = sc.camera(sc.SOS_POINT[0], sc.SOS_POINT[1], 0.24)
     s = map_view(cam, pois=False)
-    scrim(s, 190)
-    chrome(s, tab=1)
-    scrim(s, 150)
+    _dim(s, tab=1)
 
     top = 196
     s.shadow(16, top, 361, 500, radius=28, blur=26, dy=10, alpha=70)
@@ -250,7 +335,7 @@ def sos_compose() -> Screen:
     sheet(s, top)
     y = sheet_header(s, top + 20, "درخواست امداد فوری", "پیش‌نویس · هنوز ارسال نشده",
                      icon="mdi-alarm-light", tone="danger", title_style="title")
-    y = sos_steps(s, 16, y, 361, -1) + 12
+    y = form_step(s, 16, y, 361, 1, "شرح حادثه") + 10
 
     y = section_label(s, y, "شدت حادثه", "بر اساس خطری که شما را تهدید می‌کند")
     y = severity_cards(s, y, "high") + 14
@@ -259,11 +344,19 @@ def sos_compose() -> Screen:
     y = section_label(s, y, "شرح وضعیت", f"{fa_digits(96)}/{fa_digits(500)}")
     s.rect(16, y, 361, 84, fill=C.surface_2, radius=14, outline=C.outline, outline_w=1)
     s.para(28, y + 8, sc.SOS_DESCRIPTION, "caption", C.text_2, align="right", max_width=330)
-    y += 98
+    y += 92
 
-    s.button(201, y, 176, 50, "ادامه", icon="mdi-arrow-left", variant="filled", color=C.danger,
-             shadow=True)
-    s.button(16, y, 176, 50, "انصراف", variant="text", color=C.muted)
+    # the requester's first question is "will they find me?" — answer it before the CTA
+    s.i.draw_icon(357 - 10, y + 9, "mdi-crosshairs-gps", 15, C.primary)
+    s.text(357 - 30, y + 1, "موقعیت شما خودکار ثبت می‌شود؛", "caption", C.text_2, align="right")
+    s.text(357 - 30, y + 18, "در قدم بعد روی نقشه اصلاحش کنید.", "caption", C.muted,
+           align="right")
+    y += 40
+
+    # the header's × already leaves the form; a second, quieter exit next to the CTA only made
+    # the forward action look optional
+    # red is the request itself; moving between form screens is the ordinary primary action
+    s.button(16, y, 361, 50, "ادامه", icon="mdi-arrow-left", variant="filled", shadow=True)
     home_bar(s)
     return s
 
@@ -322,13 +415,13 @@ def sos_location() -> Screen:
     # bottom card: what the pin means, then one confirm
     top = 582
     sheet(s, top, radius=26)
-    s.text(357, top + 20, "موقعیت انتخاب‌شده", "caption-bold", C.muted, align="right")
+    s.text(357, top + 20, "مرحلهٔ ۲ از ۴ · محل حادثه", "caption-bold", C.muted, align="right")
     s.text(357, top + 40, sc.SOS_ADDRESS, "label", C.text, align="right", max_width=336)
     s.chip(24, top + 68, "دستی روی نقشه", "mdi-gesture-tap", "warning", h=24)
     s.chip(24, top + 98, f"دقت GPS: ± {fa_digits(sc.SOS_ACCURACY)} متر",
            "mdi-crosshairs-gps", "info", h=24)
     s.button(16, top + 134, 361, 50, "تأیید این نقطه", icon="mdi-check", variant="filled",
-             color=C.danger, shadow=True)
+             shadow=True)
     s.button(16, top + 190, 361, 44, "برگشت به موقعیت فعلی من", icon="mdi-crosshairs-gps",
              variant="outline")
     home_bar(s)
@@ -348,7 +441,7 @@ def sos_photo() -> Screen:
     sheet(s, top)
     y = sheet_header(s, top + 20, "عکس صحنه", "اختیاری · ارسال درخواست را متوقف نمی‌کند",
                      icon="mdi-camera-outline", tone="primary", title_style="title")
-    y = sos_steps(s, 16, y, 361, -1, note="مرحلهٔ ۳ از ۴") + 14
+    y = form_step(s, 16, y, 361, 3, "عکس صحنه") + 14
 
     # source tiles
     for index, (label, icon, hint) in enumerate([("دوربین", "mdi-camera", "همین حالا ثبت کن"),
@@ -362,9 +455,7 @@ def sos_photo() -> Screen:
 
     # one attached photo, rendered as the thumbnail the client shows after choosing a file
     s.rect(16, y, 361, 92, fill=C.surface_2, radius=16, outline=C.outline, outline_w=1)
-    s.rect(28, y + 10, 88, 72, fill=C.primary_soft, radius=12)
-    s.i.draw_icon(72, y + 40, "mdi-fire", 26, C.danger)
-    s.text(72, y + 62, "پیش‌نمایش", "caption", C.muted, align="center")
+    _photo_thumb(s, 28, y + 10, 88, 72, radius=12)
     s.text(357 - 14, y + 12, "IMG_2041.jpg", "label", C.text, align="right")
     s.text(357 - 14, y + 34, "۲٫۱ مگابایت", "caption", C.muted, align="right")
     s.ltr(150, y + 34, "3024×4032", "caption", C.muted_2)
@@ -374,8 +465,8 @@ def sos_photo() -> Screen:
     s.text(377, y, "فقط تصویر — تا ۵ مگابایت", "caption", C.muted_2, align="right")
     s.ltr(46, y, "JPEG · PNG · WebP", "caption", C.muted_2)
     y += 26
-    s.button(16, y, 361, 50, "ادامه: بازبینی و ارسال", icon="mdi-arrow-left", variant="filled",
-             color=C.danger, shadow=True)
+    s.button(16, y, 361, 50, "ادامه به بازبینی", icon="mdi-arrow-left", variant="filled",
+             shadow=True)
     y += 58
     s.text(196.5, y, "ادامه بدون عکس", "caption-bold", C.primary, align="center")
     home_bar(s)
@@ -395,14 +486,16 @@ def sos_review() -> Screen:
     sheet(s, top)
     y = sheet_header(s, top + 20, "بازبینی پیش از ارسال", "پس از ارسال، درخواست قابل پیگیری است",
                      icon="mdi-clipboard-check-outline", tone="danger", title_style="title")
-    y = sos_steps(s, 16, y, 361, -1, note="مرحلهٔ ۴ از ۴") + 12
+    y = form_step(s, 16, y, 361, 4, "بازبینی") + 12
 
     rows = [("نوع حادثه", "آتش‌سوزی", "mdi-fire"),
             ("شدت", "شدید · خطر جانی", "mdi-alert-outline"),
-            ("موقعیت", "خیابان شریعتی، بازار قدیم، پلاک ۱۴", "mdi-map-marker-outline"),
-            ("تصویر", "IMG_2041.jpg", "mdi-image-outline")]
-    for index, (label, value, icon) in enumerate(rows):
+            ("موقعیت", "خیابان شریعتی، بازار قدیم، پلاک ۱۴", "mdi-map-marker-outline")]
+    for label, value, icon in rows:
         y = field(s, 16, y, 361, 52, label, value, icon=icon) + 8
+    # the photo row shows the frame itself: a filename cannot be checked at a glance
+    y = field(s, 16, y, 361, 66, "تصویر", "IMG_2041.jpg", thumb=True,
+              note="۲٫۱ مگابایت · پیوست شده") + 8
     s.text(357 - 12, y - 4, "شرح", "caption", C.muted, align="right")
     s.rect(16, y + 18, 361, 62, fill=C.surface_2, radius=14, outline=C.outline, outline_w=1)
     s.para(28, y + 24, sc.SOS_DESCRIPTION, "caption", C.text_2, align="right", max_width=330)
@@ -430,9 +523,7 @@ def sos_review() -> Screen:
 def sos_sending() -> Screen:
     cam = sc.camera(sc.SOS_POINT[0], sc.SOS_POINT[1], 0.3)
     s = map_view(cam, pois=False)
-    scrim(s, 190)
-    chrome(s, tab=1)
-    scrim(s, 150)
+    _dim(s, tab=1)
 
     top = 258
     s.shadow(16, top, 361, 328, radius=28, blur=26, dy=10, alpha=70)
@@ -461,10 +552,10 @@ def sos_sending() -> Screen:
         if index < len(steps) - 1:
             s.divider(30, y + 32, 363)
 
-    s.rect(32, top + 282, 329, 32, fill=C.danger_soft, radius=10)
-    s.i.draw_icon(345, top + 298, "mdi-information-outline", 14, C.danger)
+    s.rect(32, top + 282, 329, 32, fill=C.surface_2, radius=10)
+    s.i.draw_icon(345, top + 298, "mdi-information-outline", 14, C.muted)
     s.text(327, top + 289, "تا پایان ارسال، درخواست در سوابق «در حال ثبت» است.", "caption",
-           C.danger, align="right", max_width=280)
+           C.muted, align="right", max_width=280)
     home_bar(s)
     return s
 
@@ -473,7 +564,8 @@ def sos_sending() -> Screen:
 # 08 — pending: registered, nobody assigned yet
 # --------------------------------------------------------------------------- #
 def sos_pending() -> Screen:
-    cam = sc.camera(sc.SOS_POINT[0], sc.SOS_POINT[1] - 20, 0.3)
+    # aim_at, not a centred camera: at 852/2 the pin lands under the sheet
+    cam = sc.camera(*sc.SOS_POINT, 0.3).aim_at(*sc.SOS_POINT, 196, 196)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)),
                  pois=False)
     s.top_scrim(120)
@@ -483,23 +575,25 @@ def sos_pending() -> Screen:
 
     top = 292
     y = rail_sheet(s, top, "درخواست شما ثبت شد", f"پیگیری {fa_digits(sc.SOS_ID)} · "
-                    f"{sc.SOS_TIMES['submitted']}", "mdi-check-circle-outline", 0,
+                    f"{sc.SOS_TIMES['submitted']}", "mdi-clock-outline", 0,
                     timestamps=sc.SOS_STAGE_TIMES)
 
-    # what the system is doing right now
-    s.rect(16, y, 361, 84, fill=C.danger_soft, radius=16)
-    s.spinner(357 - 30, y + 30, 15, C.danger, 2.4)
-    s.text(357 - 58, y + 16, "در حال یافتن امدادگر آماده", "label-lg", C.danger, align="right")
-    s.text(357 - 58, y + 40, "به امدادگران آموزش‌دیده در شعاع ۵ کیلومتر اطلاع داده شد.",
-           "caption", C.muted, align="right", max_width=270)
-    s.progress(357 - 58 - 250, y + 64, 250, 5, 0.35, C.danger)
-    y += 96
+    # what the system is doing right now. A determinate bar here promised a progress nobody knows;
+    # the request is waiting for an answer, which is exactly what the spinner says.
+    s.rect(16, y, 361, 88, fill=C.danger_soft, radius=16)
+    s.spinner(357 - 30, y + 32, 16, C.danger, 2.4)
+    s.text(357 - 58, y + 14, "در حال یافتن امدادگر آماده", "label-lg", C.danger, align="right")
+    s.text(357 - 58, y + 38, "به امدادگران آموزش‌دیده در شعاع ۵ کیلومتر اطلاع داده شد.",
+           "caption", C.muted, align="right", max_width=260)
+    s.text(357 - 58, y + 58, "به‌محض پذیرش، نام و مسیر امدادگر همین‌جا می‌آید.", "caption",
+           C.muted, align="right", max_width=260)
+    y += 100
 
-    s.text(377, y, "تا رسیدن امدادگر", "caption-bold", C.muted, align="right")
+    s.text(377, y, "تا رسیدن امدادگر چه کنم؟", "caption-bold", C.muted, align="right")
     y += 22
     for icon, text in [("mdi-phone", "گوشی را در دسترس نگه دارید؛ ممکن است تماس بگیریم."),
                        ("mdi-map-marker-check", "اگر جای خود را ترک کردید، موقعیت را دوباره بفرستید."),
-                       ("mdi-alert-circle-outline", "اگر وضعیت بدتر شد، همین‌جا پشتیبانی بخواهید.")]:
+                       ("mdi-phone-alert-outline", "اگر وضعیت بدتر شد، با ۱۲۵ تماس بگیرید.")]:
         s.rect(16, y, 361, 46, fill=C.surface_2, radius=14)
         s.i.draw_icon(357 - 20, y + 23, icon, 17, C.text_2)
         s.text(357 - 42, y + 14, text, "caption", C.text_2, align="right", max_width=300)
@@ -516,9 +610,10 @@ def sos_pending() -> Screen:
 # 09 — dispatched: a rescuer has been chosen
 # --------------------------------------------------------------------------- #
 def sos_dispatched() -> Screen:
-    cam = fit_camera(sc.route_world(sc.SOS_ROUTE), (20, 150, 373, 560), padding=0.9,
+    # fit the route *above* the sheet: at (20,150,373,560) the destination pin landed under it
+    cam = fit_camera(sc.route_world(sc.SOS_ROUTE), (24, 146, 369, 340), padding=0.9,
                      max_ppu=0.42)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 372, 393, 480)),
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 356, 393, 496)),
                  pois=False)
     s.top_scrim(120)
     chrome(s, tab=1)
@@ -530,13 +625,15 @@ def sos_dispatched() -> Screen:
     s.circle(*cam.project_grid(*start), 6.4, fill=C.primary)
 
     top = 364
-    y = rail_sheet(s, top, "امدادگر تعیین شد", f"اعزام {sc.SOS_TIMES['dispatched']} · "
-                    "در انتظار پذیرش امدادگر", "mdi-account-check-outline", 1,
+    # the header says where the request is, the card says who it went to — the two used to
+    # repeat «در انتظار پذیرش» three times
+    y = rail_sheet(s, top, "امدادگر تعیین شد", f"پیگیری {fa_digits(sc.SOS_ID)} · "
+                    f"اعزام {sc.SOS_TIMES['dispatched']}", "mdi-account-check-outline", 1,
                     timestamps=sc.SOS_STAGE_TIMES)
-    y = rescuer_row(s, y, note="درخواست برای این امدادگر ارسال شده", action="mdi-clock-outline")
+    y = rescuer_row(s, y, note=f"{sc.SOS_RESCUER['vehicle']} · تیم ۲", status="در انتظار پذیرش")
     y += 12
-    metric_tiles(s, 16, y, 361, [("زمان رسیدن", sc.SOS_ETA, "mdi-timer-sand"),
-                                 ("فاصله", sc.SOS_DISTANCE, "mdi-map-marker-distance"),
+    # no ETA before the rescuer accepts: at this point ۴ دقیقه was a promise nobody had made
+    metric_tiles(s, 16, y, 361, [("فاصله", sc.SOS_DISTANCE, "mdi-map-marker-distance"),
                                  ("تیم", "۲ نفر", "mdi-account-group")], h=62)
     y += 74
     s.rect(16, y, 361, 52, fill=C.warning_soft, radius=14)
@@ -547,8 +644,6 @@ def sos_dispatched() -> Screen:
            align="right")
     y += 64
     s.button(16, y, 361, 46, "لغو درخواست", icon="mdi-close", variant="outline", color=C.danger)
-    s.text(196.5, y + 58, "پایان کار را امدادگر ثبت می‌کند؛ تا آن موقع درخواست باز است", "caption",
-           C.muted_2, align="center", max_width=330)
     home_bar(s)
     return s
 
@@ -587,29 +682,27 @@ def sos_accepted() -> Screen:
     y = rail_sheet(s, top, "امدادگر در راه شماست", f"پذیرش {sc.SOS_TIMES['accepted']} · "
                     "مسیر رسیدن را می‌بینید", "mdi-fire-truck", 2,
                     timestamps=sc.SOS_STAGE_TIMES)
-    y = rescuer_row(s, y) + 12
+    y = rescuer_row(s, y, note=f"{sc.SOS_RESCUER['vehicle']} · تیم ۲") + 12
 
-    s.rect(16, y, 361, 68, fill=C.danger_soft, radius=16)
-    s.text(357 - 14, y + 8, "زمان تقریبی رسیدن", "caption", C.muted, align="right")
-    s.text(357 - 14, y + 26, sc.SOS_ETA_ENROUTE, "metric", C.danger, align="right")
-    s.text(196, y + 34, f"{sc.SOS_DISTANCE_ENROUTE} · {sc.SOS_RESCUER['vehicle']}", "caption",
-           C.text_2, align="right")
-    y += 80
+    # the countdown is data, so it sits in the same tile shape as every other number on the flow;
+    # a full-width red card made an ETA look like an alarm
+    metric_tiles(s, 16, y, 361, [("زمان رسیدن", sc.SOS_ETA_ENROUTE, "mdi-timer-sand"),
+                                 ("فاصله", sc.SOS_DISTANCE_ENROUTE,
+                                  "mdi-map-marker-distance")], h=62)
+    y += 74
+
+    s.rect(16, y, 361, 38, fill=C.primary_soft, radius=12)
+    s.i.draw_icon(357 - 20, y + 19, "mdi-phone-in-talk-outline", 15, C.primary)
+    s.text(357 - 40, y + 9, "گوشی را در دسترس نگه دارید؛ ممکن است امدادگر تماس بگیرد.",
+           "caption", C.text_2, align="right", max_width=300)
+    y += 50
 
     s.button(16, y, 176, 46, "تماس", icon="mdi-phone", variant="filled", color=C.primary)
     s.button(201, y, 176, 46, "پیام", icon="mdi-message-text-outline", variant="tonal")
     y += 60
 
-    # what to do while waiting: three lines, the same shape as the pending plate uses
-    s.text(377, y, "همین حالا", "caption-bold", C.muted, align="right")
-    y += 22
-    for icon, text in [("mdi-door-open", "اگر ایمن است، درِ ورودی را باز بگذارید."),
-                       ("mdi-phone-in-talk-outline", "گوشی را در دسترس نگه دارید؛ ممکن است تماس بگیریم."),
-                       ("mdi-alert-circle-outline", "اگر وضعیت بدتر شد، لغو کنید و دوباره درخواست بدهید.")]:
-        s.rect(16, y, 361, 42, fill=C.surface_2, radius=12)
-        s.i.draw_icon(357 - 20, y + 21, icon, 16, C.text_2)
-        s.text(357 - 42, y + 12, text, "caption", C.text_2, align="right", max_width=300)
-        y += 48
+    # cancelling mid-approach has to stay reachable: it was missing on the two live status plates
+    s.button(16, y, 361, 46, "لغو درخواست", icon="mdi-close", variant="outline", color=C.danger)
     home_bar(s)
     return s
 
@@ -634,28 +727,29 @@ def sos_arrived() -> Screen:
     y = rail_sheet(s, top, "امدادگر رسید", f"رسیدن {sc.SOS_TIMES['arrived']} · رسیدگی آغاز شد",
                    "mdi-map-marker-check", 3, timestamps=sc.SOS_STAGE_TIMES)
 
-    s.rect(16, y, 361, 76, fill=C.success_soft, radius=16)
-    s.i.draw_icon(357 - 26, y + 24, "mdi-account-hard-hat", 22, C.success)
-    s.text(357 - 50, y + 10, "زهرا احمدی در محل حادثه است", "label-lg", C.success,
+    # one line about the state, not three: the rail above and the pin's check already carry
+    # arrival and the tracking number
+    s.rect(16, y, 361, 62, fill=C.success_soft, radius=16)
+    s.i.draw_icon(357 - 24, y + 22, "mdi-account-hard-hat", 20, C.success)
+    s.text(357 - 48, y + 10, "زهرا احمدی در محل حادثه است", "label-lg", C.success,
            align="right", max_width=300)
-    s.text(357 - 50, y + 34, "دو امدادگر دیگر در راه‌اند · تیم ۲", "caption", C.muted,
-           align="right")
-    s.text(357 - 50, y + 52, f"شمارهٔ پیگیری {fa_digits(sc.SOS_ID)}", "caption", C.muted_2,
-           align="right")
-    y += 88
+    s.text(357 - 48, y + 34, "رسیدگی آغاز شد · دو امدادگر دیگر در راه‌اند", "caption", C.text_2,
+           align="right", max_width=300)
+    y += 74
 
-    s.text(377, y, "همین حالا", "caption-bold", C.muted, align="right")
-    y += 22
-    for icon, text in [("mdi-information-outline", "به امدادگر بگویید چند نفر داخل هستند."),
-                       ("mdi-door-open", "درب‌ها را باز بگذارید تا دود خارج شود."),
-                       ("mdi-phone", "اگر وضعیت تغییر کرد، همین‌جا اطلاع بدهید."),
-                       ("mdi-account-multiple-outline", "همسایه‌ها را از محل دور نگه دارید.")]:
+    # two things that actually change the outcome, instead of four generic reminders
+    for icon, text in [("mdi-account-multiple-outline", "به امدادگر بگویید چند نفر داخل هستند."),
+                       ("mdi-map-marker-radius-outline", "همسایه‌ها را از محل دور نگه دارید.")]:
         s.rect(16, y, 361, 44, fill=C.surface_2, radius=12)
         s.i.draw_icon(357 - 20, y + 22, icon, 16, C.text_2)
         s.text(357 - 42, y + 13, text, "caption", C.text_2, align="right", max_width=300)
         y += 50
-    y += 2
-    s.button(16, y, 361, 46, "لغو درخواست", icon="mdi-close", variant="outline", color=C.danger)
+    y += 8
+
+    s.button(16, y, 361, 46, "تماس با امدادگر", icon="mdi-phone", variant="outline",
+             color=C.primary)
+    y += 56
+    s.button(16, y, 361, 42, "لغو درخواست", variant="text", color=C.danger)
     home_bar(s)
     return s
 
@@ -717,8 +811,6 @@ def sos_completed() -> Screen:
     s.button(16, 700, 361, 52, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled",
              shadow=True)
     s.button(16, 760, 361, 46, "سوابق درخواست‌ها", icon="mdi-history", variant="tonal")
-    s.text(196.5, 812, "دکمهٔ SOS روی نقشه همیشه در دسترس است", "caption", C.muted_2,
-           align="center")
     home_bar(s)
     return s
 
@@ -729,13 +821,11 @@ def sos_completed() -> Screen:
 def sos_cancel() -> Screen:
     cam = sc.camera(sc.SOS_POINT[0], sc.SOS_POINT[1], 0.24)
     s = map_view(cam, pois=False)
-    scrim(s, 120)
-    chrome(s, tab=1)
-    scrim(s, 110)
+    _dim(s, tab=1)
 
     top = 186
-    s.shadow(16, top, 361, 524, radius=28, blur=26, dy=10, alpha=70)
-    s.rect(16, top, 361, 524, fill="#FFFFFF", radius=28)
+    s.shadow(16, top, 361, 548, radius=28, blur=26, dy=10, alpha=70)
+    s.rect(16, top, 361, 548, fill="#FFFFFF", radius=28)
     s.circle(357 - 26, top + 30, 21, fill=C.danger_soft)
     s.i.draw_icon(357 - 26, top + 30, "mdi-alert-outline", 22, C.danger)
     s.text(357 - 54, top + 12, "لغو درخواست امداد", "title", C.text, align="right")
@@ -755,24 +845,27 @@ def sos_cancel() -> Screen:
         s.text(357 - 42, y + 11, reason, "caption", C.text if on else C.text_2, align="right")
         y += 43
 
-    # «سایر» is the only reason the API marks requiresCustomText — the field appears with it
-    s.rect(16, y + 4, 361, 72, fill="#FFFFFF", radius=12, outline=C.outline_strong,
+    # «سایر» is the only reason the API marks requiresCustomText. The plate used to show it
+    # selected with an empty field and an enabled confirm — a state the form refuses to send.
+    note = "همسایه کمک کرد و آتش خاموش شد."
+    s.rect(16, y + 10, 361, 78, fill="#FFFFFF", radius=12, outline=C.outline_strong,
            outline_w=1.4)
-    s.text(357 - 28, y + 12, "توضیح بدهید (۱۰ تا ۲۰۰ نویسه)", "caption-bold", C.muted,
+    s.text(357 - 28, y + 18, "توضیح بدهید (۱۰ تا ۲۰۰ نویسه)", "caption-bold", C.muted,
            align="right")
-    s.text(357 - 28, y + 34, "مثلاً: همسایه کمک کرد و آتش خاموش شد.", "caption", C.muted_2,
+    s.text(357 - 28, y + 40, note, "caption", C.text, align="right", max_width=310)
+    s.text(357 - 28, y + 60, f"{fa_digits(len(note))} / {fa_digits(200)}", "caption", C.muted,
            align="right")
-    s.text(357 - 28, y + 56, "۰ / ۲۰۰", "caption", C.muted_2, align="right")
 
-    s.rect(16, y + 86, 361, 48, fill=C.warning_soft, radius=12)
-    s.i.draw_icon(357 - 18, y + 102, "mdi-information-outline", 15, C.warning)
-    s.text(357 - 38, y + 90, "پس از لغو، پیشنهادهای در انتظار بسته می‌شوند", "caption-bold",
+    s.rect(16, y + 98, 361, 48, fill=C.warning_soft, radius=12)
+    s.i.draw_icon(357 - 18, y + 114, "mdi-information-outline", 15, C.warning)
+    s.text(357 - 38, y + 102, "پس از لغو، پیشنهادهای در انتظار بسته می‌شوند", "caption-bold",
            C.warning, align="right", max_width=300)
-    s.text(357 - 38, y + 109, "و مأموریت امدادگر پذیرفته‌شده پایان می‌یابد.", "caption",
+    s.text(357 - 38, y + 121, "و مأموریت امدادگر پذیرفته‌شده پایان می‌یابد.", "caption",
            C.muted, align="right", max_width=300)
 
-    s.button(16, top + 462, 176, 46, "بازگشت", variant="text", color=C.muted)
-    s.button(201, top + 462, 176, 46, "تأیید لغو", icon="mdi-close-circle-outline",
+    # inset inside the dialog: at 16/201 the two buttons sat flush with the card's own edge
+    s.button(32, top + 470, 153, 46, "بازگشت", variant="text", color=C.muted)
+    s.button(196, top + 470, 165, 46, "تأیید لغو", icon="mdi-close-circle-outline",
              variant="filled", color=C.danger)
     home_bar(s)
     return s
@@ -821,9 +914,12 @@ def sos_cancelled() -> Screen:
            f"{fa_digits(5)} دقیقه", "caption", C.muted_2, align="right")
     y += 134
 
-    s.button(16, 700, 361, 52, "ثبت درخواست جدید", icon="mdi-plus", variant="filled",
-             color=C.danger, shadow=True)
-    s.button(16, 762, 361, 46, "بازگشت به نقشه", icon="mdi-map-outline", variant="outline")
+    # the request was just withdrawn by the user: the red filled button must not invite another
+    # emergency ping by reflex, so "back to the map" is primary and a new request is deliberate
+    s.button(16, 700, 361, 52, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled",
+             shadow=True)
+    s.button(16, 762, 361, 46, "ثبت درخواست جدید", icon="mdi-plus", variant="outline",
+             color=C.danger)
     home_bar(s)
     return s
 
@@ -832,7 +928,7 @@ def sos_cancelled() -> Screen:
 # 15 — the request exists, the photo did not
 # --------------------------------------------------------------------------- #
 def sos_photo_retry() -> Screen:
-    cam = sc.camera(sc.SOS_POINT[0], sc.SOS_POINT[1], 0.26)
+    cam = sc.camera(*sc.SOS_POINT, 0.26).aim_at(*sc.SOS_POINT, 196, 168)
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584)),
                  pois=False)
     s.top_scrim(120)
@@ -852,14 +948,13 @@ def sos_photo_retry() -> Screen:
     s.text(357 - 42, y + 48, "صحنه ضمیمه نشد.", "caption", C.muted, align="right")
     y += 90
 
-    s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
-    s.i.draw_icon(357 - 18, y + 20, "mdi-image-outline", 16, C.muted)
-    s.text(357 - 38, y + 9, "۲٫۱ مگابایت", "caption", C.text_2, align="right")
-    s.ltr(40, y + 9, "IMG_2041.jpg", "caption", C.text_2)
-    s.text(357 - 38, y + 29, "خطای شبکه هنگام بارگذاری", "caption", C.danger, align="right")
-    y += 70
-
-    s.text(377, y + 4, "درخواست بدون عکس هم معتبر است", "caption", C.muted_2, align="right")
+    # the attachment that failed, with the frame itself: a filename alone tells the user nothing
+    s.rect(16, y, 361, 64, fill=C.surface_2, radius=14)
+    _photo_thumb(s, 16 + 361 - 12 - 44, y + 10, 44, 44, radius=10)
+    s.text(357 - 68, y + 8, "IMG_2041.jpg", "label", C.text, align="right")
+    s.text(357 - 68, y + 30, "۲٫۱ مگابایت", "caption", C.muted, align="right")
+    s.text(357 - 68, y + 46, "خطای شبکه هنگام بارگذاری", "caption", C.danger, align="right")
+    y += 78
 
     s.button(16, 634, 361, 50, "تلاش دوباره برای ارسال تصویر", icon="mdi-reload", variant="filled",
              color=C.danger, shadow=True)
@@ -879,24 +974,21 @@ def sos_offline() -> Screen:
     chrome(s, tab=1)
     s.rect(0, 116, 393, 44, fill=C.warning)
     s.i.draw_icon(357 - 22, 138, "mdi-wifi-off", 17, "#FFFFFF")
-    s.text(357 - 40, 130, "اتصال قطع است · درخواست امداد ارسال نمی‌شود", "caption-bold",
+    s.text(357 - 40, 130, "اتصال قطع است · در حالت آفلاین", "caption-bold",
            "#FFFFFF", align="right")
 
     top = 232
-    s.shadow(16, top, 361, 336, radius=26, blur=24, dy=10, alpha=60)
-    s.rect(16, top, 361, 336, fill="#FFFFFF", radius=26)
+    s.shadow(16, top, 361, 296, radius=26, blur=24, dy=10, alpha=60)
+    s.rect(16, top, 361, 296, fill="#FFFFFF", radius=26)
     s.circle(196.5, top + 44, 30, fill=C.warning_soft)
     s.i.draw_icon(196.5, top + 44, "mdi-cloud-off-outline", 30, C.warning)
     s.text(196.5, top + 84, "بدون اینترنت، درخواست ثبت نمی‌شود", "title", C.text, align="center")
     s.para(41.5, top + 114, "ثبت درخواست فقط با اتصال انجام می‌شود تا مرکز امداد مطمئن شود "
            "آن را دیده است.", "body-sm", C.muted, align="center", max_width=310, line_height=21)
-    s.rect(32, top + 172, 329, 40, fill=C.warning_soft, radius=12)
-    s.i.draw_icon(345, top + 192, "mdi-phone", 15, C.warning)
-    s.text(325, top + 183, "در خطر فوری، همین حالا با ۱۲۵ تماس بگیرید.", "caption-bold",
-           C.warning, align="right")
-    s.button(40, top + 224, 313, 48, "تماس با ۱۲۵", icon="mdi-phone", variant="filled",
+    # one call to action, not a banner and a button saying the same number
+    s.button(32, top + 176, 329, 48, "تماس با ۱۲۵", icon="mdi-phone", variant="filled",
              color=C.danger, shadow=True)
-    s.button(40, top + 280, 313, 40, "تلاش دوباره برای اتصال", icon="mdi-refresh",
+    s.button(32, top + 232, 329, 40, "تلاش دوباره برای اتصال", icon="mdi-refresh",
              variant="text", color=C.primary)
 
     # what still works offline: the cached record
@@ -922,7 +1014,8 @@ def _sos_row(s: Screen, y: float, item: dict) -> float:
            outline=C.danger if active else C.outline, outline_w=1.6 if active else 1)
     right = 357 - 52
     s.circle(357 - 24, y + 26, 17, fill=C.danger_soft if active else C.surface_3)
-    s.i.draw_icon(357 - 24, y + 26, "mdi-alarm-light", 17, C.danger if active else C.muted)
+    s.i.draw_icon(357 - 24, y + 26, item.get("icon", "mdi-alarm-light"), 17,
+                  C.danger if active else C.muted)
     s.text(right, y + 12, item["title"], "label", C.text, align="right", max_width=250)
     s.text(right, y + 34, item["when"], "caption", C.muted_2, align="right")
 
@@ -942,8 +1035,8 @@ def _sos_row(s: Screen, y: float, item: dict) -> float:
             s.circle(cx + 10 + index * 13, y + h - 21, 4.6 if not here else 5.2,
                      fill=C.danger if on else "#FFFFFF",
                      outline=None if on else C.outline_strong, outline_w=0 if on else 1.4)
-        # a chevron the row is tappable
-        s.i.draw_icon(16 + 16, y + 24, "mdi-chevron-left", 18, C.muted_2)
+    # a chevron so every record, not only the live one, reads as a door
+    s.i.draw_icon(16 + 16, y + 24, "mdi-chevron-left", 18, C.muted_2)
     return y + h + 10
 
 
@@ -977,13 +1070,14 @@ def sos_history() -> Screen:
 
     items = [
         {"title": "آتش‌سوزی · بازار قدیم", "when": "امروز · ۹:۳۶", "chip": "در حال رسیدگی",
-         "tone": "danger", "active": True, "stage": 3, "stage_label": "مرحلهٔ ۴ از ۵"},
+         "tone": "danger", "active": True, "stage": 3, "stage_label": "مرحلهٔ ۴ از ۵",
+         "icon": "mdi-fire"},
         {"title": "اورژانس پزشکی · خیابان دانشگاه", "when": "دیروز · ۲۱:۱۰",
-         "chip": "انجام شد", "tone": "success"},
+         "chip": "انجام شد", "tone": "success", "icon": "mdi-medical-bag"},
         {"title": "تصادف · بلوار چمران", "when": "۲ روز پیش · ۰۸:۰۲", "chip": "لغو توسط شما",
-         "tone": "muted"},
+         "tone": "muted", "icon": "mdi-car"},
         {"title": "سیل و آبگرفتگی · کوچهٔ لاله", "when": "۵ روز پیش · ۱۹:۴۵",
-         "chip": "منقضی شد", "tone": "warning"},
+         "chip": "منقضی شد", "tone": "warning", "icon": "mdi-home-flood"},
     ]
     y = 306
     for item in items:
@@ -991,7 +1085,7 @@ def sos_history() -> Screen:
 
     s.button(16, y + 10, 361, 46, "درخواست‌های بیشتر", icon="mdi-chevron-down",
              variant="outline")
-    s.text(196.5, y + 66, "درخواست‌ها از همهٔ دستگاه‌های شما جمع می‌شوند", "caption", C.muted_2,
+    s.text(196.5, y + 66, "درخواست‌ها از همهٔ دستگاه‌های شما جمع می‌شوند", "caption", C.muted,
            align="center")
     home_bar(s)
     return s
@@ -1017,7 +1111,8 @@ def sos_history_detail() -> Screen:
     s.i.draw_icon(357 - 20, 308, "mdi-fire", 20, C.danger)
     s.text(357 - 44, 302, "آتش‌سوزی · شدت بالا", "label-lg", C.text, align="right")
     s.text(357 - 44, 328, sc.SOS_ADDRESS, "caption", C.text_2, align="right", max_width=290)
-    s.chip(28, 348, "طبقهٔ دوم · دو نفر", None, "warning", h=22)
+    # incident detail, not a warning: an amber pill on a red card shouted over the status
+    s.chip(28, 348, "طبقهٔ دوم · دو نفر", None, "neutral", h=22)
 
     s.text(377, 392, "شرح ثبت‌شده", "caption-bold", C.muted, align="right")
     s.rect(16, 412, 361, 74, fill="#FFFFFF", radius=14, outline=C.outline, outline_w=1)
@@ -1026,11 +1121,9 @@ def sos_history_detail() -> Screen:
     # the photo, as a thumbnail with one action instead of a row of overlapping pills
     s.text(377, 500, "تصویر صحنه", "caption-bold", C.muted, align="right")
     s.rect(16, 520, 361, 58, fill="#FFFFFF", radius=14, outline=C.outline, outline_w=1)
-    s.rect(24, 526, 46, 46, fill=C.surface_3, radius=10)
-    s.i.draw_icon(47, 549, "mdi-image-outline", 20, C.muted)
-    s.i.draw_icon(84, 549, "mdi-open-in-new", 16, C.primary)
+    _photo_thumb(s, 24, 526, 46, 46, radius=10)
     s.text(345, 528, "IMG_2041.jpg", "caption-bold", C.text_2, align="right")
-    s.text(345, 546, "۲٫۱ مگابایت · پیوست شده", "caption", C.muted_2, align="right")
+    s.text(345, 546, "۲٫۱ مگابایت · پیوست شده", "caption", C.muted, align="right")
 
     # who came: the one fact the rail cannot carry
     s.text(377, 594, "امدادگر", "caption-bold", C.muted, align="right")
@@ -1074,7 +1167,8 @@ def sos_validation() -> Screen:
 
     y = section_label(s, y, "شدت حادثه")
     y = severity_cards(s, y, "high") + 12
-    y = section_label(s, y, "نوع حادثه", "بارگذاری فهرست ناموفق بود")
+    # the card below already says the catalog failed; a label note said it twice
+    y = section_label(s, y, "نوع حادثه")
     # the catalog failed: the plate shows the recoverable error, not an empty dropdown
     s.rect(16, y, 361, 56, fill=C.warning_soft, radius=12)
     s.i.draw_icon(357 - 18, y + 20, "mdi-alert-outline", 16, C.warning)
@@ -1087,18 +1181,17 @@ def sos_validation() -> Screen:
 
     y = section_label(s, y, "شرح وضعیت", f"{fa_digits(8)} / {fa_digits(500)}")
     s.rect(16, y, 361, 96, fill=C.danger_soft, radius=14, outline=C.danger, outline_w=1.4)
-    s.text(357 - 12, y + 10, "دود زیاد است", "label", C.text, align="right")
-    s.text(357 - 12, y + 40, "حداقل ۱۰ نویسه دربارهٔ وضعیت، افراد و راه دسترسی بنویسید.",
+    # eight characters, which is what the counter above the field says and what the error says
+    s.text(357 - 12, y + 10, "دود زیاد", "label", C.text, align="right")
+    # one sentence, once: the two lines said the same minimum length in different words
+    s.text(357 - 12, y + 38, "حداقل ۱۰ نویسه دربارهٔ وضعیت، افراد و راه دسترسی بنویسید.",
            "caption", C.danger, align="right", max_width=330)
-    s.text(357 - 12, y + 62, "شرح کوتاه‌تر از ۱۰ نویسه پذیرفته نمی‌شود.", "caption", C.muted,
-           align="right", max_width=330)
-    y += 112
 
-    s.button(16, y, 361, 50, "ارسال درخواست امداد فوری", icon="mdi-send-circle-outline",
-             variant="tonal", color=C.danger)
-    s.text(196.5, y + 58, "تا تکمیل موارد بالا، این دکمه فعال نمی‌شود", "caption", C.muted_2,
+    # the action sits where every other sheet in this flow puts it, not glued to the last field
+    s.button(16, 700, 361, 50, "ارسال درخواست امداد فوری", icon="mdi-lock-outline",
+             variant="surface", color=C.muted_2)
+    s.text(196.5, 758, "تا تکمیل موارد بالا، این دکمه فعال نمی‌شود", "caption", C.muted,
            align="center")
-    s.button(16, y + 90, 361, 44, "انصراف", variant="text", color=C.muted_2)
     home_bar(s)
     return s
 
@@ -1112,21 +1205,19 @@ def sos_history_empty() -> Screen:
     s.text(377, 130, "سوابق درخواست‌های امداد", "title-lg", C.text, align="right")
     s.text(377, 160, "وضعیت هر درخواست، از ثبت تا بسته‌شدن", "caption", C.muted, align="right")
 
-    s.rect(16, 200, 361, 380, fill="#FFFFFF", radius=24, outline=C.outline, outline_w=1)
-    s.circle(196.5, 280, 40, fill=C.danger_soft)
-    s.i.draw_icon(196.5, 280, "mdi-lifebuoy", 36, C.danger)
-    s.text(196.5, 338, "هنوز درخواستی ثبت نکرده‌اید", "title", C.text, align="center")
-    s.para(56.5, 368, "درخواست امداد فقط در وضعیت اضطراری فرستاده می‌شود و همیشه در همین "
+    s.rect(16, 200, 361, 336, fill="#FFFFFF", radius=24, outline=C.outline, outline_w=1)
+    s.circle(196.5, 274, 38, fill=C.danger_soft)
+    s.i.draw_icon(196.5, 274, "mdi-lifebuoy", 34, C.danger)
+    s.text(196.5, 326, "هنوز درخواستی ثبت نکرده‌اید", "title", C.text, align="center")
+    s.para(56.5, 356, "درخواست امداد فقط در وضعیت اضطراری فرستاده می‌شود و همیشه در همین "
            "فهرست می‌ماند.", "body-sm", C.muted, align="center", max_width=280)
-    s.button(56.5, 436, 280, 50, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled")
-    s.text(196.5, 504, "دکمهٔ SOS همیشه در گوشهٔ نقشه در دسترس است", "caption", C.muted_2,
-           align="center")
+    s.button(56.5, 430, 280, 50, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled")
 
     # the explanation sits where a list footer would be, not floating in the middle
-    s.rect(16, 690, 361, 84, fill=C.surface_2, radius=16)
-    s.i.draw_icon(357 - 22, 712, "mdi-information-outline", 17, C.muted)
-    s.text(357 - 44, 702, "چه چیزی اینجا ثبت می‌شود؟", "caption-bold", C.text_2, align="right")
-    s.text(357 - 44, 724, "شمارهٔ پیگیری، وضعیت، تصویر مستندات و سیر درخواست.", "caption",
+    s.rect(16, 568, 361, 84, fill=C.surface_2, radius=16)
+    s.i.draw_icon(357 - 22, 590, "mdi-information-outline", 17, C.muted)
+    s.text(357 - 44, 580, "چه چیزی اینجا ثبت می‌شود؟", "caption-bold", C.text_2, align="right")
+    s.text(357 - 44, 602, "شمارهٔ پیگیری، وضعیت، تصویر مستندات و سیر درخواست.", "caption",
            C.muted, align="right", max_width=300)
     home_bar(s)
     return s

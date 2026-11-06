@@ -502,6 +502,33 @@ def mission_pill(screen: Screen, x: float | None, y: float, stage: int, label: s
 # --- the requester's SOS track ----------------------------------------------
 # Same three shapes as the mission track, one vocabulary difference (see `SOS_STAGES`), and its own
 # colour: red belongs to the emergency the citizen is inside, not to the rescue team's brown.
+def form_step(screen: Screen, x: float, y: float, w: float, index: int, label: str,
+              total: int = 4) -> float:
+    """Pre-submit progress for the SOS form: چهار قدم، یک مدل، در همهٔ صفحه‌های فرم.
+
+    The request's own five-stage rail only starts existing after `POST /sos` (the server answers
+    with `requestId` + `pending`), so the form cannot borrow it: before submit the user is moving
+    through *their* four steps — شرح، محل، عکس، بازبینی. Showing the rail here made the plate claim
+    a request that had not been sent yet.
+    """
+    seg_w, gap, seg_h = 22.0, 5.0, 4.0
+    right = x + w
+    caption = f"مرحلهٔ {fa_digits(index)} از {fa_digits(total)}"
+    label_w = screen.tw(caption, "caption-bold") + 10 + screen.tw("· " + label, "caption")
+    # the segments hug the text: pinned to the far edge of a 361-wide row they read as a
+    # different control, not as this sentence's progress
+    seg_right = right - label_w - 14
+    for step in range(total):
+        # RTL: the first step is the right-most segment and the group fills leftwards
+        sx = seg_right - seg_w - step * (seg_w + gap)
+        screen.rect(sx, y + 8, seg_w, seg_h, radius=seg_h / 2,
+                    fill=C.danger if step < index else C.outline_strong)
+    screen.text(right, y, caption, "caption-bold", C.text_2, align="right")
+    screen.text(right - screen.tw(caption, "caption-bold") - 10, y, "· " + label, "caption",
+                C.muted, align="right")
+    return y + 20
+
+
 def sos_rail(screen: Screen, x: float, y: float, w: float, stage: int,
              timestamps: Sequence[str] | None = None, ended: str | None = None,
              caption: str = "وضعیت درخواست") -> float:

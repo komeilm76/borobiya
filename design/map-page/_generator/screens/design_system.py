@@ -6,7 +6,7 @@ from typing import Callable
 from bb.prims import Screen
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
-from bb.ui import (MISSION_STAGES, SEGMENTS, chrome, mission_pill, mission_rail,
+from bb.ui import (MISSION_STAGES, SEGMENTS, chrome, form_step, mission_pill, mission_rail,
                    mission_steps, segmented_small, sos_button, sos_dock, sos_pill, sos_rail,
                    sos_steps)
 
@@ -290,7 +290,7 @@ def mission_state_board() -> Screen:
     y += 206
 
     # 4 — the rules
-    s.rect(40, y, BOARD_W - 80, 136, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.rect(40, y, BOARD_W - 80, 142, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y + 10, "قواعد وضعیت", "label-lg", C.text, align="right")
     rules = [
         "پنج مرحله، همیشه و همه‌جا، از راست: پذیرش، در مسیر، رسیده، رسیدگی، پایان.",
@@ -305,7 +305,7 @@ def mission_state_board() -> Screen:
 
 def sos_parts_board() -> Screen:
     """The SOS request's own parts: its rail, its button, and the tiles the form uses."""
-    from screens.sos import incident_tiles, severity_cards
+    from screens.sos import hold_button, incident_tiles, severity_cards
 
     s = _board()
     class _Shift:
@@ -337,48 +337,44 @@ def sos_parts_board() -> Screen:
 
     y = _head(s, "DESIGN SYSTEM · 6/6", "اجزای درخواست امداد",
               "درخواست SOS ریل و دکمهٔ خودش را دارد، اما از همان توکن‌ها و همان قواعد RTL "
-              "می‌آید: پنج مرحله، قرمز تا پیش از پایان، و یک دکمهٔ ثابت روی نقشه.")
+              "می‌آید: چهار قدم پیش از ارسال، پنج مرحله پس از آن، و یک دکمهٔ ثابت روی نقشه.")
 
     # 1 — the SOS rail, running then finished
     s.rect(40, y, BOARD_W - 80, 232, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y + 12, "ریل · sos_rail", "label-lg", C.text, align="right")
     s.text(BOARD_W - 58, y + 36, "ثبت → اعزام → پذیرش → رسیدگی → پایان؛ قرمز تا پایان، "
            "سبز پس از بسته‌شدن.", "caption", C.muted, align="right", max_width=BOARD_W - 140)
-    sos_rail(s, 58, y + 62, BOARD_W - 116, 2, timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹"))
-    sos_rail(s, 58, y + 148, BOARD_W - 116, 4,
+    sos_rail(s, 58, y + 58, BOARD_W - 116, 2, timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹"))
+    sos_rail(s, 58, y + 150, BOARD_W - 116, 4,
              timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹", "۹:۵۳", "۱۰:۱۲"), ended="انجام شد")
-    y += 248
+    y += 244
 
-    # 2 — the slim line, for the form sheets
-    s.rect(40, y, BOARD_W - 80, 120, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
-    s.text(BOARD_W - 58, y + 12, "خط فشرده · sos_steps / sos_pill", "label-lg", C.text,
-           align="right")
-    s.text(BOARD_W - 58, y + 36, "برای فرم‌ها و شیت‌های پر؛ پیل همان قرارداد با ارتفاع ۳۰ است.",
-           "caption", C.muted, align="right")
-    sos_steps(s, 58, y + 58, BOARD_W - 116, -1, note="پیش‌نویس")
-    sos_steps(s, 58, y + 88, BOARD_W - 116, 3, note="در حال رسیدگی")
-    y += 136
+    # 2 — the form's own four steps: the request rail cannot exist before the request does
+    s.rect(40, y, BOARD_W - 80, 116, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.text(BOARD_W - 58, y + 12, "پیشرفت فرم · form_step", "label-lg", C.text, align="right")
+    s.text(BOARD_W - 58, y + 36, "پیش از ثبت، فرم چهار قدم دارد (شرح، محل، عکس، بازبینی)؛ ریل "
+           "پنج‌مرحله‌ای درخواست از لحظهٔ ارسال شروع می‌شود و اینجا نمی‌آید.",
+           "caption", C.muted, align="right", max_width=BOARD_W - 160)
+    form_step(s, 58, y + 52, BOARD_W - 116, 1, "شرح حادثه")
+    form_step(s, 58, y + 84, BOARD_W - 116, 3, "عکس صحنه")
+    y += 128
 
     # 3 — the docked button, its wide form and the hold state
-    s.rect(40, y, BOARD_W - 80, 150, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
+    s.rect(40, y, BOARD_W - 80, 156, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y + 12, "دکمهٔ SOS · ui.sos_button / ui.sos_dock", "label-lg", C.text,
            align="right")
     s.text(BOARD_W - 58, y + 36, "همیشه در گوشهٔ نقشه (x=16) و همیشه قرمز پر؛ نگه‌داشتن "
            "۰٫۸ ثانیه فرم را باز می‌کند و رها کردن چیزی نمی‌فرستد.",
            "caption", C.muted, align="right", max_width=BOARD_W - 160)
-    import math as _math
-    sos_button(s, 58 + 56, y + 96, r=24, wide=False)
-    s.text(58 + 56, y + 124, "فشرده", "caption", C.muted_2, align="center")
-    sos_button(s, 58 + 200, y + 96, r=26, wide=True)
-    s.text(58 + 200, y + 124, "روی نقشه", "caption", C.muted_2, align="center")
-    hx = 58 + 372
-    for step in range(18):
-        a = _math.radians(-90 + step * 12)
-        s.circle(hx + 34 * _math.cos(a), y + 96 + 34 * _math.sin(a), 2.4,
-                 fill=C.danger if step > 8 else C.danger_soft)
-    s.circle(hx, y + 96, 20, fill=C.danger)
-    s.text(hx, y + 124, "در حال نگه‌داشتن", "caption", C.muted_2, align="center")
-    y += 166
+    sos_button(s, 58 + 56, y + 84, r=24, wide=False)
+    s.text(58 + 56, y + 114, "فشرده", "caption", C.muted, align="center")
+    sos_button(s, 58 + 200, y + 84, r=26, wide=True)
+    s.text(58 + 200, y + 114, "روی نقشه", "caption", C.muted, align="center")
+    # the hold state is the real component, not a sketch of it
+    hold_button(s, 58 + 372, y + 84, r=30, progress=0.62)
+    s.text(58 + 372, y + 128, "در حال نگه‌داشتن · hold_button", "caption", C.muted,
+           align="center")
+    y += 168
 
     # 4 — severity tiles (the one control that is *always* on the form) and the rules
     s.rect(40, y, BOARD_W - 80, 136, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
@@ -387,7 +383,7 @@ def sos_parts_board() -> Screen:
            "پر می‌کند.", "caption", C.muted, align="right", max_width=BOARD_W - 160)
     shift = _Shift(s, 40)
     severity_cards(shift, y + 54, "high")
-    y += 150
+    y += 154
 
     s.rect(40, y, BOARD_W - 80, 118, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y + 10, "قواعد درخواست امداد", "label-lg", C.text, align="right")
