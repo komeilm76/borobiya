@@ -971,14 +971,15 @@ def mission_completed() -> Screen:
     s.img.paste(preview.img, (0, 108 * s.s))
     s.gradient(0, 108, 393, 84, "#F1F5F4", 230, 0)
 
-    # the celebration gets its own card: drawn straight on the map the headline sat on street names
-    s.shadow(16, 138, 361, 136, radius=24, blur=20, dy=6, alpha=28)
-    s.rect(16, 138, 361, 136, fill="#FFFFFF", radius=24)
-    s.circle(196.5, 172, 27, fill=C.success_soft)
-    s.i.draw_icon(196.5, 172, "mdi-check-bold", 27, C.success)
-    s.text(196.5, 200, "مأموریت با موفقیت بسته شد", "title-lg", C.text, align="center")
-    s.text(196.5, 232, "گزارش شما همیشه در سوابق امدادگری می‌ماند", "caption", C.muted, align="center")
-    y = 288
+    # The celebration is one card with one sentence: the closing plate ended it three times —
+    # here («گزارش شما همیشه در سوابق امدادگری می‌ماند»), in the review card below, and again in a
+    # footer line. The headline is the sentence; the rail underneath is the proof.
+    s.shadow(16, 138, 361, 108, radius=24, blur=20, dy=6, alpha=28)
+    s.rect(16, 138, 361, 108, fill="#FFFFFF", radius=24)
+    s.circle(196.5, 175, 26, fill=C.success_soft)
+    s.i.draw_icon(196.5, 175, "mdi-check-bold", 26, C.success)
+    s.text(196.5, 207, "مأموریت با موفقیت بسته شد", "title-lg", C.text, align="center")
+    y = 262
 
     card_y = y
     s.shadow(16, card_y, 361, 210, radius=22, blur=18, dy=6, alpha=26)
@@ -992,9 +993,9 @@ def mission_completed() -> Screen:
                                            ("مسافت", f"{fa_number(sc.MISSION_DISTANCE_KM)} کیلومتر", ""),
                                            ("تیم", f"{fa_digits(4)} نفر", "")], h=60)
     s.divider(30, card_y + 142, 363)
+    # five gold stars are the rating; «۵ از ۵» beside them counted them out loud
     s.text(357, card_y + 152, "امتیاز درخواست‌کننده", "caption", C.muted, align="right")
     s.stars(357 - 96, card_y + 172, 5)
-    s.text(250, card_y + 164, "۵ از ۵", "caption-bold", C.amber_ink, align="right")
     y = card_y + 224
 
     s.rect(16, y, 361, 56, fill=C.surface_2, radius=16)
@@ -1011,12 +1012,8 @@ def mission_completed() -> Screen:
 
     s.button(201, y, 176, 50, "سوابق مأموریت", icon="mdi-history", variant="tonal")
     s.button(16, y, 176, 50, "بازگشت به نقشه", icon="mdi-map-outline", variant="filled")
-    y += 62
-    s.text(196.5, y, "وضعیت آمادگی شما برای مأموریت بعدی فعال است", "caption", C.muted_2,
-           align="center")
     home_bar(s)
     return s
-
 
 # --------------------------------------------------------------------------- #
 # 18/19 — extra states

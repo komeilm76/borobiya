@@ -838,23 +838,25 @@ def sos_completed() -> Screen:
     sos_rail(s, 28, y + 8, 337, 4, timestamps=sc.SOS_STAGE_TIMES_DONE, ended="انجام شد")
     y += 109
 
-    # the record itself: four facts, the same four the history row and the detail plate carry
-    s.shadow(16, y, 361, 208, radius=20, blur=18, dy=5, alpha=22)
-    s.rect(16, y, 361, 208, fill="#FFFFFF", radius=20)
+    # three facts the record holds and the plate has not already said: type, place, id. The
+    # rescuer's name is not among them — `sosRequestRecordSchema` never carries it (this plate
+    # used to invent it). The window («۹:۳۶ تا ۱۰:۱۲») and its ۳۶ minutes are already the
+    # header's headline and the rail's five stamps; a card row repeating them made one sentence
+    # appear three times on a single screen.
+    card_h = 168
+    s.shadow(16, y, 361, card_h, radius=20, blur=18, dy=5, alpha=22)
+    s.rect(16, y, 361, card_h, fill="#FFFFFF", radius=20)
     s.text(357 - 16, y + 14, "خلاصهٔ درخواست", "label-lg", C.text, align="right")
-    # four facts the record actually holds: type, place, window and id. The rescuer's name is
-    # not among them — `sosRequestRecordSchema` never carries it (this plate used to invent it).
     rows = [("mdi-fire", "نوع حادثه", "آتش‌سوزی · شدت شدید"),
             ("mdi-map-marker-outline", "محل", "خیابان شریعتی، بازار قدیم، پلاک ۱۴"),
-            ("mdi-clock-outline", "بازه", f"{sc.SOS_TIMES['submitted']} تا {sc.SOS_TIMES['completed']}"),
-            ("mdi-pound-box-outline", "شناسهٔ پیگیری", f"{fa_digits(sc.SOS_ID)} · {fa_digits(36)} دقیقه")]
+            ("mdi-pound-box-outline", "شناسهٔ پیگیری", fa_digits(sc.SOS_ID))]
     for index, (icon, label, value) in enumerate(rows):
         ry = y + 46 + index * 40
         s.i.draw_icon(357 - 20, ry + 9, icon, 17, C.muted)
         s.text(357 - 40, ry, label, "caption", C.muted, align="right")
         s.text(357 - 40 - 88, ry, value, "caption-bold", C.text_2, align="right",
                max_width=206)
-    y += 224
+    y += card_h + 16
 
     # what the requester wrote stays with the record: the same text the detail plate shows
     s.rect(16, y, 361, 112, fill=C.surface_2, radius=18)

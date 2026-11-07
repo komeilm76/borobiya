@@ -38,7 +38,9 @@ from ._base import box, keepout, map_view
 
 TABS = ["سفرها", "مأموریت‌ها", "همراهان"]
 TAB_COUNTS = ["۱۲", "۳", "۶"]
-SUBTITLE = "سفرها، مأموریت‌های امدادی و همراهان شما"
+# no section subtitle: the three tabs directly under the title *are* the three subjects, and a
+# caption repeating their names was the first line of copy on every history plate
+SUBTITLE = ""
 
 ROW_H = 84
 
@@ -52,7 +54,9 @@ def _header(s: Screen, subtitle: str = SUBTITLE, clock: str | None = None) -> fl
     else:
         chrome(s, tab=0, map_mode=False)
     s.text(377, 124, "تاریخچه", "display", C.text, align="right")
-    s.text(377, 162, subtitle, "caption", C.muted, align="right", max_width=340)
+    if subtitle:
+        s.text(377, 162, subtitle, "caption", C.muted, align="right", max_width=340)
+    # the tabs keep one position across the section whether or not the plate carries a subtitle
     return 186
 
 
@@ -85,9 +89,13 @@ def _search_row(s: Screen, y: float, placeholder: str) -> float:
     return y + 58
 
 
-def _day_header(s: Screen, y: float, title: str, summary: str) -> float:
+def _day_header(s: Screen, y: float, title: str) -> float:
+    """The date alone.
+
+    The per-day total («۲ سفر · ۵٫۱ کیلومتر») was arithmetic the rows underneath already show:
+    two rows, two distances. A calendar needs a boundary, not a subtotal of its own list.
+    """
     s.text(377, y, title, "caption-bold", C.muted, align="right")
-    s.text(16, y, summary, "caption", C.muted_2, align="left")
     return y + 24
 
 
@@ -172,7 +180,8 @@ def _month_strip(s: Screen, y: float, h: float = 54) -> float:
     s.rect(16, y, 361, h, fill=C.primary_soft, radius=16)
     s.i.draw_icon(377 - 26, y + h / 2, "mdi-calendar-month-outline", 20, C.primary)
     s.text(377 - 52, y + 9, "آبان ۱۴۰۵", "label", C.primary, align="right")
-    s.text(377 - 52, y + 30, "۱۲ سفر · ۳۸٫۴ کیلومتر · ۲ سفر امدادی", "caption", C.muted,
+    # «۱۲ سفر» already rides on the tab badge; the month strip carries only what it adds
+    s.text(377 - 52, y + 30, "۳۸٫۴ کیلومتر · ۲ سفر امدادی", "caption", C.muted,
            align="right", max_width=290)
     return y + h + 12
 
@@ -185,13 +194,12 @@ def history_user() -> Screen:
     y = _month_strip(s, y)
 
     for day in DAYS:
-        y = _day_header(s, y, day["title"], day["summary"])
+        y = _day_header(s, y, day["title"])
         for trip in day["trips"]:
             y = _trip_row(s, y, trip)
         y += 2
 
-    s.text(196.5, y + 6, "۴ سفر از ۱۲ سفر · برای دیدن بقیه اسکرول کنید",
-           "caption", C.muted_2, align="center", max_width=350)
+    s.text(196.5, y + 6, "۴ سفر از ۱۲ سفر", "caption", C.muted_2, align="center")
     home_bar(s)
     return s
 
@@ -291,7 +299,7 @@ def _mission_summary(s: Screen, y: float, headline: str, parts: str, hint: str, 
 def history_missions() -> Screen:
     """SOS creator side: «I asked for help — who came, and how did it end?»"""
     s = Screen(background=C.background)
-    y = _header(s, "درخواست‌های امدادی که ثبت کرده‌اید", clock="۹:۵۳")
+    y = _header(s, clock="۹:۵۳")
     y = _tabs(s, y, 1)
     y = _sub_tabs(s, y, 0)
     y = _mission_summary(
@@ -300,7 +308,7 @@ def history_missions() -> Screen:
         soft=C.danger_soft)
 
     for day in REQUEST_DAYS:
-        y = _day_header(s, y, day["title"], day["summary"])
+        y = _day_header(s, y, day["title"])
         for row in day["rows"]:
             y = _mission_row(s, y, row, side="requester")
         y += 2
@@ -318,7 +326,7 @@ def history_missions() -> Screen:
 def history_missions_agent() -> Screen:
     """Responder side: «I accepted a mission — what did it cost me, and how was I rated?»"""
     s = Screen(background=C.background)
-    y = _header(s, "مأموریت‌هایی که پذیرفته‌اید", clock="۹:۵۳")
+    y = _header(s, clock="۹:۵۳")
     y = _tabs(s, y, 1)
     y = _sub_tabs(s, y, 1)
     y = _mission_summary(
@@ -327,7 +335,7 @@ def history_missions_agent() -> Screen:
         tone=C.mission, soft=C.mission_soft)
 
     for day in AGENT_DAYS:
-        y = _day_header(s, y, day["title"], day["summary"])
+        y = _day_header(s, y, day["title"])
         for row in day["rows"]:
             y = _mission_row(s, y, row, side="agent")
         y += 2
@@ -404,12 +412,17 @@ def history_companions() -> Screen:
 # --------------------------------------------------------------------------- #
 # 03 — filter
 # --------------------------------------------------------------------------- #
-def _toggle_row(s: Screen, y: float, title: str, note: str, on: bool, h: float = 38) -> float:
+def _toggle_row(s: Screen, y: float, title: str, on: bool, h: float = 34) -> float:
+    """A switch and its name.
+
+    Both toggles used to carry a second line that only re-said the first («سفرهایی که مسیرشان
+    برای بازپخش هست» under «فقط سفرهای ضبط‌شده»), so the sheet had four lines of label for two
+    decisions.
+    """
     s.rect(16, y, 361, h, fill=C.surface_2, radius=12)
     s.toggle(377 - 12 - 44, y + (h - 26) / 2, 44, 26, on=on)
-    s.text(377 - 68, y + 5, title, "body-sm", C.text, align="right", max_width=250)
-    s.text(377 - 68, y + 21, note, "caption", C.muted_2, align="right", max_width=250)
-    return y + h + 4
+    s.text(377 - 68, y + (h - 20) / 2, title, "body-sm", C.text, align="right", max_width=250)
+    return y + h + 6
 
 
 def history_filter() -> Screen:
@@ -425,9 +438,9 @@ def history_filter() -> Screen:
     s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
     s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
 
-    # the count on the apply button and the count in this subtitle have to agree, or the sheet
-    # is asking the user to do arithmetic before trusting it
-    y = sheet_header(s, top + 22, "فیلتر سوابق", "۷ از ۱۲ سفر با فیلترهای فعلی",
+    # one count on the plate: the apply button's. A subtitle repeating «۷ از ۱۲» made the sheet
+    # ask the user to compare two numbers before trusting either.
+    y = sheet_header(s, top + 22, "فیلتر سوابق", "",
                      icon="mdi-tune-variant", title_style="title")
 
     # period
@@ -448,7 +461,7 @@ def history_filter() -> Screen:
     s.rect(16, y, 361, 44, fill=C.surface_2, radius=12)
     s.i.draw_icon(377 - 24, y + 22, "mdi-calendar-range", 18, C.muted)
     s.text(377 - 48, y + 6, "بازهٔ انتخاب‌شده", "caption", C.muted, align="right")
-    s.text(377 - 48, y + 22, "۲ آبان تا ۲ آذر ۱۴۰۵ · ۳۰ روز", "label", C.text, align="right",
+    s.text(377 - 48, y + 22, "۲ آبان تا ۲ آذر ۱۴۰۵", "label", C.text, align="right",
            max_width=290)
     y += 56
 
@@ -493,8 +506,8 @@ def history_filter() -> Screen:
     y += 38
 
     # what the record is allowed to hide — the two toggles the list header cannot express
-    y = _toggle_row(s, y, "فقط سفرهای ضبط‌شده", "سفرهایی که مسیرشان برای بازپخش هست", True)
-    y = _toggle_row(s, y, "فقط سفرهای امدادی", "سفرهایی که در یک مأموریت ثبت شده‌اند", False)
+    y = _toggle_row(s, y, "فقط سفرهای ضبط‌شده", True)
+    y = _toggle_row(s, y, "فقط سفرهای امدادی", False)
 
     assert y < 752, f"filter sheet content runs into the action bar (ends at {y:.0f})"
     s.shadow(16, 762, 176, 50, radius=16, blur=14, dy=5, color=C.primary, alpha=70)
@@ -587,7 +600,8 @@ def history_details() -> Screen:
 
     y = top + 18
     s.text(357, y, "سفر به آتش‌نشانی مرکزی", "title", C.text, align="right", max_width=250)
-    s.text(357, y + 28, "امروز · ۹:۴۱ تا ۹:۵۲ · ۱٫۴ کیلومتر", "caption", C.muted, align="right")
+    # the start, the end and the ۱۱ دقیقه between them are on the timeline and in the tiles
+    s.text(357, y + 28, "امروز · ۱٫۴ کیلومتر", "caption", C.muted, align="right")
     s.chip(24, y + 2, "تکمیل‌شده", "mdi-check", "success", h=24)
     y += 54
 
@@ -617,9 +631,7 @@ def history_details() -> Screen:
         s.text(16, ry + 2, when, "caption-bold", C.muted_2, align="left")
     y += len(steps) * 44 + 8
 
-    # the trip's own facts, in one line: vehicle, company, and whether it can be replayed
-    s.text(16, y + 4, "خودرو · ۲ همسفر · مسیر ضبط‌شده", "caption", C.muted, align="left")
-    y += 28
+    y += 6
 
     # replaying the record is the primary action here; the client shares *live* location, not
     # a past trip, so «اشتراک‌گذاری» on a finished trip was a door with nothing behind it
@@ -760,7 +772,7 @@ def history_companion() -> Screen:
     chrome(s, tab=0, map_mode=False, clock="۹:۵۵")
     s.icon_button(16, 120, 38, "mdi-chevron-right", 20, C.text_2, fill="#FFFFFF", radius=13)
     s.text(377, 118, "مریم رضایی", "title-lg", C.text, align="right")
-    s.text(377, 150, "۶ سفر مشترک · آخرین سفر دیروز", "caption", C.muted, align="right")
+    s.text(377, 150, "آخرین سفر: دیروز", "caption", C.muted, align="right")
 
     s.rect(16, 182, 361, 92, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
     s.circle(377 - 38, 228, 24, fill=C.primary_soft)
@@ -769,29 +781,24 @@ def history_companion() -> Screen:
     s.text(377 - 74, 192, "۶ سفر مشترک", "label-lg", C.text, align="right")
     s.text(377 - 74, 214, "۳۴٫۲ کیلومتر همراهی · در ۱۳ ماه", "caption", C.muted,
            align="right", max_width=250)
-    s.text(377 - 74, 234, "اولین سفر: ۳ مهر ۱۴۰۴ · آخرین سفر: دیروز", "caption", C.muted_2,
+    s.text(377 - 74, 234, "اولین سفر: ۳ مهر ۱۴۰۴", "caption", C.muted_2,
            align="right", max_width=250)
 
     y = 292
     s.text(377, y, "سفرهای مشترک", "caption-bold", C.muted, align="right")
     s.text(16, y, "۳ از ۶ سفر", "caption", C.muted_2, align="left")
     y += 24
-    y = _day_header(s, y, "امروز", "۱ سفر · ۱٫۳ کیلومتر")
+    y = _day_header(s, y, "امروز")
     y = _trip_row(s, y, COMPANION_TRIPS[0])
-    y = _day_header(s, y + 2, "دیروز", "۱ سفر · ۴٫۸ کیلومتر")
+    y = _day_header(s, y + 2, "دیروز")
     y = _trip_row(s, y, COMPANION_TRIPS[1])
-    y = _day_header(s, y + 2, "۲۷ آبان", "۱ سفر · ۳٫۴ کیلومتر")
+    y = _day_header(s, y + 2, "۲۷ آبان")
     y = _trip_row(s, y, COMPANION_TRIPS[2])
 
-    s.rect(16, y, 361, 66, fill=C.info_soft, radius=14)
-    s.i.draw_icon(377 - 24, y + 22, "mdi-link-variant", 16, C.info)
-    s.text(377 - 46, y + 12, "این فهرست از سفرهای ثبت‌شده ساخته شده است", "caption-bold",
-           C.info, align="right", max_width=290)
-    s.text(377 - 46, y + 32, "نه از اشتراک موقعیت؛ برای دیدن مریم روی نقشه به بخش",
-           "caption", C.muted, align="right", max_width=300)
-    s.text(377 - 46, y + 48, "«همراهان» بروید.", "caption", C.muted, align="right")
-
-    s.button(16, y + 82, 361, 48, "رفتن به بخش همراهان", icon="mdi-account-multiple",
+    # The blue card that used to sit here explained that this list is built from recorded trips
+    # rather than from a live share, then told the reader to open «همراهان» — which is the button
+    # directly under it. The list is its own explanation.
+    s.button(16, y + 10, 361, 48, "رفتن به بخش همراهان", icon="mdi-account-multiple",
              variant="filled", shadow=True)
     home_bar(s)
     return s
@@ -869,7 +876,7 @@ def history_error() -> Screen:
 
     s.chip(16, y, "نسخهٔ ذخیره‌شده", "mdi-database-outline", "neutral", h=28)
     y += 40
-    y = _day_header(s, y, "امروز", "۲ سفر · ۵٫۱ کیلومتر")
+    y = _day_header(s, y, "امروز")
     for trip in DAYS[0]["trips"]:
         y = _trip_row(s, y, trip)
 

@@ -109,12 +109,14 @@ def legend_row(s: Screen, x: float, y: float, items) -> float:
 # --------------------------------------------------------------------------- #
 def companions_hub() -> Screen:
     s = _page()
-    y = _title(s, "همراهان", "سفر مشترک، موقعیت زنده و اشتراک‌گذاری — جدا از سوابق")
+    # the subtitle names the three subjects. Its old tail, «— جدا از سوابق», was a note about a
+    # *different* section printed on this one.
+    y = _title(s, "همراهان", "سفر مشترک، موقعیت زنده و اشتراک‌گذاری")
     y += 6
 
     # live card: who is on the road with me right now
-    s.shadow(16, y, 361, 128, radius=22, blur=18, dy=6, alpha=32)
-    s.rect(16, y, 361, 128, fill=C.primary, radius=22)
+    s.shadow(16, y, 361, 132, radius=22, blur=18, dy=6, alpha=32)
+    s.rect(16, y, 361, 132, fill=C.primary, radius=22)
     s.text(357, y + 16, "همین حالا در سفر", "caption", "#BFE0DC", align="right")
     s.text(357, y + 34, "۳ همسفر آنلاین", "title", "#FFFFFF", align="right")
     avatar_stack(s, 197, y + 44, ["م", "س", "ز"], d=26)
@@ -122,20 +124,18 @@ def companions_hub() -> Screen:
            fill="#2C7C7C", color="#FFFFFF")
     s.text(357, y + 76, "مسیر: خیابان دانشگاه، آتش‌نشانی مرکزی", "caption", "#D6EDE9",
            align="right")
-    s.rect(28, y + 100, 337, 1, fill="#2C7C7C")
-    s.text(357, y + 108, "موقعیت همه روی نقشه زنده است", "caption-bold", "#FFFFFF", align="right")
-    s.text(24, y + 108, "باز کردن نقشه ‹", "caption-bold", "#F4D796", align="left")
-    y += 144
+    s.rect(28, y + 92, 337, 1, fill="#2C7C7C")
+    # the row under the divider is the door. Its right half used to read «موقعیت همه روی نقشه
+    # زنده است», which is the card's own lead-in said a second time.
+    s.text(357, y + 102, "باز کردن نقشه ‹", "caption-bold", "#F4D796", align="right")
+    y += 154
 
-    # the three doors
-    s.text(377, y, "کارهای این بخش", "caption-bold", C.muted, align="right")
-    y += 22
+    # the three doors, with no label above them: «کارهای این بخش» named the container, and the
+    # three rows already say what they are. Each second line is a fact, not an invitation.
     actions = [
-        ("mdi-account-plus-outline", "افزودن همسفر", "با نام کاربری جستجو کنید و به سفر دعوت کنید.",
-         C.primary),
-        ("mdi-map-marker-radius-outline", "اشتراک موقعیت", "نامحدود یا محدود به زمان؛ جدا از سفر.",
-         C.info),
-        ("mdi-history", "اشتراک تاریخچه", "یک بازهٔ زمانی از مسیرهای خود را به کسی بدهید.", C.mission),
+        ("mdi-account-plus-outline", "افزودن همسفر", "با نام کاربری", C.primary),
+        ("mdi-map-marker-radius-outline", "اشتراک موقعیت", "نامحدود یا محدود به زمان", C.info),
+        ("mdi-history", "اشتراک تاریخچه", "یک بازه از مسیرها", C.mission),
     ]
     for icon, head, body, tone in actions:
         s.rect(16, y, 361, 64, fill="#FFFFFF", radius=R.md, outline=C.outline, outline_w=1)
@@ -149,8 +149,7 @@ def companions_hub() -> Screen:
 
     # my current grants
     y += 4
-    row = s.text(377, y, "اشتراک‌های فعال من", "caption-bold", C.muted, align="right")
-    s.text(377, y, "", "caption", C.muted, align="right")
+    s.text(377, y, "اشتراک‌های فعال من", "caption-bold", C.muted, align="right")
     y += 22
     s.rect(16, y, 361, 96, fill="#FFFFFF", radius=R.md, outline=C.outline, outline_w=1)
     s.chip(24, y + 14, "نامحدود", "mdi-infinity", "success", h=24)
@@ -169,7 +168,6 @@ def companions_hub() -> Screen:
     s.button(16, y, 361, 46, "مدیریت همهٔ اشتراک‌ها", icon="mdi-tune", variant="tonal")
     home_bar(s)
     return s
-
 
 def _rgb(color: str):
     color = color.lstrip("#")
