@@ -8,15 +8,33 @@ from bb.map import Camera, draw_route, fit_camera, scale_bar
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R, TYPE
-from bb.ui import (bottom_panel, chrome, card_title_row, fab, home_bar, map_avatar_button, map_tools, metric_tiles,
-                   nav_banner, notice, quick_chips, search_pill, sheet_header, sos_button,
-                   sos_dock, telemetry_strip)
+from bb.ui import (bottom_panel, card_title_row, chrome, fab, home_bar, map_avatar_button, map_tools,
+                   metric_tiles, nav_banner, place_action_pin, place_chips, quick_chips,
+                   search_pill, sheet_header, sos_button, sos_dock, telemetry_strip)
 
 from ._base import (box, destination_pin, incident_marker, keepout, map_view, origin_marker,
                     user_cone)
 
 ROUTE_MAIN = sc.route_world(sc.ROUTE_MAIN)
 ROUTE_ALT = sc.route_world(sc.ROUTE_ALT)
+
+# «نشانها» — the places a user saves. Order is theirs: the map takes the first `CHIP_LIMIT`
+# and the profile owns the whole list (reorder, pin to top, rename, delete).
+CHIP_LIMIT = 2
+BOOKMARKS = (
+    {"name": "خانه", "address": "خیابان دانشگاه، کوچهٔ یاس، پلاک ۱۲", "icon": "mdi-home-outline",
+     "pinned": True},
+    {"name": "محل کار", "address": "بلوار کشاورز، برج اداری نگین، طبقهٔ ۴",
+     "icon": "mdi-briefcase-outline", "pinned": True},
+    {"name": "باشگاه", "address": "بلوار فردوس، نبش خیابان ۱۲", "icon": "mdi-bookmark-outline",
+     "pinned": False},
+    {"name": "بیمارستان امید", "address": "خیابان دانشگاه، پلاک ۸", "icon": "mdi-bookmark-outline",
+     "pinned": False},
+)
+# Saved from plate 03: the fifth place, which does *not* push a third chip onto the map.
+NEW_PLACE = {"name": "خانهٔ مادرم", "address": "خیابان طالقانی، پلاک ۴۸",
+             "icon": "mdi-bookmark-outline"}
+LAST_DESTINATION = "آخرین مقصد"
 
 
 # --------------------------------------------------------------------------- #
@@ -43,8 +61,9 @@ def map_idle() -> Screen:
     # floating over the streets where the eye has to hunt for it
     sos_box = sos_dock(s, 606)
 
-    quick_chips(s, 700, [("خانه", "mdi-home-outline"), ("محل کار", "mdi-briefcase-outline"),
-                         ("آخرین مقصد", "mdi-history")])
+    # two bookmarks, not five: a shortcut row you can hit without looking, and the ordering is
+    # the user's own (profile → نشان‌ها)
+    place_chips(s, 700, BOOKMARKS, LAST_DESTINATION)
     search_pill(s, 14, 752, 365, h=58, placeholder="کجا می‌روی؟")
     # the scale bar moved off the corner the SOS pill now owns: single line, under the fabs
     scale_bar(s, cam, 268, 660)
@@ -53,7 +72,208 @@ def map_idle() -> Screen:
 
 
 # --------------------------------------------------------------------------- #
-# 02 — search open
+# 02 — press and hold the map: the point is chosen, and a small button offers to keep it
+# --------------------------------------------------------------------------- #
+PRESS_POINT = (-140, 150)
+
+
+def map_press_hold() -> Screen:
+    """A long press drops a soft pin; the small bookmark button is the only new thing on screen.
+
+    The request was one icon button, not a menu: the point is already chosen, and everything else
+    this card could say (navigate, send) lives in the peek card at the bottom, where the same two
+    actions sit on every other place plate.
+    """
+    cam = sc.camera(0, 0, 0.20).aim_at(*PRESS_POINT, 196, 386)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 236, 393, 78),
+                                      box(0, 560, 393, 292), box(112, 320, 172, 118)))
+    s.top_scrim(126)
+    chrome(s, tab=1, clock="۹:۴۳")
+    map_avatar_button(s, 128, x=335)
+    map_tools(s, 128, angle=22)
+
+    user_cone(s, cam, *sc.USER, bearing=28)
+    draw_route(s, cam, ROUTE_MAIN, width_m=10, dashed=True, mute=0.55)
+
+    px, py = cam.project(*PRESS_POINT, s)
+    place_action_pin(s, px, py, "میدان انقلاب")
+
+    # the one control the request asked for: 44px, thumb-sized, one tap from the pin, clear of
+    # the label above it and of the destination pin on its right
+    bx, by = px + 24, py - 6
+    s.shadow(bx, by, 44, 44, radius=15, blur=14, dy=5, alpha=50)
+    s.rect(bx, by, 44, 44, fill=C.primary, radius=15)
+    s.i.draw_icon(bx + 22, by + 22, "mdi-bookmark-plus-outline", 21, "#FFFFFF")
+
+    # what a press-and-hold is, said once, on the plate that teaches it
+    s.rect(16, 236, 361, 70, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
+    s.circle(357 - 24, 271, 15, fill=C.primary_soft)
+    s.i.draw_icon(357 - 24, 271, "mdi-gesture-tap-hold", 17, C.primary)
+    s.text(357 - 48, 246, "نگه‌داشتن روی نقشه، یک نقطه انتخاب می‌کند", "label", C.text,
+           align="right", max_width=300)
+    s.text(357 - 48, 268, "نشانگر را جابه‌جا کنید، بعد یکی از کارها را بزنید.", "caption",
+           C.muted, align="right", max_width=300)
+
+    # the peek card: same two actions as every other place plate
+    top = 560
+    s.shadow(12, top, 369, 262, radius=26, blur=24, dy=8, alpha=48)
+    s.rect(12, top, 369, 262, fill="#FFFFFF", radius=26, outline=C.outline, outline_w=1)
+    s.rect(188, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    s.circle(357 - 14 - 20, top + 22 + 20, 20, fill=C.primary_soft)
+    s.i.draw_icon(357 - 14 - 20, top + 42, "mdi-map-marker-outline", 21, C.primary)
+    s.text(357 - 14 - 54, top + 22, "میدان انقلاب", "title", C.text, align="right",
+           max_width=250)
+    s.text(357 - 14 - 54, top + 50, "نقطهٔ انتخابی · دقت تقریبی ۲۰ متر", "caption", C.muted,
+           align="right", max_width=280)
+
+    # the bookmark action, repeated as a labelled chip because here there is room to name it
+    chip_w = s.chip(24, top + 84, "ذخیره در نشان‌ها", "mdi-bookmark-plus-outline", "primary",
+                    h=30)
+    s.text(24 + chip_w + 12, top + 90, "نامش را قدم بعد می‌گذارید", "caption", C.muted_2,
+           align="left", max_width=220)
+
+    s.divider(30, top + 128, 363)
+    s.button(201, top + 142, 168, 50, "مسیریابی به اینجا", icon="mdi-navigation-variant",
+             variant="filled", shadow=True)
+    s.button(24, top + 142, 168, 50, "ارسال موقعیت", icon="mdi-share-variant", variant="tonal")
+    s.text(196.5, top + 210, "برای انتخاب نقطهٔ دیگر، نقشه را جابه‌جا کنید",
+           "caption", C.muted_2, align="center", max_width=330)
+    s.text(196.5, top + 228, "یا از نوار جستجو استفاده کنید", "caption", C.muted_2,
+           align="center", max_width=330)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 03 — the form that turns that point into a saved place
+# --------------------------------------------------------------------------- #
+def bookmark_form() -> Screen:
+    cam = sc.camera(sc.USER[0] - 40, sc.USER[1] + 60, 0.22).aim_at(*PRESS_POINT, 196, 200)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 232, 393, 620)),
+                 pois=False)
+    s.top_scrim(120)
+    chrome(s, tab=1, clock="۹:۴۳")
+    map_avatar_button(s, 128, x=335)
+    map_tools(s, 128, angle=22)
+    px, py = cam.project(*PRESS_POINT, s)
+    place_action_pin(s, px, py, "میدان انقلاب")
+
+    top = 232
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=52)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 22, "ذخیره در نشان‌ها", "این نقطه در پروفایل شما نگه داشته می‌شود",
+                     icon="mdi-bookmark-plus-outline", title_style="title")
+
+    # 1. the point, read-only: it came from the map and is not edited here
+    s.rect(16, y, 361, 66, fill=C.surface_2, radius=16)
+    s.circle(357 - 22, y + 22, 15, fill="#FFFFFF")
+    s.i.draw_icon(357 - 22, y + 22, "mdi-map-marker-outline", 17, C.primary)
+    s.text(357 - 46, y + 10, "میدان انقلاب", "label", C.text, align="right", max_width=280)
+    s.text(357 - 46, y + 34, "از نقشه برداشته شد · دقت ۲۰ متر", "caption", C.muted_2,
+           align="right", max_width=250)
+    # a coordinate is a Latin run, like an IP: in an RTL line its separators reorder
+    s.ltr(24, y + 12, "35.7001, 51.3900", "caption", C.muted_2)
+    s.text(24, y + 34, "تغییر نقطه", "caption-bold", C.primary, align="left")
+    y += 78
+
+    # 2. the name: the only field the user must fill
+    s.text(377, y, "نام این مکان", "caption-bold", C.muted, align="right")
+    s.text(16, y, "۱۰ / ۲۴", "caption", C.muted_2, align="left")
+    y += 22
+    s.rect(16, y, 361, 52, fill="#FFFFFF", radius=14, outline=C.primary, outline_w=1.6)
+    s.text(357, y + 15, "خانهٔ مادرم", "title-sm", C.text, align="right", max_width=280)
+    s.rect(357 - s.tw("خانهٔ مادرم", "title-sm") - 5, y + 17, 1.8, 24, fill=C.primary)
+    s.i.draw_icon(32, y + 26, "mdi-pencil-outline", 16, C.muted_2)
+    y += 64
+
+    # 3. the label: it picks the icon on the map chip, and nothing else
+    s.text(377, y, "برچسب", "caption-bold", C.muted, align="right")
+    s.text(16, y, "آیکن چیپ روی نقشه", "caption", C.muted_2, align="left")
+    y += 22
+    cursor = 377
+    for label, icon, on in (("خانه", "mdi-home-outline", True),
+                            ("محل کار", "mdi-briefcase-outline", False),
+                            ("دلخواه", "mdi-bookmark-outline", False)):
+        width = s.tw(label, "caption-bold") + 58
+        cursor -= width
+        s.rect(cursor, y, width, 40, fill=C.primary_soft if on else C.surface_2, radius=12,
+               outline=C.primary if on else None, outline_w=1.4 if on else 0)
+        s.i.draw_icon(cursor + width - 20, y + 20, icon, 18, C.primary if on else C.muted)
+        s.text(cursor + width - 34, y + 12, label, "body-sm", C.primary if on else C.text_2,
+               align="right")
+        cursor -= 8
+    y += 52
+
+    # 4. the order rule, stated before the save instead of after it
+    s.rect(16, y, 361, 76, fill=C.info_soft, radius=14)
+    s.i.draw_icon(357 - 22, y + 22, "mdi-format-list-numbered", 16, C.info)
+    s.text(357 - 44, y + 10, "روی نقشه فقط دو نشان اول دیده می‌شود.", "caption-bold",
+           C.info, align="right", max_width=300)
+    s.text(357 - 44, y + 32, "این یکی به انتهای فهرست می‌رود؛ برای بالا کشیدنش،", "caption",
+           C.muted, align="right", max_width=300)
+    s.text(357 - 44, y + 50, "«نشان‌های من» را در پروفایل باز کنید.", "caption", C.muted,
+           align="right", max_width=300)
+    y += 90
+
+    s.button(16, y, 361, 52, "ذخیره در نشان‌ها", icon="mdi-bookmark-check-outline",
+             variant="filled", shadow=True)
+    y += 64
+    s.button(16, y, 361, 44, "انصراف", variant="text", color=C.muted)
+    assert y + 44 < 838, f"bookmark form overflows ({y + 44:.0f})"
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 04 — saved: the map keeps its two chips, and says where the rest went
+# --------------------------------------------------------------------------- #
+def bookmark_saved() -> Screen:
+    cam = sc.camera(sc.USER[0] - 40, sc.USER[1] + 60, 0.20)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 236, 393, 92),
+                                      box(0, 594, 132, 80), box(258, 646, 135, 40)))
+    s.top_scrim(126)
+    chrome(s, tab=1, clock="۹:۴۴")
+    map_avatar_button(s, 128, x=335)
+    map_tools(s, 128, angle=22)
+
+    user_cone(s, cam, *sc.USER, bearing=28)
+    # the saved point wears a green flag pin: a tick on the accuracy ring read as «here I am»
+    destination_pin(s, cam, *PRESS_POINT, None, color=C.success, icon="bookmark-check")
+
+    # the confirmation is a toast under the section control — the peek slot belongs to the place
+    # sheet, and the SOS dock owns the bottom-left corner on every map plate
+    # under the two map controls, never on top of them: the tools end at 224
+    s.shadow(16, 236, 361, 76, radius=18, blur=18, dy=6, alpha=44)
+    s.rect(16, 236, 361, 76, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
+    s.circle(357 - 24, 274, 16, fill=C.success_soft)
+    s.i.draw_icon(357 - 24, 274, "mdi-bookmark-check", 18, C.success)
+    s.text(357 - 48, 248, "«خانهٔ مادرم» ذخیره شد", "label", C.text, align="right",
+           max_width=200)
+    s.text(357 - 48, 270, "۵ نشان دارید؛ دو تای اول روی نقشه می‌آیند.", "caption", C.muted,
+           align="right", max_width=210)
+    s.text(357 - 48, 288, "ترتیب را از پروفایل ← نشان‌ها تغییر دهید.", "caption", C.muted_2,
+           align="right", max_width=235)
+    s.chip(28, 249, "دیدن", "mdi-bookmark-multiple-outline", "primary", h=28)
+
+    fab(s, 327, 552, 44, "mdi-crosshairs-gps")
+    fab(s, 327, 604, 44, "mdi-broadcast", C.success)
+    sos_dock(s, 606)
+
+    # the shortcut row is unchanged on purpose: a fifth place does not push a third chip in
+    drawn = place_chips(s, 700, BOOKMARKS, LAST_DESTINATION)
+    assert drawn == ["خانه", "محل کار"], drawn
+    search_pill(s, 14, 752, 365, h=58, placeholder="کجا می‌روی؟")
+    scale_bar(s, cam, 268, 660)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 05 — search open
 # --------------------------------------------------------------------------- #
 def search_open() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] + 40, 0.185)
@@ -146,6 +366,9 @@ def destination_selected() -> Screen:
     s.rect(12, card_y, 369, 262, fill="#FFFFFF", radius=26, outline=C.outline, outline_w=1)
     s.rect(188, card_y + 8, 53, 4.5, fill=C.outline_strong, radius=3)
 
+    # the bookmark control sits on the card's free left edge: the right corner is the place icon
+    s.icon_button(24, card_y + 20, 36, "mdi-bookmark-plus-outline", 17, C.primary,
+                  fill=C.primary_soft, outline=None, shadow=False, radius=12)
     card_title_row(s, 12, card_y + 22, 369, sc.DEST_NAME, sc.DEST_ADDRESS, "fire-truck", "danger")
 
     # metric chips, right to left
@@ -189,8 +412,11 @@ def destination_details() -> Screen:
 
     # The kind already has its own row below, and the full "kind · address" string
     # ellipsized between the close button and the icon: keep the address only.
+    # the same door as the long-press pin: a place you opened is a place you may want to keep.
+    # `trailing_icon` puts it beside the close control, clear of the title's measured run.
     y = sheet_header(s, top + 22, sc.DEST_NAME, sc.DEST_ADDRESS,
-                     icon="fire-truck", tone="danger", title_style="title-lg")
+                     icon="fire-truck", tone="danger", title_style="title-lg",
+                     trailing_icon="mdi-bookmark-plus-outline")
 
     # metric strip
     metric_tiles(s, 16, y, 361, [("فاصله", "۱٫۲ کیلومتر", "mdi-map-marker-distance"),
@@ -213,11 +439,13 @@ def destination_details() -> Screen:
              shadow=True)
     y += 66
     s.button(201, y, 176, 48, "ارسال موقعیت", icon="mdi-share-variant", variant="tonal")
-    s.button(16, y, 176, 48, "افزودن به مسیر", icon="mdi-plus-circle-outline", variant="tonal")
+    s.button(16, y, 176, 48, "ذخیره در نشان‌ها", icon="mdi-bookmark-plus-outline",
+             variant="tonal")
     y += 62
 
     s.rect(16, y, 361, 96, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
-    actions = [("کپی مختصات", "mdi-content-copy", C.text_2), ("مسیریابی چندمقصدی", "mdi-map-marker-path", C.text_2)]
+    actions = [("کپی مختصات", "mdi-content-copy", C.text_2),
+               ("افزودن به مسیر چندمقصدی", "mdi-map-marker-path", C.text_2)]
     for index, (label, icon, color) in enumerate(actions):
         ry = y + 12 + index * 38
         s.i.draw_icon(357, ry + 12, icon, 19, color)
@@ -629,10 +857,14 @@ def navigation_off_route() -> Screen:
     s.text(_right - 23, 233, _lbl, "caption-bold", "#FBEFD6", align="right")
 
     s.icon_button(14, 290, 44, "mdi-volume-off", 20, C.muted, radius=15)
-    s.shadow(96, 292, 200, 32, radius=16, blur=10, dy=3, alpha=30)
-    s.rect(96, 292, 200, 32, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
-    s.i.draw_icon(276, 308, "mdi-signal-cellular-1", 15, C.warning)
-    s.text(262, 300, "GPS ضعیف · دقت ۳۸ متر", "caption-bold", C.warning, align="right")
+    # the pill is sized by its own text: a fixed 200px box put the warning's first word 6px
+    # outside the outline
+    _gps = "GPS ضعیف · دقت ۳۸ متر"
+    _w = s.tw(_gps, "caption-bold") + 42
+    s.shadow(96, 292, _w, 32, radius=16, blur=10, dy=3, alpha=30)
+    s.rect(96, 292, _w, 32, fill="#FFFFFF", radius=16, outline=C.outline, outline_w=1)
+    s.i.draw_icon(96 + _w - 20, 308, "mdi-signal-cellular-1", 15, C.warning)
+    s.text(96 + _w - 32, 300, _gps, "caption-bold", C.warning, align="right")
 
     top = 616
     s.shadow(0, top - 8, 393, 852 - top + 16, radius=26, blur=24, dy=-2, alpha=48)
@@ -974,22 +1206,26 @@ def trip_completed() -> Screen:
 
 SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
     "01-map-idle": ("navigation/01-map-idle.png", map_idle),
-    "02-search-open": ("navigation/02-search-open.png", search_open),
-    "03-destination-selected": ("navigation/03-destination-selected.png", destination_selected),
-    "04-destination-details": ("navigation/04-destination-details.png", destination_details),
-    "05-trip-transport": ("navigation/05-trip-transport-selection.png", trip_transport),
-    "06-manual-origin": ("navigation/06-manual-origin-selection.png", manual_origin),
-    "07-route-options": ("navigation/07-route-options.png", route_options),
-    "08-route-selected": ("navigation/08-route-selected.png", route_selected),
-    "09-navigation-active": ("navigation/09-navigation-active.png", navigation_active),
-    "10-navigation-alternatives": ("navigation/10-navigation-alternatives.png",
+    "02-map-press-hold": ("navigation/02-map-press-hold.png", map_press_hold),
+    "03-bookmark-form": ("navigation/03-bookmark-form.png", bookmark_form),
+    "04-bookmark-saved": ("navigation/04-bookmark-saved.png", bookmark_saved),
+    "05-search-open": ("navigation/05-search-open.png", search_open),
+    "06-destination-selected": ("navigation/06-destination-selected.png", destination_selected),
+    "07-destination-details": ("navigation/07-destination-details.png", destination_details),
+    "08-trip-transport": ("navigation/08-trip-transport-selection.png", trip_transport),
+    "09-manual-origin": ("navigation/09-manual-origin-selection.png", manual_origin),
+    "10-route-options": ("navigation/10-route-options.png", route_options),
+    "11-route-selected": ("navigation/11-route-selected.png", route_selected),
+    "12-navigation-active": ("navigation/12-navigation-active.png", navigation_active),
+    "13-navigation-alternatives": ("navigation/13-navigation-alternatives.png",
                                    navigation_alternatives),
-    "11-navigation-full-route": ("navigation/11-navigation-full-route.png", navigation_full_route),
-    "12-navigation-off-route": ("navigation/12-navigation-off-route.png", navigation_off_route),
-    "13-multi-destination": ("navigation/13-multi-destination.png", multi_destination),
-    "14-destination-reordering": ("navigation/14-destination-reordering.png",
+    "14-navigation-full-route": ("navigation/14-navigation-full-route.png",
+                                 navigation_full_route),
+    "15-navigation-off-route": ("navigation/15-navigation-off-route.png", navigation_off_route),
+    "16-multi-destination": ("navigation/16-multi-destination.png", multi_destination),
+    "17-destination-reordering": ("navigation/17-destination-reordering.png",
                                   destination_reordering),
-    "15-sos-confirmation": ("navigation/15-sos-confirmation.png", sos_confirmation),
-    "16-trip-cancel": ("navigation/16-trip-cancel.png", trip_cancel),
-    "17-trip-completed": ("navigation/17-trip-completed.png", trip_completed),
+    "18-sos-confirmation": ("navigation/18-sos-confirmation.png", sos_confirmation),
+    "19-trip-cancel": ("navigation/19-trip-cancel.png", trip_cancel),
+    "20-trip-completed": ("navigation/20-trip-completed.png", trip_completed),
 }

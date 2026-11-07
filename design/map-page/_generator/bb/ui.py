@@ -123,6 +123,37 @@ def quick_chips(screen: Screen, y: float, items: Sequence[tuple[str, str]], from
     return cursor
 
 
+def place_action_pin(screen: Screen, x: float, y: float, label: str = "این نقطه") -> None:
+    """The pin a press-and-hold drops: a soft target the user is still moving around.
+
+    It is drawn dashed and pale because the point is not committed yet — the committed pin on the
+    next plates is solid and carries a flag.
+    """
+    with screen.alpha_layer():
+        screen.circle(x, y, 26, fill=(14, 102, 102, 26))
+        screen.circle(x, y, 15, fill=(14, 102, 102, 46))
+    screen.circle(x, y, 7, fill="#FFFFFF", outline=C.primary, outline_w=3)
+    # the label sits above the dot, so a thumb covering the point does not hide the name
+    width = screen.tw(label, "caption-bold") + 22
+    screen.shadow(x - width / 2, y - 46, width, 24, radius=12, blur=10, dy=3, alpha=38)
+    screen.rect(x - width / 2, y - 46, width, 24, fill="#FFFFFF", radius=12,
+                outline=C.outline, outline_w=1)
+    screen.text(x, y - 39, label, "caption-bold", C.primary, align="center")
+
+
+def place_chips(screen: Screen, y: float, bookmarks, last: str, limit: int = 2) -> list[str]:
+    """The two shortcuts the map shows, plus the last destination.
+
+    **Only `limit` bookmarks live on the map** — the rest wait in the profile, ordered by the user.
+    A row of nine saved places would be a menu, not a shortcut; two is what a thumb can hit blind.
+    Returns the labels actually drawn, so a plate can say what it hid.
+    """
+    shown = list(bookmarks)[:limit]
+    items = [(item["name"], item["icon"]) for item in shown] + [(last, "mdi-history")]
+    quick_chips(screen, y, items)
+    return [item["name"] for item in shown]
+
+
 def fab(screen: Screen, x: float, y: float, d: float, icon: str, color: str = C.primary,
         fill: str = "#FFFFFF", badge: str | None = None, label: str | None = None):
     screen.shadow(x, y, d, d, radius=d / 2, blur=16, dy=6, alpha=48)

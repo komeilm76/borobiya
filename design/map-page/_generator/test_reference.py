@@ -160,6 +160,43 @@ def test_history_keeps_three_records():
         assert day["summary"].startswith(history.fa_digits(str(len(day["rows"])))), day["title"]
 
 
+def test_the_map_row_shows_two_bookmarks_only():
+    """«فقط دو نشان روی نقشه» — the third saved place must not push a third chip into the row."""
+    from screens import nav
+
+    assert nav.CHIP_LIMIT == 2
+    assert len(nav.BOOKMARKS) > nav.CHIP_LIMIT, "a shortcut row is only a choice if there are more"
+    assert [item["pinned"] for item in nav.BOOKMARKS[:2]] == [True, True], (
+        "the two places that reach the map row have to be the pinned head of the list")
+
+
+def test_the_saved_place_lands_in_the_profile_list():
+    """Plate 03 saves one place; the profile list has to be the same list plus that one."""
+    from screens import nav, profile
+
+    map_names = [item["name"] for item in nav.BOOKMARKS]
+    profile_names = [item[0] for item in profile.PLACES]
+    assert profile_names == map_names + [nav.NEW_PLACE["name"]], profile_names
+    # the map row is the head of the same list, not a second hard-coded pair
+    assert profile_names[:2] == ["خانه", "محل کار"]
+
+
+def test_a_place_is_saved_from_a_press_on_the_map():
+    """The requested flow: long press → one small icon button → a form naming the place."""
+    import inspect
+
+    from screens import nav
+
+    for key in ("02-map-press-hold", "03-bookmark-form", "04-bookmark-saved"):
+        assert key in nav.SCREENS, key
+    hold = inspect.getsource(nav.map_press_hold)
+    assert "place_action_pin(" in hold
+    assert "mdi-bookmark-plus-outline" in hold
+    form = inspect.getsource(nav.bookmark_form)
+    for needle in ("نام این مکان", "برچسب", "ذخیره در نشان‌ها"):
+        assert needle in form, needle
+
+
 def test_history_rows_stay_compact():
     """The whole point of the rebuild: a day fits on one screen, so rows are ~84px, not 146."""
     from screens import history

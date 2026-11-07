@@ -26,7 +26,7 @@ from bb import scenario as sc
 from bb.prims import Screen, scrim
 from bb.text import fa_digits
 from bb.theme import C, R
-from bb.ui import chrome, home_bar, map_avatar_button, map_tools, metric_tiles
+from bb.ui import chrome, home_bar, map_avatar_button, map_tools, metric_tiles, sheet_header
 
 from ._base import box, keepout, map_view
 
@@ -66,7 +66,7 @@ def _card(s: Screen, y: float, h: float, fill: str = "#FFFFFF", outline: str | N
 
 def _row(s: Screen, y: float, icon: str, title: str, subtitle: str, *, h: float = 64,
          danger: bool = False, trailing: str | None = "mdi-chevron-left",
-         value: str | None = None) -> float:
+         value: str | None = None, gap: float = 10) -> float:
     """One account destination: icon, two lines, a chevron or a short value on the left."""
     color = C.danger if danger else C.primary
     _card(s, y, h)
@@ -82,7 +82,7 @@ def _row(s: Screen, y: float, icon: str, title: str, subtitle: str, *, h: float 
         # a value on the left is still a door: keep the chevron and take the tint
         s.i.draw_icon(30, y + h / 2, "mdi-chevron-left", 18, C.muted_2)
         s.text(50, y + (h - 16) / 2, value, "caption-bold", C.primary, align="left")
-    return y + h + 10
+    return y + h + gap
 
 
 def _device_icon(name: str) -> str:
@@ -96,7 +96,7 @@ def _device_icon(name: str) -> str:
 
 def _identity(s: Screen, y: float) -> float:
     """The account as the server describes it: a username, a role, and what the role can do."""
-    _card(s, y, 136, shadow=True, outline=None, radius=20)
+    _card(s, y, 132, shadow=True, outline=None, radius=20)
     # avatar: the account has no upload endpoint, so it is the initial of the stored username
     s.circle(357 - 40, y + 40, 28, fill=C.primary_soft)
     s.text(357 - 40, y + 27, "R", "title-lg", C.primary, align="center")
@@ -117,7 +117,7 @@ def _identity(s: Screen, y: float) -> float:
         cursor -= width
         s.chip(cursor, y + 96, label, icon, tone, h=26)
         cursor -= 6
-    return y + 136
+    return y + 132
 
 
 # --------------------------------------------------------------------------- #
@@ -131,24 +131,27 @@ def profile_home() -> Screen:
     # three numbers the account can actually count
     metric_tiles(s, 16, y, 361, [("سفرها", "۱۲", "mdi-map-marker-path"),
                                  ("درخواست امداد", "۳", "mdi-alarm-light-outline"),
-                                 ("همراهان", "۶", "mdi-account-multiple-outline")], h=58)
-    y += 70
+                                 ("همراهان", "۶", "mdi-account-multiple-outline")], h=54)
+    y += 64
 
     s.text(377, y, "حساب کاربری", "caption-bold", C.muted, align="right")
-    y += 20
+    y += 18
     # «ورودها» and «دستگاهها» are two pages because they answer two questions: *when did I sign
     # in, and from what* versus *what is still signed in, and can I end it*. Merging them left
     # both questions half-answered.
     y = _row(s, y, "mdi-account-edit-outline", "اطلاعات حساب",
-             "نام کاربری و مشخصات ثابت حساب", h=52)
+             "نام کاربری و مشخصات ثابت حساب", h=48, gap=7)
     y = _row(s, y, "mdi-login-variant", "ورودها",
-             "تاریخچهٔ ورود: زمان، دستگاه و IP", h=52)
+             "تاریخچهٔ ورود: زمان، دستگاه و IP", h=48, gap=7)
     y = _row(s, y, "mdi-devices", "دستگاه‌ها",
-             "۳ دستگاه باز · پخش اشتراک‌ها", h=52)
+             "۳ دستگاه باز · پخش اشتراک‌ها", h=48, gap=7)
     y = _row(s, y, "mdi-shield-lock-outline", "امنیت حساب",
-             "پرسش‌های امنیتی و گذرواژه", h=52)
-    y = _row(s, y, "mdi-palette-outline", "تنظیمات و ظاهر", "پوستهٔ روشن/تیره و ترجیحات", h=52)
-    # the sessions and the devices are one page with two tabs, so the hub has one door for both
+             "پرسش‌های امنیتی و گذرواژه", h=48, gap=7)
+    # the two chips on the map are the head of this list: it belongs to the profile, next to the
+    # account, not to a separate «places» concept the user would have to learn
+    y = _row(s, y, "mdi-bookmark-multiple-outline", "نشان‌های من",
+             "۵ مکان ذخیره‌شده · دو تای اول روی نقشه", h=48, gap=7)
+    y = _row(s, y, "mdi-palette-outline", "تنظیمات و ظاهر", "پوستهٔ روشن/تیره و ترجیحات", h=48)
     assert y < 745, y
 
     # leaving is a real destination, not a footer footnote — but it follows the list instead of
@@ -169,18 +172,20 @@ def profile_edit() -> Screen:
     s = _page("۹:۵۲")
     y = _header(s, "اطلاعات حساب", "فقط نام کاربری قابل تغییر است")
 
-    _card(s, y, 132)
+    # the card is 12px of padding + label + field + two caption lines; the old 132px cut the
+    # second caption in half, so the card grew with its content instead of the content being cut
+    _card(s, y, 148)
     s.text(353, y + 12, "نام کاربری", "caption-bold", C.muted, align="right")
     s.rect(28, y + 32, 337, 54, fill="#FFFFFF", radius=14, outline=C.primary, outline_w=1.6)
     # `ltr()` anchors the run's left edge, so a Latin value starts just inside the field
     s.ltr(44, y + 47, "reza_mohammadi", "title", C.text)
     s.i.draw_icon(348, y + 59, "mdi-pencil-outline", 17, C.primary)
-    s.text(353, y + 92, "۳ تا ۳۰ نویسه؛ حرف کوچک لاتین، رقم و زیرخط", "caption", C.muted,
+    s.text(353, y + 94, "۳ تا ۳۰ نویسه؛ حرف کوچک لاتین، رقم و زیرخط", "caption", C.muted,
            align="right")
-    s.text(28, y + 92, "۱۴ / ۳۰", "caption", C.muted, align="left")
-    s.text(353, y + 112, "همین نام در جست‌وجوی همسفر و دعوت‌نامه دیده می‌شود.", "caption",
+    s.text(28, y + 94, "۱۴ / ۳۰", "caption", C.muted, align="left")
+    s.text(353, y + 116, "همین نام در جست‌وجوی همسفر و دعوت‌نامه دیده می‌شود.", "caption",
            C.muted_2, align="right")
-    y += 146
+    y += 162
 
     # read-only facts, with the reason they are read-only
     s.text(377, y, "ثابت‌های حساب", "caption-bold", C.muted, align="right")
@@ -521,6 +526,156 @@ def profile_logout() -> Screen:
 
 
 # --------------------------------------------------------------------------- #
+# 08 — bookmark places: two on the map, all of them here, ordered by the user
+# --------------------------------------------------------------------------- #
+# The map row is a shortcut, not a menu: it shows the first two saved places and the last
+# destination. Everything else — the rest of the list, the order, the pin that decides which two
+# those are — lives on this page, because a place is account data.
+PLACES = (
+    ("خانه", "خیابان دانشگاه، کوچهٔ یاس، پلاک ۱۲", "mdi-home-outline", True),
+    ("محل کار", "بلوار کشاورز، برج اداری نگین، طبقهٔ ۴", "mdi-briefcase-outline", True),
+    ("باشگاه", "بلوار فردوس، نبش خیابان ۱۲", "mdi-bookmark-outline", False),
+    ("بیمارستان امید", "خیابان دانشگاه، پلاک ۸", "mdi-bookmark-outline", False),
+    ("خانهٔ مادرم", "خیابان طالقانی، پلاک ۴۸", "mdi-bookmark-outline", False),
+)
+
+
+def _place_row(s: Screen, y: float, index: int, item: tuple, h: float = 76) -> float:
+    """One saved place: its rank, what it is, and the two controls that decide the rank."""
+    name, address, icon, pinned = item
+    on_map = index < 2
+    s.rect(16, y, 361, h, fill="#FFFFFF", radius=16,
+           outline=C.primary if index == 0 else C.outline, outline_w=1.4 if index == 0 else 1)
+
+    # rank + icon: the number is what the map reads, so it rides on the icon
+    s.circle(357 - 30, y + 30, 18, fill=C.primary_soft if on_map else C.surface_3)
+    s.i.draw_icon(357 - 30, y + 30, icon, 18, C.primary if on_map else C.text_2)
+    s.circle(357 - 15, y + 16, 9.5, fill=C.primary if on_map else C.muted_2,
+             outline="#FFFFFF", outline_w=1.8)
+    s.text(357 - 15, y + 9, fa_digits(str(index + 1)), "caption-bold", "#FFFFFF",
+           align="center")
+
+    s.text(357 - 60, y + 8, name, "label-lg", C.text, align="right", max_width=190)
+    s.text(357 - 60, y + 30, address, "caption", C.muted, align="right", max_width=200)
+    if on_map:
+        s.text(357 - 60, y + 50, "روی نقشه، کنار «آخرین مقصد»", "caption-bold", C.primary,
+               align="right", max_width=215)
+    else:
+        s.text(357 - 60, y + 50, "فقط در این فهرست", "caption", C.muted_2, align="right",
+               max_width=215)
+
+    # left column: pin-to-top, then the drag handle — the control order the hand expects
+    s.circle(56, y + 30, 16, fill=C.primary_soft if pinned else C.surface_2)
+    s.i.draw_icon(56, y + 30, "mdi-pin" if pinned else "mdi-pin-outline", 16,
+                  C.primary if pinned else C.muted)
+    s.i.draw_icon(28, y + 30, "mdi-drag-vertical", 18, C.muted_2)
+    return y + h + 7
+
+
+def profile_places() -> Screen:
+    s = _page("۹:۵۲")
+    y = _header(s, "نشان‌های من", "۵ مکان ذخیره‌شده · ترتیب را خودتان می‌چینید",
+                action_icon="mdi-plus")
+
+    # the rule first: why only two of five are on the map
+    s.rect(16, y, 361, 66, fill=C.primary_soft, radius=16)
+    s.i.draw_icon(357 - 24, y + 22, "mdi-map-marker-multiple-outline", 17, C.primary)
+    s.text(357 - 48, y + 10, "روی نقشه فقط دو نشان اول می‌آید", "caption-bold", C.primary,
+           align="right", max_width=300)
+    s.text(357 - 48, y + 32, "برای بالا کشیدن یک مکان، سنجاقش را بزنید یا دستهٔ چپ را", "caption",
+           C.muted, align="right", max_width=300)
+    s.text(357 - 48, y + 50, "بگیرید و جابه‌جا کنید.", "caption", C.muted, align="right",
+           max_width=300)
+    y += 78
+
+    s.text(377, y, "به ترتیب نمایش", "caption-bold", C.muted, align="right")
+    s.text(16, y, "۴ مکان دیگر پایین‌تر", "caption", C.muted_2, align="left")
+    y += 22
+    for index, item in enumerate(PLACES):
+        y = _place_row(s, y, index, item)
+
+    assert y < 700, f"place list runs into the footer ({y:.0f})"
+    s.button(16, 706, 361, 50, "افزودن نشان از نقشه", icon="mdi-map-marker-plus-outline",
+             variant="filled", shadow=True)
+    s.text(196.5, 768, "نشان تازه با نگه‌داشتن روی نقشه و زدن دکمهٔ نشانگر ساخته می‌شود.",
+           "caption", C.muted_2, align="center", max_width=350)
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
+# 09 — one place: rename, move, delete
+# --------------------------------------------------------------------------- #
+def profile_place_edit() -> Screen:
+    s = _page("۹:۵۲")
+    y = _header(s, "نشان‌های من", "۵ مکان ذخیره‌شده · ترتیب را خودتان می‌چینید")
+    # the list stays visible behind the sheet: the user is editing one row of it, not leaving
+    for index, item in enumerate(PLACES[:2]):
+        y = _place_row(s, y, index, item)
+    scrim(s, 96, top=0, height=852)
+
+    top = 292
+    s.shadow(0, top - 10, 393, 852 - top + 20, radius=30, blur=26, dy=-2, alpha=60)
+    s.rect(0, top, 393, 852 - top + 2, fill="#FFFFFF", radius=30)
+    s.rect(0, top + 30, 393, 852 - top - 30, fill="#FFFFFF")
+    s.rect(170, top + 8, 53, 4.5, fill=C.outline_strong, radius=3)
+
+    y = sheet_header(s, top + 22, "ویرایش نشان", "نام، آدرس و جای آن روی نقشه",
+                     icon="mdi-bookmark-outline", title_style="title")
+
+    s.text(377, y, "نام", "caption-bold", C.muted, align="right")
+    s.text(16, y, "۱۰ / ۲۴", "caption", C.muted_2, align="left")
+    y += 22
+    s.rect(16, y, 361, 50, fill="#FFFFFF", radius=14, outline=C.primary, outline_w=1.6)
+    s.text(357, y + 14, "خانه", "title-sm", C.text, align="right", max_width=280)
+    s.rect(357 - s.tw("خانه", "title-sm") - 5, y + 16, 1.8, 24, fill=C.primary)
+    s.i.draw_icon(32, y + 25, "mdi-pencil-outline", 16, C.muted_2)
+    y += 62
+
+    s.text(377, y, "آدرس", "caption-bold", C.muted, align="right")
+    s.text(16, y, "از روی نقشه خوانده شده", "caption", C.muted_2, align="left")
+    y += 22
+    s.rect(16, y, 361, 50, fill=C.surface_2, radius=14)
+    s.text(357, y + 14, "خیابان دانشگاه، کوچهٔ یاس، پلاک ۱۲", "body-sm", C.text, align="right",
+           max_width=310)
+    y += 62
+
+    s.text(377, y, "برچسب", "caption-bold", C.muted, align="right")
+    y += 22
+    cursor = 377
+    for label, icon, on in (("خانه", "mdi-home-outline", True),
+                            ("محل کار", "mdi-briefcase-outline", False),
+                            ("دلخواه", "mdi-bookmark-outline", False)):
+        width = s.tw(label, "caption-bold") + 58
+        cursor -= width
+        s.rect(cursor, y, width, 38, fill=C.primary_soft if on else C.surface_2, radius=12,
+               outline=C.primary if on else None, outline_w=1.4 if on else 0)
+        s.i.draw_icon(cursor + width - 20, y + 19, icon, 18, C.primary if on else C.muted)
+        s.text(cursor + width - 34, y + 11, label, "body-sm", C.primary if on else C.text_2,
+               align="right")
+        cursor -= 8
+    y += 50
+
+    # the pin, stated as the consequence it has: it moves the place onto the map row
+    s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
+    s.toggle(357 - 12 - 44, y + 14, 44, 26, on=True)
+    s.text(357 - 66, y + 8, "نشان‌کردن بالای فهرست", "body-sm", C.text, align="right",
+           max_width=240)
+    s.text(357 - 66, y + 28, "روی نقشه می‌آید، کنار «آخرین مقصد»", "caption", C.muted_2,
+           align="right", max_width=250)
+    y += 66
+
+    s.button(16, y, 361, 50, "ذخیره", icon="mdi-check", variant="filled", shadow=True)
+    y += 62
+    s.rect(16, y, 361, 46, fill=C.danger_soft, radius=14)
+    s.i.draw_icon(357 - 24, y + 23, "mdi-trash-can-outline", 17, C.danger)
+    s.text(357 - 48, y + 14, "حذف این نشان", "label", C.danger, align="right")
+    assert y + 46 < 838, f"place edit overflows ({y + 46:.0f})"
+    home_bar(s)
+    return s
+
+
+# --------------------------------------------------------------------------- #
 # 07 — the door: how a user reaches this section from the map
 # --------------------------------------------------------------------------- #
 def profile_entry() -> Screen:
@@ -540,7 +695,7 @@ def profile_entry() -> Screen:
     map_avatar_button(s, 128, active=True, x=335)
 
     # the menu hangs from the button it belongs to: same corner, same inset
-    left, top, w, h = 393 - 14 - 268, 184, 268, 300
+    left, top, w, h = 393 - 14 - 268, 184, 268, 340
     s.shadow(left, top, w, h, radius=20, blur=24, dy=10, alpha=64)
     s.rect(left, top, w, h, fill="#FFFFFF", radius=20)
 
@@ -557,6 +712,7 @@ def profile_entry() -> Screen:
     y += 6
 
     rows = (("پروفایل من", "mdi-account-circle-outline", False),
+            ("نشان‌های من", "mdi-bookmark-multiple-outline", False),
             ("ورودها", "mdi-login-variant", False),
             ("دستگاه‌ها", "mdi-devices", False),
             ("تاریخچه", "mdi-history", False),
@@ -569,7 +725,7 @@ def profile_entry() -> Screen:
                align="right")
         if not danger:
             s.i.draw_icon(left + 18, y + 18, "mdi-chevron-left", 16, C.muted_2)
-        y += 40
+        y += 38
 
     home_bar(s)
     return s
@@ -583,4 +739,6 @@ SCREENS: dict[str, tuple[str, Callable[[], Screen]]] = {
     "p-05-security": ("profile/05-security.png", profile_security),
     "p-06-logout": ("profile/06-logout-confirm.png", profile_logout),
     "p-07-entry": ("profile/07-map-entry.png", profile_entry),
+    "p-08-places": ("profile/08-bookmarks.png", profile_places),
+    "p-09-place-edit": ("profile/09-bookmark-edit.png", profile_place_edit),
 }
