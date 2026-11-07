@@ -7,7 +7,7 @@ from bb import scenario as sc
 from bb import ui
 from bb.map import Camera, draw_route, team_cluster, team_marker
 from bb.prims import Screen, scrim
-from bb.text import fa_digits, fa_number
+from bb.text import count_chars, fa_digits, fa_number
 from bb.theme import C, R, TYPE
 from bb.ui import (MISSION_TAB, bottom_panel, chrome, empty_state, home_bar, map_tools, metric_tiles,
                    mission_pill, mission_rail, mission_steps, nav_banner, notice, sheet_header,
@@ -558,12 +558,13 @@ def support_request() -> Screen:
     s.i.draw_icon(357 - 188, y + 28, "mdi-minus", 19, C.text_2)
     y += 70
 
+    note = "آتش‌سوزی در طبقهٔ دوم انبار؛ نیاز به نردبان و دو نیروی آموزش‌دیده."
     s.text(357, y, "یادداشت برای تیم پشتیبان", "caption-bold", C.muted, align="right")
     y += 22
     s.rect(16, y, 361, 76, fill=C.surface_2, radius=16)
-    s.para(25, y + 10, "آتش‌سوزی در طبقهٔ دوم انبار؛ نیاز به نردبان و دو نیروی آموزش‌دیده.",
-           "body-sm", C.text_2, align="right", max_width=320)
-    s.text(357 - 12, y + 54, f"{fa_digits(44)}/{fa_digits(120)}", "caption", C.muted_2, align="left")
+    s.para(25, y + 10, note, "body-sm", C.text_2, align="right", max_width=320)
+    # counted, not typed: the hand-written «۴۴» sat under a ۶۳-character note
+    s.text(357 - 12, y + 54, count_chars(note, 120), "caption", C.muted_2, align="left")
     y += 90
 
     # summary
@@ -922,12 +923,12 @@ def mission_report() -> Screen:
     y += 22
     # the textarea is the only thing on this sheet the rescuer actually writes: give it the room
     # that the deleted «زمان صرف‌شده» box used to take
+    report = ("آتش‌سوزی انبار با کمک تیم پشتیبانی مهار شد؛ ساکنان تخلیه شدند و محل به "
+              "آتش‌نشانی تحویل داده شد.")
     s.rect(16, y, 361, 126, fill=C.surface_2, radius=16)
-    s.para(15, y + 10, "آتش‌سوزی انبار با کمک تیم پشتیبانی مهار شد؛ ساکنان تخلیه شدند و محل به آتش‌نشانی تحویل داده شد.",
-           "body-sm", C.text_2, align="right", max_width=330)
+    s.para(15, y + 10, report, "body-sm", C.text_2, align="right", max_width=330)
     s.rect(16, y + 96, 361, 1.2, fill=C.outline)
-    s.text(357 - 12, y + 104, f"{fa_digits(96)}/{fa_digits(300)}", "caption", C.muted_2,
-           align="left")
+    s.text(357 - 12, y + 104, count_chars(report, 300), "caption", C.muted_2, align="left")
     y += 140
 
     s.text(357, y, "وضعیت درخواست‌کننده", "caption-bold", C.muted, align="right")
@@ -991,7 +992,7 @@ def mission_completed() -> Screen:
     s.divider(30, card_y + 142, 363)
     s.text(357, card_y + 152, "امتیاز درخواست‌کننده", "caption", C.muted, align="right")
     s.stars(357 - 96, card_y + 172, 5)
-    s.text(250, card_y + 164, "۵ از ۵", "caption-bold", C.amber, align="right")
+    s.text(250, card_y + 164, "۵ از ۵", "caption-bold", C.amber_ink, align="right")
     y = card_y + 224
 
     s.rect(16, y, 361, 56, fill=C.surface_2, radius=16)

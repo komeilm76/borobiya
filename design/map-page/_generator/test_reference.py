@@ -795,7 +795,8 @@ def test_every_colour_pair_that_ships_is_readable():
 
     inks = {"text": C.text, "text_2": C.text_2, "muted": C.muted, "muted_2": C.muted_2,
             "primary": C.primary, "primary_deep": C.primary_deep, "danger": C.danger,
-            "warning": C.warning, "success": C.success, "info": C.info, "mission": C.mission}
+            "warning": C.warning, "success": C.success, "info": C.info, "mission": C.mission,
+            "amber_ink": C.amber_ink}
     surfaces = {"white": "#FFFFFF", "background": C.background, "surface": C.surface,
                 "surface_2": C.surface_2, "surface_3": C.surface_3,
                 "primary_soft": C.primary_soft, "danger_soft": C.danger_soft,
@@ -808,3 +809,36 @@ def test_every_colour_pair_that_ships_is_readable():
             if ratio < 4.5:
                 weak.append(f"{ink_name} on {surface_name} = {ratio:.2f}")
     assert not weak, "under 4.5:1: " + "; ".join(weak)
+
+
+def test_counters_are_computed_not_typed():
+    """A character counter that was typed by hand goes stale the moment the field is edited.
+
+    `mission/11` printed «۴۴/۱۲۰» under a ۶۳-character note; `sos/03` and `mission/17` were
+    wrong the same way. The plates now call `count_chars`, and this keeps the next one honest.
+    """
+    import glob
+    import re
+
+    offenders = []
+    pattern = re.compile(r"fa_digits\(\d+\)\}\s*/\s*\{?(fa_digits\()?")
+    for path in glob.glob(os.path.join(HERE, "screens", "*.py")):
+        with open(path, encoding="utf-8") as handle:
+            for number, line in enumerate(handle, 1):
+                if "docstring" in line:
+                    continue
+                if pattern.search(line):
+                    offenders.append(f"{os.path.basename(path)}:{number}")
+    assert not offenders, "hand-typed counter: " + ", ".join(offenders)
+
+
+def test_every_counter_reads_as_a_fraction():
+    """`count_chars` is the one way the plates count; it must agree with the visible length."""
+    from bb.text import count_chars
+
+    assert count_chars("خانه") == "۴"
+    # the hamze of «خانهٔ» is a combining mark and the ZWNJ of «می‌شود» a joiner: both are
+    # spelling, not keystrokes, so neither counts toward the limit
+    assert count_chars("خانهٔ") == "۴"
+    assert count_chars("می‌شود") == "۵"
+    assert count_chars("آتش‌سوزی", 120) == "۷ / ۱۲۰"

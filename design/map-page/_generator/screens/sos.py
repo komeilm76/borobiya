@@ -21,7 +21,7 @@ from bb import scenario as sc
 from bb import ui
 from bb.map import Camera, draw_route, fit_camera, fit_camera_rotated
 from bb.prims import Screen, scrim
-from bb.text import fa_digits
+from bb.text import count_chars, fa_digits
 from bb.theme import C, R
 from bb.ui import chrome, form_step, home_bar, map_tools, metric_tiles, sheet_header, sos_rail
 
@@ -343,7 +343,7 @@ def sos_compose() -> Screen:
     y = severity_cards(s, y, "high") + 14
     y = section_label(s, y, "نوع حادثه")
     y = incident_tiles(s, y, "آتش‌سوزی") + 14
-    y = section_label(s, y, "شرح وضعیت", f"{fa_digits(96)}/{fa_digits(500)}")
+    y = section_label(s, y, "شرح وضعیت", count_chars(sc.SOS_DESCRIPTION, 500))
     s.rect(16, y, 361, 84, fill=C.surface_2, radius=14, outline=C.outline, outline_w=1)
     s.para(28, y + 8, sc.SOS_DESCRIPTION, "caption", C.text_2, align="right", max_width=330)
     y += 92
@@ -1198,10 +1198,11 @@ def sos_validation() -> Screen:
     s.chip(24, y + 14, "بارگذاری دوباره", "mdi-reload", "warning", h=26)
     y += 68
 
-    y = section_label(s, y, "شرح وضعیت", f"{fa_digits(8)} / {fa_digits(500)}")
+    short = "دود زیاد"
+    y = section_label(s, y, "شرح وضعیت", count_chars(short, 500))
     s.rect(16, y, 361, 96, fill=C.danger_soft, radius=14, outline=C.danger, outline_w=1.4)
     # eight characters, which is what the counter above the field says and what the error says
-    s.text(357 - 12, y + 10, "دود زیاد", "label", C.text, align="right")
+    s.text(357 - 12, y + 10, short, "label", C.text, align="right")
     # one sentence, once: the two lines said the same minimum length in different words
     s.text(357 - 12, y + 38, "حداقل ۱۰ نویسه دربارهٔ وضعیت، افراد و راه دسترسی بنویسید.",
            "caption", C.danger, align="right", max_width=330)

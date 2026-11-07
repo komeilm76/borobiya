@@ -62,7 +62,8 @@ class C:
     danger_soft = "#FBE9EA"
     info = "#316D86"
     info_soft = "#E6F1F5"
-    amber = "#B57A12"
+    amber = "#B57A12"        # star fills and rings: a UI glyph, needs 3:1
+    amber_ink = "#8F5F0C"    # the same hue as *text*: 5.5:1 on white, 5.2:1 on surface_2
 
     # mission (rescue operations) accent
     mission = "#8A4B0F"
