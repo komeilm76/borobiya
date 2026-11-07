@@ -210,6 +210,52 @@ SOS_W = 104.0          # width of the labelled SOS pill at r=28
 SOS_H = 56.0
 
 
+def pill_perimeter(x: float, y: float, w: float, h: float, progress: float) -> list[tuple[float, float]]:
+    """Points along a pill's outline, clockwise from its top-right shoulder, `progress` of the way.
+
+    A press-and-hold on a wide pill cannot show its fill with a circular ring: the control is a
+    bar with rounded ends, so the progress has to travel along the same shape the finger is on.
+    """
+    import math as _math
+
+    r = h / 2
+    ring: list[tuple[float, float]] = []
+    steps = 20
+
+    def arc(cx: float, cy: float, a0: float, a1: float):
+        for index in range(steps + 1):
+            angle = a0 + (a1 - a0) * index / steps
+            ring.append((cx + _math.cos(angle) * r, cy + _math.sin(angle) * r))
+
+    # right cap: from the top shoulder round to the bottom one; then the bottom run right→left,
+    # the left cap, and the top run left→right — one closed path, no branches to guess at
+    arc(x + w - r, y + r, -_math.pi / 2, _math.pi / 2)
+    ring.append((x + r, y + h))
+    arc(x + r, y + r, _math.pi / 2, 3 * _math.pi / 2)
+    ring.append((x + w - r, y))
+
+    lengths = [0.0]
+    for a, b in zip(ring, ring[1:]):
+        lengths.append(lengths[-1] + _math.dist(a, b))
+    target = max(0.0, min(1.0, progress)) * lengths[-1]
+    points = [ring[0]]
+    for index in range(1, len(ring)):
+        if lengths[index] >= target:
+            span = lengths[index] - lengths[index - 1]
+            t = (target - lengths[index - 1]) / span if span else 0.0
+            a, b = ring[index - 1], ring[index]
+            points.append((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+            break
+        points.append(ring[index])
+    return points
+
+
+def sos_dock_box(y: float, x: float = 16.0, r: float = 28) -> tuple[float, float, float, float]:
+    """Where `sos_dock` will paint — known before the map is drawn, so the map can reserve it."""
+    w = SOS_W if r >= 26 else 76.0
+    return (x - 4, y - 6, x + w + 4, y + SOS_H + 6)
+
+
 def sos_dock(screen: Screen, y: float, x: float = 16.0, r: float = 28) -> tuple[float, float, float, float]:
     """Dock the emergency control to the trailing edge of the map, above the sheet.
 
@@ -220,7 +266,7 @@ def sos_dock(screen: Screen, y: float, x: float = 16.0, r: float = 28) -> tuple[
     """
     w = SOS_W if r >= 26 else 76.0
     sos_button(screen, x + w / 2, y + 28, r=r, wide=True)
-    return (x - 4, y - 6, x + w + 4, y + SOS_H + 6)
+    return sos_dock_box(y, x, r)
 
 
 def sheet_header(screen: Screen, top: float, title: str, subtitle: str | None = None,
@@ -287,11 +333,16 @@ def segmented_small(screen: Screen, x: float, y: float, w: float, items: Sequenc
 
 def metric_tiles(screen: Screen, x: float, y: float, w: float, items: Sequence[tuple[str, str, str]],
                  h: float = 62, gap: float = 8, surface: str = C.surface_2):
-    """(label, value, icon) tiles in a row, right-to-left."""
+    """(label, value, icon) tiles in a row, right-to-left: the first item is the right-most.
+
+    The tiles used to be laid out left-to-right while every caller wrote its list in reading
+    order, so the most important number of a plate drifted to the wrong end — on `sos/10` the ETA
+    sat left of the distance, and on `sos/09` the distance sat left of the team size.
+    """
     n = len(items)
     tw = (w - gap * (n - 1)) / n
     for index, (label, value, icon) in enumerate(items):
-        tx = x + index * (tw + gap)
+        tx = x + w - (index + 1) * tw - index * gap
         screen.rect(tx, y, tw, h, fill=surface, radius=R.sm)
         # RTL: icon sits on the tile's right shoulder, caption ends just left of it
         label_right = tx + tw - 10

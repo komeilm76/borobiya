@@ -636,10 +636,6 @@ def history_details() -> Screen:
 def history_playback() -> Screen:
     pts = sc.route_world(sc.TRIP_ACTUAL)
     cam = _fit_box(pts, (24, 132, 369, 470), 852, padding=0.96)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 120), box(0, 500, 393, 352)),
-                 pois=False)
-    s.top_scrim(120)
-    chrome(s, tab=0, clock="۸:۲۴")
 
     # split by *distance*, not by point index: the densified trace is not evenly spaced, and a
     # 55 % index split left the playhead parked next to the destination pin
@@ -648,6 +644,18 @@ def history_playback() -> Screen:
         cum.append(cum[-1] + math.hypot(b[0] - a[0], b[1] - a[1]))
     target = cum[-1] * 0.55
     split = max(1, min(len(pts) - 1, next(i for i, d in enumerate(cum) if d >= target)))
+    probe = Screen()
+    play_x, play_y = cam.project(*pts[split], probe)
+
+    # the legend under the section control and the playhead's time pill are painted over the
+    # map, so their footprints are reserved up front; otherwise «بلوار چمران» came out from
+    # under the legend with its first half missing and the pill cut «کوچهٔ یاس» in two
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 120), box(10, 116, 262, 48),
+                                      box(play_x - 38, play_y - 60, 76, 40),
+                                      box(0, 500, 393, 352)),
+                 pois=False)
+    s.top_scrim(120)
+    chrome(s, tab=0, clock="۸:۲۴")
 
     draw_trace(s, cam, pts[:split + 1], color=C.primary, width_px=5.4, opacity=235)
     draw_trace(s, cam, pts[split:], color=C.route_alt, width_px=4.2, opacity=210, dashed=True)

@@ -493,7 +493,10 @@ def profile_security() -> Screen:
 # --------------------------------------------------------------------------- #
 def profile_logout() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 40, 0.2)
-    s = map_view(cam, pois=False)
+    # the confirm dialog is painted over the map: its footprint is reserved, or a street name
+    # was left poking out from behind its top-left corner with half a letter missing
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 120), box(20, 238, 353, 352)),
+                 pois=False)
     chrome(s, tab=-1, clock="۹:۵۳", status=False)
     scrim(s, 120)
     s.status_bar("۹:۵۳", color="#FFFFFF")
@@ -694,8 +697,11 @@ def profile_entry() -> Screen:
     stacked control group as the map tools (`nav/01`).
     """
     cam = sc.camera(sc.USER[0] + 90, sc.USER[1] - 130, 0.185)
+    # the menu covers 111..379 x 184..524 and is drawn over the map: its footprint is reserved
+    # so no street name is left half-emerging from behind the card
     s = map_view(cam, exclude=keepout(box(0, 0, 393, 126), box(0, 690, 393, 162),
-                                      box(0, 594, 132, 80), box(258, 646, 135, 40)))
+                                      box(0, 594, 132, 80), box(258, 646, 135, 40),
+                                      box(103, 176, 286, 356)))
     s.top_scrim(128)
     # the map goes back one layer: the menu is the thing being read
     scrim(s, 52, top=0, height=852)

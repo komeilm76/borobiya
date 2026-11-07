@@ -564,7 +564,9 @@ def support_request() -> Screen:
     s.rect(16, y, 361, 76, fill=C.surface_2, radius=16)
     s.para(25, y + 10, note, "body-sm", C.text_2, align="right", max_width=320)
     # counted, not typed: the hand-written «۴۴» sat under a ۶۳-character note
-    s.text(357 - 12, y + 54, count_chars(note, 120), "caption", C.muted_2, align="left")
+    # the counter sits at the card's *end* (left, in RTL) with the card's inner padding; anchored
+    # to 357-12 it grew rightwards and «۶۳ / ۱۲۰» hung 6 px outside the rounded border
+    s.text(25, y + 54, count_chars(note, 120), "caption", C.muted_2, align="left")
     y += 90
 
     # summary
@@ -928,7 +930,7 @@ def mission_report() -> Screen:
     s.rect(16, y, 361, 126, fill=C.surface_2, radius=16)
     s.para(15, y + 10, report, "body-sm", C.text_2, align="right", max_width=330)
     s.rect(16, y + 96, 361, 1.2, fill=C.outline)
-    s.text(357 - 12, y + 104, count_chars(report, 300), "caption", C.muted_2, align="left")
+    s.text(25, y + 104, count_chars(report, 300), "caption", C.muted_2, align="left")
     y += 140
 
     s.text(357, y, "وضعیت درخواست‌کننده", "caption-bold", C.muted, align="right")

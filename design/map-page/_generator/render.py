@@ -25,12 +25,14 @@ SECTIONS = {
     "mission": "screens.mission",
     "sos": "screens.sos",
     "profile": "screens.profile",
+    "guides": "screens.sos_guide",
 }
 
 
 SECTION_PREFIX = {"design-system": "design-system", "history": "history",
                   "navigation": "navigation", "mission": "mission",
-                  "companions": "companions", "sos": "sos", "profile": "profile"}
+                  "companions": "companions", "sos": "sos", "profile": "profile",
+                  "guides": "guides"}
 
 
 def registry():

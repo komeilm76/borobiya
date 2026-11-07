@@ -41,7 +41,7 @@ def test_registry_and_disk_agree():
     registered = {path for path, _ in screens().values()}
     on_disk = set()
     for folder in ("design-system", "history", "navigation", "mission", "companions", "sos",
-                   "profile"):
+                   "profile", "guides"):
         directory = os.path.join(DESIGN, folder)
         for name in sorted(os.listdir(directory)):
             if name.endswith(".png"):
@@ -56,7 +56,8 @@ def test_every_plate_is_a_phone_screenshot():
     expected = (786, 1704)
     wrong = {}
     for path, _ in screens().values():
-        if path.startswith("design-system/"):    # those plates are spec sheets, not phone screens
+        # design-system plates and the guides are spec sheets, not phone screens
+        if path.startswith(("design-system/", "guides/")):
             continue
         with Image.open(os.path.join(DESIGN, path)) as image:
             if image.size != expected:
@@ -842,3 +843,43 @@ def test_every_counter_reads_as_a_fraction():
     assert count_chars("خانهٔ") == "۴"
     assert count_chars("می‌شود") == "۵"
     assert count_chars("آتش‌سوزی", 120) == "۷ / ۱۲۰"
+
+
+# --------------------------------------------------------------------------- #
+# The requester's payload: no plate may print what this side of the API cannot return
+# --------------------------------------------------------------------------- #
+def test_no_requester_plate_draws_rescuer_data():
+    """`sosRequestRecordSchema` carries the requester's own fields — never the rescuer's.
+
+    Mission coordinates are readable by the *assigned rescuer* (`missionNavigationTargetSchema`),
+    and the users table has no phone column at all, so a drawing that prints «زهرا احمدی», a
+    vehicle number or a «تماس با امدادگر» button invents a payload the client cannot fetch and a
+    channel the product does not have.
+
+    The check reads *drawn strings and called names*, not comments: the module explains in prose
+    why these fields are absent, and that explanation must be allowed to name them.
+    """
+    import ast
+    import glob
+
+    banned_text = ("زهرا احمدی", "خودروی امداد", "تماس با امدادگر")
+    offenders = []
+    for path in sorted(glob.glob(os.path.join(HERE, "screens", "sos*.py"))):
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+        docstrings = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", [])
+                if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+                    docstrings.add(id(body[0].value))
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    and id(node) not in docstrings):
+                for needle in banned_text:
+                    if needle in node.value:
+                        offenders.append(f"{os.path.basename(path)}: {needle}")
+            # the scenario's rescuer record is not a field any requester payload returns
+            if (isinstance(node, ast.Attribute) and node.attr == "SOS_RESCUER"):
+                offenders.append(f"{os.path.basename(path)}: sc.SOS_RESCUER")
+    assert not offenders, "rescuer data drawn on a requester plate: " + ", ".join(sorted(offenders))
