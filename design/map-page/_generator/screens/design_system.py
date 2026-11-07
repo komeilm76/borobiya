@@ -43,7 +43,8 @@ def tokens_board() -> Screen:
         ("سطوح و متن", [("surface", C.surface, "کارت، شیت"),
                        ("surface-2", C.surface_2, "فیلد، ردیف ثانویه"),
                        ("text", C.text, "متن اصلی"),
-                       ("muted", C.muted, "متن کم‌اهمیت")]),
+                       ("muted", C.muted, "متن ثانویه"),
+                       ("muted-2", C.muted_2, "متن کم‌اهمیت")]),
         ("نقشه", [("land", C.map_land, "پس‌زمینهٔ شهر"),
                  ("water", C.map_water, "آب"),
                  ("park", C.map_park, "فضای سبز"),
@@ -82,7 +83,7 @@ def tokens_board() -> Screen:
 
     s.rect(40, y2, BOARD_W - 80, 116, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y2 + 14, "قواعد کنتراست", "label-lg", C.text, align="right")
-    rules = ["متن روی سطح روشن حداقل ۴٫۵:۱ کنتراست دارد؛ متن ثانویه از #63797A تیره‌تر نمی‌شود.",
+    rules = ["متن روی سطح روشن حداقل ۴٫۵:۱ کنتراست دارد؛ muted و muted_2 هر دو از آن عبور می‌کنند.",
              "وضعیت‌ها همیشه رنگ + آیکن + متن دارند تا فقط به رنگ وابسته نباشند.",
              "قرمز پر فقط برای SOS و حادثه؛ بقیهٔ خطاها با تن ملایم و حاشیه مشخص می‌شوند."]
     for i, rule in enumerate(rules):
@@ -140,7 +141,8 @@ def controls_board() -> Screen:
     y += 68
     s.button(40, y, 210, 48, "پایان سفر", icon="mdi-stop-circle-outline", variant="tonal", color=C.danger)
     s.button(266, y, 210, 48, "لغو مأموریت", variant="filled", color=C.danger)
-    s.button(492, y, 228, 48, "غیرفعال", variant="filled")
+    # a disabled control: the resting surface, no border, muted label — not a filled button
+    # with a pale plate painted over it
     s.rect(492, y, 228, 48, fill=C.surface_3, radius=16)
     s.text(606, y + 13, "غیرفعال", "label-lg", C.muted_2, align="center")
     y += 82

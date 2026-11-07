@@ -126,7 +126,9 @@ def _dim(s: Screen, tab: int = 1, alpha: int = 150) -> None:
     which left the clock as dark text on a near-black map. One pass dims the page; the status bar
     is re-drawn on top because a phone never hides the time.
     """
-    chrome(s, tab=tab)
+    # the clock is drawn once, after the scrim: drawing it twice left the dark copy under the
+    # dim and made the status bar a double print in every audit of these plates
+    chrome(s, tab=tab, status=False)
     scrim(s, alpha)
     s.status_bar(ui.MOMENT or "۹:۴۱", color="#FFFFFF")
 
@@ -368,7 +370,17 @@ def sos_location() -> Screen:
     # frame both the GPS fix and the hand-placed pin, so the dashed offset is a real distance
     cam = fit_camera([sc.to_world(*sc.SOS_POINT), sc.to_world(*sc.SOS_MANUAL)],
                      (40, 210, 353, 570), padding=0.66, max_ppu=0.5)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 590, 393, 262)))
+    # the two legend cards sit at y=200 over the map and the distance pill hangs at the middle
+    # of the offset line; the camera is known before anything is drawn, so both are reserved
+    # exactly instead of guessed — a street name half-hidden behind a pill reads as a defect
+    probe = Screen()
+    _gx, _gy = cam.project_grid(*sc.SOS_POINT, probe)
+    _px, _py = cam.project_grid(*sc.SOS_MANUAL, probe)
+    _mid = ((_px + _gx) / 2, (_py + _gy) / 2)
+    _tw = probe.tw(f"{fa_digits(sc.SOS_MANUAL_OFFSET_M)} متر از GPS", "caption-bold") + 24
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 200), box(0, 590, 393, 262),
+                                      box(12, 198, 369, 38),
+                                      box(_mid[0] - _tw / 2, _mid[1] - 14, _tw, 28)))
     s.status_bar(sc.SOS_CLOCKS["s-04-location"])
     s.top_scrim(200, start=0)
 
@@ -566,8 +578,10 @@ def sos_sending() -> Screen:
 def sos_pending() -> Screen:
     # aim_at, not a centred camera: at 852/2 the pin lands under the sheet
     cam = sc.camera(*sc.SOS_POINT, 0.3).aim_at(*sc.SOS_POINT, 196, 196)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552)),
-                 pois=False)
+    # the alarm pin and its «شما» pill are drawn on top of the map; reserving their footprint
+    # keeps «خیابان ۱۲ فروردین» from printing across the pin's head
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 300, 393, 552),
+                                      box(158, 148, 76, 88)), pois=False)
     s.top_scrim(120)
     chrome(s, tab=1)
     destination_pin(s, cam, *sc.SOS_POINT, "شما", color=C.incident, icon="alarm-light",
@@ -929,8 +943,8 @@ def sos_cancelled() -> Screen:
 # --------------------------------------------------------------------------- #
 def sos_photo_retry() -> Screen:
     cam = sc.camera(*sc.SOS_POINT, 0.26).aim_at(*sc.SOS_POINT, 196, 168)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584)),
-                 pois=False)
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 268, 393, 584),
+                                      box(158, 116, 76, 60)), pois=False)
     s.top_scrim(120)
     chrome(s, tab=1)
     destination_pin(s, cam, *sc.SOS_POINT, None, color=C.incident, icon="alarm-light")
@@ -1008,7 +1022,9 @@ def sos_offline() -> Screen:
 def _sos_row(s: Screen, y: float, item: dict) -> float:
     """One SOS record, in the same card language the History section uses."""
     active = item.get("active", False)
-    h = 100 if active else 80
+    # 92/112, not 80/100: the status pill needs 14px of breathing room above the 18px corner,
+    # and at the old height it sat 8px from the edge and looked like it was sliding out
+    h = 112 if active else 92
     s.shadow(16, y, 361, h, radius=18, blur=14, dy=4, alpha=18)
     s.rect(16, y, 361, h, fill="#FFFFFF", radius=18,
            outline=C.danger if active else C.outline, outline_w=1.6 if active else 1)
@@ -1019,24 +1035,27 @@ def _sos_row(s: Screen, y: float, item: dict) -> float:
     s.text(right, y + 12, item["title"], "label", C.text, align="right", max_width=250)
     s.text(right, y + 34, item["when"], "caption", C.muted_2, align="right")
 
-    chip_w = s.tw(item["chip"], "caption-bold") + 24
-    s.chip(16 + 12, y + h - 32, item["chip"], None, item["tone"], h=24)
+    # status on the row's bottom line, 14px clear of the card's edge
+    chip_w = s.chip_width(item["chip"])
+    pill_y = y + h - 24 - 14
+    s.chip(16 + 12, pill_y, item["chip"], None, item["tone"], h=24)
 
     if active:
-        # the request's own rail, mini: five dots and where it stands
+        # the request's own rail, mini: five dots and where it stands, on the same baseline
         label = item["stage_label"]
         tw = s.tw(label, "caption") + 8
         dots_x = 16 + 12 + chip_w + 16
-        s.text(dots_x + tw, y + h - 27, label, "caption", C.danger, align="right")
+        mid = pill_y + 12
+        s.text(dots_x + tw, mid - 8.5, label, "caption", C.danger, align="right")
         cx = dots_x + tw + 6
         for index in range(5):
             on = index <= item["stage"]
             here = index == item["stage"]
-            s.circle(cx + 10 + index * 13, y + h - 21, 4.6 if not here else 5.2,
+            s.circle(cx + 10 + index * 13, mid, 4.6 if not here else 5.2,
                      fill=C.danger if on else "#FFFFFF",
                      outline=None if on else C.outline_strong, outline_w=0 if on else 1.4)
     # a chevron so every record, not only the live one, reads as a door
-    s.i.draw_icon(16 + 16, y + 24, "mdi-chevron-left", 18, C.muted_2)
+    s.i.draw_icon(16 + 16, y + h / 2, "mdi-chevron-left", 18, C.muted_2)
     return y + h + 10
 
 

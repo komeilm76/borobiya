@@ -13,7 +13,7 @@ def map_view(cam: Camera, exclude=None, pois: bool = True, labels: bool = True, 
     if labels:
         draw_labels(screen, cam, exclude=exclude or ())
     if pois:
-        draw_pois(screen, cam)
+        draw_pois(screen, cam, exclude=exclude or ())
     screen.cam = cam  # type: ignore[attr-defined]
     return screen
 

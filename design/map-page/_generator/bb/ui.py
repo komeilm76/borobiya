@@ -25,14 +25,16 @@ MOMENT: str | None = None
 
 
 def chrome(screen: Screen, tab: int = 1, locked: bool = False, map_mode: bool = True,
-           mission_badge: str | None = None, show_menu: bool = True, clock: str | None = None):
+           mission_badge: str | None = None, show_menu: bool = True, clock: str | None = None,
+           status: bool = True):
     """Status bar + the section control that owns the top of the page.
 
     `clock` exists because a plate is a *moment*: the mission plates print ۹:۴۹–۱۰:۱۲ in their
     timestamps, and a status bar that insists it is ۹:۴۱ makes every one of them read as a mistake.
     """
     clock = clock if clock is not None else MOMENT
-    screen.status_bar(clock) if clock else screen.status_bar()
+    if status:
+        screen.status_bar(clock) if clock else screen.status_bar()
     top = 60
     x = 14
     w = screen.w - 28

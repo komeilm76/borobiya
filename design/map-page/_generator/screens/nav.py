@@ -538,7 +538,10 @@ def trip_transport() -> Screen:
 # --------------------------------------------------------------------------- #
 def manual_origin() -> Screen:
     cam = sc.camera(-40, 40, 0.30).aim_at(-40, 60, 196, 470)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 226), box(0, 676, 393, 176)))
+    # the fixed centre pin has no label of its own, so the map must not put a street name under
+    # it: «خیابان ۱۲ فروردین» printed across the pin read as the address it was pointing at
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 226), box(0, 676, 393, 176),
+                                      box(156, 428, 82, 82)))
     s.top_scrim(120)
     chrome(s, tab=1)
 
@@ -770,8 +773,7 @@ def navigation_alternatives() -> Screen:
         s.text(357 - 14, ry + 12, name, "label-lg", C.text, align="right", max_width=240)
         s.text(357 - 14, ry + 33, f"{time} · {distance}", "caption", C.muted, align="right",
                max_width=240)
-        chip_w = s.chip(0, -100, traffic, None, "success" if traffic == "روان" else "warning",
-                        h=22)  # measure only, drawn below
+        chip_w = s.chip_width(traffic)
         s.chip(357 - 14 - chip_w, ry + 48, traffic, None,
                "success" if traffic == "روان" else "warning", h=22)
     y += len(options) * 88
@@ -907,12 +909,20 @@ def multi_destination() -> Screen:
     # camera let the last leg run under the segmented control.
     route_pts = sc.route_world(MULTI_ROUTE)
     cam = fit_camera(route_pts, (30, 168, 363, 274), padding=1.0)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 128), box(0, 286, 393, 566)))
+    stops = [sc.INCIDENT, (-250, 200), sc.HOME]
+    # the numbered legs are drawn after the map, so their footprints are reserved up front:
+    # otherwise a roundabout pin sat exactly under the «۲» and read as its badge
+    reserved = []
+    probe = Screen()
+    for u, v in stops:
+        px, py = cam.project_grid(u, v, probe)
+        reserved.append(box(px - 20, py - 22, 40, 40))
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 128), box(0, 286, 393, 566), *reserved))
     s.top_scrim(120)
     chrome(s, tab=1)
 
     draw_route(s, cam, route_pts, width_m=13)
-    for index, (u, v) in enumerate([sc.INCIDENT, (-250, 200), sc.HOME], start=1):
+    for index, (u, v) in enumerate(stops, start=1):
         x, y = cam.project_grid(u, v, s)
         if index == 3:
             destination_pin(s, cam, u, v, None, icon="flag-checkered")
@@ -982,11 +992,18 @@ def destination_reordering() -> Screen:
     # the line never runs under the section control or off into empty canvas.
     reorder_pts = sc.route_world(MULTI_ROUTE)
     cam = fit_camera(reorder_pts, (30, 168, 363, 274), padding=1.0)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 124), box(0, 286, 393, 566)))
+    stops = [sc.INCIDENT, (-250, 200), sc.HOME]
+    reserved = []
+    probe = Screen()
+    for u, v in stops:
+        px, py = cam.project_grid(u, v, probe)
+        reserved.append(box(px - 20, py - 22, 40, 40))
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 124), box(0, 286, 393, 566),
+                                     *reserved))
     s.top_scrim(120)
     chrome(s, tab=1)
     draw_route(s, cam, reorder_pts, width_m=13)
-    for index, (u, v) in enumerate([sc.INCIDENT, (-250, 200), sc.HOME], start=1):
+    for index, (u, v) in enumerate(stops, start=1):
         x, y = cam.project_grid(u, v, s)
         if index == 3:
             destination_pin(s, cam, u, v, None, icon="flag-checkered")

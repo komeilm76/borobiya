@@ -509,7 +509,10 @@ def _collides(box, placed) -> bool:
     return False
 
 
-def draw_pois(screen: Screen, cam: Camera, icons: bool = True, only: Iterable[str] | None = None):
+def draw_pois(screen: Screen, cam: Camera, icons: bool = True, only: Iterable[str] | None = None,
+              exclude: Sequence[tuple[float, float, float, float]] = ()):
+    """Map POI pins. `exclude` is the same reserved-area list the labels use, so a pin never
+    ends up under a card, a route badge or a fixed control drawn later."""
     if cam.ppu < 0.11:
         return
     for poi in CITY["pois"]:
@@ -517,6 +520,8 @@ def draw_pois(screen: Screen, cam: Camera, icons: bool = True, only: Iterable[st
             continue
         x, y = cam.project_grid(poi.u, poi.v, screen)
         if not (-20 < x < screen.w + 20 and 40 < y < screen.h - 40):
+            continue
+        if any(b[0] <= x <= b[2] and b[1] <= y <= b[3] for b in exclude):
             continue
         if icons:
             fill = {"danger": C.danger_soft, "info": C.info_soft, "neutral": "#FFFFFF"}[poi.tone]

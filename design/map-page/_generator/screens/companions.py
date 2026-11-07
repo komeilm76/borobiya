@@ -85,8 +85,10 @@ def person_row(s: Screen, y: float, name: str, initial: str, detail: str, meta: 
         s.arc_badge(x + w - 24, y + h / 2 - 15, "#E9B35A", "mdi-microphone", 12)
     right = x + w - 64
     s.text(right, y + 12, name, "label-lg", C.text, align="right", max_width=w - 150)
-    s.text(right, y + 34, detail, "caption", C.muted, align="right", max_width=w - 150)
-    s.text(x + 16, y + 24, meta, "caption-bold", edge, align="left", max_width=110)
+    s.text(right, y + 34, detail, "caption", C.muted, align="right", max_width=w - 162)
+    # the freshness stamp shares the second line with the status and starts clear of the
+    # chevron: at x+16 it was printed straight through the arrow's head
+    s.text(x + 34, y + 34, meta, "caption-bold", edge, align="left", max_width=76)
     if trailing:
         s.i.draw_icon(x + 14, y + h / 2, trailing, 18, C.muted_2)
     return y + h + 8
@@ -474,7 +476,9 @@ def companion_talk() -> Screen:
            align="center")
     s.text(196.5, top + 274, "ارتباط دو‌نفره است؛ همسفر سوم صدای شما را نمی‌شنود", "caption",
            "#8FB8B4", align="center")
-    s.text(196.5, top + 300, "ضبط نمی‌شود و جایی ذخیره نمی‌ماند", "caption", "#6E9C99",
+    # 8FB8B4, not 6E9C99: on the deep sheet the old grey-green was 3.2:1 — the footnote simply
+    # disappeared at a glance
+    s.text(196.5, top + 300, "ضبط نمی‌شود و جایی ذخیره نمی‌ماند", "caption", "#8FB8B4",
            align="center")
     home_bar(s)
     return s
@@ -720,7 +724,10 @@ def shared_with_me() -> Screen:
     target = (-40, -120)
     # aimed at the visible band above the sheet, not at the sheet-covered middle of the screen
     cam = sc.camera(*target, 0.34).aim_at(*target, 196, 208)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 298, 393, 554)))
+    # the marker and the name pill under it are drawn after the map; without a reservation
+    # «بلوار ساحلی» printed behind the pill and read as «مریم بلوار ساحلی»
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 118), box(0, 298, 393, 554),
+                                      box(152, 176, 88, 78)))
     s.top_scrim(120)
     chrome(s, tab=2)
 

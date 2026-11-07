@@ -45,13 +45,17 @@ class C:
     # text
     text = "#122A2A"
     text_2 = "#3E5754"
-    muted = "#63797A"
-    muted_2 = "#87999A"
+    # Secondary and tertiary copy. The old values missed 4.5:1 on every tint they sat on
+    # (a caption in #87999A on white was 2.98:1 — visually a grey smudge). These are the
+    # lightest values that still clear 4.5:1 on white, surface_2/3, primary_soft and the
+    # warning/error tints, so the two levels stay distinguishable without going muddy.
+    muted = "#4C5F60"
+    muted_2 = "#5C6D6E"
 
     # semantic
-    success = "#2C7A57"
+    success = "#28724F"   # 4.99:1 on primary_soft; the old #2C7A57 stopped at 4.47
     success_soft = "#E4F2EA"
-    warning = "#A9690B"
+    warning = "#8C5609"   # 4.5:1 on warning_soft and surface_2 as small caption
     warning_soft = "#FCF0DC"
     danger = "#AF3438"
     danger_deep = "#8E2429"

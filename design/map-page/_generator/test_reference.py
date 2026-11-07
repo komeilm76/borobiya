@@ -621,3 +621,190 @@ def test_no_plate_clips_its_own_copy():
         text_module.ellipsize = original
 
     assert not truncated, "clipped copy: " + " | ".join(sorted(set(truncated)))
+
+
+# --------------------------------------------------------------------------- #
+# Ink-on-ink and contrast: the two checks that catch «looks fine at a glance»
+# --------------------------------------------------------------------------- #
+def _geometry_violations():
+    """Render every plate while recording paint order, and return what collides visibly.
+
+    A run drawn before an opaque card is not on the plate (the card was painted over it), and a
+    run under a scrim is dimmed on purpose. What remains — two visible runs sharing pixels — is
+    always a defect: a name printed across an ETA, a number on a label.
+    """
+    from contextlib import contextmanager
+    import bb.icons as icons_mod
+    import bb.prims as prims_mod
+    import bb.text as text_module
+    from bb.theme import TYPE as _TYPE
+
+    ops: list = []
+    layer = {"depth": 0}
+    _line, _ltr = text_module.Text.line, text_module.Text.ltr
+    _icon, _rect, _alpha = (icons_mod.Icons.draw_icon, prims_mod.Screen.rect,
+                            prims_mod.Screen.alpha_layer)
+    _circle = prims_mod.Screen.circle
+
+    def tbox(x, y, width, style, align, visual=""):
+        """The *ink* box: the glyphs, not the line box. Two runs whose line boxes touch are
+        normal typography; two runs whose glyphs touch are a bug."""
+        size, lh = _TYPE[style][1], _TYPE[style][2]
+        x0 = x - width if align == "right" else (x - width / 2 if align == "center" else x)
+        top, bottom = y, y + lh
+        try:
+            import bb.text as _t
+            from bb.theme import type_font
+            f = type_font(style, 1)
+            bbox = f.getbbox(_t.shape(visual or "ا"))
+            baseline = y + lh / 2
+            top = baseline + bbox[1]
+            bottom = baseline + bbox[3]
+        except Exception:                      # pragma: no cover - font metrics are optional
+            pad = (lh - size) * 0.35
+            top, bottom = y + pad, y + lh - pad
+        return (x0, top, x0 + width, bottom)
+
+    def line(self, x, y, text, style="body", color="#122A2A", align="left", line_height=None,
+             opacity=None, max_width=None, halo=None, halo_width=2.0):
+        width = _line(self, x, y, text, style, color, align, line_height, opacity, max_width,
+                      halo=halo, halo_width=halo_width)
+        if text and style in _TYPE and not layer["depth"]:
+            ops.append(("text", text, tbox(x, y, width, style, align, text), bool(halo)))
+        return width
+
+    def ltr(self, x, y, text, style="body", color="#122A2A", align="left", max_width=None):
+        width = _ltr(self, x, y, text, style, color, align, max_width)
+        if text and style in _TYPE and not layer["depth"]:
+            ops.append(("text", text, tbox(x, y, width, style, align), False))
+        return width
+
+    def draw_icon(self, x, y, name, size=22, color="#122A2A", anchor="center"):
+        half = size / 2
+        x0 = x - half if anchor in ("center", "top-left", "bottom-left") else (
+            x - size if anchor == "right" else x)
+        if not layer["depth"]:
+            # the glyph's ink, not its em box: a 22px Material glyph only paints ~16px
+            box = (x0 + size * 0.14, y - half + size * 0.14, x0 + size * 0.86,
+                   y + half - size * 0.14)
+            ops.append(("icon", name, box, False))
+        return _icon(self, x, y, name, size, color, anchor)
+
+    def rect(self, x, y, w, h, fill=None, radius=0, outline=None, outline_w=1, corners=None):
+        if fill is not None and not layer["depth"]:
+            ops.append(("rect", "", (x, y, x + w, y + h), False))
+        return _rect(self, x, y, w, h, fill=fill, radius=radius, outline=outline,
+                     outline_w=outline_w, corners=corners)
+
+    def circle(self, cx, cy, r, fill=None, outline=None, outline_w=1):
+        # a disc is opaque too: the incident badge is painted over the station pin under it
+        if fill is not None and not layer["depth"]:
+            ops.append(("rect", "", (cx - r, cy - r, cx + r, cy + r), False))
+        return _circle(self, cx, cy, r, fill=fill, outline=outline, outline_w=outline_w)
+
+    @contextmanager
+    def alpha_layer(self):
+        layer["depth"] += 1
+        try:
+            with _alpha(self):
+                yield self
+        finally:
+            layer["depth"] -= 1
+
+    text_module.Text.line, text_module.Text.ltr = line, ltr
+    icons_mod.Icons.draw_icon = draw_icon
+    prims_mod.Screen.rect = rect
+    prims_mod.Screen.circle = circle
+    prims_mod.Screen.alpha_layer = alpha_layer
+    found = []
+    try:
+        for key, item in screens().items():
+            ops.clear()
+            (item[1] if isinstance(item, tuple) else item)()
+            visible = []
+            for index, (kind, label, box, halo) in enumerate(ops):
+                if kind == "rect":
+                    continue
+                if any(_swallows(box, op[2]) for op in ops[index + 1:] if op[0] == "rect"):
+                    continue
+                visible.append((kind, label, box, halo))
+            for i in range(len(visible)):
+                for j in range(i + 1, len(visible)):
+                    a, b = visible[i], visible[j]
+                    if a[0] == b[0] == "text" and a[3] and b[3]:
+                        continue      # two street names, each haloing itself
+                    if _share(a[2], b[2]) > 0.24:
+                        found.append(f"{key}: {a[1][:24]!r} x {b[1][:24]!r}")
+    finally:
+        text_module.Text.line, text_module.Text.ltr = _line, _ltr
+        icons_mod.Icons.draw_icon = _icon
+        prims_mod.Screen.rect = _rect
+        prims_mod.Screen.circle = _circle
+        prims_mod.Screen.alpha_layer = _alpha
+    return found
+
+
+def _share(a, b):
+    w = min(a[2], b[2]) - max(a[0], b[0])
+    h = min(a[3], b[3]) - max(a[1], b[1])
+    if w <= 0 or h <= 0:
+        return 0.0
+    smallest = min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+    return (w * h) / smallest if smallest else 0.0
+
+
+def _swallows(box, rect):
+    x0, y0 = max(box[0], rect[0]), max(box[1], rect[1])
+    x1, y1 = min(box[2], rect[2]), min(box[3], rect[3])
+    if x1 <= x0 or y1 <= y0:
+        return False
+    return (x1 - x0) * (y1 - y0) >= 0.55 * (box[2] - box[0]) * (box[3] - box[1])
+
+
+def test_no_two_visible_runs_share_pixels():
+    """The audit that found the dispatch card's ETA printed over the requester's name."""
+    violations = _geometry_violations()
+    assert not violations, "overlapping ink: " + " | ".join(violations)
+
+
+def _contrast_ratio(a, b):
+    def channel(v):
+        v /= 255
+        return v / 12.92 if v <= 0.03928 else ((v + 0.055) / 1.055) ** 2.4
+
+    def luminance(c):
+        r, g, blue = (channel(x) for x in c)
+        return 0.2126 * r + 0.7152 * g + 0.0722 * blue
+
+    hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _rgb(value):
+    value = value.lstrip("#")
+    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def test_every_colour_pair_that_ships_is_readable():
+    """The palette, not the plates: every ink the theme exports against every surface it lands on.
+
+    A caption at 2.98:1 looks deliberate to the person who drew it and unreadable to everyone
+    else, so the pairing is checked as a rule instead of plate by plate.
+    """
+    from bb.theme import C
+
+    inks = {"text": C.text, "text_2": C.text_2, "muted": C.muted, "muted_2": C.muted_2,
+            "primary": C.primary, "primary_deep": C.primary_deep, "danger": C.danger,
+            "warning": C.warning, "success": C.success, "info": C.info, "mission": C.mission}
+    surfaces = {"white": "#FFFFFF", "background": C.background, "surface": C.surface,
+                "surface_2": C.surface_2, "surface_3": C.surface_3,
+                "primary_soft": C.primary_soft, "danger_soft": C.danger_soft,
+                "warning_soft": C.warning_soft, "success_soft": C.success_soft,
+                "info_soft": C.info_soft, "mission_soft": C.mission_soft}
+    weak = []
+    for ink_name, ink in inks.items():
+        for surface_name, surface in surfaces.items():
+            ratio = _contrast_ratio(_rgb(ink), _rgb(surface))
+            if ratio < 4.5:
+                weak.append(f"{ink_name} on {surface_name} = {ratio:.2f}")
+    assert not weak, "under 4.5:1: " + "; ".join(weak)

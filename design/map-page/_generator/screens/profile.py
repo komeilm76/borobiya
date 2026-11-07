@@ -494,7 +494,7 @@ def profile_security() -> Screen:
 def profile_logout() -> Screen:
     cam = sc.camera(sc.USER[0] + 40, sc.USER[1] - 40, 0.2)
     s = map_view(cam, pois=False)
-    chrome(s, tab=-1, clock="۹:۵۳")
+    chrome(s, tab=-1, clock="۹:۵۳", status=False)
     scrim(s, 120)
     s.status_bar("۹:۵۳", color="#FFFFFF")
 

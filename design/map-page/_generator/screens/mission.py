@@ -285,9 +285,12 @@ def mission_accepted() -> Screen:
     s.text(357, y + 10, INCIDENT_NAME, "label", C.text, align="right", max_width=320)
     s.text(357, y + 32, INCIDENT_ADDRESS, "caption", C.muted, align="right", max_width=320)
     s.divider(30, y + 56, 363)
-    s.text(357, y + 62, "درخواست‌کننده: رضا محمدی", "caption", C.text_2, align="right")
-    s.text(240, y + 62, f"{fa_digits(1)}٫{fa_digits(2)} کیلومتر · رسیدن {sc.MISSION_ETA}",
-           "caption-bold", C.primary, align="right")
+    # the name on the right and the ETA on the left, each anchored to its own edge: the ETA used
+    # to be anchored at x=240 «right», so the long name ran straight through it
+    s.text(357, y + 62, "درخواست‌کننده: رضا محمدی", "caption", C.text_2, align="right",
+           max_width=190)
+    s.text(30, y + 62, f"{fa_digits(1)}٫{fa_digits(2)} کیلومتر · رسیدن {sc.MISSION_ETA}",
+           "caption-bold", C.primary, align="left", max_width=130)
     y += 106
 
     # the same five-stage rail every mission plate uses, at the stage this plate shows
@@ -308,7 +311,10 @@ def mission_accepted() -> Screen:
 # --------------------------------------------------------------------------- #
 def mission_navigation() -> Screen:
     cam = sc.camera(*sc.USER, 0.46).heading_up(28).aim_at(*sc.USER, 196, 540)
-    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 668, 393, 184)), pois=False)
+    # the three controls on the left edge are 44px wide at x=14; a street name drawn under one
+    # of them read as the button's own caption
+    s = map_view(cam, exclude=keepout(box(0, 0, 393, 240), box(0, 668, 393, 184),
+                                      box(8, 280, 62, 200)), pois=False)
     s.top_scrim(200, start=240)
     chrome(s, tab=MISSION_TAB, locked=True)
 

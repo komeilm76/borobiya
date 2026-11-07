@@ -329,6 +329,11 @@ class Screen:
             self.circle(x + d - 7, y + 7, 9.5, fill=badge_color, outline="#FFFFFF", outline_w=2)
             self.text(x + d - 7, y + 7 - 8, badge_text, "caption-bold", "#FFFFFF", align="center")
 
+    def chip_width(self, label, icon=None, style: str = "caption-bold") -> float:
+        """How wide `chip` will be. Measuring by drawing one off-canvas paints outside the
+        plate; a plate that needs to right-align a chip asks first."""
+        return self._content_width(label, icon, style, 15, 5) + 20
+
     def chip(self, x, y, label, icon=None, tone: str = "neutral", h: float = 28, style="caption-bold",
              fill=None, color=None, outline=None, radius=None) -> float:
         """RTL pill: `x` is the LEFT edge, content reads icon-then-label from the right."""
