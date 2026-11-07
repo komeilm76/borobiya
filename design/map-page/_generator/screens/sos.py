@@ -303,7 +303,7 @@ def sos_hold() -> Screen:
     s.text(357 - 42, top + 136, "موقعیت فعلی · GPS", "label", C.text, align="right")
     s.text(357 - 42, top + 158, sc.USER_ADDRESS, "caption", C.muted, align="right",
            max_width=280)
-    s.chip(44, top + 176, f"دقت ± {fa_digits(sc.SOS_ACCURACY)} متر", None, "info", h=22)
+    s.chip(44, top + 176, f"دقت حدود {fa_digits(sc.SOS_ACCURACY)} متر", None, "info", h=22)
 
     # what travels with it
     s.text(357 - 32, top + 220, "همراه این درخواست ارسال می‌شود:", "caption", C.muted,
@@ -418,7 +418,7 @@ def sos_location() -> Screen:
     s.text(357, top + 20, "مرحلهٔ ۲ از ۴ · محل حادثه", "caption-bold", C.muted, align="right")
     s.text(357, top + 40, sc.SOS_ADDRESS, "label", C.text, align="right", max_width=336)
     s.chip(24, top + 68, "دستی روی نقشه", "mdi-gesture-tap", "warning", h=24)
-    s.chip(24, top + 98, f"دقت GPS: ± {fa_digits(sc.SOS_ACCURACY)} متر",
+    s.chip(24, top + 98, f"دقت GPS: حدود {fa_digits(sc.SOS_ACCURACY)} متر",
            "mdi-crosshairs-gps", "info", h=24)
     s.button(16, top + 134, 361, 50, "تأیید این نقطه", icon="mdi-check", variant="filled",
              shadow=True)

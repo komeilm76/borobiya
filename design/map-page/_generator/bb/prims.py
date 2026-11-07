@@ -278,7 +278,12 @@ class Screen:
         elif variant == "soft":
             fill, outline, label_color = _tint(color, 0.14), None, color
         elif variant == "outline":
-            fill, outline, label_color = None, C.outline_strong, C.text
+            # a neutral outline is the default; asking for a colour means «this one is
+            # different» (a destructive cancel, a warning), so it has to show
+            if color == C.primary:
+                fill, outline, label_color = None, C.outline_strong, C.text
+            else:
+                fill, outline, label_color = _tint(color, 0.05), _tint(color, 0.45), color
         elif variant == "text":
             fill, outline, label_color = None, None, color
         elif variant == "surface":

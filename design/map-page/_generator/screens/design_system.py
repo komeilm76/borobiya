@@ -342,7 +342,7 @@ def sos_parts_board() -> Screen:
     # 1 — the SOS rail, running then finished
     s.rect(40, y, BOARD_W - 80, 232, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
     s.text(BOARD_W - 58, y + 12, "ریل · sos_rail", "label-lg", C.text, align="right")
-    s.text(BOARD_W - 58, y + 36, "ثبت → اعزام → پذیرش → رسیدگی → پایان؛ قرمز تا پایان، "
+    s.text(BOARD_W - 58, y + 36, "ثبت ‹ اعزام ‹ پذیرش ‹ رسیدگی ‹ پایان؛ قرمز تا پایان، "
            "سبز پس از بسته‌شدن.", "caption", C.muted, align="right", max_width=BOARD_W - 140)
     sos_rail(s, 58, y + 58, BOARD_W - 116, 2, timestamps=("۹:۳۶", "۹:۴۳", "۹:۴۹"))
     sos_rail(s, 58, y + 150, BOARD_W - 116, 4,

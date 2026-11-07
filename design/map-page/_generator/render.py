@@ -56,7 +56,7 @@ def render(keys: list[str]) -> list[str]:
         screen = fn()
         screen.img.convert("RGB").save(target, optimize=True)
         written.append(target)
-        print(f"  ✓ {path}")
+        print(f"  • {path}")
     return written
 
 
@@ -83,7 +83,7 @@ def contact_sheet(paths: list[str], target: str, cols: int = 4, scale: float = 0
         sheet.paste(img, (x, y))
         draw.text((x + 4, y + th + 5), name, font=font, fill="#CFE0DC")
     sheet.save(target, optimize=True)
-    print(f"  ✓ sheet {os.path.basename(target)}")
+    print(f"  • sheet {os.path.basename(target)}")
 
 
 def main(argv: list[str]) -> None:

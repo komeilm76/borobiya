@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import os
 import re
+import unicodedata
 from typing import Iterable, Sequence
 
 from PIL import Image, ImageDraw, ImageFont
@@ -46,6 +47,17 @@ def fa_number(value: float | int, decimals: int = 1) -> str:
     """A measurement in Persian: 1.2 -> «۱٫۲», 14 -> «۱۴», with a Persian decimal separator."""
     text = f"{value:.{decimals}f}".rstrip("0").rstrip(".") if isinstance(value, float) else str(value)
     return fa_digits(text.replace(".", "\u066b"))
+
+
+def count_chars(text: str, limit: int | None = None) -> str:
+    """The «۱۰ / ۲۴» counter of a text field, counted the way a Persian user counts.
+
+    Combining marks (the hamze in «خانهٔ») and the zero-width non-joiner are part of the
+    spelling, not of the length a keyboard shows.
+    """
+    visible = [ch for ch in text if not unicodedata.combining(ch) and ch not in "\u200c\u200f\u200e"]
+    used = fa_digits(len(visible))
+    return f"{used} / {fa_digits(limit)}" if limit is not None else used
 
 
 def _has_arabic(text: str) -> bool:

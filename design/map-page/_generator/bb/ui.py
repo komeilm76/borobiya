@@ -130,9 +130,9 @@ def place_action_pin(screen: Screen, x: float, y: float, label: str = "این ن
     next plates is solid and carries a flag.
     """
     with screen.alpha_layer():
-        screen.circle(x, y, 26, fill=(14, 102, 102, 26))
-        screen.circle(x, y, 15, fill=(14, 102, 102, 46))
-    screen.circle(x, y, 7, fill="#FFFFFF", outline=C.primary, outline_w=3)
+        screen.circle(x, y, 30, fill=(14, 102, 102, 20))
+        screen.circle(x, y, 18, outline=(14, 102, 102, 96), outline_w=1.4)
+    screen.circle(x, y, 8.5, fill="#FFFFFF", outline=C.primary, outline_w=3.4)
     # the label sits above the dot, so a thumb covering the point does not hide the name
     width = screen.tw(label, "caption-bold") + 22
     screen.shadow(x - width / 2, y - 46, width, 24, radius=12, blur=10, dy=3, alpha=38)

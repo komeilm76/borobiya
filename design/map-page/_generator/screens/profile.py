@@ -24,7 +24,7 @@ from typing import Callable
 
 from bb import scenario as sc
 from bb.prims import Screen, scrim
-from bb.text import fa_digits
+from bb.text import count_chars, fa_digits
 from bb.theme import C, R
 from bb.ui import chrome, home_bar, map_avatar_button, map_tools, metric_tiles, sheet_header
 
@@ -540,12 +540,17 @@ PLACES = (
 )
 
 
-def _place_row(s: Screen, y: float, index: int, item: tuple, h: float = 76) -> float:
-    """One saved place: its rank, what it is, and the two controls that decide the rank."""
+def _place_row(s: Screen, y: float, index: int, item: tuple, h: float = 76,
+               highlight: bool = False) -> float:
+    """One saved place: its rank, what it is, and the two controls that decide the rank.
+
+    `highlight` belongs to the edit plate only: a ring around a row in a plain list says
+    «selected», and nothing on the list plate is selected.
+    """
     name, address, icon, pinned = item
     on_map = index < 2
     s.rect(16, y, 361, h, fill="#FFFFFF", radius=16,
-           outline=C.primary if index == 0 else C.outline, outline_w=1.4 if index == 0 else 1)
+           outline=C.primary if highlight else C.outline, outline_w=1.4 if highlight else 1)
 
     # rank + icon: the number is what the map reads, so it rides on the icon
     s.circle(357 - 30, y + 30, 18, fill=C.primary_soft if on_map else C.surface_3)
@@ -564,11 +569,12 @@ def _place_row(s: Screen, y: float, index: int, item: tuple, h: float = 76) -> f
         s.text(357 - 60, y + 50, "فقط در این فهرست", "caption", C.muted_2, align="right",
                max_width=215)
 
-    # left column: pin-to-top, then the drag handle — the control order the hand expects
-    s.circle(56, y + 30, 16, fill=C.primary_soft if pinned else C.surface_2)
-    s.i.draw_icon(56, y + 30, "mdi-pin" if pinned else "mdi-pin-outline", 16,
+    # left column: pin-to-top, then the drag handle — the control order the hand expects.
+    # the two sit 16px apart, not 3: the pin is a 32px disc and the grip is a bare glyph
+    s.circle(64, y + 30, 16, fill=C.primary_soft if pinned else C.surface_2)
+    s.i.draw_icon(64, y + 30, "mdi-pin" if pinned else "mdi-pin-outline", 17,
                   C.primary if pinned else C.muted)
-    s.i.draw_icon(28, y + 30, "mdi-drag-vertical", 18, C.muted_2)
+    s.i.draw_icon(26, y + 30, "mdi-drag-vertical", 18, C.muted_2)
     return y + h + 7
 
 
@@ -588,8 +594,8 @@ def profile_places() -> Screen:
            max_width=300)
     y += 78
 
-    s.text(377, y, "به ترتیب نمایش", "caption-bold", C.muted, align="right")
-    s.text(16, y, "۴ مکان دیگر پایین‌تر", "caption", C.muted_2, align="left")
+    s.text(377, y, "ترتیب نمایش", "caption-bold", C.muted, align="right")
+    s.text(16, y, "۴ مکان دیگر", "caption", C.muted_2, align="left")
     y += 22
     for index, item in enumerate(PLACES):
         y = _place_row(s, y, index, item)
@@ -611,7 +617,7 @@ def profile_place_edit() -> Screen:
     y = _header(s, "نشان‌های من", "۵ مکان ذخیره‌شده · ترتیب را خودتان می‌چینید")
     # the list stays visible behind the sheet: the user is editing one row of it, not leaving
     for index, item in enumerate(PLACES[:2]):
-        y = _place_row(s, y, index, item)
+        y = _place_row(s, y, index, item, highlight=index == 0)
     scrim(s, 96, top=0, height=852)
 
     top = 292
@@ -624,7 +630,7 @@ def profile_place_edit() -> Screen:
                      icon="mdi-bookmark-outline", title_style="title")
 
     s.text(377, y, "نام", "caption-bold", C.muted, align="right")
-    s.text(16, y, "۱۰ / ۲۴", "caption", C.muted_2, align="left")
+    s.text(16, y, count_chars("خانه", 24), "caption", C.muted_2, align="left")
     y += 22
     s.rect(16, y, 361, 50, fill="#FFFFFF", radius=14, outline=C.primary, outline_w=1.6)
     s.text(357, y + 14, "خانه", "title-sm", C.text, align="right", max_width=280)
@@ -658,10 +664,12 @@ def profile_place_edit() -> Screen:
 
     # the pin, stated as the consequence it has: it moves the place onto the map row
     s.rect(16, y, 361, 54, fill=C.surface_2, radius=14)
-    s.toggle(357 - 12 - 44, y + 14, 44, 26, on=True)
-    s.text(357 - 66, y + 8, "نشان‌کردن بالای فهرست", "body-sm", C.text, align="right",
+    # the switch hugs the card's 12px inset, exactly like the history filters: at 301 it
+    # floated 32px inside the card and read as a stray control
+    s.toggle(377 - 12 - 44, y + 14, 44, 26, on=True)
+    s.text(377 - 66, y + 8, "نشان‌کردن بالای فهرست", "body-sm", C.text, align="right",
            max_width=240)
-    s.text(357 - 66, y + 28, "روی نقشه می‌آید، کنار «آخرین مقصد»", "caption", C.muted_2,
+    s.text(377 - 66, y + 28, "روی نقشه می‌آید، کنار «آخرین مقصد»", "caption", C.muted_2,
            align="right", max_width=250)
     y += 66
 

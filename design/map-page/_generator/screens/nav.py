@@ -6,7 +6,7 @@ from typing import Callable
 from bb import scenario as sc
 from bb.map import Camera, draw_route, fit_camera, scale_bar
 from bb.prims import Screen, scrim
-from bb.text import fa_digits
+from bb.text import count_chars, fa_digits
 from bb.theme import C, R, TYPE
 from bb.ui import (bottom_panel, card_title_row, chrome, fab, home_bar, map_avatar_button, map_tools,
                    metric_tiles, nav_banner, place_action_pin, place_chips, quick_chips,
@@ -34,6 +34,7 @@ BOOKMARKS = (
 # Saved from plate 03: the fifth place, which does *not* push a third chip onto the map.
 NEW_PLACE = {"name": "خانهٔ مادرم", "address": "خیابان طالقانی، پلاک ۴۸",
              "icon": "mdi-bookmark-outline"}
+NEW_PLACE_NAME = NEW_PLACE["name"]
 LAST_DESTINATION = "آخرین مقصد"
 
 
@@ -93,7 +94,6 @@ def map_press_hold() -> Screen:
     map_tools(s, 128, angle=22)
 
     user_cone(s, cam, *sc.USER, bearing=28)
-    draw_route(s, cam, ROUTE_MAIN, width_m=10, dashed=True, mute=0.55)
 
     px, py = cam.project(*PRESS_POINT, s)
     place_action_pin(s, px, py, "میدان انقلاب")
@@ -123,14 +123,14 @@ def map_press_hold() -> Screen:
     s.circle(357 - 14 - 20, top + 22 + 20, 20, fill=C.primary_soft)
     s.i.draw_icon(357 - 14 - 20, top + 42, "mdi-map-marker-outline", 21, C.primary)
     s.text(357 - 14 - 54, top + 22, "میدان انقلاب", "title", C.text, align="right",
-           max_width=250)
+           max_width=240)
     s.text(357 - 14 - 54, top + 50, "نقطهٔ انتخابی · دقت تقریبی ۲۰ متر", "caption", C.muted,
            align="right", max_width=280)
 
     # the bookmark action, repeated as a labelled chip because here there is room to name it
     chip_w = s.chip(24, top + 84, "ذخیره در نشان‌ها", "mdi-bookmark-plus-outline", "primary",
                     h=30)
-    s.text(24 + chip_w + 12, top + 90, "نامش را قدم بعد می‌گذارید", "caption", C.muted_2,
+    s.text(24 + chip_w + 12, top + 90, "نامش را در گام بعد می‌گذارید", "caption", C.muted_2,
            align="left", max_width=220)
 
     s.divider(30, top + 128, 363)
@@ -174,21 +174,21 @@ def bookmark_form() -> Screen:
     s.i.draw_icon(357 - 22, y + 22, "mdi-map-marker-outline", 17, C.primary)
     s.text(357 - 46, y + 10, "میدان انقلاب", "label", C.text, align="right", max_width=280)
     s.text(357 - 46, y + 34, "از نقشه برداشته شد · دقت ۲۰ متر", "caption", C.muted_2,
-           align="right", max_width=250)
+           align="right", max_width=240)
     # a coordinate is a Latin run, like an IP: in an RTL line its separators reorder
     s.ltr(24, y + 12, "35.7001, 51.3900", "caption", C.muted_2)
     s.text(24, y + 34, "تغییر نقطه", "caption-bold", C.primary, align="left")
-    y += 78
+    y += 88
 
     # 2. the name: the only field the user must fill
     s.text(377, y, "نام این مکان", "caption-bold", C.muted, align="right")
-    s.text(16, y, "۱۰ / ۲۴", "caption", C.muted_2, align="left")
+    s.text(16, y, count_chars(NEW_PLACE_NAME, 24), "caption", C.muted_2, align="left")
     y += 22
     s.rect(16, y, 361, 52, fill="#FFFFFF", radius=14, outline=C.primary, outline_w=1.6)
-    s.text(357, y + 15, "خانهٔ مادرم", "title-sm", C.text, align="right", max_width=280)
-    s.rect(357 - s.tw("خانهٔ مادرم", "title-sm") - 5, y + 17, 1.8, 24, fill=C.primary)
+    s.text(357, y + 15, NEW_PLACE_NAME, "title-sm", C.text, align="right", max_width=280)
+    s.rect(357 - s.tw(NEW_PLACE_NAME, "title-sm") - 5, y + 17, 1.8, 24, fill=C.primary)
     s.i.draw_icon(32, y + 26, "mdi-pencil-outline", 16, C.muted_2)
-    y += 64
+    y += 74
 
     # 3. the label: it picks the icon on the map chip, and nothing else
     s.text(377, y, "برچسب", "caption-bold", C.muted, align="right")
@@ -206,7 +206,7 @@ def bookmark_form() -> Screen:
         s.text(cursor + width - 34, y + 12, label, "body-sm", C.primary if on else C.text_2,
                align="right")
         cursor -= 8
-    y += 52
+    y += 62
 
     # 4. the order rule, stated before the save instead of after it
     s.rect(16, y, 361, 76, fill=C.info_soft, radius=14)
@@ -217,13 +217,13 @@ def bookmark_form() -> Screen:
            C.muted, align="right", max_width=300)
     s.text(357 - 44, y + 50, "«نشان‌های من» را در پروفایل باز کنید.", "caption", C.muted,
            align="right", max_width=300)
-    y += 90
+    y += 100
 
     s.button(16, y, 361, 52, "ذخیره در نشان‌ها", icon="mdi-bookmark-check-outline",
              variant="filled", shadow=True)
-    y += 64
+    y += 74
     s.button(16, y, 361, 44, "انصراف", variant="text", color=C.muted)
-    assert y + 44 < 838, f"bookmark form overflows ({y + 44:.0f})"
+    assert y + 44 < 812, f"bookmark form overflows ({y + 44:.0f})"
     home_bar(s)
     return s
 
@@ -247,17 +247,24 @@ def bookmark_saved() -> Screen:
     # the confirmation is a toast under the section control — the peek slot belongs to the place
     # sheet, and the SOS dock owns the bottom-left corner on every map plate
     # under the two map controls, never on top of them: the tools end at 224
-    s.shadow(16, 236, 361, 76, radius=18, blur=18, dy=6, alpha=44)
-    s.rect(16, 236, 361, 76, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
-    s.circle(357 - 24, 274, 16, fill=C.success_soft)
-    s.i.draw_icon(357 - 24, 274, "mdi-bookmark-check", 18, C.success)
-    s.text(357 - 48, 248, "«خانهٔ مادرم» ذخیره شد", "label", C.text, align="right",
-           max_width=200)
-    s.text(357 - 48, 270, "۵ نشان دارید؛ دو تای اول روی نقشه می‌آیند.", "caption", C.muted,
-           align="right", max_width=210)
-    s.text(357 - 48, 288, "ترتیب را از پروفایل ← نشان‌ها تغییر دهید.", "caption", C.muted_2,
-           align="right", max_width=235)
-    s.chip(28, 249, "دیدن", "mdi-bookmark-multiple-outline", "primary", h=28)
+    s.shadow(16, 236, 361, 84, radius=18, blur=18, dy=6, alpha=44)
+    s.rect(16, 236, 361, 84, fill="#FFFFFF", radius=18, outline=C.outline, outline_w=1)
+    s.circle(357 - 26, 262, 16, fill=C.success_soft)
+    s.i.draw_icon(357 - 26, 262, "mdi-bookmark-check", 18, C.success)
+    # 12px between the badge and the text, measured from the disc's edge, and 12px of card
+    # padding above the first line: a toast that hugs its own content reads as a bug
+    txt = 357 - 26 - 16 - 12
+    s.text(txt, 246, f"«{NEW_PLACE_NAME}» ذخیره شد", "label", C.text, align="right",
+           max_width=240)
+    s.text(txt, 268, "۵ نشان دارید؛ دو تای اول روی نقشه می‌آیند.", "caption", C.muted,
+           align="right", max_width=240)
+    s.text(txt, 287, "ترتیب را از «نشان‌های من» تغییر دهید.", "caption", C.muted_2,
+           align="right", max_width=240)
+    # one control at the far left, on the card's vertical centre; the label makes it a door,
+    # not a decorative chevron
+    s.rect(20, 254, 74, 30, fill=C.primary_soft, radius=15)
+    s.i.draw_icon(76, 269, "mdi-chevron-left", 16, C.primary)
+    s.text(66, 262, "دیدن", "caption-bold", C.primary, align="right")
 
     fab(s, 327, 552, 44, "mdi-crosshairs-gps")
     fab(s, 327, 604, 44, "mdi-broadcast", C.success)
@@ -488,14 +495,14 @@ def trip_transport() -> Screen:
     # origin
     s.circle(349, y + 26, 6, fill=C.origin)
     s.text(334, y + 12, "مبدأ · موقعیت فعلی من", "caption", C.text_2, align="right")
-    s.text(334, y + 32, sc.USER_ADDRESS, "body-sm", C.muted, align="right", max_width=250)
+    s.text(334, y + 32, sc.USER_ADDRESS, "body-sm", C.muted, align="right", max_width=240)
     s.text(70, y + 22, "تغییر", "caption-bold", C.primary, align="right")
     s.divider(46, y + 62, 340)
     # destination
     s.circle(349, y + 90, 6, fill=C.destination)
     s.text(334, y + 76, "مقصد", "caption", C.text_2, align="right")
     s.text(334, y + 96, sc.DEST_NAME, "body-sm", C.ink if hasattr(C, "ink") else C.text,
-           align="right", max_width=250)
+           align="right", max_width=240)
     s.text(70, y + 86, "تغییر", "caption-bold", C.primary, align="right")
     y += 146
 
@@ -760,9 +767,9 @@ def navigation_alternatives() -> Screen:
             s.i.draw_icon(16 + 30, ry + 40, "mdi-check", 16, "#FFFFFF")
         else:
             s.circle(16 + 30, ry + 40, 13, fill=None, outline=C.outline_strong, outline_w=1.6)
-        s.text(357 - 14, ry + 12, name, "label-lg", C.text, align="right", max_width=250)
+        s.text(357 - 14, ry + 12, name, "label-lg", C.text, align="right", max_width=240)
         s.text(357 - 14, ry + 33, f"{time} · {distance}", "caption", C.muted, align="right",
-               max_width=250)
+               max_width=240)
         chip_w = s.chip(0, -100, traffic, None, "success" if traffic == "روان" else "warning",
                         h=22)  # measure only, drawn below
         s.chip(357 - 14 - chip_w, ry + 48, traffic, None,

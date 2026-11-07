@@ -118,11 +118,11 @@ def companions_hub() -> Screen:
     avatar_stack(s, 197, y + 44, ["م", "س", "ز"], d=26)
     s.chip(24, y + 32, "در حال حرکت", "mdi-access-point", "success", h=24,
            fill="#2C7C7C", color="#FFFFFF")
-    s.text(357, y + 76, "مسیر: خیابان دانشگاه ← آتش‌نشانی مرکزی", "caption", "#D6EDE9",
+    s.text(357, y + 76, "مسیر: خیابان دانشگاه، آتش‌نشانی مرکزی", "caption", "#D6EDE9",
            align="right")
     s.rect(28, y + 100, 337, 1, fill="#2C7C7C")
     s.text(357, y + 108, "موقعیت همه روی نقشه زنده است", "caption-bold", "#FFFFFF", align="right")
-    s.text(24, y + 108, "باز کردن نقشه ←", "caption-bold", "#F4D796", align="left")
+    s.text(24, y + 108, "باز کردن نقشه ‹", "caption-bold", "#F4D796", align="left")
     y += 144
 
     # the three doors
@@ -154,7 +154,7 @@ def companions_hub() -> Screen:
     s.chip(24, y + 14, "نامحدود", "mdi-infinity", "success", h=24)
     s.text(357, y + 12, "موقعیت من — برای ۲ نفر", "label", C.text, align="right", max_width=230)
     s.text(357, y + 34, "مریم رضایی · سعید کریمی", "caption", C.muted, align="right", max_width=280)
-    s.text(357, y + 56, "از امروز ۹:۳۰ · دقت ۱۲± متر", "caption", C.muted_2, align="right")
+    s.text(357, y + 56, "از امروز ۹:۳۰ · دقت حدود ۱۲ متر", "caption", C.muted_2, align="right")
     s.i.draw_icon(32, y + 78, "mdi-close-circle-outline", 18, C.muted_2)
     y += 104
     s.rect(16, y, 361, 76, fill="#FFFFFF", radius=R.md, outline=C.outline, outline_w=1)
@@ -518,7 +518,7 @@ def companion_status() -> Screen:
            "caption", C.text_2, align="right", max_width=300)
 
     metric_tiles(s, 16, top + 122, 361, [("آخرین به‌روزرسانی", "۱۰:۰۵", "mdi-clock-outline"),
-                                         ("دقت GPS", "±۱۴ متر", "mdi-crosshairs-gps"),
+                                         ("دقت GPS", "حدود ۱۴ متر", "mdi-crosshairs-gps"),
                                          ("فاصله تا شما", "۲۱۰ متر", "mdi-map-marker-distance")],
                  h=62)
 

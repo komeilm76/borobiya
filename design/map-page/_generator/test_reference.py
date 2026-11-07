@@ -551,3 +551,46 @@ def test_sos_stages_are_the_client_stages():
     from bb import ui
 
     assert ui.SOS_STAGES == ("ثبت", "اعزام", "پذیرش", "رسیدگی", "پایان")
+
+
+def test_every_drawn_character_exists_in_the_font():
+    """Vazirmatn has no arrows: «←» renders as nothing at all, leaving a hole in the line.
+
+    A string literal is the whole surface of what a plate can print, so walking the sources
+    is enough — and it catches the next arrow before it reaches a PNG.
+    """
+    import ast
+    import glob
+    import unicodedata
+
+    from PIL import ImageFont
+
+    from bb.theme import FONT_DIR, FONTS
+
+    font = ImageFont.truetype(os.path.join(FONT_DIR, FONTS["regular"]), 40)
+    literals = set()
+    for path in glob.glob(os.path.join(HERE, "**", "*.py"), recursive=True):
+        if os.path.basename(path).startswith("test_"):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            tree = ast.parse(handle.read())
+        # a docstring may draw an ASCII diagram («offer → accepted → closed»); it is never printed
+        docstrings = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                body = getattr(node, "body", [])
+                if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant):
+                    docstrings.add(id(body[0].value))
+        for node in ast.walk(tree):
+            if id(node) in docstrings:
+                continue
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                literals.add(node.value)
+
+    def drawable(ch: str) -> bool:
+        if ch.isspace() or unicodedata.category(ch) in {"Cf", "Mn"}:
+            return True
+        return font.getmask(ch).getbbox() is not None
+
+    missing = sorted({ch for text in literals for ch in text if len(text) > 1 and not drawable(ch)})
+    assert not missing, "characters with no glyph: " + ", ".join(f"{ch!r} U+{ord(ch):04X}" for ch in missing)
