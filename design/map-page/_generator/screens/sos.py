@@ -583,7 +583,7 @@ def sos_pending() -> Screen:
     s.rect(16, y, 361, 88, fill=C.danger_soft, radius=16)
     s.spinner(357 - 30, y + 32, 16, C.danger, 2.4)
     s.text(357 - 58, y + 14, "در حال یافتن امدادگر آماده", "label-lg", C.danger, align="right")
-    s.text(357 - 58, y + 38, "به امدادگران آموزش‌دیده در شعاع ۵ کیلومتر اطلاع داده شد.",
+    s.text(357 - 58, y + 38, "به امدادگران آموزش‌دیده تا شعاع ۵ کیلومتر اطلاع شد.",
            "caption", C.muted, align="right", max_width=260)
     s.text(357 - 58, y + 58, "به‌محض پذیرش، نام و مسیر امدادگر همین‌جا می‌آید.", "caption",
            C.muted, align="right", max_width=260)

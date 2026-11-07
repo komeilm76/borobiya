@@ -594,3 +594,30 @@ def test_every_drawn_character_exists_in_the_font():
 
     missing = sorted({ch for text in literals for ch in text if len(text) > 1 and not drawable(ch)})
     assert not missing, "characters with no glyph: " + ", ".join(f"{ch!r} U+{ord(ch):04X}" for ch in missing)
+
+
+def test_no_plate_clips_its_own_copy():
+    """A `max_width` that is too small silently ends a sentence in «…».
+
+    Every string on every plate is copy a designer wrote; if the box cannot hold it, the box is
+    wrong. This renders all ninety-five screens and fails on the first truncated run.
+    """
+    import bb.text as text_module
+
+    original = text_module.ellipsize
+    truncated: list[str] = []
+
+    def spy(content, style, max_width, scale):
+        out = original(content, style, max_width, scale)
+        if out != content:
+            truncated.append(content)
+        return out
+
+    text_module.ellipsize = spy
+    try:
+        for key, item in screens().items():
+            (item[1] if isinstance(item, tuple) else item)()
+    finally:
+        text_module.ellipsize = original
+
+    assert not truncated, "clipped copy: " + " | ".join(sorted(set(truncated)))

@@ -561,11 +561,18 @@ def draw_route(screen: Screen, cam: Camera, points: Sequence[tuple[float, float]
     w = max(4.5, width_m * cam.ppu)
     if mute:
         color = _blend(color, C.map_road_casing, mute)
-    screen.line(screen_pts, "#FFFFFF", w + max(3.0, w * 0.42))
+    casing = w + max(3.0, w * 0.42)
+    screen.line(screen_pts, "#FFFFFF", casing)
+    # PIL draws butt-ended strokes, so a route that stops in the middle of a street ends in a
+    # square. Two discs make the ends round, like every map that draws a path.
     if dashed:
         _dashed_line(screen, screen_pts, color, w, dash=max(6, w * 1.4), gap=max(5, w * 1.1))
     else:
+        screen.circle(*screen_pts[0], casing / 2, fill="#FFFFFF")
+        screen.circle(*screen_pts[-1], casing / 2, fill="#FFFFFF")
         screen.line(screen_pts, color, w)
+        for point in (screen_pts[0], screen_pts[-1]):
+            screen.circle(*point, w / 2, fill=color)
 
 
 def _blend(a: str, b: str, t: float) -> tuple[int, int, int]:
@@ -748,6 +755,8 @@ def draw_trace(screen: Screen, cam: Camera, points: Sequence[tuple[float, float]
             _dashed_line(screen, pts, rgb + (opacity,), width_px, dash=7, gap=5)
         else:
             screen.line(pts, rgb + (opacity,), width_px)
+            for point in (pts[0], pts[-1]):
+                screen.circle(*point, width_px / 2, fill=rgb + (opacity,))
 
 
 def label_fits(screen: Screen, label: str, cx: float, top: float, placed: list,

@@ -336,8 +336,8 @@ def sos_parts_board() -> Screen:
             return attr
 
     y = _head(s, "DESIGN SYSTEM · 6/6", "اجزای درخواست امداد",
-              "درخواست SOS ریل و دکمهٔ خودش را دارد، اما از همان توکن‌ها و همان قواعد RTL "
-              "می‌آید: چهار قدم پیش از ارسال، پنج مرحله پس از آن، و یک دکمهٔ ثابت روی نقشه.")
+              "ریل و دکمهٔ SOS از همان توکن‌ها و قواعد RTL می‌آیند: چهار قدم پیش از ارسال، "
+              "پنج مرحله پس از آن، یک دکمهٔ ثابت روی نقشه.")
 
     # 1 — the SOS rail, running then finished
     s.rect(40, y, BOARD_W - 80, 232, fill=C.surface, radius=18, outline=C.outline, outline_w=1)
