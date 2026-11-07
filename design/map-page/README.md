@@ -344,6 +344,7 @@ python render.py 09-navigation-active --sheet
 | پروفایل — نشست‌ها و دستگاه‌ها | `GET /_user/devices` (`sessionId`, `deviceName`, `ip`, `lastActiveAt`, `isOnline`, `isCurrentDevice`؛ سقف ۵۰) + `DELETE /_user/devices/:sessionId`؛ تأیید با همان متن `DevicePriorityPanel.vue` |
 | پروفایل — دستگاه پخش‌کننده | پین روی هر اشتراک در `POST /_user/location/share`؛ `settings/priority-device.ts::planReprioritizeAll` برای «همه را به این دستگاه ببر» |
 | پروفایل — خروج | `POST /_auth/logout` (همان نشست) و بازیابی گذرواژه با `/_auth/forgot-password/*` و پنج پرسش امنیتی |
+| نشان‌ها (مکان‌های ذخیره‌شده) | **هیچ endpointی در `packages/` نیست**: نه روت، نه اسکیمای `zod` و نه جدولی (جست‌وجوی `bookmark|savedPlace|favorite` فقط کامنت روتر را برمی‌گرداند). پیشنهاد: جدول `saved_places` با `userId, name, label, lat, lng, address, icon, rank` و `GET/POST /_user/places` + `PATCH/DELETE /_user/places/:id` با `reorder`؛ «دو نشان اول» همان `rank` است، نه یک پرچم جدا، و ترتیب روی نقشه و پروفایل از یک منبع می‌آید |
 | درِ ورود روی نقشه | `bb/ui.py::map_avatar_button` در تصاویر؛ در کد فعلی معادلی ندارد و باید به `UserMapView.vue` (کنار `map_tools`) اضافه شود |
 | بازپخش سفر (playback) | `history/playback.ts` (سرعت‌های ۱/۴/۱۶/۶۰، بازه‌های ۱/۷/۳۰ روز) |
 | همراهان و موقعیت زنده | `live/companion-locations.ts` (تازگی ۴۵ ثانیه، دورریز ۳۰ دقیقه)، `components/map/LiveCompanionPanel.vue`, `CompanionDetailSheet.vue` |
