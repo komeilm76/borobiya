@@ -117,6 +117,20 @@ export class TalkAudio {
     void view;
   }
 
+  /**
+   * Adopts the session identifier the server assigned.
+   *
+   * The screen starts capture before the floor has answered, so the first frames carry a
+   * client-chosen id. Once the server replies with the real one, later frames must switch to it or
+   * the floor drops them as `talk-not-active`. The sequence keeps counting from where it was, which
+   * is what the floor expects for a single turn.
+   *
+   * @param talkId Identifier from the `talk.start` acknowledgement.
+   */
+  adoptTalkId(talkId: number): void {
+    this.talkId = talkId >>> 0;
+  }
+
   /** Stops capture and releases every audio resource. */
   stop(): void {
     this.active = false;

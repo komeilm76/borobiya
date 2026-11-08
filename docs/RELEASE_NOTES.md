@@ -37,6 +37,9 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - An expired session during the profile device read clears the local session and redirects instead of raising an unhandled rejection.
 - In the command palette, holding Ctrl/Cmd and pressing K registered the chord, and one arrow press moved the highlight two rows because both the window handler and the search-field handler counted the same event; the field now owns the step and stops the event.
 - The palette announces its match count in a polite live region, so filtering to no results is no longer silent for a screen reader.
+- Push-to-talk releases the microphone on `pointercancel`, on leaving the button and on unmount, and stops streaming when the floor refuses a turn instead of showing a live call that does not exist.
+- Push-to-talk is operable from the keyboard, which it was not before: a button that only listened to pointer events could not be used without a mouse.
+- Talk frames adopt the session id the server assigns to the `talk.start` acknowledgement, so audio is not dropped as belonging to an unknown session.
 - Registration applies the same password policy as recovery, through one shared composable, and refuses a blank security answer or a repeated question before the account is created.
 - The SOS composer refuses to send a description the server will reject, naming the ten-character minimum in place instead of letting the request fail at the last step with "Invalid request."
 - The mission screen's rating form is reachable: it sat inside a block gated on the *active* mission, and an active mission by definition excludes completed ones, so the form could never render.

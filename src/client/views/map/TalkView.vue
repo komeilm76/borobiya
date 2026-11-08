@@ -20,23 +20,50 @@ const target = ref('');
 const audio = new TalkAudio((frame) => realtime.sendBinary(frame));
 const unsubscribers: Array<() => void> = [];
 
+/**
+ * Releases the microphone and tells the floor the turn is over.
+ *
+ * Every path that can end a turn goes through here — pointer release, pointer cancel, leaving the
+ * button, a rejected floor request, unmount — because a stream that is captured but never stopped
+ * keeps the browser's recording indicator lit long after the user let go.
+ */
+function release(): void {
+  if (!active.value) return;
+  audio.stop();
+  realtime.send({ type: WS_EVENTS.TALK_STOP, talkId: talkId.value, requestId: `talk-${Date.now()}` });
+  active.value = false;
+}
+
 const { run: start } = useAsyncAction(async () => {
-  if (!target.value) return;
+  if (!target.value) {
+    toast.push('نخست همراه مورد نظر را انتخاب کنید.', 'error', 3000);
+    return;
+  }
   await audio.start(talkId.value || Date.now() >>> 0);
   realtime.send({ type: WS_EVENTS.TALK_START, peerUserId: target.value, requestId: `talk-${Date.now()}` });
   active.value = true;
 });
 
-const { run: stop } = useAsyncAction(async () => {
-  audio.stop();
-  realtime.send({ type: WS_EVENTS.TALK_STOP, talkId: talkId.value, requestId: `talk-${Date.now()}` });
-  active.value = false;
-});
+const { run: stop } = useAsyncAction(async () => release());
 
 onMounted(() => {
   unsubscribers.push(
-    realtime.on(WS_EVENTS.ACK, (message: { kind?: string; talkId?: number }) => {
-      if (message.kind === WS_EVENTS.TALK_START && message.talkId) talkId.value = Number(message.talkId);
+    realtime.on(WS_EVENTS.ACK, (message: { kind?: string; talkId?: number; accepted?: boolean; reason?: string }) => {
+      if (message.kind !== WS_EVENTS.TALK_START) return;
+      if (message.accepted === false) {
+        // The floor can refuse a turn (the peer is already in a call, or one of the two is busy).
+        // Streaming into a refused turn sends audio nobody is listening to and leaves the button
+        // showing "live" for a call that does not exist.
+        release();
+        toast.push(message.reason === 'participant-is-busy' ? 'طرف مقابل در گفت‌وگوی دیگری است.' : 'گفت‌وگو آغاز نشد.', 'error', 3600);
+        return;
+      }
+      if (message.talkId) {
+        talkId.value = Number(message.talkId);
+        // Already open by press time, so adopt the real id: frames carry the session id, and a
+        // client-chosen one would have every frame dropped by the floor as `talk-not-active`.
+        audio.adoptTalkId?.(talkId.value);
+      }
     }),
     realtime.on('binary', (frame: ArrayBuffer) => audio.play(frame)),
     realtime.on(WS_EVENTS.ERROR, (message: { message?: string }) => toast.push(String(message?.message ?? 'خطای گفت‌وگو'), 'error', 3600))
@@ -45,6 +72,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   for (const off of unsubscribers.splice(0)) off();
+  // Leaving the screen must not leave a hot microphone behind.
+  if (active.value) realtime.send({ type: WS_EVENTS.TALK_STOP, talkId: talkId.value, requestId: `talk-${Date.now()}` });
   audio.destroy();
 });
 </script>
@@ -71,6 +100,12 @@ onUnmounted(() => {
       @pointerdown="start"
       @pointerup="stop"
       @pointerleave="stop"
+      @pointercancel="stop"
+      @keydown.space.prevent="start"
+      @keydown.enter.prevent="start"
+      @keyup.space.prevent="stop"
+      @keyup.enter.prevent="stop"
+      @blur="stop"
     >
       <span class="mdi mdi-microphone" aria-hidden="true" />
       <span>{{ active ? 'در حال صحبت…' : 'نگه دارید تا صحبت کنید' }}</span>
