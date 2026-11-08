@@ -27,9 +27,10 @@ describe("authenticated mission SSE parser", () => {
     await followMissionTimelineEvents("secret", id, controller.signal, refresh);
     expect(refresh).toHaveBeenCalledOnce();
     expect(fetcher).toHaveBeenCalledWith(`/api/_user/sos/missions/${id}/timeline/events`, expect.objectContaining({
-      credentials: "same-origin", cache: "no-store", signal: controller.signal,
+      credentials: "same-origin", cache: "no-store", signal: expect.any(AbortSignal),
       headers: { authorization: "Bearer secret", accept: "text/event-stream" }
     }));
+    expect(controller.signal.aborted).toBe(false); // Internal cleanup must not cancel the owner's mission context.
   });
   it("accepts many small valid frames coalesced into one read without stampeding timeline reloads", async () => {
     const refresh = vi.fn();
@@ -37,6 +38,70 @@ describe("authenticated mission SSE parser", () => {
     vi.stubGlobal("fetch", vi.fn(async () => stream([frame.repeat(150)])));
     await followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
     expect(refresh).toHaveBeenCalledOnce(); // Invalidation, not one HTTP re-read per queued notice.
+  });
+
+  it("bounds a connection that never returns SSE headers, even if fetch ignores abort", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => {}));
+      vi.stubGlobal("fetch", fetcher);
+      const refresh = vi.fn();
+      const follow = followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
+      const failure = expect(follow).rejects.toThrow("MISSION_STREAM_CONNECT_TIMEOUT");
+      await vi.advanceTimersByTimeAsync(12_000);
+      await failure;
+      expect((fetcher.mock.calls[0]?.[1].signal as AbortSignal).aborted).toBe(true);
+      expect(refresh).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("stops an in-flight SSE connection promptly when the mission is no longer selected", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetcher = vi.fn((_url: string, _init: RequestInit) => new Promise<Response>(() => {}));
+      vi.stubGlobal("fetch", fetcher);
+      const controller = new AbortController();
+      const follow = followMissionTimelineEvents("token", id, controller.signal, vi.fn());
+      const cancelled = expect(follow).rejects.toMatchObject({ name: "AbortError" });
+      controller.abort();
+      await cancelled;
+      expect((fetcher.mock.calls[0]?.[1].signal as AbortSignal).aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("rejects a cancellation fired synchronously by the fetch adapter before it returns", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const fetcher = vi.fn(() => {
+        controller.abort();
+        return new Promise<Response>(() => {});
+      });
+      vi.stubGlobal("fetch", fetcher);
+      await expect(followMissionTimelineEvents("token", id, controller.signal, vi.fn()))
+        .rejects.toMatchObject({ name: "AbortError" });
+      expect(fetcher).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("clears its connection deadline after headers, leaving the stream's own silence clock in charge", async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveHeaders!: (response: Response) => void;
+      const fetcher = vi.fn(() => new Promise<Response>((resolve) => { resolveHeaders = resolve; }));
+      vi.stubGlobal("fetch", fetcher);
+      const refresh = vi.fn();
+      const follow = followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
+      await vi.advanceTimersByTimeAsync(10_000);
+      resolveHeaders(stream([`event: refresh\ndata: {"missionId":"${id}"}\n\n`]));
+      await follow;
+      expect(refresh).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(46_000);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
   });
 
   it("detects a silent open stream after missed keepalives so the fallback can reconnect", async () => {

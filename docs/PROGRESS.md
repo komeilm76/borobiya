@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound the mission SSE connection before headers (T4.5.3 incomplete)
+
+- Bug hunt: the previous 45-second timeline-stream silence check only began *after* fetch returned response headers. An intermediary that accepted the SSE connection but never replied left the fallback pending forever, so the existing lost-transport warning/retry path never ran. The initial authenticated fetch now has a separate 12-second deadline and request abort; mission/account cancellation rejects immediately even if an injected fetch ignores abort. The existing per-read silence deadline still applies after headers. Two fake-timer regressions hung before the change and now pass alongside a slow-but-healthy header response; this was not tested against a real proxy, browser, migrated VM or live SSE session. The complete Playwright login-to-rating and stream acceptance task remains open.
+
 ### 2026-10-23 — Fence confirmed admin account-status writes to the login (T4.4.2 partial)
 
 - Audited the Users page's activation/deactivation confirmation: after a delayed session refresh, a prior administrator's selected account could be PATCHed using a replacement login's bearer, while a late old reply could replace the new login's feedback or unlock its in-flight write. Extracted the confirmation into a session-scoped nonmounted controller. Same-session bearer renewal still works; account, role or JWT session changes synchronously clear the old dialog/busy state, and delayed results cannot show success or trigger a new-session list refresh. A PATCH already sent may commit server-side; this does not roll it back. Deferred tests reproduced the missing boundary before the fix, and the existing admin search source contract was updated to follow its moved guard. This is not a real administrator/browser/API run; the wider feedback/optimistic-write audit remains open.
