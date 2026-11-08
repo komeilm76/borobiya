@@ -48,7 +48,7 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('@search="openRouteSearch" @choose-route="openRouteChoices"');
     const styles = css(sheet, "PointRouteSheet.vue");
     expect(styles).toContain('section.point-route-shell[data-v-route-panel] { position: fixed; z-index: 7');
-    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%');
+    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
     expect(styles).toContain('max-height: min(52dvh, 27rem)');
     expect(styles).toContain('overflow-y: auto');
     expect(styles).toContain('min-height: 44px');
@@ -207,7 +207,7 @@ describe("progressive trip planning and editing", () => {
     const chooser = css(choices, "PointRouteChoicesSheet.vue");
     const dock = css(map, "UserMapView.vue");
     for (const panel of [planner, chooser, css(transport, "PointTransportChoicesSheet.vue")]) {
-      expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
+      expect(panel).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
       expect(panel).toContain('pointer-events: auto');
     }
     expect(dock).toContain('inset-block-end: calc(0.75rem + env(safe-area-inset-bottom, 0px))');
@@ -257,7 +257,8 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain('role="region" aria-label="انتخاب مسیر"');
     expect(choices).not.toContain('VBottomSheet');
     const choiceStyles = css(choices, "PointRouteChoicesSheet.vue");
-    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: 0; right: 0;\n    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%;');
+    expect(choiceStyles).toContain('section.point-route-choices-shell[data-v-route-panel] { left: calc(.75rem + env(safe-area-inset-left, 0px));');
+    expect(choiceStyles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));\n    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto;');
     expect(choiceStyles).toContain('width: min(30rem, calc(100vw - 7.5rem))');
     expect(choices).toContain("@keydown.esc.stop.prevent=\"emit('close')\"");
     expect(choices).toContain('v-for="(route, index) in api.routes.value"');
@@ -303,8 +304,9 @@ describe("progressive trip planning and editing", () => {
     expect(map).toContain('if (next !== previous) { routeChoicesOpen.value = false; transportChoicesOpen.value = false; routeChoiceSnapshot = null; }');
     expect(map).toContain('transportChoicesOpen.value = false;\n  routeChoiceSnapshot = null;\n  journey.clear()');
     const styles = css(transport, "PointTransportChoicesSheet.vue");
-    expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel] { left: 0; right: 0;');
-    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%');
+    expect(styles).toContain('section.point-transport-choices-shell[data-v-route-panel] { left: calc(.75rem + env(safe-area-inset-left, 0px));');
+    expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px));');
+    expect(styles).toContain('bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto');
     expect(styles).toContain('max-height: min(62dvh, 32rem)');
     expect(styles).toContain('overflow-y: auto'); // Full-size footer is reachable on short phones.
   });

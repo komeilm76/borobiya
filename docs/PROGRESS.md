@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Refine navigation buttons and phone card corners
+
+- Follow-up to the rejected surface-only pass: Send/Travel/Start, chooser confirmation and Guidance exits now use consistent 12px rounded-rectangle, 44px-or-taller Vuetify actions; secondary Back/Cancel actions have a visible tonal treatment, while Stop/delete stay distinct error actions. Phone point, route, transport and guidance cards are inset from the sides with four 24px corners rather than edge-to-edge top-only sheets. Safe-area insets, bounded content scrolling, and the nonmodal map/dock remain; guidance measures the card's actual viewport top (including its bottom gap) on resize so SOS and map controls clear it. Nonmounted visual/layout contracts and client checks cover the change, but an authenticated browser/device visual review is still needed.
+
 ### 2026-10-23 — Match map navigation surfaces to the other widgets
 
 - The point/Travel, route and transport chooser, and active Guidance cards previously mixed opaque/no-border, custom shadow and 12–20px corner styles unlike Search, Companions and History. They now share the map widget's translucent theme surface, border, 24px outer corners and responsive floating-card depth, with 16px inset rows and stable selected borders. The phone sheets retain their top-only rounded edges, safe-area space, nonmodal map access, controls and bounded scrolling; opening Search inside Guidance no longer stacks a second floating shadow. Nonmounted SFC/CSS contract tests failed before styling and now pass; this is not a rendered screenshot, authenticated browser or device review.

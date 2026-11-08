@@ -30,16 +30,24 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(common).toContain('.v-card.bb-floating-card {'); // Existing desktop/phone depth tiers.
   });
 
-  it("retains phone top-only corners and nested scrolling without obscuring map actions", () => {
+  it("uses inset fully rounded phone cards and keeps map controls above their measured edge", () => {
     for (const [source, name, root] of [[point, "PointRouteSheet.vue", ".point-route"],
       [routes, "PointRouteChoicesSheet.vue", ".point-route-choices"],
       [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices"],
       [map, "UserMapView.vue", ".user-map-view__journey-content"]] as const) {
       const styles = css(source, name);
       expect(styles).toContain(`${root}.bb-map-navigation-card[data-v-navigation]`);
-      expect(styles).toContain('0 0 !important');
+      expect(styles).toContain('border-radius: var(--bb-radius-card, 24px) !important');
+      expect(styles).not.toContain('var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0');
       expect(styles).toContain('safe-area-inset-bottom');
+      expect(styles).toContain('left: calc(.75rem + env(safe-area-inset-left, 0px))');
+      expect(styles).toContain('right: calc(.75rem + env(safe-area-inset-right, 0px))');
     }
+    expect(map).toContain('Math.ceil(window.innerHeight - element.getBoundingClientRect().top)');
+    expect(map).toContain('window.addEventListener("resize", onResize)');
+    expect(map).toContain('window.removeEventListener("resize", onResize)');
+    expect(point).toContain('.point-route.bb-map-navigation-card { max-height: max(7rem');
+    expect(transport).toContain('.point-transport-choices.bb-map-navigation-card { max-height: max(7rem');
     expect(map).toContain('id="map-navigation-search"');
     expect(map).toContain('PlaceSearchPanel :api="placeSearch"');
     expect(map).toContain('.user-map-view__navigation-search :deep(.place-search.v-card.bb-floating-card)');
@@ -51,6 +59,20 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(point).toContain('aria-label="حذف مقصد و مسیر"');
     expect(routes).toContain('بازگشت بدون تغییر');
     expect(transport).toContain('تأیید وسیلهٔ انتخابی');
+  });
+
+  it("gives real action buttons the same rounded-rectangle shape and tactile size as the other widgets", () => {
+    for (const [source, selector] of [[point, ".point-route__actions"],
+      [routes, ".point-route-choices__footer"],
+      [transport, ".point-transport-choices__footer"],
+      [map, ".user-map-view__journey-actions"]] as const) {
+      expect(source).toMatch(new RegExp(`${selector.replaceAll('.', '\\.')}[^\\n]*:deep\\(\\.v-btn\\)\\s*\\{[^}]*border-radius: \\.75rem !important;`));
+    }
+    expect(point).toContain('variant="tonal" color="primary" rounded="lg" @click="backToPoint"');
+    expect(routes).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
+    expect(transport).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
+    expect(map).toContain('variant="tonal" color="primary" rounded="lg" @click="backToTravelPlan"');
+    expect(map).toContain('variant="flat" color="error" rounded="lg" @click="clearPointRoute"');
   });
 
   it("uses the same nested 16px scale for travel metrics, actions and guidance telemetry", () => {

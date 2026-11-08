@@ -27,8 +27,8 @@
         <p v-else-if="!api.routes.value.length" role="status">هنوز مسیری آماده نیست.</p>
       </div>
       <footer class="point-route-choices__footer">
-        <v-btn variant="text" @click="emit('close')">بازگشت بدون تغییر</v-btn>
-        <v-btn color="primary" variant="flat" :disabled="!api.selectedRoute.value || api.loading.value"
+        <v-btn variant="tonal" color="primary" rounded="lg" @click="emit('close')">بازگشت بدون تغییر</v-btn>
+        <v-btn color="primary" variant="flat" rounded="lg" :disabled="!api.selectedRoute.value || api.loading.value"
           @click="emit('confirm')">تأیید مسیر انتخابی</v-btn>
       </footer>
     </v-card>
@@ -66,24 +66,26 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
 .point-route-choices__name small { font-size: .8rem; font-weight: 500; }
 .point-route-choices__metrics { flex: 1 1 10rem; font-size: .86rem; }
 .point-route-choices__selected { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
-.point-route-choices__card:focus-visible, .point-route-choices__header :deep(.v-btn:focus-visible) {
+.point-route-choices__card:focus-visible, .point-route-choices__header :deep(.v-btn:focus-visible),
+.point-route-choices__footer :deep(.v-btn:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .point-route-choices__footer { display: flex; flex-wrap: wrap; gap: .5rem;
   padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-route-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto; }
+.point-route-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto;
+  border-radius: .75rem !important; }
 .point-route-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
   section.point-route-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
     width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  section.point-route-choices-shell { left: 0; right: 0;
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
-  .point-route-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important; }
+  section.point-route-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
+  .point-route-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important; }
   .point-route-choices { width: 100%; max-height: min(62dvh, 32rem); }
-  .point-route-choices__list { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px))
-    calc(.85rem + env(safe-area-inset-left, 0px)); }
+  .point-route-choices__list { padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
   .point-route-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));

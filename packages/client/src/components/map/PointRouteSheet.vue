@@ -32,8 +32,8 @@
             <textarea :value="shareFallback" readonly dir="ltr" @focus="selectShareFallback" />
           </label>
           <div class="point-route__actions point-route__actions--initial">
-            <v-btn variant="tonal" color="primary" prepend-icon="mdi-share-variant" :disabled="sharePending" @click="sendPoint">ارسال</v-btn>
-            <v-btn color="primary" variant="flat" prepend-icon="mdi-navigation-variant" @click="showPlan">سفر</v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-share-variant" :disabled="sharePending" @click="sendPoint">ارسال</v-btn>
+            <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-navigation-variant" @click="showPlan">سفر</v-btn>
           </div>
         </template>
 
@@ -59,10 +59,10 @@
             <div><span>زمان تقریبی سفر</span><strong>{{ api.durationLabel.value }}</strong></div>
           </div>
           <div class="point-route__actions point-route__actions--plan">
-            <v-btn variant="text" @click="backToPoint">انصراف</v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" @click="backToPoint">انصراف</v-btn>
             <v-btn v-if="api.error.value || (!api.routes.value.length && !api.loading.value)"
-              variant="tonal" :disabled="api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
-            <v-btn color="primary" variant="flat" :disabled="!api.point.value" @click="emit('start')">شروع سفر</v-btn>
+              variant="tonal" color="primary" rounded="lg" :disabled="api.loading.value" @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
+            <v-btn color="primary" variant="flat" rounded="lg" :disabled="!api.point.value" @click="emit('start')">شروع سفر</v-btn>
           </div>
         </template>
       </div>
@@ -79,8 +79,8 @@
         راهبری جاری متوقف می‌شود.
       </v-card-text>
       <v-card-actions>
-        <v-btn id="point-route-cancel-remove" variant="tonal" color="primary" @click="confirmDeleteOpen = false">انصراف</v-btn>
-        <v-btn color="error" variant="flat" @click="confirmDelete">حذف مقصد و مسیر</v-btn>
+        <v-btn id="point-route-cancel-remove" variant="tonal" color="primary" rounded="lg" @click="confirmDeleteOpen = false">انصراف</v-btn>
+        <v-btn color="error" variant="flat" rounded="lg" @click="confirmDelete">حذف مقصد و مسیر</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
@@ -246,7 +246,8 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route__fallback textarea { width: 100%; min-height: 3rem; padding: .35rem; border: 1px solid currentColor; border-radius: .5rem; resize: none; }
 .point-route__actions { display: flex; flex-wrap: wrap; gap: .5rem; padding: .65rem .85rem calc(.65rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-route__actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 44px; height: auto; }
+.point-route__actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 44px; height: auto;
+  border-radius: .75rem !important; }
 .point-route__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 .point-route__header :deep(.v-btn:focus-visible), .point-route button:focus-visible, .point-route textarea:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
@@ -254,19 +255,22 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route__delete-confirm :deep(.v-card-title) { white-space: normal; overflow-wrap: anywhere; }
 .point-route__delete-confirm :deep(.v-card-text) { overflow-y: auto; overflow-wrap: anywhere; line-height: 1.65; }
 .point-route__delete-confirm :deep(.v-card-actions) { flex-wrap: wrap; gap: .4rem; padding: .5rem .75rem calc(.75rem + env(safe-area-inset-bottom, 0px)); }
-.point-route__delete-confirm :deep(.v-card-actions .v-btn) { min-height: 44px; }
+.point-route__delete-confirm :deep(.v-card-actions .v-btn) { min-height: 44px;
+  border-radius: .75rem !important; }
 @media (max-width: 1023px) {
   section.point-route-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
     width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  section.point-route-shell { left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
-  .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+  section.point-route-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
+  .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
     max-height: min(52dvh, 27rem); }
   .point-route__header, .point-route__endpoints, .point-route__choices, .point-route__metrics, .point-route__actions {
-    padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px)); }
+    padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-route { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
+  .point-route.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))); }
 }
 </style>

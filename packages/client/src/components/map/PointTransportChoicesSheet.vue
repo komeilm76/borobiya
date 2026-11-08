@@ -20,8 +20,8 @@
         </button>
       </div>
       <footer class="point-transport-choices__footer">
-        <v-btn variant="text" @click="emit('close')">بازگشت بدون تغییر</v-btn>
-        <v-btn color="primary" variant="flat" @click="emit('confirm', selected)">تأیید وسیلهٔ انتخابی</v-btn>
+        <v-btn variant="tonal" color="primary" rounded="lg" @click="emit('close')">بازگشت بدون تغییر</v-btn>
+        <v-btn color="primary" variant="flat" rounded="lg" @click="emit('confirm', selected)">تأیید وسیلهٔ انتخابی</v-btn>
       </footer>
     </v-card>
   </section>
@@ -60,27 +60,29 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
   box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
 .point-transport-choices__name { flex: 1; font-weight: 800; }
 .point-transport-choices__selected { color: rgb(var(--v-theme-primary)); font-size: .82rem; font-weight: 800; }
-.point-transport-choices__card:focus-visible, .point-transport-choices__header :deep(.v-btn:focus-visible) {
+.point-transport-choices__card:focus-visible, .point-transport-choices__header :deep(.v-btn:focus-visible),
+.point-transport-choices__footer :deep(.v-btn:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .point-transport-choices__footer { display: flex; flex-wrap: wrap; gap: .5rem;
   padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-transport-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto; }
+.point-transport-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 44px; height: auto;
+  border-radius: .75rem !important; }
 .point-transport-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
   section.point-transport-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
     width: min(30rem, calc(100vw - 7.5rem)); }
 }
 @media (max-width: 599px) {
-  section.point-transport-choices-shell { left: 0; right: 0;
-    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
-  .point-transport-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
+  section.point-transport-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: auto; }
+  .point-transport-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) !important;
     width: 100%; max-height: min(62dvh, 32rem); }
-  .point-transport-choices__list { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px))
-    calc(.85rem + env(safe-area-inset-left, 0px)); }
+  .point-transport-choices__list { padding-inline: .85rem; }
 }
 @media (max-height: 430px) and (max-width: 599px) {
-  .point-transport-choices { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
+  .point-transport-choices.bb-map-navigation-card { max-height: max(7rem, calc(100dvh - 13rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)));
     overflow-y: auto; }
   .point-transport-choices__header, .point-transport-choices__hint, .point-transport-choices__footer { flex-shrink: 0; }
   .point-transport-choices__list { flex: none; overflow-y: visible; }

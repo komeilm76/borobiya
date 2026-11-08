@@ -142,8 +142,8 @@
             </div>
           </dl>
           <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های سفر">
-            <v-btn variant="tonal" color="primary" @click="backToTravelPlan">بازگشت به برنامهٔ سفر</v-btn>
-            <v-btn variant="flat" color="error" @click="clearPointRoute">توقف و پایان سفر</v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" @click="backToTravelPlan">بازگشت به برنامهٔ سفر</v-btn>
+            <v-btn variant="flat" color="error" rounded="lg" @click="clearPointRoute">توقف و پایان سفر</v-btn>
           </div>
         </div>
         <div v-if="journey.gpsWarning.value || journey.rerouteMessage.value" class="user-map-view__navigation-status">
@@ -657,14 +657,17 @@ watch(() => journey.arrived.value, (arrived) => {
   arrivalDialogOpen.value = true;
   navigationAlert.playArrival(); // Web Audio may be blocked; the alert remains visible.
 }, { flush: "post" });
-// Vuetify teleports the sheet outside the map shell. Share its measured height with
-// the map action rail and SOS (an App.vue sibling), including when results expand.
+// The guidance card can be teleported outside the map shell. Measure from its top
+// to the viewport bottom (including its safe-area inset), so the map rail and SOS
+// stay clear even when content expands or the phone rotates.
 watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => journey.sheetOpen.value],
   async (_values, _previous, onCleanup) => {
     let disposed = false;
     let observer: ResizeObserver | undefined;
+    let onResize: (() => void) | undefined;
     onCleanup(() => {
       disposed = true; observer?.disconnect();
+      if (onResize) window.removeEventListener("resize", onResize);
       document.documentElement.style.removeProperty("--bb-map-navigation-sheet-height");
     });
     if (!isPhone.value || !journey.navigating.value || journey.sheetOpen.value) return;
@@ -674,12 +677,14 @@ watch([isPhone, navigationSearchOpen, () => journey.navigating.value, () => jour
     if (!element) return;
     const update = () => {
       document.documentElement.style.setProperty(
-        "--bb-map-navigation-sheet-height", `${Math.ceil(element.getBoundingClientRect().height)}px`);
+        "--bb-map-navigation-sheet-height", `${Math.ceil(window.innerHeight - element.getBoundingClientRect().top)}px`);
       if (navigationFollowEnabled.value && journey.navigating.value) journey.focus();
     };
     update();
     observer = new ResizeObserver(update);
     observer.observe(element);
+    onResize = update;
+    window.addEventListener("resize", onResize);
   }, { flush: "post" });
 // The planner and the route/vehicle choice sheets are mutually exclusive.
 // Keep SOS and the route launcher ABOVE whichever in-map phone sheet is visible.
@@ -1804,8 +1809,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__telemetry-item--unknown dd { opacity: .7; }
 .user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .4rem; }
 .user-map-view__journey-actions > :first-child { flex: 1 1 auto; }
-.user-map-view__journey-actions .v-btn { min-height: 44px; min-width: 44px; height: auto; }
+.user-map-view__journey-actions :deep(.v-btn) { min-height: 44px; min-width: 44px; height: auto;
+  border-radius: .75rem !important; }
 .user-map-view__journey-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.user-map-view__journey-actions :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px; }
 @media (min-width: 600px) {
   /* The desktop/tablet search widget is already on the map. Do not reserve a
      blank icon column after hiding the redundant header launcher. */
@@ -2027,11 +2035,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (max-width: 599px) {
   /* Leave the journey label a full row even on narrow phones; the controls wrap separately. */
   .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
-  .user-map-view__journey-stack { left: 0; transform: none; bottom: 0; width: 100%; }
+  .user-map-view__journey-stack { left: calc(.75rem + env(safe-area-inset-left, 0px));
+    right: calc(.75rem + env(safe-area-inset-right, 0px));
+    transform: none; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px)); width: auto; }
   .user-map-view__journey-content.bb-map-navigation-card { max-height: min(72dvh, 36rem);
-    padding: .5rem calc(.75rem + env(safe-area-inset-right, 0px))
-      calc(.5rem + env(safe-area-inset-bottom, 0px)) calc(.75rem + env(safe-area-inset-left, 0px));
-    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important; }
+    padding: .5rem .75rem;
+    border-radius: var(--bb-radius-card, 24px) !important; }
   /* A horizontal 48px action row clears the sheet even on short phones. The
      shared measured height also moves SOS, which lives outside this view. */
   .user-map-view--navigating .user-map-view__share,
