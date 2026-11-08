@@ -15,7 +15,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - `Bun.password` hashes with Argon2id. Stored hashes remain self-describing, so the format is verifiable and upgradable.
 - `Bun.file`, `Bun.write` and `Bun.Glob` replace every filesystem helper; `scripts/*.ts` run through `bun` and the `boro` shim only executes Bun.
 - `bun run build` clears the previous bundle before building, so a rebuild of unchanged sources is byte-identical instead of accumulating stale hashed chunks.
-- The toolchain is pinned to Bun 1.4.4 in `.bun-version`, `packageManager` and CI. `package-lock.json` is deleted and `bun.lock` is committed; CI installs with `bun install --frozen-lockfile`.
+- The toolchain is pinned to Bun 1.4.4 in `.bun-version`, `packageManager` and CI; CI installs that exact version from the npm registry tarball because the GitHub release CDN intermittently returns 504. `package-lock.json` is deleted and `bun.lock` is committed; CI installs with `bun install --frozen-lockfile`.
 - `engines.node` and `@types/node` are removed, and no active source imports `node:http`, `node:stream`, `node:sqlite`, `node:fs` or `node:crypto` for runtime behavior.
 
 ### Browser application

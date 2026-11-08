@@ -24,26 +24,31 @@ jobs:
         with:
           persist-credentials: false
       # The Bun release objects on GitHub's CDN intermittently answer 504, which fails the whole
-      # gate before any project step runs. Retry the same pinned action a bounded number of times
-      # rather than weakening the version pin or adding a second install path.
-      - name: Set up Bun
-        id: bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        continue-on-error: true
-        with:
-          bun-version-file: .bun-version
-      - name: Set up Bun (retry 1)
-        id: bun-retry-1
-        if: steps.bun.outcome == 'failure'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        continue-on-error: true
-        with:
-          bun-version-file: .bun-version
-      - name: Set up Bun (retry 2)
-        if: steps.bun.outcome == 'failure' && steps.bun-retry-1.outcome == 'failure'
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
+      # gate before any project step runs. Install the same pinned version from the npm registry
+      # (the `@oven/bun-linux-x64` tarball for 1.4.4) instead, with a bounded retry. The version
+      # comes from `.bun-version`, so the pin is unchanged and there is no floating download.
+      - name: Install the pinned Bun runtime from the npm registry
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < .bun-version)"
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt $attempt of 5 for Bun $version"
+            if curl --fail --silent --show-error --location --retry 3 --retry-delay 2 \
+                --max-time 300 \
+                -o /tmp/bun-linux-x64.tgz \
+                "https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-${version}.tgz" \
+              && mkdir -p "$HOME/.bun/bin" \
+              && tar -xzf /tmp/bun-linux-x64.tgz -C /tmp \
+              && install -m 755 /tmp/package/bin/bun "$HOME/.bun/bin/bun" \
+              && ln -sf "$HOME/.bun/bin/bun" "$HOME/.bun/bin/bunx" \
+              && echo "$HOME/.bun/bin" >> "$GITHUB_PATH"; then
+              "$HOME/.bun/bin/bun" --version
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "::error::Could not install Bun $version from the npm registry after 5 attempts"
+          exit 1
       - name: Verify the pinned Bun runtime
         run: bun --version
       - name: Install dependencies from the frozen lockfile

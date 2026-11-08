@@ -82,8 +82,6 @@ describe('release acceptance', () => {
       'FRAME_ANCESTORS: https://borobiya.example.test',
       'runs-on: ubuntu-24.04',
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803',
-      'oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6',
-      'bun-version-file: .bun-version',
       'persist-credentials: false'
     ]) {
       expect(workflow, value).toContain(value);
@@ -91,13 +89,15 @@ describe('release acceptance', () => {
     for (const banned of ['ubuntu-latest', 'actions/checkout@v4', 'setup-node', 'npm ci', 'npm run']) {
       expect(workflow, banned).not.toContain(banned);
     }
-    // The Bun CDN intermittently 504s, so a bounded retry must exist instead of a single attempt.
-    const setupBun = workflow.match(/uses: oven-sh\/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6/g) ?? [];
-    expect(setupBun.length).toBe(3);
-    expect(workflow).toMatch(/id: bun\n {8}uses: oven-sh\/setup-bun/);
-    expect(workflow).toMatch(/if: steps\.bun\.outcome == 'failure'\n {8}uses: oven-sh\/setup-bun/);
-    expect(workflow).toMatch(/if: steps\.bun\.outcome == 'failure' && steps\.bun-retry-1\.outcome == 'failure'\n {8}uses: oven-sh\/setup-bun/);
-    expect(workflow).toMatch(/continue-on-error: true/);
+    // The Bun release objects on GitHub's CDN intermittently answer 504, so the runtime is
+    // installed from the npm registry tarball for the pinned version, with bounded retries.
+    expect(workflow).not.toContain('oven-sh/setup-bun');
+    expect(workflow).toMatch(/registry\.npmjs\.org\/@oven\/bun-linux-x64\/-\/bun-linux-x64-\$\{version\}\.tgz/);
+    expect(workflow).toMatch(/version="\$\(tr -d '\[:space:\]' < \.bun-version\)"/);
+    expect(workflow).toMatch(/for attempt in 1 2 3 4 5; do/);
+    expect(workflow).toMatch(/--retry 3/);
+    expect(workflow).toMatch(/\$GITHUB_PATH/);
+    expect(workflow).toMatch(/Could not install Bun \$version from the npm registry after 5 attempts/);
     expect(workflow).toMatch(/permissions:\n {2}contents: read/);
     expect(workflow).toMatch(/concurrency:/);
     expect(workflow).toMatch(/cancel-in-progress: true/);
