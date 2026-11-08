@@ -8,7 +8,7 @@ import {
   tokenHash,
   verifyPassword
 } from '../src/server/core/crypto.ts';
-import { loadConfig, originAllowed } from '../src/server/core/config.ts';
+import { loadConfig, originAllowed, parseDotEnv } from '../src/server/core/config.ts';
 import { RateLimiters } from '../src/server/core/rate-limit.ts';
 import { boolean, number, oneOf, parse, shape, text } from '../src/server/core/validate.ts';
 import { boundingBox, isValidPoint, tileBounds, validateTile } from '../src/server/domain/geo.ts';
@@ -131,5 +131,60 @@ describe('core primitives', () => {
     expect(originAllowed('https://attacker.test', 'http://localhost:3000', config)).toBe(false);
     expect(originAllowed(undefined, 'http://localhost:3000', config)).toBe(true);
     expect(() => loadConfig({ environment: 'production', adminPassword: 'change-me-before-production' })).toThrow(/ADMIN_PASSWORD/);
+  });
+});
+
+describe('test isolation', () => {
+  it('runs under NODE_ENV=test so configuration guards cannot read a developer .env', () => {
+    // `tests/setup.ts` strips every key named in the repository `.env`, which itself sets
+    // NODE_ENV=development. Pinning NODE_ENV before the strip let the strip delete it, so the
+    // runner's inherited value decided whether `loadConfig` re-read the file: green on CI, and a
+    // different branch locally after any build in the same shell. The value is a contract.
+    expect(process.env.NODE_ENV).toBe('test');
+  });
+
+  it('does not expose the repository .env settings to suites', () => {
+    // `./boro setup` writes these two; neither may reach a test.
+    expect(process.env.SEED_DEMO_USERS).toBeUndefined();
+    expect(process.env.COOKIE_SECURE).toBeUndefined();
+  });
+});
+
+describe('dotenv parsing', () => {
+  it('reads the format the setup script writes', () => {
+    const parsed = parseDotEnv('NODE_ENV=development\nPORT=3000\nADMIN_USERNAME=admin\n');
+    expect(parsed).toEqual({ NODE_ENV: 'development', PORT: '3000', ADMIN_USERNAME: 'admin' });
+  });
+
+  it('ignores blank lines and comments', () => {
+    // `./boro setup` writes a commented header, and a stray blank line must not become a key.
+    const parsed = parseDotEnv('# Borobiya local settings\n\n   \nPORT=3000\n#PORT=4000\n');
+    expect(parsed).toEqual({ PORT: '3000' });
+  });
+
+  it('does not treat a line without = or with = first as a setting', () => {
+    const parsed = parseDotEnv('JUST_A_WORD\n=novalue\nOK=yes\n');
+    expect(parsed).toEqual({ OK: 'yes' });
+  });
+
+  it('strips one layer of matching quotes but keeps inner spaces', () => {
+    const parsed = parseDotEnv(`A="quoted value"\nB='single value'\nC= bare value \nD="mismatched'\n`);
+    expect(parsed).toEqual({ A: 'quoted value', B: 'single value', C: 'bare value', D: `"mismatched'` });
+  });
+
+  it('keeps everything after the first = so values may contain one', () => {
+    // A base64 secret or a URL query string must survive intact.
+    const parsed = parseDotEnv('DATABASE_URL=postgres://u:p@h/db?a=b\nTOKEN=abc==\n');
+    expect(parsed.DATABASE_URL).toBe('postgres://u:p@h/db?a=b');
+    expect(parsed.TOKEN).toBe('abc==');
+  });
+
+  it('handles CRLF line endings', () => {
+    const parsed = parseDotEnv('PORT=3000\r\nHOST=0.0.0.0\r\n');
+    expect(parsed).toEqual({ PORT: '3000', HOST: '0.0.0.0' });
+  });
+
+  it('returns nothing for an empty file', () => {
+    expect(parseDotEnv('')).toEqual({});
   });
 });

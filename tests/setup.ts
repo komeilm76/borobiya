@@ -8,9 +8,7 @@ import { vi } from 'vitest';
 
 // Hermetic tests: the repository `.env` (created by `./boro setup`) and `./boro check` both export
 // local settings such as COOKIE_SECURE=0 or SEED_DEMO_USERS=1. Remove those keys so every suite
-// observes only its own explicit overrides, and pin NODE_ENV so configuration guards behave alike
-// no matter how the runner was started.
-process.env.NODE_ENV = 'test';
+// observes only its own explicit overrides.
 // `import.meta.dir` is rewritten by the runner's transform, so resolve from the process root.
 const envFile = Bun.file(`${process.cwd()}/.env`);
 if (envFile.size) {
@@ -22,6 +20,11 @@ if (envFile.size) {
     delete process.env[line.slice(0, index).trim()];
   }
 }
+// Pin NODE_ENV *after* the strip. `.env` sets NODE_ENV=development, so pinning it first let the
+// loop delete it, and the runner's own value ('test' under Vitest, but 'production' after a
+// developer ran a build in the same shell) decided how `loadConfig` behaves. That silently changed
+// which branch of the configuration was measured and made local results disagree with CI.
+process.env.NODE_ENV = 'test';
 
 // Vue Test Utils keeps real transitions disabled so component tests never depend on timing.
 config.global.stubs = { transition: false, 'transition-group': false };

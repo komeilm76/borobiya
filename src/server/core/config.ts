@@ -96,11 +96,18 @@ function readFileSync(file: string): string {
   return result.success ? result.stdout.toString() : '';
 }
 
-function loadDotEnv(): Record<string, string> {
-  const file = Bun.file(pathResolve(ROOT, '.env'));
+/**
+ * Parses the text of a `.env` file.
+ *
+ * Kept separate from the file read so the format rules can be tested without depending on the
+ * repository's own `.env`: blank lines, `#` comments, lines without `=`, and one layer of matching
+ * single or double quotes around a value.
+ *
+ * @param text Raw file contents.
+ * @returns The settings the file declares.
+ */
+export function parseDotEnv(text: string): Record<string, string> {
   const output: Record<string, string> = {};
-  if (!file.size) return output;
-  const text = readFileSync(file.name ?? '');
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
@@ -113,6 +120,12 @@ function loadDotEnv(): Record<string, string> {
     output[line.slice(0, index).trim()] = value;
   }
   return output;
+}
+
+function loadDotEnv(): Record<string, string> {
+  const file = Bun.file(pathResolve(ROOT, '.env'));
+  if (!file.size) return {};
+  return parseDotEnv(readFileSync(file.name ?? ''));
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
