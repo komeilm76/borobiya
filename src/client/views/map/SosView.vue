@@ -8,6 +8,7 @@ import { useFormatters } from '@/composables/useFormatters.ts';
 import { useToast } from '@/composables/useToast.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
+import { toPersianDigits } from '@shared/geo.ts';
 
 /**
  * Four-step SOS composer: severity and incident type, location confirmation, optional photo,
@@ -49,7 +50,20 @@ async function onPhoto(event: Event): Promise<void> {
   reader.readAsDataURL(file);
 }
 
+/**
+ * The server requires a description of 10–500 characters and rejects anything shorter with a bare
+ * "Invalid request." — the same message it uses for a malformed id. Saying so on the review step
+ * is the difference between fixing one field and abandoning the request.
+ */
+const DESCRIPTION_MIN = 10;
+
 async function submit(): Promise<void> {
+  const description = sos.draft.description.trim();
+  if (description.length < DESCRIPTION_MIN) {
+    // Persian digits, like every other message in the app.
+    sos.error = `شرح وضعیت باید دست‌کم ${toPersianDigits(DESCRIPTION_MIN)} نویسه باشد.`;
+    return;
+  }
   try {
     await sos.submit();
     toast.push('درخواست امداد ثبت شد.', 'success', 3200);
