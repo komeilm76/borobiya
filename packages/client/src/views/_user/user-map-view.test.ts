@@ -253,7 +253,8 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('@click="centerOnOwnLocation"');
     expect(view).toContain('aria-live="polite"');
     expect(body("syncOwnMarker")).toContain('new markerConstructor(');
-    expect(body("syncOwnMarker")).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
+    expect(body("syncOwnMarker")).toContain('ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,');
+    expect(view).toContain('ownMarker?.setLngLat([lon, lat]).setRotation(bearing)');
     expect(body("focusOwnIfRequested")).toContain('centerOnOwnLocation(false)');
     expect(body("centerOnOwnLocation")).toContain('if (!fix)');
     expect(body("centerOnOwnLocation")).toContain('userControlledCamera.value = true');
@@ -319,6 +320,11 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
     expect(body("syncOwnMarker")).toContain('navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value)');
+    expect(body("syncOwnMarker")).toContain('reliableHeading && wasGuiding && !reducedMotion.value');
+    expect(view).toContain('watch(reducedMotion, () => syncOwnMarker())');
+    expect(body("syncOwnMarker")).not.toContain('else ownMarker.setLngLat([fix.lon, fix.lat])');
+    expect(body("onMapReady")).toContain('ownMarkerMotion.reset()');
+    expect(view.slice(view.indexOf('onBeforeUnmount('))).toContain('ownMarkerMotion.reset()');
     expect(view).toMatch(/watch\(\(\) => journey\.selectedRoute\.value, \(\) => \{ syncOwnMarker\(\);/);
     expect(view).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--walking');
@@ -343,7 +349,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(camera).toContain('navigationFollowZoom(journey.profile.value');
     expect(camera).toContain('instance.getMinZoom(), instance.getMaxZoom()');
     expect(camera).toContain('Math.min(camera.pitch, instance.getMaxPitch())');
-    expect(camera).toContain('instance.easeTo({ ...camera, offset');
+    expect(camera).toContain('instance.easeTo({ ...camera, duration: NAVIGATION_MOTION_MS, easing: navigationMotionEase, offset');
     expect(camera).toContain('map-point-route-sheet');
     expect(view).toContain('watch(() => journey.sheetOpen.value');
     expect(body("onMapResize")).toContain('journey.focus()');

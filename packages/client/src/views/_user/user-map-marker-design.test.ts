@@ -46,7 +46,8 @@ describe("own and companion marker design", () => {
     expect(own).toContain('createElementNS("http://www.w3.org/2000/svg", "svg")');
     expect(own).toContain('new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })');
     expect(own).toContain('ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport")');
-    expect(own).toContain('ownMarker.setRotation(reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0)');
+    expect(own).toContain('bearing: reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0');
+    expect(view).toContain('ownMarker?.setLngLat([lon, lat]).setRotation(bearing)');
     expect(body("syncRouteOriginMarker")).toContain('journey.navigating.value');
     expect(view).toMatch(/watch\(\(\) => journey\.navigating\.value,[\s\S]*?syncRouteOriginMarker\(\)/);
     expect(own).toContain('!journey.replanning.value && !journey.rerouteWaitingForFix.value');
@@ -54,7 +55,7 @@ describe("own and companion marker design", () => {
     expect(own).toContain('body.setAttribute("d", "M24 3 L43 41 L24 32 L5 41 Z")');
     expect(own).not.toContain('getBearing()'); // MapLibre itself subtracts map bearing for map-aligned markers.
     expect(own).not.toContain('mdi-navigation-variant');
-    expect(own).toContain('ownMarker.setLngLat([fix.lon, fix.lat])');
+    expect(own).toContain('ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,');
     expect(own).not.toContain('new markerConstructor({ color:');
     expect(body("syncSelectedPlaceMarker")).toContain('new markerConstructor({ color: "#7c3aed" })');
     expect(body("onMapReady")).toContain('ownMarker?.remove(); ownMarker = null;');

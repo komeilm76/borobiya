@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Smooth the private navigation arrow between GPS fixes
+
+- The guidance arrow previously jumped directly to each new GPS coordinate and bearing while the map camera eased separately. It now interpolates only the visual marker with the same bounded duration/easing as the follow camera, including the shortest heading turn; raw fixes still drive route safety, rerouting, arrival and telemetry. Large GPS corrections, long gaps, weak-route transitions and reduced-motion settings snap rather than inventing travel. New nonmounted animation tests cover movement, mid-flight retargeting, wraparound bearings, jump/stale handling and frame teardown; map wiring tests, client typecheck and the repository gates passed. No device GPS drive, rendered browser or navigation acceptance run was performed.
+
 ### 2026-10-23 — Bound the mission SSE connection before headers (T4.5.3 incomplete)
 
 - Bug hunt: the previous 45-second timeline-stream silence check only began *after* fetch returned response headers. An intermediary that accepted the SSE connection but never replied left the fallback pending forever, so the existing lost-transport warning/retry path never ran. The initial authenticated fetch now has a separate 12-second deadline and request abort; mission/account cancellation rejects immediately even if an injected fetch ignores abort. The existing per-read silence deadline still applies after headers. Two fake-timer regressions hung before the change and now pass alongside a slow-but-healthy header response; this was not tested against a real proxy, browser, migrated VM or live SSE session. The complete Playwright login-to-rating and stream acceptance task remains open.

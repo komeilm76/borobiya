@@ -288,6 +288,7 @@ import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
 import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime, navigationStatusAnnouncement } from "@/sos/navigation-telemetry";
 import { navigationArrowBearing, navigationCameraOffset, navigationFollowZoom, type NavigationCamera } from "@/sos/navigation-follow";
+import { createNavigationMarkerMotion, NAVIGATION_MOTION_MS, navigationMotionEase } from "@/sos/navigation-marker-motion";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
 import { searchUsers } from "@/api/location";
@@ -329,6 +330,7 @@ const mapTools: { id: MapTool; label: string; shortLabel: string; icon: string }
 ];
 const isPhone = useMediaQuery("(max-width: 599px)");
 const isShortPhone = useMediaQuery("(max-width: 479px) and (max-height: 560px)");
+const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 const activeTool = ref<MapTool | null>(null);
 const navigationSearchOpen = ref(false);
 const routeDeleteConfirmOpen = ref(false);
@@ -489,6 +491,10 @@ const playback = useHistoryPlayback({
 const map = shallowRef<MapLibreMap | null>(null);
 const own = useOwnMapPosition(computed(() => auth.user?.id ?? null));
 let ownMarker: Marker | null = null;
+// Animate only the visual arrow: route safety and arrival continue to use raw GPS fixes.
+const ownMarkerMotion = createNavigationMarkerMotion(({ lon, lat, bearing }) => {
+  ownMarker?.setLngLat([lon, lat]).setRotation(bearing);
+});
 let markerConstructor: typeof Marker | null = null;
 let focusOnNextFix = false;
 let automaticFocus = false;
@@ -503,7 +509,10 @@ const recenterLabel = computed(() => {
 function syncOwnMarker(): void {
   const instance = map.value;
   const fix = own.position.value;
-  if (!instance || !fix || !markerConstructor) { ownMarker?.remove(); ownMarker = null; return; }
+  if (!instance || !fix || !markerConstructor) {
+    ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null; return;
+  }
+  const wasGuiding = ownMarker?.getElement().classList.contains("user-map-view__own-marker--navigating") ?? false;
   if (!ownMarker) {
     // An explicit private-GPS target, not MapLibre's default destination pin.
     // Never confuse seeing one's location with opting into outgoing sharing.
@@ -532,14 +541,16 @@ function syncOwnMarker(): void {
     element.addEventListener("click", (event) => event.stopPropagation());
     ownMarker = new markerConstructor({ element, anchor: "center", rotationAlignment: "viewport", pitchAlignment: "viewport" })
       .setLngLat([fix.lon, fix.lat]).addTo(instance);
-  } else ownMarker.setLngLat([fix.lon, fix.lat]);
+  }
   const reliableHeading = journey.navigating.value && !journey.navigationPending.value &&
     !journey.replanning.value && !journey.rerouteWaitingForFix.value &&
     fix.accuracy !== null && fix.accuracy <= 80 && journey.routePoints.value.length >= 2;
   // 'map' applies heading - map bearing on every camera move, including a manual compass
   // turn. The static GPS crosshair instead remains upright outside reliable guidance.
   ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport");
-  ownMarker.setRotation(reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0);
+  ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,
+    bearing: reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0 },
+    reliableHeading && wasGuiding && !reducedMotion.value);
   const element = ownMarker.getElement();
   element.classList.toggle("user-map-view__own-marker--navigating", reliableHeading);
   element.classList.toggle("user-map-view__own-marker--walking", reliableHeading && journey.profile.value === "foot");
@@ -587,6 +598,7 @@ function focusOwnIfRequested(): void {
   centerOnOwnLocation(false); // Recenter once, not on every update.
 }
 watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(); focusOwnIfRequested(); });
+watch(reducedMotion, () => syncOwnMarker()); // A changed accessibility preference stops a running interpolation.
 watch(() => own.active.value, (active) => { if (!active) { focusOnNextFix = false; automaticFocus = false; } });
 // Start only after the authenticated map is ready. Watch owner as well: the map
 // can finish loading before session restoration. A denial is not auto-retried.
@@ -629,7 +641,7 @@ function followNavigationCamera(camera: NavigationCamera): void {
     const pitch = Math.min(camera.pitch, instance.getMaxPitch());
     const zoom = navigationFollowZoom(journey.profile.value, camera.center[1], canvas.height, top, bottom,
       instance.getMinZoom(), instance.getMaxZoom(), pitch);
-    instance.easeTo({ ...camera, offset, zoom, pitch });
+    instance.easeTo({ ...camera, duration: NAVIGATION_MOTION_MS, easing: navigationMotionEase, offset, zoom, pitch });
   }
 }
 const journey = usePointRoute(computed(() => auth.user?.id ?? null), own.position, own.error, reverse,
@@ -1581,7 +1593,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   if (map.value !== instance) {
     map.value?.off("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
     detachHold?.(); detachHold = null;
-    ownMarker?.remove(); ownMarker = null;
+    ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null;
     destinationMarker?.remove(); destinationMarker = null;
     routeOriginMarker?.remove(); routeOriginMarker = null;
     selectedPlaceMarker?.remove(); selectedPlaceMarker = null;
@@ -1663,6 +1675,7 @@ onBeforeUnmount(() => {
   removeSelectedCompanion();
   for (const marker of peerMarkers.values()) marker.remove();
   peerMarkers.clear();
+  ownMarkerMotion.reset();
   ownMarker?.remove();
   ownMarker = null;
   destinationMarker?.remove(); destinationMarker = null;
