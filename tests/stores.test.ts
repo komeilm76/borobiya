@@ -107,6 +107,45 @@ describe('offline store', () => {
     expect(offline.serviceWorkerReady).toBe(false);
   });
 
+  it('marks the document while offline so the stylesheet can react', async () => {
+    // VueUse reads `navigator.onLine` on the window's offline event, so drive both.
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    const offline = useOfflineStore();
+    window.dispatchEvent(new Event('offline'));
+    await vi.waitFor(() => expect(offline.offline).toBe(true));
+
+    // `public/app.css` keys `.connection-badge` on `[data-offline]`; without this attribute the
+    // badge looks identical offline and online.
+    await vi.waitFor(() => expect(document.documentElement.getAttribute('data-offline')).toBe('true'));
+
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+    window.dispatchEvent(new Event('online'));
+    await vi.waitFor(() => expect(document.documentElement.hasAttribute('data-offline')).toBe(false));
+  });
+
+  it('records when connectivity was last lost', async () => {
+    const offline = useOfflineStore();
+    const before = Date.now();
+    window.dispatchEvent(new Event('offline'));
+    expect(offline.lastOfflineAt).toBeGreaterThanOrEqual(before - 5);
+  });
+
+  it('treats a failed manifest fetch as an unknown version rather than throwing', async () => {
+    const offline = useOfflineStore();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 503 })));
+    expect(await offline.loadCacheVersion()).toBe(null);
+    expect(offline.cachedVersion).toBe(null);
+  });
+
+  it('survives a network error while reading the manifest', async () => {
+    const offline = useOfflineStore();
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new Error('network down');
+    }));
+    // The offline screen shows "در حال خواندن…" forever if this rejects instead of returning null.
+    expect(await offline.loadCacheVersion()).toBe(null);
+  });
+
   it('reads the generated cache manifest version via relative URLs', async () => {
     const offline = useOfflineStore();
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ version: 'abc1234567890def' }), {
