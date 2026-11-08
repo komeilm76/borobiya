@@ -61,7 +61,7 @@ The snapshot downloader/cache, hash manifest, crops/merge, import, service-start
 flowchart LR
   T[Area catalog: countries + cities<br/>regions.json] --> SEL[MAP_REGION_IDS selection<br/>default ir-tehran]
   SEL -.-> ENV
-  ENV[MAP_LIBRARY_DIR + MAP_DATASET_DIR<br/>MAP_SNAPSHOT_DATE + MAP_SOURCE_POLICY<br/>MAP_REGION (dataset slug)<br/>MAP_BBOX (area union)<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
+  ENV[MAP_LIBRARY_DIR + MAP_DATASET_DIR<br/>MAP_SNAPSHOT_DATE + MAP_SOURCE_POLICY<br/>MAP_REGION dataset slug<br/>MAP_BBOX area union<br/>MAP_DATA_VERSION<br/>MAP_MIN_ZOOM / MAP_MAX_ZOOM]
   ENV --> CFG[GET /map-config]
   CFG --> CLIENT[Client validates shared MapConfig schema]
 ```

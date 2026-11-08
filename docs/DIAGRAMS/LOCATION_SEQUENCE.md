@@ -25,7 +25,7 @@ sequenceDiagram
     API->>Socket: emit location:peer-update to room user:{targetId}
     Socket-->>Target: update marker on MapLibre
   end
-  Note over API,DB: Cron every 1m: expire timed shares; daily prune history >RETENTION_DAYS
+  Note over API,DB: Cron every minute expires timed shares and daily prunes history older than RETENTION_DAYS
   Owner->>API: DELETE /_user/location/share/:shareId → immediate revoke
   API->>DB: set isRevoked=true
   API->>Socket: emit share revoked

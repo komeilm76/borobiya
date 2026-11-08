@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Correct SOS lifecycle diagram against live contracts (T4.7.1 partial)
+
+- The SOS diagram conflated request and mission statuses (`dispatched` is a request status), showed a non-existent automatic 24-hour expiry and GPS-driven 50 m arrival, and documented stale dispatch/progress/rating routes and the wrong 400 transition error. Split request, proposal and mission state diagrams; aligned sequence/error paths with shared route definitions and server status/accept/cancellation/rating handlers. A syntax pass over all 13 Mermaid blocks found two additional parse errors (a semicolon/comparison in the location-sharing sequence note and unquoted parentheses in a map-pipeline node), which were corrected; all 13 now parse under Mermaid 11.12.2. This is **not** visual/rendered review. No screenshots were captured; the diagrams and manual still require visual review, so T4.7.1 and the documentation percentage remain open rather than being marked 100%.
+
 ### 2026-10-23 — Parse coalesced mission timeline SSE frames safely (T4.5.3 preparation)
 
 - The authenticated timeline SSE client checked an 8 KiB limit on the entire received chunk *before* separating frames. A queued batch of many small valid invalidation events could therefore be rejected as an invalid stream; a smaller batch needlessly launched one timeline HTTP read per event. It now checks the size of each complete frame and the unfinished remainder, then coalesces same-chunk notices for this mission into one authoritative re-read. A batch regression failed before the fix; oversized single frames still fail and other missions are ignored. Targeted client tests pass, but no Playwright/browser login-to-rating E2E has run; T4.5.3 remains not started as a full workflow.
