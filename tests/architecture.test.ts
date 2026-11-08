@@ -173,6 +173,7 @@ describe('architecture guards', () => {
       'dispatch-view.test.ts',
       'groups-view.test.ts',
       'admin-layout.test.ts',
+      'settings-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
