@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-11-08 — Correct safety-critical manual claims against code (T4.7.1 partial)
+
+- Compared the user manual with login/session, admin-user and SOS behavior plus the security audit. Distinguished inactive accounts (admin reactivation) from persisted suspensions (no admin unsuspend UI or automatic 24-hour release); rate limiting does not suspend users. Removed claims of automatic pending-SOS expiry and six-hour mission alerts, and warned readers to contact emergency services directly rather than await an app escalation. Corrected admin Users filters and controls: deactivation revokes sessions but does not pause rescue records; no user-detail drawer or delete control is available. Replaced obsolete Dashboard, queued-history and planned mission status/location claims with source-backed current scope. This was a documentation/source review, not a live API, browser, map, VM or emergency workflow test. Remaining manual screenshot placeholders and acceptance work keep T4.7.1 open; documentation is not 100%.
+
 ### 2026-10-23 — Add genuine pre-login manual captures (T4.7.1 partial)
 
 - Built the production client and opened `/_auth/login` in headless Chromium 141 with an empty browser state. Captured the real rendered form at 1280×800 desktop and a 390×844 phone viewport, and added the two images and accessible captions to `USER_MANUAL.md`. A first full-page desktop capture appeared horizontally clipped under RTL despite DOM geometry being within the viewport; the final desktop capture uses a viewport screenshot and was visually checked, as was the mobile full-page capture. No credentials, fake account data or API responses were used. The API/database/map server were not running, so neither successful login nor any authenticated/manual flow is evidenced; other screenshot placeholders remain. Documentation is not 100% and T4.7.1 stays partial.

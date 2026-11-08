@@ -88,7 +88,8 @@ These are captures of the **production client build** at `/_auth/login` in headl
 Errors:
 
 - **Invalid credentials** — wrong username or password.
-- **Account suspended** — too many failed attempts / abuse; contact admin.
+- **Account inactive** — an administrator can reactivate the account on the Users screen. An inactive account cannot sign in, and deactivation revokes its existing sessions.
+- **Account suspended** — a separate persisted suspension flag prevents login even if the account is active. Rate limits alone do **not** automatically suspend accounts. Contact the service operator; this build has no admin unsuspend control or automatic 24-hour unlock.
 - **Already authenticated** — you are already logged in; go to the Map.
 
 ---
@@ -115,7 +116,7 @@ If admin created you (`mustCompleteSecurityQuestions` flag):
 
 1. On first login you see **“Complete security questions to continue”** — you cannot use other pages until done.
 2. Select **5 unique** questions + answers → **Save**.
-3. Now Dashboard unlocks.
+3. The authenticated map (`/_user/map`) becomes available; an admin-created user must complete this step before opening other user pages.
 
 [Screenshot: Complete security questions forced screen]
 
@@ -152,7 +153,7 @@ Open **Map** (`/_user/map`) for the full-height MapLibre view. It is the user ho
 
 **Current scope:** private own GPS, live companion markers, place search, reverse-place lookup, private point navigation and history playback are on the map. Broadcasting (geolocation → socket) still needs a separate explicit action; mission-specific route planning also remains on the mission map.
 
-[Screenshot: Dashboard map widget and full-height map view]
+[Screenshot: Full-height map view — requires an authenticated session]
 
 ---
 
@@ -229,7 +230,7 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ## 14. SOS — Requesting Help
 
-> **Current status:** End-to-end requester SOS filing is live across API and client (`POST /_user/sos/requests` T3.2.2, `POST /_user/sos/requests/:id/photo` T3.2.3, and the global floating red SOS button + bottom-sheet form T3.2.4). Live `sos:new-request` admin broadcast (T3.2.5), signed photo read-back (T3.2.6) is available to participants and admins; request history pages (T3.7) remain queued.
+> **Current status:** Requester SOS filing and optional photo upload are implemented across API and client (`POST /_user/sos/requests`, `POST /_user/sos/requests/:id/photo`). The global SOS button opens the request sheet; admin `sos:new-request` broadcast, participant/admin signed-photo read-back, requester SOS history and rescuer mission history are also implemented. Live API, target-VM and device acceptance are not established by this manual.
 
 ### Big red SOS button
 
@@ -237,7 +238,7 @@ In a native (Android) build the device column is filled from the platform: brand
 
 ### Steps
 
-1. Tap **SOS امداد** from any screen (or **ارسال درخواست امداد (SOS)** on Dashboard) to open the bottom sheet.
+1. Tap **SOS امداد** from an authenticated screen after completing security-question onboarding to open the bottom sheet; the old Dashboard URL redirects to Map.
 2. Fill:
    - **Severity (`شدت حادثه`):** `کم‌خطر` (Low) / `متوسط` (Medium) / `بحرانی / فوری` (High).
    - **Incident Type (`نوع حادثه`):** loaded live from `/_public/incident-types` (configured by an administrator).
@@ -273,7 +274,7 @@ If rescuer cancels later, you see **red flash “NEEDS REPLACEMENT”** → re-d
 
 ## 16. SOS — Responding as Rescuer
 
-> **Current status:** The proposal inbox and accept/decline actions open from the top-right bell on `/_user/map` (not a separate page). After acceptance, the inbox dialog shows a two-point mission preview map when you allow location (T3.5.4). Route preview on an active mission is live; foreground GPS-follow navigation is live, while live participant locations and client-side status controls remain planned under T3.5.
+> **Current status:** The proposal inbox and accept/decline actions open from the map bell (not a separate page). After acceptance, the inbox dialog can show a two-point mission preview map with location permission. The active mission page implements route preview, foreground GPS-follow navigation, explicit status controls and participant-consented live location. A map position badge shows fix freshness, not guaranteed human presence; live browser/VM acceptance remains open.
 
 ### Inbox
 
@@ -350,10 +351,9 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 - Open the linked SOS in `/_admin/dispatch`. A `cancelled_by_rescuer` request stays in the pending queue after reload, with a red badge and explanatory detail panel. If another rescuer is still active on the request, do not re-dispatch: the console first checks the server’s authoritative status and keeps dispatch disabled.
 - The cancellation banner may show the rescuer’s **last-known** location and a review-required flag (admin only; this is not a live location feed). Select eligible responders in the existing nearest-responder panel and dispatch; the live notice clears after success. Dismissing the banner does not remove the request’s replacement badge. Re-dispatch workflow polish remains T3.6.6.
 
-### System cancels
+### No automatic SOS timeout or escalation
 
-- SOS auto-expires after 24h without acceptance (`expired`).
-- Mission stuck `on_the_way` >6h → alert admin.
+The current server does **not** automatically expire a pending SOS after 24 hours or send an admin alert after six hours `on_the_way`. The `expired` status exists in the shared contract, but no such scheduler is running. Use the request history to check the actual status and the reason-gated cancellation action if the request should be withdrawn. **For an emergency, contact local emergency services directly; do not wait for this app to escalate or time out a request.**
 
 ---
 
@@ -375,12 +375,11 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 
 *`/_admin/users`*
 
-- **List:** Search by name, filter `active/suspended/has category`, pagination.
-- **Detail:** View user’s devices, rating, mission history, shares.
-- **Activate/Deactivate:** Toggle → confirmation → audit log; deactivated user cannot login, tokens revoked, missions paused.
-- **No delete** — never exists; only activate toggle.
+- **List:** Search by username, filter active/inactive and assigned/unassigned responder category; paginate. The table shows username, role, categories, active status and join date. There is no suspension filter here.
+- **Activate/Deactivate:** Use the row switch and confirm. Deactivation blocks new login, invalidates existing sessions and writes an audit event. It does **not** pause or cancel existing SOS/mission rows; coordinate any active rescue separately and verify its server status. Reactivation requires a fresh login.
+- **No detail drawer or delete control** on this screen. It does not expose another user's devices, shares or mission history, and it cannot unsuspend an account.
 
-[Screenshot: Admin users table + detail drawer]
+[Screenshot: Admin users list and activation confirmation — requires an admin session]
 
 ---
 
@@ -402,7 +401,8 @@ If an update fails or its result is uncertain (including an HTTP 409 conflict), 
 |---------|-----------|
 | Map blank | Check internet/LAN to `map server`; reload; if offline, wait for tiles cache |
 | Location not sharing | Allow Location permission; check priority device; ensure GPS on |
-| Cannot login, suspended | Contact admin with username; wait 24h |
+| Cannot login, inactive | Ask an administrator to reactivate the account; then sign in again |
+| Cannot login, suspended | Contact the service operator; reactivation in Users does not remove suspension, and there is no automatic 24-hour release or admin unsuspend screen |
 | Cannot accept SOS | You may be On Mission — complete/cancel first |
 | Photo upload fails | Under 5MB, jpg/png/webp; retry with smaller |
 | Security answer rejected | Answers are case-insensitive & trimmed — try lowercase |
