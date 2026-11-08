@@ -180,7 +180,7 @@
       {{ deviceSettings.status.value.text }}
     </p>
 
-    <v-dialog v-model="bulkConfirmOpen" max-width="420" scrollable aria-labelledby="share-bulk-title">
+    <v-dialog v-model="bulkConfirmOpen" max-width="420" scrollable :persistent="deviceSettings.bulkRunning.value" aria-labelledby="share-bulk-title">
       <v-card rounded="xl">
         <v-card-title id="share-bulk-title">تغییر دستگاه همهٔ همراهان؟</v-card-title>
         <v-card-text class="share-lists__confirm-body">
@@ -195,7 +195,7 @@
       </v-card>
     </v-dialog>
 
-    <v-dialog v-model="confirmOpen" max-width="420" scrollable aria-labelledby="share-revoke-title">
+    <v-dialog v-model="confirmOpen" max-width="420" scrollable :persistent="revoking" aria-labelledby="share-revoke-title">
       <v-card rounded="xl" v-if="pendingRow">
         <v-card-title id="share-revoke-title">{{ pendingRow.history ? "حذف دسترسی تاریخچه؟" : "لغو این اشتراک؟" }}</v-card-title>
         <v-card-text class="share-lists__confirm-body">

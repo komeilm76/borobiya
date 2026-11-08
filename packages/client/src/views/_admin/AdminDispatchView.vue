@@ -574,7 +574,7 @@
             </v-btn>
           </v-card-actions>
         </v-card>
-        <v-dialog v-model="manualDispatchConfirmation" max-width="480" aria-label="تأیید اعزام دستی">
+        <v-dialog v-model="manualDispatchConfirmation" max-width="480" :persistent="adminSos.dispatchSubmitting" aria-label="تأیید اعزام دستی">
           <v-card title="تأیید اعزام دستی" rounded="xl">
             <v-card-text>
               موقعیت یا تخصص مرتبط برای افراد زیر تأیید نشده است. پیش از ارسال پیشنهاد مأموریت، صلاحیت و دسترسی آن‌ها را بررسی کنید:
@@ -586,7 +586,7 @@
             </v-card-text>
             <v-card-actions>
               <v-spacer />
-              <v-btn variant="text" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
+              <v-btn variant="text" :disabled="adminSos.dispatchSubmitting" @click="manualDispatchConfirmation = false">بازگشت</v-btn>
               <v-btn color="error" :loading="adminSos.dispatchSubmitting" :disabled="!adminSos.canDispatchSelected"
                 @click="confirmManualDispatch">ارسال با آگاهی از محدودیت‌ها</v-btn>
             </v-card-actions>

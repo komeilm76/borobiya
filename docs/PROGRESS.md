@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Keep confirmed writes visible while pending (T4.4.2 partial)
+
+- Audited destructive/partially atomic confirmations against the installed Vuetify overlay: Back buttons were disabled while privacy revocation, multi-share device reassignment or remote-session termination ran, but Escape/backdrop/Back could still dismiss those dialogs; warned manual SOS dispatch also left its Back button enabled. The operations might still commit after dismissal. Bound each dialog's persistent state to its actual pending-write flag and disabled manual dispatch's Back while submitting. Programmatic close on settled result or context change remains possible. Four source-level regressions failed before the edit and now cover those bindings without mounting Vue. No browser keyboard/back navigation or real server/device confirmation was performed; T4.4.2 and the full rescue workflow stay open.
+
 ### 2026-10-23 — Fence SOS consent at same-account login changes (T4.4.2 partial)
 
 - A new login to the same account retained the previous JWT session's emergency draft and pending create/photo retry, unlike an account switch. A queued submit could thus post the old approved draft with the new login's token; a late create could show an old request or start its photo upload. The SOS composable now resets consent synchronously when the login session ID changes, while keeping a normal same-session bearer refresh and allowing cold same-owner session recovery. Deferred tests reproduced two failures before the fix and now cover pending session checks, late create, photo retry and same-tick A→B→A. Already-sent writes may have committed on the server; this change only fences client-side continuation and feedback, not server rollback. No live browser/API/GPS/emergency workflow test was run; T4.4.2 and full T4.5.3 Playwright acceptance remain open.

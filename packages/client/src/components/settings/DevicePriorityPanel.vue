@@ -52,7 +52,7 @@
     </p>
     <p v-if="message" class="device-priority__hint" :class="error ? 'device-priority__hint--error' : ''" role="status" aria-live="polite">{{ message }}</p>
 
-    <v-dialog v-model="confirmOpen" max-width="420" scrollable aria-labelledby="device-termination-title">
+    <v-dialog v-model="confirmOpen" max-width="420" scrollable :persistent="terminating" aria-labelledby="device-termination-title">
       <v-card v-if="pending" rounded="xl">
         <v-card-title id="device-termination-title">پایان این نشست؟</v-card-title>
         <v-card-text class="device-priority__confirm">
