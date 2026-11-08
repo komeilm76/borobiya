@@ -35,6 +35,8 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - Sign-in accepts any provisioned secret while the 12-character/letters-and-numbers policy still applies where a password is chosen, so the documented bootstrap administrator password works on a fresh install.
 - A push-to-talk hold streams for its whole duration; the per-frame payload ceiling is no longer mistaken for a session budget.
 - An expired session during the profile device read clears the local session and redirects instead of raising an unhandled rejection.
+- In the command palette, holding Ctrl/Cmd and pressing K registered the chord, and one arrow press moved the highlight two rows because both the window handler and the search-field handler counted the same event; the field now owns the step and stops the event.
+- The palette announces its match count in a polite live region, so filtering to no results is no longer silent for a screen reader.
 - The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree.
 - Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
 - Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.

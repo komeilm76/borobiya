@@ -82,6 +82,9 @@ describe('accessibility contract', () => {
     const palette = await read('src/client/components/CommandPalette.vue');
     expect(palette).toMatch(/role="dialog"|aria-label/);
     expect(palette).toMatch(/aria-selected|aria-activedescendant|role="option"/);
+    // Filtering can empty the list without any focus change, so the match count needs an
+    // announceable live region; otherwise the dialog silently goes blank for a screen reader.
+    expect(palette).toMatch(/role="status"[^>]*aria-live="polite"|aria-live="polite"[^>]*role="status"/);
     const paletteLogic = await read('src/client/composables/useCommandPalette.ts');
     expect(paletteLogic).toMatch(/ArrowDown/);
     expect(paletteLogic).toMatch(/ArrowUp/);

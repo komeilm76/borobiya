@@ -57,13 +57,16 @@ watch(
 );
 
 useEventListener(searchInput, 'keydown', (event: KeyboardEvent) => {
-  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    event.preventDefault();
-    const total = palette.results.value.length;
-    if (!total) return;
-    const delta = event.key === 'ArrowDown' ? 1 : -1;
-    palette.activeIndex.value = (palette.activeIndex.value + delta + total) % total;
-  }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+  // The composable already listens on `window`, and the search field is inside it, so this event
+  // reaches both handlers. Move the highlight here and stop it there: one press must move one row.
+  // Without this the highlight advanced twice per press and Enter ran the command below it.
+  event.stopPropagation();
+  event.preventDefault();
+  const total = palette.results.value.length;
+  if (!total) return;
+  const delta = event.key === 'ArrowDown' ? 1 : -1;
+  palette.activeIndex.value = (palette.activeIndex.value + delta + total) % total;
 });
 
 const hasResults = computed(() => palette.results.value.length > 0);
@@ -85,7 +88,10 @@ const hasResults = computed(() => palette.results.value.length > 0);
           >
           <kbd>Esc</kbd>
         </div>
-        <ul class="command-list" role="listbox">
+        <p class="command-status" data-testid="command-status" role="status" aria-live="polite">
+          {{ palette.results.value.length }} فرمان
+        </p>
+        <ul class="command-list" role="listbox" :aria-label="`${palette.results.value.length} فرمان`">
           <li v-for="(entry, index) in palette.results.value" :key="entry.id" role="none">
             <button
               type="button"
@@ -114,6 +120,14 @@ const hasResults = computed(() => palette.results.value.length > 0);
 .bb-palette-enter-from,
 .bb-palette-leave-to {
   opacity: 0;
+}
+.command-status {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .command-panel {
   inline-size: min(560px, calc(100vw - 32px));

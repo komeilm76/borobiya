@@ -48,16 +48,18 @@ describe('application shell components', () => {
     wrapper.unmount();
   });
 
-  it('mounts the command palette as an accessible dialog with searchable entries', async () => {
+  it('mounts the command palette closed and opens it as an accessible dialog', async () => {
+    // Behaviour lives in tests/command-palette.test.ts; this only checks it mounts beneath the app
+    // shell without a router in the current view, so the assertion has to be about the closed state.
     const host = defineComponent({
       components: { CommandPalette },
       setup() {
-        const router = testRouter();
         return () => h('div', [h(CommandPalette)]);
       }
     });
     const wrapper = await mountWithPlugins(host);
-    expect(wrapper.exists()).toBe(true);
+    expect(wrapper.find('[data-testid="command-palette"]').exists()).toBe(false);
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
     wrapper.unmount();
   });
 
