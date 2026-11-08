@@ -238,4 +238,45 @@ describe('HTTP API', () => {
     expect(health.json.data.status).toBe('ok');
     expect(health.json.data.database.users).toBeGreaterThanOrEqual(1);
   });
+
+  it('serializes device sessions with the field names the profile screen reads', async () => {
+    // The screen once read `id`/`lastSeenAt`/`current` while the API returned
+    // `sessionId`/`lastActiveAt`/`isCurrentDevice`, and revoked through a route that did not exist.
+    // Pin the wire contract here so a rename fails in CI instead of silently blanking the UI.
+    const second = await login(server, 'saeed.k', 'DemoPass!2026');
+    expect(second).toBeTruthy();
+
+    const listed = await apiFetch(server, '/_user/devices', { cookie: userCookie });
+    expect(listed.status).toBe(200);
+    const devices = listed.json.data.items as Array<Record<string, unknown>>;
+    expect(devices.length).toBeGreaterThanOrEqual(2);
+
+    const current = devices.find((device) => device.isCurrentDevice === true);
+    expect(current).toBeTruthy();
+    expect(Object.keys(current!).sort()).toEqual([
+      'createdAt',
+      'deviceId',
+      'deviceName',
+      'expiresAt',
+      'ip',
+      'isCurrentDevice',
+      'isOnline',
+      'lastActiveAt',
+      'sessionId'
+    ]);
+    expect(typeof current!.sessionId).toBe('string');
+
+    const other = devices.find((device) => device.isCurrentDevice === false)!;
+    const revoked = await apiFetch(server, `/_user/devices/${other.sessionId}`, { method: 'DELETE', cookie: userCookie });
+    expect(revoked.status).toBe(200);
+
+    const after = await apiFetch(server, '/_user/devices', { cookie: userCookie });
+    expect(after.json.data.items.some((device: any) => device.sessionId === other.sessionId)).toBe(false);
+    // The caller keeps its own session: revoking another device must not sign you out.
+    expect(after.json.data.items.some((device: any) => device.isCurrentDevice === true)).toBe(true);
+
+    // Revoking a session that is already gone is a 404, not a silent success.
+    const again = await apiFetch(server, `/_user/devices/${other.sessionId}`, { method: 'DELETE', cookie: userCookie });
+    expect(again.status).toBe(404);
+  });
 });

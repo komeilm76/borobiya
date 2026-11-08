@@ -28,13 +28,16 @@ onMounted(() => void auth.loadDevices());
   <div class="sheet__body">
     <h3 class="sheet__subtitle">دستگاه‌های فعال</h3>
     <ul class="device-list">
-      <li v-for="device in devices" :key="device.id">
+      <li v-for="device in devices" :key="device.sessionId">
         <span class="mdi mdi-cellphone-link" aria-hidden="true" />
         <div>
           <strong>{{ device.deviceName }}</strong>
-          <small>{{ device.ip }} · {{ format.dateTime(device.lastSeenAt) }}</small>
+          <small>{{ device.ip }} · {{ format.dateTime(device.lastActiveAt) }}</small>
         </div>
-        <button type="button" class="text-link" :disabled="device.current" @click="auth.revokeDevice(device.id)">پایان</button>
+        <!-- The current session cannot revoke itself: the button is disabled, not merely failing. -->
+        <button type="button" class="text-link" :disabled="device.isCurrentDevice" @click="auth.revokeDevice(device.sessionId)">
+          {{ device.isCurrentDevice ? 'این دستگاه' : 'پایان' }}
+        </button>
       </li>
     </ul>
     <p v-if="!devices.length" class="sheet__status">دستگاه دیگری فعال نیست.</p>

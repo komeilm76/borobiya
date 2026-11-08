@@ -192,13 +192,19 @@ export interface AuditEntryView {
 }
 
 /** A device/session row for the profile screen. */
+/** One active device session, as `GET /_user/devices` returns it. */
 export interface SessionView {
-  id: string;
+  /** Session identifier, and the value the revoke endpoint takes. */
+  sessionId: string;
+  deviceId: string;
   deviceName: string;
   ip: string;
   createdAt: number;
-  lastSeenAt: number;
-  current: boolean;
+  lastActiveAt: number;
+  expiresAt: number;
+  /** True for the session making the request: it cannot be revoked from here. */
+  isCurrentDevice: boolean;
+  isOnline: boolean;
 }
 
 /** A paged list envelope. */

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { get, post, ApiError } from '@/api/client.ts';
+import { del, get, post, ApiError } from '@/api/client.ts';
 import type { SecurityQuestionView, SessionView, UserView } from '@/api/types.ts';
 import { ROLES } from '@shared/protocol.ts';
 
@@ -125,9 +125,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  /** Revokes a single device session. */
+  /** Revokes a single device session; the endpoint is `DELETE /_user/devices/:sessionId`. */
   async function revokeDevice(sessionId: string): Promise<void> {
-    await post(`/_user/devices/${sessionId}/revoke`);
+    await del(`/_user/devices/${encodeURIComponent(sessionId)}`);
     await loadDevices();
   }
 

@@ -160,6 +160,7 @@ describe('architecture guards', () => {
       'command-palette.test.ts',
       'sos-store.test.ts',
       'recovery-view.test.ts',
+      'profile-devices.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
