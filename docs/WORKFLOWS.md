@@ -69,6 +69,39 @@ A local hook is a contributor safeguard, not a substitute for reviewed CI or
 VM/browser acceptance. Never bypass a failing gate merely to push; if the
 platform lacks ShellCheck/Ruff, install them before claiming local lint passed.
 
+### Browser E2E entry check (T4.5.3, opt-in and incomplete)
+
+A separate Playwright 1.56.1 test starts in a **fresh browser context**, logs in through the real UI,
+reaches the private map and opens the share-creation dialog on a dedicated nonproduction VM. It does
+not intercept HTTP, manufacture bearer tokens, submit a location grant, or trigger an SOS. It is **not**
+the required login → share → SOS → dispatch → accept → status → rate acceptance run. The normal
+`bun run test` does not discover `.pw.ts` tests, and pre-push does not run this browser check.
+
+Prepare a separate seeded test user with completed security questions and a working same-origin
+client/API/map edge. **Never point this at production or an account that may generate a real rescue
+request.** The acknowledgement below is an operator assertion, not an automatic production detector.
+On the test VM or a trusted test workstation, install the pinned browser (`bunx playwright install chromium`)
+and trust the VM's HTTPS certificate in the browser/OS. The origin can be a hostname or the current VM
+IP; it must be HTTPS except for loopback-only HTTP. From `packages/client`, with Bash:
+
+```bash
+export BOROBIYA_E2E_NONPRODUCTION=I_ACKNOWLEDGE_NONPRODUCTION
+export BOROBIYA_E2E_BASE_URL=https://your-test-vm.example
+export BOROBIYA_E2E_USERNAME=dedicated_test_user
+read -r -s -p 'Dedicated test password: ' BOROBIYA_E2E_PASSWORD; echo
+export BOROBIYA_E2E_PASSWORD
+bun run test:e2e
+unset BOROBIYA_E2E_PASSWORD
+```
+
+The target is a **single origin** without a path, query, URL credentials or fragment; the script
+fails closed without the acknowledgement and URL. Only on a private nonproduction VM with a
+self-signed certificate, `BOROBIYA_E2E_INSECURE_CERT=1` allows Chromium to skip certificate errors;
+prefer installing the CA instead. This browser option does not configure Android certificate trust.
+No trace/video/screenshot or saved browser storage is written by the test, but use dedicated test
+credentials and keep them out of shell history and Git. Successful discovery (`test:e2e --list`) and
+Vitest target-guard tests are not evidence that the browser journey or SSE works.
+
 ### Branch Protection (GitHub)
 
 Settings → Branches → `main`:

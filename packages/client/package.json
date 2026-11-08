@@ -10,7 +10,8 @@
     "generate:api": "bun scripts/generate-api.ts",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
-    "typecheck": "vue-tsc --noEmit --project tsconfig.json"
+    "test:e2e": "playwright test --config ./playwright.config.ts",
+    "typecheck": "vue-tsc --noEmit --project tsconfig.json && tsc --noEmit --project tsconfig.e2e.json"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.3",
@@ -29,6 +30,7 @@
   "devDependencies": {
     "@capacitor/android": "8.5.3",
     "@capacitor/cli": "8.5.3",
+    "@playwright/test": "1.56.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.20.5",
     "@vitejs/plugin-vue": "^6.0.10",

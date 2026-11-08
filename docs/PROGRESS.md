@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Prepare guarded real-browser E2E entry (T4.5.3 incomplete)
+
+- Added a separate, opt-in Playwright entry test for a dedicated nonproduction user: real UI login, private map and opening the live/history share dialog, without intercepted APIs or safety-sensitive share/SOS writes. The test target requires an explicit nonproduction acknowledgement and a single secure origin; runtime credentials are not committed and trace/video/screenshots are disabled. A target-guard Vitest suite failed to import before the guard existed, then passed all four assertions; TypeScript checks and Playwright `--list` confirmed the scenario is discoverable and missing target env fails closed. This workspace has no browser binary, migrated database, running VM or dedicated test account, so the browser scenario **was not executed**. Full login-to-rating and stream acceptance remain not started; see WORKFLOWS §2.
+
 ### 2026-10-23 — Reuse history trace and skip unchanged map writes (T4.4.4 partial)
 
 - During history playback, a 50ms cursor tick rebuilt the entire recorded GeoJSON trace and asked MapLibre to rewrite all three sources and paint properties, even though only the played prefix and head moved. Cached the full trace by track identity; the playback-specific planner skips identical source data and unchanged paint only for the same map/style with every source/layer intact. Missing overlays, a style change, a new ready map and route suppression retain full restoration paths. Three regressions failed before the change; 92 focused tests, all 1,303 client tests and client typecheck passed. This is a nonmounted source/pure planner check, not a measured browser/device FPS, map paint, GPS latency or offline-style acceptance; T4.4.4 remains open.
