@@ -49,10 +49,10 @@ export default defineConfig({
         // timing and the suite's statement total moved between identical runs (87.06-87.32%).
         // Each of those views now has its own deterministic suite, and these thresholds sit below
         // the stable figure (87.27 / 91.19 / 87.73 / 74.21).
-        lines: 90,
-        functions: 87,
+        lines: 91,
+        functions: 88,
         statements: 87,
-        branches: 73
+        branches: 74
 
       }
     }
