@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Index the companion card's authorized-age join (T4.4.4 partial)
+
+- The Companions card rebuilt its list on each five-second age tick by calling `peers.find` for every authorized registry entry, scanning the same positioned array repeatedly. Extracted a linear indexed projection: one pass over positioned peers, then one pass over the authorized registry. It keeps the registry's order, waiting-for-first-fix rows, old/unknown-time status and accuracy, and never adds unlisted peers. Pure tests exercise those boundaries and guard against per-row scans; a nonmounted source check pins card wiring. Both new tests failed before the change; 103 targeted tests, the 1,276-test client suite and client typecheck passed. This is a source-level reduction, **not** measured FPS, virtual scroll, <2s map paint or <500ms GPS acquisition; T4.4.4 and device/browser acceptance stay open.
+
 ### 2026-10-23 — Announce mission-location state transitions, not each GPS timestamp (T4.4.3 partial)
 
 - The three-role mission panel put `aria-live="polite"` around the entire member list, including each member's last-seen timestamp. Frequent consented GPS fixes could therefore repeatedly interrupt a screen-reader user. Kept the visible timestamps, badges, map and opt-in controls unchanged, but moved automatic speech to a separate atomic status derived only from each role's not-sharing/fresh/stale phase. The wording explicitly avoids equating GPS freshness with device connection or human presence; the independent connection badges remain. A pure reactive regression verifies that timestamp-only changes do not alter the announcement while freshness/revocation changes do, and a nonmounted source check pins the live-region boundary. The source check failed before the fix; 26 targeted tests, 1,274 client tests and client typecheck passed. No browser/assistive-technology or device verification was performed; the wider T4.4.3 audit remains open.

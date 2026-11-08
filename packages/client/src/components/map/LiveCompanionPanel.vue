@@ -92,7 +92,7 @@
 import { computed } from "vue";
 import { useThemeStore } from "@/stores/theme";
 import { avatarInitial } from "@/live/avatar-initial";
-import { ageWords, connectionTitle, liveMarkerColors } from "@/live/companion-locations";
+import { ageWords, companionListMembers, connectionTitle, liveMarkerColors } from "@/live/companion-locations";
 import type { BroadcastStatusView } from "@/live/broadcast-status";
 import type { useLiveCompanions } from "@/composables/use-live-companions";
 
@@ -113,13 +113,9 @@ const props = defineProps<{
 }>();
 defineEmits<{ 'update:visible': [visible: boolean]; select: [userId: string]; 'create-share': [] }>();
 
-// Include permitted users who are waiting for their first fix; disabling their
-// action avoids pretending we can center on an unknown coordinate.
-const members = computed(() => Object.values(props.api.registry.value).map((entry) => {
-  const positioned = props.api.peers.value.find((peer) => peer.userId === entry.userId);
-  return { userId: entry.userId, name: entry.name, position: positioned?.position ?? null,
-    stale: positioned?.stale ?? true, ageMs: positioned?.ageMs ?? null, accuracy: positioned?.accuracy ?? null };
-}));
+// Include permitted users awaiting a first fix; index the age snapshot once rather
+// than rescanning it for each authorized companion on every clock tick.
+const members = computed(() => companionListMembers(props.api.registry.value, props.api.peers.value));
 
 const theme = useThemeStore();
 const colors = computed(() => liveMarkerColors(theme.isDark));

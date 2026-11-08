@@ -120,6 +120,26 @@ export interface CompanionView {
 /** MapLibre's DOM avatars read these fields, not the age displayed in the companion panel. */
 export type CompanionMapPeer = Pick<CompanionView, "userId" | "name" | "position" | "stale">;
 
+export interface CompanionListMember {
+  readonly userId: string;
+  readonly name: string;
+  readonly position: MapPosition | null;
+  readonly stale: boolean;
+  readonly ageMs: number | null;
+  readonly accuracy: number | null;
+}
+
+/** Join the authorized list with the changing age snapshot once per tick, without showing unlisted fixes. */
+export function companionListMembers(registry: CompanionRegistry, peers: readonly CompanionView[]): CompanionListMember[] {
+  const byId = new Map<string, CompanionView>();
+  for (const peer of peers) if (!byId.has(peer.userId)) byId.set(peer.userId, peer);
+  return Object.values(registry).map((entry) => {
+    const positioned = byId.get(entry.userId);
+    return { userId: entry.userId, name: entry.name, position: positioned?.position ?? null,
+      stale: positioned?.stale ?? true, ageMs: positioned?.ageMs ?? null, accuracy: positioned?.accuracy ?? null };
+  });
+}
+
 /** Keep the previous snapshot on age-only ticks; compare ids as well as appearance for grant safety. */
 export function mapPeersOf(peers: readonly CompanionView[], previous?: readonly CompanionMapPeer[]): readonly CompanionMapPeer[] {
   if (previous?.length === peers.length) {
