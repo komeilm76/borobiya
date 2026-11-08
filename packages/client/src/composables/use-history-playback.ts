@@ -191,9 +191,13 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       grantsLoaded.value = true;
       grantsFailed.value = false;
       if (grantId.value && !response.sharedWithMe.some((grant) => grant.id === grantId.value)) {
+        // A history read started before this revocation may still resolve afterward.
+        // Revoke its authority to repaint even if the request cannot be aborted.
+        ++requestId;
         stopTimer();
         grantId.value = "";
         clearTrack();
+        loading.value = false;
         if (sourceKind.value === "grant") {
           failed.value = true;
           loadIssue.value = "grant_gone";

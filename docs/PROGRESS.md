@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Keep revoked shared-history tracks cleared
+
+- A receiver could refresh their companion-grant list while an older shared-history read was in flight. If the refreshed list no longer contained the selected grant, the panel cleared its track but the delayed read could repaint the removed private trace and keep the loading indicator active until it finished. Revocation now invalidates that read immediately and clears loading; late success cannot restore the track or overwrite the grant-gone state. A delayed-response regression failed before the fix and passes without mounting a Vue component. Live revocation and network behavior still require device/server acceptance.
+
 ### 2026-11-04 — Expire silent GPS outages on the private map
 
 - The map previously invalidated speed/ETA after a stale GPS sample, but retained the blue own-position marker and last distance/warning state indefinitely if a browser or native geolocation bridge silently stopped sending fixes without an error callback. A valid fix now arms a 20-second freshness deadline; if it expires, the private position and timestamp are cleared so guidance reports missing GPS instead of presenting the old coordinate as live. The watch stays active and a later valid fix recovers automatically. New fixes renew the deadline; invalid samples do not, and stop, transient errors, account changes and disposal cancel it. Fake-timer composable regressions reproduced silent staleness before the fix. Physical GPS bridge timing still needs device acceptance.

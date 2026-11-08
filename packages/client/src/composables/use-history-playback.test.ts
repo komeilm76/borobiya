@@ -750,6 +750,39 @@ describe("reloading a track", () => {
     expect(api.bounds.value).toBeNull();
   });
 
+  it("cannot restore a revoked companion track from an in-flight history reply", async () => {
+    const { scope, api } = mount();
+    try {
+      autoRespond = () => ({ owned: [], sharedWithMe: [grantRow("c")] });
+      api.selectSource("grant");
+      await settle();
+      expect(api.grants.value).toHaveLength(1);
+      autoRespond = null;
+      api.selectGrant(grantRow("c").id);
+      await settle();
+      const oldHistory = calls.at(-1)!;
+      expect(oldHistory.url).toContain("/history/shared/");
+      expect(api.loading.value).toBe(true);
+
+      const refresh = api.loadShares();
+      await settle();
+      const list = calls.at(-1)!;
+      expect(list.url).not.toBe(oldHistory.url);
+      list.resolve({ owned: [], sharedWithMe: [] });
+      await refresh;
+      expect(api.grantId.value).toBe("");
+      expect(api.hasTrack.value).toBe(false);
+      expect(api.loadIssue.value).toBe("grant_gone");
+
+      oldHistory.resolve(historyBody([point(35.7, 51.4, new Date(NOW - HOUR).toISOString())]));
+      await settle();
+      expect(api.points.value).toEqual([]);
+      expect(api.hasTrack.value).toBe(false);
+      expect(api.loading.value).toBe(false);
+      expect(api.loadIssue.value).toBe("grant_gone");
+    } finally { scope.stop(); }
+  });
+
   it("re-reads companion grants on re-entering grant mode and evicts a revoked active grant on refresh", async () => {
     const { api } = mount();
     autoRespond = () => ({ owned: [], sharedWithMe: [] });
