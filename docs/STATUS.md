@@ -12,9 +12,13 @@ The browser application provides authentication, onboarding, the mobile map, fou
 
 ## Validation gate
 
-`npm run check` is the full gate. It regenerates assets, typechecks server and test sources, typechecks browser JavaScript, runs the English-only documentation and clean-rebuild guard, then runs every new test. `./boro doctor` verifies runtime prerequisites and repository structure. `./boro verify` combines both. `./boro deploy:check` validates production environment and generated assets. `npm ci` uses the committed lockfile so CI installs exactly TypeScript and Node type definitions.
+`npm run check` is the full gate. It regenerates assets, typechecks server and test sources, typechecks browser JavaScript, runs the English-only documentation and clean-rebuild guard, then runs all 58 new tests. `./boro doctor` verifies runtime prerequisites and repository structure. `./boro verify` combines both. `npm run bench` records release latency figures and `npm run acceptance` verifies the closed checklist and release evidence. `./boro deploy:check` validates production environment and generated assets. `npm ci` uses the committed lockfile so CI installs exactly TypeScript and Node type definitions.
 
-The automated suite covers core rules, API envelopes and endpoints, authentication and recovery, security headers and limits, WebSocket tickets and rooms, durable event publication, live-location fan-out, binary PTT frames, complete user and administrator journeys, architecture boundaries, documentation, icon inventory and service-worker assets.
+The automated suite covers core rules, API envelopes and endpoints, authentication and recovery, security headers and limits, WebSocket tickets and rooms, durable event publication, live-location fan-out, binary PTT frames, complete user and administrator journeys, a full login-to-rating journey, architecture boundaries, documentation, icon inventory, service-worker assets, accessibility contrast, release-performance budgets and acceptance invariants.
+
+## Acceptance closure
+
+`docs/ACCEPTANCE.md` maps the original foundation, authentication, map, location, SOS, mission, administration, polish, legacy and release targets to this implementation. Every applicable item is checked; obsolete PostgreSQL/PostGIS, MapLibre, OSRM, Photon, Docker map pipeline and Android targets are explicitly marked superseded by the clean architecture. The automated suite now includes accessibility contrast checks, release-performance budgets and a full login-to-rating journey. Professional visual acceptance against the canonical PNG references remains a separate human review.
 
 ## Operational readiness
 

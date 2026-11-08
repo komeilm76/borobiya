@@ -44,6 +44,43 @@ export function mount(markup, mode) {
   void root.offsetWidth;
   root.classList.add('view-enter');
   window.scrollTo(0, 0);
+  root.focus({ preventScroll: true });
+}
+
+/**
+ * Renders an immediate loading surface while a route fetches its data.
+ * @param {'auth'|'map'|'admin'} mode
+ */
+export function loadingShell(mode) {
+  const rows = mode === 'admin' ? 6 : 4;
+  return `<div class="loading-shell" role="status" aria-label="در حال بارگذاری">
+    <span class="loading-shell__header skeleton"></span>
+    ${Array.from({ length: rows }, (_, index) => `<span class="loading-shell__row skeleton" style="--delay:${index * 60}ms"></span>`).join('')}
+  </div>`;
+}
+
+/** @param {string} [message] */
+export function offlinePanel(message = 'اتصال اینترنت قطع است. دادههای ذخیرهشده همچنان در دسترساند.') {
+  return `<div class="offline-state">${icon('wifi-off')}<strong>حالت آفلاین</strong><span>${escapeHtml(message)}</span></div>`;
+}
+
+/**
+ * Disables a control while an async action is in flight.
+ * @param {HTMLElement} button
+ * @param {() => Promise<unknown>} task
+ */
+export async function busy(button, task) {
+  const original = button.innerHTML;
+  const wasDisabled = button.hasAttribute('disabled');
+  button.setAttribute('disabled', '');
+  button.setAttribute('aria-busy', 'true');
+  button.innerHTML = `${icon('loading', 'is-spinning')}<span>لطفاً صبر کنید</span>`;
+  try { return await task(); }
+  finally {
+    button.innerHTML = original;
+    button.removeAttribute('aria-busy');
+    if (!wasDisabled) button.removeAttribute('disabled');
+  }
 }
 
 /** @param {string} message @param {'info'|'success'|'warning'|'error'} [kind] @param {number} [timeout] */

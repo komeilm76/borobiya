@@ -28,7 +28,7 @@ const EXTRA_ICONS = [
   'phone-hangup', 'pulse', 'radiobox-marked', 'ray-start-arrow', 'ray-end-arrow',
   'robot-off-outline', 'school-outline', 'shield-edit-outline', 'shopping-outline', 'signal',
   'star', 'sync', 'table-edit', 'tag', 'target', 'theme-light-dark', 'timer-sand-empty',
-  'upload-outline', 'web', 'wifi', 'wrench-outline'
+  'upload-outline', 'web', 'wifi', 'wifi-off', 'wrench-outline'
 ];
 
 function walk(directory, extension, output = []) {

@@ -8,6 +8,10 @@ Start at `/_auth/login`. Enter your username and password; the primary button be
 
 Theme follows the system by default. You can explicitly choose light or dark. The choice is applied before the first paint so the screen does not flash. Active devices can be reviewed and revoked from the profile section; login history is available for auditing your own account.
 
+## Loading, offline and keyboard access
+
+The shell shows a loading skeleton while a view is fetched, an offline panel when navigation requires a route that has not been cached, and a retryable error panel if a view cannot be loaded. The service worker caches application routes and static assets; map tiles use a bounded offline cache. On reconnect, the realtime client resumes durable event synchronization instead of asking you to reload. Use the skip link at the start of the page to jump directly to the main content, and press `Ctrl` or `Command` plus `K` to open the command palette.
+
 ## Map and places
 
 The map is the home surface. Use the four-part top selector to move between map, mission, companions and history. The search field finds destinations, and quick chips jump to saved places. The layers and compass controls adjust the view; recenter returns to your location. An accuracy circle shows how precise the current fix is. Live companions appear as ringed markers with freshness indicators.

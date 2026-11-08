@@ -24,6 +24,8 @@
     "test:assets": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/assets.test.ts",
     "check": "node scripts/boro.mjs check",
     "verify": "node scripts/boro.mjs verify",
+    "bench": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/bench.mjs",
+    "acceptance": "node scripts/acceptance.mjs",
     "deploy:check": "node scripts/boro.mjs deploy:check",
     "db:seed": "node scripts/boro.mjs db:seed",
     "db:reset": "node scripts/boro.mjs db:reset",

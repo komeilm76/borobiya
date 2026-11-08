@@ -23,3 +23,5 @@ Location retention is bounded by `LOCATION_RETENTION_HOURS`, and old durable eve
 ## Startup and verification
 
 Start with `npm start` or a process manager that runs `node --experimental-transform-types --disable-warning=ExperimentalWarning src/index.ts`. Confirm `/_public/health`, `/_public/openapi.json`, a protected route with an administrator session, an SVG tile response and a WebSocket upgrade. Watch logs for request IDs on failed responses. Graceful shutdown closes WebSocket peers, clears jobs and closes the database.
+
+Close `docs/ACCEPTANCE.md`, run `npm run verify`, `npm run bench`, `npm run acceptance` and `./boro deploy:check`, then record the release in `docs/RELEASE_NOTES.md`. Create the annotated `v1.0.0` tag from the final release commit and have the release operator push the tag after approval. Follow `docs/OPERATIONS.md` for routine startup, health signals, incidents, backups and outage recovery.

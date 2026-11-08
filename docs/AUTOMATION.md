@@ -9,6 +9,8 @@
 - `./boro doctor` checks Node version, native TypeScript mode, canonical images, shared protocol, generated icon CSS, cache manifest, new tests, legacy-path removal and `node:sqlite` availability.
 - `./boro check` regenerates assets, runs server and browser typechecks, validates documentation and runs the full test suite.
 - `./boro verify` runs doctor followed by check.
+- `./boro bench` measures pure validation, deterministic tiles, concurrent HTTP reads and realtime live-location fan-out.
+- `./boro acceptance` verifies that the target checklist is closed and that release evidence, automation and CI are present.
 - `./boro deploy:check` validates production environment and generated assets.
 - `./boro db:seed` and `./boro db:reset` manage the local SQLite file.
 - `./boro clean` removes generated local data after an explicit operator command.
@@ -19,7 +21,7 @@
 
 ## CI
 
-The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs `npm run check`. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The check pipeline fails on typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests or any automated test failure.
+The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run acceptance` and a production-configured deployment check. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
 
 ## Asset generation
 

@@ -22,4 +22,4 @@ The browser uses native ES modules, CSS and a service worker; there is no build-
 
 ## Verification
 
-`npm run check` validates the full suite, including asset and architecture invariants. `/_public/health`, `/_admin/system/health` and the realtime statistics expose live counters for peers, frames, map cache entries, database tables and talk-floor state. Use these counters with request IDs when investigating latency or cache growth.
+`npm run check` validates the full suite, including asset and architecture invariants. `npm run bench` records release figures for 1,000 validations, 100 deterministic tiles, 50 concurrent public reads and WebSocket live-location fan-out; `tests/performance.test.ts` keeps those measurements inside generous automated budgets. `/_public/health`, `/_admin/system/health` and the realtime statistics expose live counters for peers, frames, map cache entries, database tables and talk-floor state. Use these counters with request IDs when investigating latency or cache growth.

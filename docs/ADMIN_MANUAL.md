@@ -6,6 +6,10 @@ The administrator console is a right-to-left desktop application served at `/_ad
 
 The overview shows four KPIs: online responders, average response time, active missions and requests today. Trend notes are semantic and color-coded. The live operations map uses offline vector tiles with incident and responder markers. Group readiness cards show capacity, incident coverage and paused state. The alert card allows an unresolved item to be marked reviewed. The recent-requests table links to SOS detail. Use the refresh action to reload all console data; realtime events also trigger a refresh.
 
+## Access and keyboard support
+
+The skip link moves focus directly to the main content, and `Ctrl` or `Command` plus `K` opens the command palette. Use the arrow keys, `Home`, `End` and `Enter` to navigate palette results, and `Escape` to close it. Active navigation items expose `aria-current`, and dialogs keep keyboard focus inside the modal until they close. Focus returns to the control that opened a dialog.
+
 ## Dispatch board
 
 The dispatch board has a queue on the physical left, a map and nearest responders in the center, and incident detail with selected responders on the right. Select a queue card to load nearest responders for that incident location and type. Choose an active group and at least one responder, then submit the dispatch. The response updates the SOS state and emits durable events to the requester, responders and all administrators. The dispatch action cannot be repeated once the state machine has advanced.

@@ -72,7 +72,7 @@ function statusBar() {
 function topPill(view) {
   const active = view === 'sos' || view === 'talk' ? 'map' : view === 'profile' ? 'history' : view;
   return `<nav class="top-pill" aria-label="بخشهای اصلی">
-    ${TABS.map((tab) => `<button type="button" class="top-pill__item ${tab.id === active ? 'is-active' : ''}" data-go="${tab.path}">
+    ${TABS.map((tab) => `<button type="button" class="top-pill__item ${tab.id === active ? 'is-active' : ''}" ${tab.id === active ? 'aria-current="page"' : ''} data-go="${tab.path}">
       ${icon(tab.icon)}<span>${escapeHtml(tab.label)}</span>${tab.id === 'mission' ? '<b class="mission-badge">۳</b>' : ''}
     </button>`).join('')}
   </nav>`;

@@ -12,7 +12,8 @@ const REQUIRED = [
   'docs/DEVELOPMENT.md', 'docs/DEPLOYMENT.md', 'docs/USER_MANUAL.md',
   'docs/ADMIN_MANUAL.md', 'docs/TESTING.md', 'docs/SECURITY.md',
   'docs/PERFORMANCE.md', 'docs/AUTOMATION.md', 'docs/DESIGN_SYSTEM.md',
-  'docs/LEGACY_REVIEW.md', 'docs/STATUS.md'
+  'docs/LEGACY_REVIEW.md', 'docs/STATUS.md', 'docs/ACCEPTANCE.md',
+  'docs/RELEASE_NOTES.md', 'docs/OPERATIONS.md'
 ];
 const ARABIC_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/u;
 const JUNK = /\b(TODO|TBD|lorem ipsum|junk text|placeholder screenshot)\b/i;

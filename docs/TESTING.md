@@ -12,12 +12,16 @@ The automated suite is written for the Node test runner and executes TypeScript 
 - `journeys.test.ts` checks complete requester, companion and administrator journeys from API calls through state transitions and exports.
 - `architecture.test.ts` checks zero runtime dependencies, pure domain boundaries, route declarations, shared protocol, required documentation, English-only Markdown and canonical design images.
 - `assets.test.ts` checks generated cache manifest paths, self-hosted fonts, icon inventory, HTML shell, web app manifest and service-worker caching rules.
+- `accessibility.test.ts` checks WCAG AA contrast for light-theme text and semantic colors, skip navigation, focusable landmarks, reduced motion, lazy view loading, modal focus handling and keyboard palette behavior.
+- `performance.test.ts` records generous budgets for validation, deterministic tiles, concurrent public reads and WebSocket live-location fan-out.
+- `acceptance.test.ts` checks the closed target checklist, release evidence, automation scripts and CI coverage.
+- `journeys.test.ts` includes a full login-to-rating journey from registration and sharing through SOS, dispatch, acceptance, mission status and rating.
 
 The shared harness in `tests/helpers.ts` starts `createApp` with a `:memory:` database, a loopback port, deterministic admin credentials, demo seeding and disabled background jobs. It wraps same-origin fetch, session cookies, ticket issuance, WebSocket opening, JSON/binary message waiting and graceful socket shutdown.
 
 ## Commands
 
-Use `npm run test:core`, `npm run test:api`, `npm run test:sockets`, `npm run test:journeys`, `npm run test:architecture` or `npm run test:assets` for focused iteration. Use `npm run check` for the full gate: asset generation, server typecheck, browser typecheck, documentation guard and all tests. `./boro verify` adds runtime diagnostics.
+Use `npm run test:core`, `npm run test:api`, `npm run test:sockets`, `npm run test:journeys`, `npm run test:architecture` or `npm run test:assets` for focused iteration. Use `npm run check` for the full gate: asset generation, server typecheck, browser typecheck, documentation guard and all tests. `./boro verify` adds runtime diagnostics. Use `npm run bench` for release latency figures and `npm run acceptance` for checklist/evidence validation. Neither command performs browser-driven professional UI acceptance.
 
 ## Interpretation
 

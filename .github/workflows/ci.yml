@@ -10,7 +10,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,4 +19,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run assets
-      - run: npm run check
+      - run: npm run verify
+      - run: npm run bench
+      - run: npm run acceptance
+      - name: Validate production configuration
+        env:
+          NODE_ENV: production
+          COOKIE_SECURE: '1'
+          ADMIN_PASSWORD: CIReleasePass!2026
+          ALLOWED_ORIGINS: https://borobiya.example.test
+        run: npm run deploy:check

@@ -70,7 +70,7 @@ function mapTileUrl(config) {
 function sidebar(view) {
   return `<aside class="admin-sidebar">
     <div class="admin-brand"><img src="/assets/logo.svg" alt=""><div><strong>بورو بیا</strong><span>پلتفرم مدیریت امداد</span></div></div>
-    <nav class="admin-nav">${NAV.map((section) => `<div class="admin-nav__group"><span>${escapeHtml(section.group)}</span>${section.items.map((item) => `<button type="button" class="admin-nav__item ${item.id === view ? 'is-active' : ''}" data-go="${item.path}">${icon(item.icon)}<span>${escapeHtml(item.label)}</span>${item.id === view ? '<i></i>' : ''}</button>`).join('')}</div>`).join('')}</nav>
+    <nav class="admin-nav">${NAV.map((section) => `<div class="admin-nav__group"><span>${escapeHtml(section.group)}</span>${section.items.map((item) => `<button type="button" class="admin-nav__item ${item.id === view ? 'is-active' : ''}" ${item.id === view ? 'aria-current="page"' : ''} data-go="${item.path}">${icon(item.icon)}<span>${escapeHtml(item.label)}</span>${item.id === view ? '<i></i>' : ''}</button>`).join('')}</div>`).join('')}</nav>
     <div class="admin-user"><span class="admin-user__avatar">${icon('account-outline')}</span><div><strong>مهدی رستمی</strong><span>مدیر ارشد امداد</span></div>${icon('chevron-left')}</div>
   </aside>`;
 }

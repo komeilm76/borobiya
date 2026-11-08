@@ -1,6 +1,7 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { apiFetch, createTestServer, login, type TestServer } from './helpers.ts';
+import { apiFetch, createTestServer, login, sessionCookie, type TestServer } from './helpers.ts';
+import { SECURITY_QUESTIONS } from '../src/domain/catalog.ts';
 
 let server: TestServer;
 let requesterCookie: string;
@@ -136,4 +137,63 @@ test('hypothetical administrator journey: overview, dispatch board, alerts, sett
   assert.match(users.text, /id,username,role,active/);
   const audit = await apiFetch(server, '/_admin/audit.csv', { cookie: adminCookie });
   assert.match(audit.text, /id,createdAt,actorUsername/);
+});
+
+test('full login-to-rating journey: registration, sharing, SOS, dispatch, acceptance, status and rating', async () => {
+  const username = `journey.${Date.now().toString(36)}`;
+  const password = 'JourneyPass!2026';
+  const securityQuestions = SECURITY_QUESTIONS.map((question) => ({ questionId: question.id, answer: `Journey-${question.id}` }));
+  const registered = await apiFetch(server, '/_auth/register', {
+    method: 'POST', body: { username, password, securityQuestions }
+  });
+  assert.equal(registered.status, 201, registered.text);
+  const signedIn = await apiFetch(server, '/_auth/login', {
+    method: 'POST', body: { username, password, deviceId: 'journey-device' }
+  });
+  assert.equal(signedIn.status, 200);
+  const requester = sessionCookie(signedIn);
+  const me = await apiFetch(server, '/_user/me', { cookie: requester });
+  assert.equal(me.json.data.username, username);
+  assert.equal(me.json.data.securityReady, true);
+
+  const share = await apiFetch(server, '/_user/location/shares', {
+    method: 'POST', cookie: requester,
+    body: { recipientId: 'usr_companion', kind: 'live', durationSeconds: 1800 }
+  });
+  assert.equal(share.status, 201);
+  const created = await apiFetch(server, '/_user/sos', {
+    method: 'POST', cookie: requester,
+    body: {
+      incidentTypeId: 'inc_medical', severity: 'high',
+      description: 'End-to-end journey from account creation to mission rating.',
+      latitude: 35.7219, longitude: 51.3347, accuracy: 10, isManual: false
+    }
+  });
+  assert.equal(created.status, 201);
+  const sosId = created.json.data.sos.id;
+  const dispatched = await apiFetch(server, `/_admin/sos/${sosId}/dispatch`, {
+    method: 'POST', cookie: adminCookie,
+    body: { groupId: 'grp_medical', responderIds: ['usr_responder'] }
+  });
+  assert.equal(dispatched.status, 200);
+  const accepted = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie: responderCookie });
+  assert.equal(accepted.status, 200);
+  const missionId = accepted.json.data.missionId;
+  for (const [action, expected] of [['arrive', 'arrived'], ['start', 'in_progress'], ['complete', 'completed']]) {
+    const progress = await apiFetch(server, `/_user/missions/${missionId}/progress`, {
+      method: 'POST', cookie: responderCookie, body: { action }
+    });
+    assert.equal(progress.status, 200, progress.text);
+    assert.equal(progress.json.data.status, expected);
+  }
+  const rated = await apiFetch(server, `/_user/missions/${missionId}/rating`, {
+    method: 'POST', cookie: requester, body: { rating: 5, note: 'Complete end-to-end journey.' }
+  });
+  assert.equal(rated.status, 200);
+  const final = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requester });
+  assert.equal(final.json.data.status, 'completed');
+  assert.equal(final.json.data.mission.id, missionId);
+  assert.equal(final.json.data.mission.rating, 5);
+  const timeline = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requester });
+  assert.ok(timeline.json.data.timeline.length >= 4);
 });

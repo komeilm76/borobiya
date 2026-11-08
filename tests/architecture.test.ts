@@ -85,7 +85,8 @@ test('every required practical document exists, is substantial and is English-on
     'design/admin-panel/README.md', 'design/map-page/README.md', 'docs/README.md', 'docs/ARCHITECTURE.md',
     'docs/API.md', 'docs/WEBSOCKET.md', 'docs/DEVELOPMENT.md', 'docs/DEPLOYMENT.md', 'docs/USER_MANUAL.md',
     'docs/ADMIN_MANUAL.md', 'docs/TESTING.md', 'docs/SECURITY.md', 'docs/PERFORMANCE.md',
-    'docs/AUTOMATION.md', 'docs/DESIGN_SYSTEM.md', 'docs/LEGACY_REVIEW.md', 'docs/STATUS.md'];
+    'docs/AUTOMATION.md', 'docs/DESIGN_SYSTEM.md', 'docs/LEGACY_REVIEW.md', 'docs/STATUS.md',
+    'docs/ACCEPTANCE.md', 'docs/RELEASE_NOTES.md', 'docs/OPERATIONS.md'];
   for (const relative of required) {
     const absolute = path.join(ROOT, relative);
     assert.ok(existsSync(absolute), relative);
