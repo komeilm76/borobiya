@@ -273,9 +273,7 @@ const props = defineProps<{ api: HistoryPlayback; showReturnToTrack: boolean; ex
 const emit = defineEmits<{ "return-to-track": [] }>();
 const route = useRoute();
 
-const isNarrow = typeof window !== "undefined" && typeof window.matchMedia === "function"
-  && window.matchMedia("(max-width: 1023px)").matches;
-const isOpen = ref(historyPanelInitiallyOpen(isNarrow, route.query.historyShare));
+const isOpen = ref(historyPanelInitiallyOpen(route.query.historyShare));
 // A full-screen phone dialog must show the complete controls on every open, not
 // the old sheet's compact preview. Wider in-flow panels keep their own toggle.
 watch(() => props.expanded, (expanded) => { if (expanded) isOpen.value = true; }, { immediate: true });

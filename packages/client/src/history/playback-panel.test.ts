@@ -6,16 +6,18 @@ import { historyPanelInitiallyOpen, playbackSpeedLabel } from "./playback-panel"
 const panel = readFileSync(new URL("../components/map/HistoryPlaybackPanel.vue", import.meta.url), "utf8");
 
 describe("history panel entry state", () => {
-  it("starts compact on narrow in-flow panels; the full-screen phone dialog expands it on open", () => {
-    expect(historyPanelInitiallyOpen(true, undefined)).toBe(false);
-    expect(historyPanelInitiallyOpen(true, "  ")).toBe(false);
-    expect(historyPanelInitiallyOpen(false, undefined)).toBe(true);
+  it("starts compact at every map width; the full-screen phone dialog expands it on open", () => {
+    expect(historyPanelInitiallyOpen(undefined)).toBe(false);
+    expect(historyPanelInitiallyOpen("  ")).toBe(false);
+    expect(historyPanelInitiallyOpen(null)).toBe(false);
+    expect(panel).toContain("historyPanelInitiallyOpen(route.query.historyShare)");
+    expect(panel).not.toContain("window.matchMedia");
   });
 
-  it("opens a shared-history deep link even on a narrow screen", () => {
-    expect(historyPanelInitiallyOpen(true, "a-share-id")).toBe(true);
-    expect(historyPanelInitiallyOpen(true, ["a-share-id", "another"])).toBe(true);
-    expect(historyPanelInitiallyOpen(true, [null])).toBe(false);
+  it("opens an explicit shared-history deep link regardless of viewport width", () => {
+    expect(historyPanelInitiallyOpen("a-share-id")).toBe(true);
+    expect(historyPanelInitiallyOpen(["a-share-id", "another"])).toBe(true);
+    expect(historyPanelInitiallyOpen([null])).toBe(false);
   });
 
   it("formats speed labels in Persian without changing the numeric playback rates", () => {
@@ -90,8 +92,7 @@ describe("history panel entry state", () => {
   });
 
   it("renders a compact narrow-screen preview with accessible controls and a bounded expansion", () => {
-    expect(panel).toContain('window.matchMedia("(max-width: 1023px)").matches');
-    expect(panel).toContain("historyPanelInitiallyOpen(isNarrow, route.query.historyShare)");
+    expect(panel).toContain("historyPanelInitiallyOpen(route.query.historyShare)");
     expect(panel).toContain('v-else class="history-playback__preview" role="status"');
     expect(panel).toContain('aria-controls="history-playback-controls"');
     expect(panel).toContain('id="history-playback-controls" v-show="isOpen"');
