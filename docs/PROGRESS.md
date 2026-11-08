@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Keep requester SOS history unverified after interrupting refresh (T4.4.2 partial)
+
+- A requester could select a cached SOS while its history refresh was pending. Selection invalidated the pending response and cleared `loading`, but left the old `listLoaded` flag set; the page then presented stale rows/count as verified and re-enabled the reason-gated cancellation action. The same false verification followed a confirmed cancellation that interrupted a pending list read. Both paths now mark the cached list unverified when they interrupt a read, retaining the stale-list warning and disabling cancellation until a successful retry; ordinary selection/cancellation after a settled read preserves verified state. Deferred regressions failed before the fix; 31 targeted composable/view tests, the full client suite (1,271 tests) and client typecheck passed. No live API/browser/VM cancellation was exercised, and the broader feedback audit remains open.
+
 ### 2026-11-08 — Correct safety-critical manual claims against code (T4.7.1 partial)
 
 - Compared the user manual with login/session, admin-user and SOS behavior plus the security audit. Distinguished inactive accounts (admin reactivation) from persisted suspensions (no admin unsuspend UI or automatic 24-hour release); rate limiting does not suspend users. Removed claims of automatic pending-SOS expiry and six-hour mission alerts, and warned readers to contact emergency services directly rather than await an app escalation. Corrected admin Users filters and controls: deactivation revokes sessions but does not pause rescue records; no user-detail drawer or delete control is available. Replaced obsolete Dashboard, queued-history and planned mission status/location claims with source-backed current scope. This was a documentation/source review, not a live API, browser, map, VM or emergency workflow test. Remaining manual screenshot placeholders and acceptance work keep T4.7.1 open; documentation is not 100%.

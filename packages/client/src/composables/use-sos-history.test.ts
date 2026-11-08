@@ -42,14 +42,17 @@ describe("requester SOS history and cancellation", () => {
     await history.load();
     expect(history.selected.value?.id).toBe(requestId);
     expect(history.canCancelSelected.value).toBe(true);
+    expect(history.listVerified.value).toBe(true);
     const other = { ...record, id: olderId, status: "completed" as const };
     history.choose(other);
     expect(history.canCancelSelected.value).toBe(false);
+    expect(history.listVerified.value).toBe(true); // a settled read stays verified on ordinary selection
     history.choose(record);
     // The dialog composable owns the confirmed server call. A success flag only updates
     // this request's visible record; no other row can be silently marked cancelled.
     history.cancellation.cancelled.value = true;
     history.markCancelled();
+    expect(history.listVerified.value).toBe(true); // no read was interrupted
     expect(history.selected.value?.status).toBe("cancelled_by_requester");
     expect(history.items.value[0]?.status).toBe("cancelled_by_requester");
     expect(history.canCancelSelected.value).toBe(false);
@@ -90,16 +93,26 @@ describe("requester SOS history and cancellation", () => {
     expect(history.canCancelSelected.value).toBe(true);
   });
 
-  it("keeps the chosen request selected when an older page response arrives late", async () => {
+  it("keeps the chosen cached request unverified when an interrupted page response arrives late", async () => {
     const history = useSosHistory(ref("token"), ref(requesterId));
+    const cached = { ...record, id: olderId };
+    vi.mocked(listRequesterSosHistory).mockResolvedValueOnce({
+      items: [record, cached], total: 2, page: 1, limit: 12, totalPages: 1
+    });
     await history.load();
     const waiting = pending<{ items: SosRequest[]; total: number; page: number; limit: number; totalPages: number }>();
     vi.mocked(listRequesterSosHistory).mockReturnValueOnce(waiting.promise);
     const loading = history.load(2);
-    history.choose({ ...record, id: olderId });
+    expect(history.listVerified.value).toBe(false);
+    history.choose(cached);
+    expect(history.loading.value).toBe(false);
+    expect(history.listVerified.value).toBe(false); // cancelling a pending read cannot certify its cached rows
     waiting.resolve({ items: [record], total: 1, page: 2, limit: 12, totalPages: 1 });
     await loading;
     expect(history.selected.value?.id).toBe(olderId);
+    expect(history.listVerified.value).toBe(false); // ignored late reply cannot certify them either
+    await history.load();
+    expect(history.listVerified.value).toBe(true); // an authoritative retry restores actions
   });
 
   it("does not let an older history reply revive a request after confirmed cancellation", async () => {
@@ -114,8 +127,10 @@ describe("requester SOS history and cancellation", () => {
     history.cancellation.cancelled.value = true;
     history.markCancelled();
     expect(history.selected.value?.status).toBe("cancelled_by_requester");
+    expect(history.listVerified.value).toBe(false); // cancellation confirms this row, not the entire stale list
     waiting.resolve({ items: [record], total: 1, page: 1, limit: 12, totalPages: 1 });
     await refresh;
+    expect(history.listVerified.value).toBe(false);
     expect(history.selected.value?.status).toBe("cancelled_by_requester");
     expect(history.items.value[0]?.status).toBe("cancelled_by_requester");
     expect(history.canCancelSelected.value).toBe(false);

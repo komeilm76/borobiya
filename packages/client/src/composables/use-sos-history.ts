@@ -90,6 +90,9 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
   function choose(item: SosRequest): void {
     if (cancellation.submitting.value) return;
     ++generation;
+    // Selecting a cached row interrupts an in-flight refresh. Its old rows/count
+    // are not newly verified simply because the pending indicator is removed.
+    if (loading.value) listLoaded.value = false;
     loading.value = false;
     linkError.value = null;
     linkRetryable.value = false;
@@ -103,7 +106,9 @@ export function useSosHistory(token: Ref<string | null>, userId: Ref<string | nu
     const id = selected.value.id;
     // A history read begun before the committed mutation must not restore the
     // old cancellable status when it arrives after this local acknowledgement.
+    // The cancellation confirms this one row, not the other cached rows/count.
     ++generation;
+    if (loading.value) listLoaded.value = false;
     loading.value = false;
     selected.value = { ...selected.value, status: "cancelled_by_requester" };
     items.value = items.value.map((item) => item.id === id ? { ...item, status: "cancelled_by_requester" } : item);
