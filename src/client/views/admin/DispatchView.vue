@@ -11,14 +11,21 @@ const format = useFormatters();
 const toast = useToast();
 const queue = computed(() => admin.dispatchQueue?.items ?? []);
 
+/**
+ * Dispatches a request to the first active group that actually has responders.
+ *
+ * Sending a responder id that is not a member of the chosen group is rejected as a whole by the
+ * server, so an empty group would have produced a failure with no explanation. A seeded demo id was
+ * hardcoded here, which only worked on a database with demo users and never in production.
+ */
 async function dispatch(sosId: string): Promise<void> {
-  const group = admin.groups[0];
+  const group = admin.groups.find((candidate) => candidate.status === 'active' && (candidate.memberIds?.length ?? 0) > 0);
   if (!group) {
-    toast.push('گروهی برای اعزام تعریف نشده است.', 'warning', 3200);
+    toast.push('گروهی با امدادگر فعال برای اعزام تعریف نشده است.', 'warning', 3600);
     return;
   }
   try {
-    await admin.dispatch(sosId, group.id, ['usr_responder']);
+    await admin.dispatch(sosId, group.id, group.memberIds!);
     toast.push('درخواست اعزام شد.', 'success', 2400);
   } catch (caught) {
     toast.push(errorMessage(caught), 'error', 3800);

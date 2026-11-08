@@ -171,7 +171,12 @@ export class AdminService {
       status: String(row.status), rank: Number(row.rank), memberCount: Number(row.memberCount ?? 0),
       coverageCount: Number(row.coverageCount ?? 0),
       incidentIds: this.ctx.repo.all<{ incident_type_id: string }>(
-        'SELECT incident_type_id FROM group_incident_types WHERE group_id=?', String(row.id)).map((item) => String(item.incident_type_id))
+        'SELECT incident_type_id FROM group_incident_types WHERE group_id=?', String(row.id)).map((item) => String(item.incident_type_id)),
+      // Dispatch must name responders that belong to this group: the server rejects the whole
+      // request otherwise, so the board cannot invent an id and hope.
+      memberIds: this.ctx.repo.all<{ user_id: string }>(
+        'SELECT user_id FROM group_members WHERE group_id=? ORDER BY role DESC, user_id', String(row.id))
+        .map((item) => String(item.user_id))
     }));
     return { items, total: items.length };
   }

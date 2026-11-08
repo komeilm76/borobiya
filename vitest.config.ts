@@ -45,9 +45,9 @@ export default defineConfig({
       // genuine coverage loss still does.
       thresholds: {
         lines: 88,
-        functions: 81,
+        functions: 82,
         statements: 84,
-        branches: 71
+        branches: 72
       }
     }
   }

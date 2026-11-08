@@ -170,6 +170,8 @@ export interface GroupView {
   incidentIds: string[];
   memberCount: number;
   coverageCount: number;
+  /** Responders who may receive a dispatch for this group. */
+  memberIds?: string[];
 }
 
 /** An operational alert. */

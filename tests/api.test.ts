@@ -208,6 +208,42 @@ describe('HTTP API', () => {
     expect(group.status, group.text).toBe(201);
     const groups = await apiFetch(server, '/_admin/groups', { cookie: adminCookie });
     expect(groups.json.data.items.some((item: any) => item.id === group.json.data.groupId)).toBe(true);
+    // A freshly created group has no members. The dispatch board relies on knowing which
+    // responders a group actually has, because the server rejects any id that is not a member.
+    const fresh = groups.json.data.items.find((item: any) => item.id === group.json.data.groupId);
+    expect(fresh.memberIds).toEqual([]);
+    // The seeded medical group is the one that has a responder; it is what the board should pick.
+    const staffed = groups.json.data.items.find((item: any) => item.memberIds.length > 0);
+    expect(staffed.memberIds).toContain('usr_responder');
+    expect(staffed.memberCount).toBe(staffed.memberIds.length);
+
+    // A real pending request, so the dispatch below exercises the membership rule rather than
+    // stopping at an unknown SOS id.
+    const pending = await apiFetch(server, '/_user/sos', {
+      method: 'POST',
+      cookie: userCookie,
+      body: {
+        incidentTypeId: 'inc_fire',
+        severity: 'high',
+        description: 'Smoke on the fourth floor of the depot.',
+        latitude: 35.7219,
+        longitude: 51.4047,
+        accuracy: 12,
+        isManual: false
+      }
+    });
+    expect(pending.status, pending.text).toBe(201);
+    // The creation response nests the record under `sos`.
+    const sosId = pending.json.data.sos.id;
+    const sos = await apiFetch(server, `/_admin/sos/${sosId}/dispatch`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { groupId: group.json.data.groupId, responderIds: ['usr_responder'] }
+    });
+    // The empty group must refuse the dispatch rather than half-accepting it: every named
+    // responder has to be an active member of the chosen group.
+    expect(sos.status).toBe(400);
+    expect(String(sos.json.error.message)).toContain('active member');
 
     const settings = await apiFetch(server, '/_admin/settings', {
       method: 'PUT',

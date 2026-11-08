@@ -72,12 +72,15 @@ export const useAdminStore = defineStore('admin', () => {
   /** Loads the dispatch board queue. */
   async function loadDispatch(): Promise<void> {
     const result = await guard('تخته اعزام', () =>
-      get<{ queue: ListView<SosView>; groups: GroupView[]; incidentTypes: IncidentTypeView[] }>('/_admin/dispatch')
+      get<{ queue: ListView<SosView>; groups: ListView<GroupView>; incidentTypes: ListView<IncidentTypeView> }>('/_admin/dispatch')
     );
     if (result) {
       dispatchQueue.value = result.queue;
-      groups.value = result.groups ?? [];
-      incidentTypes.value = result.incidentTypes ?? [];
+      // These three are list envelopes, not bare arrays. Assigning the envelope left `groups` as
+      // `{ items, total }`, so every `v-for` over it rendered the envelope's own keys and the
+      // board crashed on the first group field it touched.
+      groups.value = result.groups?.items ?? [];
+      incidentTypes.value = result.incidentTypes?.items ?? [];
     }
   }
 
