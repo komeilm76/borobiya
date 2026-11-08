@@ -5,6 +5,7 @@ import { VAlert, VBtn, VCard, VSelect, VTextField } from 'vuetify/components';
 import { useAuthStore } from '@/stores/auth.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
+import { passwordIssue, passwordIssueMessage } from '@/composables/usePasswordPolicy.ts';
 
 /**
  * Registration requires five distinct catalog-backed security questions; the server
@@ -35,6 +36,21 @@ async function submit(): Promise<void> {
   }
   if (duplicateSelection.value) {
     error.value = 'پرسش‌های امنیتی باید متفاوت باشند.';
+    return;
+  }
+  // The server rejects a weak password with "Invalid request.", so name the rule here instead.
+  const weak = passwordIssueMessage(passwordIssue(password.value));
+  if (weak) {
+    error.value = weak;
+    return;
+  }
+  if (selected.value.some((questionId) => !questionId)) {
+    error.value = 'هر پنج پرسش امنیتی را انتخاب کنید.';
+    return;
+  }
+  // Answers are 2-100 characters server-side; an empty one is silently a failed match later.
+  if (answers.value.some((answer) => answer.trim().length < 2)) {
+    error.value = 'پاسخ هر پرسش باید دست‌کم ۲ نویسه باشد.';
     return;
   }
   busy.value = true;

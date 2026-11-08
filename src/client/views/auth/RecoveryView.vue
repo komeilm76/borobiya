@@ -5,6 +5,7 @@ import { VAlert, VBtn, VCard, VTextField } from 'vuetify/components';
 import { useAuthStore } from '@/stores/auth.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
+import { passwordIssue, passwordIssueMessage } from '@/composables/usePasswordPolicy.ts';
 
 /**
  * Five-question password recovery: account lookup, three challenge answers, then a
@@ -57,22 +58,8 @@ async function answerQuestions(): Promise<void> {
   }
 }
 
-/**
- * Mirrors the server password policy (12–128 characters, at least one letter and one digit) so the
- * reset step explains the rule instead of posting a secret that is known to fail. The server keeps
- * the final say: it answers a bare "Invalid request." that says nothing about what to change.
- *
- * @param value The candidate password.
- * @returns A message for the user, or `null` when the value is acceptable.
- */
-function passwordIssue(value: string): string | null {
-  if (value.length < 12 || value.length > 128) return 'گذرواژه تازه باید بین ۱۲ تا ۱۲۸ نویسه باشد.';
-  if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value)) return 'گذرواژه تازه باید هم حرف و هم رقم داشته باشد.';
-  return null;
-}
-
 async function reset(): Promise<void> {
-  const issue = passwordIssue(newPassword.value);
+  const issue = passwordIssueMessage(passwordIssue(newPassword.value));
   if (issue) {
     error.value = issue;
     return;

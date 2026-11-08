@@ -165,6 +165,7 @@ describe('architecture guards', () => {
       'admin-overview-view.test.ts',
       'mission-view.test.ts',
       'sos-view.test.ts',
+      'register-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
