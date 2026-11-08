@@ -32,6 +32,9 @@ dist/
 design/**/_generator/__pycache__/
 design/**/_generator/.venv/
 
+# Scratch directories created by tooling during test runs
+tmp/
+
 # Tooling and OS artifacts
 .DS_Store
 Thumbs.db

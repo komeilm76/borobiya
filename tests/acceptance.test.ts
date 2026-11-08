@@ -1,5 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { ROOT } from '../src/server/core/config.ts';
 
@@ -108,8 +110,8 @@ describe('release acceptance', () => {
     expect(boro).toMatch(/function fileEnv\(key: string\)/);
     expect(boro).toMatch(/NODE_ENV: fileEnv\('NODE_ENV'\) \?\? 'development'/);
     expect(boro.indexOf('const BASE_ENV')).toBeLessThan(boro.indexOf('async function setup'));
-    const scratch = await Bun.$`mktemp -d`.text();
-    const dataDir = scratch.trim();
+    // A real temporary directory: the seed writes a SQLite file, and nothing may land in the repo.
+    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'borobiya-setup-'));
     const seed = Bun.spawnSync(['bun', 'src/server/index.ts', '--seed-only'], {
       cwd: ROOT,
       env: { ...process.env, NODE_ENV: 'production', ADMIN_PASSWORD: 'change-me-before-production', DATA_DIR: dataDir },
@@ -125,7 +127,7 @@ describe('release acceptance', () => {
     });
     expect(local.exitCode).toBe(0);
     expect(new TextDecoder().decode(local.stdout)).toContain('database ready');
-    await Bun.$`rm -rf ${dataDir}`.quiet();
+    rmSync(dataDir, { recursive: true, force: true });
   });
 
   it('production safety defaults stay documented and enforced', async () => {
