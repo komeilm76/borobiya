@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Announce mission-location state transitions, not each GPS timestamp (T4.4.3 partial)
+
+- The three-role mission panel put `aria-live="polite"` around the entire member list, including each member's last-seen timestamp. Frequent consented GPS fixes could therefore repeatedly interrupt a screen-reader user. Kept the visible timestamps, badges, map and opt-in controls unchanged, but moved automatic speech to a separate atomic status derived only from each role's not-sharing/fresh/stale phase. The wording explicitly avoids equating GPS freshness with device connection or human presence; the independent connection badges remain. A pure reactive regression verifies that timestamp-only changes do not alter the announcement while freshness/revocation changes do, and a nonmounted source check pins the live-region boundary. The source check failed before the fix; 26 targeted tests, 1,274 client tests and client typecheck passed. No browser/assistive-technology or device verification was performed; the wider T4.4.3 audit remains open.
+
 ### 2026-10-23 — Fence rescuer history page reads after a manual choice (T4.4.2 partial)
 
 - The rescuer could choose a cached mission during a pending page request; the delayed result would then replace the visible list/page while leaving the selected detail on the old page. A pending off-page deep-link detail could also keep the list in a loading state after a manual choice. Manual selection now invalidates the interrupted operation: a cancelled **list read** leaves cached rows/count unverified until a successful retry, whereas a cancelled **detail-only** read preserves the already verified list. The internal detail read after a successful list still follows the existing selection flow. Deferred tests reproduced both races before the fix; 30 targeted history tests, all 1,272 client tests, client typecheck and repository lint passed. No live browser/API/VM flow was exercised; T4.4.2 remains open for the wider feedback audit.

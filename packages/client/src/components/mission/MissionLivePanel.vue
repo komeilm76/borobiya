@@ -26,12 +26,13 @@
       </v-chip>
       <small>وضعیت اتصال، مستقل از اشتراک داوطلبانهٔ موقعیت است. پس از ۵ دقیقه فقط بررسی دستی لازم است؛ مأموریت خودکار لغو نمی‌شود.</small>
     </div>
+    <span class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ locationAnnouncement }}</span>
     <div class="live-panel__grid">
       <div class="live-panel__map">
         <MapCanvas :center="center" :zoom="13" :constrain-bounds="false"
           :style-url="mapStyleUrl" aria-label="نقشهٔ موقعیت زندهٔ درخواست‌کننده، امدادگر و مدیر" @ready="onMapReady" />
       </div>
-      <div class="live-panel__members" aria-live="polite">
+      <div class="live-panel__members">
         <div v-for="member in live.participantStatus.value" :key="member.role" class="live-panel__member">
           <span class="live-panel__dot" :class="member.role" />
           <div>
@@ -71,6 +72,7 @@ import { planMissionMarkerSync, type MissionMarkerSnapshot } from "@/mission/liv
 import { useMissionLiveLocations, type LiveMissionIdentity } from "@/composables/use-mission-live-locations";
 import { useMissionPresence } from "@/composables/use-mission-presence";
 import { missionPresenceLabel } from "@/mission/presence";
+import { missionLocationAnnouncement } from "@/mission/location-phase";
 import { useAuthStore } from "@/stores/auth";
 import { useThemeStore } from "@/stores/theme";
 
@@ -90,6 +92,9 @@ const map = shallowRef<MapLibreMap | null>(null);
 // MapCanvas supplies the constructor after its lazy MapLibre import finishes.
 let markerConstructor: typeof Marker | null = null;
 const hasMarkers = computed(() => Object.values(live.locations.value).some(Boolean));
+// Announce only changes in whether each participant shares a fresh/old fix.
+// The visible timestamps can still update on every GPS fix without interrupting speech.
+const locationAnnouncement = computed(() => missionLocationAnnouncement(live.participantStatus.value));
 const presentRoles = computed(() => Object.keys(live.locations.value).sort().join(","));
 type Role = "requester" | "rescuer" | "admin";
 const markers: Partial<Record<Role, Marker>> = {};
