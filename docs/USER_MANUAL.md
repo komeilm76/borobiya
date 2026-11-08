@@ -173,47 +173,41 @@ The accepted-offer page shows a simple incident/rescuer preview map. On an activ
 
 ### Share
 
-1. Open **`/_user`** → click **اشتراک تازه** (**New Share**).
-2. Select **Targets** (one or more companions via debounced username search).
-3. Choose **Mode:**
-   - **Timed (`مدت‌دار`):** slider / presets from 15 min up to 30 days. Auto-expires.
-   - **Permanent (`تا لغو دستی`):** active until manually revoked.
-4. Add **Note** (optional) → **اشتراک‌گذاری** (**Share**). If multiple sessions are active on your account, choose which device broadcasts in the prompt.
-5. Start broadcasting your device's GPS from the **پخش زندهٔ موقعیت** bar on **`/_user`** or the compact control on **`/_user/map`** (**شروع پخش** / **توقف پخش**).
+1. Open **اشتراک موقعیت** (`/_user/location-shares`) → **اشتراک تازه**. You can also open the recipient form from **همراهان** on `/_user/map`.
+2. Search for a username (at least two characters), optionally filter to online accounts, and select one or more companions.
+3. For a live share, choose a duration preset or slider value (15 minutes–30 days), or **تا وقتی خاموش کنم** for an open-ended share that you must revoke yourself.
+4. Add an optional note and press **اشتراک‌گذاری**. If the server requires a broadcaster device because multiple sessions are active, choose one in **کدام دستگاه موقعیت بفرستد؟** and press **ادامه**.
+5. Creating a grant does **not** start GPS broadcast. On **`/_user/map`**, explicitly use the sharing icon above SOS to start or stop outgoing broadcast; check its label/status if GPS permission, connectivity or the selected device prevents sharing. The shares page does not have a broadcast bar.
 
-[Screenshot: Share dialog with target picker + timed toggle]
+[Screenshot: Share dialog with companion picker and live-duration presets]
 
 ### Manage
 
-- **اشتراک‌های من** (**My Shares**): active and permanent shares → **لغو** (**Revoke**) cuts off access immediately across live maps.
-- **با من به اشتراک گذاشته‌اند** (**Shared With Me**): incoming live shares and history grants, with direct links to **`/_user/map`**.
+- **اشتراک‌های من**: review your outgoing live shares and choose **لغو** to confirm revocation. Server-side authorization stops new access after revocation; a recipient's already displayed last position may remain until its map receives the end notification or refreshes. Closing a grant does not erase positions already seen or copied by a recipient.
+- **از دیگران**: review incoming live shares and history grants. For a received history grant, **پخش در نقشه** opens its playback on `/_user/map`.
 
 ### Live Updates
 
-- When active, your device streams GPS fixes over Socket.IO every 3s while moving and refreshes stationary heartbeats automatically.
-- Companions viewing **`/_user/map`** see your live marker update in real time and disappear immediately upon revoke or timed expiry.
+- With an active broadcast and a usable GPS fix, the selected device sends throttled Socket.IO updates (the client interval is 4 seconds); a stationary active watcher sends keepalives. This is not a guaranteed delivery rate: GPS, browser backgrounding, network and device priority can interrupt it.
+- Authorized companions on **`/_user/map`** can see the last received fix. Revocation stops server-side access to new updates; timed grants expire at their deadline and a server maintenance sweep runs approximately every minute. Connected maps handle an end event, and the companion list also rechecks active grants; a disconnected/stale map is not guaranteed to remove a cached marker instantly. Check the share list and refresh the recipient map if its display seems stale.
 
 ---
 
 ## 12. History Sharing
 
-1. Open **`/_user`** → **اشتراک تازه** → choose **تاریخچه مسیر** (**Route History**).
-2. Pick **Targets**, choose a quick preset (`1h`–`7d`) or custom **از زمان / تا زمان** window within the server's max share window, and optionally cap **حداکثر تعداد نقاط** (`maxPoints`).
-3. Submit → recipients see the grant under **با من به اشتراک گذاشته‌اند** and can play back the polyline on **`/_user/map`** (**مسیر همراهم** toggle in the **پخش حرکت** panel, with `1×` / `4×` / `16×` / `60×` transport, scrub slider, and **تازه‌سازی**).
+1. Open **اشتراک موقعیت** (`/_user/location-shares`) → **اشتراک تازه** → **تاریخچه مسیر**.
+2. Select companions, choose a recent-window preset (1, 6, 24 or 72 hours, or 7 days) or set **از زمان / تا زمان** within the server's configured maximum share window, and optionally set **حداکثر تعداد نقاط**. This grants access to recorded points in that window; it does not start live broadcasting.
+3. Press **اشتراک‌گذاری**. Recipients find the grant under **از دیگران** → **پخش در نقشه**; on `/_user/map` they can choose **مسیر همراهم** in the **تاریخچهٔ مسیر** panel, then scrub, refresh or play at 1×/4×/16×/60×.
 
 [Screenshot: History share date picker + polyline playback]
 
-> Old history older than 90 days is auto-deleted (configurable). Owners can delete any history grant at any time under **بازه‌های تاریخچه** on **`/_user`**.
+> Recorded points older than the configured retention window (90 days by default) are pruned by a daily server job; deletion is not instantaneous at the cutoff and a server failure may delay it. Owners can revoke a history grant under **بازه‌های تاریخچه** on `/_user/location-shares`; this removes access, **not** copies already seen or the underlying recorded history.
 
 ---
 
 ## 13. Active Devices & Priority Device
 
-If you are logged in on **two devices** (e.g., phone + laptop):
-
-1. When starting **Live Share** or **SOS as rescuer**, a **warning modal** appears: “Your account is active on 2 devices. Select which device broadcasts location.”
-2. Choose a device (e.g., “Samsung S23”) → **Confirm**.
-3. Only that device’s GPS is used; the other is ignored.
+If your account has multiple active sessions (for example, phone and laptop), a **live-share creation request** without a broadcaster-device choice may be rejected. The sharing form then opens **کدام دستگاه موقعیت بفرستد؟**; select one of the listed sessions and press **ادامه** to retry that grant. This choice pins the broadcaster for the grant; it does not turn on GPS automatically. The SOS rescuer flow does not use this live-share chooser.
 
 Manage the broadcaster on **`/_user/location-shares`**: choose the **اشتراک‌های من** tab, then choose a device beside each live recipient and press **اعمال**. A confirmation lets you assign the current device to all eligible live shares; partial failures are reported. The **از دیگران** tab lists live and history access others gave you. Expired shares cannot be silently restarted through the device selector.
 

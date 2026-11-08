@@ -102,6 +102,20 @@ describe("client route records", () => {
     }
   });
 
+  it("keeps sharing-manual route instructions on implemented user pages", () => {
+    const manual = readFileSync(new URL("../../../../docs/USER_MANUAL.md", import.meta.url), "utf8");
+    const sharingSections = manual.split("## 11. Live Location Sharing")[1]?.split("## 14. ")[0];
+    expect(sharingSections).toBeDefined();
+
+    const paths = [...sharingSections!.matchAll(/`(\/_user(?:\/[a-z-]+)?)`/g)].map((match) => match[1]!);
+    expect(paths).toContain("/_user/location-shares");
+    expect(paths).toContain("/_user/map");
+    const registeredPaths = new Set(routeRecords.map((route) => route.path));
+    for (const path of paths) {
+      expect(registeredPaths.has(path), `Sharing-manual route ${path}`).toBe(true);
+    }
+  });
+
   it("exposes desktop and mobile navigation links for user and admin views and allows multipart uploads in nginx", () => {
     const appVue = readFileSync(new URL("../App.vue", import.meta.url), "utf8");
     for (const target of [

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Reconcile sharing instructions with implemented controls (T4.7.1 partial)
+
+- Reviewed USER_MANUAL §§11–13 against the shares/map views, grant form and device selector, broadcaster interval, recipient verification and server expiry/retention jobs. Corrected the nonexistent `/_user` sharing flow and broadcast bar, obsolete labels and instant-marker-removal promise; documented that creating a grant is separate from opting into GPS broadcasting, that server-side revocation does not erase previously displayed/captured locations, and that timed expiry and history pruning have maintenance schedules rather than instantaneous display/deletion guarantees. A new nonmounted router/manual regression guards the sharing instructions' inline user paths; all 1,277 client, 576 server and 63 shared tests, shared/server/client typechecks, repository lint and the production client build passed. This was a source/documentation pass only: no authenticated browser, live API/socket, device or screenshot acceptance was performed. Other screenshot placeholders and evidence-backed completion remain open; T4.7.1 is **not** complete and documentation is **not** 100%.
+
 ### 2026-10-23 — Index the companion card's authorized-age join (T4.4.4 partial)
 
 - The Companions card rebuilt its list on each five-second age tick by calling `peers.find` for every authorized registry entry, scanning the same positioned array repeatedly. Extracted a linear indexed projection: one pass over positioned peers, then one pass over the authorized registry. It keeps the registry's order, waiting-for-first-fix rows, old/unknown-time status and accuracy, and never adds unlisted peers. Pure tests exercise those boundaries and guard against per-row scans; a nonmounted source check pins card wiring. Both new tests failed before the change; 103 targeted tests, the 1,276-test client suite and client typecheck passed. This is a source-level reduction, **not** measured FPS, virtual scroll, <2s map paint or <500ms GPS acquisition; T4.4.4 and device/browser acceptance stay open.
