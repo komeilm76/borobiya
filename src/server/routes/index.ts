@@ -2,10 +2,10 @@ import type { AuthIdentity, RequestContext, Router } from '../core/router.ts';
 import { created, ok, raw } from '../core/router.ts';
 import { forbidden, notFound } from '../core/errors.ts';
 import {
-  accuracy, array, boolean, description, displayText, identifier, latitude, longitude,
+  accuracy, array, boolean, description, displayText, identifier, latitude, loginSecret, longitude,
   number, oneOf, optional, password, shape, text, username, type Validator
 } from '../core/validate.ts';
-import { ROLES, SOS_STATUS } from '../../shared/protocol.ts';
+import { APP_VERSION, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
 import type { AppContext } from '../services/context.ts';
 
 const SOS_STATUSES = Object.values(SOS_STATUS) as string[];
@@ -38,7 +38,7 @@ const recoveryAnswers = array(shape({
 }), { min: 3, max: 3 });
 const registerBody = shape({ username, password, securityQuestions: securityAnswers });
 const loginBody = shape({
-  username, password,
+  username, password: loginSecret,
   deviceId: optional(identifier),
   deviceName: optional(text({ max: 120, allowEmpty: true }))
 });
@@ -127,9 +127,9 @@ function withCookie(data: unknown, cookie: string) {
 export function registerRoutes(router: Router<AppContext>): void {
   // Public, cacheable and unauthenticated.
   router.add({ method: 'GET', path: '/_public/health', auth: 'none', tags: ['public'], summary: 'Health', handler: (ctx) =>
-    ok({ status: 'ok', serverTime: ctx.app.clock(), dataVersion: ctx.app.config.dataVersion }) });
+    ok({ status: 'ok', version: APP_VERSION, serverTime: ctx.app.clock(), dataVersion: ctx.app.config.dataVersion }) });
   router.add({ method: 'GET', path: '/_public/openapi.json', auth: 'none', tags: ['public'], summary: 'OpenAPI document', handler: (ctx) =>
-    raw(JSON.stringify(ctx.app.router.openapi('Borobiya API', '1.0.0'), null, 2), 'application/json; charset=utf-8',
+    raw(JSON.stringify(ctx.app.router.openapi('Borobiya API', APP_VERSION), null, 2), 'application/json; charset=utf-8',
       { cacheControl: 'public, max-age=3600', compress: true }) });
   router.add({ method: 'GET', path: '/_public/security-questions', auth: 'none', tags: ['auth'], summary: 'Security question catalog', handler: (ctx) =>
     ok({ items: ctx.app.services.auth.securityCatalog() }) });

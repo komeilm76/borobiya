@@ -3,6 +3,9 @@
  * Both sides import this module directly; there is no generated client stub and no duplicated enum.
  */
 
+/** Product version advertised by the health endpoint and the OpenAPI document. */
+export const APP_VERSION = '2.0.0';
+
 /** Account roles understood by authentication, routing and dispatch. */
 export const ROLES = Object.freeze({
   USER: 'user',

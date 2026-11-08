@@ -22,11 +22,13 @@ describe('HTTP API', () => {
     expect(health.status).toBe(200);
     expect(health.json.ok).toBe(true);
     expect(health.json.data.status).toBe('ok');
+    expect(health.json.data.version).toBe('2.0.0');
     expect(health.json.requestId).toMatch(/^req_/);
 
     const openapi = await apiFetch(server, '/_public/openapi.json');
     expect(openapi.status).toBe(200);
     expect(openapi.json.openapi).toBe('3.1.0');
+    expect(openapi.json.info.version).toBe('2.0.0');
     expect(openapi.json.paths['/_auth/login']).toBeTruthy();
     expect(openapi.json.paths['/_user/sos']).toBeTruthy();
 

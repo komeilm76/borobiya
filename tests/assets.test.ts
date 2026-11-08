@@ -45,6 +45,21 @@ describe('generated assets', () => {
     expect(JSON.stringify(second)).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
+  it('every emitted bundle chunk is referenced once and no stale chunk survives a rebuild', async () => {
+    const manifest = JSON.parse(await read('public/assets/cache-manifest.json'));
+    const precached = (manifest.precache as string[]).filter((entry) => entry.startsWith('/js/'));
+    const emitted = (await glob(path.join(PUBLIC, 'js'), '**/*.js')).map((file) => `/js/${path.basename(file)}`);
+    expect(precached.sort()).toEqual(emitted.sort());
+    const duplicated = emitted.filter((entry, index) => emitted.indexOf(entry) !== index);
+    expect(duplicated).toEqual([]);
+    // One hashed chunk per code-split view; a second copy means a previous build was not cleaned.
+    const viewChunks = emitted.filter((entry) => /View-[A-Za-z0-9_-]+\.js$/.test(entry)).map((entry) => entry.split('-')[0]);
+    expect(viewChunks.length).toBe(new Set(viewChunks).size);
+    const build = await read('scripts/build.ts');
+    expect(build).toMatch(/cleanPreviousBundle/);
+    expect(build.indexOf('await cleanPreviousBundle()')).toBeLessThan(build.indexOf("await build({"));
+  });
+
   it('the bundle contains a stable SPA entry and hashed code-split views', async () => {
     const html = await read('public/index.html');
     expect(html).toMatch(/<script type="module"[^>]*src="\/js\/index\.js"/);

@@ -1,6 +1,6 @@
 # HTTP API
 
-All API routes are same-origin and are declared in `src/server/routes/index.ts` The generated OpenAPI document is available at `/_public/openapi.json`. The browser uses relative URLs only. There is no external API host and no API key in browser code.
+All API routes are same-origin and are declared in `src/server/routes/index.ts` The generated OpenAPI document is available at `/_public/openapi.json` and reports the product version from `APP_VERSION` in `src/shared/protocol.ts`; `/_public/health` reports the same `version` alongside `status`, `serverTime` and `dataVersion`. The browser uses relative URLs only. There is no external API host and no API key in browser code.
 
 ## Envelopes
 

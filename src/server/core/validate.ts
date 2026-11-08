@@ -40,11 +40,23 @@ export const username = text({ min: 3, max: 32, lower: true, pattern: /^[a-z0-9.
 export const displayText = (min = 1, max = 200) => text({ min, max });
 export const description = text({ min: 10, max: 500 });
 export const identifier = text({ min: 2, max: 80, pattern: /^[A-Za-z0-9_.:-]+$/ });
+/**
+ * Strict password policy. Applied where a password is chosen: registration, recovery reset and
+ * administrator-created accounts.
+ */
 export const password: Validator<string> = (value, path = 'password') => {
   const output = text({ min: 12, max: 128, trim: false })(value, path);
   if (!/[A-Za-z]/.test(output) || !/[0-9]/.test(output)) issue(path, 'must include letters and numbers');
   return output;
 };
+
+/**
+ * Login secret. Authentication must accept whatever is stored, including secrets provisioned
+ * outside the registration policy (for example the documented bootstrap administrator password),
+ * so only length is checked here. Strength is enforced where a password is set.
+ */
+export const loginSecret: Validator<string> = (value, path = 'password') =>
+  text({ min: 1, max: 128, trim: false })(value, path);
 
 export interface NumberOptions { min?: number; max?: number; integer?: boolean }
 export function number(options: NumberOptions = {}): Validator<number> {

@@ -154,7 +154,8 @@ describe('architecture guards', () => {
       'service-worker.test.ts',
       'components.test.ts',
       'stores.test.ts',
-      'composables.test.ts'
+      'composables.test.ts',
+      'smoke.test.ts'
     ]) {
       expect(tests, name).toContain(name);
     }
@@ -165,6 +166,27 @@ describe('architecture guards', () => {
     const journeys = await read('tests/journeys.test.ts');
     expect(journeys).toMatch(/hypothetical requester journey/);
     expect(journeys).toMatch(/hypothetical administrator journey/);
+  });
+
+  it('documentation describes the Bun and Vue toolchain instead of the retired Node one', async () => {
+    const documents = (await glob(path.join(ROOT, 'docs'), '*.md')).concat([path.join(ROOT, 'README.md')]);
+    const stale: string[] = [];
+    for (const document of documents) {
+      const relative = path.relative(ROOT, document);
+      const text = await Bun.file(document).text();
+      for (const match of text.matchAll(/`(npm (?:ci|run|test|start)|npx [a-z-]+)`/g)) {
+        stale.push(`${relative}: ${match[1]}`);
+      }
+      if (/\bhashes? (?:use|with) scrypt\b|node --experimental-transform-types/.test(text)) {
+        stale.push(`${relative}: legacy Node runtime claim`);
+      }
+      expect(text, relative).not.toMatch(/Node\.js 22\.12/);
+    }
+    expect(stale).toEqual([]);
+    const manifest = JSON.parse(await read('package.json'));
+    const protocol = await read('src/shared/protocol.ts');
+    expect(protocol).toContain(`APP_VERSION = '${manifest.version}'`);
+    expect(await read('docs/RELEASE_NOTES.md')).toContain(`## Version ${manifest.version}`);
   });
 
   it('every required practical document exists, is substantial and is English-only', async () => {

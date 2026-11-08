@@ -14,6 +14,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - `bun:sqlite` replaces `node:sqlite`; the schema, the idempotent `photo_data_url` migration and the transaction boundary are unchanged.
 - `Bun.password` hashes with Argon2id. Stored hashes remain self-describing, so the format is verifiable and upgradable.
 - `Bun.file`, `Bun.write` and `Bun.Glob` replace every filesystem helper; `scripts/*.ts` run through `bun` and the `boro` shim only executes Bun.
+- `bun run build` clears the previous bundle before building, so a rebuild of unchanged sources is byte-identical instead of accumulating stale hashed chunks.
 - The toolchain is pinned to Bun 1.4.4 in `.bun-version`, `packageManager` and CI. `package-lock.json` is deleted and `bun.lock` is committed; CI installs with `bun install --frozen-lockfile`.
 - `engines.node` and `@types/node` are removed, and no active source imports `node:http`, `node:stream`, `node:sqlite`, `node:fs` or `node:crypto` for runtime behavior.
 
@@ -31,6 +32,8 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - Strict request envelopes, typed validators, typed errors, CSP, CORS, CSRF and origin checks, request IDs, no-store API responses, body limits, rate limits and static path safety.
 - Preview-proxy trusted headers with sanitized `FRAME_ANCESTORS` (empty stays deny-by-default; no wildcard default), plus the omission of the conflicting `X-Frame-Options` header when frame ancestors are explicitly allowed.
 - One-use IP-bound WebSocket tickets, audience-filtered durable events, cursor sync, presence, live location fan-out, SOS fan-out and binary push-to-talk.
+- Sign-in accepts any provisioned secret while the 12-character/letters-and-numbers policy still applies where a password is chosen, so the documented bootstrap administrator password works on a fresh install.
+- The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree.
 - Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
 - Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.
 

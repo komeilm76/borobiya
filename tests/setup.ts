@@ -6,6 +6,23 @@
 import { config } from '@vue/test-utils';
 import { vi } from 'vitest';
 
+// Hermetic tests: the repository `.env` (created by `./boro setup`) and `./boro check` both export
+// local settings such as COOKIE_SECURE=0 or SEED_DEMO_USERS=1. Remove those keys so every suite
+// observes only its own explicit overrides, and pin NODE_ENV so configuration guards behave alike
+// no matter how the runner was started.
+process.env.NODE_ENV = 'test';
+// `import.meta.dir` is rewritten by the runner's transform, so resolve from the process root.
+const envFile = Bun.file(`${process.cwd()}/.env`);
+if (envFile.size) {
+  for (const raw of (await envFile.text()).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const index = line.indexOf('=');
+    if (index < 1) continue;
+    delete process.env[line.slice(0, index).trim()];
+  }
+}
+
 // Vue Test Utils keeps real transitions disabled so component tests never depend on timing.
 config.global.stubs = { transition: false, 'transition-group': false };
 

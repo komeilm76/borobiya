@@ -11,12 +11,19 @@ import { buildAll } from './build.ts';
 
 const ROOT = REPOSITORY_ROOT;
 
+/**
+ * Environment captured before any in-process build runs. `vite build` sets
+ * `process.env.NODE_ENV = 'production'`, which must never leak into child commands such as the
+ * local database seed, so later steps always start from this pristine snapshot.
+ */
+const BASE_ENV: Record<string, string> = {};
+for (const [key, value] of Object.entries(process.env)) {
+  if (typeof value === 'string') BASE_ENV[key] = value;
+}
+
 /** Loads `.env` values without overriding the real process environment. */
 function envFile(): Record<string, string> {
-  const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === 'string') result[key] = value;
-  }
+  const result: Record<string, string> = { ...BASE_ENV };
   const file = Bun.file(path.join(ROOT, '.env'));
   if (!file.size) return result;
   const text = Bun.spawnSync(['cat', path.join(ROOT, '.env')], { stdout: 'pipe', stderr: 'ignore' }).stdout.toString();
@@ -35,6 +42,26 @@ function envFile(): Record<string, string> {
   return result;
 }
 
+/** Reads one key from `.env` only, ignoring the process environment. */
+function fileEnv(key: string): string | undefined {
+  const file = Bun.file(path.join(ROOT, '.env'));
+  if (!file.size) return undefined;
+  const text = Bun.spawnSync(['cat', path.join(ROOT, '.env')], { stdout: 'pipe', stderr: 'ignore' }).stdout.toString();
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const index = line.indexOf('=');
+    if (index < 1) continue;
+    if (line.slice(0, index).trim() !== key) continue;
+    let value = line.slice(index + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    return value;
+  }
+  return undefined;
+}
+
 /**
  * Runs a Bun command as a child process, inheriting stdio so output streams live.
  *
@@ -42,9 +69,13 @@ function envFile(): Record<string, string> {
  * @param args Command and arguments, starting with `bun`.
  * @returns The child exit code.
  */
-async function step(label: string, args: string[]): Promise<number> {
+async function step(label: string, args: string[], extraEnv: Record<string, string> = {}): Promise<number> {
   console.log(`\n[boro] ${label}`);
-  const child = Bun.spawn(args, { cwd: ROOT, stdio: ['inherit', 'inherit', 'inherit'], env: envFile() });
+  const child = Bun.spawn(args, {
+    cwd: ROOT,
+    stdio: ['inherit', 'inherit', 'inherit'],
+    env: { ...envFile(), ...extraEnv }
+  });
   return child.exited;
 }
 
@@ -83,7 +114,10 @@ async function setup(): Promise<number> {
   }
   await Bun.spawn(['mkdir', '-p', path.join(ROOT, 'data')], { stdout: 'ignore', stderr: 'ignore' }).exited;
   await buildAll();
-  return step('prepare local database', ['bun', 'src/server/index.ts', '--seed-only']);
+  // The in-process Vite build switches NODE_ENV to production; the local seed must stay local.
+  return step('prepare local database', ['bun', 'src/server/index.ts', '--seed-only'], {
+    NODE_ENV: fileEnv('NODE_ENV') ?? 'development'
+  });
 }
 
 async function dev(): Promise<number> {

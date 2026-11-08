@@ -129,6 +129,9 @@ function int(value: string | undefined, fallback: number, min: number, max: numb
 }
 
 function environment(): Record<string, string | undefined> {
+  // Tests are hermetic: `tests/setup.ts` strips the repository `.env` from the environment, and
+  // the file is not re-read here, so a developer's local settings can never change an assertion.
+  if ((process.env.NODE_ENV ?? '').toLowerCase() === 'test') return { ...process.env } as Record<string, string | undefined>;
   return { ...loadDotEnv(), ...process.env } as Record<string, string | undefined>;
 }
 
@@ -178,7 +181,9 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     sessionTtlSeconds: overrides.sessionTtlSeconds ?? int(env.SESSION_TTL_SECONDS, 86400, 60, 2592000),
     ticketTtlSeconds: overrides.ticketTtlSeconds ?? int(env.REALTIME_TICKET_TTL_SECONDS, 20, 5, 120),
     maxBodyBytes: overrides.maxBodyBytes ?? int(env.MAX_BODY_BYTES, 262144, 1024, 8 * 1024 * 1024),
-    cookieSecure: overrides.cookieSecure ?? bool(env.COOKIE_SECURE, runtimeEnvironment === 'production'),
+    // A production runtime always issues secure cookies, whatever a stray local value says.
+    cookieSecure: overrides.cookieSecure
+      ?? (runtimeEnvironment === 'production' || bool(env.COOKIE_SECURE, false)),
     trustProxy: overrides.trustProxy ?? bool(env.TRUST_PROXY, false),
     allowedOrigins: overrides.allowedOrigins ?? (env.ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     frameAncestors: (overrides.frameAncestors ?? frameAncestorSources(env.FRAME_ANCESTORS ?? '')).filter(validFrameAncestor),

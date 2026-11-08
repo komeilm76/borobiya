@@ -34,7 +34,7 @@ Motion is declarative first. Route and sheet transitions use `<Transition>`, liv
 
 ## Build pipeline
 
-`scripts/build.ts` runs `vite build` with the root `src/client` and output `public/`, compiles the service worker, then runs `scripts/build-assets.ts` to write the icon subset, fonts, logo, favicon and the deterministic cache manifest. `public/` is generated output and is git-ignored; a clean build reproduces it byte for byte because the manifest contains no timestamps.
+`scripts/build.ts` first removes the previous `public/js` bundle and the previous `index.html`, `app.css` and web app manifest, then runs `vite build` with the root `src/client` and output `public/`, compiles the service worker, and finally runs `scripts/build-assets.ts` to write the icon subset, fonts, logo, favicon and the deterministic cache manifest. Cleaning first is what makes the emitted chunk set — and therefore the precache manifest — identical for identical sources instead of accumulating stale hashed chunks. `public/` is generated output and is git-ignored; a clean build reproduces it byte for byte because the manifest contains no timestamps.
 
 ## Dependency direction
 

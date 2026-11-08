@@ -17,7 +17,7 @@
 
 ## Bun scripts
 
-`bun install --frozen-lockfile` installs the pinned Vue/Vite/Vitest toolchain from `bun.lock`. `bun run assets` regenerates fonts, icon CSS, logos, favicon and the content-versioned cache manifest. `bun run build` runs the Vite build, compiles the TypeScript service worker and then regenerates assets. `bun run typecheck:server` runs `tsc` over `src/server` and `src/shared`; `bun run typecheck:client` runs `vue-tsc --noEmit` over every SFC and TypeScript module in `src/client`. `bun run test` and `bun run coverage` execute Vitest under Bun (`bunx --bun vitest`), which is required because the suites import Bun-only modules. `bun run start` runs the server without watching.
+`bun install --frozen-lockfile` installs the pinned Vue/Vite/Vitest toolchain from `bun.lock`. `bun run assets` regenerates fonts, icon CSS, logos, favicon and the content-versioned cache manifest. `bun run build` clears previous Vite output, runs the Vite build, compiles the TypeScript service worker and then regenerates assets, so rebuilding the same sources reproduces the same chunk set and cache version. `bun run typecheck:server` runs `tsc` over `src/server` and `src/shared`; `bun run typecheck:client` runs `vue-tsc --noEmit` over every SFC and TypeScript module in `src/client`. `bun run test` and `bun run coverage` execute Vitest under Bun (`bunx --bun vitest`), which is required because the suites import Bun-only modules. `bun run start` runs the server without watching.
 
 ## CI
 

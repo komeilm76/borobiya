@@ -14,6 +14,30 @@ beforeAll(async () => {
 });
 afterAll(async () => { if (server) await server.close(); });
 
+it('login accepts any provisioned secret while registration keeps the strength policy', async () => {
+  // The documented bootstrap administrator password is long but contains no digits. Login must
+  // accept it, otherwise a fresh install can never sign in; registration must still reject it.
+  const weak = await apiFetch(server, '/_auth/register', {
+    method: 'POST',
+    body: { username: `weak.${suffix}`, password: 'change-me-before-production', securityQuestions: answers }
+  });
+  expect(weak.status).toBe(400);
+  expect(String(weak.json.error.details.field)).toContain('password');
+  const signedIn = await apiFetch(server, '/_auth/login', {
+    method: 'POST',
+    body: { username: 'admin', password: 'AdminPass!2026' }
+  });
+  expect(signedIn.status, signedIn.text).toBe(200);
+
+  const bootstrap = await createTestServer({ adminPassword: 'change-me-before-production' });
+  try {
+    const cookie = await login(bootstrap, 'admin', 'change-me-before-production');
+    expect(cookie).toMatch(/=/);
+  } finally {
+    await bootstrap.close();
+  }
+});
+
 it('registration requires five distinct security questions and creates a ready account', async () => {
   const username = `reg.${suffix}`;
   const registered = await apiFetch(server, '/_auth/register', {

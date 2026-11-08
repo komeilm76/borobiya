@@ -99,6 +99,35 @@ describe('release acceptance', () => {
     expect(await read('src/server/core/http.ts')).toMatch(/config\.frameAncestors\.length/);
   });
 
+  it('local setup seeds the database as a local run, not as the production build it just ran', async () => {
+    // `vite build` sets process.env.NODE_ENV = 'production' inside the `boro` process. That value
+    // must not reach the seed child, or a fresh `./boro setup` fails the production password guard.
+    const boro = await read('scripts/boro.ts');
+    expect(boro).toMatch(/BASE_ENV/);
+    expect(boro).toMatch(/const BASE_ENV: Record<string, string> = \{\};\nfor \(const \[key, value\] of Object.entries\(process\.env\)\)/);
+    expect(boro).toMatch(/function fileEnv\(key: string\)/);
+    expect(boro).toMatch(/NODE_ENV: fileEnv\('NODE_ENV'\) \?\? 'development'/);
+    expect(boro.indexOf('const BASE_ENV')).toBeLessThan(boro.indexOf('async function setup'));
+    const scratch = await Bun.$`mktemp -d`.text();
+    const dataDir = scratch.trim();
+    const seed = Bun.spawnSync(['bun', 'src/server/index.ts', '--seed-only'], {
+      cwd: ROOT,
+      env: { ...process.env, NODE_ENV: 'production', ADMIN_PASSWORD: 'change-me-before-production', DATA_DIR: dataDir },
+      stdout: 'pipe',
+      stderr: 'pipe'
+    });
+    expect(new TextDecoder().decode(seed.stderr)).toContain('ADMIN_PASSWORD');
+    const local = Bun.spawnSync(['bun', 'src/server/index.ts', '--seed-only'], {
+      cwd: ROOT,
+      env: { ...process.env, NODE_ENV: 'development', ADMIN_PASSWORD: 'change-me-before-production', DATA_DIR: dataDir },
+      stdout: 'pipe',
+      stderr: 'pipe'
+    });
+    expect(local.exitCode).toBe(0);
+    expect(new TextDecoder().decode(local.stdout)).toContain('database ready');
+    await Bun.$`rm -rf ${dataDir}`.quiet();
+  });
+
   it('production safety defaults stay documented and enforced', async () => {
     const env = await read('.env.example');
     expect(env).toMatch(/^SEED_DEMO_USERS=1$/m);

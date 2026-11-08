@@ -14,6 +14,8 @@ Use `./boro dev` for watch mode: it regenerates assets and starts `bun --watch s
 
 Run `bun run build` after changing client code, icon inputs, fonts, logos or asset generator logic. Run `bun run typecheck:server` and `bun run typecheck:client` after editing source; the client check is `vue-tsc` over all SFCs and TypeScript modules, so template type errors fail the gate. Run focused suites while iterating with `bunx --bun vitest run tests/core.test.ts` (or `api`, `realtime`, `journeys`, `components`, `stores`, `assets`, `security`). Run `bun run check` before committing: it builds, typechecks both projects, runs the documentation guard and the full Vitest suite with coverage.
 
+The suite is hermetic: `tests/setup.ts` removes the repository `.env` keys from the environment so `./boro check` and `bunx --bun vitest` behave identically, and configuration falls back to explicit test overrides instead of local settings.
+
 Vitest must run under Bun (`bunx --bun vitest run`), because the suites import Bun-only modules such as `bun:sqlite`, `Bun.password` and `Bun.serve`. The npm-style `bunx vitest` alone would execute the runner on Node and fail at those imports; the `test`, `coverage` and `check` scripts already pass `--bun`.
 
 ## Client conventions

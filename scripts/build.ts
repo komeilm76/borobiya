@@ -7,8 +7,24 @@
  *
  * Run through Bun only (`bun run build`).
  */
+import { rm } from 'node:fs/promises';
+import path from 'node:path';
 import { build } from 'vite';
 import { buildAssets } from './build-assets.ts';
+import { ROOT } from '../src/server/core/config.ts';
+
+/**
+ * Removes previous Vite output. `public/sw.js`, `public/index.html`, `public/app.css` and
+ * `public/js/**` are all produced by this script, so deleting them before each build keeps the
+ * emitted chunk set (and therefore the precache manifest) identical for identical sources instead
+ * of accumulating stale hashed chunks from earlier builds.
+ */
+async function cleanPreviousBundle(): Promise<void> {
+  await rm(path.join(ROOT, 'public/js'), { recursive: true, force: true });
+  for (const file of ['index.html', 'app.css', 'manifest.webmanifest']) {
+    await rm(path.join(ROOT, 'public', file), { force: true });
+  }
+}
 
 /**
  * Compiles the TypeScript service worker into the browser-required `public/sw.js`.
@@ -41,6 +57,7 @@ export async function buildServiceWorker(): Promise<number> {
  * @returns A summary of generated artifacts and their sizes.
  */
 export async function buildAll(): Promise<{ serviceWorkerBytes: number; manifestVersion: string; precacheEntries: number }> {
+  await cleanPreviousBundle();
   await build({
     configFile: 'vite.config.ts',
     logLevel: 'warn'
