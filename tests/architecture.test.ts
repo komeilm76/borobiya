@@ -155,6 +155,8 @@ describe('architecture guards', () => {
       'components.test.ts',
       'stores.test.ts',
       'composables.test.ts',
+      'views.test.ts',
+      'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
       expect(tests, name).toContain(name);

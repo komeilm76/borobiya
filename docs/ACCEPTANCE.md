@@ -59,6 +59,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Skip navigation, focus restoration, modal focus handling, labelled icon-only controls, visible focus rings, reduced-motion support and keyboard shortcuts are implemented.
 - [x] Contrast ratios for primary text, muted text and semantic status colors are verified by an automated check.
 - [x] Lazy view loading replaces eager imports of all view modules; every one of the 20 views is a code-split chunk.
+- [x] Every routed view and layout is mounted by the suite, and the role guard is exercised for anonymous, user, administrator and onboarding-only accounts.
 - [x] Animation is declarative first (`<Transition>`, `<TransitionGroup>`, `motion-v`, `@vueuse/motion`) with GSAP limited to one timeline, and every duration collapses to zero under `prefers-reduced-motion`.
 - [x] A full login-to-rating journey test exercises registration/session, sharing, SOS, dispatch, acceptance, mission status and rating.
 - [x] A Bun-native benchmark records validator, tile, HTTP and live-location latency figures for release review.

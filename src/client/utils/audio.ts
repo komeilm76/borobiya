@@ -68,7 +68,10 @@ export class TalkAudio {
 
   /** Encodes float samples into the shared binary frame layout. */
   private encode(samples: Float32Array): ArrayBuffer | null {
-    if (this.sequence * BUFFER_SIZE >= AUDIO.MAX_PAYLOAD_BYTES) return null;
+    // `AUDIO.MAX_PAYLOAD_BYTES` is the server's per-frame ceiling (see `TalkFloor.authorizeAudio`),
+    // not a budget for the whole talk session: a 30-second hold is ~960 kB of 16 kHz PCM16 and is
+    // expected to be streamed frame by frame. Only skip a frame that would itself be too large.
+    if (samples.length * 2 > AUDIO.MAX_PAYLOAD_BYTES) return null;
     const payload = new Int16Array(samples.length);
     for (let index = 0; index < samples.length; index++) {
       const clamped = Math.max(-1, Math.min(1, samples[index] ?? 0));

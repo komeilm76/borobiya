@@ -84,7 +84,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <main id="app" class="map-shell" tabindex="-1" aria-live="polite">
+  <main id="app" class="map-shell" tabindex="-1">
     <div class="map-shell__frame">
       <div class="status-bar" aria-hidden="true">
         <span class="status-bar__clock">{{ new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) }}</span>

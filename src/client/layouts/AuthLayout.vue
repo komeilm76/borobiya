@@ -23,7 +23,7 @@ const pageMotion = computed<Record<string, unknown>>(() => ({
 </script>
 
 <template>
-  <main id="app" class="auth-shell" tabindex="-1" aria-live="polite">
+  <main id="app" class="auth-shell" tabindex="-1">
     <section class="auth-brand" aria-hidden="true">
       <div class="auth-brand__mark">
         <span class="mdi mdi-compass-outline" aria-hidden="true" />

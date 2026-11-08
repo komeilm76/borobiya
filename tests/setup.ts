@@ -47,6 +47,39 @@ if (hasWindow) {
     });
   }
   if (!window.scrollTo) window.scrollTo = (() => undefined) as typeof window.scrollTo;
+  // `motion-v` drives the Web Animations API. happy-dom's implementation rejects the animation's
+  // `finished` promise with `AbortError` when a component unmounts mid-flight, which Vitest reports
+  // as an unhandled rejection and fails the run even though every assertion passed. Return an
+  // already-settled animation: motion still marks the element animated, but nothing can abort.
+  if (typeof Element !== 'undefined') {
+    Element.prototype.animate = function animate() {
+      return {
+        finished: Promise.resolve(this),
+        currentTime: 0,
+        startTime: 0,
+        playState: 'finished',
+        playbackRate: 1,
+        id: '',
+        effect: null,
+        timeline: null,
+        onfinish: null,
+        oncancel: null,
+        cancel() {},
+        finish() {},
+        play() {},
+        pause() {},
+        reverse() {},
+        persist() {},
+        commitStyles() {},
+        updatePlaybackRate() {},
+        addEventListener() {},
+        removeEventListener() {},
+        dispatchEvent() {
+          return true;
+        }
+      } as unknown as Animation;
+    } as typeof Element.prototype.animate;
+  }
   if (!window.requestAnimationFrame) {
     window.requestAnimationFrame = ((callback: FrameRequestCallback) =>
       setTimeout(() => callback(Date.now()), 0)) as typeof window.requestAnimationFrame;

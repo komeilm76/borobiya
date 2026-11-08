@@ -39,11 +39,14 @@ export default defineConfig({
         'src/server/index.ts',
         'src/client/service-worker/**'
       ],
+      // Raised after the view, layout, route-guard, realtime-client and push-to-talk suites landed
+      // (59% → 75% statements); the guard leaves headroom below the measured figures so an
+      // unrelated small change does not fail for rounding, while a genuine coverage loss does.
       thresholds: {
-        lines: 45,
-        functions: 45,
-        statements: 45,
-        branches: 35
+        lines: 70,
+        functions: 60,
+        statements: 70,
+        branches: 52
       }
     }
   }

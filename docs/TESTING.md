@@ -21,6 +21,8 @@ Component, store and composable suites run in `happy-dom`. Server, realtime, scr
 - `components.test.ts` mounts `AppToastHost`, `CommandPalette`, `LoginView` and `MapCanvas` with real Vuetify, Pinia and Vue Router plugins, and validates the 20-route table.
 - `stores.test.ts` drives the auth, offline, map, SOS, realtime, admin and settings stores against mocked envelopes.
 - `composables.test.ts` covers the settings tokens and theme cycling, the toast queue, `useAsyncAction`, the formatters, motion preferences, the SOS hold gesture and the command palette.
+- `views.test.ts` mounts all 20 routed views and the layouts against a mocked API, then exercises the real route guard: anonymous visitors, both roles, onboarding, and the per-role landing route.
+- `realtime-client.test.ts` drives the browser transport with a fake socket (ticket request, queueing, heartbeat, durable cursor, reconnect policy, binary routing) and the push-to-talk codec with a fake Web Audio context.
 - `acceptance.test.ts` checks the closed target checklist, legacy scope reconciliation, release evidence, Bun automation scripts and CI coverage.
 - `database.test.ts` verifies the idempotent migration for older SQLite databases and the production configuration guards.
 
@@ -28,7 +30,7 @@ Component, store and composable suites run in `happy-dom`. Server, realtime, scr
 
 Run one suite while iterating, for example `bunx --bun vitest run tests/realtime.test.ts` or `bunx --bun vitest tests/components.test.ts` for watch mode. Run `bun run coverage` for the whole suite with coverage, `./boro check` for the full gate (build, both typechecks, documentation guard and coverage) and `./boro verify` to add runtime diagnostics. `bun run bench` records release latency figures, `bun run smoke` runs the reproducible in-process runtime smoke and `bun run acceptance` validates the checklist and evidence. None of these commands performs browser-driven professional UI acceptance.
 
-Coverage thresholds (45% statements/lines/functions, 35% branches) exist to catch silent regressions in the untested remainder, not to certify the product. Generated output, the service-worker artifact and the process entry point are excluded.
+Coverage thresholds (70% statements/lines, 60% functions, 52% branches) are set a little below the measured figures (about 75% statements, 79% lines) so they catch a genuine coverage loss without failing on rounding. They exist to catch silent regressions, not to certify the product. Generated output, the service-worker artifact and the process entry point are excluded.
 
 ## Interpretation
 

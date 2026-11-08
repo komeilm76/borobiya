@@ -71,7 +71,7 @@ async function logout(): Promise<void> {
 </script>
 
 <template>
-  <main id="app" class="admin-shell" tabindex="-1" aria-live="polite">
+  <main id="app" class="admin-shell" tabindex="-1">
     <aside class="admin-sidebar bb-admin-sidebar" aria-label="ناوبری مدیریت">
       <div class="admin-sidebar__brand">
         <span class="mdi mdi-compass-outline" aria-hidden="true" />
