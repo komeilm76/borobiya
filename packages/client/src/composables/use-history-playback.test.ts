@@ -3,6 +3,7 @@ import { effectScope, nextTick, ref, type Ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationHistoryPoint } from "@shared/index";
 import {
+  HISTORY_GRANT_READ_DEADLINE_MS,
   PLAYBACK_MAX_TICK_DELTA_MS,
   PLAYBACK_TICK_MS,
   useHistoryPlayback
@@ -26,6 +27,7 @@ const NOW = Date.parse("2026-10-21T12:00:00.000Z");
 
 interface FetchCall {
   readonly url: string;
+  readonly signal?: AbortSignal;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
 }
@@ -93,7 +95,7 @@ beforeEach(() => {
       };
       reject = (error: unknown) => rej(error);
     });
-    const call: FetchCall = { url, resolve, reject };
+    const call: FetchCall = { url, signal: (_init as RequestInit | undefined)?.signal ?? undefined, resolve, reject };
     calls.push(call);
     pending.push({ resolve, reject });
     if (autoRespond) resolve(autoRespond(url));
@@ -120,7 +122,7 @@ function bearer(owner: string, sessionId: string, nonce = 0): string {
 }
 
 async function settle(): Promise<void> {
-  for (let index = 0; index < 4; index += 1) await Promise.resolve();
+  for (let index = 0; index < 8; index += 1) await Promise.resolve();
   await nextTick();
 }
 
@@ -162,6 +164,7 @@ describe("JWT login boundary", () => {
       await settle();
       expect(calls).toHaveLength(2);
       token.value = bearer("owner-a", "session-b");
+      expect(calls[1]?.signal?.aborted).toBe(true);
       calls[0]!.resolve(track());
       calls[1]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
       await Promise.all([oldTrack, oldGrants]);
@@ -524,6 +527,34 @@ describe("the two sources", () => {
     await settle();
     expect(api.loadIssue.value).toBe("request_failed");
     expect(api.failed.value).toBe(true);
+  });
+
+  it("times out a stalled grant list and keeps its late reply from replacing a successful retry", async () => {
+    const { api, scope } = mount();
+    try {
+      const stalled = api.loadShares();
+      await settle();
+      expect(calls).toHaveLength(1);
+      expect(api.grantsLoading.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(HISTORY_GRANT_READ_DEADLINE_MS);
+      expect(api.grantsLoading.value).toBe(false);
+      await stalled;
+      expect(api.grantsFailed.value).toBe(true);
+      expect(api.grantsLoaded.value).toBe(false);
+      expect(calls[0]?.signal?.aborted).toBe(true);
+
+      const retry = api.loadShares();
+      await settle();
+      expect(calls).toHaveLength(2);
+      calls[1]!.resolve({ owned: [], sharedWithMe: [] });
+      await retry;
+      expect(api.grantsFailed.value).toBe(false);
+      expect(api.grantsLoaded.value).toBe(true);
+      calls[0]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
+      await settle();
+      expect(api.grants.value).toEqual([]);
+      expect(api.grantsFailed.value).toBe(false);
+    } finally { scope.stop(); }
   });
 
   it("keeps a grant list it already had when a refresh fails", async () => {

@@ -51,6 +51,8 @@ export type PlaybackSourceKind = "own" | "grant";
 export const PLAYBACK_TICK_MS = 50;
 /** Ceiling for one tick's advance, in wall-clock ms. See the note above. */
 export const PLAYBACK_MAX_TICK_DELTA_MS = 250;
+/** Keep a stalled history-grant read from permanently blocking the panel's Refresh control. */
+export const HISTORY_GRANT_READ_DEADLINE_MS = 12_000;
 
 /** Everything the panel and the view share; the component's only prop. */
 export type HistoryPlayback = ReturnType<typeof useHistoryPlayback>;
@@ -116,6 +118,27 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
 
   let requestId = 0;
   let grantsRequestId = 0;
+  let grantsReadController: AbortController | null = null;
+  async function readGrants(token: string) {
+    const controller = new AbortController();
+    grantsReadController = controller;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let onAbort = () => {};
+    const deadline = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new Error("HISTORY_GRANT_READ_ABORTED"));
+      controller.signal.addEventListener("abort", onAbort, { once: true });
+      timeout = setTimeout(() => {
+        reject(new Error("HISTORY_GRANT_READ_TIMEOUT"));
+        controller.abort();
+      }, HISTORY_GRANT_READ_DEADLINE_MS);
+    });
+    try { return await Promise.race([listLocationHistoryShares(token, controller.signal), deadline]); }
+    finally {
+      if (timeout !== null) clearTimeout(timeout);
+      controller.signal.removeEventListener("abort", onAbort);
+      if (grantsReadController === controller) grantsReadController = null;
+    }
+  }
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastTickAt = 0;
 
@@ -170,7 +193,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       }
       let response;
       try {
-        response = await listLocationHistoryShares(accessToken);
+        response = await readGrants(accessToken);
       } catch (error) {
         if (error instanceof ApiError && error.status === 401 && options.refreshSession) {
           const refreshed = await options.refreshSession();
@@ -178,7 +201,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
           // Never replay its private grant list with the new session's bearer.
           if (requestIdForThisLoad !== grantsRequestId) return;
           if (refreshed && options.accessToken.value) {
-            response = await listLocationHistoryShares(options.accessToken.value);
+            response = await readGrants(options.accessToken.value);
           } else {
             throw error;
           }
@@ -400,6 +423,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     if (next === previous || (previous === null && next !== null)) return;
     ++requestId;
     ++grantsRequestId;
+    grantsReadController?.abort();
     stopTimer();
     clearTrack();
     loading.value = false;
@@ -414,6 +438,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   onScopeDispose(() => {
     ++requestId;
     ++grantsRequestId;
+    grantsReadController?.abort();
     stopTimer();
   });
 

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound shared-history grant reads (T4.4.2 partial)
+
+- The history playback panel has its own received-grants list: a stalled fetch could leave its loading state active indefinitely and block the refresh/retry control. That read now has a 12-second deadline and an abort signal, exposing the existing failure/Refresh feedback even if the transport ignores abort. Late responses cannot overwrite a successful retry; account replacement, sign-out and disposal cancel the old read. A fake-timer test reproduced the stalled state before the fix; composable and API tests now cover cancellation and signal forwarding. No Vue component was mounted; live browser/device network behavior and wider T4.4.2 feedback remain open.
+
 ### 2026-10-23 — Bound companion grant reads (T4.4.2 partial)
 
 - A grant-list request could leave the Companions card showing its initial checking state forever. Reads now time out after 12 seconds and expose the existing error/Retry feedback even if a test adapter ignores abort. The production fetch receives an abort signal; a superseded read, sign-out or account switch aborts it, and late replies cannot repaint a newer retry. A fake-timer regression reproduced the indefinite wait before the change; API signal forwarding and composable cleanup are covered without mounting Vue. T4.4.2 remains open for broader feedback and browser/device network acceptance.

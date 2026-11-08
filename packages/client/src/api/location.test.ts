@@ -227,10 +227,11 @@ describe("history share and read calls", () => {
   it("lists grants in both directions and revokes one", async () => {
     const payload = { owned: historyCreated.shares.map((row) => ({ ...row, targetUsername: "satellite" })), sharedWithMe: [] };
     const listMock = stubFetch(() => jsonResponse(payload));
-    await expect(listLocationHistoryShares(token)).resolves.toEqual(payload);
-    expect((listMock.mock.calls[0] as unknown as [string])[0]).toBe(
-      "/api/_user/location/history/shares"
-    );
+    const signal = new AbortController().signal;
+    await expect(listLocationHistoryShares(token, signal)).resolves.toEqual(payload);
+    const [listUrl, listInit] = listMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(listUrl).toBe("/api/_user/location/history/shares");
+    expect(listInit.signal).toBe(signal);
 
     const revokeMock = stubFetch(() => new Response(null, { status: 204 }));
     await revokeLocationHistoryShare(historyCreated.shares[0]!.id, token);

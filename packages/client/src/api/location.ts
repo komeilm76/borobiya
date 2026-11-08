@@ -124,9 +124,10 @@ export async function createLocationHistoryShare(
 }
 
 export async function listLocationHistoryShares(
-  accessToken: string
+  accessToken: string,
+  signal?: AbortSignal
 ): Promise<LocationHistorySharesResponse> {
-  const response = await requestJson<unknown>(apiRoutes.location.listHistoryShares.url, { accessToken });
+  const response = await requestJson<unknown>(apiRoutes.location.listHistoryShares.url, { accessToken, signal });
   return locationHistorySharesResponseSchema.parse(response);
 }
 
