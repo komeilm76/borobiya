@@ -27,6 +27,14 @@ export function decodeAccessTokenClaims(accessToken: string | null | undefined):
   }
 }
 
+/** Stable across same-session bearer renewal; a different login must invalidate pending private writes. */
+export function accountSessionKey(owner: string | null, bearer: string | null): string | null {
+  if (!owner || !bearer) return null;
+  const claims = decodeAccessTokenClaims(bearer);
+  if (bearer.includes(".") && (claims?.sub !== owner || typeof claims.sessionId !== "string")) return null;
+  return JSON.stringify([owner, claims?.sessionId ?? null]);
+}
+
 /** The `deviceId` claim of this session, or `null` for a malformed/non-JWT token. */
 export function ownDeviceId(accessToken: string | null | undefined): string | null {
   const claims = decodeAccessTokenClaims(accessToken);

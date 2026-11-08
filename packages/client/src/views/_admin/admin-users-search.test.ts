@@ -22,7 +22,9 @@ describe("admin user search feedback while typing", () => {
     expect(searchInput).not.toContain(':disabled="loading && !users.length"');
     expect(view).toContain('if (loading.value) return "در حال دریافت فهرست کاربران…";');
     expect(view).toContain('if (listError.value) return "تعداد حساب‌ها در دسترس نیست";');
-    expect(view).toContain('if (loading.value || typeof value !== "boolean"');
+    const statusController = readFileSync(new URL("../../admin/user-status-change.ts", import.meta.url), "utf8");
+    expect(view).toContain('listLoading: loading,');
+    expect(statusController).toContain('options.listLoading.value || typeof value !== "boolean"');
   });
 
   it("waits for debounce even when the query resets pagination, but allows explicit filter/refresh reads", () => {

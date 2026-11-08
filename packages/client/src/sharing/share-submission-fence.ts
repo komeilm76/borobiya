@@ -1,12 +1,7 @@
-import { decodeAccessTokenClaims } from "@/composables/device-identity";
+import { accountSessionKey } from "@/composables/device-identity";
 
-/** Same-session bearer renewal may continue; a different JWT login needs fresh share consent. */
-export function shareSessionKey(owner: string | null, bearer: string | null): string | null {
-  if (!owner || !bearer) return null;
-  const claims = decodeAccessTokenClaims(bearer);
-  if (bearer.includes(".") && (claims?.sub !== owner || typeof claims.sessionId !== "string")) return null;
-  return JSON.stringify([owner, claims?.sessionId ?? null]);
-}
+/** Preserve the sharing API while using the same session identity for other private writes. */
+export const shareSessionKey = accountSessionKey;
 
 /** Prevent async share writes and priority-device lookups from updating a closed or changed session. */
 export function createShareSubmissionFence(context: {

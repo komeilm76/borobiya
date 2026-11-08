@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Fence confirmed admin account-status writes to the login (T4.4.2 partial)
+
+- Audited the Users page's activation/deactivation confirmation: after a delayed session refresh, a prior administrator's selected account could be PATCHed using a replacement login's bearer, while a late old reply could replace the new login's feedback or unlock its in-flight write. Extracted the confirmation into a session-scoped nonmounted controller. Same-session bearer renewal still works; account, role or JWT session changes synchronously clear the old dialog/busy state, and delayed results cannot show success or trigger a new-session list refresh. A PATCH already sent may commit server-side; this does not roll it back. Deferred tests reproduced the missing boundary before the fix, and the existing admin search source contract was updated to follow its moved guard. This is not a real administrator/browser/API run; the wider feedback/optimistic-write audit remains open.
+
 ### 2026-10-23 — Detect silently stalled mission timeline streams (T4.5.3 incomplete)
 
 - The authenticated timeline SSE fallback could stay open without receiving data if an intermediary silently stopped forwarding its server keepalives; the interface then had no reason to show that live updates had ceased. Added a 45-second per-read silence deadline against the server's approximately 15-second keepalive cadence. On expiry, the existing reader cleanup and composable fallback path report the loss and retry; periodic keepalives reset the deadline. A fake-timer regression timed out before the fix, then passed with a healthy-idle and timer-cleanup test. This is pure stream-parser coverage, **not** a real proxy/browser run or full login → share → SOS → dispatch → rating/SSE acceptance; T4.5.3 is still open.

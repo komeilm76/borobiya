@@ -298,6 +298,8 @@ import type { UserProfile } from "@shared/index";
 import { ApiError } from "../../api/http";
 import { friendlyErrorMessage } from "../../api/error-message";
 import { listAdminUsers, updateAdminUserStatus } from "../../api/admin-users";
+import { accountSessionKey } from "../../composables/device-identity";
+import { useAdminUserStatusChange } from "../../admin/user-status-change";
 import { useAuthStore } from "../../stores/auth";
 
 const PAGE_SIZE = 20;
@@ -328,11 +330,17 @@ const total = ref(0);
 const totalPages = ref(0);
 const loading = ref(true);
 const listError = ref("");
-const statusSavingUserId = ref<string | null>(null);
-const statusError = ref("");
-const statusChange = ref<{ user: UserProfile; nextIsActive: boolean } | null>(null);
-const successVisible = ref(false);
-const successMessage = ref("");
+const { statusSavingUserId, statusError, statusChange, successVisible, successMessage,
+  requestStatusChange, closeStatusDialog, updateStatusDialog, confirmStatusChange } = useAdminUserStatusChange({
+  session: () => auth.user?.role === "admin" ? accountSessionKey(auth.user.id, auth.accessToken) : null,
+  accessToken: () => auth.accessToken,
+  ensureSession: () => auth.ensureSession(),
+  update: updateAdminUserStatus,
+  refresh: () => loadUsers(),
+  listLoading: loading,
+  isCurrentAdmin: (id) => id === auth.user?.id,
+  errorMessage: friendlyAdminError
+});
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null;
 let activeListController: AbortController | null = null;
@@ -487,51 +495,6 @@ function updatePage(value: unknown): void {
   const next = Number(value);
   if (!Number.isInteger(next) || next < 1 || next > totalPages.value || next === page.value) return;
   page.value = next;
-}
-
-function requestStatusChange(user: UserProfile, value: unknown): void {
-  if (loading.value || typeof value !== "boolean" || value === user.isActive || statusSavingUserId.value !== null || isCurrentAdmin(user)) return;
-  statusError.value = "";
-  statusChange.value = { user, nextIsActive: value };
-}
-
-function updateStatusDialog(open: boolean): void {
-  if (!open) closeStatusDialog();
-}
-
-function closeStatusDialog(): void {
-  if (statusSavingUserId.value !== null) return;
-  statusChange.value = null;
-  statusError.value = "";
-}
-
-async function confirmStatusChange(): Promise<void> {
-  const pendingChange = statusChange.value;
-  if (!pendingChange || statusSavingUserId.value !== null) return;
-
-  statusSavingUserId.value = pendingChange.user.id;
-  statusError.value = "";
-  try {
-    // Refresh a near-expiry token before mutating; a mounted admin page may outlive its JWT.
-    await auth.ensureSession();
-    const accessToken = auth.accessToken;
-    if (!accessToken) {
-      statusError.value = "نشست مدیر در دسترس نیست؛ دوباره وارد حساب شوید.";
-      return;
-    }
-
-    await updateAdminUserStatus(pendingChange.user.id, pendingChange.nextIsActive, accessToken);
-    statusChange.value = null;
-    successMessage.value = pendingChange.nextIsActive
-      ? `حساب ${pendingChange.user.username} فعال شد.`
-      : `حساب ${pendingChange.user.username} غیرفعال شد و نشست‌های آن لغو شدند.`;
-    successVisible.value = true;
-    await loadUsers();
-  } catch (error) {
-    statusError.value = friendlyAdminError(error, "تغییر وضعیت حساب انجام نشد. دوباره تلاش کنید.");
-  } finally {
-    statusSavingUserId.value = null;
-  }
 }
 
 watch(page, () => {
