@@ -49,9 +49,19 @@ export default defineConfig({
         // timing and the suite's statement total moved between identical runs (87.06-87.32%).
         // Each of those views now has its own deterministic suite. Later suites then raised the
         // floor again — the push-to-talk floor, and the map canvas, whose duplicate projection was
-        // deleted when the canvas was given one. These thresholds sit below the figure measured
-        // across three identical clean runs (88.34 / 92.05 / 89.40 / 76.27).
-        lines: 92,
+        // deleted when the canvas was given one.
+        //
+        // The figure is still not perfectly reproducible, and the cause is understood: several spec
+        // files import the same single-file component, so it is instrumented more than once with
+        // different statement ids, and the v8 remap then reports one record or the other rather
+        // than their union. The result is a whole-file difference that appears in a minority of
+        // runs — `MissionView.vue` reports 45 or 43 covered lines, which moves the total between
+        // 92.05% and 92.00%. Disabling `fileParallelism`, enabling `experimentalAstAwareRemapping`,
+        // and importing the components statically instead of through a computed specifier were each
+        // measured and none removed it. So the guards sit below the *lowest* figure seen in a clean
+        // checkout (88.17 / 91.83 / 89.12 / 76.19) rather than below the typical one. A threshold
+        // between the two would be a coin flip, which is how this cost a red build once already.
+        lines: 91,
         functions: 89,
         statements: 88,
         branches: 76
