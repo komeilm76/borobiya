@@ -102,6 +102,39 @@ describe("client route records", () => {
     }
   });
 
+  it("keeps the map manual's Send → Travel → Guidance instructions aligned with the nonmounted route controls", () => {
+    const manual = readFileSync(new URL("../../../../docs/USER_MANUAL.md", import.meta.url), "utf8");
+    const mapSection = manual.split("## 8. Map Basics")[1]?.split("## 9. ")[0] ?? "";
+    const planner = readFileSync(new URL("../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    const routes = readFileSync(new URL("../components/map/PointRouteChoicesSheet.vue", import.meta.url), "utf8");
+    const transport = readFileSync(new URL("../components/map/PointTransportChoicesSheet.vue", import.meta.url), "utf8");
+    const mapView = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
+    const journey = readFileSync(new URL("../composables/use-point-route.ts", import.meta.url), "utf8");
+
+    for (const label of ["ارسال", "سفر", "شروع سفر", "انتخاب وسیلهٔ دیگر", "انتخاب مسیر دیگر"])
+      expect(mapSection, `map manual: ${label}`).toContain(`**${label}**`);
+    expect(planner).toContain('@click="sendPoint">ارسال</v-btn>');
+    expect(planner).toContain('@click="showPlan">سفر</v-btn>');
+    expect(planner).toContain('@click="emit(\'start\')">شروع سفر</v-btn>');
+    expect(planner).toContain('@click="emit(\'choose-transport\')"');
+    expect(planner).toContain('@click="emit(\'choose-route\')"');
+    expect(routes).toContain('@click="emit(\'choose\', index)"');
+    expect(routes).toContain('@click="emit(\'confirm\')">تأیید مسیر انتخابی</v-btn>');
+    expect(transport).toContain('@click="emit(\'confirm\', selected)">تأیید وسیلهٔ انتخابی</v-btn>');
+    expect(mapSection).toContain("**تأیید مسیر انتخابی**");
+    expect(mapSection).toContain("**تأیید وسیلهٔ انتخابی**");
+    expect(mapSection).toContain("**بازگشت بدون تغییر**");
+    expect(mapSection).toContain("**توقف و پایان سفر**");
+    expect(mapView).toContain("function closeRouteChoices(): void");
+    expect(mapView).toContain("function confirmPointRoute(): void");
+    expect(mapView).toContain("function confirmTransportChoice(mode: TransportProfile): void");
+    expect(mapView).toContain("@click=\"clearPointRoute\">توقف و پایان سفر</v-btn>");
+    expect(journey).toContain("navigationPending.value = !usable;");
+    expect(mapSection).toContain("weak or unavailable GPS fix does not disable **شروع سفر**");
+    expect(mapSection).not.toContain("**جزئیات و وسیلهٔ حرکت**");
+    expect(mapSection).not.toContain("tap a card to select it and return to the planner");
+  });
+
   it("keeps sharing-manual route instructions on implemented user pages", () => {
     const manual = readFileSync(new URL("../../../../docs/USER_MANUAL.md", import.meta.url), "utf8");
     const sharingSections = manual.split("## 11. Live Location Sharing")[1]?.split("## 14. ")[0];

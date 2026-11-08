@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Correct map route instructions against current controls (T4.7.1 partial)
+
+- Replaced stale Map Basics instructions that said tapping an alternative commits it immediately and pointed to an obsolete planner button. The manual now distinguishes Send (a selected-point link, not live sharing), Travel, the separate route and transport choice sheets with explicit confirm/cancel, weak-GPS pending start, Back-to-plan and Stop/clear in Guidance. A new nonmounted router/manual regression failed before the correction and passes afterward against current component labels and view/composable wiring. Source review and tests are not rendered or authenticated map acceptance; no GPS, OSRM, real browser or screenshot was exercised. Genuine authenticated captures and evidence-backed completion remain open; T4.7.1 is not complete and documentation is not 100%.
+
 ### 2026-10-23 — Prepare guarded real-browser E2E entry (T4.5.3 incomplete)
 
 - Added a separate, opt-in Playwright entry test for a dedicated nonproduction user: real UI login, private map and opening the live/history share dialog, without intercepted APIs or safety-sensitive share/SOS writes. The test target requires an explicit nonproduction acknowledgement and a single secure origin; runtime credentials are not committed and trace/video/screenshots are disabled. A target-guard Vitest suite failed to import before the guard existed, then passed all four assertions; TypeScript checks and Playwright `--list` confirmed the scenario is discoverable and missing target env fails closed. This workspace has no browser binary, migrated database, running VM or dedicated test account, so the browser scenario **was not executed**. Full login-to-rating and stream acceptance remain not started; see WORKFLOWS §2.
