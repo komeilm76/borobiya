@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Parse coalesced mission timeline SSE frames safely (T4.5.3 preparation)
+
+- The authenticated timeline SSE client checked an 8 KiB limit on the entire received chunk *before* separating frames. A queued batch of many small valid invalidation events could therefore be rejected as an invalid stream; a smaller batch needlessly launched one timeline HTTP read per event. It now checks the size of each complete frame and the unfinished remainder, then coalesces same-chunk notices for this mission into one authoritative re-read. A batch regression failed before the fix; oversized single frames still fail and other missions are ignored. Targeted client tests pass, but no Playwright/browser login-to-rating E2E has run; T4.5.3 remains not started as a full workflow.
+
 ### 2026-10-23 — Skip companion DOM-avatar work on age-only ticks (T4.4.4 partial)
 
 - The map's GeoJSON was already stable on five-second age ticks, but its DOM avatar watcher still walked every peer, rewrote accessibility text/classes and rechecked the selected companion on each tick. The companion panel keeps updating ages; a separate avatar snapshot changes only for authorized ID, name, coordinates or stale-state changes, and direct registry changes still invalidate a removed selection synchronously. Comparison includes IDs even when two grants have visually identical positions/names. Pure, fake-timer and source-pinned tests cover the behavior without mounting Vue. This is a source-level work reduction, **not** a device FPS, <2s map-load or <500ms GPS measurement; T4.4.4 remains open.

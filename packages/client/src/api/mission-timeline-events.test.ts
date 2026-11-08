@@ -31,11 +31,21 @@ describe("authenticated mission SSE parser", () => {
       headers: { authorization: "Bearer secret", accept: "text/event-stream" }
     }));
   });
+  it("accepts many small valid frames coalesced into one read without stampeding timeline reloads", async () => {
+    const refresh = vi.fn();
+    const frame = `event: refresh\ndata: {"missionId":"${id}"}\n\n`;
+    vi.stubGlobal("fetch", vi.fn(async () => stream([frame.repeat(150)])));
+    await followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
+    expect(refresh).toHaveBeenCalledOnce(); // Invalidation, not one HTTP re-read per queued notice.
+  });
+
   it("rejects non-SSE and oversized frames without calling the refresh handler", async () => {
     const refresh = vi.fn();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
     await expect(followMissionTimelineEvents("token", id, new AbortController().signal, refresh)).rejects.toThrow();
     vi.stubGlobal("fetch", vi.fn(async () => stream(["event: refresh\ndata: " + "x".repeat(8192)])));
+    await expect(followMissionTimelineEvents("token", id, new AbortController().signal, refresh)).rejects.toThrow("INVALID_MISSION_STREAM");
+    vi.stubGlobal("fetch", vi.fn(async () => stream(["event: refresh\ndata: " + "x".repeat(8192) + "\n\n"])));
     await expect(followMissionTimelineEvents("token", id, new AbortController().signal, refresh)).rejects.toThrow("INVALID_MISSION_STREAM");
     expect(refresh).not.toHaveBeenCalled();
   });

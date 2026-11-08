@@ -553,6 +553,7 @@ The numbered T1.0–T1.5 checkboxes above track feature implementation. These fo
 - [x] **T4.5.2** Route tests: prefix guards (already-authed 403, admin-only 403, no DELETE) — completed 2026-10-24
   - Existing route suites verify each auth, admin and user handler in isolation. A mounted-Fastify integration matrix now sends signed ordinary/admin requests through the real route registration: already-authenticated guest mutations return 403 before body validation or store reads, an ordinary account gets 403 on user/catalog/SOS admin reads before admin queries, a signed ordinary account can read `/_user/me`, an active admin can list users, and `DELETE /_admin/users/:id` is absent even for an admin (404 and no Swagger operation). No database service is needed; these are injected-store tests. Playwright/full E2E remains T4.5.3.
 - [ ] **T4.5.3** SSE/Playwright E2E: login → share → SOS → dispatch → accept → status → rate
+  - **SSE parser reliability preparation (2026-10-23):** A browser returning many valid timeline invalidations in one network read could exceed the parser's 8 KiB *whole-buffer* ceiling and falsely close the stream. It now limits each complete/incomplete frame separately and coalesces same-chunk mission notices into one scoped timeline re-read, retaining rejection of an actual oversized event and ignoring other missions. A regression reproduced the oversized-batch failure before the fix. This is client parser coverage, **not** a Playwright login-to-rating run, browser stream acceptance or completion of T4.5.3.
 
 ### 4.6 Workflows & Deploy
 

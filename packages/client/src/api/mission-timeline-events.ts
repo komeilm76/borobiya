@@ -20,20 +20,27 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
       const { done, value } = await reader.read();
       if (done) break;
       buffer = (buffer + decoder.decode(value, { stream: true })).replaceAll("\r\n", "\n");
-      if (buffer.length > 8192) throw new Error("INVALID_MISSION_STREAM");
       let boundary: number;
+      let refreshNeeded = false;
       while ((boundary = buffer.indexOf("\n\n")) >= 0) {
         const frame = buffer.slice(0, boundary);
         buffer = buffer.slice(boundary + 2);
+        // Bound each frame, not the entire network chunk: a paused tab can receive
+        // many small, valid notices at once without making one oversized SSE event.
+        if (frame.length > 8192) throw new Error("INVALID_MISSION_STREAM");
         if (frame.startsWith(":")) continue;
         const lines = frame.split("\n");
         if (lines[0] !== "event: refresh" || lines.length !== 2 || !lines[1]?.startsWith("data: ")) continue;
         let payload: unknown;
         try { payload = JSON.parse(lines[1].slice(6)); } catch { continue; }
-        if (payload && typeof payload === "object" && "missionId" in payload && payload.missionId === id && !signal.aborted) {
-          onRefresh(); // notice only: always reread the scoped HTTP timeline
+        if (payload && typeof payload === "object" && "missionId" in payload && payload.missionId === id) {
+          refreshNeeded = true;
         }
       }
+      if (buffer.length > 8192) throw new Error("INVALID_MISSION_STREAM");
+      // A burst of invalidations names the same authoritative timeline. One scoped
+      // HTTP re-read per received chunk is enough; never stampede it per frame.
+      if (refreshNeeded && !signal.aborted) onRefresh();
     }
   } finally {
     await reader.cancel().catch(() => {});
