@@ -1,147 +1,25 @@
-# پنل مدیریت — تصاویر مرجع و نقشهٔ پیاده‌سازی
+# Administrator console reference
 
-این پوشه **تصاویر مرجع (reference mockups)** پنل مدیریت `/_admin` را نگه می‌دارد:
-۲۱ تصویر در ۶ گروه، با یک سیستم طراحی مشترک با صفحهٔ نقشه (`design/map-page`).
+This folder defines the desktop operations console. The reference set contains 21 images across six groups: dashboard, users, dispatch, reports, groups and system views. The clean rebuild implements these surfaces in a dependency-free browser module served from the same origin as the API. All documentation here is English; the product interface is right-to-left.
 
-> مرحلهٔ فعلی: **مرحلهٔ ۱ — تصاویر مرجع**. تصاویر با خط لولهٔ اختصاصی خودمان
-> (`_generator/`) رندر شده‌اند تا متن فارسی/RTL، اعداد فارسی و نقشه در همهٔ صفحه‌ها
-> دقیق و یکسان باشند. پیاده‌سازی Vue/TypeScript در مرحلهٔ بعد روی همین تصاویر
-> بنا می‌شود.
+## Layout
 
----
+The reference canvas is 1440 by 900. A 264-pixel sidebar sits on the physical right, a 68-pixel top bar spans the remaining width and the content area is 1176 pixels with 28-pixel padding. The dispatch rail is 1148 pixels. Cards use a 16-pixel radius, buttons an 11-pixel radius, table headers `#F7FAF9`, row lines `#EFF4F2`, card edges `#E3EAE8` and a rail background `#FBFDFC`. Chart grid lines use `#E8EEEC`; chart series are teal, amber, blue, brown and green.
 
-## ۱. فهرست تصاویر
+The sidebar groups navigation into operations, management and system sections and shows the active administrator at the bottom. The top bar contains a breadcrumb on the physical right, a global search with a keyboard hint, notifications, help and an account avatar. The first table column starts on the right, status appears on the left and row menus occupy a fixed 48-pixel column. A left chevron opens detail views.
 
-### Design System — `design-system/`
-| فایل | محتوا |
-|---|---|
-| `01-foundations.png` | پالت (برند/وضعیت/اطلاع)، مقیاس تایپوگرافی دسکتاپ، فاصله و شعاع، سایه و لایه |
-| `02-controls.png` | دکمه‌ها (پر/خط‌دار/ملایم/خطر/غیرفعال)، فیلد و انتخاب‌گر، چیپ وضعیت، سوییچ، تب، آواتار، و نوار نمونهٔ آیکن (یک گلیف برای هر اندازهٔ مجاز) |
-| `03-patterns.png` | اسکلت صفحه، الگوی جدول، و لایه‌های روی‌هم (کشو/مودال/توست) |
+## Overview
 
-### Dashboard — `dashboard/`
-| فایل | محتوا |
-|---|---|
-| `01-overview.png` | نمای کلی: ۴ شاخص، نقشهٔ عملیات زنده، گروه‌های امداد، هشدارها، آخرین درخواست‌ها |
-| `02-dispatch-board.png` | تابلوی اعزام: صف درخواست‌های باز، نقشهٔ حادثه، نزدیک‌ترین امدادگران، پنل جزئیات + ثبت اعزام |
-| `03-reports.png` | گزارش‌ها: شاخص‌های بازه، روند ۷ روزه، سهم گروه‌ها، فراوانی نوع حادثه، عملکرد گروه‌ها |
+The overview title is accompanied by report and refresh actions. Four KPI cards show online responders, average response time, active missions and requests today, each with a semantic trend note. The lower grid contains a live operations map with incident markers, group readiness cards, a recent-requests table and a system-alert card. KPI values and tables are populated from the administrator API, not from decorative constants.
 
-### Services — `services/`
-| فایل | محتوا |
-|---|---|
-| `01-groups.png` | فهرست گروه‌های امداد: پوشش انواع حادثه، اعضا، وضعیت، کارت‌های پوشش/کمبود عضو |
-| `02-group-edit.png` | کشوی ویرایش گروه: نام، رنگ، انواع حادثهٔ پوشش‌داده‌شده، سقف ظرفیت، وضعیت انتشار |
-| `03-members.png` | مودال مدیریت اعضا: جست‌وجو، افزودن، حذف، نقش داخل گروه |
-| `04-incident-types.png` | انواع حادثه: کارت‌های نوع حادثه، آیکن، رنگ، تعداد گروه‌های پوشش‌دهنده |
+## Dispatch board
 
-### Users — `users/`
-| فایل | محتوا |
-|---|---|
-| `01-list.png` | فهرست کاربران: شاخص‌های حساب، تب‌ها، فیلترها، جدول + صفحه‌بندی |
-| `02-account.png` | کشوی حساب کاربر: مشخصات، دستگاه‌های فعال، رویدادها، ویرایش/غیرفعال‌سازی |
-| `03-roles.png` | ماتریس نقش × مجوز + قواعد ثابت (مدیر ارشد حذف‌شدنی نیست) |
+Dispatch uses three columns: the SOS queue on the physical left, a live map and nearest responders in the center, and incident detail, selected responders and the dispatch action on the right. Selecting a queue card loads the nearest-responder query for the incident location. The chosen group and responders are submitted through the dispatch endpoint; the resulting durable event updates the API, realtime sockets and the board together.
 
-### System — `system/` (وظایف اداری)
-| فایل | محتوا |
-|---|---|
-| `01-audit-log.png` | گزارش رویدادها: فیلتر بازه/کاربر/اقدام، جدول با آدرس شبکه، خروجی CSV، کد رهگیری |
-| `02-alerts.png` | هشدارها: فید هشدارها با خوانده/نخوانده، تنظیم قاعده‌ها، ارسال اطلاعیه به گروه‌ها |
-| `03-settings.png` | تنظیمات: آستانه‌های عملیاتی، کانال‌های اطلاع‌رسانی، حالت تعمیرات، پشتیبان‌گیری |
+## Users and management
 
-### States — `states/` (حالت‌های سراسری)
-| فایل | محتوا |
-|---|---|
-| `01-loading.png` | اسکلتون جدول + پیام «در حال دریافت» (اسکلتون با ستون‌های واقعی هم‌تراز است) |
-| `02-empty.png` | حالت خالی با فیلتر فعال + CTA پاک‌کردن فیلترها |
-| `03-error.png` | خطای سرور (۵۰۳): بنر، نسخهٔ آخر موفق، کارت کد رهگیری و «چه چیزی از دست رفت» |
-| `04-offline.png` | آفلاین: بنر، شاخص‌های ذخیره‌شده، نقشهٔ غیرفعال، صف کارهای معوق |
-| `05-forbidden.png` | دسترسی ۴۰۳ برای نقش ناکافی + مسیر درخواست دسترسی |
+The users view contains four KPI cards, status filters, role filters, search, a paginated right-to-left table, user detail, role and active-state editing, user creation and CSV export. Group views expose capacity, incident coverage, membership and readiness. Incident types are shown as a stable catalog. Reports provide a seven-day trend and status distribution. Audit shows tracking codes, actors, actions, targets, timestamps and IP addresses with CSV export. Alerts can be resolved; settings control automatic dispatch, search radius, mission readiness and maintenance mode.
 
----
+## Consistency rules
 
-### آیکن‌ها — `../icons/`
-
-کتابخانهٔ کامل آیکن جدا از این پوشه نگه‌داری می‌شود: [`design/icons`](../icons/README.md) هر `mdi-*` را که کلاینت
-رندر می‌کند با نقش، تعداد کاربرد، فایل‌ها و اندازهٔ مجاز نشان می‌دهد. دو چیز این دو پوشه را به هم می‌بندد:
-
-- نمونه‌های نوار «آیکن‌ها» در `design-system/02-controls.png` با همان `glyph_box()` کشیده می‌شوند که کتابخانه
-  استفاده می‌کند؛ اندازه‌ای که اینجا دیده می‌شود و ردیفی که آنجا هست نمی‌توانند از هم جدا شوند.
-- تست `packages/client/src/design/icon-inventory.test.ts` مجموعهٔ آیکن‌های کد را با `design/icons/icons.json`
-  مقایسه می‌کند و وجود هر نام در فونت Material Design Icons را بررسی می‌کند.
-
-## ۲. سیستم طراحی (توکن‌ها)
-
-همه از `design/map-page/_generator/bb/theme.py` گرفته می‌شوند و در
-`_generator/atheme.py` با مقیاس دسکتاپ تکمیل می‌شوند.
-
-| توکن | مقدار | کاربرد |
-|---|---|---|
-| `primary` | `#0E6666` | کنش اصلی، آیتم فعال سایدبار، لینک |
-| `primary_soft` | `#E4F0EE` | چیپ، آیتم انتخاب‌شده، آواتار |
-| `mission` | `#8A4B0F` | تأکید مأموریت امداد، اسلایس نمودار |
-| `text` | `#122A2A` | متن اصلی، تیتر و جدول |
-| `success` / `warning` / `danger` / `info` | `#2C7A57` / `#A9690B` / `#AF3438` / `#316D86` | وضعیت‌ها (ثابت در کل پنل) |
-
-**بوم:** ۱۴۴۰×۹۰۰ — سایدبار ۲۶۴ از **راست**، نوار بالا ۶۸، حاشیهٔ محتوا ۲۸،
-ستون کنار ۳۰۰. شعاع: کارت ۱۶، دکمه ۱۱، چیپ `h/2`.
-
-**قواعد RTL که در همهٔ تصاویر رعایت شده:**
-- آیکن در لبهٔ فیزیکی **راست**، متن به سمت چپ آن.
-- هر لنگر لبهٔ راست باید `align="right"` بگیرد (پیش‌فرض `text()` چپ‌است).
-- اعداد همیشه فارسی (`D.fa()` برای اعداد محاسبه‌شده).
-- نشانگر «رفتن به جزئیات» (`mdi-chevron-left`) در **چپ** برچسب، چون مسیر خواندن ادامه دارد.
-- جدول‌ها: ستون اول از راست، ستون آخر (وضعیت) در چپ؛ ۴۸ پیکسل برای منوی ردیف.
-
----
-
-## ۳. نقشهٔ پیاده‌سازی (کد فعلی)
-
-| مسیر | نمای فعلی | وضعیت |
-|---|---|---|
-| `/_admin/dashboard` | `AdminDashboardView.vue` | پیاده‌سازی شد — KPI، صف باز، آمادگی گروه‌ها، نمودار ۷ روز |
-| `/_admin/dispatch` | `AdminDispatchView.vue` | موجود؛ تابلوی اعزام |
-| `/_admin/reports` | `AdminReportsView.vue` | پیاده‌سازی شد — بازهٔ ۷/۳۰ روز، رتبه‌بندی و بار کاری |
-| `/_admin/users` | `AdminUsersView.vue` | پیاده‌سازی شد — فهرست + کشوی جزئیات حساب (`?user=`) با دستگاه‌ها و مأموریت‌ها |
-| `/_admin/services` | `AdminServiceGroupsView.vue` | پیاده‌سازی شد — ساخت/ویرایش گروه و اعضا |
-| `/_admin/categories` | — (تغییرمسیر به `/_admin/services`) | صفحهٔ تکراری گروه‌ها حذف شد؛ مسیر قدیمی حفظ می‌شود |
-| `/_admin/incidents` | `AdminIncidentsView.vue` | موجود |
-| `/_admin/audit` | `AdminAuditView.vue` | پیاده‌سازی شد — خواندن `admin_audit_log` + پالایه + CSV |
-| `/_admin/alerts` | `AdminAlertsView.vue` | پیاده‌سازی شد — صف بررسی + ثبت بررسی |
-| `/_admin/settings` | `AdminSettingsView.vue` | پیاده‌سازی شد — کلیدهای واقعی + وضعیت جاری |
-| نقش‌ها و دسترسی‌ها | — | بدون مسیر؛ فقط تصویر مرجع (`users/03`) |
-
-کلاینت: `packages/client/src/api/{admin-sos,admin-catalog,admin-users,admin-governance}.ts`،
-`components/admin/{AdminShell,AdminStatePanel}.vue` و `views/_admin/` (۹ نمای واقعی).
-سرور: `packages/server/src/admin/` (`users`, `categories`, `incidents`, `sos`, `governance`,
-`authorize`, `normalize`).
-
-### شکاف‌های سرور که این تصاویر فرض می‌کنند
-
-| قابلیت | تصویر | نیاز سرور |
-|---|---|---|
-| مدل «گروه امداد» | `services/01–03` | ✅ با `categories` + `category_incident_types` + `category_users` پیاده شد؛ **باقی‌مانده:** نقش داخل گروه، ظرفیت و رنگ/وضعیت گروه |
-| پوشش نوع حادثه ↔ گروه | `services/01`, `04` | ✅ همان pivot موجود؛ صفحه `/_admin/services` گروه‌های بدون پوشش را هشدار می‌دهد |
-| گزارش‌ها و شاخص‌ها | `dashboard/03` | **باقی‌مانده:** endpoint تجمیعی بازه‌ای؛ فعلاً از حداکثر ۳ صفحهٔ فهرست SOS محاسبه می‌شود و همین در نما نوشته شده |
-| گزارش رویدادها | `system/01` | ✅ `GET /_admin/audit` + پالایه + CSV در کلاینت |
-| هشدارها و اطلاعیه | `system/02` | ✅ خواندن + `POST /_admin/alerts/:id/resolve`؛ **باقی‌مانده:** قاعده‌های هشدار دلخواه و صف ارسال اطلاعیه |
-| تنظیمات سامانه | `system/03` | ✅ `app_settings` + `GET/PUT /_admin/settings` (دو کلید واقعی) و `GET /_admin/stats`؛ **باقی‌مانده:** حالت تعمیرات و وضعیت پشتیبان |
-| نقش × مجوز | `users/03` | **باقی‌مانده:** جدول `roles` + `role_permissions` (فعلاً فقط `authorize.ts` با نقش ثابت) |
-| نشست‌ها و دستگاه‌ها | `users/02` | جزئیات کاربر نشست‌ها را نشان می‌دهد؛ **باقی‌مانده:** «خروج از همه» |
-
----
-
-## ۴. چطور ساخته شد
-
-```bash
-cd design/admin-panel/_generator
-python render.py                # همهٔ ۲۱ تصویر
-python render.py dashboard      # یک گروه
-python render.py a-dash-overview --sheet   # پیش‌نمایش یک صفحه
-```
-
-- `atheme.py` — توکن‌های مشترک با `design/map-page` + مقیاس تایپوگرافی دسکتاپ + کلاس `A`.
-- `desk.py` — ویجت‌های دسکتاپ: `page()`, `card()`, `table()`, `kpi()`, `chart_line/bars/donut`,
-  `pill()`, `drawer()`, `modal()`, `toast()`, `banner()`, `empty_block()`, `skeleton()`.
-- `sections/*.py` — یک فایل برای هر گروه؛ دیکشنری `SCREENS` نام فایل خروجی را می‌دهد.
-
-وابستگی‌ها: Python 3.11، Pillow، `arabic-reshaper`، `python-bidi`، فونت وزیرمتن.
+Every table column, filter and action maps to a declared API route. Charts use the shared series colors. Status combines color, icon and text. Detail actions never bypass the service layer or the durable event log. The console is responsive below 900 pixels by collapsing the sidebar into a compact horizontal rail while preserving full table access through horizontal scrolling.

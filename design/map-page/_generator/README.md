@@ -1,42 +1,19 @@
-# Map-page mockup generator
+# Map-page reference generator
 
-Renders every PNG under `design/map-page/` from code, so the whole reference set
-stays consistent (one city, one palette, one type scale) and can be regenerated
-after a design change.
+This generator produces the canonical PNG references for the mobile map experience. It is preserved as a design source and is not part of the production runtime. The application does not execute Python at request time; it serves deterministic SVG tiles and a dependency-free browser client generated from the same visual tokens.
 
-```bash
-python3 -m venv .venv && . .venv/bin/activate
-pip install pillow arabic-reshaper python-bidi
-python render.py                    # all screens
-python render.py navigation --sheet # one section + contact sheet
-python render.py 09-navigation-active
-```
+## Environment
 
-## Why not an image model?
+The scripts target Python 3.11 and use the local Pillow package with the bundled font assets in `_generator/assets/`. Theme values live in `_generator/bb/theme.py`, including the primary teal, surface colors, typography scale, spacing, radii, status colors and map palette. The generator draws right-to-left text with the bundled Vazirmatn font and uses logical coordinates so that the physical right and left sides match the reference composition.
 
-Image models break Persian text and invent a different map on every frame. These
-mockups need exact labels, exact numbers and one continuous map, so the renderer
-draws them: `bb/text.py` shapes Persian with `arabic-reshaper` + `python-bidi`,
-`bb/icons.py` uses the same Material Design Icons font as the client, and
-`bb/map.py` draws a deterministic vector city.
+## Outputs
 
-## Layout
+The generator writes the navigation, bottom-sheet, SOS, mission, companions, talk, history, profile and design-system images into their corresponding folders under `design/map-page/`. Each image is a full screen or component snapshot at the mobile reference size. The files are read-only evidence for the browser implementation. Do not replace them with approximations or unrelated artwork; a visual contract change requires a deliberate generator change and a full regeneration of the affected family.
 
-| module | responsibility |
-|---|---|
-| `bb/theme.py` | colour, type, radius and spacing tokens (mirrors `packages/client/src/styles/tokens.ts`) |
-| `bb/text.py` | Persian shaping, RTL layout, wrapping, Persian digits |
-| `bb/icons.py` | MDI icon lookup from the shipped CSS, glyph drawing |
-| `bb/prims.py` | Screen canvas and UI primitives (card, button, chip, sheet, scrim, gradient) |
-| `bb/map.py` | vector city, camera with rotation, routes, markers, map chrome |
-| `bb/ui.py` | page-level components (section control, manoeuvre banner, telemetry strip) |
-| `bb/scenario.py` | the single fixed trip/incident used across screens |
-| `screens/*.py` | one function per PNG, registered in `SCREENS` |
-| `assets/` | Vazirmatn + MDI webfont (needed to render outside the app) |
+## Implementation mapping
 
-Rendering is deterministic: no randomness outside the fixed city seed, so diffs in
-the PNGs always mean a real design change.
+The browser reproduces the generator tokens in `public/app.css`. The offline tile renderer in `src/domain/map.ts` uses the same land, water, park, road and route colors. Bottom-sheet detents, SOS hold timing, segmented navigation, quick chips, live markers, accuracy circles, waveform geometry and status semantics are described in `design/map-page/README.md`. The generated images are consulted when implementing or reviewing those components.
 
-`_preview-*.png` files next to this folder are quick contact sheets for review and
-are not part of the deliverable set; regenerate them with
-`python render.py <section> --sheet`.
+## Maintenance
+
+Run the generator only when the design itself changes. Keep source coordinates, colors and typography in the theme module rather than scattering literals across drawing scripts. After regeneration, review every affected PNG and rerun `npm run assets` plus the automated suite. Production assets come from `scripts/build-assets.mjs`; this Python generator remains an isolated design aid.
