@@ -111,7 +111,8 @@
 
     <div v-if="journey.point.value && journey.navigating.value && !journey.sheetOpen.value"
       class="user-map-view__journey-stack" aria-label="راهبری فعال" @keydown.esc.stop="closeNavigationSearch">
-      <div id="map-navigation-sheet" class="user-map-view__journey-content">
+      <v-card id="map-navigation-sheet" class="user-map-view__journey-content bb-floating-card bb-map-navigation-card"
+        elevation="3" rounded="xl" dir="rtl">
         <div class="user-map-view__journey-bar">
           <v-icon icon="mdi-navigation-variant" size="21" aria-hidden="true" />
           <span class="user-map-view__journey-label" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
@@ -156,7 +157,7 @@
           role="region" aria-label="جست‌وجوی مکان در مسیر" @keydown.esc.stop="closeNavigationSearch">
           <PlaceSearchPanel :api="placeSearch" :ready="!!map" @select="selectPlace" @show-all="showAllSearchResults" />
         </div>
-      </div>
+      </v-card>
     </div>
     <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
       :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone" v-model:confirm-delete-open="routeDeleteConfirmOpen"
@@ -1765,16 +1766,22 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__journey-stack { position: fixed; z-index: 7; left: 50%; transform: translateX(-50%);
   bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); width: min(36rem, calc(100vw - 1.5rem)); pointer-events: none; }
 .user-map-view__journey-content { display: flex; flex-direction: column; gap: .35rem; max-height: min(72dvh, 36rem);
-  overflow-y: auto; overscroll-behavior: contain; padding: .55rem .75rem;
-  border-radius: 20px; background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay); pointer-events: auto; }
+  overflow-y: auto; overscroll-behavior: contain; padding: .55rem .75rem; pointer-events: auto; }
 .user-map-view__journey-bar { display: grid; grid-template-columns: 21px minmax(0, 1fr) 44px;
   align-items: center; column-gap: .65rem; row-gap: .5rem; color: rgb(var(--v-theme-on-surface)); }
 .user-map-view__journey-bar > .v-btn { min-width: 44px; height: 44px; }
 .user-map-view__journey-bar > .v-btn:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
 .user-map-view__navigation-search { max-height: 32dvh; min-height: 0; overflow-y: auto; }
+/* Search remains complete, but inside guidance it is content, not a second floating surface. */
+.user-map-view__navigation-search :deep(.place-search.v-card.bb-floating-card) {
+  width: 100%; max-height: none; padding: .4rem 0; border: 0; background: transparent;
+  backdrop-filter: none; box-shadow: none !important;
+}
+.user-map-view__navigation-search :deep(.place-search__results) { max-height: none; overflow: visible; }
 .user-map-view__navigation-status { display: grid; gap: .35rem; pointer-events: none; }
 .user-map-view__gps-warning, .user-map-view__reroute-status { margin: 0; padding: .55rem .85rem;
-  border-radius: 16px; box-shadow: var(--bb-shadow-overlay); font-size: .83rem; line-height: 1.5;
+  border: 1px solid rgba(var(--v-theme-on-warning), .2); border-radius: var(--bb-radius-nested, 16px);
+  font-size: .83rem; line-height: 1.5;
   color: rgb(var(--v-theme-on-warning)); background: rgb(var(--v-theme-warning)); }
 .user-map-view__gps-warning { display: flex; align-items: flex-start; gap: .4rem; }
 .user-map-view__gps-warning .v-icon { flex: 0 0 auto; margin-top: .12rem; }
@@ -1785,8 +1792,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__telemetry { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: .35rem; margin: 0; }
 .user-map-view__telemetry-item { min-width: 0; display: flex; flex-direction: column; align-items: center;
-  gap: .05rem; padding: .4rem .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .13);
-  border-radius: 12px; background: rgba(var(--v-theme-primary), .07); text-align: center; }
+  gap: .05rem; padding: .4rem .2rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035); text-align: center; }
 .user-map-view__telemetry-item dt { display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
   gap: .2rem; font-size: .8rem; line-height: 1.25; font-weight: 700; }
 .user-map-view__telemetry-item dt .v-icon { color: rgb(var(--v-theme-primary)); }
@@ -2021,10 +2028,10 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   /* Leave the journey label a full row even on narrow phones; the controls wrap separately. */
   .user-map-view__reroute-status { top: calc(12.5rem + env(safe-area-inset-top, 0px)); }
   .user-map-view__journey-stack { left: 0; transform: none; bottom: 0; width: 100%; }
-  .user-map-view__journey-content { max-height: min(72dvh, 36rem);
+  .user-map-view__journey-content.bb-map-navigation-card { max-height: min(72dvh, 36rem);
     padding: .5rem calc(.75rem + env(safe-area-inset-right, 0px))
       calc(.5rem + env(safe-area-inset-bottom, 0px)) calc(.75rem + env(safe-area-inset-left, 0px));
-    border-radius: 20px 20px 0 0; }
+    border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important; }
   /* A horizontal 48px action row clears the sheet even on short phones. The
      shared measured height also moves SOS, which lives outside this view. */
   .user-map-view--navigating .user-map-view__share,

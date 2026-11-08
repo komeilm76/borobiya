@@ -3,7 +3,7 @@
   <section v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
     class="point-route-shell" :class="{ 'point-route-shell--expanded': step === 'plan' }"
     role="region" aria-label="مقصد و برنامه‌ریزی سفر" @keydown.esc.stop.prevent="onEscape">
-    <v-card id="map-point-route-sheet" class="point-route" rounded="xl" dir="rtl" tabindex="-1">
+    <v-card id="map-point-route-sheet" class="point-route bb-floating-card bb-map-navigation-card" elevation="3" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route__header">
         <v-icon icon="mdi-map-marker" size="23" aria-hidden="true" />
         <div class="point-route__headings"><small>{{ step === 'plan' ? 'برنامه‌ریزی سفر' : 'مقصد انتخاب‌شده' }}</small>
@@ -213,9 +213,7 @@ const destinationAddress = computed(() => {
 section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
   right: calc(5.5rem + env(safe-area-inset-right, 0px)); bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   width: min(36rem, calc(100vw - 34rem)); max-width: 100%; }
-.point-route { pointer-events: auto; display: flex; flex-direction: column; max-height: min(70dvh, 36rem); overflow: hidden;
-  border: 1px solid rgba(var(--v-theme-on-surface), .14); color: rgb(var(--v-theme-on-surface));
-  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay); }
+.point-route { pointer-events: auto; display: flex; flex-direction: column; max-height: min(70dvh, 36rem); overflow: hidden; }
 .point-route__header { display: flex; flex: 0 0 auto; align-items: center; gap: .35rem;
   min-height: 54px; padding: .25rem .6rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
 .point-route__headings { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
@@ -229,14 +227,17 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route__endpoint-address { display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: start; font-size: .87rem; }
 .point-route__choices { display: grid; gap: .5rem; padding: .7rem .85rem; }
 .point-route__choice { display: flex; align-items: center; gap: .6rem; width: 100%; min-height: 56px; padding: .5rem .7rem;
-  border: 1px solid rgba(var(--v-theme-on-surface), .18); border-radius: 14px; background: rgba(var(--v-theme-primary), .06);
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-on-surface), .035);
   text-align: start; color: inherit; cursor: pointer; font: inherit; }
 .point-route__choice:disabled { opacity: .55; cursor: not-allowed; }
 .point-route__choice > span { flex: 1; min-width: 0; display: grid; }
 .point-route__choice strong { font-size: .9rem; }
 .point-route__choice small { font-size: .8rem; opacity: .8; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; padding: .25rem .85rem .7rem; }
-.point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .14); border-radius: 12px; }
+.point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .45rem;
+  border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px);
+  background: rgba(var(--v-theme-on-surface), .035); }
 .point-route__metrics span { font-size: .81rem; opacity: .8; }
 .point-route__metrics strong { font-size: .95rem; }
 .point-route__message { margin: .4rem .85rem; font-size: .84rem; line-height: 1.5; }
@@ -260,7 +261,7 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 }
 @media (max-width: 599px) {
   section.point-route-shell { left: 0; right: 0; bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
-  .point-route { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0;
+  .point-route.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important;
     max-height: min(52dvh, 27rem); }
   .point-route__header, .point-route__endpoints, .point-route__choices, .point-route__metrics, .point-route__actions {
     padding-inline: calc(.85rem + env(safe-area-inset-right, 0px)) calc(.85rem + env(safe-area-inset-left, 0px)); }

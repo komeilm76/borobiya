@@ -2,7 +2,7 @@
   <!-- A separate, scrollable route chooser; the map remains visible behind it. -->
   <section v-if="open && api.point.value" class="point-route-choices-shell"
     role="region" aria-label="انتخاب مسیر" @keydown.esc.stop.prevent="emit('close')">
-    <v-card id="map-point-route-choices-sheet" class="point-route-choices" rounded="xl" dir="rtl" tabindex="-1">
+    <v-card id="map-point-route-choices-sheet" class="point-route-choices bb-floating-card bb-map-navigation-card" elevation="3" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route-choices__header">
         <h2>انتخاب مسیر</h2>
         <v-btn v-if="showSearch" icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
@@ -57,11 +57,11 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
   overscroll-behavior: contain; padding: .5rem .85rem .85rem; }
 .point-route-choices__list p { margin: .4rem 0; line-height: 1.5; }
 .point-route-choices__card { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .65rem;
-  width: 100%; min-height: 72px; padding: .65rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .25);
-  border-radius: var(--bb-radius-nested, 16px); background: rgb(var(--v-theme-surface)); color: inherit; font: inherit;
-  text-align: start; cursor: pointer; }
-.point-route-choices__card[aria-pressed="true"] { border: 2px solid rgb(var(--v-theme-primary));
-  background: rgba(var(--v-theme-primary), .12); }
+  width: 100%; min-height: 72px; padding: .65rem .75rem; border: 1px solid rgba(var(--v-theme-on-surface), .1);
+  border-radius: var(--bb-radius-nested, 16px); background: rgba(var(--v-theme-on-surface), .035);
+  color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.point-route-choices__card[aria-pressed="true"] { border-color: rgb(var(--v-theme-primary));
+  box-shadow: inset 0 0 0 1px rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
 .point-route-choices__name { display: grid; flex: 1 1 10rem; font-weight: 800; }
 .point-route-choices__name small { font-size: .8rem; font-weight: 500; }
 .point-route-choices__metrics { flex: 1 1 10rem; font-size: .86rem; }
@@ -80,7 +80,7 @@ section.point-route-choices-shell { position: fixed; z-index: 7; pointer-events:
 @media (max-width: 599px) {
   section.point-route-choices-shell { left: 0; right: 0;
     bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)); width: 100%; }
-  .point-route-choices { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0; }
+  .point-route-choices.bb-map-navigation-card { border-radius: var(--bb-radius-card, 24px) var(--bb-radius-card, 24px) 0 0 !important; }
   .point-route-choices { width: 100%; max-height: min(62dvh, 32rem); }
   .point-route-choices__list { padding-inline: calc(.85rem + env(safe-area-inset-right, 0px))
     calc(.85rem + env(safe-area-inset-left, 0px)); }

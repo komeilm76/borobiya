@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Match map navigation surfaces to the other widgets
+
+- The point/Travel, route and transport chooser, and active Guidance cards previously mixed opaque/no-border, custom shadow and 12–20px corner styles unlike Search, Companions and History. They now share the map widget's translucent theme surface, border, 24px outer corners and responsive floating-card depth, with 16px inset rows and stable selected borders. The phone sheets retain their top-only rounded edges, safe-area space, nonmodal map access, controls and bounded scrolling; opening Search inside Guidance no longer stacks a second floating shadow. Nonmounted SFC/CSS contract tests failed before styling and now pass; this is not a rendered screenshot, authenticated browser or device review.
+
 ### 2026-10-23 — Preserve navigation-arrow smoothing after stationary GPS fixes
 
 - Bug hunt of the recent arrow interpolator found that repeated *fresh* GPS samples with identical coordinates were treated like duplicate UI repaints. They did not renew the motion clock; the first change after a long stop then snapped instead of animating. The map now distinguishes actual position-watch updates from layout/route repaints, renewing freshness without restarting a stationary arrow. A nonmounted test reproduced the stop-and-go snap before the fix and passes afterward; a separate regression still confirms that repainting the same old fix cannot fake freshness. This is motion/unit coverage, not real GPS or browser drive acceptance.

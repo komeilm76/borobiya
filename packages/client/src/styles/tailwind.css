@@ -133,6 +133,16 @@ a {
   box-shadow: var(--bb-shadow-overlay) !important;
 }
 
+/* Navigation's point, plan, chooser and guidance cards share the same glass-like
+   24px widget surface as History/Search rather than using four unrelated shells. */
+.v-card.bb-map-navigation-card {
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: var(--bb-radius-card, 24px) !important;
+  background: rgba(var(--v-theme-surface), 0.95);
+  backdrop-filter: blur(12px);
+  color: rgb(var(--v-theme-on-surface));
+}
+
 @media (max-width: 1023px) {
   .v-card.bb-floating-card {
     box-shadow: var(--bb-shadow-surface) !important;
