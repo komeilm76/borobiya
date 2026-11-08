@@ -5,6 +5,7 @@ import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
+import { passwordIssue, passwordIssueMessage } from '@/composables/usePasswordPolicy.ts';
 
 /** User administration: search, role filter, activation toggle and account creation. */
 const admin = useAdminStore();
@@ -37,6 +38,13 @@ async function toggle(userId: string, active: boolean): Promise<void> {
 
 async function create(): Promise<void> {
   formError.value = null;
+  // The administrator sets the account's first password, and the server applies the same 12-128
+  // rule to it; rejecting here names the rule instead of returning "Invalid request.".
+  const weak = passwordIssueMessage(passwordIssue(draft.value.password));
+  if (weak) {
+    formError.value = weak;
+    return;
+  }
   try {
     await admin.createUser({ ...draft.value, username: draft.value.username.trim().toLowerCase() });
     draft.value = { username: '', password: '', role: 'user' };
