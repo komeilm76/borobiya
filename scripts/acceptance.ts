@@ -98,16 +98,22 @@ export async function acceptanceChecks(): Promise<AcceptanceCheck[]> {
     ].every((value) => workflow.includes(value))
   );
   check(
-    'CI pins a supported runner and an immutable setup-bun commit',
+    'CI pins a supported runner and an immutable checkout commit',
     [
       'runs-on: ubuntu-24.04',
       'actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803',
-      'oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6',
       'persist-credentials: false'
     ].every((value) => workflow.includes(value)) &&
       !workflow.includes('ubuntu-latest') &&
       !workflow.includes('setup-node') &&
       !workflow.includes('actions/checkout@v4')
+  );
+  check(
+    'CI installs exactly the Bun version pinned in .bun-version',
+    workflow.includes("version=\"$(tr -d '[:space:]' < .bun-version)\"") &&
+      workflow.includes('@oven/bun-linux-x64/-/bun-linux-x64-${version}.tgz') &&
+      workflow.includes('bun --version') &&
+      (await read('.bun-version')).trim() === '1.4.4'
   );
   check(
     'CI is least-privilege, concurrency-safe and covers both push and pull requests',
