@@ -21,7 +21,10 @@ const actions = [
 ] as const;
 
 const request = computed(() => sos.activeRequest);
-const mission = computed(() => sos.activeMission);
+// Not `activeMission`: that deliberately excludes completed missions, and a completed mission is
+// exactly the one this screen has to show a rating form for. Falling back to the last mission keeps
+// the rating reachable instead of leaving it inside a block that can never render.
+const mission = computed(() => sos.activeMission ?? [...sos.missions].reverse().find((item) => item.status === MISSION_STATUS.COMPLETED) ?? null);
 const stageIndex = computed(() => {
   const status = request.value?.status;
   if (!status) return -1;

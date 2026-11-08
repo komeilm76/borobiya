@@ -163,6 +163,7 @@ describe('architecture guards', () => {
       'profile-devices.test.ts',
       'api-contract.test.ts',
       'admin-overview-view.test.ts',
+      'mission-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
