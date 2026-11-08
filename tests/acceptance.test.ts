@@ -91,6 +91,13 @@ describe('release acceptance', () => {
     for (const banned of ['ubuntu-latest', 'actions/checkout@v4', 'setup-node', 'npm ci', 'npm run']) {
       expect(workflow, banned).not.toContain(banned);
     }
+    // The Bun CDN intermittently 504s, so a bounded retry must exist instead of a single attempt.
+    const setupBun = workflow.match(/uses: oven-sh\/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6/g) ?? [];
+    expect(setupBun.length).toBe(3);
+    expect(workflow).toMatch(/id: bun\n {8}uses: oven-sh\/setup-bun/);
+    expect(workflow).toMatch(/if: steps\.bun\.outcome == 'failure'\n {8}uses: oven-sh\/setup-bun/);
+    expect(workflow).toMatch(/if: steps\.bun\.outcome == 'failure' && steps\.bun-retry-1\.outcome == 'failure'\n {8}uses: oven-sh\/setup-bun/);
+    expect(workflow).toMatch(/continue-on-error: true/);
     expect(workflow).toMatch(/permissions:\n {2}contents: read/);
     expect(workflow).toMatch(/concurrency:/);
     expect(workflow).toMatch(/cancel-in-progress: true/);

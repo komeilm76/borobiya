@@ -23,7 +23,25 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      # The Bun release objects on GitHub's CDN intermittently answer 504, which fails the whole
+      # gate before any project step runs. Retry the same pinned action a bounded number of times
+      # rather than weakening the version pin or adding a second install path.
+      - name: Set up Bun
+        id: bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        continue-on-error: true
+        with:
+          bun-version-file: .bun-version
+      - name: Set up Bun (retry 1)
+        id: bun-retry-1
+        if: steps.bun.outcome == 'failure'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        continue-on-error: true
+        with:
+          bun-version-file: .bun-version
+      - name: Set up Bun (retry 2)
+        if: steps.bun.outcome == 'failure' && steps.bun-retry-1.outcome == 'failure'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
       - name: Verify the pinned Bun runtime
