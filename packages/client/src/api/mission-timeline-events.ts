@@ -15,9 +15,25 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  // The server sends a refresh or keepalive every ~15 seconds. A proxy that
+  // silently stalls an open response must not leave the UI claiming live updates
+  // forever. The caller reports a transport failure and reconnects on rejection.
+  async function readWithDeadline(): Promise<ReadableStreamReadResult<Uint8Array>> {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      return await Promise.race([
+        reader.read(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error("MISSION_STREAM_STALLED")), 45_000);
+        })
+      ]);
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+    }
+  }
   try {
     while (!signal.aborted) {
-      const { done, value } = await reader.read();
+      const { done, value } = await readWithDeadline();
       if (done) break;
       buffer = (buffer + decoder.decode(value, { stream: true })).replaceAll("\r\n", "\n");
       let boundary: number;

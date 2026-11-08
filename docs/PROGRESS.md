@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Detect silently stalled mission timeline streams (T4.5.3 incomplete)
+
+- The authenticated timeline SSE fallback could stay open without receiving data if an intermediary silently stopped forwarding its server keepalives; the interface then had no reason to show that live updates had ceased. Added a 45-second per-read silence deadline against the server's approximately 15-second keepalive cadence. On expiry, the existing reader cleanup and composable fallback path report the loss and retry; periodic keepalives reset the deadline. A fake-timer regression timed out before the fix, then passed with a healthy-idle and timer-cleanup test. This is pure stream-parser coverage, **not** a real proxy/browser run or full login → share → SOS → dispatch → rating/SSE acceptance; T4.5.3 is still open.
+
 ### 2026-10-23 — Correct map route instructions against current controls (T4.7.1 partial)
 
 - Replaced stale Map Basics instructions that said tapping an alternative commits it immediately and pointed to an obsolete planner button. The manual now distinguishes Send (a selected-point link, not live sharing), Travel, the separate route and transport choice sheets with explicit confirm/cancel, weak-GPS pending start, Back-to-plan and Stop/clear in Guidance. A new nonmounted router/manual regression failed before the correction and passes afterward against current component labels and view/composable wiring. Source review and tests are not rendered or authenticated map acceptance; no GPS, OSRM, real browser or screenshot was exercised. Genuine authenticated captures and evidence-backed completion remain open; T4.7.1 is not complete and documentation is not 100%.

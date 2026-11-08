@@ -39,6 +39,54 @@ describe("authenticated mission SSE parser", () => {
     expect(refresh).toHaveBeenCalledOnce(); // Invalidation, not one HTTP re-read per queued notice.
   });
 
+  it("detects a silent open stream after missed keepalives so the fallback can reconnect", async () => {
+    vi.useFakeTimers();
+    try {
+      const cancelled = vi.fn();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new TextEncoder().encode(
+          `event: refresh\ndata: {"missionId":"${id}"}\n\n`
+        )); },
+        cancel: cancelled
+      });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {
+        headers: { "content-type": "text/event-stream" }
+      })));
+      const refresh = vi.fn();
+      const follow = followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
+      const failure = expect(follow).rejects.toThrow("MISSION_STREAM_STALLED");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(refresh).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(45_000);
+      await failure;
+      expect(cancelled).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("accepts periodic keepalives instead of timing out an idle but healthy stream", async () => {
+    vi.useFakeTimers();
+    try {
+      let writer!: ReadableStreamDefaultController<Uint8Array>;
+      const body = new ReadableStream<Uint8Array>({ start(controller) { writer = controller; } });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {
+        headers: { "content-type": "text/event-stream" }
+      })));
+      const refresh = vi.fn();
+      const follow = followMissionTimelineEvents("token", id, new AbortController().signal, refresh);
+      await vi.advanceTimersByTimeAsync(0);
+      for (let tick = 0; tick < 3; tick++) {
+        await vi.advanceTimersByTimeAsync(30_000);
+        writer.enqueue(new TextEncoder().encode(": keepalive\n\n"));
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      writer.close();
+      await follow;
+      expect(refresh).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("rejects non-SSE and oversized frames without calling the refresh handler", async () => {
     const refresh = vi.fn();
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 403 })));
