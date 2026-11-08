@@ -223,11 +223,12 @@ export interface PlaybackFrameData {
  * rebuilt the trace every frame would re-upload the largest geometry 60 times a second for no visual
  * gain.
  */
-export function playbackGeoJson(frames: readonly PlaybackFrame[], cursorMs: number): PlaybackFrameData {
+export function playbackGeoJson(frames: readonly PlaybackFrame[], cursorMs: number,
+  trace = lineOverlay(frames.map((frame) => [frame.lon, frame.lat] as MapPosition))): PlaybackFrameData {
   return {
-    // `[lon, lat]` and not `[lat, lon]`, in the one place that order is chosen for playback: a swap
-    // here draws a plausible track across the wrong continent.
-    trace: lineOverlay(frames.map((frame) => [frame.lon, frame.lat] as MapPosition)),
+    // `[lon, lat]` and not `[lat, lon]`. The composable can supply its track-scoped trace so
+    // advancing the cursor never rebuilds or re-uploads the whole line.
+    trace,
     played: lineOverlay(playedCoordinates(frames, cursorMs)),
     head: pointOverlay(positionAt(frames, cursorMs))
   };

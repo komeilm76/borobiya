@@ -89,6 +89,34 @@ describe("planPlaybackSync", () => {
     ]);
   });
 
+  it("does not re-upload the full track or reapply unchanged paint on each cursor tick", () => {
+    const style = historyPlaybackStyle(false);
+    const map = withMap({ sources: ALL_SOURCES, layers: style.layers.map((layer) => layer.id) });
+    const previous = { style, frame };
+    expect(planPlaybackSync(map, style, frame, previous)).toEqual([]);
+    const moved = { ...frame, played: emptyCollection(), head: emptyCollection() };
+    expect(planPlaybackSync(map, style, moved, previous).map((op) => [op.op, "id" in op ? op.id : null])).toEqual([
+      ["setData", PLAYBACK_SOURCE_IDS.played], ["setData", PLAYBACK_SOURCE_IDS.head]
+    ]);
+  });
+
+  it("repaints every collection after a theme or style replacement, even with the same frame", () => {
+    const light = historyPlaybackStyle(false);
+    const dark = historyPlaybackStyle(true);
+    const previous = { style: light, frame };
+    const warm = withMap({ sources: ALL_SOURCES, layers: dark.layers.map((layer) => layer.id) });
+    expect(planPlaybackSync(warm, dark, frame, previous).filter((op) => op.op === "setData")).toHaveLength(3);
+    expect(planPlaybackSync(warm, dark, frame, previous).filter((op) => op.op === "setPaintProperty")).toHaveLength(3);
+    // Even the same style/frame cannot skip restoring a source/layer that a basemap reload removed.
+    const missing = withMap({ sources: ALL_SOURCES, layers: [] });
+    expect(planPlaybackSync(missing, light, frame, previous).filter((op) => op.op === "setData")).toHaveLength(3);
+    expect(planPlaybackSync(missing, light, frame, previous).filter((op) => op.op === "addLayer")).toHaveLength(3);
+    const missingTrace = withMap({ sources: ALL_SOURCES.slice(1), layers: light.layers.map((layer) => layer.id) });
+    expect(planPlaybackSync(missingTrace, light, frame, previous).some((op) =>
+      op.op === "addSource" && op.id === PLAYBACK_SOURCE_IDS.trace)).toBe(true);
+    expect(planPlaybackSync(missingTrace, light, frame, previous).filter((op) => op.op === "setData")).toHaveLength(2);
+  });
+
   it("inserts below the live overlay so companion markers stay on top", () => {
     const ops = planPlaybackSync(withMap({ beforeLayerId: "borobiya-live" }), historyPlaybackStyle(false), frame);
     const added = ops.filter((entry) => entry.op === "addLayer");

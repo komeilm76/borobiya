@@ -22,8 +22,25 @@ const DATA_BY_SOURCE: Record<string, keyof PlaybackFrameData> = {
   "borobiya-history-head": "head"
 };
 
-export function planPlaybackSync(state: PlaybackMapState, style: OverlayStyle, frame: PlaybackFrameData): PlaybackOp[] {
-  return planOverlaySync(state, style, (sourceId) => frame[DATA_BY_SOURCE[sourceId] ?? "trace"]);
+export interface PlaybackPaintSnapshot {
+  readonly style: OverlayStyle;
+  readonly frame: PlaybackFrameData;
+}
+
+export function planPlaybackSync(state: PlaybackMapState, style: OverlayStyle, frame: PlaybackFrameData,
+  previous: PlaybackPaintSnapshot | null = null): PlaybackOp[] {
+  const ops = planOverlaySync(state, style, (sourceId) => frame[DATA_BY_SOURCE[sourceId] ?? "trace"]);
+  // Only skip writes when the same mounted map still has *all* our sources and layers. A
+  // setStyle/detach may drop either half; the next plan must then fully restore its contents.
+  if (!previous || previous.style !== style ||
+    !style.sources.every((source) => state.hasSource(source.id)) ||
+    !style.layers.every((layer) => state.hasLayer(layer.id))) return ops;
+  return ops.filter((op) => {
+    if (op.op === "setPaintProperty") return false;
+    if (op.op !== "setData") return true;
+    const key = DATA_BY_SOURCE[op.id] ?? "trace";
+    return previous.frame[key] !== frame[key];
+  });
 }
 
 /** What to run when the view unmounts, so leaving the map does not leave two dead sources on it. */

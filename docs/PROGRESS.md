@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Reuse history trace and skip unchanged map writes (T4.4.4 partial)
+
+- During history playback, a 50ms cursor tick rebuilt the entire recorded GeoJSON trace and asked MapLibre to rewrite all three sources and paint properties, even though only the played prefix and head moved. Cached the full trace by track identity; the playback-specific planner skips identical source data and unchanged paint only for the same map/style with every source/layer intact. Missing overlays, a style change, a new ready map and route suppression retain full restoration paths. Three regressions failed before the change; 92 focused tests, all 1,303 client tests and client typecheck passed. This is a nonmounted source/pure planner check, not a measured browser/device FPS, map paint, GPS latency or offline-style acceptance; T4.4.4 remains open.
+
 ### 2026-10-23 — Announce private map position state, not GPS coordinates (T4.4.3 partial)
 
 - The private “موقعیت من” card exposed its coordinate and accuracy sentence as a live status. A changing GPS fix could therefore trigger repeated screen-reader announcements. Kept coordinates and accuracy visible and readable on demand, but moved automatic speech to a separate atomic status with only map-loading, off, waiting, acquired (explicitly private/not shared), and error phases. Pure and nonmounted source regressions failed before the edit; the existing card contract was updated to the new announcement boundary. This is not a rendered assistive-technology or real GPS run, and the site-wide keyboard/contrast/WCAG AA audit stays open.

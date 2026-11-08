@@ -303,7 +303,7 @@ import { shareSessionKey } from "@/sharing/share-submission-fence";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
 import { historyCameraPadding } from "@/history/camera-padding";
-import { planPlaybackRemoval, planPlaybackSync } from "@/history/playback-map-sync";
+import { planPlaybackRemoval, planPlaybackSync, type PlaybackPaintSnapshot } from "@/history/playback-map-sync";
 import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
 import { planOverlayRemoval, planOverlaySync, pointsOverlay, type OverlayOp } from "@/map/overlay-sync";
 import { needsOverlayRestore } from "@/map/overlay-restore";
@@ -1289,16 +1289,22 @@ function playbackMapState(instance: MapLibreMap) {
   return instance.getLayer(LIVE_BOTTOM_LAYER_ID) ? { ...state, beforeLayerId: LIVE_BOTTOM_LAYER_ID } : state;
 }
 
+let lastPlaybackPaint: PlaybackPaintSnapshot | null = null;
 function paintPlayback(): void {
   const instance = map.value;
   if (!instance) return;
   // Route planning owns the map while a destination is selected; a historical track
   // behind the live route is misleading. The history panel's data remains intact.
   if (journey.point.value || historySuppressedAfterRouteClear.value) {
+    lastPlaybackPaint = null;
     for (const op of planPlaybackRemoval(mapState(instance), playbackStyle.value)) applyOp(instance, op);
     return;
   }
-  for (const op of planPlaybackSync(playbackMapState(instance), playbackStyle.value, playback.frame.value)) applyOp(instance, op);
+  const state = playbackMapState(instance);
+  const style = playbackStyle.value;
+  const frame = playback.frame.value;
+  for (const op of planPlaybackSync(state, style, frame, lastPlaybackPaint)) applyOp(instance, op);
+  if (state.styleLoaded) lastPlaybackPaint = { style, frame };
 }
 
 function frameCamera(): void {
@@ -1570,6 +1576,8 @@ function onMapResize(): void {
   else if (journey.sheetOpen.value) fitPointRoute();
 }
 function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
+  // A replacement or reloaded basemap may carry new sources under familiar IDs.
+  lastPlaybackPaint = null;
   if (map.value !== instance) {
     map.value?.off("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
     detachHold?.(); detachHold = null;
@@ -1613,6 +1621,7 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
 
 watch(() => playback.frame.value, paintPlayback);
 watch(() => playbackStyle.value, () => {
+  lastPlaybackPaint = null;
   paintLive();
   paintPlayback();
 });

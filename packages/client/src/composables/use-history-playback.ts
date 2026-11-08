@@ -1,6 +1,7 @@
 import { computed, onScopeDispose, ref, shallowRef, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationHistoryPoint, ReceivedLocationHistoryShare } from "@shared/index";
 import { ApiError } from "@/api/http";
+import { lineOverlay, type MapPosition } from "@/map/overlay-sync";
 import { decodeAccessTokenClaims } from "@/composables/device-identity";
 import { fetchMyLocationHistory, fetchSharedLocationHistory, listLocationHistoryShares } from "@/api/location";
 import {
@@ -112,7 +113,9 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   const canPlay = computed(() => frames.value.length > 1);
   const progress = computed(() => cursorProgress(cursorMs.value, bounds.value));
   const position = computed(() => positionAt(frames.value, cursorMs.value));
-  const frame = computed(() => playbackGeoJson(frames.value, cursorMs.value));
+  // A cursor tick changes only the played prefix and head, not the full 1000-point trace.
+  const trace = computed(() => lineOverlay(frames.value.map((item) => [item.lon, item.lat] as MapPosition)));
+  const frame = computed(() => playbackGeoJson(frames.value, cursorMs.value, trace.value));
   const sampling = computed(() => samplingState(points.value.length, totalPoints.value));
   const boundsForMap = computed(() => trackBounds(frames.value));
 

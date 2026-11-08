@@ -372,6 +372,16 @@ describe("the panel and the view", () => {
     expect(view).toContain("syncOwnMarker();\n  syncDestinationMarker();\n  syncRouteOriginMarker();\n  syncSelectedPlaceMarker();\n  syncResultMarkers();\n  syncPeerAvatars();\n  frameCamera();");
   });
 
+  it("scopes playback paint reuse to a mounted map and invalidates it when a route hides the history", () => {
+    expect(view).toContain("let lastPlaybackPaint:");
+    expect(view).toContain("const state = playbackMapState(instance);");
+    expect(view).toContain("planPlaybackSync(state, style, frame, lastPlaybackPaint)");
+    expect(view).toContain("if (state.styleLoaded) lastPlaybackPaint = { style, frame }");
+    expect(view).toMatch(/if \(journey\.point\.value \|\| historySuppressedAfterRouteClear\.value\) \{\s*lastPlaybackPaint = null;/);
+    expect(view).toMatch(/function onMapReady\([\s\S]*?lastPlaybackPaint = null;/);
+    expect(view).toMatch(/watch\(\(\) => playbackStyle\.value, \(\) => \{\s*lastPlaybackPaint = null;/);
+  });
+
   it("frames the camera once per track, and does not zoom into a single fix", () => {
     expect(view).toContain("playback.boundsForMap.value");
     expect(view).toContain("maxZoom: 15");

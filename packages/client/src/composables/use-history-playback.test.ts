@@ -584,6 +584,26 @@ describe("loading without a session", () => {
   });
 });
 
+describe("playback frame reuse", () => {
+  it("keeps the full trace collection stable while the cursor advances, and rebuilds it for a new track", () => {
+    const { api, scope } = mount();
+    api.points.value = [
+      point(35.7, 51.4, new Date(NOW - HOUR).toISOString()),
+      point(35.8, 51.5, new Date(NOW).toISOString())
+    ];
+    api.cursorMs.value = NOW - HOUR;
+    const first = api.frame.value;
+    api.cursorMs.value = NOW - HOUR / 2;
+    const next = api.frame.value;
+    expect(next.trace).toBe(first.trace);
+    expect(next.played).not.toBe(first.played);
+    expect(next.head).not.toBe(first.head);
+    api.points.value = [point(35.9, 51.6, new Date(NOW).toISOString())];
+    expect(api.frame.value.trace).not.toBe(first.trace);
+    scope.stop();
+  });
+});
+
 describe("the transport loop", () => {
   async function loaded(count = 5) {
     const { api } = mount();
