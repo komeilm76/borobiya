@@ -22,6 +22,7 @@ Component, store and composable suites run in `happy-dom`. Server, realtime, scr
 - `stores.test.ts` drives the auth, offline, map, SOS, realtime, admin and settings stores against mocked envelopes.
 - `composables.test.ts` covers the settings tokens and theme cycling, the toast queue, `useAsyncAction`, the formatters, motion preferences, the SOS hold gesture and the command palette.
 - `views.test.ts` mounts all 20 routed views and the layouts against a mocked API, then exercises the real route guard: anonymous visitors, both roles, onboarding, and the per-role landing route.
+- `sos-store.test.ts` pins the emergency path: the four-endpoint load, the seeded incident type that survives a reload, the composer's clamped step cursor, the exact submit payload (photo only when attached), and that a failed submit keeps the draft so the user only has to press again while the `submitting` flag is still cleared.
 - `command-palette.test.ts` types the real Ctrl+K / Cmd+K chord, filters, wraps the highlight with arrows, Home and End, checks that default scrolling is prevented, runs the active command, and mounts the dialog to assert focus, single-step arrow movement, role-aware entries, backdrop dismissal and the announced match count.
 - `map-shell.test.ts` exercises the mobile shell as a behaviour: realtime subscriptions and their teardown, geolocation start/stop, the press-and-hold SOS gesture from pointer and keyboard (including cancellation), the offline banner, logout and Escape navigation.
 - `realtime-client.test.ts` drives the browser transport with a fake socket (ticket request, queueing, heartbeat, durable cursor, reconnect policy, binary routing) and the push-to-talk codec with a fake Web Audio context.
@@ -32,7 +33,7 @@ Component, store and composable suites run in `happy-dom`. Server, realtime, scr
 
 Run one suite while iterating, for example `bunx --bun vitest run tests/realtime.test.ts` or `bunx --bun vitest tests/components.test.ts` for watch mode. Run `bun run coverage` for the whole suite with coverage, `./boro check` for the full gate (build, both typechecks, documentation guard and coverage) and `./boro verify` to add runtime diagnostics. `bun run bench` records release latency figures, `bun run smoke` runs the reproducible in-process runtime smoke and `bun run acceptance` validates the checklist and evidence. None of these commands performs browser-driven professional UI acceptance.
 
-Coverage thresholds (74% statements, 78% lines, 66% functions, 60% branches) are set a little below the measured figures (about 78% statements, 82% lines) so they catch a genuine coverage loss without failing on rounding. They exist to catch silent regressions, not to certify the product. Generated output, the service-worker artifact and the process entry point are excluded.
+Coverage thresholds (75% statements, 79% lines, 68% functions, 61% branches) are set a little below the measured figures (about 79% statements, 83% lines) so they catch a genuine coverage loss without failing on rounding. They exist to catch silent regressions, not to certify the product. Generated output, the service-worker artifact and the process entry point are excluded.
 
 ## Interpretation
 
