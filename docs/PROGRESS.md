@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Preserve navigation-arrow smoothing after stationary GPS fixes
+
+- Bug hunt of the recent arrow interpolator found that repeated *fresh* GPS samples with identical coordinates were treated like duplicate UI repaints. They did not renew the motion clock; the first change after a long stop then snapped instead of animating. The map now distinguishes actual position-watch updates from layout/route repaints, renewing freshness without restarting a stationary arrow. A nonmounted test reproduced the stop-and-go snap before the fix and passes afterward; a separate regression still confirms that repainting the same old fix cannot fake freshness. This is motion/unit coverage, not real GPS or browser drive acceptance.
+
 ### 2026-10-23 — Smooth the private navigation arrow between GPS fixes
 
 - The guidance arrow previously jumped directly to each new GPS coordinate and bearing while the map camera eased separately. It now interpolates only the visual marker with the same bounded duration/easing as the follow camera, including the shortest heading turn; raw fixes still drive route safety, rerouting, arrival and telemetry. Large GPS corrections, long gaps, weak-route transitions and reduced-motion settings snap rather than inventing travel. New nonmounted animation tests cover movement, mid-flight retargeting, wraparound bearings, jump/stale handling and frame teardown; map wiring tests, client typecheck and the repository gates passed. No device GPS drive, rendered browser or navigation acceptance run was performed.

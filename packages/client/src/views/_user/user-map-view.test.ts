@@ -320,7 +320,8 @@ describe("hold-to-select destination and map navigation", () => {
     expect(body("syncOwnMarker")).toContain('user-map-view__own-marker--navigating');
     expect(body("syncOwnMarker")).toContain('user-map-view__direction-arrow');
     expect(body("syncOwnMarker")).toContain('navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value)');
-    expect(body("syncOwnMarker")).toContain('reliableHeading && wasGuiding && !reducedMotion.value');
+    expect(body("syncOwnMarker")).toContain('reliableHeading && wasGuiding && !reducedMotion.value, freshFix');
+    expect(view).toContain('watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(true);');
     expect(view).toContain('watch(reducedMotion, () => syncOwnMarker())');
     expect(body("syncOwnMarker")).not.toContain('else ownMarker.setLngLat([fix.lon, fix.lat])');
     expect(body("onMapReady")).toContain('ownMarkerMotion.reset()');

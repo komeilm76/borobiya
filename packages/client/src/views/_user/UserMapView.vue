@@ -506,7 +506,7 @@ const recenterLabel = computed(() => {
   return "مرکز کردن نقشه روی موقعیت من";
 });
 
-function syncOwnMarker(): void {
+function syncOwnMarker(freshFix = false): void {
   const instance = map.value;
   const fix = own.position.value;
   if (!instance || !fix || !markerConstructor) {
@@ -550,7 +550,7 @@ function syncOwnMarker(): void {
   ownMarker.setRotationAlignment(reliableHeading ? "map" : "viewport");
   ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,
     bearing: reliableHeading ? navigationArrowBearing(fix, journey.routePoints.value, journey.profile.value) : 0 },
-    reliableHeading && wasGuiding && !reducedMotion.value);
+    reliableHeading && wasGuiding && !reducedMotion.value, freshFix);
   const element = ownMarker.getElement();
   element.classList.toggle("user-map-view__own-marker--navigating", reliableHeading);
   element.classList.toggle("user-map-view__own-marker--walking", reliableHeading && journey.profile.value === "foot");
@@ -597,7 +597,7 @@ function focusOwnIfRequested(): void {
   automaticFocus = false;
   centerOnOwnLocation(false); // Recenter once, not on every update.
 }
-watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(); focusOwnIfRequested(); });
+watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(true); focusOwnIfRequested(); });
 watch(reducedMotion, () => syncOwnMarker()); // A changed accessibility preference stops a running interpolation.
 watch(() => own.active.value, (active) => { if (!active) { focusOnNextFix = false; automaticFocus = false; } });
 // Start only after the authenticated map is ready. Watch owner as well: the map

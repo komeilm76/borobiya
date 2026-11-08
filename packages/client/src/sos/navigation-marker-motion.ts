@@ -45,17 +45,21 @@ export function createNavigationMarkerMotion(paint: (pose: NavigationMarkerPose)
     current = from = target = null;
     lastFixAt = null;
   }
-  function move(next: NavigationMarkerPose, smooth: boolean): void {
-    // A route/overlay watcher can repaint the same GPS fix several times. Do not
-    // restart the animation or make an old sample look newly received.
-    if (smooth && target && next.lon === target.lon && next.lat === target.lat && next.bearing === target.bearing) return;
+  function move(next: NavigationMarkerPose, smooth: boolean, freshFix = false): void {
+    // A stationary user can receive new, identical GPS fixes for minutes. Refresh
+    // their recency without restarting the drawing; route/overlay repaints of the
+    // same old fix must not refresh it. The view passes true only from the GPS watcher.
+    if (smooth && target && next.lon === target.lon && next.lat === target.lat && next.bearing === target.bearing) {
+      if (freshFix) lastFixAt = now();
+      return;
+    }
     const at = now();
     const gap = lastFixAt === null ? Infinity : at - lastFixAt;
     const displayed = from && target ? poseBetween(from, target,
       Math.max(0, Math.min(1, (at - startedAt) / NAVIGATION_MOTION_MS))) : current;
     stopFrame();
     current = displayed;
-    lastFixAt = at;
+    if (freshFix || lastFixAt === null) lastFixAt = at;
     // A big GPS correction, a resumed tab or a mode/accuracy change must snap;
     // drawing a long fictitious travel segment would be misleading.
     if (!smooth || !displayed || gap < 0 || gap > 2500 || separationMetres(displayed, next) > 120) {

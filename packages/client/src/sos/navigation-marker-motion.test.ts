@@ -75,6 +75,20 @@ describe("navigation arrow motion", () => {
     expect(h.paint.mock.lastCall?.[0].bearing).toBe(0);
   });
 
+  it("stays smooth when fresh stationary GPS fixes keep the same coordinates", () => {
+    const h = harness();
+    h.motion.move(west, true, true);
+    for (let i = 0; i < 4; i++) {
+      h.tick(1000);
+      h.motion.move({ ...west }, true, true); // Fresh watchPosition callback, same observed location.
+    }
+    h.tick(1000);
+    h.motion.move(east, true, true);
+    expect(h.pending.size).toBe(1); // No multi-second lurch on the first fix after a stop.
+    h.tick(NAVIGATION_MOTION_MS);
+    expect(h.paint).toHaveBeenLastCalledWith(east);
+  });
+
   it("does not treat a duplicate UI repaint as a fresh GPS fix", () => {
     const h = harness();
     h.motion.move(west, true);
