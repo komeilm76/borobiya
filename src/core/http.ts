@@ -16,11 +16,12 @@ export interface WriteOptions {
 export function baseHeaders(req: IncomingMessage, config: Config): Record<string, string> {
   const sameOrigin = requestOrigin(req, config);
   const ws = websocketOrigin(sameOrigin);
+  const frameAncestors = config.frameAncestors.length ? config.frameAncestors.join(' ') : "'none'";
   const csp = [
     "default-src 'self'",
     "base-uri 'none'",
     "object-src 'none'",
-    "frame-ancestors 'none'",
+    `frame-ancestors ${frameAncestors}`,
     "form-action 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
@@ -36,7 +37,7 @@ export function baseHeaders(req: IncomingMessage, config: Config): Record<string
     'Cross-Origin-Resource-Policy': 'same-origin',
     'Referrer-Policy': 'no-referrer',
     'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
+    ...(config.frameAncestors.length ? {} : { 'X-Frame-Options': 'DENY' }),
     'Permissions-Policy': 'geolocation=(self), microphone=(self), camera=(self)',
     'Cache-Control': 'no-store',
     'X-Request-Id': ''

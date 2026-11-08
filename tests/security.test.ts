@@ -128,6 +128,18 @@ test('preview proxy headers produce matching WebSocket CSP and CORS origins', as
   }
 });
 
+test('explicit frame ancestors permit embedding without a conflicting legacy DENY header', async () => {
+  const isolated = await createTestServer({ frameAncestors: ["'self'", 'https://*.e2b.app'] });
+  try {
+    const shell = await apiFetch(isolated, '/');
+    assert.equal(shell.status, 200);
+    assert.match(String(shell.headers.get('content-security-policy')), /frame-ancestors 'self' https:\/\/\*\.e2b\.app/);
+    assert.equal(shell.headers.get('x-frame-options'), null);
+  } finally {
+    await isolated.close();
+  }
+});
+
 test('trusted forwarded-host proxies produce matching preview origins', async () => {
   const isolated = await createTestServer({ trustProxy: true, allowedOrigins: [] });
   try {

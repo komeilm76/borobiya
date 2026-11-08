@@ -4,13 +4,13 @@ A production deployment is one Node.js process behind an HTTPS reverse proxy. Th
 
 ## Required configuration
 
-Use Node.js 22.12 or newer. Set `NODE_ENV=production`, `COOKIE_SECURE=1`, a unique `ADMIN_PASSWORD` of at least twelve characters, and `ALLOWED_ORIGINS` to exact HTTPS origins without wildcards. Set `SEED_DEMO_USERS=0`. Configure `HOST`, `PORT`, `DATA_DIR` and `DATABASE_PATH` according to the host layout. Keep `TRUST_PROXY=1` only when the reverse proxy correctly sets forwarded headers and is the only path to the process.
+Use Node.js 22.12 or newer. Set `NODE_ENV=production`, `COOKIE_SECURE=1`, a unique `ADMIN_PASSWORD` of at least twelve characters, and `ALLOWED_ORIGINS` to exact HTTPS origins without wildcards. Set `SEED_DEMO_USERS=0`. If the app is embedded, set `FRAME_ANCESTORS` to exact trusted origins without wildcards; leave it empty to deny framing. Configure `HOST`, `PORT`, `DATA_DIR` and `DATABASE_PATH` according to the host layout. Keep `TRUST_PROXY=1` only when the reverse proxy correctly sets forwarded headers and is the only path to the process.
 
 `./boro deploy:check` validates the production environment and generated assets. It rejects the default or known preview/CI administrator passwords, short passwords, enabled demo seeding, missing or wildcard allowed origins, disabled proxy trust, insecure cookies and missing cache manifests. The runtime configuration enforces the same password and demo-seed rules on startup. Run `npm ci`, `./boro setup` with the production environment, `npm run check` and `./boro verify` before enabling traffic.
 
 ## Reverse proxy
 
-Terminate TLS at the proxy and forward HTTP and WebSocket upgrades to the Node listener on `0.0.0.0`. Preserve the original host, set `X-Forwarded-Proto: https` and, when `TRUST_PROXY=1`, set `X-Forwarded-For` from the proxy only. Do not expose the Node port directly. Allow `Upgrade` and `Connection` headers on `/ws`. Keep the browser, API and WebSocket on one origin so cookies and CSP remain simple.
+Terminate TLS at the proxy and forward HTTP and WebSocket upgrades to the Node listener on `0.0.0.0`. Preserve the original host using a public `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto: https`; when `TRUST_PROXY=1`, set `X-Forwarded-For` from the proxy only. Do not expose the Node port directly. Allow `Upgrade` and `Connection` headers on `/ws`. Keep the browser, API and WebSocket on one origin so cookies and CSP remain simple.
 
 The application sets a strict CSP, frame denial, no-referrer policy, content-type options, cross-origin isolation headers and HSTS in production. Responses with explicit allowed origins receive credentialed CORS headers. Do not add broad wildcard origins when cookies are used.
 

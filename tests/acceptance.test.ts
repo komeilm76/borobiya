@@ -51,4 +51,7 @@ test('CI exercises install, verification, benchmark, smoke, acceptance and deplo
   assert.match(workflow, /NODE_ENV: production/);
   assert.match(workflow, /TRUST_PROXY: '1'/);
   assert.match(workflow, /SEED_DEMO_USERS: '0'/);
+  assert.match(workflow, /FRAME_ANCESTORS: https:\/\/borobiya\.example\.test/);
+  assert.match(read('.env.example'), /^FRAME_ANCESTORS=$/m);
+  assert.match(read('src/core/http.ts'), /config\.frameAncestors\.length/);
 });

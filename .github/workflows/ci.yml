@@ -31,4 +31,5 @@ jobs:
           SEED_DEMO_USERS: '0'
           ADMIN_PASSWORD: CIGeneratedPass!2026-A
           ALLOWED_ORIGINS: https://borobiya.example.test
+          FRAME_ANCESTORS: https://borobiya.example.test
         run: npm run deploy:check

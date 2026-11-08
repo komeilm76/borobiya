@@ -11,7 +11,8 @@ const previewHost = '3000-example.e2b.app';
 const previewOrigin = `https://${previewHost}`;
 const server = await createTestServer({
   trustProxy: true,
-  allowedOrigins: ['https://*.e2b.app']
+  allowedOrigins: ['https://*.e2b.app'],
+  frameAncestors: ["'self'", 'https://*.e2b.app']
 });
 let adminSocket;
 try {
@@ -33,6 +34,8 @@ try {
   const csp = shell.headers.get('content-security-policy');
   assert.match(csp, /script-src 'self'/);
   assert.match(csp, new RegExp(`connect-src 'self' wss:\\/\\/${previewHost.replaceAll('.', '\\.')}`));
+  assert.match(csp, /frame-ancestors 'self' https:\/\/\*\.e2b\.app/);
+  assert.equal(shell.headers.get('x-frame-options'), null);
   assert.equal(shell.headers.get('access-control-allow-origin'), previewOrigin);
 
   const staticPaths = [
@@ -89,7 +92,7 @@ try {
   await closeSocket(admin.socket);
   adminSocket = undefined;
   console.log(JSON.stringify({
-    health: 'ok', previewCsp: 'ok', previewCors: 'ok', staticAssets: staticPaths.length,
+    health: 'ok', previewCsp: 'ok', previewFrames: 'ok', previewCors: 'ok', staticAssets: staticPaths.length,
     precachedViews: 3, openapi: 'ok', mapConfig: 'ok', tile: 'ok', login: 'ok',
     wsHello: 'ok', sosFanout: published.event.id, adminOverview: 'ok', systemHealth: 'ok'
   }));

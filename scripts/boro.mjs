@@ -119,6 +119,7 @@ function deployCheck() {
     failures.push('set a unique ADMIN_PASSWORD of at least 12 characters');
   }
   if (!env.ALLOWED_ORIGINS || env.ALLOWED_ORIGINS.includes('*')) failures.push('set ALLOWED_ORIGINS to exact HTTPS origins without wildcards');
+  if ((env.FRAME_ANCESTORS || '').includes('*')) failures.push('set FRAME_ANCESTORS to exact origins without wildcards');
   if (/^(1|true|yes|on)$/i.test(env.SEED_DEMO_USERS || '')) failures.push('disable SEED_DEMO_USERS in production');
   if (!/^(1|true|yes|on)$/i.test(env.TRUST_PROXY || '')) failures.push('set TRUST_PROXY=1 behind the HTTPS reverse proxy');
   if (!existsSync(path.join(ROOT, 'public/assets/cache-manifest.json'))) failures.push('run npm run assets');

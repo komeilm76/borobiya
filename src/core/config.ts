@@ -24,6 +24,7 @@ export interface Config {
   cookieSecure: boolean;
   trustProxy: boolean;
   allowedOrigins: string[];
+  frameAncestors: string[];
   locationRetentionHours: number;
   wsHeartbeatMs: number;
   wsMaxFrameBytes: number;
@@ -99,6 +100,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     cookieSecure: overrides.cookieSecure ?? bool(env.COOKIE_SECURE, nodeEnv === 'production'),
     trustProxy: overrides.trustProxy ?? bool(env.TRUST_PROXY, false),
     allowedOrigins: overrides.allowedOrigins ?? (env.ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
+    frameAncestors: (overrides.frameAncestors ?? frameAncestorSources(env.FRAME_ANCESTORS ?? '')).filter(validFrameAncestor),
     locationRetentionHours: overrides.locationRetentionHours ?? int(env.LOCATION_RETENTION_HOURS, 168, 1, 8760),
     wsHeartbeatMs: overrides.wsHeartbeatMs ?? int(env.WS_HEARTBEAT_MS, 25000, 1000, 120000),
     wsMaxFrameBytes: overrides.wsMaxFrameBytes ?? int(env.WS_MAX_FRAME_BYTES, 65536, 256, 1024 * 1024),
@@ -107,6 +109,16 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     dataVersion: overrides.dataVersion ?? '2026-11-07-clean-1'
   };
   return config;
+}
+
+function validFrameAncestor(source: string): boolean {
+  return source === "'self'" || source === "'none'"
+    || /^https:\/\/(?:\*\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d{1,5})?$/i.test(source)
+    || /^http:\/\/(?:localhost|127\.0\.0\.1)(?::\d{1,5})?$/i.test(source);
+}
+
+function frameAncestorSources(value: string): string[] {
+  return value.split(/[\s,]+/).map((item) => item.trim()).filter(validFrameAncestor);
 }
 
 export function requestOrigin(req: IncomingMessage, config: Config): string {

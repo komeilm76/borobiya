@@ -86,10 +86,10 @@ The old root README and roadmap described a multi-service product. The clean reb
 
 ## Release evidence
 
-- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 67 automated tests.
+- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 68 automated tests.
 - [x] `./boro doctor`, `./boro verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and production-configured deployment checks pass.
 - [x] A reproducible in-process smoke command checks health, preview CSP/CORS, OpenAPI, map config and tiles, static assets, login, ticket issuance, WebSocket hello, SOS fan-out, administrator overview and system health.
 - [x] Older SQLite files gain the SOS photo column without losing rows; production refuses demo seeding, known preview/CI passwords and weak administrator passwords.
-- [x] Trusted `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto` headers produce matching WebSocket CSP and CORS origins.
+- [x] Trusted `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto` headers produce matching WebSocket CSP and CORS origins; explicit `FRAME_ANCESTORS` values permit embedded previews without a conflicting legacy DENY header.
 - [x] Release notes and an operations runbook are present.
 - [x] The branch is committed and pushed; release tagging is recorded in `docs/RELEASE_NOTES.md`.
