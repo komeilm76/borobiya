@@ -34,17 +34,18 @@ test('release evidence, notes, operations runbook and automation commands exist'
   assert.match(operations, /Routine startup/);
   assert.match(operations, /Outages and recovery/);
   const pkg = JSON.parse(read('package.json'));
-  for (const script of ['check', 'verify', 'doctor', 'deploy:check', 'bench', 'acceptance']) {
+  for (const script of ['check', 'verify', 'doctor', 'deploy:check', 'bench', 'smoke', 'acceptance']) {
     assert.ok(pkg.scripts[script], script);
   }
   assert.deepEqual(Object.keys(pkg.dependencies || {}), []);
 });
 
-test('CI exercises install, verification, benchmark, acceptance and deployment configuration', () => {
+test('CI exercises install, verification, benchmark, smoke, acceptance and deployment configuration', () => {
   const workflow = read('.github/workflows/ci.yml');
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run verify/);
   assert.match(workflow, /npm run bench/);
+  assert.match(workflow, /npm run smoke/);
   assert.match(workflow, /npm run acceptance/);
   assert.match(workflow, /npm run deploy:check/);
   assert.match(workflow, /NODE_ENV: production/);

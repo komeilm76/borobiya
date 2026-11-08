@@ -113,8 +113,11 @@ export function requestOrigin(req: IncomingMessage, config: Config): string {
   const forwardedProto = config.trustProxy && typeof req.headers['x-forwarded-proto'] === 'string'
     ? req.headers['x-forwarded-proto'].split(',')[0].trim()
     : undefined;
+  const forwardedHost = config.trustProxy && typeof req.headers['x-forwarded-host'] === 'string'
+    ? req.headers['x-forwarded-host'].split(',')[0].trim().slice(0, 255)
+    : undefined;
   const protocol = forwardedProto || ((req.socket as { encrypted?: boolean }).encrypted ? 'https' : 'http');
-  const host = req.headers.host || `localhost:${config.port}`;
+  const host = forwardedHost || req.headers.host || `localhost:${config.port}`;
   return `${protocol}://${host}`;
 }
 

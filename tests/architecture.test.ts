@@ -70,7 +70,7 @@ test('the declarative route layer and shared protocol connect server and browser
 
 test('the new test suite is comprehensive and free of old Python design tests', () => {
   const tests = readdirSync(path.join(ROOT, 'tests')).filter((file) => file.endsWith('.test.ts')).sort();
-  for (const name of ['core.test.ts', 'api.test.ts', 'auth.test.ts', 'security.test.ts', 'realtime.test.ts', 'journeys.test.ts', 'architecture.test.ts', 'assets.test.ts', 'acceptance.test.ts', 'accessibility.test.ts', 'performance.test.ts', 'database.test.ts']) {
+  for (const name of ['core.test.ts', 'api.test.ts', 'auth.test.ts', 'security.test.ts', 'realtime.test.ts', 'journeys.test.ts', 'architecture.test.ts', 'assets.test.ts', 'acceptance.test.ts', 'accessibility.test.ts', 'performance.test.ts', 'database.test.ts', 'service-worker.test.ts']) {
     assert.ok(tests.includes(name), name);
   }
   const oldDesignTests = walk(path.join(ROOT, 'design'), '.py').filter((file) => /^(test_|.*_test)\.py$/.test(path.basename(file)));

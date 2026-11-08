@@ -158,6 +158,7 @@ Usage: ./boro <command>
   check          typecheck, client check, docs guard, full test suite
   verify         doctor + check
   bench          measure pure work, HTTP reads and realtime fan-out
+  smoke          run an in-process HTTP, asset, auth, WebSocket and SOS smoke test
   acceptance     verify the closed acceptance checklist and release evidence
   deploy:check   validate production environment and generated assets
   db:seed        create/refresh the local database without starting a server
@@ -171,12 +172,16 @@ function bench() {
   step('release benchmark', process.execPath, ['--experimental-transform-types', '--disable-warning=ExperimentalWarning', 'scripts/bench.mjs']);
 }
 
+function smoke() {
+  step('runtime smoke', process.execPath, ['--experimental-transform-types', '--disable-warning=ExperimentalWarning', 'scripts/smoke.mjs']);
+}
+
 function acceptance() {
   step('release acceptance evidence', process.execPath, ['scripts/acceptance.mjs']);
 }
 
 const commands = {
-  setup, dev, doctor, check, bench, acceptance,
+  setup, dev, doctor, check, bench, smoke, acceptance,
   verify() { doctor(); check(); },
   'deploy:check': deployCheck,
   'db:seed': () => step('seed local database', process.execPath, ['--experimental-transform-types', '--disable-warning=ExperimentalWarning', 'src/index.ts', '--seed-only']),

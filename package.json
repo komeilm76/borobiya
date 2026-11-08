@@ -25,6 +25,7 @@
     "check": "node scripts/boro.mjs check",
     "verify": "node scripts/boro.mjs verify",
     "bench": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/bench.mjs",
+    "smoke": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/smoke.mjs",
     "acceptance": "node scripts/acceptance.mjs",
     "deploy:check": "node scripts/boro.mjs deploy:check",
     "db:seed": "node scripts/boro.mjs db:seed",

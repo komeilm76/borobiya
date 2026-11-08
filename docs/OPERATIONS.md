@@ -13,7 +13,7 @@ This runbook is for the operator of a deployed Borobiya instance. It assumes a s
 
 ## Routine verification
 
-Run `npm run check` before deploying a new revision. Run `./boro doctor` for runtime prerequisites and `./boro verify` for the full gate. Run `npm run bench` to record validator, tile, HTTP and live-location latency figures. Run `npm run acceptance` to verify that the acceptance checklist is closed and that release evidence files are present. These commands do not perform browser-driven professional UI acceptance.
+Run `npm run check` before deploying a new revision. Run `./boro doctor` for runtime prerequisites and `./boro verify` for the full gate. Run `npm run bench` to record validator, tile, HTTP and live-location latency figures. Run `npm run smoke` or `./boro smoke` for a reproducible in-process HTTP, asset, authentication, WebSocket and SOS fan-out check. Run `npm run acceptance` to verify that the acceptance checklist is closed and that release evidence files are present. These commands do not perform browser-driven professional UI acceptance.
 
 ## Health signals
 
@@ -31,7 +31,7 @@ The SQLite database at `DATA_DIR/borobiya.sqlite` is the source of truth. For fi
 
 ## Outages and recovery
 
-If the process is unreachable, check the reverse proxy, the Node listener and the persistent volume. If WebSockets fail while HTTP succeeds, confirm that the proxy forwards upgrade headers and that the browser origin is allowed. If static assets are stale, rerun `npm run assets` and confirm the content-versioned cache manifest changed. If the database file is missing, restore it from backup before starting; do not rely on demo seeding in production. After recovery, rerun the routine verification commands and a login/ticket/SOS smoke test.
+If the process is unreachable, check the reverse proxy, the Node listener and the persistent volume. If WebSockets fail while HTTP succeeds, confirm that the proxy forwards upgrade headers, `X-Forwarded-Proto`, `X-Forwarded-Host` or the public `Host`, and that the browser origin is allowed. If static assets are stale, rerun `npm run assets` and confirm the content-versioned cache manifest changed. If the database file is missing, restore it from backup before starting; do not rely on demo seeding in production. After recovery, rerun the routine verification commands and `npm run smoke`.
 
 ## Release procedure
 

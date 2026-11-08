@@ -30,6 +30,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] One authenticated WebSocket carries durable events, presence, live fixes, snapshots, sync, talk state and binary audio.
 - [x] Reconnect uses one-use tickets and an event cursor; durable events are committed before publication.
 - [x] Private APIs are never cached by the service worker; static assets and SVG tiles are cached explicitly.
+- [x] Service-worker install/activate, versioned static caches, stale-while-revalidate, private-API bypass, bounded tile caching and offline fallback are exercised without a browser.
 - [x] External-Internet VM acceptance for the former map pipeline is superseded: the new map has no external data pipeline, Java tools, PMTiles artifacts or Docker map services.
 
 ## SOS, missions and dispatch
@@ -85,10 +86,10 @@ The old root README and roadmap described a multi-service product. The clean reb
 
 ## Release evidence
 
-- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 61 automated tests.
-- [x] `./boro doctor`, `./boro verify`, `npm run bench`, `npm run acceptance` and production-configured deployment checks pass.
-- [x] Database seed, foreground startup, health checks, login, ticket issuance, WebSocket hello, SOS creation, durable event delivery, administrator overview, lazy view modules and service-worker precache entries were smoke-tested against a running process.
+- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 67 automated tests.
+- [x] `./boro doctor`, `./boro verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and production-configured deployment checks pass.
+- [x] A reproducible in-process smoke command checks health, preview CSP/CORS, OpenAPI, map config and tiles, static assets, login, ticket issuance, WebSocket hello, SOS fan-out, administrator overview and system health.
 - [x] Older SQLite files gain the SOS photo column without losing rows; production refuses demo seeding, known preview/CI passwords and weak administrator passwords.
-- [x] Forwarded preview-host headers produce matching WebSocket CSP and CORS origins.
+- [x] Trusted `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto` headers produce matching WebSocket CSP and CORS origins.
 - [x] Release notes and an operations runbook are present.
 - [x] The branch is committed and pushed; release tagging is recorded in `docs/RELEASE_NOTES.md`.

@@ -127,3 +127,26 @@ test('preview proxy headers produce matching WebSocket CSP and CORS origins', as
     await isolated.close();
   }
 });
+
+test('trusted forwarded-host proxies produce matching preview origins', async () => {
+  const isolated = await createTestServer({ trustProxy: true, allowedOrigins: [] });
+  try {
+    const headers = await new Promise<Record<string, string | string[] | undefined>>((resolve, reject) => {
+      const req = httpRequest({
+        host: '127.0.0.1', port: isolated.port, path: '/', method: 'GET',
+        headers: {
+          Host: `127.0.0.1:${isolated.port}`,
+          Origin: 'https://3000-example.e2b.app',
+          'X-Forwarded-Host': '3000-example.e2b.app',
+          'X-Forwarded-Proto': 'https'
+        }
+      }, (res) => { res.resume(); resolve(res.headers); });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.match(String(headers['content-security-policy']), /connect-src 'self' wss:\/\/3000-example\.e2b\.app/);
+    assert.equal(headers['access-control-allow-origin'], 'https://3000-example.e2b.app');
+  } finally {
+    await isolated.close();
+  }
+});

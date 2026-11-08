@@ -10,6 +10,7 @@
 - `./boro check` regenerates assets, runs server and browser typechecks, validates documentation and runs the full test suite.
 - `./boro verify` runs doctor followed by check.
 - `./boro bench` measures pure validation, deterministic tiles, concurrent HTTP reads and realtime live-location fan-out.
+- `./boro smoke` runs an in-process runtime smoke covering preview headers, generated assets, public APIs, login, WebSocket hello and SOS fan-out.
 - `./boro acceptance` verifies that the target checklist is closed and that release evidence, automation and CI are present.
 - `./boro deploy:check` validates production environment and generated assets.
 - `./boro db:seed` and `./boro db:reset` manage the local SQLite file.
@@ -21,7 +22,7 @@
 
 ## CI
 
-The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run acceptance` and a production-configured deployment check. The deployment check supplies explicit secure-cookie, proxy-trust and demo-seed settings, so it also exercises the production safety guards. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
+The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and a production-configured deployment check. The deployment check supplies explicit secure-cookie, proxy-trust and demo-seed settings, so it also exercises the production safety guards. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
 
 ## Asset generation
 
