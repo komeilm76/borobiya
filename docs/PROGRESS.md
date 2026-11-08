@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Review rendered location-sharing diagrams against the implementation (T4.7.1 partial)
+
+- The location-sharing diagram still depicted a single-share `201 {shareId}`, a top-level `activeDevices` 409, an HTTP `409 WRONG_DEVICE` for a Socket.IO acknowledgement, `system:offline` and `sync` socket events that do not exist, refresh-token socket authentication, `/_user/sync` replaying GPS, a fixed 03:00 UTC retention run, and an hourly 24-hour SOS expiry. Rewrote its five Mermaid blocks against the shared schemas, handlers and client consumption paths. Rendered each with Mermaid CLI 11.12.0 in headless Chromium and visually inspected the resulting PNGs; Mermaid 11.12.2 syntax parsing across all 13 blocks passes. No live-app screenshot, target-VM/device, or visual review of ERD/SOS/map-pipeline renders was performed. T4.7.1 remains partial and documentation is not 100%.
+
 ### 2026-10-23 — Correct SOS lifecycle diagram against live contracts (T4.7.1 partial)
 
 - The SOS diagram conflated request and mission statuses (`dispatched` is a request status), showed a non-existent automatic 24-hour expiry and GPS-driven 50 m arrival, and documented stale dispatch/progress/rating routes and the wrong 400 transition error. Split request, proposal and mission state diagrams; aligned sequence/error paths with shared route definitions and server status/accept/cancellation/rating handlers. A syntax pass over all 13 Mermaid blocks found two additional parse errors (a semicolon/comparison in the location-sharing sequence note and unquoted parentheses in a map-pipeline node), which were corrected; all 13 now parse under Mermaid 11.12.2. This is **not** visual/rendered review. No screenshots were captured; the diagrams and manual still require visual review, so T4.7.1 and the documentation percentage remain open rather than being marked 100%.
