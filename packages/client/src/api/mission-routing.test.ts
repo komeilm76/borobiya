@@ -17,6 +17,9 @@ describe("mission navigation APIs", () => {
     expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("authorization")).toBe("Bearer secret-token");
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ missionId, incident: { lat: 200, lon: 51 } }))));
     await expect(getMissionNavigationTarget("secret-token", missionId)).rejects.toThrow();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      missionId: "50000000-0000-4000-8000-000000000006", incident: to }))));
+    await expect(getMissionNavigationTarget("secret-token", missionId)).rejects.toThrow("NAVIGATION_TARGET_MISMATCH");
   });
   it("POSTs to same-origin /route for up to three viable alternatives, never a remote origin", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(reply), { status: 200 }));

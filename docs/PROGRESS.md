@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: revoke stale rescuer route data and reject mismatched targets
+
+- The rescuer mission route picker previously depended on its view calling `reset()` on account, mission or bearer changes; without that call, it kept the previous incident/GPS origin and left in-flight route requests alive. It now clears and aborts synchronously at those identity boundaries, while preserving the picker across an ordinary nonempty bearer refresh. The navigation-target API also rejected invalid coordinates but accepted a valid target belonging to a different mission ID; it now fails closed if the response does not match the requested mission. Nonmounted tests reproduced both failures before the fix. This is a client-side regression/safety check, not a live server/device validation.
+
 ### 2026-10-23 — Refine navigation buttons and phone card corners
 
 - Follow-up to the rejected surface-only pass: Send/Travel/Start, chooser confirmation and Guidance exits now use consistent 12px rounded-rectangle, 44px-or-taller Vuetify actions; secondary Back/Cancel actions have a visible tonal treatment, while Stop/delete stay distinct error actions. Phone point, route, transport and guidance cards are inset from the sides with four 24px corners rather than edge-to-edge top-only sheets. Safe-area insets, bounded content scrolling, and the nonmodal map/dock remain; guidance measures the card's actual viewport top (including its bottom gap) on resize so SOS and map controls clear it. Nonmounted visual/layout contracts and client checks cover the change, but an authenticated browser/device visual review is still needed.

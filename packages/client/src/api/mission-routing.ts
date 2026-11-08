@@ -38,7 +38,10 @@ export type RouteChoice = z.infer<typeof routeSchema>;
 /** Incident point is authorized by the API using the active rescuer's mission ID, not a public SOS lookup. */
 export async function getMissionNavigationTarget(token: string, missionId: string, signal?: AbortSignal): Promise<MissionNavigationTarget> {
   const path = apiRoutes.sos.getMissionNavigationTarget.url.replace(":id", encodeURIComponent(missionId));
-  return missionNavigationTargetSchema.parse(await requestJson<unknown>(path, { accessToken: token, signal }));
+  const target = missionNavigationTargetSchema.parse(await requestJson<unknown>(path, { accessToken: token, signal }));
+  // A valid coordinate from another mission must never become this rescuer's destination.
+  if (target.missionId !== missionId) throw new Error("NAVIGATION_TARGET_MISMATCH");
+  return target;
 }
 
 export type RoutePoint = { lat: number; lon: number };

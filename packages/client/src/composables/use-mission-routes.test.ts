@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { ref } from "vue";
+import { effectScope, ref } from "vue";
 import { describe, expect, it, vi } from "vitest";
 import { useMissionRoutes } from "./use-mission-routes";
 
@@ -54,7 +54,6 @@ describe("active rescuer mission route picker", () => {
     });
     const pendingTarget = picker.open();
     userId.value = "someone-else";
-    picker.reset();
     oldTarget.resolve(target);
     await pendingTarget;
     expect(picker.target.value).toBeNull();
@@ -68,11 +67,68 @@ describe("active rescuer mission route picker", () => {
     await vi.waitFor(() => expect(active.loading.value).toBe(true));
     token.value = null;
     userId.value = null;
-    active.reset();
     oldRoute.resolve([route]);
     await pendingRoute;
     expect(active.routes.value).toEqual([]);
     expect(active.target.value).toBeNull();
+  });
+
+  it("revokes private target and route state synchronously when the mission or session disappears", async () => {
+    const scope = effectScope();
+    const userId = ref<string | null>("rescuer");
+    const token = ref<string | null>("bearer");
+    const id = ref<string | null>(mission);
+    const picker = scope.run(() => useMissionRoutes(token, userId, id, undefined, {
+      getTarget: async () => target,
+      getPosition: async () => from,
+      getRoutes: async () => [route]
+    }))!;
+    try {
+      await picker.open();
+      await picker.findRoutes();
+      expect(picker.selectedRoute.value).toEqual(route);
+      id.value = "another-mission";
+      expect(picker.visible.value).toBe(false);
+      expect(picker.target.value).toBeNull();
+      expect(picker.from.value).toBeNull();
+      expect(picker.routes.value).toEqual([]);
+      id.value = mission;
+      await picker.open();
+      await picker.findRoutes();
+      token.value = "refreshed-bearer";
+      expect(picker.visible.value).toBe(true);
+      expect(picker.selectedRoute.value).toEqual(route);
+      token.value = null;
+      expect(picker.visible.value).toBe(false);
+      expect(picker.target.value).toBeNull();
+      expect(picker.from.value).toBeNull();
+      expect(picker.routes.value).toEqual([]);
+    } finally { scope.stop(); }
+  });
+
+  it("aborts and ignores pending private replies on account switch without requiring a view reset", async () => {
+    const scope = effectScope();
+    const userId = ref<string | null>("rescuer");
+    const oldRoute = deferred<typeof route[]>();
+    let routeSignal: AbortSignal | undefined;
+    const picker = scope.run(() => useMissionRoutes(ref("bearer"), userId, ref(mission), undefined, {
+      getTarget: async () => target,
+      getPosition: async () => from,
+      getRoutes: async (_from, _to, _profile, signal) => { routeSignal = signal; return oldRoute.promise; }
+    }))!;
+    try {
+      await picker.open();
+      const pending = picker.findRoutes();
+      await vi.waitFor(() => expect(routeSignal).toBeDefined());
+      userId.value = "different-rescuer";
+      expect(routeSignal?.aborted).toBe(true);
+      expect(picker.target.value).toBeNull();
+      expect(picker.from.value).toBeNull();
+      expect(picker.visible.value).toBe(false);
+      oldRoute.resolve([route]);
+      await pending;
+      expect(picker.routes.value).toEqual([]);
+    } finally { oldRoute.resolve([route]); scope.stop(); }
   });
 
   it("does not route from an old fix after an explicit GPS refresh is denied", async () => {

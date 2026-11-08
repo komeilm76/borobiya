@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 import { coordinatesSchema, type MissionNavigationTarget } from "@shared/index";
 import {
   getMissionNavigationTarget, getMissionRouteChoices, getMissionRoutePlan, type RouteChoice, type RoutePoint, type TransportProfile
@@ -67,6 +67,11 @@ export function useMissionRoutes(
     error.value = null;
     profile.value = "car";
   }
+  // The caller may close its panel on navigation, but privacy must not depend on
+  // remembering to call reset. A new mission/account or a lost bearer immediately
+  // drops the previous incident, GPS origin and alternatives and aborts old work.
+  // A bearer refresh while still signed in keeps the same route picker open.
+  watch([userId, missionId, () => !!token.value], reset, { flush: "sync" });
   async function open(): Promise<void> {
     if (!missionId.value || !token.value || !userId.value) return;
     const mission = missionId.value;
