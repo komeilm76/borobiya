@@ -346,6 +346,13 @@ describe("liveCompanionsStyle", () => {
 });
 
 describe("status copy", () => {
+  it("does not claim an empty grant list before the first read is verified", () => {
+    const status = liveStatus(emptyRegistry, { connected: false, nowMs: NOW, shareCount: 0, readPending: true });
+    expect(status.line).toContain("در حال بررسی اشتراک");
+    expect(status.line).not.toContain("هنوز کسی");
+    expect(status.peerCount).toBe(0);
+  });
+
   it("says nobody has shared when there is nothing to show, and does not blame a connection", () => {
     expect(liveStatus(emptyRegistry, { connected: true, nowMs: NOW, shareCount: 0 }).line).toBe("هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است.");
   });

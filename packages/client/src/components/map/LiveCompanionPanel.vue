@@ -5,7 +5,7 @@
         <p>موقعیت زنده</p>
         <h2>همراهان</h2>
       </div>
-      <v-chip class="live-companions__count" size="small" variant="tonal" color="primary">
+      <v-chip v-if="!api.readPending.value" class="live-companions__count" size="small" variant="tonal" color="primary">
         {{ api.status.value.peerCount }}
       </v-chip>
       <v-icon
@@ -28,6 +28,9 @@
     <p class="live-companions__status" role="status" aria-live="polite">
       {{ visible ? api.status.value.line : 'همراهان روی نقشه پنهان‌اند؛ با انتخاب یک همراه دوباره نمایش داده می‌شوند.' }}
     </p>
+
+    <v-skeleton-loader v-if="api.readPending.value" class="live-companions__skeleton"
+      type="list-item-two-line@2" aria-hidden="true" />
 
     <v-btn id="map-share-location-button" class="live-companions__create" block color="primary" variant="tonal"
       prepend-icon="mdi-account-plus-outline" @click="$emit('create-share')">

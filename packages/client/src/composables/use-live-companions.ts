@@ -100,6 +100,12 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   const connected = ref(false);
   const shareCount = ref(0);
   const readFailed = ref(false);
+  const sharesVerified = ref(false);
+  const readPending = computed(() => {
+    const token = options.accessToken.value, owner = options.ownUserId.value;
+    return !!token && !!owner && bearerBelongsToOwner(token, owner) &&
+      !sharesVerified.value && !readFailed.value;
+  });
   const nowMs = ref(clock());
   let lastShareVerifyAt = nowMs.value;
 
@@ -140,7 +146,8 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       connected: connected.value,
       nowMs: nowMs.value,
       shareCount: shareCount.value,
-      readFailed: readFailed.value
+      readFailed: readFailed.value,
+      readPending: readPending.value
     })
   );
 
@@ -154,6 +161,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     );
     shareCount.value = shares.sharedWithMe.length;
     registry.value = applyShareList(registry.value, shares.sharedWithMe);
+    sharesVerified.value = true;
     readFailed.value = false;
   }
 
@@ -161,6 +169,8 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     // Invalidate older HTTP replies before even awaiting a session refresh. Otherwise
     // a sign-out/revocation during that await can resurrect another account's peers.
     const request = ++requestId;
+    // A retry after an unverified first read is checking again, not a confirmed empty list.
+    if (!sharesVerified.value) readFailed.value = false;
     const owner = options.ownUserId.value;
     let token = options.accessToken.value;
     if (!token && options.ensureSession) {
@@ -176,7 +186,8 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       registry.value = emptyRegistry;
       openShareIds = new Set();
       shareCount.value = 0;
-      readFailed.value = false;
+      sharesVerified.value = false;
+      readFailed.value = !!token && !!owner; // A mismatched bearer is not a verified empty grant list.
       return;
     }
     const readsSession = readsGeneration;
@@ -331,6 +342,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     registry.value = emptyRegistry;
     openShareIds = new Set();
     shareCount.value = 0;
+    sharesVerified.value = false;
     readFailed.value = false;
   }
 
@@ -407,5 +419,5 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     void refresh();
   }
 
-  return { registry, peers, overlay, status, connected, shareCount, readFailed, nowMs, refresh };
+  return { registry, peers, overlay, status, connected, shareCount, readFailed, readPending, nowMs, refresh };
 }

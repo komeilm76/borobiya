@@ -182,6 +182,14 @@ describe("the composable's own imports", () => {
     const mapView = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
     expect(mapView).toContain('ownUserId: computed(() => auth.user?.id ?? null)');
   });
+
+  it("shows a non-announcing skeleton instead of an unverified zero count on first read", () => {
+    const panel = readFileSync(new URL("../components/map/LiveCompanionPanel.vue", import.meta.url), "utf8");
+    expect(panel).toContain('v-if="!api.readPending.value" class="live-companions__count"');
+    expect(panel).toContain('v-if="api.readPending.value" class="live-companions__skeleton"');
+    expect(panel).toContain('type="list-item-two-line@2" aria-hidden="true"');
+    expect(panel).toContain('class="live-companions__status" role="status" aria-live="polite"');
+  });
 });
 
 describe("useLiveCompanions", () => {
@@ -192,6 +200,52 @@ describe("useLiveCompanions", () => {
     expect(harness.reads()).toBe(0);
     expect(harness.api.status.value.line).toContain("هنوز کسی موقعیتش را با شما زنده به اشتراک نگذاشته است");
     harness.scope.stop();
+  });
+
+  it("distinguishes the first pending grant read from a verified empty list and from failure", async () => {
+    const harness = mount({ blockReads: true });
+    try {
+      expect(harness.api.readPending.value).toBe(true);
+      expect(harness.api.status.value.line).toContain("در حال بررسی اشتراک");
+      expect(harness.api.status.value.line).not.toContain("هنوز کسی");
+      harness.setShares([]);
+      harness.resolveRead();
+      await settle();
+      expect(harness.api.readPending.value).toBe(false);
+      expect(harness.api.status.value.line).toContain("هنوز کسی");
+    } finally { harness.scope.stop(); }
+  });
+
+  it("keeps a previously verified companion visible during a later list refresh", async () => {
+    const harness = mount({ blockReads: true });
+    try {
+      harness.resolveRead();
+      await settle();
+      const before = harness.api.status.value.line;
+      expect(harness.api.readPending.value).toBe(false);
+      const refresh = harness.api.refresh();
+      expect(harness.api.readPending.value).toBe(false);
+      expect(harness.api.status.value.line).toBe(before);
+      harness.resolveRead();
+      await refresh;
+    } finally { harness.scope.stop(); }
+  });
+
+  it("shows a pending state again when retrying an unverified failed read", async () => {
+    const harness = mount({ blockReads: true });
+    try {
+      harness.failRead();
+      harness.resolveRead();
+      await settle();
+      expect(harness.api.readFailed.value).toBe(true);
+      expect(harness.api.status.value.line).toContain("خوانده نشد");
+      const retry = harness.api.refresh();
+      expect(harness.api.readPending.value).toBe(true);
+      harness.setShares([]);
+      harness.resolveRead();
+      await retry;
+      expect(harness.api.status.value.line).toContain("هنوز کسی");
+    } finally { harness.scope.stop(); }
   });
 
   it("seeds a peer from the share list, marked as not-live", async () => {

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Show unverified companion grants as checking (T4.4.2 partial)
+
+- The Companions card now shows an accessible checking message and decorative skeleton while its first grant-list read is pending, instead of asserting that nobody has shared and showing an unverified zero count. An empty state appears only after a successful list response; failures still offer retry, and retries return to checking until verified. Previously verified peers remain visible during later refreshes. Pure/composable and nonmounted UI contracts cover the change; T4.4.2 remains open for the rest of the site and browser/device acceptance.
+
 ### 2026-10-23 — Keep revoked shared-history tracks cleared
 
 - A receiver could refresh their companion-grant list while an older shared-history read was in flight. If the refreshed list no longer contained the selected grant, the panel cleared its track but the delayed read could repaint the removed private trace and keep the loading indicator active until it finished. Revocation now invalidates that read immediately and clears loading; late success cannot restore the track or overwrite the grant-gone state. A delayed-response regression failed before the fix and passes without mounting a Vue component. Live revocation and network behavior still require device/server acceptance.

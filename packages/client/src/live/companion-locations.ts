@@ -397,7 +397,7 @@ export function liveCompanionsStyle(dark: boolean): OverlayStyle {
  */
 export function liveStatus(
   registry: CompanionRegistry,
-  options: { connected: boolean; nowMs: number; shareCount: number; readFailed?: boolean }
+  options: { connected: boolean; nowMs: number; shareCount: number; readFailed?: boolean; readPending?: boolean }
 ): { line: string; peerCount: number; staleCount: number; awaitingCount: number } {
   const peers = peersOf(registry, options.nowMs);
   const staleCount = peers.filter((peer) => peer.stale).length;
@@ -407,6 +407,10 @@ export function liveStatus(
     // invention, so the copy says the list did not load and keeps whatever is already on the map.
     const shown = peers.length > 0 ? `${peers.length} آخرین موقعیت شناخته‌شده نمایش داده می‌شود` : "موقعیتی نمایش داده نمی‌شود";
     return { line: `فهرست اشتراک‌ها خوانده نشد؛ ${shown}. با دکمهٔ تازه‌سازی دوباره تلاش کنید.`, peerCount: peers.length, staleCount, awaitingCount: awaiting };
+  }
+  if (options.readPending) {
+    // Until the first grant list is verified, zero peers is not evidence of zero shares.
+    return { line: "در حال بررسی اشتراک‌های زنده…", peerCount: peers.length, staleCount, awaitingCount: awaiting };
   }
   if (peers.length === 0) {
     if (options.shareCount === 0) {
