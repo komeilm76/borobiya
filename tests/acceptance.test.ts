@@ -57,6 +57,11 @@ test('CI exercises install, verification, benchmark, smoke, acceptance and deplo
   assert.match(workflow, /actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38/);
   assert.match(workflow, /persist-credentials: false/);
   assert.doesNotMatch(workflow, /ubuntu-latest|actions\/checkout@v4|actions\/setup-node@v4/);
+  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /concurrency:/);
+  assert.match(workflow, /cancel-in-progress: true/);
+  assert.match(workflow, /^  push:$/m);
+  assert.match(workflow, /^  pull_request:$/m);
   assert.match(read('.env.example'), /^FRAME_ANCESTORS=$/m);
   assert.match(read('src/core/http.ts'), /config\.frameAncestors\.length/);
 });
