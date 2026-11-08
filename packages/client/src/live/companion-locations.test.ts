@@ -15,6 +15,7 @@ import {
   liveMarkerColors,
   connectionTitle,
   liveStatus,
+  mapPeersOf,
   peersOf,
   peersOverlay,
   peerLabel,
@@ -257,6 +258,26 @@ describe("staleness", () => {
 
   it("never reports a future fix as a negative age", () => {
     expect(peersOf(registryWith({ userId: ALICE, observedAtMs: NOW + 60_000 }), NOW)[0]?.ageMs).toBe(0);
+  });
+});
+
+describe("mapPeersOf", () => {
+  it("ignores age-only updates and reorder, but not identity, movement, stale state or a name", () => {
+    const first = peersOf(registryWith({ userId: ALICE, observedAtMs: NOW - 1_000 }), NOW);
+    const snapshot = mapPeersOf(first);
+    expect(mapPeersOf(peersOf(registryWith({ userId: ALICE, observedAtMs: NOW - 1_000 }), NOW + 5_000), snapshot)).toBe(snapshot);
+    const sameAppearanceDifferentGrant = peersOf(registryWith({ userId: BOB, observedAtMs: NOW - 1_000 }), NOW);
+    expect(mapPeersOf(sameAppearanceDifferentGrant, snapshot)).not.toBe(snapshot);
+    expect(mapPeersOf(peersOf(registryWith({ userId: ALICE, lon: 52 }), NOW), snapshot)).not.toBe(snapshot);
+    expect(mapPeersOf(peersOf(registryWith({ userId: ALICE, name: "نام تازه" }), NOW), snapshot)).not.toBe(snapshot);
+    expect(mapPeersOf(peersOf(registryWith({ userId: ALICE, observedAtMs: NOW - 1_000 }), NOW + STALE_AFTER_MS + 1), snapshot)).not.toBe(snapshot);
+    const empty = mapPeersOf([], snapshot);
+    expect(empty).toEqual([]);
+    expect(empty).not.toBe(snapshot);
+    expect(mapPeersOf([], empty)).toBe(empty);
+    const two = peersOf({ ...registryWith({ userId: ALICE }), ...registryWith({ userId: BOB }) }, NOW);
+    const both = mapPeersOf(two);
+    expect(mapPeersOf([...two].reverse(), both)).toBe(both); // Marker map is keyed by id, not list order.
   });
 });
 

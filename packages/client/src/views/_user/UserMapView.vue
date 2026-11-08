@@ -1159,7 +1159,7 @@ watch(() => auth.accessToken, () => {
 /** MapLibre DOM markers keep a 44px focus/tap target; changing a fix moves rather than rebuilds it. */
 function syncPeerAvatars(): void {
   const instance = map.value;
-  const permitted = instance && markerConstructor && showCompanions.value ? live.peers.value : [];
+  const permitted = instance && markerConstructor && showCompanions.value ? live.mapPeers.value : [];
   const ids = new Set(permitted.map((peer) => peer.userId));
   for (const [id, marker] of peerMarkers) {
     if (ids.has(id)) continue;
@@ -1225,7 +1225,7 @@ function selectCompanion(userId: string, centerMap = true): void {
 
 watch(showCompanions, (visible) => { if (!visible) removeSelectedCompanion(); paintLive(); syncPeerAvatars(); }, { flush: "sync" });
 watch(() => live.registry.value, syncSelectedCompanion, { flush: "sync" });
-watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }, { flush: "sync" });
+watch(() => live.mapPeers.value, syncPeerAvatars, { flush: "sync" });
 watch(() => auth.user?.id, () => {
   removeSelectedCompanion(); placeSearch.clear();
   peerSelectionError.value = null; showCompanions.value = true;

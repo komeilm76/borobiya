@@ -17,7 +17,7 @@ function body(name: string): string {
 describe("companion map avatar and detail sheet", () => {
   it("renders one keyboard-accessible DOM avatar per authorized positioned peer, not a second dot", () => {
     expect(view).toContain('const peerMarkers = new Map<string, Marker>()');
-    expect(body("syncPeerAvatars")).toContain('live.peers.value');
+    expect(body("syncPeerAvatars")).toContain('live.mapPeers.value');
     expect(body("syncPeerAvatars")).toContain('showCompanions.value');
     expect(body("syncPeerAvatars")).toContain('new markerConstructor({ element: button, anchor: "center" })');
     expect(body("syncPeerAvatars")).toContain('peerMarkers.get(peer.userId)');
@@ -28,7 +28,8 @@ describe("companion map avatar and detail sheet", () => {
     expect(body("syncPeerAvatars")).toContain('marker.setLngLat(peer.position)');
     expect(body("syncPeerAvatars")).toContain('marker.getLngLat()');
     expect(body("syncPeerAvatars")).toContain('marker.remove()');
-    expect(view).toContain('watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }, { flush: "sync" })');
+    expect(view).toContain('watch(() => live.mapPeers.value, syncPeerAvatars, { flush: "sync" })');
+    expect(view).not.toContain('watch(() => live.peers.value, () => { syncSelectedCompanion(); syncPeerAvatars(); }');
     expect(view).toContain('watch(showCompanions,');
     expect(view).toContain('for (const marker of peerMarkers.values()) marker.remove()');
     expect(live).not.toContain('LIVE_DOT_LAYER_ID');

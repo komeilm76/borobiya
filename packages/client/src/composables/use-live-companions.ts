@@ -12,10 +12,12 @@ import {
   applyShareList,
   emptyRegistry,
   liveStatus,
+  mapPeersOf,
   peersOf,
   peersOverlay,
   pruneRegistry,
-  type CompanionRegistry
+  type CompanionRegistry,
+  type CompanionMapPeer
 } from "@/live/companion-locations";
 
 /**
@@ -164,6 +166,9 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   }
 
   const peers = computed(() => peersOf(registry.value, nowMs.value));
+  // The panel still ages each peer every tick; DOM avatars only need a changed position,
+  // name, stale flag or authorized id. Do not walk/write each marker for age-only ticks.
+  const mapPeers = computed((previous: readonly CompanionMapPeer[] | undefined) => mapPeersOf(peers.value, previous));
   // Vue 3.5 computed(previous) suppresses the view's MapLibre setData watcher when only
   // the age/status text changed. Permission loss, moved dots and stale transitions still repaint.
   const overlay = computed((previous: OverlayCollection | undefined) => peersOverlay(registry.value, nowMs.value, previous));
@@ -447,5 +452,5 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     void refresh();
   }
 
-  return { registry, peers, overlay, status, connected, shareCount, readFailed, readPending, nowMs, refresh };
+  return { registry, peers, mapPeers, overlay, status, connected, shareCount, readFailed, readPending, nowMs, refresh };
 }

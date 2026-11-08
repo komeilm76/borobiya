@@ -117,6 +117,22 @@ export interface CompanionView {
   readonly stale: boolean;
 }
 
+/** MapLibre's DOM avatars read these fields, not the age displayed in the companion panel. */
+export type CompanionMapPeer = Pick<CompanionView, "userId" | "name" | "position" | "stale">;
+
+/** Keep the previous snapshot on age-only ticks; compare ids as well as appearance for grant safety. */
+export function mapPeersOf(peers: readonly CompanionView[], previous?: readonly CompanionMapPeer[]): readonly CompanionMapPeer[] {
+  if (previous?.length === peers.length) {
+    const byId = new Map(previous.map((peer) => [peer.userId, peer]));
+    if (peers.every((peer) => {
+      const before = byId.get(peer.userId);
+      return before?.name === peer.name && before.stale === peer.stale &&
+        before.position[0] === peer.position[0] && before.position[1] === peer.position[1];
+    })) return previous;
+  }
+  return peers.map(({ userId, name, position, stale }) => ({ userId, name, position, stale }));
+}
+
 /**
  * Records one `location:peer-update`.
  *

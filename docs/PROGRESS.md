@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Skip companion DOM-avatar work on age-only ticks (T4.4.4 partial)
+
+- The map's GeoJSON was already stable on five-second age ticks, but its DOM avatar watcher still walked every peer, rewrote accessibility text/classes and rechecked the selected companion on each tick. The companion panel keeps updating ages; a separate avatar snapshot changes only for authorized ID, name, coordinates or stale-state changes, and direct registry changes still invalidate a removed selection synchronously. Comparison includes IDs even when two grants have visually identical positions/names. Pure, fake-timer and source-pinned tests cover the behavior without mounting Vue. This is a source-level work reduction, **not** a device FPS, <2s map-load or <500ms GPS measurement; T4.4.4 remains open.
+
 ### 2026-10-23 — Announce guidance phases, not every GPS distance (T4.4.3 partial)
 
 - The map guidance banner previously marked its continuously changing distance label as a live status, potentially announcing every GPS update to a screen reader. The visual distance and its on-demand readable text remain; a separate screen-reader-only live status now announces only meaningful guidance phases such as waiting for GPS, replanning, weak GPS and active guidance. Existing GPS/reroute warnings still surface separately. A source regression failed on the old binding; pure state tests and nonmounted source checks pass. Actual assistive-technology/browser verification and the wider WCAG AA audit remain open.
