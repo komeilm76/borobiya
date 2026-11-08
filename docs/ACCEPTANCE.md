@@ -71,8 +71,10 @@ This checklist maps the original technical specification and roadmap targets to 
 
 ## Release evidence
 
-- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 58 automated tests.
+- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 61 automated tests.
 - [x] `./boro doctor`, `./boro verify`, `npm run bench`, `npm run acceptance` and production-configured deployment checks pass.
 - [x] Database seed, foreground startup, health checks, login, ticket issuance, WebSocket hello, SOS creation, durable event delivery, administrator overview, lazy view modules and service-worker precache entries were smoke-tested against a running process.
+- [x] Older SQLite files gain the SOS photo column without losing rows; production refuses demo seeding, known preview/CI passwords and weak administrator passwords.
+- [x] Forwarded preview-host headers produce matching WebSocket CSP and CORS origins.
 - [x] Release notes and an operations runbook are present.
 - [x] The branch is committed and pushed; release tagging is recorded in `docs/RELEASE_NOTES.md`.

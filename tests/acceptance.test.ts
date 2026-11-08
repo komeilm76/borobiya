@@ -43,4 +43,6 @@ test('CI exercises install, verification, benchmark, acceptance and deployment c
   assert.match(workflow, /npm run acceptance/);
   assert.match(workflow, /npm run deploy:check/);
   assert.match(workflow, /NODE_ENV: production/);
+  assert.match(workflow, /TRUST_PROXY: '1'/);
+  assert.match(workflow, /SEED_DEMO_USERS: '0'/);
 });

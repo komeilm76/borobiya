@@ -26,6 +26,8 @@ jobs:
         env:
           NODE_ENV: production
           COOKIE_SECURE: '1'
-          ADMIN_PASSWORD: CIReleasePass!2026
+          TRUST_PROXY: '1'
+          SEED_DEMO_USERS: '0'
+          ADMIN_PASSWORD: CIGeneratedPass!2026-A
           ALLOWED_ORIGINS: https://borobiya.example.test
         run: npm run deploy:check

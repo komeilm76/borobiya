@@ -72,8 +72,15 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
   const root = ROOT;
   const dataDir = path.resolve(root, overrides.dataDir ?? env.DATA_DIR ?? './data');
   const adminPassword = overrides.adminPassword ?? env.ADMIN_PASSWORD ?? 'change-me-before-production';
-  if (nodeEnv === 'production' && adminPassword === 'change-me-before-production') {
-    throw new Error('ADMIN_PASSWORD must be changed before production startup');
+  const unsafeAdminPasswords = new Set([
+    'change-me-before-production', 'DemoPass!2026', 'PreviewPass!2026', 'CIReleasePass!2026'
+  ]);
+  if (nodeEnv === 'production' && (unsafeAdminPasswords.has(adminPassword) || adminPassword.length < 12)) {
+    throw new Error('ADMIN_PASSWORD must be a unique password of at least 12 characters before production startup');
+  }
+  const seedDemoUsers = overrides.seedDemoUsers ?? bool(env.SEED_DEMO_USERS, nodeEnv !== 'production');
+  if (nodeEnv === 'production' && seedDemoUsers) {
+    throw new Error('SEED_DEMO_USERS must be disabled in production');
   }
   const config: Config = {
     root,
@@ -95,7 +102,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     locationRetentionHours: overrides.locationRetentionHours ?? int(env.LOCATION_RETENTION_HOURS, 168, 1, 8760),
     wsHeartbeatMs: overrides.wsHeartbeatMs ?? int(env.WS_HEARTBEAT_MS, 25000, 1000, 120000),
     wsMaxFrameBytes: overrides.wsMaxFrameBytes ?? int(env.WS_MAX_FRAME_BYTES, 65536, 256, 1024 * 1024),
-    seedDemoUsers: overrides.seedDemoUsers ?? bool(env.SEED_DEMO_USERS, nodeEnv !== 'production'),
+    seedDemoUsers,
     startJobs: overrides.startJobs ?? (nodeEnv !== 'test'),
     dataVersion: overrides.dataVersion ?? '2026-11-07-clean-1'
   };

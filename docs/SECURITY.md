@@ -4,7 +4,7 @@ Security is enforced at the HTTP boundary, the session layer, the service layer 
 
 ## HTTP defenses
 
-Every response receives a strict Content Security Policy: scripts and workers are same-origin, styles are same-origin plus the small inline style allowance required by generated components, images are same-origin or data URLs, and WebSocket connections are limited to the calculated same-origin `ws` or `wss` endpoint. Frame ancestors are denied. Other headers disable content-type sniffing, set referrer policy, apply cross-origin isolation and add HSTS in production.
+Every response receives a strict Content Security Policy: scripts and workers are same-origin, styles are same-origin plus the small inline style allowance required by generated components, images are same-origin or data URLs, and WebSocket connections are limited to the calculated same-origin `ws` or `wss` endpoint. When `TRUST_PROXY=1`, the endpoint is derived from the forwarded host and protocol, so a preview or reverse-proxy origin receives its own `wss://` value. Frame ancestors are denied. Other headers disable content-type sniffing, set referrer policy, apply cross-origin isolation and add HSTS in production.
 
 CORS is explicit. Same-origin requests are allowed without an `Origin` header. Requests with an origin receive credentialed CORS headers only when the origin equals the calculated same origin or matches `ALLOWED_ORIGINS`. Mutating requests additionally pass an origin check before parsing. `Sec-Fetch-Site: cross-site` is rejected unless the origin is explicitly allowed. Do not configure wildcard origins with credentialed cookies.
 
@@ -22,4 +22,4 @@ Sessions use `HttpOnly`, `SameSite=Lax`, path-scoped cookies, optional secure co
 
 ## Data protection
 
-SQLite uses foreign keys and prepared statements. Audiences on durable events restrict catch-up and socket publication. Location history requires an active authorized share. Audit CSV escapes spreadsheet formulas. Administrator passwords must be replaced before production, demo seeding must be disabled, and `COOKIE_SECURE=1` plus exact allowed origins are required behind HTTPS. Audio is ephemeral and is never stored.
+SQLite uses foreign keys, prepared statements and an idempotent schema migration that adds the SOS photo column to older databases without losing rows. Audiences on durable events restrict catch-up and socket publication. Location history requires an active authorized share. Audit CSV escapes spreadsheet formulas. Production startup rejects known bootstrap, demo, preview and CI passwords, passwords shorter than twelve characters and enabled demo seeding. `./boro deploy:check` also requires `COOKIE_SECURE=1`, `TRUST_PROXY=1` and exact non-wildcard allowed origins behind HTTPS. Audio is ephemeral and is never stored.

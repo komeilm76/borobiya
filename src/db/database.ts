@@ -5,7 +5,7 @@ import type { Config } from '../core/config.ts';
 import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -234,6 +234,13 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS idx_events_id ON events(id);
 `;
 
+function ensureColumn(database: DatabaseSync, table: string, column: string, definition: string): void {
+  const rows = database.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+  if (!rows.some((row) => row.name === column)) {
+    database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
 export function openDatabase(config: Config): DatabaseSync {
   if (config.databasePath !== ':memory:') mkdirSync(path.dirname(config.databasePath), { recursive: true });
   const database = new DatabaseSync(config.databasePath);
@@ -246,6 +253,7 @@ export function openDatabase(config: Config): DatabaseSync {
     database.exec('PRAGMA synchronous = NORMAL;');
   }
   database.exec(SCHEMA);
+  ensureColumn(database, 'sos_requests', 'photo_data_url', 'TEXT');
   database.prepare('INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
     .run('schema_version', String(SCHEMA_VERSION));
   return database;

@@ -6,7 +6,7 @@ This runbook is for the operator of a deployed Borobiya instance. It assumes a s
 
 1. Confirm Node.js 22.12 or newer is installed.
 2. Run `npm ci` from the committed lockfile.
-3. Confirm `NODE_ENV`, `HOST`, `PORT`, `DATA_DIR`, `ADMIN_PASSWORD`, `COOKIE_SECURE`, `TRUST_PROXY`, `ALLOWED_ORIGINS` and `SEED_DEMO_USERS`.
+3. Confirm `NODE_ENV=production`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, `SEED_DEMO_USERS=0`, exact `ALLOWED_ORIGINS` without wildcards, a unique `ADMIN_PASSWORD` of at least twelve characters, and `HOST`, `PORT` and `DATA_DIR`.
 4. Run `./boro deploy:check` before enabling traffic.
 5. Start with `npm start` or a process manager that invokes `node --experimental-transform-types --disable-warning=ExperimentalWarning src/index.ts`.
 6. Verify `/_public/health`, `/_public/openapi.json`, the SPA shell, an SVG tile and a WebSocket upgrade.

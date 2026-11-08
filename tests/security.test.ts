@@ -1,5 +1,6 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { request as httpRequest } from 'node:http';
 import { apiFetch, createTestServer, login, type TestServer } from './helpers.ts';
 
 let server: TestServer;
@@ -98,6 +99,30 @@ test('authentication rate limiting returns a typed 429 after the bucket is exhau
     assert.equal(responses.at(-1)?.status, 429);
     assert.equal(responses.at(-1)?.json.error.code, 'RATE_LIMITED');
     assert.ok(Number(responses.at(-1)?.headers.get('retry-after')) >= 1);
+  } finally {
+    await isolated.close();
+  }
+});
+
+test('preview proxy headers produce matching WebSocket CSP and CORS origins', async () => {
+  const isolated = await createTestServer({
+    trustProxy: true, allowedOrigins: ['https://3000-example.e2b.app']
+  });
+  try {
+    const headers = await new Promise<Record<string, string | string[] | undefined>>((resolve, reject) => {
+      const req = httpRequest({
+        host: '127.0.0.1', port: isolated.port, path: '/', method: 'GET',
+        headers: {
+          Host: '3000-example.e2b.app',
+          Origin: 'https://3000-example.e2b.app',
+          'X-Forwarded-Proto': 'https'
+        }
+      }, (res) => { res.resume(); resolve(res.headers); });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.match(String(headers['content-security-policy']), /connect-src 'self' wss:\/\/3000-example\.e2b\.app/);
+    assert.equal(headers['access-control-allow-origin'], 'https://3000-example.e2b.app');
   } finally {
     await isolated.close();
   }

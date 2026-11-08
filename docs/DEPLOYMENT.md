@@ -4,9 +4,9 @@ A production deployment is one Node.js process behind an HTTPS reverse proxy. Th
 
 ## Required configuration
 
-Use Node.js 22.12 or newer. Set `NODE_ENV=production`, `COOKIE_SECURE=1`, a unique `ADMIN_PASSWORD`, and `ALLOWED_ORIGINS` to the exact HTTPS origins that may call the API or open WebSockets. Set `SEED_DEMO_USERS=0`. Configure `HOST`, `PORT`, `DATA_DIR` and `DATABASE_PATH` according to the host layout. Keep `TRUST_PROXY=1` only when the reverse proxy correctly sets forwarded headers and is the only path to the process.
+Use Node.js 22.12 or newer. Set `NODE_ENV=production`, `COOKIE_SECURE=1`, a unique `ADMIN_PASSWORD` of at least twelve characters, and `ALLOWED_ORIGINS` to exact HTTPS origins without wildcards. Set `SEED_DEMO_USERS=0`. Configure `HOST`, `PORT`, `DATA_DIR` and `DATABASE_PATH` according to the host layout. Keep `TRUST_PROXY=1` only when the reverse proxy correctly sets forwarded headers and is the only path to the process.
 
-`./boro deploy:check` validates the production environment and generated assets. It rejects the default administrator password, missing allowed origins, insecure cookies and missing cache manifests. Run `npm ci`, `./boro setup` with the production environment, `npm run check` and `./boro verify` before enabling traffic.
+`./boro deploy:check` validates the production environment and generated assets. It rejects the default or known preview/CI administrator passwords, short passwords, enabled demo seeding, missing or wildcard allowed origins, disabled proxy trust, insecure cookies and missing cache manifests. The runtime configuration enforces the same password and demo-seed rules on startup. Run `npm ci`, `./boro setup` with the production environment, `npm run check` and `./boro verify` before enabling traffic.
 
 ## Reverse proxy
 

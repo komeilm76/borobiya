@@ -21,7 +21,7 @@
 
 ## CI
 
-The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run acceptance` and a production-configured deployment check. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
+The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset generation, `npm run verify`, `npm run bench`, `npm run acceptance` and a production-configured deployment check. The deployment check supplies explicit secure-cookie, proxy-trust and demo-seed settings, so it also exercises the production safety guards. Because the lockfile is committed, the CI environment installs exactly the same development tools. No runtime dependencies are installed. The pipeline fails on runtime diagnostics, typecheck errors, missing or non-English documentation, legacy paths, missing design images, unresolved icon names, stale service-worker manifests, open acceptance items, benchmark failures or any automated test failure.
 
 ## Asset generation
 

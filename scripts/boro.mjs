@@ -110,10 +110,17 @@ function check() {
 function deployCheck() {
   const env = envFile();
   const failures = [];
+  const unsafeAdminPasswords = new Set([
+    'change-me-before-production', 'DemoPass!2026', 'PreviewPass!2026', 'CIReleasePass!2026'
+  ]);
   if (env.NODE_ENV !== 'production') failures.push('NODE_ENV must be production');
   if (env.COOKIE_SECURE !== '1' && env.NODE_ENV === 'production') failures.push('COOKIE_SECURE must be 1 behind HTTPS');
-  if (!env.ADMIN_PASSWORD || env.ADMIN_PASSWORD === 'change-me-before-production') failures.push('set a unique ADMIN_PASSWORD');
-  if (!env.ALLOWED_ORIGINS) failures.push('set ALLOWED_ORIGINS to the exact HTTPS origins');
+  if (!env.ADMIN_PASSWORD || unsafeAdminPasswords.has(env.ADMIN_PASSWORD) || env.ADMIN_PASSWORD.length < 12) {
+    failures.push('set a unique ADMIN_PASSWORD of at least 12 characters');
+  }
+  if (!env.ALLOWED_ORIGINS || env.ALLOWED_ORIGINS.includes('*')) failures.push('set ALLOWED_ORIGINS to exact HTTPS origins without wildcards');
+  if (/^(1|true|yes|on)$/i.test(env.SEED_DEMO_USERS || '')) failures.push('disable SEED_DEMO_USERS in production');
+  if (!/^(1|true|yes|on)$/i.test(env.TRUST_PROXY || '')) failures.push('set TRUST_PROXY=1 behind the HTTPS reverse proxy');
   if (!existsSync(path.join(ROOT, 'public/assets/cache-manifest.json'))) failures.push('run npm run assets');
   for (const message of failures) console.error(`FAIL ${message}`);
   if (failures.length) process.exit(1);
