@@ -48,10 +48,19 @@ const EXTRA_ICONS = [
  * @returns Sorted absolute file paths.
  */
 async function listFiles(directory: string, extension?: string): Promise<string[]> {
+  // `Bun.Glob.scan` throws ENOENT for a directory that does not exist yet, which happens on a
+  // clean checkout before the first Vite build has written `public/js`. A missing directory simply
+  // has no files, so `bun run assets` stays runnable on its own in CI and locally. Do not gate this
+  // on a `Bun.file()` existence check: that helper is file-only and reports false for directories.
   const glob = new Bun.Glob(extension ? `**/*${extension}` : '**/*');
   const output: string[] = [];
-  for await (const relative of glob.scan({ cwd: directory, onlyFiles: true })) {
-    output.push(path.join(directory, relative));
+  try {
+    for await (const relative of glob.scan({ cwd: directory, onlyFiles: true })) {
+      output.push(path.join(directory, relative));
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    return [];
   }
   return output.sort();
 }

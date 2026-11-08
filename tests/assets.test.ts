@@ -112,6 +112,23 @@ describe('generated assets', () => {
     for (const name of inventory) expect(shipped.has(name), `canonical icon omitted: ${name}`).toBe(true);
   });
 
+  it('asset generation survives a clean checkout without a previous Vite bundle', async () => {
+    // CI runs `bun run assets` before `bun run build`, so `public/js` does not exist yet. The
+    // generator must treat that as "no files" instead of throwing, and it must not use
+    // `Bun.file(dir).exists()` as the guard because that reports false for every directory.
+    const source = await read('scripts/build-assets.ts');
+    expect(source).not.toMatch(/Bun\.file\(directory\)\.exists\(\)/);
+    expect(source).toMatch(/error as NodeJS\.ErrnoException\)\.code !== 'ENOENT'/);
+    const { staticFiles, copyClientPublic } = await import('../scripts/build-assets.ts');
+    const copied = await copyClientPublic();
+    expect(copied).toContain('/manifest.webmanifest');
+    const precache = await staticFiles();
+    expect(precache).toContain('/manifest.webmanifest');
+    expect(precache).toContain('/assets/icons.css');
+    expect(precache).not.toContain('/assets/cache-manifest.json');
+    expect(precache.every((entry) => entry.startsWith('/'))).toBe(true);
+  });
+
   it('the stylesheet and web app manifest keep the design tokens and RTL contract', async () => {
     const css = await read('public/app.css');
     expect(css).not.toMatch(/@import/);
