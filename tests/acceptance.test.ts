@@ -52,6 +52,11 @@ test('CI exercises install, verification, benchmark, smoke, acceptance and deplo
   assert.match(workflow, /TRUST_PROXY: '1'/);
   assert.match(workflow, /SEED_DEMO_USERS: '0'/);
   assert.match(workflow, /FRAME_ANCESTORS: https:\/\/borobiya\.example\.test/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.match(workflow, /actions\/checkout@d23441a48e516b6c34aea4fa41551a30e30af803/);
+  assert.match(workflow, /actions\/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.doesNotMatch(workflow, /ubuntu-latest|actions\/checkout@v4|actions\/setup-node@v4/);
   assert.match(read('.env.example'), /^FRAME_ANCESTORS=$/m);
   assert.match(read('src/core/http.ts'), /config\.frameAncestors\.length/);
 });
