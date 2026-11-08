@@ -1,6 +1,6 @@
 # Diagrams — Entity Relationship Diagram (ERD)
 
-> Generated from spec §17 (Data Storage) + §8/11. Renders on GitHub via Mermaid.
+> Schema sketch from spec §17 (Data Storage) and §8/11; Mermaid relationship directions were checked against the current foreign keys and the graph was rendered and visually reviewed in headless Chromium (zoom in for the dense relationships). The SQL below is illustrative, **not** a complete migrated schema or executable migration. See `packages/server/src/db/schema.ts` and the Drizzle migrations for authoritative DDL.
 
 ---
 
@@ -23,7 +23,8 @@ erDiagram
   incident_types ||--o{ sos_requests : typed
   sos_requests ||--o{ mission_proposals : dispatches
   sos_requests ||--o{ missions : becomes
-  sos_requests ||--o{ cancellation_reasons : cancelledWith
+  cancellation_reasons o|--o{ sos_requests : explains
+  cancellation_reasons o|--o{ missions : explains
   missions ||--o{ mission_status_history : transitions
   missions ||--o{ mission_ratings : rated
   users ||--o{ admin_audit_log : audited
@@ -259,7 +260,7 @@ CREATE TABLE admin_audit_log (
 
 ## Notes
 
-- This is the target ERD. Current Drizzle migrations cover the auth/reference tables, T1.1.4 user-state/rating/location columns, `admin_audit_log`, the live `location_shares` table (T2.1.1), and `location_history`/`location_history_shares` (T2.2.1/T2.2.2, `0007_brief_hedge_knight.sql`). Socket `location:update` (T2.1.5) now writes one `location_history` row and the `users.last_location` geography per accepted fix; history reads/shares (T2.2.3-T2.2.4) are not implemented yet, while retention is: the share-expiry sweep and the batched history prune (T2.1.6/T2.2.5) run as in-process timers over these two tables. Category/incident, SOS, proposals, missions, and mission status history are migrated through `0014`; `mission_ratings` is migrated in `0018`, including database-side eligibility and average cache triggers; remaining user columns (`suspended_until`, `suspension_reason`) remain future tasks.
+- The core tables shown here have been migrated and the location, history-grant/read, SOS, proposal, mission, cancellation and rating handlers are implemented. `location:update` stores accepted fixes in `users.last_location` and `location_history`; the minute share-expiry sweep and daily history prune are implemented. The sketch omits later additions, including `location_history_shares.max_points`, `admin_alerts` and several indexes/checks; its `users.suspended_until` and `suspension_reason` columns remain future work. `mission_ratings` is migrated in `0018`, including eligibility and average-cache triggers. Do not apply this SQL as a replacement for the ordered Drizzle migrations.
 - **History storage choice:** `location_history` keeps plain `lat`/`lon` columns with a composite `(user_id, timestamp)` index and no geography column or GiST index; every read is user- and time-scoped. Monthly partitioning stays the documented optional scale-up path (ARCHITECTURE §8.3).
 - **Geospatial:** `last_location` and `sos_requests.location` use `GEOGRAPHY(Point,4326)` for meter-accurate `ST_Distance`.
 - **No delete:** No `deleted_at` — deactivated users stay with `is_active=false` for audit.

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Finish source-diagram render review, keep manual acceptance open (T4.7.1 partial)
+
+- Rendered the SOS, ERD and map-pipeline Mermaid diagrams in headless Chromium and inspected each image, completing a visual render pass over all four diagram docs (15 Mermaid blocks after the correction below). The SOS state diagram parsed but *rendered incorrectly*: compound states reused `cancelled_by_requester` and `cancelled_by_rescuer` IDs, so Mermaid connected the request and mission records across boxes and made the graph unreadable. Split request, proposal and mission states into separate diagrams, re-rendered, and corrected the cancellation-flow root label and narrow-screen route-preview layout. Also corrected the ERD's backwards cancellation-reason FK (and added the mission FK), removed its stale claim that history grant reads are unimplemented, and changed the map update flow to a legible vertical layout. The ERD relationship graph remains dense and benefits from zoom. This was rendering in a local headless browser, **not** real UI screenshots, database migration verification, map runtime or target-VM acceptance. T4.7.1 stays open for manual screenshots and evidence-backed percentage completion.
+
 ### 2026-10-23 — Review rendered location-sharing diagrams against the implementation (T4.7.1 partial)
 
 - The location-sharing diagram still depicted a single-share `201 {shareId}`, a top-level `activeDevices` 409, an HTTP `409 WRONG_DEVICE` for a Socket.IO acknowledgement, `system:offline` and `sync` socket events that do not exist, refresh-token socket authentication, `/_user/sync` replaying GPS, a fixed 03:00 UTC retention run, and an hourly 24-hour SOS expiry. Rewrote its five Mermaid blocks against the shared schemas, handlers and client consumption paths. Rendered each with Mermaid CLI 11.12.0 in headless Chromium and visually inspected the resulting PNGs; Mermaid 11.12.2 syntax parsing across all 13 blocks passes. No live-app screenshot, target-VM/device, or visual review of ERD/SOS/map-pipeline renders was performed. T4.7.1 remains partial and documentation is not 100%.

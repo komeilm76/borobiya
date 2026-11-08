@@ -1,6 +1,6 @@
 # Diagrams — Map Data Pipeline
 
-> T1.4.7's map-data cache/reuse, safe cache clearing, and whole-country/city-crop selection are implemented. Selected areas from `map-server/regions.json` are cropped/merged into one shared external-library dataset for tiles, routing, and Nominatim→Photon. The original Tehran pipeline passed target-VM checks on 2026-10-20; on 2026-10-21 the user reported Ubuntu 24.04 setup and core app/map acceptance. A dedicated external-Internet-offline library run remains an operational follow-up, now non-blocking for Phase 2/release by user decision (see `../PROGRESS.md`).
+> The three Mermaid diagrams were rendered and visually reviewed in headless Chromium; this is not a live map-server or offline-runtime test. T1.4.7's map-data cache/reuse, safe cache clearing, and whole-country/city-crop selection are implemented. Selected areas from `map-server/regions.json` are cropped/merged into one shared external-library dataset for tiles, routing, and Nominatim→Photon. The original Tehran pipeline passed target-VM checks on 2026-10-20; on 2026-10-21 the user reported Ubuntu 24.04 setup and core app/map acceptance. A dedicated external-Internet-offline library run remains an operational follow-up, now non-blocking for Phase 2/release by user decision (see `../PROGRESS.md`).
 
 ---
 
@@ -36,7 +36,7 @@ flowchart TD
 ## 2. Update Flow (Build Artifacts)
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Pinned Geofabrik source] --> B[Download + verify MD5]
   B --> C[Osmium crops + merge]
   C --> D[Shared dataset PBF + provenance manifest]

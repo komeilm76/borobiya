@@ -1,47 +1,47 @@
 # Diagrams — SOS Lifecycle (implemented contract)
 
-> Source-level view of the current SOS, proposal and mission handlers. These Mermaid blocks have not yet been visually reviewed in a rendered browser; that review remains part of T4.7.1. The three records have **different** status vocabularies; do not use the SOS request's `dispatched` state as a mission status.
+> Source-level view of the current SOS, proposal and mission handlers. The diagrams were rendered and visually reviewed in headless Chromium; this is not a live-app screenshot. The three records have **different** status vocabularies; do not use the SOS request's `dispatched` state as a mission status.
 
 ## 1. States (separate records)
 
+**SOS request** (`sos_requests.status`):
+
 ```mermaid
 stateDiagram-v2
-  state "SOS request" as SOS {
-    [*] --> pending: requester creates
-    pending --> dispatched: admin dispatches
-    dispatched --> dispatched: admin dispatches more offers
-    dispatched --> accepted: rescuer accepts an offer
-    accepted --> completed: last active mission completes
-    pending --> cancelled_by_requester: requester cancels
-    dispatched --> cancelled_by_requester: requester cancels
-    accepted --> cancelled_by_requester: requester cancels active missions
-    accepted --> cancelled_by_rescuer: last active rescuer cancels
-    cancelled_by_rescuer --> dispatched: admin re-dispatches
-  }
-  state "One dispatched proposal" as PROPOSAL {
-    [*] --> offer_pending: dispatch creates offer
-    offer_pending --> offer_accepted: assigned rescuer accepts
-    offer_pending --> offer_declined: assigned rescuer declines
-    offer_pending --> offer_expired: requester cancels SOS
-  }
-  state "One accepted mission" as MISSION {
-    [*] --> mission_pending: offer accepted
-    mission_pending --> on_the_way: rescuer advances
-    on_the_way --> arrived: rescuer advances
-    arrived --> in_progress: rescuer advances
-    in_progress --> mission_completed: rescuer advances
-    mission_pending --> cancelled_by_requester: requester cancels
-    mission_pending --> cancelled_by_rescuer: rescuer cancels
-    on_the_way --> cancelled_by_requester: requester cancels
-    on_the_way --> cancelled_by_rescuer: rescuer cancels
-    arrived --> cancelled_by_requester: requester cancels
-    arrived --> cancelled_by_rescuer: rescuer cancels
-    in_progress --> cancelled_by_requester: requester cancels
-    in_progress --> cancelled_by_rescuer: rescuer cancels
-  }
+  [*] --> pending: requester creates
+  pending --> dispatched: admin dispatches
+  dispatched --> dispatched: admin dispatches more offers
+  dispatched --> accepted: rescuer accepts an offer
+  pending --> cancelled_by_requester: requester cancels
+  dispatched --> cancelled_by_requester: requester cancels
+  accepted --> cancelled_by_requester: requester cancels active missions
+  accepted --> cancelled_by_rescuer: last active rescuer cancels
+  cancelled_by_rescuer --> dispatched: admin re-dispatches
+  accepted --> completed: last active mission completes
 ```
 
-`offer_pending` and `mission_pending` above are diagram aliases for the distinct tables' `pending` values; `mission_completed` is the mission's `completed`. The shared schemas also allow `expired` for SOS requests and missions, but this diagram does **not** imply an automatic 24-hour expiry job. Advancing a mission is an explicit rescuer request, not a GPS-triggered 50 m arrival. Repeating the current step is an unchanged success; skipping, reversing or reviving a terminal step returns **409 `INVALID_MISSION_TRANSITION`**. When several rescuers accept for one SOS, the request becomes `completed` only after the last active mission completes; it becomes `cancelled_by_rescuer` only after the last active mission is cancelled by a rescuer.
+**One proposal** (`mission_proposals.status`):
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: dispatch creates offer
+  pending --> accepted: assigned rescuer accepts
+  pending --> declined: assigned rescuer declines
+  pending --> expired: requester cancels SOS
+```
+
+**One mission** (`missions.status`, ordered progress):
+
+```mermaid
+stateDiagram-v2
+  [*] --> pending: offer accepted
+  pending --> on_the_way: rescuer advances
+  on_the_way --> arrived: rescuer advances
+  arrived --> in_progress: rescuer advances
+  in_progress --> completed: rescuer advances
+```
+
+A requester may cancel their SOS (including its active missions) from `pending`, `dispatched` or `accepted`. A rescuer may cancel **their own** mission from any active progress step; these terminal mission states are `cancelled_by_requester` and `cancelled_by_rescuer` (see §3), not shortcuts in the ordered *progress* chain. The shared schemas also allow `expired` for SOS requests and missions, but these diagrams do **not** imply an automatic 24-hour expiry job. Advancing a mission is an explicit rescuer request, not a GPS-triggered 50 m arrival. Repeating the current step is an unchanged success; skipping, reversing or reviving a terminal step returns **409 `INVALID_MISSION_TRANSITION`**. When several rescuers accept for one SOS, the request becomes `completed` only after the last active mission completes; it becomes `cancelled_by_rescuer` only after the last active mission is cancelled by a rescuer.
 
 ## 2. Request → dispatch → mission → rating
 
@@ -78,7 +78,7 @@ The rate body requires an integer `rating` from 1 to 5 and permits an optional `
 
 ```mermaid
 flowchart TD
-  A[Active SOS request] -->|Requester: POST /_user/sos/requests/:id/cancel with reason| B[Cancel SOS and active missions; withdraw pending offers]
+  A[SOS and mission actions] -->|Requester: POST /_user/sos/requests/:id/cancel with reason| B[Cancel SOS and active missions; withdraw pending offers]
   A -->|Rescuer: POST /_user/missions/:id/cancel with reason| C[Cancel own active mission]
   C --> D{Other active missions for SOS?}
   D -->|No| E[SOS cancelled_by_rescuer; admin can re-dispatch]
@@ -96,7 +96,7 @@ Cancellation requires an active reason from `GET /_user/sos/cancellation-reasons
 ## 4. Rescuer navigation (client-side route preview)
 
 ```mermaid
-flowchart LR
+flowchart TD
   A[Accept proposal] --> B[Read active mission navigation target]
   B --> C[Get current position]
   C --> D[Choose transport profile and optional waypoints]
