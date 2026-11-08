@@ -171,6 +171,7 @@ describe('architecture guards', () => {
       'users-view.test.ts',
       'onboarding-view.test.ts',
       'dispatch-view.test.ts',
+      'groups-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {

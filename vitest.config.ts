@@ -44,9 +44,9 @@ export default defineConfig({
       // measured figures so an unrelated small change cannot fail it by rounding alone, while a
       // genuine coverage loss still does.
       thresholds: {
-        lines: 88,
-        functions: 82,
-        statements: 84,
+        lines: 89,
+        functions: 83,
+        statements: 85,
         branches: 72
       }
     }
