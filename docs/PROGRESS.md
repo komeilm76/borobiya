@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Add genuine pre-login manual captures (T4.7.1 partial)
+
+- Built the production client and opened `/_auth/login` in headless Chromium 141 with an empty browser state. Captured the real rendered form at 1280×800 desktop and a 390×844 phone viewport, and added the two images and accessible captions to `USER_MANUAL.md`. A first full-page desktop capture appeared horizontally clipped under RTL despite DOM geometry being within the viewport; the final desktop capture uses a viewport screenshot and was visually checked, as was the mobile full-page capture. No credentials, fake account data or API responses were used. The API/database/map server were not running, so neither successful login nor any authenticated/manual flow is evidenced; other screenshot placeholders remain. Documentation is not 100% and T4.7.1 stays partial.
+
 ### 2026-10-23 — Finish source-diagram render review, keep manual acceptance open (T4.7.1 partial)
 
 - Rendered the SOS, ERD and map-pipeline Mermaid diagrams in headless Chromium and inspected each image, completing a visual render pass over all four diagram docs (15 Mermaid blocks after the correction below). The SOS state diagram parsed but *rendered incorrectly*: compound states reused `cancelled_by_requester` and `cancelled_by_rescuer` IDs, so Mermaid connected the request and mission records across boxes and made the graph unreadable. Split request, proposal and mission states into separate diagrams, re-rendered, and corrected the cancellation-flow root label and narrow-screen route-preview layout. Also corrected the ERD's backwards cancellation-reason FK (and added the mission FK), removed its stale claim that history grant reads are unimplemented, and changed the map update flow to a legible vertical layout. The ERD relationship graph remains dense and benefits from zoom. This was rendering in a local headless browser, **not** real UI screenshots, database migration verification, map runtime or target-VM acceptance. T4.7.1 stays open for manual screenshots and evidence-backed percentage completion.

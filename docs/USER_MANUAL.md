@@ -1,6 +1,6 @@
 # Borobiya — User Manual
 
-> **For end users (requesters, rescuers, admins).** Step-by-step with screenshots placeholders (`[Screenshot: ...]`). Replace placeholders with real captures after UI lands.
+> **For end users (requesters, rescuers, admins).** Step-by-step instructions with a few real UI captures and remaining `[Screenshot: ...]` placeholders. Captures of unverified flows must not be presented as evidence that an API, live map, rescue dispatch, or physical device worked.
 
 ---
 
@@ -77,7 +77,13 @@ Roles:
 
 To sign out, open the account menu in the top bar (or the map's top-left menu), select **خروج از حساب**, and confirm **بله، خروج از حساب**. Choose **انصراف** (or dismiss the dialog) to stay signed in.
 
-[Screenshot: Login page]
+**Login form, before entering credentials** (desktop and phone widths):
+
+![Persian login screen at desktop width: empty username and password fields, recovery link, sign-in button and create-account link.](./screenshots/login-desktop.png)
+
+![Persian login screen at phone width: empty username and password fields, recovery link, sign-in button and create-account link.](./screenshots/login-mobile.png)
+
+These are captures of the **production client build** at `/_auth/login` in headless Chromium 141 (1280 × 800 desktop; 390 × 844 phone viewport, full-page image 390 × 959). No credentials were entered, no API/database was running, and neither sign-in nor the post-login map is verified by these images. Persian text uses this environment's available font fallback; appearance may differ on a device with Vazirmatn installed.
 
 Errors:
 
