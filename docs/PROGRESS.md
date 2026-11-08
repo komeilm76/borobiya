@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Announce guidance phases, not every GPS distance (T4.4.3 partial)
+
+- The map guidance banner previously marked its continuously changing distance label as a live status, potentially announcing every GPS update to a screen reader. The visual distance and its on-demand readable text remain; a separate screen-reader-only live status now announces only meaningful guidance phases such as waiting for GPS, replanning, weak GPS and active guidance. Existing GPS/reroute warnings still surface separately. A source regression failed on the old binding; pure state tests and nonmounted source checks pass. Actual assistive-technology/browser verification and the wider WCAG AA audit remain open.
+
 ### 2026-10-23 — Bound both share-management list reads (T4.4.2 partial)
 
 - The location-sharing page used `Promise.allSettled` on live and history grant requests without a deadline: one stalled request kept the skeleton/Refresh action blocked and withheld the other list's successful response indefinitely. Each request now has its own 12-second deadline and abort signal. A successful source is retained as verified while a stalled source becomes retryable/unavailable, never verified empty. New refreshes, session changes and unmount abort old reads; existing version checks fence late responses even when an HTTP adapter ignores abort. Pure fake-timer and nonmounted source tests cover this; actual browser/device network behavior and the wider T4.4.2 feedback audit remain open.

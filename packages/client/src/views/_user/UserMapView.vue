@@ -114,7 +114,8 @@
       <div id="map-navigation-sheet" class="user-map-view__journey-content">
         <div class="user-map-view__journey-bar">
           <v-icon icon="mdi-navigation-variant" size="21" aria-hidden="true" />
-          <span class="user-map-view__journey-label" role="status" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+          <span class="user-map-view__journey-label" :title="journeyBarLabel">{{ journeyBarLabel }}</span>
+          <span class="sr-only" role="status" aria-live="polite">{{ journeyAnnouncement }}</span>
           <v-btn v-if="isPhone" id="map-navigation-search-toggle" icon="mdi-magnify" variant="text"
             aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان" aria-controls="map-navigation-search"
             :aria-expanded="navigationSearchOpen" @click="navigationSearchOpen = !navigationSearchOpen" />
@@ -285,7 +286,7 @@ import type { TransportProfile } from "@/api/mission-routing";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
-import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime } from "@/sos/navigation-telemetry";
+import { currentSpeedKmh, estimateRemainingRouteSeconds, formatRemainingTime, navigationStatusAnnouncement } from "@/sos/navigation-telemetry";
 import { navigationArrowBearing, navigationCameraOffset, navigationFollowZoom, type NavigationCamera } from "@/sos/navigation-follow";
 import CompanionDetailSheet from "@/components/map/CompanionDetailSheet.vue";
 import { reversePlace } from "@/api/geocoding";
@@ -729,6 +730,15 @@ watch([() => journey.plannedFrom.value, () => journey.sheetOpen.value], ([origin
   if (current?.lat === origin.lat && current.lon === origin.lon) return;
   originReverse.select(origin.lat, origin.lon);
 }, { flush: "sync" });
+// Do not make the changing distance a live region: announce the guidance phase only.
+const journeyAnnouncement = computed(() => navigationStatusAnnouncement({
+  navigationPending: journey.navigationPending.value,
+  calculating: journey.loading.value,
+  replanning: journey.replanning.value,
+  waitingForFix: journey.rerouteWaitingForFix.value,
+  remainingMetres: journey.remaining.value,
+  hasPosition: !!own.position.value
+}));
 const journeyBarLabel = computed(() => {
   if (!journey.navigating.value) return journey.title.value;
   if (journey.navigationPending.value) return journey.loading.value

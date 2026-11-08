@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { estimateRemainingRouteSeconds, currentSpeedKmh, formatRemainingTime } from "./navigation-telemetry";
+import { estimateRemainingRouteSeconds, currentSpeedKmh, formatRemainingTime, navigationStatusAnnouncement } from "./navigation-telemetry";
 
 const line = [[0, 0], [0.01, 0], [0.02, 0]] as const;
 
 describe("private navigation telemetry", () => {
+  it("announces guidance phases without narrating every changing distance", () => {
+    const active = { navigationPending: false, calculating: false, replanning: false,
+      waitingForFix: false, remainingMetres: 1500, hasPosition: true };
+    expect(navigationStatusAnnouncement(active)).toBe("راهبری فعال است");
+    expect(navigationStatusAnnouncement({ ...active, remainingMetres: 1490 })).toBe("راهبری فعال است");
+    expect(navigationStatusAnnouncement({ ...active, remainingMetres: 20 })).toBe("راهبری فعال است");
+    expect(navigationStatusAnnouncement({ ...active, remainingMetres: null })).toContain("فاصلهٔ باقیمانده نامشخص");
+    expect(navigationStatusAnnouncement({ ...active, remainingMetres: null, hasPosition: false })).toContain("در انتظار GPS");
+    expect(navigationStatusAnnouncement({ ...active, navigationPending: true, calculating: true })).toContain("در حال محاسبهٔ مسیر");
+    expect(navigationStatusAnnouncement({ ...active, navigationPending: true, calculating: false })).toContain("در انتظار GPS برای محاسبه");
+    expect(navigationStatusAnnouncement({ ...active, replanning: true })).toContain("در حال محاسبهٔ مسیر تازه");
+    expect(navigationStatusAnnouncement({ ...active, waitingForFix: true })).toContain("منتظر GPS دقیق");
+  });
+
   it("uses GPS speed in m/s only for a recent precise fix, never inventing it from route duration", () => {
     const fix = { lat: 0, lon: 0.01, accuracy: 10, speed: 10 };
     expect(currentSpeedKmh(fix, 100_000, 110_000)).toBe(36);

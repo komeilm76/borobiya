@@ -2,6 +2,25 @@ import type { TransportProfile, RoutePoint } from "@/api/mission-routing";
 import type { OwnMapFix } from "@/composables/use-own-map-position";
 import { deviationThreshold } from "@/map/route-deviation";
 
+export interface NavigationAnnouncementState {
+  navigationPending: boolean;
+  calculating: boolean;
+  replanning: boolean;
+  waitingForFix: boolean;
+  remainingMetres: number | null;
+  hasPosition: boolean;
+}
+
+/** Announce state transitions, not every GPS distance update in the visible guidance banner. */
+export function navigationStatusAnnouncement(state: NavigationAnnouncementState): string {
+  if (state.navigationPending) return state.calculating ? "در حال محاسبهٔ مسیر…" : "در انتظار GPS برای محاسبهٔ مسیر…";
+  if (state.replanning) return "در حال محاسبهٔ مسیر تازه…";
+  if (state.waitingForFix) return "منتظر GPS دقیق برای مسیر تازه…";
+  if (state.remainingMetres === null) return state.hasPosition
+    ? "GPS دقیق نیست؛ فاصلهٔ باقیمانده نامشخص است" : "در انتظار GPS؛ موقعیت زنده در دسترس نیست";
+  return "راهبری فعال است";
+}
+
 /** A browser GPS speed is metres/second; a route's average speed is NOT the vehicle's speed. */
 export function currentSpeedKmh(fix: OwnMapFix | null, observedAtMs: number | null, nowMs: number): number | null {
   if (!fix || fix.accuracy === null || !Number.isFinite(fix.accuracy) || fix.accuracy < 0 || fix.accuracy > 35 ||
