@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Fence rescuer history page reads after a manual choice (T4.4.2 partial)
+
+- The rescuer could choose a cached mission during a pending page request; the delayed result would then replace the visible list/page while leaving the selected detail on the old page. A pending off-page deep-link detail could also keep the list in a loading state after a manual choice. Manual selection now invalidates the interrupted operation: a cancelled **list read** leaves cached rows/count unverified until a successful retry, whereas a cancelled **detail-only** read preserves the already verified list. The internal detail read after a successful list still follows the existing selection flow. Deferred tests reproduced both races before the fix; 30 targeted history tests, all 1,272 client tests, client typecheck and repository lint passed. No live browser/API/VM flow was exercised; T4.4.2 remains open for the wider feedback audit.
+
 ### 2026-10-23 — Keep requester SOS history unverified after interrupting refresh (T4.4.2 partial)
 
 - A requester could select a cached SOS while its history refresh was pending. Selection invalidated the pending response and cleared `loading`, but left the old `listLoaded` flag set; the page then presented stale rows/count as verified and re-enabled the reason-gated cancellation action. The same false verification followed a confirmed cancellation that interrupted a pending list read. Both paths now mark the cached list unverified when they interrupt a read, retaining the stale-list warning and disabling cancellation until a successful retry; ordinary selection/cancellation after a settled read preserves verified state. Deferred regressions failed before the fix; 31 targeted composable/view tests, the full client suite (1,271 tests) and client typecheck passed. No live API/browser/VM cancellation was exercised, and the broader feedback audit remains open.

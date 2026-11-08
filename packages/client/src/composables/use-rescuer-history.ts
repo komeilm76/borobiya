@@ -26,11 +26,20 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
   let retryId: string | null = null;
   let generation = 0;
   let detailGeneration = 0;
+  let listReadPending = false;
 
   async function choose(id: string, preserveLinkFeedback = false): Promise<void> {
     const owner = userId.value;
     const bearer = token.value;
     if (!owner || !bearer || !items.value.some((item) => item.id === id)) return;
+    if (!preserveLinkFeedback && loading.value) {
+      // A manual choice interrupts either a pending page read or an off-page
+      // linked-detail lookup. Only the former makes the cached list unverified.
+      ++generation;
+      if (listReadPending) listLoaded.value = false;
+      listReadPending = false;
+      loading.value = false;
+    }
     const current = ++detailGeneration;
     if (!preserveLinkFeedback) {
       linkError.value = null;
@@ -69,6 +78,7 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
     const selectionVersion = detailGeneration;
     if (!owner || !token.value) { reset(); return; }
     loading.value = true;
+    listReadPending = true;
     error.value = null;
     linkError.value = null;
     linkRetryable.value = false;
@@ -78,6 +88,7 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
       if (current !== generation || userId.value !== owner || !token.value) return;
       const result = await listRescuerMissions(token.value, nextPage);
       if (current !== generation || userId.value !== owner) return;
+      listReadPending = false;
       items.value = result.items;
       page.value = nextPage;
       total.value = result.total;
@@ -120,12 +131,16 @@ export function useRescuerHistory(token: Ref<string | null>, userId: Ref<string 
       if (current === generation && userId.value === owner)
         error.value = sosApiErrorMessage(cause, "بارگذاری سابقهٔ مأموریت‌ها انجام نشد.");
     } finally {
-      if (current === generation) loading.value = false;
+      if (current === generation) {
+        listReadPending = false;
+        loading.value = false;
+      }
     }
   }
 
   function reset(): void {
     ++generation;
+    listReadPending = false;
     ++detailGeneration;
     items.value = [];
     selected.value = null;

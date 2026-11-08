@@ -112,7 +112,10 @@ describe("rescuer mission history", () => {
     try {
       const linked = state.load(1, otherId);
       await started.promise;
+      expect(state.listVerified.value).toBe(false);
       await state.choose(id);
+      expect(state.loading.value).toBe(false);
+      expect(state.listVerified.value).toBe(true); // list succeeded before the linked detail was interrupted
       rejectDetail(new ApiError(503, "UNAVAILABLE", "Offline"));
       await linked;
       expect(state.selected.value?.id).toBe(id);
@@ -176,6 +179,36 @@ describe("rescuer mission history", () => {
       waiting.resolve(detail);
       await first;
       expect(state.selected.value?.id).toBe(otherId);
+    } finally { scope.stop(); }
+  });
+
+  it("keeps cached selection and list unverified when a pending page read is interrupted", async () => {
+    const other = { ...mission, id: otherId };
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [mission, other], total: 2, totalPages: 1 });
+    const scope = effectScope();
+    const state = scope.run(() => useRescuerHistory(ref("token"), ref(rescuer)))!;
+    try {
+      await state.load();
+      const waiting = pending<{ items: Mission[]; total: number; totalPages: number }>();
+      vi.mocked(listRescuerMissions).mockReturnValueOnce(waiting.promise);
+      const nextPage = state.load(2);
+      expect(state.listVerified.value).toBe(false);
+      vi.mocked(getMission).mockResolvedValueOnce({ ...detail, id: otherId });
+      await state.choose(otherId); // the user picks an actual cached row while page 2 is on the wire
+      expect(state.selected.value?.id).toBe(otherId);
+      expect(state.loading.value).toBe(false);
+      expect(state.listVerified.value).toBe(false);
+      waiting.resolve({ items: [mission], total: 2, totalPages: 2 });
+      await nextPage;
+      expect(state.page.value).toBe(1);
+      expect(state.items.value).toEqual([mission, other]);
+      expect(state.requestedId.value).toBe(otherId);
+      expect(state.listVerified.value).toBe(false); // a discarded reply cannot certify cached rows
+      vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [mission, other], total: 2, totalPages: 1 });
+      vi.mocked(getMission).mockResolvedValueOnce({ ...detail, id: otherId });
+      await state.load();
+      expect(state.selected.value?.id).toBe(otherId);
+      expect(state.listVerified.value).toBe(true);
     } finally { scope.stop(); }
   });
 
