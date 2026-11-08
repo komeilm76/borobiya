@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationSharesResponse } from "@shared/index";
 import type { RealtimeClient } from "@/services/socket";
 import { DISCARD_AFTER_MS, STALE_AFTER_MS } from "@/live/companion-locations";
-import { PEER_TICK_MS, SHARE_VERIFY_MS, useLiveCompanions } from "./use-live-companions";
+import { PEER_TICK_MS, SHARE_READ_DEADLINE_MS, SHARE_VERIFY_MS, useLiveCompanions } from "./use-live-companions";
 
 /**
  * The receiver's wiring: what a share read does to the map, what a socket event does, and what a
@@ -48,6 +48,7 @@ interface Harness {
   readonly socket: FakeSocket;
   readonly api: ReturnType<typeof useLiveCompanions>;
   readonly reads: () => number;
+  readonly readSignals: () => readonly (AbortSignal | undefined)[];
   readonly token: Ref<string | null>;
   readonly setOwnUserId: (value: string | null) => void;
   readonly closeCalls: () => number;
@@ -79,11 +80,13 @@ function mount(
     { id: ALICE, username: "مریم", lastLocation: { lat: 35.7, lon: 51.4 } }
   ];
   let reads = 0;
+  const readSignals: (AbortSignal | undefined)[] = [];
   let pending: (() => void)[] = [];
   let failNext = false;
 
-  const readShares = vi.fn(async () => {
+  const readShares = vi.fn(async (_token: string, signal?: AbortSignal) => {
     reads += 1;
+    readSignals.push(signal);
     // Model an HTTP response computed before a later revoke, but delivered after its socket event.
     const snapshot = options.captureReadSnapshot ? [...owners] : null;
     if (options.blockReads) {
@@ -135,6 +138,7 @@ function mount(
     updateTokenCalls: () => updateToken.mock.calls.length,
     connectCalls: () => connect.mock.calls.length,
     reads: () => reads,
+    readSignals: () => readSignals,
     resolveRead: () => {
       const waiting = pending;
       pending = [];
@@ -213,6 +217,30 @@ describe("useLiveCompanions", () => {
       await settle();
       expect(harness.api.readPending.value).toBe(false);
       expect(harness.api.status.value.line).toContain("هنوز کسی");
+    } finally { harness.scope.stop(); }
+  });
+
+  it("ends a stalled first list read with Retry and fences its late reply after recovery", async () => {
+    const harness = mount({ blockReads: true, captureReadSnapshot: true });
+    try {
+      expect(harness.api.readPending.value).toBe(true);
+      expect(harness.api.status.value.line).toContain("در حال بررسی اشتراک");
+      await vi.advanceTimersByTimeAsync(SHARE_READ_DEADLINE_MS);
+      await settle();
+      expect(harness.api.readPending.value).toBe(false);
+      expect(harness.api.readFailed.value).toBe(true);
+      expect(harness.api.status.value.line).toContain("دوباره تلاش کنید");
+      expect(harness.readSignals()[0]?.aborted).toBe(true);
+
+      harness.setShares([]);
+      const retry = harness.api.refresh();
+      expect(harness.api.readPending.value).toBe(true);
+      harness.resolveRead(); // Both the old, stalled read and the new read resolve together.
+      await retry;
+      await settle();
+      expect(harness.api.readFailed.value).toBe(false);
+      expect(harness.api.status.value.line).toContain("هنوز کسی");
+      expect(harness.peers()).toEqual([]); // The old grant was never repainted.
     } finally { harness.scope.stop(); }
   });
 
@@ -653,7 +681,7 @@ describe("useLiveCompanions", () => {
     await settle();
 
     expect(ensureSession).toHaveBeenCalledTimes(1);
-    expect(readShares).toHaveBeenCalledWith("fresh-map-token");
+    expect(readShares).toHaveBeenCalledWith("fresh-map-token", expect.any(AbortSignal));
     expect(api.status.value.line).not.toContain("خوانده نشد");
     scope.stop();
   });
@@ -714,6 +742,7 @@ describe("useLiveCompanions", () => {
     await settle();
     expect(harness.reads()).toBe(1);
     harness.token.value = null;
+    expect(harness.readSignals()[0]?.aborted).toBe(true);
     await nextTick();
     harness.resolveRead();
     await settle();

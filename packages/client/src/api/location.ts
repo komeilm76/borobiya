@@ -97,8 +97,8 @@ export async function createLocationShare(
 }
 
 /** Both directions of the live-share list in one round trip (My Shares and Shared With Me). */
-export async function listLocationShares(accessToken: string): Promise<LocationSharesResponse> {
-  const response = await requestJson<unknown>(apiRoutes.location.listShares.url, { accessToken });
+export async function listLocationShares(accessToken: string, signal?: AbortSignal): Promise<LocationSharesResponse> {
+  const response = await requestJson<unknown>(apiRoutes.location.listShares.url, { accessToken, signal });
   return locationSharesResponseSchema.parse(response);
 }
 

@@ -29,6 +29,8 @@ import {
 export const PEER_TICK_MS = 5_000;
 /** Bound stale grants if a share-ended notification is lost without a socket disconnect. */
 export const SHARE_VERIFY_MS = 60_000;
+/** A half-open grant-list request must eventually expose Retry, even if abort is ignored. */
+export const SHARE_READ_DEADLINE_MS = 12_000;
 
 function bearerBelongsToOwner(token: string, owner: string): boolean {
   // This is only a conservative display gate, never authentication: the server
@@ -59,7 +61,7 @@ export interface UseLiveCompanionsOptions {
   openSocket?: (token: string) => RealtimeClient | Promise<RealtimeClient>;
   /** Refreshes the access token via the HttpOnly refresh cookie if a reconnect hits an expired JWT. */
   ensureSession?: () => Promise<unknown>;
-  readShares?: (token: string) => Promise<Pick<LocationSharesResponse, "sharedWithMe">>;
+  readShares?: (token: string, signal?: AbortSignal) => Promise<Pick<LocationSharesResponse, "sharedWithMe">>;
   now?: () => number;
   tickMs?: number;
 }
@@ -92,7 +94,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
       const { createRealtimeClient: create } = await import("@/services/socket");
       return create(token);
     });
-  const readShares = options.readShares ?? ((token: string) => listLocationShares(token));
+  const readShares = options.readShares ?? ((token: string, signal?: AbortSignal) => listLocationShares(token, signal));
   const clock = options.now ?? (() => Date.now());
   const tickMs = options.tickMs ?? PEER_TICK_MS;
 
@@ -114,6 +116,30 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
   let refreshing = false;
   let activeReads = 0;
   let readsGeneration = 0;
+  const shareReadControllers = new Set<AbortController>();
+  async function readSharesWithDeadline(token: string): Promise<Pick<LocationSharesResponse, "sharedWithMe">> {
+    const controller = new AbortController();
+    shareReadControllers.add(controller);
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    let onAbort = () => {};
+    const deadline = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new Error("SHARE_READ_ABORTED"));
+      controller.signal.addEventListener("abort", onAbort, { once: true });
+      timeout = setTimeout(() => {
+        reject(new Error("SHARE_READ_TIMEOUT"));
+        controller.abort();
+      }, SHARE_READ_DEADLINE_MS);
+    });
+    try { return await Promise.race([readShares(token, controller.signal), deadline]); }
+    finally {
+      if (timeout !== null) clearTimeout(timeout);
+      controller.signal.removeEventListener("abort", onAbort);
+      shareReadControllers.delete(controller);
+    }
+  }
+  function cancelShareReads(): void {
+    for (const controller of shareReadControllers) controller.abort();
+  }
   let refreshingAuth = false;
   let inRefreshRetry = false;
   let authGeneration = 0;
@@ -169,6 +195,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     // Invalidate older HTTP replies before even awaiting a session refresh. Otherwise
     // a sign-out/revocation during that await can resurrect another account's peers.
     const request = ++requestId;
+    cancelShareReads();
     // A retry after an unverified first read is checking again, not a confirmed empty list.
     if (!sharesVerified.value) readFailed.value = false;
     const owner = options.ownUserId.value;
@@ -194,7 +221,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
     activeReads++;
     refreshing = true;
     try {
-      const shares = await readShares(token);
+      const shares = await readSharesWithDeadline(token);
       if (request !== requestId || options.accessToken.value !== token || options.ownUserId.value !== owner || disposed) return;
       applyShares(shares);
     } catch (error) {
@@ -211,7 +238,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
           if (nextToken && nextToken !== token) {
             const retryRequest = ++requestId;
             try {
-              const retried = await readShares(nextToken);
+              const retried = await readSharesWithDeadline(nextToken);
               if (retryRequest === requestId && options.accessToken.value === nextToken &&
                 options.ownUserId.value === owner && !disposed) applyShares(retried);
             } catch {
@@ -332,6 +359,7 @@ export function useLiveCompanions(options: UseLiveCompanionsOptions) {
 
   function clearPrivateState(): void {
     requestId++;
+    cancelShareReads();
     readsGeneration++;
     activeReads = 0;
     refreshing = false;

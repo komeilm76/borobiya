@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound companion grant reads (T4.4.2 partial)
+
+- A grant-list request could leave the Companions card showing its initial checking state forever. Reads now time out after 12 seconds and expose the existing error/Retry feedback even if a test adapter ignores abort. The production fetch receives an abort signal; a superseded read, sign-out or account switch aborts it, and late replies cannot repaint a newer retry. A fake-timer regression reproduced the indefinite wait before the change; API signal forwarding and composable cleanup are covered without mounting Vue. T4.4.2 remains open for broader feedback and browser/device network acceptance.
+
 ### 2026-10-23 — Show unverified companion grants as checking (T4.4.2 partial)
 
 - The Companions card now shows an accessible checking message and decorative skeleton while its first grant-list read is pending, instead of asserting that nobody has shared and showing an unverified zero count. An empty state appears only after a successful list response; failures still offer retry, and retries return to checking until verified. Previously verified peers remain visible during later refreshes. Pure/composable and nonmounted UI contracts cover the change; T4.4.2 remains open for the rest of the site and browser/device acceptance.

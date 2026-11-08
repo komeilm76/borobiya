@@ -175,8 +175,10 @@ describe("live share calls", () => {
   it("lists both directions", async () => {
     const payload = { owned: created.shares.map((row) => ({ ...row, targetUsername: "satellite" })), sharedWithMe: [] };
     const fetchMock = stubFetch(() => jsonResponse(payload));
-    await expect(listLocationShares(token)).resolves.toEqual(payload);
+    const signal = new AbortController().signal;
+    await expect(listLocationShares(token, signal)).resolves.toEqual(payload);
     expect((fetchMock.mock.calls[0] as unknown as [string])[0]).toBe("/api/_user/location/shares");
+    expect((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].signal).toBe(signal);
   });
 
   it("revokes one share by id", async () => {
