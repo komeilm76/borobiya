@@ -1,4 +1,4 @@
-import { computed, ref, watch, type ComputedRef, type Ref } from "vue";
+import { computed, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { LocationShare, UserDevice } from "@shared/index";
 import { fetchUserDevices } from "@/api/devices";
 import { listLocationShares } from "@/api/location";
@@ -18,6 +18,9 @@ import { decodeAccessTokenClaims, ownDeviceId } from "@/composables/device-ident
  *   session when the share was created (T2.3.3's auto-pin rule), so any of its devices may send; treating
  *   a null as “somebody else's” would report the opposite of what the server does.
  */
+/** A half-open priority snapshot must not keep the Start action in "connecting" forever. */
+export const PRIORITY_READ_DEADLINE_MS = 12_000;
+
 export interface UsePriorityDeviceOptions {
   accessToken: ComputedRef<string | null> | Ref<string | null>;
   /** The authenticated account, independently of the bearer (which may rotate within a session). */
@@ -39,6 +42,7 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
   /** When the two lists were last read, so a caller can age its own sentence instead of guessing. */
   const loadedAtMs = ref<number | null>(null);
   let readVersion = 0;
+  let activeRead: AbortController | null = null;
   // Null while signed out or while the account and token belong to different users during a switch.
   // Access-token renewal for the same account/session must not discard a last-good answer.
   const sessionKey = computed(() => {
@@ -74,6 +78,8 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
 
   function clear(): void {
     ++readVersion; // Also invalidates responses already on the wire, not just the displayed rows.
+    activeRead?.abort();
+    activeRead = null;
     devices.value = [];
     liveShares.value = [];
     loadedAtMs.value = null;
@@ -89,6 +95,8 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
 
   async function refresh(): Promise<void> {
     const version = ++readVersion;
+    activeRead?.abort();
+    activeRead = null;
     const startingOwner = options.ownerId.value;
     let accessToken = options.accessToken.value;
     if (!accessToken && options.ensureSession) {
@@ -105,36 +113,54 @@ export function usePriorityDevice(options: UsePriorityDeviceOptions) {
       clear();
       return;
     }
-    const isCurrent = () => version === readVersion && sessionKey.value === key;
+    const controller = new AbortController();
+    activeRead = controller;
+    const isCurrent = () => version === readVersion && sessionKey.value === key && !controller.signal.aborted;
+    let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+    let onAbort = () => {};
+    const deadline = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new Error("PRIORITY_READ_ABORTED"));
+      controller.signal.addEventListener("abort", onAbort, { once: true });
+      deadlineTimer = setTimeout(() => controller.abort(), PRIORITY_READ_DEADLINE_MS);
+    });
     loading.value = true;
     try {
-      const [deviceList, shares] = await Promise.all([
-        fetchUserDevices(accessToken),
-        listLocationShares(accessToken)
+      const read = Promise.all([
+        fetchUserDevices(accessToken, controller.signal),
+        listLocationShares(accessToken, controller.signal)
       ]).catch(async (error: unknown) => {
         if (isCurrent() && (error as { status?: unknown } | null)?.status === 401 && options.ensureSession) {
           await options.ensureSession();
           const refreshed = options.accessToken.value;
           if (isCurrent() && refreshed && refreshed !== accessToken) {
-            return Promise.all([fetchUserDevices(refreshed), listLocationShares(refreshed)]);
+            return Promise.all([
+              fetchUserDevices(refreshed, controller.signal),
+              listLocationShares(refreshed, controller.signal)
+            ]);
           }
         }
         throw error;
       });
+      // Abort alone is insufficient: a transport or auth refresh may ignore it indefinitely.
+      const [deviceList, shares] = await Promise.race([read, deadline]);
       if (!isCurrent()) return;
       devices.value = deviceList;
       liveShares.value = shares.owned;
       loadedAtMs.value = Date.now();
       failed.value = false;
     } catch {
-      if (!isCurrent()) return;
-      // A failed refresh keeps the previous *same-session* answer: a failed read is not evidence
-      // that this device's priority changed. Account/session changes clear it synchronously above.
+      if (version !== readVersion || sessionKey.value !== key) return;
+      // Timeout or failure keeps the previous *same-session* answer, never guesses a new priority.
       failed.value = true;
     } finally {
-      if (isCurrent()) loading.value = false;
+      if (deadlineTimer !== null) clearTimeout(deadlineTimer);
+      controller.signal.removeEventListener("abort", onAbort);
+      if (activeRead === controller) activeRead = null;
+      if (version === readVersion && sessionKey.value === key) loading.value = false;
     }
   }
+
+  onScopeDispose(clear);
 
   return {
     ownId,

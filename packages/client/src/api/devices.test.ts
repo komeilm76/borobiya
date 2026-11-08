@@ -39,6 +39,13 @@ describe("fetchUserDevices", () => {
     expect(new Headers(calls[0]!.init.headers).get("authorization")).toBe("Bearer access-token");
   });
 
+  it("forwards a cancellation signal for bounded priority reads", async () => {
+    const calls = stubFetch([row]);
+    const controller = new AbortController();
+    await fetchUserDevices("access-token", controller.signal);
+    expect(calls[0]!.init.signal).toBe(controller.signal);
+  });
+
   it("rejects a wrapped or malformed payload at the boundary", async () => {
     // `{ devices: [...] }` is the shape a paginated endpoint would answer; this one does not paginate, so
     // the parse failing here is the contract check, not a bug.

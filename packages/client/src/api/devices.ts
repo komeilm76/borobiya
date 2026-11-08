@@ -12,8 +12,8 @@ import { requestJson } from "./http";
  * device is *absent* rather than listed as offline. The panel therefore describes "دستگاه‌های فعال" and
  * never claims to show every device the account ever had.
  */
-export async function fetchUserDevices(accessToken: string): Promise<UserDevice[]> {
-  const response = await requestJson<unknown>(apiRoutes.user.devices.url, { accessToken });
+export async function fetchUserDevices(accessToken: string, signal?: AbortSignal): Promise<UserDevice[]> {
+  const response = await requestJson<unknown>(apiRoutes.user.devices.url, { accessToken, signal });
   return devicesSchema.parse(response);
 }
 

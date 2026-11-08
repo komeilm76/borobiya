@@ -292,6 +292,88 @@ describe("deriving from the two lists", () => {
     expect(api.failed.value).toBe(false);
   });
 
+  it("ends a stalled device read so Start is not stuck waiting for a priority snapshot", async () => {
+    const { api, scope } = mount();
+    let release!: (response: Response) => void;
+    const pendingDevices = new Promise<Response>((resolve) => { release = resolve; });
+    const signals: AbortSignal[] = [];
+    globalThis.fetch = vi.fn(async (input: unknown, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/_user/devices")) {
+        if (init?.signal) signals.push(init.signal);
+        return pendingDevices; // Simulate a transport that ignores abort.
+      }
+      return jsonResponse(okResponder(url).body, 200);
+    }) as unknown as typeof fetch;
+
+    const oldRead = api.refresh();
+    await settle();
+    expect(api.loading.value).toBe(true);
+    await vi.advanceTimersByTimeAsync(12_000);
+    await oldRead;
+    expect(api.loading.value).toBe(false);
+    expect(api.failed.value).toBe(true);
+    expect(api.hasData.value).toBe(false);
+    expect(signals[0]?.aborted).toBe(true);
+
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      return jsonResponse(okResponder(url).body, 200);
+    }) as unknown as typeof fetch;
+    await api.refresh();
+    expect(api.failed.value).toBe(false);
+    expect(api.devices.value).toHaveLength(2);
+    release(jsonResponse([deviceRow(LAPTOP)], 200));
+    await settle();
+    expect(api.devices.value[0]?.deviceId).toBe(PHONE);
+    scope.stop();
+  });
+
+  it("ends a stalled share read while preserving the last verified priority answer", async () => {
+    const { api, scope } = mount();
+    await api.refresh();
+    const original = api.liveShares.value.map((share) => share.id);
+    globalThis.fetch = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      return url.endsWith("/_user/location/shares")
+        ? new Promise<Response>(() => {})
+        : jsonResponse(okResponder(url).body, 200);
+    }) as unknown as typeof fetch;
+    const pending = api.refresh();
+    await vi.advanceTimersByTimeAsync(12_000);
+    await pending;
+    expect(api.loading.value).toBe(false);
+    expect(api.failed.value).toBe(true);
+    expect(api.liveShares.value.map((share) => share.id)).toEqual(original);
+    scope.stop();
+  });
+
+  it("does not replay a timed-out 401 read after late session recovery", async () => {
+    const accessToken = ref<string | null>(token(PHONE));
+    let release!: () => void;
+    const recovery = new Promise<void>((resolve) => { release = resolve; });
+    const ensureSession = vi.fn(async () => { await recovery; accessToken.value = token(PHONE, "user-1", "new-session"); });
+    const scope = effectScope();
+    const api = scope.run(() => usePriorityDevice({ accessToken, ownerId: ref("user-1"), ensureSession }))!;
+    const fetchMock = vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.endsWith("/_user/devices")) return jsonResponse({ code: "UNAUTHORIZED", message: "Expired", issues: [] }, 401);
+      return jsonResponse(okResponder(url).body, 200);
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    const pending = api.refresh();
+    await settle();
+    expect(ensureSession).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(12_000);
+    await pending;
+    expect(api.loading.value).toBe(false);
+    release();
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2); // No retry with a later bearer.
+    expect(api.devices.value).toEqual([]);
+    scope.stop();
+  });
+
   it("keeps the last good answer when a refresh fails", async () => {
     const { api } = mount();
     await api.refresh();

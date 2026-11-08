@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound priority reads before starting live broadcast (T4.4.2 partial)
+
+- The app-scoped broadcast Start waits for a device/owned-share snapshot before starting GPS. A hung device or share request could hold Start in “connecting” without a recovery path. Added one 12-second deadline spanning the snapshot and 401 recovery, with abort signals forwarded to both requests, cancellation on session change/superseding refresh/disposal, and late-result fencing even for transports that ignore abort. A failure preserves the last verified same-session answer and releases the pending Start; the server still determines which device may publish to each share. Two stalled-read regressions timed out before the fix and now pass alongside signal-forwarding and late-401 checks; 32 focused tests, all 1,297 client tests and client typecheck passed. No browser/network/GPS/device acceptance was performed; T4.4.2 remains open.
+
 ### 2026-10-23 — Keep share creation and retry feedback visible (T4.4.2 partial)
 
 - The live/history share form disabled its Close action while posting a grant but Vuetify's default Escape/backdrop/Back behavior could still dismiss it, even though the server write might commit. Its multi-device chooser also obscured errors from a failed device-pinned retry, because the error was rendered only in the underlying form. Bound the main dialog's persistent state to the pending write and put retry errors in the chooser while hiding the duplicate underlying alert. Two nonmounted source regressions failed before the edit; 13 focused tests, all 1,293 client tests, client typecheck and repository lint passed. This does not undo already-posted grants. Browser/keyboard, live multi-device/API and wider T4.4.2 acceptance remain open.
