@@ -12,6 +12,13 @@ describe("privacy-sensitive share list feedback", () => {
     expect(shareSectionPresentation(true, true, 0)).toBe("loading");
   });
 
+  it("bounds both grant-list reads and cancels stale requests on refresh, logout or unmount", () => {
+    expect(source).toContain("readShareListWithinDeadline((signal) => listLocationShares(token, signal), controller.signal)");
+    expect(source).toContain("readShareListWithinDeadline((signal) => listLocationHistoryShares(token, signal), controller.signal)");
+    expect(source).toContain("readController?.abort();");
+    expect(source).toContain("if (version !== readVersion) return;");
+  });
+
   it("keeps known rows on screen even when a subsequent refresh fails", () => {
     expect(shareSectionPresentation(true, false, 2)).toBe("rows");
     expect(shareSectionPresentation(false, false, 2)).toBe("rows");

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound both share-management list reads (T4.4.2 partial)
+
+- The location-sharing page used `Promise.allSettled` on live and history grant requests without a deadline: one stalled request kept the skeleton/Refresh action blocked and withheld the other list's successful response indefinitely. Each request now has its own 12-second deadline and abort signal. A successful source is retained as verified while a stalled source becomes retryable/unavailable, never verified empty. New refreshes, session changes and unmount abort old reads; existing version checks fence late responses even when an HTTP adapter ignores abort. Pure fake-timer and nonmounted source tests cover this; actual browser/device network behavior and the wider T4.4.2 feedback audit remain open.
+
 ### 2026-10-23 — Bound history-track reads (T4.4.2 partial)
 
 - Own-history and shared-history track fetches could remain loading forever on a half-open request, blocking playback controls with no visible recovery. Both now share the grant-list's 12-second deadline; timeout exposes the request failure and a 44px Retry action for the same range or selected grant, while distinguishing it from a server-confirmed revoked grant. Abort signals reach both API calls, and replacing a range/source, revoking a selected grant, switching accounts, signing out or disposing the panel cancels the old track request. Late responses cannot repaint a successful retry. Fake-timer regressions failed before the fix and pass for both routes without mounting Vue; browser/device network behavior and wider T4.4.2 acceptance remain open.

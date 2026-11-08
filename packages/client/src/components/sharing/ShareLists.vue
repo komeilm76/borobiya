@@ -247,6 +247,7 @@ import {
   type ShareRowKind
 } from "@/sharing/share-form";
 import { shareSectionPresentation } from "@/sharing/share-list-presentation";
+import { readShareListWithinDeadline } from "@/sharing/share-list-read";
 import { createShareEndedSubscription } from "@/sharing/share-list-session";
 import { createShareSubmissionFence, shareSessionKey } from "@/sharing/share-submission-fence";
 
@@ -301,6 +302,7 @@ const liveFresh = ref(false);
 const historyFresh = ref(false);
 const loadError = ref<string | null>(null);
 let readVersion = 0;
+let readController: AbortController | null = null;
 const owned = ref<OwnedLocationShare[]>([]);
 const received = ref<ReceivedLocationShare[]>([]);
 const ownedHistory = ref<OwnedLocationHistoryShare[]>([]);
@@ -411,6 +413,9 @@ const receivedState = computed(() => shareSectionPresentation(loading.value, liv
 
 async function refresh(): Promise<void> {
   const version = ++readVersion;
+  readController?.abort();
+  const controller = new AbortController();
+  readController = controller;
   loading.value = true;
   loadError.value = null;
   // Re-read the clock with the data, so a manual refresh never shows a countdown measured against the
@@ -435,7 +440,10 @@ async function refresh(): Promise<void> {
     }
     // Both lists in parallel, but a failure of either one must not discard the other's successful
     // read. In particular, no failed read may support the claim that nobody has access.
-    const [live, history] = await Promise.allSettled([listLocationShares(token), listLocationHistoryShares(token)]);
+    const [live, history] = await Promise.allSettled([
+      readShareListWithinDeadline((signal) => listLocationShares(token, signal), controller.signal),
+      readShareListWithinDeadline((signal) => listLocationHistoryShares(token, signal), controller.signal)
+    ]);
     if (version !== readVersion) return;
     liveFresh.value = live.status === "fulfilled";
     historyFresh.value = history.status === "fulfilled";
@@ -461,6 +469,7 @@ async function refresh(): Promise<void> {
     historyFresh.value = false;
     loadError.value = `${friendlyErrorMessage(error, "فهرست اشتراک‌ها را نشد دید؛ دوباره تلاش کنید.")} ردیف‌های موجود ممکن است قدیمی باشند.`;
   } finally {
+    if (readController === controller) readController = null;
     if (version === readVersion) {
       loaded.value = true;
       loading.value = false;
@@ -611,6 +620,7 @@ function resetShareRows(): void {
   // A logout, account change, or new JWT login must invalidate reads and privacy writes before
   // an old bearer can update this session's rows or announce a false success.
   readVersion += 1;
+  readController?.abort();
   revocationFence.invalidate();
   revoking.value = false;
   pendingRevocation.value = null;
@@ -674,6 +684,7 @@ onBeforeUnmount(() => {
   disposed = true;
   revocationFence.invalidate();
   readVersion += 1;
+  readController?.abort();
   shareSync.close();
 });
 onMounted(refresh);
