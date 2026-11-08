@@ -175,6 +175,7 @@ describe('architecture guards', () => {
       'admin-layout.test.ts',
       'settings-view.test.ts',
       'app-shell.test.ts',
+      'users-service.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
