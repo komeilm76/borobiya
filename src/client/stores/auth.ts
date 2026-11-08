@@ -101,11 +101,28 @@ export const useAuthStore = defineStore('auth', () => {
     await post('/_auth/recovery/reset', { recoveryId, resetToken, newPassword });
   }
 
-  /** Loads the active device list for the profile screen. */
+  /**
+   * Loads the active device list for the profile screen.
+   *
+   * A failed read must not reject into the view's `void` call: an expired session would become an
+   * unhandled rejection with no feedback, so an unauthorized response clears the local user (the
+   * router guard then redirects) and any other failure is reported through `error`.
+   */
   async function loadDevices(): Promise<SessionView[]> {
-    const response = await get<{ items: SessionView[] }>('/_user/devices');
-    devices.value = response.items ?? [];
-    return devices.value;
+    try {
+      const response = await get<{ items: SessionView[] }>('/_user/devices');
+      devices.value = response.items ?? [];
+      error.value = null;
+      return devices.value;
+    } catch (caught) {
+      if (caught instanceof ApiError && (caught.status === 401 || caught.status === 403)) {
+        user.value = null;
+        devices.value = [];
+        return [];
+      }
+      error.value = caught instanceof Error ? caught.message : 'فهرست دستگاه‌ها خوانده نشد.';
+      return devices.value;
+    }
   }
 
   /** Revokes a single device session. */

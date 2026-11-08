@@ -33,6 +33,8 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - Preview-proxy trusted headers with sanitized `FRAME_ANCESTORS` (empty stays deny-by-default; no wildcard default), plus the omission of the conflicting `X-Frame-Options` header when frame ancestors are explicitly allowed.
 - One-use IP-bound WebSocket tickets, audience-filtered durable events, cursor sync, presence, live location fan-out, SOS fan-out and binary push-to-talk.
 - Sign-in accepts any provisioned secret while the 12-character/letters-and-numbers policy still applies where a password is chosen, so the documented bootstrap administrator password works on a fresh install.
+- A push-to-talk hold streams for its whole duration; the per-frame payload ceiling is no longer mistaken for a session budget.
+- An expired session during the profile device read clears the local session and redirects instead of raising an unhandled rejection.
 - The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree.
 - Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
 - Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.
@@ -41,7 +43,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 
 `bun run check` is the gate: it builds the Vue bundle and the service worker, typechecks the Bun server (`tsc`), typechecks the Vue client (`vue-tsc --noEmit`), runs the English-only documentation and clean-rebuild guard, and executes the Vitest suite with coverage. `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and `./boro deploy:check` complete the release gate.
 
-The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, Vuetify component mounting, all 20 routed views plus the route guard, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
+The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, Vuetify component mounting, all 20 routed views plus the route guard, the mobile shell's realtime, geolocation and hold-to-SOS behaviour, Pinia stores, composables, the browser WebSocket transport and push-to-talk codec, and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
 
 Professional visual acceptance against the canonical PNG references remains a deliberately deferred human review: this release contains no browser-driven end-to-end sign-off, no screenshot comparison and no real-device testing.
 

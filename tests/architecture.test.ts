@@ -156,6 +156,7 @@ describe('architecture guards', () => {
       'stores.test.ts',
       'composables.test.ts',
       'views.test.ts',
+      'map-shell.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
