@@ -49,18 +49,26 @@ export interface SavedPlaceView {
 
 /** A bounded live or historical location share. */
 export interface ShareView {
-  shareId: string;
+  /** Primary key as the API returns it; also the value the revoke endpoint takes. */
+  id: string;
   ownerId: string;
   recipientId: string;
+  ownerUsername?: string;
+  recipientUsername?: string;
   kind: 'live' | 'history';
+  durationSeconds?: number;
   expiresAt: number | null;
+  historyFrom?: number | null;
+  historyTo?: number | null;
   createdAt: number;
+  revokedAt?: number | null;
 }
 
 /** An SOS request as shown to requesters, responders and administrators. */
 export interface SosView {
   id: string;
-  trackingCode: string;
+  /** Tracking number as the server serializes it: an integer, not a string. */
+  trackingCode: number;
   requesterId: string;
   requesterUsername?: string;
   incidentTypeId: string;
@@ -77,7 +85,8 @@ export interface SosView {
   createdAt: number;
   updatedAt: number;
   mission?: MissionView | null;
-  timeline: TimelineEntry[];
+  /** Only the detail endpoint attaches the audit trail; the list omits it. */
+  timeline?: TimelineEntry[];
 }
 
 /** One entry in the SOS timeline. */
@@ -87,13 +96,17 @@ export interface TimelineEntry {
   toStatus: string;
   note?: string | null;
   createdAt: number;
+  actorUsername?: string;
 }
 
 /** A responder mission. */
 export interface MissionView {
   id: string;
   sosId: string;
+  trackingCode: number;
   responderId: string;
+  requesterId: string;
+  incidentLabel: string;
   status: MissionStatus;
   rating?: number | null;
   ratingNote?: string | null;
@@ -116,10 +129,12 @@ export interface LiveFixView {
 /** Vector map configuration returned by the public API. */
 export interface MapConfigView {
   center: { latitude: number; longitude: number };
-  zoom: number;
+  /** Initial zoom level; the field is not named `zoom`. */
+  defaultZoom: number;
   bounds: number[];
   minZoom: number;
   maxZoom: number;
+  tileSize: number;
   tileTemplate: string;
   offline: boolean;
   attribution: string;
@@ -129,11 +144,20 @@ export interface MapConfigView {
 /** Administrator overview payload. */
 export interface OverviewView {
   kpis: Record<string, number>;
-  trend: Array<{ label: string; value: number }>;
-  statuses: Array<{ status: string; count: number }>;
-  recent: SosView[];
-  seriesColors: string[];
-  generatedAt: number;
+  /** Requests per day for the last week, oldest first. */
+  trend: Array<{ day: string; count: number }>;
+  /** Count keyed by SOS status, not an array. */
+  statusCounts: Record<string, number>;
+  recentRequests: Array<{
+    id: string;
+    status: SosStatus;
+    severity: string;
+    incidentLabel: string;
+    requesterUsername: string;
+    createdAt: number;
+  }>;
+  groups: GroupView[];
+  alerts: AlertView[];
 }
 
 /** A service group. */
@@ -145,6 +169,7 @@ export interface GroupView {
   status: string;
   incidentIds: string[];
   memberCount: number;
+  coverageCount: number;
 }
 
 /** An operational alert. */
@@ -153,9 +178,9 @@ export interface AlertView {
   kind: string;
   severity: 'info' | 'warning' | 'danger';
   message: string;
-  meta: Record<string, unknown>;
   createdAt: number;
   resolvedAt: number | null;
+  resolvedBy: string | null;
 }
 
 /** A paged administrator user record. */
@@ -163,13 +188,16 @@ export interface AdminUserView {
   id: string;
   username: string;
   role: Role;
-  isActive: boolean;
+  /** Whether the account may sign in; the administrator routes call it `active`. */
+  active: boolean;
   securityReady: boolean;
+  mustCompleteSecurityQuestions: boolean;
   readyForMission: boolean;
   averageRating: number;
+  sessionCount: number;
+  online: boolean;
   createdAt: number;
-  lastLoginAt?: number | null;
-  activeSessions?: number;
+  updatedAt: number;
 }
 
 /** A system setting row. */
@@ -191,7 +219,6 @@ export interface AuditEntryView {
   createdAt: number;
 }
 
-/** A device/session row for the profile screen. */
 /** One active device session, as `GET /_user/devices` returns it. */
 export interface SessionView {
   /** Session identifier, and the value the revoke endpoint takes. */

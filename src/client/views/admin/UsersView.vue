@@ -71,14 +71,14 @@ onMounted(() => void admin.loadUsers());
             <td>{{ item.username }}</td>
             <td>{{ item.role }}</td>
             <td>
-              <span class="status-pill" :class="item.isActive ? 'status-pill--success' : 'status-pill--neutral'">
-                {{ item.isActive ? 'فعال' : 'غیرفعال' }}
+              <span class="status-pill" :class="item.active ? 'status-pill--success' : 'status-pill--neutral'">
+                {{ item.active ? 'فعال' : 'غیرفعال' }}
               </span>
             </td>
             <td>{{ format.number(item.averageRating.toFixed(1)) }}</td>
             <td>
-              <button type="button" class="admin-action" @click="toggle(item.id, !item.isActive)">
-                {{ item.isActive ? 'غیرفعال کردن' : 'فعال کردن' }}
+              <button type="button" class="admin-action" @click="toggle(item.id, !item.active)">
+                {{ item.active ? 'غیرفعال کردن' : 'فعال کردن' }}
               </button>
             </td>
           </tr>

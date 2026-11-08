@@ -60,7 +60,7 @@ export const useMapStore = defineStore('map', () => {
       places.value = placeList.items ?? [];
       shares.value = shareList.items ?? [];
       if (mapConfig?.center) center.value = { latitude: mapConfig.center.latitude, longitude: mapConfig.center.longitude };
-      if (mapConfig?.zoom) zoom.value = mapConfig.zoom;
+      if (mapConfig?.defaultZoom) zoom.value = mapConfig.defaultZoom;
     } catch (caught) {
       error.value = caught instanceof Error ? caught.message : 'داده‌های نقشه خوانده نشد.';
     } finally {

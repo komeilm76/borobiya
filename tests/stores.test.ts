@@ -153,11 +153,13 @@ describe('map, SOS, realtime and admin stores', () => {
       vi.fn(async (url: string) => {
         calls.push(String(url));
         if (String(url).includes('/_public/map/config')) {
+          // The real payload names this `defaultZoom`; the fixture used to say `zoom`, which the
+          // server has never sent, so the store was silently ignoring it and keeping zoom 14.
           return envelope({
             offline: true,
             tileTemplate: '/_public/map/tiles/{z}/{x}/{y}.svg',
             center: { latitude: 35.72, longitude: 51.33 },
-            zoom: 15
+            defaultZoom: 15
           });
         }
         return envelope({ items: [] });

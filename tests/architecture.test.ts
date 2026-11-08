@@ -161,6 +161,8 @@ describe('architecture guards', () => {
       'sos-store.test.ts',
       'recovery-view.test.ts',
       'profile-devices.test.ts',
+      'api-contract.test.ts',
+      'admin-overview-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {

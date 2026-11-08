@@ -8,7 +8,10 @@ import { useToast } from '@/composables/useToast.ts';
 const admin = useAdminStore();
 const format = useFormatters();
 const toast = useToast();
-const statuses = computed(() => admin.overview?.statuses ?? []);
+// The API sends a count per status keyed by name, not a list of rows.
+const statuses = computed(() =>
+  Object.entries(admin.overview?.statusCounts ?? {}).map(([status, count]) => ({ status, count }))
+);
 const exports = [
   { label: 'کاربران (CSV)', href: '/_admin/users.csv' },
   { label: 'رویدادها (CSV)', href: '/_admin/audit.csv' }

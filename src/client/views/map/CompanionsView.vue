@@ -34,7 +34,7 @@ const shares = computed(() => map.shares);
     <p v-if="!peers.length" class="sheet__status">همراهی در حال اشتراک موقعیت نیست.</p>
     <h3 class="sheet__subtitle">اشتراک‌های فعال</h3>
     <ul class="share-list">
-      <li v-for="share in shares" :key="share.shareId">
+      <li v-for="share in shares" :key="share.id">
         <span class="mdi mdi-map-marker-path" aria-hidden="true" />
         <div>
           <strong>{{ share.kind === 'live' ? 'اشتراک زنده' : 'بازه تاریخچه' }}</strong>

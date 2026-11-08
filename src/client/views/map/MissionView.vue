@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { MISSION_STATUS, SOS_STATUS } from '@shared/protocol.ts';
@@ -28,6 +28,16 @@ const stageIndex = computed(() => {
   const stages: readonly string[] = [SOS_STATUS.PENDING, SOS_STATUS.DISPATCHED, SOS_STATUS.ACCEPTED, SOS_STATUS.IN_PROGRESS, SOS_STATUS.COMPLETED];
   return stages.indexOf(status);
 });
+
+// The list endpoint omits `timeline`; the rail below is empty until the detail call lands.
+watch(
+  () => request.value?.id,
+  (sosId) => {
+    if (!sosId) return;
+    if (!request.value?.timeline) void sos.loadDetail(sosId);
+  },
+  { immediate: true }
+);
 
 const nextActions = computed(() => {
   const status = mission.value?.status;

@@ -148,6 +148,23 @@ export const useSosStore = defineStore('sos', () => {
     await load();
   }
 
+  /**
+   * Replaces one request with the detail response, which is the only endpoint carrying the
+   * mission timeline. The list omits it, so a screen that renders the rail has to ask for it.
+   */
+  async function loadDetail(sosId: string): Promise<SosView | null> {
+    try {
+      const detail = await get<SosView>(`/_user/sos/${sosId}`);
+      const index = requests.value.findIndex((item) => item.id === detail.id);
+      if (index >= 0) requests.value[index] = { ...requests.value[index], ...detail };
+      else requests.value = [detail, ...requests.value];
+      return detail;
+    } catch (caught) {
+      error.value = caught instanceof Error ? caught.message : 'جزئیات درخواست خوانده نشد.';
+      return null;
+    }
+  }
+
   /** Merges a realtime SOS payload into the local list. */
   function applyRealtimeUpdate(payload: { sosId?: string; status?: string }): void {
     if (!payload?.sosId) return;
@@ -168,6 +185,7 @@ export const useSosStore = defineStore('sos', () => {
     activeMissionId,
     stepTotal,
     load,
+    loadDetail,
     resetDraft,
     nextStep,
     previousStep,
