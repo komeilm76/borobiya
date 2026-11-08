@@ -45,7 +45,7 @@ const SOS_DETAIL = {
  * `sos: false` models an account with no request at all; the mission is separate because the list
  * keeps them apart too.
  */
-function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean } = {}) {
+function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   const mission = options.mission === undefined
     ? { id: 'mis_1', sosId: 'sos_1', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
@@ -58,6 +58,13 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
       const path = url.split('?')[0];
       const method = init?.method ?? 'GET';
       calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+
+      if (options.failPath && path === options.failPath && method !== 'GET') {
+        return new Response(
+          JSON.stringify({ ok: false, requestId: 'r', error: { code: 'CONFLICT', message: 'ارزیابی پیش‌تر ثبت شده است.' } }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        );
+      }
 
       let data: unknown = { ok: true };
       if (path === '/_user/sos') data = { items: options.sos === false ? [] : [SOS_LIST_ITEM] };
@@ -91,7 +98,7 @@ async function render() {
     global: { plugins: [pinia, vuetify, router] }
   });
   await flushPromises();
-  return { wrapper, router };
+  return { wrapper, router, sos: useSosStore() };
 }
 
 beforeEach(() => {
@@ -233,6 +240,42 @@ describe('mission screen', () => {
     const call = calls.find((entry) => entry.path === '/_user/missions/mis_6/rating');
     expect(call?.body).toEqual({ rating: 5, note: 'ارزیابی از برنامه' });
     expect(useToast().messages.value.some((message) => message.message === 'ارزیابی ثبت شد.')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('tells the user when the rating was refused instead of failing silently', async () => {
+    const complete = { id: 'mis_7', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null };
+    stubApi({ mission: complete, failPath: '/_user/missions/mis_7/rating' });
+    const { wrapper } = await render();
+    await wrapper.findAll('.rating-star')[3].trigger('click');
+    await flushPromises();
+
+    // A rating that vanishes without a message leaves the user clicking stars forever, and the
+    // endpoint accepts only one rating per mission.
+    expect(useToast().messages.value.some((message) => message.message.includes('ارزیابی پیش‌تر'))).toBe(true);
+    expect(useToast().messages.value.some((message) => message.message === 'ارزیابی ثبت شد.')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('withdraws the stars when no mission is loaded', async () => {
+    // The stars only render for a completed mission, so `rate()`'s own guard is defensive: removing
+    // it fails nothing. Kept because a stray click during a re-fetch must not post for a stale id.
+    stubApi({ mission: { id: 'mis_8', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper, sos } = await render();
+    sos.activeMission = null;
+    sos.missions = [];
+    await flushPromises();
+    expect(wrapper.findAll('.rating-star')).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('does not re-fetch a detail that already carries its timeline', async () => {
+    // The rail needs `timeline`, which only the detail call returns. A second fetch for data the
+    // list already holds would fire on every status change.
+    const calls = stubApi();
+    const { wrapper } = await render();
+    const detailCalls = calls.filter((call) => call.path === '/_user/sos/sos_1');
+    expect(detailCalls.length).toBeLessThanOrEqual(1);
     wrapper.unmount();
   });
 });

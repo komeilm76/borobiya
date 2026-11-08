@@ -44,7 +44,12 @@ export default defineConfig({
       // measured figures so an unrelated small change cannot fail it by rounding alone, while a
       // genuine coverage loss still does.
       thresholds: {
-        lines: 91,
+        // Set from the *worst* observed run, not a single measurement: two views were previously
+        // only exercised by the generic mount sweep, so how much of them executed depended on
+        // timing and the suite's statement total moved between identical runs (87.06-87.32%).
+        // Each of those views now has its own deterministic suite, and these thresholds sit below
+        // the stable figure (87.27 / 91.19 / 87.73 / 74.21).
+        lines: 90,
         functions: 87,
         statements: 87,
         branches: 73
