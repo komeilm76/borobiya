@@ -47,13 +47,14 @@ export default defineConfig({
         // Set from the *worst* observed run, not a single measurement: two views were previously
         // only exercised by the generic mount sweep, so how much of them executed depended on
         // timing and the suite's statement total moved between identical runs (87.06-87.32%).
-        // Each of those views now has its own deterministic suite. The push-to-talk floor suite
-        // then lifted branches on its own, and these thresholds sit below the figure measured
-        // across three clean runs (88.09 / 91.73 / 88.66 / 75.71).
-        lines: 91,
-        functions: 88,
-        statements: 87,
-        branches: 75
+        // Each of those views now has its own deterministic suite. Later suites then raised the
+        // floor again — the push-to-talk floor, and the map canvas, whose duplicate projection was
+        // deleted when the canvas was given one. These thresholds sit below the figure measured
+        // across three identical clean runs (88.34 / 92.05 / 89.40 / 76.27).
+        lines: 92,
+        functions: 89,
+        statements: 88,
+        branches: 76
 
       }
     }

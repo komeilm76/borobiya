@@ -4,11 +4,18 @@ import { useMapStore } from '@/stores/map.ts';
 import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import type { MotionPreferences } from '@/composables/useMotionPreferences.ts';
+import { worldCoordinate } from '@shared/geo.ts';
 
 /**
  * Deterministic vector map surface. Tiles come from the same in-process SVG renderer the
  * service worker caches, so the offline map, the online map and the tests share one source.
  * The marker layer subscribes to realtime fixes from the map store.
+ *
+ * The projection is not written here. It used to be, twice, and the two copies had drifted: the
+ * one in `@shared/geo.ts` clamps latitude to the Mercator limit while this one did not, so a centre
+ * at exactly ±90 degrees produced an infinite y term, both tile loop bounds became infinite and the
+ * renderer never finished. Using the shared helper keeps the clamp — and keeps the map and the
+ * distance calculations agreeing about where a place is.
  */
 const props = defineProps<{ motion: MotionPreferences }>();
 const map = useMapStore();
@@ -23,10 +30,9 @@ const VIEW_WIDTH = 393;
 const VIEW_HEIGHT = 852;
 
 const tiles = computed(() => {
-  const scale = 256 * 2 ** zoom.value;
-  const centerX = ((center.value.longitude + 180) / 360) * scale;
-  const sin = Math.sin((center.value.latitude * Math.PI) / 180);
-  const centerY = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale;
+  const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
+  const centerX = origin.x;
+  const centerY = origin.y;
   const xMin = Math.floor((centerX - VIEW_WIDTH / 2) / TILE_SIZE);
   const xMax = Math.floor((centerX + VIEW_WIDTH / 2) / TILE_SIZE);
   const yMin = Math.floor((centerY - VIEW_HEIGHT / 2) / TILE_SIZE);
@@ -48,14 +54,10 @@ const tiles = computed(() => {
 });
 
 const markers = computed(() => {
-  const scale = 256 * 2 ** zoom.value;
-  const centerX = ((center.value.longitude + 180) / 360) * scale;
-  const sin = Math.sin((center.value.latitude * Math.PI) / 180);
-  const centerY = (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale;
+  const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
   const place = (latitude: number, longitude: number) => {
-    const x = ((longitude + 180) / 360) * scale - centerX + VIEW_WIDTH / 2;
-    const y = (0.5 - Math.log((1 + Math.sin((latitude * Math.PI) / 180)) / (1 - Math.sin((latitude * Math.PI) / 180))) / (4 * Math.PI)) * scale - centerY + VIEW_HEIGHT / 2;
-    return { x, y };
+    const world = worldCoordinate(latitude, longitude, zoom.value);
+    return { x: world.x - origin.x + VIEW_WIDTH / 2, y: world.y - origin.y + VIEW_HEIGHT / 2 };
   };
   return {
     self: map.ownFix ? place(map.ownFix.latitude, map.ownFix.longitude) : null,
