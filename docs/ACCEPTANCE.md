@@ -1,22 +1,23 @@
 # Acceptance checklist
 
-This checklist maps the original technical specification and roadmap targets to the clean zero-dependency rebuild. Every item is either implemented and verified, or explicitly marked as superseded by the new architecture. Professional visual/UI acceptance against the canonical PNG references remains a separate, deliberately deferred human review; no browser-driven professional UI test is claimed here.
+This checklist maps the original technical specification and roadmap targets to the Bun 1.4.4 runtime and the Vue 3 TypeScript client delivered in 2.0.0. Every item is either implemented and verified by an automated gate, or explicitly marked as superseded by the current architecture. Professional visual/UI acceptance against the canonical PNG references remains a separate, deliberately deferred human review; no browser-driven professional UI test, screenshot comparison or real-device run is claimed here.
 
 ## Foundation and contracts
 
-- [x] One repository, one package manifest, one lockfile and one strict server/test TypeScript configuration.
-- [x] Zero runtime dependencies; only TypeScript and Node type definitions are installed.
-- [x] Shared protocol constants and pure geometry helpers are imported by both server and browser.
+- [x] One repository, one package manifest, one `bun.lock` and two strict TypeScript projects (`tsconfig.server.json` for Bun, `tsconfig.client.json` for Vue).
+- [x] The runtime is Bun 1.4.4 only, pinned in `.bun-version`, `packageManager` and CI; there is no `node`, `npm`, `npx`, `engines.node` or `@types/node` in the active toolchain.
+- [x] `Bun.serve`, `bun:sqlite`, `Bun.password`, `Bun.file` and `Bun.build` replace Node HTTP, `node:sqlite`, `node:fs` and the custom WebSocket framing.
+- [x] Shared protocol constants and pure geometry helpers in `src/shared` are imported by the Bun server, the Vue client and Vitest.
 - [x] A declarative route table generates OpenAPI and owns every body, query, auth and rate-limit declaration.
 - [x] One SQLite schema replaces the former PostgreSQL/PostGIS/Drizzle migration stack.
-- [x] Native HTTP, native WebSockets, Node SQLite and direct TypeScript execution replace Fastify, Socket.IO, an ORM and a bundler.
+- [x] Vue 3 `<script setup lang="ts">` SFCs, typed Vue Router 4 routes, Vuetify 3 via `vite-plugin-vuetify`, Tailwind CSS 4 without preflight and seven typed Pinia setup stores replace the hand-written browser modules.
 - [x] Generated assets and the service-worker cache manifest are deterministic and timestamp-free, so unchanged builds do not dirty the checkout.
 
 ## Authentication and account lifecycle
 
 - [x] Registration requires five distinct catalog-backed security questions.
 - [x] Login, rotating refresh, logout, session revocation and deactivation are implemented.
-- [x] Password and answer hashes use scrypt with per-value salts; answers are normalized before comparison.
+- [x] Password and answer hashes use Argon2id through `Bun.password` with per-value salts; answers are normalized before comparison and stored hashes stay self-describing.
 - [x] Recovery uses three selected challenges, decoy responses for unknown usernames, attempt limits, expiry, one-use reset tokens and full session revocation.
 - [x] Administrator-created accounts complete onboarding before ordinary use.
 - [x] Guest-only and role-protected route guards are enforced by the server and the SPA router.
@@ -57,9 +58,10 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Loading, empty, error and offline surfaces are implemented for routed data and forms.
 - [x] Skip navigation, focus restoration, modal focus handling, labelled icon-only controls, visible focus rings, reduced-motion support and keyboard shortcuts are implemented.
 - [x] Contrast ratios for primary text, muted text and semantic status colors are verified by an automated check.
-- [x] Lazy view loading replaces eager imports of all view modules.
+- [x] Lazy view loading replaces eager imports of all view modules; every one of the 20 views is a code-split chunk.
+- [x] Animation is declarative first (`<Transition>`, `<TransitionGroup>`, `motion-v`, `@vueuse/motion`) with GSAP limited to one timeline, and every duration collapses to zero under `prefers-reduced-motion`.
 - [x] A full login-to-rating journey test exercises registration/session, sharing, SOS, dispatch, acceptance, mission status and rating.
-- [x] A dependency-free benchmark records validator, tile, HTTP and live-location latency figures for release review.
+- [x] A Bun-native benchmark records validator, tile, HTTP and live-location latency figures for release review.
 - [x] CI runs install, diagnostics, typechecks, documentation guards, tests, acceptance invariants and deployment configuration checks.
 
 ## Superseded legacy targets
@@ -68,7 +70,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] OSRM, Photon, elevation and PMTiles VM verification are superseded by deterministic in-process SVG tiles.
 - [x] MapLibre warm/cold cache outage and eight-zoom Cache Storage acceptance are superseded by a versioned static precache and one bounded SVG tile cache.
 - [x] Android/Capacitor workflow and LAN HTTPS HMR acceptance are superseded by one responsive browser application.
-- [x] Vue/Vuetify/Pinia/Vite component tests are superseded by the new native browser module suite.
+- [x] A Vue/Vuetify/Pinia test stack is reinstated as the current approach: Vitest with `@vue/test-utils`, `happy-dom` and real Vuetify mounting replaces the former native-module-only suite.
 - [x] Playwright login-to-rating acceptance is represented by an automated API/realtime journey test; professional browser-driven UI acceptance remains deferred.
 
 ## Legacy feature scope reconciliation
@@ -79,18 +81,18 @@ The old root README and roadmap described a multi-service product. The clean reb
 - [x] OSRM/Valhalla/GraphHopper routing, car/bicycle/foot profiles, multi-destination routes, navigation camera modes and elevation charts are superseded by the simplified SOS-to-mission workflow.
 - [x] The priority-device chooser and PostGIS-backed multi-device GPS arbitration are superseded by session-bound authentication, active device visibility and one authenticated realtime channel.
 - [x] Ionic/Capacitor Android packaging, signed APK artifacts and mobile LAN HTTPS HMR are superseded by one responsive progressive web application.
-- [x] Docker Compose deployment, GHCR images, SSH cutover, Lefthook/Husky hooks and Windows/Ubuntu VM runbooks are superseded by dependency-free Node startup, CI gates and the new operations runbook.
+- [x] Docker Compose deployment, GHCR images, SSH cutover, Lefthook/Husky hooks and Windows/Ubuntu VM runbooks are superseded by single-process Bun startup, CI gates and the new operations runbook.
 - [x] MapLibre theme-switch latency, eight-zoom Cache Storage, 512-resource map outage fallback and virtual-scroll user lists are superseded by generated SVG tiles, a versioned static precache, lazy view loading and benchmark budgets.
 - [x] Playwright/SSE browser acceptance and screenshot/diagram sign-off are superseded by API/realtime journey, accessibility, asset, architecture and performance tests; human screenshot review remains deferred.
 - [x] `PROGRESS.md` is a dated legacy work log with no open checkboxes; its later UI follow-ups do not redefine the clean-rebuild acceptance contract.
 
 ## Release evidence
 
-- [x] `npm run check` passes with server typecheck, browser typecheck, a 24-document/154-image guard and all 68 automated tests.
-- [x] `./boro doctor`, `./boro verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and production-configured deployment checks pass.
-- [x] CI uses a pinned Ubuntu 24.04 runner, immutable Node 24-compatible action commits and non-persisted checkout credentials; it is least-privilege, concurrency-safe and covers push and pull-request events.
-- [x] A reproducible in-process smoke command checks health, preview CSP/CORS, OpenAPI, map config and tiles, static assets, login, ticket issuance, WebSocket hello, SOS fan-out, administrator overview and system health.
+- [x] `bun run check` passes: Vue bundle and service-worker build, `tsc` server typecheck, `vue-tsc --noEmit` client typecheck, the 24-document/154-image English-only guard and the full Vitest suite with coverage.
+- [x] `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and production-configured deployment checks pass under Bun.
+- [x] CI installs with `bun install --frozen-lockfile` on a pinned Ubuntu 24.04 runner using a SHA-pinned `oven-sh/setup-bun` action and `.bun-version`, with non-persisted checkout credentials; it is least-privilege, concurrency-safe and covers push and pull-request events.
+- [x] A reproducible in-process smoke command runs the server on `0.0.0.0` with simulated preview-proxy headers and checks health, preview CSP/CORS/framing, OpenAPI, map config and tiles, every precached asset, login, ticket issuance, WebSocket hello, SOS fan-out, administrator overview and system health.
 - [x] Older SQLite files gain the SOS photo column without losing rows; production refuses demo seeding, known preview/CI passwords and weak administrator passwords.
 - [x] Trusted `Host`, `X-Forwarded-Host` and `X-Forwarded-Proto` headers produce matching WebSocket CSP and CORS origins; explicit `FRAME_ANCESTORS` values permit embedded previews without a conflicting legacy DENY header.
 - [x] Release notes and an operations runbook are present.
-- [x] The branch is committed and pushed; release tagging is recorded in `docs/RELEASE_NOTES.md`.
+- [x] The branch is committed and pushed to its Arena branch with an open pull request that is not merged; no tag and no GitHub release are created.

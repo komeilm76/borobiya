@@ -1,7 +1,7 @@
-import test, { after, before } from 'node:test';
-import assert from 'node:assert/strict';
+// @vitest-environment node
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { apiFetch, createTestServer, login, sessionCookie, type TestServer } from './helpers.ts';
-import { SECURITY_QUESTIONS } from '../src/domain/catalog.ts';
+import { SECURITY_QUESTIONS } from '../src/server/domain/catalog.ts';
 
 let server: TestServer;
 let requesterCookie: string;
@@ -9,16 +9,16 @@ let companionCookie: string;
 let responderCookie: string;
 let adminCookie: string;
 
-before(async () => {
+beforeAll(async () => {
   server = await createTestServer();
   requesterCookie = await login(server, 'saeed.k', 'DemoPass!2026');
   companionCookie = await login(server, 'maryam.a', 'DemoPass!2026');
   responderCookie = await login(server, 'reza.m', 'DemoPass!2026');
   adminCookie = await login(server, 'admin', 'AdminPass!2026');
 });
-after(async () => { if (server) await server.close(); });
+afterAll(async () => { if (server) await server.close(); });
 
-test('hypothetical requester journey: SOS, dispatch, acceptance, response, completion and rating', async () => {
+it('hypothetical requester journey: SOS, dispatch, acceptance, response, completion and rating', async () => {
   const created = await apiFetch(server, '/_user/sos', {
     method: 'POST', cookie: requesterCookie,
     body: {
@@ -27,28 +27,28 @@ test('hypothetical requester journey: SOS, dispatch, acceptance, response, compl
       latitude: 35.7219, longitude: 51.3347, accuracy: 11, isManual: false
     }
   });
-  assert.equal(created.status, 201);
+  expect(created.status).toBe(201);
   const sosId = created.json.data.sos.id;
-  assert.equal(created.json.data.sos.status, 'pending');
+  expect(created.json.data.sos.status).toBe('pending');
 
   const board = await apiFetch(server, '/_admin/dispatch', { cookie: adminCookie });
-  assert.equal(board.status, 200);
-  assert.ok(board.json.data.queue.items.some((item: any) => item.id === sosId));
+  expect(board.status).toBe(200);
+  expect(board.json.data.queue.items.some((item: any) => item.id === sosId)).toBeTruthy();
   const nearest = await apiFetch(server, `/_admin/sos/${sosId}/nearest?latitude=35.7219&longitude=51.3347&limit=10&incidentTypeId=inc_medical`, { cookie: adminCookie });
-  assert.equal(nearest.status, 200);
-  assert.ok(nearest.json.data.items.some((item: any) => item.id === 'usr_responder'));
+  expect(nearest.status).toBe(200);
+  expect(nearest.json.data.items.some((item: any) => item.id === 'usr_responder')).toBeTruthy();
 
   const dispatched = await apiFetch(server, `/_admin/sos/${sosId}/dispatch`, {
     method: 'POST', cookie: adminCookie,
     body: { groupId: 'grp_medical', responderIds: ['usr_responder'] }
   });
-  assert.equal(dispatched.status, 200);
-  assert.equal(dispatched.json.data.status, 'dispatched');
+  expect(dispatched.status).toBe(200);
+  expect(dispatched.json.data.status).toBe('dispatched');
 
   const accepted = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie: responderCookie });
-  assert.equal(accepted.status, 200);
-  assert.equal(accepted.json.data.status, 'accepted');
-  assert.equal(accepted.json.data.missionStatus, 'on_the_way');
+  expect(accepted.status).toBe(200);
+  expect(accepted.json.data.status).toBe('accepted');
+  expect(accepted.json.data.missionStatus).toBe('on_the_way');
   const missionId = accepted.json.data.missionId;
 
   for (const [action, expected] of [['arrive', 'arrived'], ['start', 'in_progress'], ['complete', 'completed']]) {
@@ -56,23 +56,23 @@ test('hypothetical requester journey: SOS, dispatch, acceptance, response, compl
       method: 'POST', cookie: responderCookie,
       body: { action, note: `Journey step ${action}` }
     });
-    assert.equal(progress.status, 200, progress.text);
-    assert.equal(progress.json.data.status, expected);
+    expect(progress.status, progress.text).toBe(200);
+    expect(progress.json.data.status).toBe(expected);
   }
 
   const rated = await apiFetch(server, `/_user/missions/${missionId}/rating`, {
     method: 'POST', cookie: requesterCookie, body: { rating: 5, note: 'The responder arrived quickly.' }
   });
-  assert.equal(rated.status, 200);
+  expect(rated.status).toBe(200);
   const final = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requesterCookie });
-  assert.equal(final.json.data.status, 'completed');
-  assert.equal(final.json.data.mission.id, missionId);
-  assert.ok(final.json.data.timeline.length >= 4);
+  expect(final.json.data.status).toBe('completed');
+  expect(final.json.data.mission.id).toBe(missionId);
+  expect(final.json.data.timeline.length >= 4).toBeTruthy();
   const missions = await apiFetch(server, '/_user/missions?limit=20', { cookie: responderCookie });
-  assert.ok(missions.json.data.items.some((item: any) => item.id === missionId));
+  expect(missions.json.data.items.some((item: any) => item.id === missionId)).toBeTruthy();
 });
 
-test('hypothetical requester journey: cancellation with a reason cannot be repeated', async () => {
+it('hypothetical requester journey: cancellation with a reason cannot be repeated', async () => {
   const created = await apiFetch(server, '/_user/sos', {
     method: 'POST', cookie: requesterCookie,
     body: {
@@ -86,18 +86,18 @@ test('hypothetical requester journey: cancellation with a reason cannot be repea
     method: 'POST', cookie: requesterCookie,
     body: { reasonId: 'cancel_resolved', detail: 'The motorist received help from a passing driver.' }
   });
-  assert.equal(cancelled.status, 200);
-  assert.equal(cancelled.json.data.status, 'cancelled');
+  expect(cancelled.status).toBe(200);
+  expect(cancelled.json.data.status).toBe('cancelled');
   const repeated = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
     method: 'POST', cookie: requesterCookie, body: { reasonId: 'cancel_mistake' }
   });
-  assert.equal(repeated.status, 409);
+  expect(repeated.status).toBe(409);
   const final = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requesterCookie });
-  assert.equal(final.json.data.status, 'cancelled');
-  assert.equal(final.json.data.cancellationReasonId, 'cancel_resolved');
+  expect(final.json.data.status).toBe('cancelled');
+  expect(final.json.data.cancellationReasonId).toBe('cancel_resolved');
 });
 
-test('hypothetical companion journey: live sharing, history playback and snapshot', async () => {
+it('hypothetical companion journey: live sharing, history playback and snapshot', async () => {
   const now = Date.now();
   const from = now - 3_600_000;
   const to = now + 30_000;
@@ -105,62 +105,62 @@ test('hypothetical companion journey: live sharing, history playback and snapsho
     method: 'POST', cookie: companionCookie,
     body: { recipientId: 'usr_requester', kind: 'history', historyFrom: from, historyTo: to }
   });
-  assert.equal(share.status, 201, share.text);
-  assert.equal(share.json.data.share.ownerId, 'usr_companion');
+  expect(share.status, share.text).toBe(201);
+  expect(share.json.data.share.ownerId).toBe('usr_companion');
   const range = `from=${from}&to=${to}&limit=50`;
   const history = await apiFetch(server, `/_user/location/history/usr_companion?${range}`, { cookie: requesterCookie });
-  assert.equal(history.status, 200, history.text);
-  assert.ok(history.json.data.items.length >= 5);
+  expect(history.status, history.text).toBe(200);
+  expect(history.json.data.items.length >= 5).toBeTruthy();
   const snapshot = await apiFetch(server, '/_user/location/snapshot', { cookie: requesterCookie });
-  assert.equal(snapshot.status, 200);
-  assert.ok(Array.isArray(snapshot.json.data.items));
+  expect(snapshot.status).toBe(200);
+  expect(Array.isArray(snapshot.json.data.items)).toBeTruthy();
   const revoked = await apiFetch(server, `/_user/location/shares/${share.json.data.share.shareId}`, { method: 'DELETE', cookie: companionCookie });
-  assert.equal(revoked.status, 200);
+  expect(revoked.status).toBe(200);
   const denied = await apiFetch(server, `/_user/location/history/usr_companion?${range}`, { cookie: requesterCookie });
-  assert.equal(denied.status, 403);
+  expect(denied.status).toBe(403);
 });
 
-test('hypothetical administrator journey: overview, dispatch board, alerts, settings and exports', async () => {
+it('hypothetical administrator journey: overview, dispatch board, alerts, settings and exports', async () => {
   const overview = await apiFetch(server, '/_admin/overview', { cookie: adminCookie });
-  assert.equal(overview.status, 200);
-  assert.ok(overview.json.data.kpis.requestsToday >= 1);
+  expect(overview.status).toBe(200);
+  expect(overview.json.data.kpis.requestsToday >= 1).toBeTruthy();
   const active = await apiFetch(server, '/_admin/alerts?includeResolved=true', { cookie: adminCookie });
-  assert.ok(active.json.data.items.length >= 1);
+  expect(active.json.data.items.length >= 1).toBeTruthy();
   const resolved = await apiFetch(server, `/_admin/alerts/${active.json.data.items[0].id}/resolve`, { method: 'POST', cookie: adminCookie });
-  assert.equal(resolved.status, 200);
+  expect(resolved.status).toBe(200);
   const settings = await apiFetch(server, '/_admin/settings', {
     method: 'PUT', cookie: adminCookie,
     body: { sos_auto_dispatch: '0', default_dispatch_radius_m: '3500', mission_ready_required: '1', maintenance_mode: '0' }
   });
-  assert.equal(settings.status, 200);
+  expect(settings.status).toBe(200);
   const users = await apiFetch(server, '/_admin/users.csv', { cookie: adminCookie });
-  assert.match(users.text, /id,username,role,active/);
+  expect(users.text).toMatch(/id,username,role,active/);
   const audit = await apiFetch(server, '/_admin/audit.csv', { cookie: adminCookie });
-  assert.match(audit.text, /id,createdAt,actorUsername/);
+  expect(audit.text).toMatch(/id,createdAt,actorUsername/);
 });
 
-test('full login-to-rating journey: registration, sharing, SOS, dispatch, acceptance, status and rating', async () => {
+it('full login-to-rating journey: registration, sharing, SOS, dispatch, acceptance, status and rating', async () => {
   const username = `journey.${Date.now().toString(36)}`;
   const password = 'JourneyPass!2026';
   const securityQuestions = SECURITY_QUESTIONS.map((question) => ({ questionId: question.id, answer: `Journey-${question.id}` }));
   const registered = await apiFetch(server, '/_auth/register', {
     method: 'POST', body: { username, password, securityQuestions }
   });
-  assert.equal(registered.status, 201, registered.text);
+  expect(registered.status, registered.text).toBe(201);
   const signedIn = await apiFetch(server, '/_auth/login', {
     method: 'POST', body: { username, password, deviceId: 'journey-device' }
   });
-  assert.equal(signedIn.status, 200);
+  expect(signedIn.status).toBe(200);
   const requester = sessionCookie(signedIn);
   const me = await apiFetch(server, '/_user/me', { cookie: requester });
-  assert.equal(me.json.data.username, username);
-  assert.equal(me.json.data.securityReady, true);
+  expect(me.json.data.username).toBe(username);
+  expect(me.json.data.securityReady).toBe(true);
 
   const share = await apiFetch(server, '/_user/location/shares', {
     method: 'POST', cookie: requester,
     body: { recipientId: 'usr_companion', kind: 'live', durationSeconds: 1800 }
   });
-  assert.equal(share.status, 201);
+  expect(share.status).toBe(201);
   const created = await apiFetch(server, '/_user/sos', {
     method: 'POST', cookie: requester,
     body: {
@@ -169,31 +169,31 @@ test('full login-to-rating journey: registration, sharing, SOS, dispatch, accept
       latitude: 35.7219, longitude: 51.3347, accuracy: 10, isManual: false
     }
   });
-  assert.equal(created.status, 201);
+  expect(created.status).toBe(201);
   const sosId = created.json.data.sos.id;
   const dispatched = await apiFetch(server, `/_admin/sos/${sosId}/dispatch`, {
     method: 'POST', cookie: adminCookie,
     body: { groupId: 'grp_medical', responderIds: ['usr_responder'] }
   });
-  assert.equal(dispatched.status, 200);
+  expect(dispatched.status).toBe(200);
   const accepted = await apiFetch(server, `/_user/sos/${sosId}/accept`, { method: 'POST', cookie: responderCookie });
-  assert.equal(accepted.status, 200);
+  expect(accepted.status).toBe(200);
   const missionId = accepted.json.data.missionId;
   for (const [action, expected] of [['arrive', 'arrived'], ['start', 'in_progress'], ['complete', 'completed']]) {
     const progress = await apiFetch(server, `/_user/missions/${missionId}/progress`, {
       method: 'POST', cookie: responderCookie, body: { action }
     });
-    assert.equal(progress.status, 200, progress.text);
-    assert.equal(progress.json.data.status, expected);
+    expect(progress.status, progress.text).toBe(200);
+    expect(progress.json.data.status).toBe(expected);
   }
   const rated = await apiFetch(server, `/_user/missions/${missionId}/rating`, {
     method: 'POST', cookie: requester, body: { rating: 5, note: 'Complete end-to-end journey.' }
   });
-  assert.equal(rated.status, 200);
+  expect(rated.status).toBe(200);
   const final = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requester });
-  assert.equal(final.json.data.status, 'completed');
-  assert.equal(final.json.data.mission.id, missionId);
-  assert.equal(final.json.data.mission.rating, 5);
+  expect(final.json.data.status).toBe('completed');
+  expect(final.json.data.mission.id).toBe(missionId);
+  expect(final.json.data.mission.rating).toBe(5);
   const timeline = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requester });
-  assert.ok(timeline.json.data.timeline.length >= 4);
+  expect(timeline.json.data.timeline.length >= 4).toBeTruthy();
 });

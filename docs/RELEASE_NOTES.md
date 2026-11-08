@@ -1,35 +1,51 @@
 # Release notes
 
-## Version 1.0.0 — clean rebuild
+## Version 2.0.0 — Bun and Vue migration
 
-Release date: 2026-11-07. Branch: `arena/2212b849-borobiya`.
+Release date: 2026-11-08. Branch: `arena/250278b6-borobiya`.
 
 ### Summary
 
-This release replaces the former multi-package framework stack with one dependency-free Node.js application. Native HTTP, native WebSockets, Node SQLite and direct TypeScript execution now serve the SPA, JSON API, offline SVG tiles and realtime events from a single process. The browser application is built from native ES modules, generated self-hosted assets and a service worker. The canonical design images remain the visual contract.
+Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules of the 1.0.0 clean rebuild with a Bun-only runtime and a Vue 3 TypeScript application. One Bun process still serves the SPA, the JSON API, the offline SVG tiles and the realtime endpoint, but every runtime primitive is now Bun-native and every browser surface is a typed single-file component. The canonical design images under `design/` remain the visual contract, and the database schema is unchanged (`SCHEMA_VERSION = 2`).
 
-### Highlights
+### Runtime
 
-- Zero runtime dependencies; only TypeScript and Node type definitions are development tools.
-- One SQLite schema with a typed repository, transaction boundary and durable event log.
-- Strict request envelopes, validators, CSP, CORS, CSRF checks, rate limits, session cookies and scrypt hashes.
-- One-use WebSocket tickets, audience-filtered events, cursor-based sync, presence, live location and one-to-one binary PTT.
-- Deterministic offline SVG vector tiles with immutable ETags and a bounded service-worker cache.
-- Full authentication, registration, recovery, onboarding, profiles, devices, places and sync.
-- SOS creation with optional photo, cancellation, dispatch, acceptance, mission progress and rating.
-- Responsive RTL mobile map and desktop administrator console generated from the design tokens.
-- Public, authentication, user and administrator APIs with generated OpenAPI and CSV exports.
-- Practical English architecture, API, WebSocket, development, deployment, user, administrator, testing, security, performance, automation, design-system, operations and acceptance documentation.
-- Automated suites for core rules, API contracts, authentication, security, realtime coordination, journeys, architecture, assets, accessibility and performance.
+- `Bun.serve` handles HTTP and WebSocket upgrades; the custom RFC 6455 implementation and the `node:http`/`node:stream` imports are gone.
+- `bun:sqlite` replaces `node:sqlite`; the schema, the idempotent `photo_data_url` migration and the transaction boundary are unchanged.
+- `Bun.password` hashes with Argon2id. Stored hashes remain self-describing, so the format is verifiable and upgradable.
+- `Bun.file`, `Bun.write` and `Bun.Glob` replace every filesystem helper; `scripts/*.ts` run through `bun` and the `boro` shim only executes Bun.
+- The toolchain is pinned to Bun 1.4.4 in `.bun-version`, `packageManager` and CI. `package-lock.json` is deleted and `bun.lock` is committed; CI installs with `bun install --frozen-lockfile`.
+- `engines.node` and `@types/node` are removed, and no active source imports `node:http`, `node:stream`, `node:sqlite`, `node:fs` or `node:crypto` for runtime behavior.
+
+### Browser application
+
+- Vue 3.5 with `<script setup lang="ts">` in every view, layout and component; 20 views cover the four authentication screens, six mobile map screens and nine administrator screens.
+- Vue Router 4 with typed `ROUTE_NAMES`, lazy view imports and role-aware guards.
+- Vuetify 3 registered through `vite-plugin-vuetify`, compiled with the Borobiya design tokens; Tailwind CSS 4 through `@tailwindcss/vite` with preflight disabled so Vuetify's reset stays authoritative.
+- Seven Pinia setup stores (`auth`, `map`, `sos`, `realtime`, `admin`, `settings`, `offline`) and VueUse for storage, online/network state, media queries, geolocation, debouncing and event listeners.
+- Motion is declarative first: `<Transition>` and `<TransitionGroup>` for routes, sheets and live lists, `motion-v` with `@vueuse/motion` variants for cards and the command palette, and GSAP for one coordinated reveal timeline. Every duration is `0` under `prefers-reduced-motion`.
+- The service worker is authored in TypeScript (`src/client/service-worker/sw.ts`) and compiled to the browser artifact at build time; `public/` is generated output and git-ignored.
+
+### Preserved behavior
+
+- Strict request envelopes, typed validators, typed errors, CSP, CORS, CSRF and origin checks, request IDs, no-store API responses, body limits, rate limits and static path safety.
+- Preview-proxy trusted headers with sanitized `FRAME_ANCESTORS` (empty stays deny-by-default; no wildcard default), plus the omission of the conflicting `X-Frame-Options` header when frame ancestors are explicitly allowed.
+- One-use IP-bound WebSocket tickets, audience-filtered durable events, cursor sync, presence, live location fan-out, SOS fan-out and binary push-to-talk.
+- Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
+- Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.
 
 ### Validation
 
-`npm run check`, `./boro doctor`, `./boro verify`, `npm run bench`, `npm run smoke`, `npm run acceptance` and deployment checks are the release gates. CI runs on a pinned Ubuntu 24.04 runner with immutable Node 24-compatible action commits and non-persisted checkout credentials; it is least-privilege, concurrency-safe and covers push and pull-request events. The final full suite passes 68 of 68 tests, the documentation guard recognizes 24 required documents and 154 canonical design images, and the release benchmark reports validation, tile, concurrent HTTP and live-location figures inside their budgets. The suite also verifies the idempotent legacy SQLite migration, production password/demo-seed guards, trusted forwarded-host CSP/CORS origins, explicit embedded-preview frame ancestors and service-worker install, activation, stale-while-revalidate, private-API bypass, bounded tile caching and offline behavior. The reproducible in-process smoke checks health, OpenAPI, SPA assets, lazy view modules and their precache entries, map tiles, login, tickets, WebSocket hello, SOS fan-out, administrator overview and system health. Professional visual acceptance against the canonical PNG references remains a separate human review and is not claimed by automated checks.
+`bun run check` is the gate: it builds the Vue bundle and the service worker, typechecks the Bun server (`tsc`), typechecks the Vue client (`vue-tsc --noEmit`), runs the English-only documentation and clean-rebuild guard, and executes the Vitest suite with coverage. `./boro doctor`, `./boro verify`, `bun run bench`, `bun run smoke`, `bun run acceptance` and `./boro deploy:check` complete the release gate.
+
+The suite is Vitest with `@vue/test-utils` and `happy-dom`, and covers core rules, HTTP contracts, authentication, security headers, realtime coordination, journeys, architecture, assets, the compiled service worker, accessibility contrast, performance budgets, the database migration, production guards, Vuetify component mounting, Pinia stores, composables and an in-process preview smoke. The documentation guard recognizes 24 required documents and 154 canonical design images.
+
+Professional visual acceptance against the canonical PNG references remains a deliberately deferred human review: this release contains no browser-driven end-to-end sign-off, no screenshot comparison and no real-device testing.
 
 ### Operational notes
 
-Set a unique `ADMIN_PASSWORD`, disable demo seeding, enable `COOKIE_SECURE=1`, configure exact allowed origins, terminate HTTPS at a trusted proxy and persist the SQLite data directory. Audio is never stored. Use graceful shutdown and back up the database and WAL together. See `docs/DEPLOYMENT.md` and `docs/OPERATIONS.md` for the full procedure.
+Install Bun 1.4.4, set a unique `ADMIN_PASSWORD`, disable demo seeding, enable `COOKIE_SECURE=1`, configure exact allowed origins, terminate HTTPS at a trusted proxy and persist the SQLite data directory. Audio is never stored. Use graceful shutdown and back up the database and WAL together. See `docs/DEPLOYMENT.md` and `docs/OPERATIONS.md` for the full procedure.
 
 ### Tag
 
-The acceptance checklist is closed on the release branch. The annotated `v1.0.0` tag is created locally from the final release commit; pushing tags remains an explicit release-operator action.
+The acceptance checklist is closed for this branch. No tag and no GitHub release are created from it.

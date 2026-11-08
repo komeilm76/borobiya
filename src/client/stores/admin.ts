@@ -1,0 +1,218 @@
+import { ref } from 'vue';
+import { defineStore } from 'pinia';
+import { get, post, put, patch } from '@/api/client.ts';
+import type {
+  AdminUserView,
+  AlertView,
+  AuditEntryView,
+  GroupView,
+  IncidentTypeView,
+  ListView,
+  OverviewView,
+  SettingView,
+  SosView
+} from '@/api/types.ts';
+
+/** User filters accepted by the administrator user list. */
+export interface UserFilters {
+  q?: string;
+  role?: string;
+  active?: boolean;
+  page?: number;
+  limit?: number;
+}
+
+/** Audit filters accepted by the audit log screen. */
+export interface AuditFilters {
+  from?: number;
+  to?: number;
+  action?: string;
+  q?: string;
+  limit?: number;
+}
+
+/**
+ * Administrator data store: overview, dispatch board, users, groups, alert, audit,
+ * settings and system health. Every screen reads from here so the shell stays light.
+ */
+export const useAdminStore = defineStore('admin', () => {
+  const overview = ref<OverviewView | null>(null);
+  const dispatchQueue = ref<ListView<SosView> | null>(null);
+  const users = ref<ListView<AdminUserView> | null>(null);
+  const groups = ref<GroupView[]>([]);
+  const alerts = ref<AlertView[]>([]);
+  const audit = ref<ListView<AuditEntryView> | null>(null);
+  const settings = ref<SettingView[]>([]);
+  const incidentTypes = ref<IncidentTypeView[]>([]);
+  const health = ref<Record<string, unknown> | null>(null);
+  const loading = ref(false);
+  const error = ref<string | null>(null);
+  const userFilters = ref<UserFilters>({ page: 1, limit: 20 });
+  const auditFilters = ref<AuditFilters>({ limit: 100 });
+
+  async function guard<T>(label: string, task: () => Promise<T>): Promise<T | null> {
+    loading.value = true;
+    error.value = null;
+    try {
+      return await task();
+    } catch (caught) {
+      error.value = caught instanceof Error ? caught.message : `${label} خوانده نشد.`;
+      return null;
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  /** Loads the operations overview used by the dashboard and report screens. */
+  async function loadOverview(): Promise<void> {
+    const result = await guard('نمای کلی', () => get<OverviewView>('/_admin/overview'));
+    if (result) overview.value = result;
+  }
+
+  /** Loads the dispatch board queue. */
+  async function loadDispatch(): Promise<void> {
+    const result = await guard('تخته اعزام', () =>
+      get<{ queue: ListView<SosView>; groups: GroupView[]; incidentTypes: IncidentTypeView[] }>('/_admin/dispatch')
+    );
+    if (result) {
+      dispatchQueue.value = result.queue;
+      groups.value = result.groups ?? [];
+      incidentTypes.value = result.incidentTypes ?? [];
+    }
+  }
+
+  /** Loads a page of users with the active filters. */
+  async function loadUsers(filters: UserFilters = userFilters.value): Promise<void> {
+    userFilters.value = filters;
+    const result = await guard('کاربران', () =>
+      get<ListView<AdminUserView>>('/_admin/users', {
+        q: filters.q,
+        role: filters.role,
+        active: filters.active,
+        page: filters.page,
+        limit: filters.limit
+      })
+    );
+    if (result) users.value = result;
+  }
+
+  /** Creates an administrator-managed account. */
+  async function createUser(input: { username: string; password: string; role: string }): Promise<void> {
+    await post('/_admin/users', input);
+    await loadUsers();
+  }
+
+  /** Activates, deactivates or re-roles an account. */
+  async function updateUser(userId: string, input: { active?: boolean; role?: string }): Promise<void> {
+    await patch(`/_admin/users/${userId}`, input);
+    await loadUsers();
+  }
+
+  /** Loads service groups. */
+  async function loadGroups(): Promise<void> {
+    const result = await guard('گروه‌ها', () => get<{ items: GroupView[] }>('/_admin/groups'));
+    if (result) groups.value = result.items ?? [];
+  }
+
+  /** Creates a service group. */
+  async function createGroup(input: { name: string; color: string; capacity: number; incidentIds: string[]; status?: string }): Promise<void> {
+    await post('/_admin/groups', input);
+    await loadGroups();
+  }
+
+  /** Updates a service group. */
+  async function updateGroup(
+    groupId: string,
+    input: { name: string; color: string; capacity: number; incidentIds: string[]; status?: string }
+  ): Promise<void> {
+    await patch(`/_admin/groups/${groupId}`, input);
+    await loadGroups();
+  }
+
+  /** Loads open (and optionally resolved) alerts. */
+  async function loadAlerts(includeResolved = false): Promise<void> {
+    const result = await guard('هشدارها', () => get<{ items: AlertView[] }>('/_admin/alerts', { includeResolved }));
+    if (result) alerts.value = result.items ?? [];
+  }
+
+  /** Resolves an alert. */
+  async function resolveAlert(alertId: string): Promise<void> {
+    await post(`/_admin/alerts/${alertId}/resolve`);
+    await loadAlerts();
+  }
+
+  /** Loads the audit log. */
+  async function loadAudit(filters: AuditFilters = auditFilters.value): Promise<void> {
+    auditFilters.value = filters;
+    const result = await guard('گزارش رویدادها', () => get<ListView<AuditEntryView>>('/_admin/audit', { ...filters }));
+    if (result) audit.value = result;
+  }
+
+  /** Loads system settings. */
+  async function loadSettings(): Promise<void> {
+    const result = await guard('تنظیمات', () => get<{ items: SettingView[] }>('/_admin/settings'));
+    if (result) settings.value = result.items ?? [];
+  }
+
+  /** Persists system settings. */
+  async function saveSettings(values: Record<string, string>): Promise<void> {
+    await put('/_admin/settings', values);
+    await loadSettings();
+  }
+
+  /** Loads the incident-type catalog. */
+  async function loadIncidentTypes(): Promise<void> {
+    const result = await guard('نوع حادثه', () => get<{ items: IncidentTypeView[] }>('/_admin/incident-types'));
+    if (result) incidentTypes.value = result.items ?? [];
+  }
+
+  /** Loads the system health snapshot. */
+  async function loadHealth(): Promise<void> {
+    const result = await guard('سلامت سیستم', () => get<Record<string, unknown>>('/_admin/system/health'));
+    if (result) health.value = result;
+  }
+
+  /** Dispatches responders to an SOS request. */
+  async function dispatch(sosId: string, groupId: string, responderIds: string[]): Promise<void> {
+    await post(`/_admin/sos/${sosId}/dispatch`, { groupId, responderIds });
+    await loadDispatch();
+  }
+
+  /** Loads every dataset an administrator screen may need. */
+  async function loadAll(): Promise<void> {
+    await Promise.all([loadOverview(), loadDispatch(), loadGroups(), loadAlerts(), loadSettings()]);
+  }
+
+  return {
+    overview,
+    dispatchQueue,
+    users,
+    groups,
+    alerts,
+    audit,
+    settings,
+    incidentTypes,
+    health,
+    loading,
+    error,
+    userFilters,
+    auditFilters,
+    loadOverview,
+    loadDispatch,
+    loadUsers,
+    createUser,
+    updateUser,
+    loadGroups,
+    createGroup,
+    updateGroup,
+    loadAlerts,
+    resolveAlert,
+    loadAudit,
+    loadSettings,
+    saveSettings,
+    loadIncidentTypes,
+    loadHealth,
+    dispatch,
+    loadAll
+  };
+});

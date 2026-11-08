@@ -1,6 +1,6 @@
 # Realtime protocol
 
-The browser keeps exactly one authenticated WebSocket. Native RFC 6455 framing is implemented in `src/core/websocket.ts`; there is no Socket.IO dependency. The endpoint is `/ws`, and the protocol version is one.
+The browser keeps exactly one authenticated WebSocket. The endpoint is served by a `Bun.serve` WebSocket upgrade handler in `src/server/core/websocket.ts`; there is no Socket.IO or `ws` package. The endpoint is `/ws`, and the protocol version is one.
 
 ## Connection
 

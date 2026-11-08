@@ -1,6 +1,6 @@
 # HTTP API
 
-All API routes are same-origin and are declared in `src/routes/index.ts`. The generated OpenAPI document is available at `/_public/openapi.json`. The browser uses relative URLs only. There is no external API host and no API key in browser code.
+All API routes are same-origin and are declared in `src/server/routes/index.ts` The generated OpenAPI document is available at `/_public/openapi.json`. The browser uses relative URLs only. There is no external API host and no API key in browser code.
 
 ## Envelopes
 

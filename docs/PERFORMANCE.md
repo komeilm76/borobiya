@@ -1,10 +1,10 @@
 # Performance
 
-Performance comes from a small runtime, bounded caches and avoiding duplicated state. One Node process serves static assets, JSON, SVG tiles and WebSockets. There is no external cache, message broker, ORM, bundler or JavaScript framework in the request path.
+Performance comes from a small runtime, bounded caches and avoiding duplicated state. One Bun process serves static assets, JSON, SVG tiles and WebSockets. There is no external cache, message broker, ORM or separate application server in the request path.
 
 ## Server path
 
-HTTP responses are written directly through Node. JSON envelopes are small; static and SVG responses add ETags, cache-control and optional gzip or Brotli compression based on request headers. The static server refuses paths outside `public`. The declarative router resolves a route once per request and validates only declared fields. Rate limiter buckets use a bounded LRU cache keyed by IP and route; they do not spawn timers.
+HTTP responses are written directly by `Bun.serve`. JSON envelopes are small; static and SVG responses add ETags, cache-control and gzip compression (Bun 1.4.4 offers gzip; Brotli is not used). The static server refuses paths outside `public`. The declarative router resolves a route once per request and validates only declared fields. Rate limiter buckets use a bounded LRU cache keyed by IP and route; they do not spawn timers.
 
 SQLite uses foreign keys, a busy timeout, memory temp storage and a tuned cache size. File-backed databases use WAL and normal synchronous mode. The repository uses prepared statements through a thin typed layer. Live fixes are held in a bounded LRU cache and persisted at most every five seconds per user, which prevents high-frequency geolocation from becoming a write amplification problem. Expired shares and old location points are purged by maintenance jobs.
 
@@ -18,8 +18,8 @@ Audio is 16 kHz PCM16 in small frames. The floor controller enforces one speaker
 
 ## Browser path
 
-The browser uses native ES modules, CSS and a service worker; there is no build-time bundle or runtime framework. Theme resolves before paint. The router renders one view at a time and clears listeners, geolocation watches and audio capture on route changes. The map places only visible tiles and a small set of POI and live markers. Charts are inline SVG. Images and fonts are self-hosted and preloaded where useful.
+The browser ships a Vite bundle with one entry chunk and per-view code-split chunks, so the login shell never downloads the administrator console. Theme resolves before paint through a small inline attribute in `src/client/index.html`. Vue Router renders one view at a time and unmounts composables, geolocation watches and audio capture on navigation. The map places only visible tiles and a small set of POI and live markers. Charts are inline SVG. Images and fonts are self-hosted and preloaded where useful, and Tailwind CSS 4 is compiled to one stylesheet.
 
 ## Verification
 
-`npm run check` validates the full suite, including asset and architecture invariants. `npm run bench` records release figures for 1,000 validations, 100 deterministic tiles, 50 concurrent public reads and WebSocket live-location fan-out; `tests/performance.test.ts` keeps those measurements inside generous automated budgets. `/_public/health`, `/_admin/system/health` and the realtime statistics expose live counters for peers, frames, map cache entries, database tables and talk-floor state. Use these counters with request IDs when investigating latency or cache growth.
+`./boro check` validates the full suite, including asset and architecture invariants. `bun run bench` records release figures for 1,000 validations, 100 deterministic tiles, 50 concurrent public reads and WebSocket live-location fan-out; `tests/performance.test.ts` keeps those measurements inside generous automated budgets. `/_public/health`, `/_admin/system/health` and the realtime statistics expose live counters for peers, frames, map cache entries, database tables and talk-floor state. Use these counters with request IDs when investigating latency or cache growth.

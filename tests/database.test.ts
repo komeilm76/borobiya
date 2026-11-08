@@ -1,17 +1,25 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
+// @vitest-environment node
+import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
-import { loadConfig } from '../src/core/config.ts';
-import { openDatabase, seedDatabase } from '../src/db/database.ts';
+import * as sqlite from 'bun:sqlite';
+import { loadConfig } from '../src/server/core/config.ts';
+import { openDatabase, seedDatabase, SCHEMA_VERSION } from '../src/server/db/database.ts';
 
-test('an older SQLite database gains the SOS photo column without losing rows', async () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'borobiya-migration-'));
-  const databasePath = path.join(directory, 'legacy.sqlite');
-  try {
-    const legacy = new DatabaseSync(databasePath);
+/** Temporary directories created by a test, removed afterwards. */
+const temporaryDirectories: string[] = [];
+
+afterEach(() => {
+  for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
+describe('SQLite persistence and production safety', () => {
+  it('an older SQLite database gains the SOS photo column without losing rows', async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'borobiya-migration-'));
+    temporaryDirectories.push(directory);
+    const databasePath = path.join(directory, 'legacy.sqlite');
+    const legacy = new (sqlite as any).Database(databasePath);
     legacy.exec(`
       CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       INSERT INTO meta(key,value) VALUES('schema_version','1');
@@ -45,41 +53,80 @@ test('an older SQLite database gains the SOS photo column without losing rows', 
     legacy.close();
 
     const config = loadConfig({
-      nodeEnv: 'test', databasePath, dataDir: directory,
-      adminPassword: 'MigrationPass!2026', seedDemoUsers: false, startJobs: false
+      environment: 'test',
+      databasePath,
+      dataDir: directory,
+      adminPassword: 'MigrationPass!2026',
+      seedDemoUsers: false,
+      startJobs: false
     });
     const database = openDatabase(config);
     try {
       const columns = database.prepare('PRAGMA table_info(sos_requests)').all() as Array<{ name: string }>;
-      assert.ok(columns.some((column) => column.name === 'photo_data_url'));
-      const row = database.prepare('SELECT id, description, photo_data_url FROM sos_requests WHERE id = ?').get('sos_legacy') as {
-        id: string; description: string; photo_data_url: string | null;
-      };
-      assert.equal(row.description, 'Preserved legacy row');
-      assert.equal(row.photo_data_url, null);
+      expect(columns.some((column) => column.name === 'photo_data_url')).toBe(true);
+      const row = database
+        .prepare('SELECT id, description, photo_data_url FROM sos_requests WHERE id = ?')
+        .get('sos_legacy') as { id: string; description: string; photo_data_url: string | null };
+      expect(row.description).toBe('Preserved legacy row');
+      expect(row.photo_data_url).toBe(null);
       const version = database.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string };
-      assert.equal(version.value, '2');
+      expect(version.value).toBe(String(SCHEMA_VERSION));
       const result = await seedDatabase(database, config);
-      assert.equal(result.seededDemoUsers, false);
+      expect(result.seededDemoUsers).toBe(false);
     } finally {
       database.close();
     }
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-test('production configuration rejects demo seeding and known bootstrap passwords', () => {
-  for (const adminPassword of ['change-me-before-production', 'DemoPass!2026', 'PreviewPass!2026', 'CIReleasePass!2026', 'short']) {
-    assert.throws(() => loadConfig({ nodeEnv: 'production', adminPassword, seedDemoUsers: false }), /ADMIN_PASSWORD/);
-  }
-  assert.throws(() => loadConfig({
-    nodeEnv: 'production', adminPassword: 'UniqueProductionPass!2026', seedDemoUsers: true
-  }), /SEED_DEMO_USERS/);
-  const config = loadConfig({
-    nodeEnv: 'production', adminPassword: 'UniqueProductionPass!2026', seedDemoUsers: false,
-    allowedOrigins: ['https://borobiya.example.test']
   });
-  assert.equal(config.seedDemoUsers, false);
-  assert.equal(config.cookieSecure, true);
+
+  it('opening an already migrated database is idempotent', async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'borobiya-idempotent-'));
+    temporaryDirectories.push(directory);
+    const config = loadConfig({
+      environment: 'test',
+      databasePath: path.join(directory, 'twice.sqlite'),
+      dataDir: directory,
+      adminPassword: 'IdempotentPass!2026',
+      seedDemoUsers: true,
+      startJobs: false
+    });
+    const first = openDatabase(config);
+    const seeded = await seedDatabase(first, config);
+    first.close();
+    expect(seeded.seededDemoUsers).toBe(true);
+    const second = openDatabase(config);
+    try {
+      const users = second.prepare('SELECT COUNT(*) AS total FROM users').get() as { total: number };
+      expect(users.total).toBeGreaterThanOrEqual(4);
+      const meta = second.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string };
+      expect(meta.value).toBe(String(SCHEMA_VERSION));
+    } finally {
+      second.close();
+    }
+  });
+
+  it('production configuration rejects demo seeding and known bootstrap passwords', () => {
+    for (const adminPassword of [
+      'change-me-before-production',
+      'DemoPass!2026',
+      'PreviewPass!2026',
+      'CIReleasePass!2026',
+      'short'
+    ]) {
+      expect(() => loadConfig({ environment: 'production', adminPassword, seedDemoUsers: false })).toThrow(
+        /ADMIN_PASSWORD/
+      );
+    }
+    expect(() =>
+      loadConfig({ environment: 'production', adminPassword: 'UniqueProductionPass!2026', seedDemoUsers: true })
+    ).toThrow(/SEED_DEMO_USERS/);
+    const config = loadConfig({
+      environment: 'production',
+      adminPassword: 'UniqueProductionPass!2026',
+      seedDemoUsers: false,
+      allowedOrigins: ['https://borobiya.example.test']
+    });
+    expect(config.seedDemoUsers).toBe(false);
+    expect(config.cookieSecure).toBe(true);
+    expect(config.trustProxy).toBe(false);
+  });
 });

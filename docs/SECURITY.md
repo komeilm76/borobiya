@@ -1,6 +1,6 @@
 # Security
 
-Security is enforced at the HTTP boundary, the session layer, the service layer and the browser. The runtime has no third-party dependencies, which keeps the auditable surface small. Private APIs are never cached by the service worker, and browser code contains no API keys or external script sources.
+Security is enforced at the HTTP boundary, the session layer, the service layer and the browser. The runtime is Bun itself plus a generated browser bundle, so the trusted server surface is small and auditable. Private APIs are never cached by the service worker, and browser code contains no API keys or external script sources.
 
 ## HTTP defenses
 
@@ -16,7 +16,7 @@ WebSockets have a maximum frame size, heartbeat timeout, room limit and typed cl
 
 ## Accounts and sessions
 
-Passwords and security answers are hashed with scrypt and a random salt. Answer normalization is consistent before hashing. Unknown users follow a dummy-hash path during login, and unknown recovery usernames receive a decoy challenge with the same visible shape. Failed logins increment a counter and can temporarily lock the account. Recovery challenges have attempt limits, expiry and one-use reset tokens. A successful reset revokes every session and disconnects realtime peers.
+Passwords and security answers are hashed with Argon2id through `Bun.password`, which uses a per-value random salt. Answer normalization is consistent before hashing, and stored hashes are self-describing so the algorithm can be upgraded later. Unknown users follow a dummy-hash path during login, and unknown recovery usernames receive a decoy challenge with the same visible shape. Failed logins increment a counter and can temporarily lock the account. Recovery challenges have attempt limits, expiry and one-use reset tokens. A successful reset revokes every session and disconnects realtime peers.
 
 Sessions use `HttpOnly`, `SameSite=Lax`, path-scoped cookies, optional secure cookies, IP binding, expiry, refresh rotation and revocation. The server stores a hash of the session secret. Deactivating a user revokes all sessions. The last active administrator cannot be removed, and an administrator cannot suspend or demote their own active account.
 

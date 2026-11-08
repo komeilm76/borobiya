@@ -1,0 +1,7 @@
+// Vuetify SASS entry: only the utility/theme variables Borobiya needs are emitted.
+// The canonical design tokens stay in app.css; Vuetify inherits them so the two systems agree.
+@use 'vuetify/settings' with (
+  $color-pack: false,
+  $body-font-family: ('Vazirmatn', system-ui, sans-serif),
+  $utilities: false
+);
