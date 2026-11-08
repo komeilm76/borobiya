@@ -8,6 +8,8 @@ import { useSosRequest, type GeolocationProvider } from "./use-sos-request";
 const INCIDENT_A = "11111111-1111-4111-8111-111111111111";
 const INCIDENT_B = "33333333-3333-4333-8333-333333333333";
 const REQUEST_ID = "22222222-2222-4222-8222-222222222222";
+const bearer = (sessionId: string, sub = "owner-a", nonce = 0) =>
+  `header.${btoa(JSON.stringify({ sessionId, sub, nonce }))}.signature`;
 
 function catalogRow(id: string) {
   return { id, name: id === INCIDENT_A ? "امداد جاده‌ای" : "امداد کوهستان",
@@ -356,6 +358,146 @@ describe("useSosRequest composable", () => {
     expect(await sendingSecond).toBe(true);
     expect(sos.submitting.value).toBe(false);
     expect(sos.createdRequestId.value).toBe(secondId);
+  });
+
+  it("does not submit an approved draft from a replaced login of the same account after a pending session check", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const token = ref<string | null>(bearer("session-a"));
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({ ownerId: ref("owner-a"), accessToken: token, ensureSession: () => pending });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A previously approved emergency draft.";
+    sos.setManualLocation(35.7, 51.4);
+    const old = sos.submit();
+    expect(sos.submitting.value).toBe(true);
+
+    token.value = bearer("session-b");
+    expect(sos.submitting.value).toBe(false);
+    expect(sos.description.value).toBe("");
+    release();
+    expect(await old).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "A newly approved request on the next login.";
+    sos.setManualLocation(35.8, 51.5);
+    expect(await sos.submit()).toBe(true);
+    expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0]?.[1]).toBe(bearer("session-b"));
+  });
+
+  it("discards a prior login's late SOS create without uploading its photo or claiming its success", async () => {
+    let finishOld!: (created: { requestId: string; status: "pending" }) => void;
+    const pending = new Promise<{ requestId: string; status: "pending" }>((resolve) => { finishOld = resolve; });
+    const token = ref<string | null>(bearer("session-a"));
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockReturnValueOnce(pending).mockResolvedValueOnce({ requestId: INCIDENT_B, status: "pending" });
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto").mockResolvedValue({ photoUrl: "/uploads/sos/old.png" });
+    const sos = useSosRequest({ ownerId: ref("owner-a"), accessToken: token });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "Old session request whose server write may have committed.";
+    sos.setManualLocation(35.7, 51.4);
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    const old = sos.submit();
+    await vi.waitFor(() => expect(create).toHaveBeenCalledOnce());
+    token.value = bearer("session-b");
+    expect(sos.createdRequestId.value).toBeNull();
+    finishOld({ requestId: REQUEST_ID, status: "pending" });
+    expect(await old).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
+    expect(sos.createdRequestId.value).toBeNull();
+
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "New session request on a separate explicit tap.";
+    sos.setManualLocation(35.8, 51.5);
+    expect(await sos.submit()).toBe(true);
+    expect(sos.createdRequestId.value).toBe(INCIDENT_B);
+  });
+
+  it("does not replay an old photo retry under the next login of the same account", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const token = ref<string | null>(bearer("session-a"));
+    const upload = vi.spyOn(sosApi, "uploadSosRequestPhoto")
+      .mockResolvedValue({ photoUrl: "/uploads/sos/old.png" });
+    const sos = useSosRequest({ ownerId: ref("owner-a"), accessToken: token, ensureSession: () => pending });
+    sos.createdRequestId.value = REQUEST_ID;
+    sos.awaitingPhotoRetry.value = true;
+    sos.selectPhoto(new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], "scene.png", { type: "image/png" }));
+    const retry = sos.retryPhotoUpload();
+    token.value = bearer("session-b");
+    expect(sos.createdRequestId.value).toBeNull();
+    release();
+    expect(await retry).toBe(false);
+    expect(upload).not.toHaveBeenCalled();
+    expect(sos.submitting.value).toBe(false);
+  });
+
+  it("cannot reuse a prior SOS after a same-tick A-to-B-to-A login replacement", async () => {
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const token = ref<string | null>(bearer("session-a"));
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({ ownerId: ref("owner-a"), accessToken: token, ensureSession: () => pending });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "Approved under the old login.";
+    sos.setManualLocation(35.7, 51.4);
+    const old = sos.submit();
+    token.value = bearer("session-b");
+    token.value = bearer("session-a", "owner-a", 1);
+    release();
+    expect(await old).toBe(false);
+    expect(create).not.toHaveBeenCalled();
+    expect(sos.description.value).toBe("");
+  });
+
+  it("reports a retryable sign-in error when cold session recovery yields no bearer", async () => {
+    const create = vi.spyOn(sosApi, "createSosRequest");
+    const sos = useSosRequest({
+      ownerId: ref("owner-a"), accessToken: ref<string | null>(null),
+      ensureSession: async () => undefined
+    });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "An emergency drafted before a cold session check.";
+    sos.setManualLocation(35.7, 51.4);
+    expect(await sos.submit()).toBe(false);
+    expect(sos.submitError.value).toContain("دوباره وارد");
+    expect(create).not.toHaveBeenCalled();
+    expect(sos.submitting.value).toBe(false);
+  });
+
+  it("keeps an explicitly approved draft during cold same-owner session recovery", async () => {
+    const token = ref<string | null>(null);
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({
+      ownerId: ref("owner-a"), accessToken: token,
+      ensureSession: async () => { token.value = bearer("restored-session"); }
+    });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "The owner prepared a request before their bearer restored.";
+    sos.setManualLocation(35.7, 51.4);
+    expect(await sos.submit()).toBe(true);
+    expect(create).toHaveBeenCalledWith(expect.anything(), bearer("restored-session"));
+  });
+
+  it("keeps an in-flight draft on a real same-session bearer renewal", async () => {
+    const token = ref<string | null>(bearer("session-a"));
+    const create = vi.spyOn(sosApi, "createSosRequest")
+      .mockResolvedValue({ requestId: REQUEST_ID, status: "pending" });
+    const sos = useSosRequest({
+      ownerId: ref("owner-a"), accessToken: token,
+      ensureSession: async () => { token.value = bearer("session-a", "owner-a", 1); }
+    });
+    sos.incidentTypeId.value = INCIDENT_A;
+    sos.description.value = "The same login renewed its bearer.";
+    sos.setManualLocation(35.7, 51.4);
+    expect(await sos.submit()).toBe(true);
+    expect(create).toHaveBeenCalledWith(expect.anything(), bearer("session-a", "owner-a", 1));
+    expect(sos.createdRequestId.value).toBe(REQUEST_ID);
   });
 
   it("still submits for the same owner after a normal access-token rotation", async () => {

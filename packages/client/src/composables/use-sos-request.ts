@@ -1,6 +1,7 @@
 import { computed, getCurrentScope, onScopeDispose, ref, watch, type ComputedRef, type Ref } from "vue";
 import type { IncidentType, Severity, SosLocation } from "@shared/index";
 import { createSosRequest, listSosIncidentTypes, uploadSosRequestPhoto } from "../api/sos";
+import { shareSessionKey } from "../sharing/share-submission-fence";
 import {
   buildSosCreatePayload,
   canSubmitSosDraft,
@@ -71,14 +72,19 @@ export function useSosRequest(options: UseSosRequestOptions) {
   let gpsRequestId = 0;
   let catalogVersion = 0;
   let operationGeneration = 0;
-  const isCurrent = (owner: string, operation: number) =>
-    operation === operationGeneration && options.ownerId.value === owner;
+  // Bind consent to the JWT login session, not just the account: logging into the same
+  // account again must not inherit an old emergency draft, in-flight photo or submit lock.
+  const sessionKey = computed(() => shareSessionKey(options.ownerId.value, options.accessToken.value));
+  const isCurrent = (owner: string, operation: number, session: string | null) =>
+    operation === operationGeneration && options.ownerId.value === owner &&
+    (session === null || sessionKey.value === session);
 
-  // The sheet can outlive a token refresh, but must not outlive the account that drafted
-  // the emergency. Invalidate synchronously: logout + login may happen before a pending
-  // ensureSession/create/upload promise settles.
-  watch(options.ownerId, () => reset(), { flush: "sync" });
-  watch(options.accessToken, (token) => { if (!token) reset(); }, { flush: "sync" });
+  // A normal same-session bearer renewal keeps the draft. An absent -> restored token
+  // also keeps an explicitly prepared draft for the same owner, but logout, a different
+  // session, or an account switch invalidates it synchronously (including A -> B -> A).
+  watch([options.ownerId, sessionKey], ([owner, session], [previousOwner, previousSession]) => {
+    if (owner !== previousOwner || (previousSession !== null && session !== previousSession)) reset();
+  }, { flush: "sync" });
   if (getCurrentScope()) onScopeDispose(() => reset());
 
   const draft = computed<SosFormDraft>(() => ({
@@ -267,11 +273,12 @@ export function useSosRequest(options: UseSosRequestOptions) {
     // Snapshot what the user approved at tap time. A late GPS fix, map drag or file-picker
     // event during session refresh must not silently change the submitted SOS or attachment.
     const owner = options.ownerId.value;
-    if (!owner) {
+    if (!owner || (options.accessToken.value && !sessionKey.value)) {
       submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
       return false;
     }
     const operation = operationGeneration;
+    const session = sessionKey.value;
     const payload = buildSosCreatePayload(draft.value);
     const selectedPhoto = photoFile.value;
     gpsRequestId++; // discard a geolocation callback already in flight
@@ -281,25 +288,25 @@ export function useSosRequest(options: UseSosRequestOptions) {
     submitting.value = true;
     try {
       const token = await requireToken();
-      if (!isCurrent(owner, operation)) return false;
-      if (!token) {
+      if (!isCurrent(owner, operation, session)) return false;
+      if (!token || !sessionKey.value) {
         submitError.value = "برای ارسال درخواست امداد دوباره وارد حساب کاربری شوید.";
         return false;
       }
       const created = await createSosRequest(payload, token);
       // A network request may already have committed when the user signed out. We cannot
       // undo that server operation, but must not upload its photo or show it to the next user.
-      if (!isCurrent(owner, operation)) return false;
+      if (!isCurrent(owner, operation, session)) return false;
       createdRequestId.value = created.requestId;
 
       if (selectedPhoto) {
         try {
           const uploaded = await uploadSosRequestPhoto(created.requestId, selectedPhoto, token);
-          if (!isCurrent(owner, operation)) return false;
+          if (!isCurrent(owner, operation, session)) return false;
           photoUploadedUrl.value = uploaded.photoUrl;
           awaitingPhotoRetry.value = false;
         } catch (uploadError) {
-          if (!isCurrent(owner, operation)) return false;
+          if (!isCurrent(owner, operation, session)) return false;
           awaitingPhotoRetry.value = true;
           submitError.value = sosApiErrorMessage(
             uploadError,
@@ -311,7 +318,7 @@ export function useSosRequest(options: UseSosRequestOptions) {
 
       return true;
     } catch (error) {
-      if (isCurrent(owner, operation)) {
+      if (isCurrent(owner, operation, session)) {
         submitError.value = sosApiErrorMessage(
           error,
           "ثبت درخواست امداد انجام نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید."
@@ -328,26 +335,27 @@ export function useSosRequest(options: UseSosRequestOptions) {
     const requestId = createdRequestId.value;
     const selectedPhoto = photoFile.value;
     const owner = options.ownerId.value;
-    if (!owner) return false;
+    if (!owner || (options.accessToken.value && !sessionKey.value)) return false;
     const operation = operationGeneration;
+    const session = sessionKey.value;
     submitError.value = null;
 
     // The photo retry is also single-flight across an asynchronous token refresh.
     submitting.value = true;
     try {
       const token = await requireToken();
-      if (!isCurrent(owner, operation)) return false;
-      if (!token) {
+      if (!isCurrent(owner, operation, session)) return false;
+      if (!token || !sessionKey.value) {
         submitError.value = "برای ارسال تصویر دوباره وارد حساب کاربری شوید.";
         return false;
       }
       const uploaded = await uploadSosRequestPhoto(requestId, selectedPhoto, token);
-      if (!isCurrent(owner, operation)) return false;
+      if (!isCurrent(owner, operation, session)) return false;
       photoUploadedUrl.value = uploaded.photoUrl;
       awaitingPhotoRetry.value = false;
       return true;
     } catch (error) {
-      if (isCurrent(owner, operation)) {
+      if (isCurrent(owner, operation, session)) {
         awaitingPhotoRetry.value = true;
         submitError.value = sosApiErrorMessage(
           error,

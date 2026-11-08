@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Fence SOS consent at same-account login changes (T4.4.2 partial)
+
+- A new login to the same account retained the previous JWT session's emergency draft and pending create/photo retry, unlike an account switch. A queued submit could thus post the old approved draft with the new login's token; a late create could show an old request or start its photo upload. The SOS composable now resets consent synchronously when the login session ID changes, while keeping a normal same-session bearer refresh and allowing cold same-owner session recovery. Deferred tests reproduced two failures before the fix and now cover pending session checks, late create, photo retry and same-tick A→B→A. Already-sent writes may have committed on the server; this change only fences client-side continuation and feedback, not server rollback. No live browser/API/GPS/emergency workflow test was run; T4.4.2 and full T4.5.3 Playwright acceptance remain open.
+
 ### 2026-10-23 — Release stale device-termination locks across logins (T4.4.2 partial)
 
 - The signed-in-devices confirmation kept `terminating` true through an old account's stalled session check or DELETE, blocking a new login's termination action; an old `finally` could also clear the new login's busy state. Extracted a session-scoped, nonmounted controller so account/session replacement and disposal clear pending UI state immediately, while a generation fence prevents late old replies from changing the new login's feedback or lock. An already-sent revocation may still commit on the server; this change does not imply rollback. Deferred tests cover a stalled session check, an old late DELETE overlapping a newer write, same-session bearer renewal and unmount. The first full client run also caught a stale source-pinned layout assertion that still looked for the moved write in the Vue file; updated it to verify the controller and view wiring. All 1,280 client tests now pass, as do 63 shared and 576 server tests, repository lint, typechecks and the production build. No browser/device acceptance or site-wide feedback audit was performed; T4.4.2 remains open.
