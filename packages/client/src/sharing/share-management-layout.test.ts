@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 // Source contracts only. docs/TASKS.md prohibits mounting Vue components in unit tests.
 const shares = readFileSync(new URL("../components/sharing/ShareLists.vue", import.meta.url), "utf8");
 const devices = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
+const termination = readFileSync(new URL("../settings/device-termination.ts", import.meta.url), "utf8");
 const shareView = readFileSync(new URL("../views/_user/UserLocationSharesView.vue", import.meta.url), "utf8");
 const deviceView = readFileSync(new URL("../views/_user/UserDevicesView.vue", import.meta.url), "utf8");
 
@@ -30,10 +31,12 @@ describe("share and signed-in device management layout", () => {
 
   it("confirms a remote termination, warns about broadcast interruption and refuses stale writes", () => {
     expect(devices).toContain('v-dialog v-model="confirmOpen"');
-    expect(devices).toContain('row.isCurrent || api.failed.value || api.loading.value || terminating.value');
-    expect(devices).toContain('device.isCurrentDevice');
-    expect(devices).toContain('revokeUserDevice(device.id, token)');
-    expect(devices).toContain('identity !== session() || disposed');
+    expect(devices).toContain('useDeviceTermination({');
+    expect(devices).toContain('revoke: revokeUserDevice');
+    expect(termination).toContain('row.isCurrent || options.failed.value || options.loading.value || terminating.value');
+    expect(termination).toContain('device.isCurrentDevice');
+    expect(termination).toContain('await options.revoke(device.id, token)');
+    expect(termination).toContain('if (!stillCurrent()) return;');
     expect(devices).toContain('اگر این دستگاه موقعیت اشتراکی را پخش می‌کند');
     expect(devices).toContain('role="status" aria-live="polite"');
   });

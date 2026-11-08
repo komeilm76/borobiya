@@ -69,77 +69,28 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, ref, watch } from "vue";
 import { useAuthStore } from "@/stores/auth";
 import { revokeUserDevice } from "@/api/devices";
-import { friendlyErrorMessage } from "@/api/error-message";
 import { formatDuration } from "@/sharing/share-form";
 import type { DeviceSettings } from "@/composables/use-device-settings";
-import type { DeviceRow } from "@/settings/priority-device";
 import { shareSessionKey } from "@/sharing/share-submission-fence";
+import { useDeviceTermination } from "@/settings/device-termination";
 
 const { api } = defineProps<{ api: DeviceSettings }>();
 const auth = useAuthStore();
-const confirmOpen = ref(false);
-const pending = ref<DeviceRow | null>(null);
-const terminating = ref(false);
-const message = ref<string | null>(null);
-const error = ref(false);
-let disposed = false;
-onBeforeUnmount(() => { disposed = true; });
-const session = () => shareSessionKey(auth.user?.id ?? null, auth.accessToken);
-
-watch(session, () => {
-  pending.value = null;
-  confirmOpen.value = false;
-  message.value = null;
-}, { flush: "sync" });
+const { confirmOpen, pending, terminating, message, error, askTerminate, terminate } = useDeviceTermination({
+  session: () => shareSessionKey(auth.user?.id ?? null, auth.accessToken),
+  accessToken: () => auth.accessToken,
+  ensureSession: () => auth.ensureSession(),
+  devices: api.devices,
+  loading: api.loading,
+  failed: api.failed,
+  refresh: () => api.refresh(),
+  revoke: revokeUserDevice
+});
 
 function ageText(minutes: number): string {
   return minutes <= 0 ? "همین الان" : `${formatDuration(minutes)} پیش`;
-}
-
-function askTerminate(row: DeviceRow): void {
-  if (row.isCurrent || api.failed.value || api.loading.value || terminating.value) return;
-  pending.value = row;
-  message.value = null;
-  confirmOpen.value = true;
-}
-
-async function terminate(): Promise<void> {
-  const target = pending.value;
-  if (!target || target.isCurrent || terminating.value || api.failed.value || api.loading.value) return;
-  const identity = session();
-  terminating.value = true;
-  try {
-    await auth.ensureSession();
-    if (!identity || identity !== session() || disposed) return;
-    const token = auth.accessToken;
-    const device = api.devices.value.find(row => row.deviceId === target.deviceId);
-    if (!token || !device || device.isCurrentDevice) {
-      confirmOpen.value = false;
-      pending.value = null;
-      message.value = "این نشست دیگر در فهرست نیست؛ فهرست را تازه کنید.";
-      error.value = true;
-      await api.refresh();
-      return;
-    }
-    await revokeUserDevice(device.id, token);
-    if (identity !== session() || disposed) return;
-    confirmOpen.value = false;
-    pending.value = null;
-    message.value = "نشست پایان یافت. وضعیت دستگاه پخش‌کننده را در اشتراک‌های موقعیت بررسی کنید.";
-    error.value = false;
-    await api.refresh();
-  } catch (cause) {
-    if (identity !== session() || disposed) return;
-    message.value = friendlyErrorMessage(cause, "پایان نشست انجام نشد؛ دوباره تلاش کنید.");
-    error.value = true;
-    confirmOpen.value = false;
-    await api.refresh();
-  } finally {
-    terminating.value = false;
-  }
 }
 </script>
 

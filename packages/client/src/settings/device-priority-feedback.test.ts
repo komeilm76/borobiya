@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 // Source-pinned view checks; do not mount Vue SFCs in unit tests.
 const panel = readFileSync(new URL("../components/settings/DevicePriorityPanel.vue", import.meta.url), "utf8");
 const view = readFileSync(new URL("../views/_user/UserDevicesView.vue", import.meta.url), "utf8");
+const termination = readFileSync(new URL("./device-termination.ts", import.meta.url), "utf8");
 
 describe("active-device read feedback", () => {
   it("binds the panel to the account identity and does not claim a device count for an unresolved read", () => {
@@ -27,6 +28,7 @@ describe("active-device read feedback", () => {
     expect(panel).toContain('@click="api.refresh()"');
     expect(panel).toContain('role="alert"');
     expect(panel).toContain(':disabled="api.loading.value || api.failed.value || terminating"');
-    expect(panel).toContain('if (row.isCurrent || api.failed.value || api.loading.value || terminating.value) return;');
+    expect(panel).toContain('useDeviceTermination({');
+    expect(termination).toContain('if (row.isCurrent || options.failed.value || options.loading.value || terminating.value || disposed) return;');
   });
 });
