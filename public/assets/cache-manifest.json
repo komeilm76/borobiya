@@ -1,0 +1,33 @@
+{
+  "version": "c4f731c19462880f",
+  "precache": [
+    "/",
+    "/app.css",
+    "/assets/favicon.svg",
+    "/assets/fonts/Vazirmatn-Black.ttf",
+    "/assets/fonts/Vazirmatn-Bold.ttf",
+    "/assets/fonts/Vazirmatn-Medium.ttf",
+    "/assets/fonts/Vazirmatn-Regular.ttf",
+    "/assets/fonts/Vazirmatn-SemiBold.ttf",
+    "/assets/fonts/materialdesignicons-webfont.ttf",
+    "/assets/icons.css",
+    "/assets/logo.svg",
+    "/js/api.js",
+    "/js/app.js",
+    "/js/audio.js",
+    "/js/geo.js",
+    "/js/protocol.js",
+    "/js/theme.js",
+    "/js/transport.js",
+    "/js/ui.js",
+    "/js/views/admin.js",
+    "/js/views/auth.js",
+    "/js/views/map.js",
+    "/manifest.webmanifest",
+    "/sw.js"
+  ],
+  "runtime": {
+    "tileLimit": 256,
+    "apiCaching": false
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "بورو بیا",
+  "short_name": "بورو بیا",
+  "description": "نقشه، موقعیت زنده، همراهان و درخواست امداد",
+  "id": "/",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/_auth/login",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F6F9F8",
+  "theme_color": "#0E6666",
+  "icons": [
+    { "src": "/assets/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "نقشه", "short_name": "نقشه", "url": "/_user/map", "icons": [{ "src": "/assets/favicon.svg", "sizes": "any" }] },
+    { "name": "همراهان", "short_name": "همراهان", "url": "/_user/companions", "icons": [{ "src": "/assets/favicon.svg", "sizes": "any" }] }
+  ]
+}

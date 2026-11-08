@@ -1,0 +1,4012 @@
+{
+  "icons": [
+    {
+      "name": "mdi-refresh",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "status"
+      ],
+      "count": 36,
+      "files": [
+        "components/admin/AdminUserDrawer.vue",
+        "components/map/PointRouteSheet.vue",
+        "components/mission/MissionRatingPanel.vue",
+        "components/mission/MissionTimelinePanel.vue",
+        "components/settings/DevicePriorityPanel.vue",
+        "components/sharing/ShareLists.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_admin/AdminAlertsView.vue",
+        "views/_admin/AdminAuditView.vue",
+        "views/_admin/AdminDashboardView.vue",
+        "views/_admin/AdminDispatchView.vue",
+        "views/_admin/AdminIncidentsView.vue",
+        "views/_admin/AdminReportsView.vue",
+        "views/_admin/AdminServiceGroupsView.vue",
+        "views/_admin/AdminSettingsView.vue",
+        "views/_admin/AdminUsersView.vue",
+        "views/_public/PublicHealthView.vue",
+        "views/_user/UserMapView.vue",
+        "views/_user/UserMissionView.vue",
+        "views/_user/UserRescuerHistoryView.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 75,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 85,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 24,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/mission/MissionRatingPanel.vue",
+          "line": 5,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/mission/MissionTimelinePanel.vue",
+          "line": 9,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/settings/DevicePriorityPanel.vue",
+          "line": 10,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 16,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 43,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 58,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 13,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 32,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminAuditView.vue",
+          "line": 20,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminAuditView.vue",
+          "line": 76,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 23,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 58,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 74,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 467,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 10,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 25,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 34,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminReportsView.vue",
+          "line": 22,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminReportsView.vue",
+          "line": 40,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 10,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 36,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 45,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminSettingsView.vue",
+          "line": 10,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminSettingsView.vue",
+          "line": 29,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminSettingsView.vue",
+          "line": 124,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 18,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 86,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 95,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 22,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 24,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 26,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 14,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 22,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-arrow-left",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "navigation",
+        "cards"
+      ],
+      "count": 15,
+      "files": [
+        "App.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_auth/LoginView.vue",
+        "views/_auth/RegisterView.vue",
+        "views/_public/PublicHealthView.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/CompleteSecurityQuestionsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 42,
+          "element": "v-list-item"
+        },
+        {
+          "file": "App.vue",
+          "line": 166,
+          "element": "v-icon"
+        },
+        {
+          "file": "App.vue",
+          "line": 183,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 105,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 53,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 76,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 111,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 123,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 93,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 147,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 33,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 13,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 69,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 80,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/CompleteSecurityQuestionsView.vue",
+          "line": 82,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chevron-left",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "navigation"
+      ],
+      "count": 15,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/admin/AdminUserDrawer.vue",
+        "components/map/LiveCompanionPanel.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_admin/AdminDashboardView.vue",
+        "views/_admin/AdminSettingsView.vue",
+        "views/_admin/AdminUsersView.vue",
+        "views/_user/UserRescuerHistoryView.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 79,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 216,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/map/LiveCompanionPanel.vue",
+          "line": 70,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 88,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 97,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 96,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 105,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 86,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 131,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 172,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminSettingsView.vue",
+          "line": 105,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 141,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 231,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 56,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 59,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-close",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 15,
+      "files": [
+        "components/admin/AdminUserDrawer.vue",
+        "components/map/CompanionDetailSheet.vue",
+        "components/map/PlaceSearchPanel.vue",
+        "components/map/PointRouteSheet.vue",
+        "components/map/ReverseAddressSheet.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/MapSidebar.vue",
+        "components/sos/SosRequestSheet.vue",
+        "views/_admin/AdminServiceGroupsView.vue",
+        "views/_user/UserMapView.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 47,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/CompanionDetailSheet.vue",
+          "line": 13,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/PlaceSearchPanel.vue",
+          "line": 55,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 30,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/ReverseAddressSheet.vue",
+          "line": 6,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 45,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 116,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 29,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 30,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 140,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 194,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 189,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 209,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 237,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 146,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-check",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "cards",
+        "status"
+      ],
+      "count": 5,
+      "files": [
+        "components/sharing/ShareDialog.vue",
+        "components/shell/AccountProfileMenu.vue",
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_public/PublicHealthView.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 116,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 66,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 118,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 11,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 49,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-weather-night",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "cards",
+        "navigation"
+      ],
+      "count": 5,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "components/shell/AccountProfileMenu.vue",
+        "components/shell/MapSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 161,
+          "element": "v-icon"
+        },
+        {
+          "file": "App.vue",
+          "line": 180,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 48,
+          "element": "v-list-item"
+        },
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 111,
+          "element": "script"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 116,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alarm-light-outline",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "cards"
+      ],
+      "count": 4,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "views/_admin/AdminDashboardView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 207,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 336,
+          "element": "script"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 27,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 289,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chevron-right",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 4,
+      "files": [
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_user/UserRescuerHistoryView.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 94,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 102,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 53,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 56,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-stop-circle-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 4,
+      "files": [
+        "components/map/OwnPositionBar.vue",
+        "components/mission/MissionLivePanel.vue",
+        "components/sharing/LiveBroadcastBar.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/OwnPositionBar.vue",
+          "line": 32,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/mission/MissionLivePanel.vue",
+          "line": 55,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/sharing/LiveBroadcastBar.vue",
+          "line": 25,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 193,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-check-circle-outline",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "cards"
+      ],
+      "count": 3,
+      "files": [
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_admin/AdminAlertsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 60,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 155,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 68,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-clock-outline",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "fields"
+      ],
+      "count": 3,
+      "files": [
+        "components/sharing/HistoryDateTimeField.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/HistoryDateTimeField.vue",
+          "line": 38,
+          "element": "v-text-field"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 87,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 95,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-information-outline",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "cards"
+      ],
+      "count": 3,
+      "files": [
+        "components/admin/AdminStatePanel.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_public/PublicHealthView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminStatePanel.vue",
+          "line": 59,
+          "element": "script"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 153,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 27,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-menu",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "components/shell/MapSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 66,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 70,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 14,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-weather-sunny",
+      "role": "actions",
+      "roles": [
+        "actions",
+        "navigation"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 161,
+          "element": "v-icon"
+        },
+        {
+          "file": "App.vue",
+          "line": 180,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 48,
+          "element": "v-list-item"
+        }
+      ]
+    },
+    {
+      "name": "mdi-arrow-right",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PointRouteChoicesSheet.vue",
+        "views/_user/UserDevicesView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteChoicesSheet.vue",
+          "line": 8,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserDevicesView.vue",
+          "line": 12,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-broadcast",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/sharing/LiveBroadcastBar.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/LiveBroadcastBar.vue",
+          "line": 25,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 94,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chevron-up",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 41,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 57,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-close-circle-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/sos/SosRequestSheet.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 69,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 112,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-pause",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 44,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 190,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-pencil-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "views/_admin/AdminIncidentsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 86,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 95,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-play",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 44,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 190,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-arrow-down",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 144,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-arrow-up",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 142,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-broadcast-off",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 94,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-check-circle",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserRescuerHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 49,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chevron-down",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/AccountProfileMenu.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 24,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-creation-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/PlaceholderPage.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/PlaceholderPage.vue",
+          "line": 49,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-database-eye-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminReportsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminReportsView.vue",
+          "line": 57,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-delete-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 146,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-dots-horizontal",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 68,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-dots-vertical",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/PointRouteSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 14,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-fit-to-screen",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/mission/MissionLivePanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/mission/MissionLivePanel.vue",
+          "line": 14,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-hand-heart-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/ProposalInboxContent.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 72,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-navigation",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 192,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-road-variant",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 130,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-selection-search",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/PlaceSearchPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PlaceSearchPanel.vue",
+          "line": 26,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-send-check-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 590,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-send-circle-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/sos/SosRequestSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 372,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-share-variant-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareDialog.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 286,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-signal-off",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 153,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-skip-next-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 201,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-skip-previous-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 178,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-speedometer",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 123,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-timer-outline",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 135,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-tune-variant",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 57,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-volume-high",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 54,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-volume-off",
+      "role": "actions",
+      "roles": [
+        "actions"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 54,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-magnify",
+      "role": "fields",
+      "roles": [
+        "fields",
+        "actions",
+        "cards"
+      ],
+      "count": 8,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/sharing/ShareDialog.vue",
+        "views/_admin/AdminAuditView.vue",
+        "views/_admin/AdminServiceGroupsView.vue",
+        "views/_admin/AdminUsersView.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 96,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 127,
+          "element": "v-text-field"
+        },
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 53,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminAuditView.vue",
+          "line": 39,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 203,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 30,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 159,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 329,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-lock-check-outline",
+      "role": "fields",
+      "roles": [
+        "fields",
+        "navigation",
+        "account"
+      ],
+      "count": 5,
+      "files": [
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_auth/LoginView.vue",
+        "views/_auth/RegisterView.vue",
+        "views/_user/CompleteSecurityQuestionsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 101,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 132,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 103,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 81,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_user/CompleteSecurityQuestionsView.vue",
+          "line": 87,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-lock-outline",
+      "role": "fields",
+      "roles": [
+        "fields",
+        "navigation"
+      ],
+      "count": 4,
+      "files": [
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_auth/LoginView.vue",
+        "views/_auth/RegisterView.vue",
+        "views/_public/PublicLandingView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 88,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 68,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 67,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 31,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-comment-question-outline",
+      "role": "fields",
+      "roles": [
+        "fields"
+      ],
+      "count": 2,
+      "files": [
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_user/CompleteSecurityQuestionsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 65,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_user/CompleteSecurityQuestionsView.vue",
+          "line": 61,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-at",
+      "role": "fields",
+      "roles": [
+        "fields"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/RegisterView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 53,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-calendar-month-outline",
+      "role": "fields",
+      "roles": [
+        "fields"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/HistoryDateTimeField.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/HistoryDateTimeField.vue",
+          "line": 10,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-eye-outline",
+      "role": "fields",
+      "roles": [
+        "fields"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/LoginView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 69,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-waves",
+      "role": "fields",
+      "roles": [
+        "fields"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminIncidentsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 140,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-plus",
+      "role": "navigation",
+      "roles": [
+        "navigation",
+        "actions",
+        "status",
+        "cards"
+      ],
+      "count": 12,
+      "files": [
+        "App.vue",
+        "components/sharing/ShareDialog.vue",
+        "components/sharing/ShareLists.vue",
+        "views/_admin/AdminDashboardView.vue",
+        "views/_admin/AdminIncidentsView.vue",
+        "views/_admin/AdminServiceGroupsView.vue",
+        "views/_auth/LoginView.vue",
+        "views/_public/PublicLandingView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 8,
+          "element": "v-icon"
+        },
+        {
+          "file": "App.vue",
+          "line": 150,
+          "element": "v-icon"
+        },
+        {
+          "file": "App.vue",
+          "line": 172,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 116,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 20,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 141,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 13,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminIncidentsView.vue",
+          "line": 43,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 14,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminServiceGroupsView.vue",
+          "line": 54,
+          "element": "adminstatepanel"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 20,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 27,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-cloud-off-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation",
+        "cards",
+        "actions",
+        "status"
+      ],
+      "count": 4,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/admin/AdminStatePanel.vue",
+        "views/_admin/AdminDashboardView.vue",
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 92,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminStatePanel.vue",
+          "line": 57,
+          "element": "script"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 33,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 88,
+          "element": "v-alert"
+        }
+      ]
+    },
+    {
+      "name": "mdi-wifi-alert",
+      "role": "navigation",
+      "roles": [
+        "navigation",
+        "actions",
+        "cards"
+      ],
+      "count": 3,
+      "files": [
+        "components/shell/MapProposalSidebar.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "composables/network-status.ts"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 55,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 63,
+          "element": "v-icon"
+        },
+        {
+          "file": "composables/network-status.ts",
+          "line": 10,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-bell-ring-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/shell/ProposalInboxContent.vue",
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 11,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 63,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alert-circle-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/ProposalInboxContent.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 115,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-bell-check-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/MapProposalSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 66,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-radius-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminAlertsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 94,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-text-box-outline",
+      "role": "navigation",
+      "roles": [
+        "navigation"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/ProposalInboxContent.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 128,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-bell-outline",
+      "role": "status",
+      "roles": [
+        "status",
+        "navigation"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "components/shell/MapProposalSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 24,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 101,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 27,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alert-octagon",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 2,
+      "files": [
+        "views/_admin/AdminDispatchView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 120,
+          "element": "v-alert"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 261,
+          "element": "v-alert"
+        }
+      ]
+    },
+    {
+      "name": "mdi-wifi",
+      "role": "status",
+      "roles": [
+        "status",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/LiveCompanionPanel.vue",
+        "components/sharing/ShareDialog.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/LiveCompanionPanel.vue",
+          "line": 13,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 62,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-wifi-off",
+      "role": "status",
+      "roles": [
+        "status",
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/LiveCompanionPanel.vue",
+        "composables/network-status.ts"
+      ],
+      "uses": [
+        {
+          "file": "components/map/LiveCompanionPanel.vue",
+          "line": 13,
+          "element": "v-icon"
+        },
+        {
+          "file": "composables/network-status.ts",
+          "line": 11,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-calendar-range",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminReportsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminReportsView.vue",
+          "line": 51,
+          "element": "adminstatepanel"
+        }
+      ]
+    },
+    {
+      "name": "mdi-filter-off-outline",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminAuditView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminAuditView.vue",
+          "line": 85,
+          "element": "adminstatepanel"
+        }
+      ]
+    },
+    {
+      "name": "mdi-filter-remove-outline",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminUsersView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 108,
+          "element": "adminstatepanel"
+        }
+      ]
+    },
+    {
+      "name": "mdi-filter-variant",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminAlertsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 45,
+          "element": "adminstatepanel"
+        }
+      ]
+    },
+    {
+      "name": "mdi-text-box-search-outline",
+      "role": "status",
+      "roles": [
+        "status"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 31,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-lifebuoy",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "actions",
+        "navigation",
+        "status"
+      ],
+      "count": 14,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_admin/AdminDashboardView.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/UserMissionView.vue",
+        "views/_user/UserRescuerHistoryView.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 38,
+          "element": "v-list-item"
+        },
+        {
+          "file": "App.vue",
+          "line": 313,
+          "element": "script"
+        },
+        {
+          "file": "App.vue",
+          "line": 319,
+          "element": "script"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 9,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 345,
+          "element": "script"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 87,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 126,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 310,
+          "element": "script"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 30,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 56,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 5,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 32,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 47,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 47,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-history",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 4,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "views/_user/UserRescuerHistoryView.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 320,
+          "element": "script"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 351,
+          "element": "script"
+        },
+        {
+          "file": "views/_user/UserRescuerHistoryView.vue",
+          "line": 5,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 5,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-home-outline",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "navigation",
+        "actions"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "components/shell/MapSidebar.vue",
+        "views/PlaceholderPage.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 70,
+          "element": "v-list-item"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 61,
+          "element": "v-list-item"
+        },
+        {
+          "file": "views/PlaceholderPage.vue",
+          "line": 41,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-timeline-clock-outline",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "status"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "components/mission/MissionTimelinePanel.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 321,
+          "element": "script"
+        },
+        {
+          "file": "components/mission/MissionTimelinePanel.vue",
+          "line": 5,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 38,
+          "element": "v-chip"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alarm-light",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/sos/SosRequestSheet.vue",
+        "components/sos/SosTriggerButton.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 14,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sos/SosTriggerButton.vue",
+          "line": 12,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alert-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "views/_public/PublicHealthView.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 11,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 72,
+          "element": "v-list-item"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alert-rhombus-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 314,
+          "element": "script"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 344,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-bicycle",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PointRouteSheet.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 199,
+          "element": "script"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 110,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-car",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PointRouteSheet.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 198,
+          "element": "script"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 109,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-cog-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "router/index.ts"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 353,
+          "element": "script"
+        },
+        {
+          "file": "router/index.ts",
+          "line": 88,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-devices",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "App.vue",
+        "components/settings/DevicePriorityPanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 323,
+          "element": "script"
+        },
+        {
+          "file": "components/settings/DevicePriorityPanel.vue",
+          "line": 23,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-theme-light-dark",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "components/shell/AccountProfileMenu.vue",
+        "components/shell/MapSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 109,
+          "element": "script"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 114,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-walk",
+      "role": "cards",
+      "roles": [
+        "cards",
+        "actions"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PointRouteSheet.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 200,
+          "element": "script"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 111,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-white-balance-sunny",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 2,
+      "files": [
+        "components/shell/AccountProfileMenu.vue",
+        "components/shell/MapSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 110,
+          "element": "script"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 115,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-access-point",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/CompanionDetailSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/CompanionDetailSheet.vue",
+          "line": 31,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-alert-decagram-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminAlertsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminAlertsView.vue",
+          "line": 68,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-bell-alert-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 352,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-cellphone-link",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminUserDrawer.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 155,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-cellphone-off",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminUserDrawer.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 155,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chart-box-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 337,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-chart-timeline-variant",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDashboardView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 167,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-check-decagram-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 79,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-clipboard-list-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDashboardView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 81,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-clock-alert-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/CompanionDetailSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/CompanionDetailSheet.vue",
+          "line": 31,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-clock-check",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareLists.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 154,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-clock-check-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareLists.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 154,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-progress-clock",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "views/_public/PublicHealthView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_public/PublicHealthView.vue",
+          "line": 11,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-server-network-off",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminStatePanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminStatePanel.vue",
+          "line": 56,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-star",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareDialog.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 90,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-view-dashboard-outline",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 335,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-wifi-check",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "composables/network-status.ts"
+      ],
+      "uses": [
+        {
+          "file": "composables/network-status.ts",
+          "line": 9,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-wifi-sync",
+      "role": "cards",
+      "roles": [
+        "cards"
+      ],
+      "count": 1,
+      "files": [
+        "composables/network-status.ts"
+      ],
+      "uses": [
+        {
+          "file": "composables/network-status.ts",
+          "line": 8,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-crosshairs-gps",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 10,
+      "files": [
+        "App.vue",
+        "components/map/OwnPositionBar.vue",
+        "components/mission/MissionLivePanel.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "components/sos/SosRequestSheet.vue",
+        "views/_admin/AdminDispatchView.vue",
+        "views/_user/UserLocationSharesView.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 322,
+          "element": "script"
+        },
+        {
+          "file": "components/map/OwnPositionBar.vue",
+          "line": 20,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/mission/MissionLivePanel.vue",
+          "line": 52,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 36,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 124,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 231,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 383,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserLocationSharesView.vue",
+          "line": 6,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 81,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 505,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-path",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 4,
+      "files": [
+        "components/map/HistoryPlaybackPanel.vue",
+        "components/sharing/ShareDialog.vue",
+        "components/sharing/ShareLists.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/HistoryPlaybackPanel.vue",
+          "line": 31,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 167,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 122,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 63,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-outline",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 4,
+      "files": [
+        "App.vue",
+        "components/admin/AdminShell.vue",
+        "views/_user/UserLocationSharesView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 318,
+          "element": "script"
+        },
+        {
+          "file": "App.vue",
+          "line": 329,
+          "element": "script"
+        },
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 53,
+          "element": "v-list-item"
+        },
+        {
+          "file": "views/_user/UserLocationSharesView.vue",
+          "line": 16,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-outline",
+      "role": "map",
+      "roles": [
+        "map",
+        "navigation"
+      ],
+      "count": 3,
+      "files": [
+        "components/sharing/ShareLists.vue",
+        "components/shell/ProposalInboxContent.vue",
+        "views/_public/PublicLandingView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 56,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 132,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 29,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PointRouteSheet.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 9,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 119,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-account-outline",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 2,
+      "files": [
+        "components/sharing/ShareDialog.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 13,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sharing/ShareDialog.vue",
+          "line": 163,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-multiple",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/PlaceSearchPanel.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PlaceSearchPanel.vue",
+          "line": 69,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 16,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-navigation-variant",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 2,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 81,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 119,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-crosshairs",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "components/map/OwnPositionBar.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/OwnPositionBar.vue",
+          "line": 43,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-crosshairs-question",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 81,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-clock-outline",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 330,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-check",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 259,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-off-outline",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareLists.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 56,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-question-outline",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "views/_public/PublicNotFoundView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_public/PublicNotFoundView.vue",
+          "line": 3,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-map-marker-radius",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "components/mission/MissionLivePanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/mission/MissionLivePanel.vue",
+          "line": 5,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-radar",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "App.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 311,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-routes",
+      "role": "map",
+      "roles": [
+        "map"
+      ],
+      "count": 1,
+      "files": [
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 69,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-content-copy",
+      "role": "media",
+      "roles": [
+        "media"
+      ],
+      "count": 4,
+      "files": [
+        "components/map/PlaceSearchPanel.vue",
+        "components/map/PointRouteSheet.vue",
+        "components/map/ReverseAddressSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/PlaceSearchPanel.vue",
+          "line": 120,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 19,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/PointRouteSheet.vue",
+          "line": 21,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/map/ReverseAddressSheet.vue",
+          "line": 19,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-image-outline",
+      "role": "media",
+      "roles": [
+        "media"
+      ],
+      "count": 3,
+      "files": [
+        "components/shell/ProposalInboxContent.vue",
+        "components/sos/SosRequestSheet.vue",
+        "views/_user/UserSosHistoryView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/ProposalInboxContent.vue",
+          "line": 141,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 332,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_user/UserSosHistoryView.vue",
+          "line": 79,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-camera-outline",
+      "role": "media",
+      "roles": [
+        "media"
+      ],
+      "count": 1,
+      "files": [
+        "components/sos/SosRequestSheet.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sos/SosRequestSheet.vue",
+          "line": 322,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-download-outline",
+      "role": "media",
+      "roles": [
+        "media"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminAuditView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminAuditView.vue",
+          "line": 16,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-group-outline",
+      "role": "account",
+      "roles": [
+        "account",
+        "status",
+        "navigation"
+      ],
+      "count": 5,
+      "files": [
+        "App.vue",
+        "views/PlaceholderPage.vue",
+        "views/_admin/AdminDispatchView.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/UserMapView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 312,
+          "element": "script"
+        },
+        {
+          "file": "views/PlaceholderPage.vue",
+          "line": 18,
+          "element": "v-chip"
+        },
+        {
+          "file": "views/_admin/AdminDispatchView.vue",
+          "line": 437,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 32,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMapView.vue",
+          "line": 331,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-outline",
+      "role": "account",
+      "roles": [
+        "account",
+        "fields"
+      ],
+      "count": 5,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/shell/AccountProfileMenu.vue",
+        "components/shell/MapProposalSidebar.vue",
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_auth/LoginView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 185,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 21,
+          "element": "v-icon"
+        },
+        {
+          "file": "components/shell/MapProposalSidebar.vue",
+          "line": 83,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 46,
+          "element": "v-text-field"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 55,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-shield-check-outline",
+      "role": "account",
+      "roles": [
+        "account",
+        "status",
+        "navigation"
+      ],
+      "count": 5,
+      "files": [
+        "views/PlaceholderPage.vue",
+        "views/_admin/AdminSettingsView.vue",
+        "views/_auth/LoginView.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/UserMissionView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/PlaceholderPage.vue",
+          "line": 15,
+          "element": "v-chip"
+        },
+        {
+          "file": "views/_admin/AdminSettingsView.vue",
+          "line": 95,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 11,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 17,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserMissionView.vue",
+          "line": 65,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-shield-lock-outline",
+      "role": "account",
+      "roles": [
+        "account",
+        "navigation"
+      ],
+      "count": 4,
+      "files": [
+        "components/admin/AdminStatePanel.vue",
+        "views/_auth/RegisterView.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/CompleteSecurityQuestionsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminStatePanel.vue",
+          "line": 58,
+          "element": "script"
+        },
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 156,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 44,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/CompleteSecurityQuestionsView.vue",
+          "line": 11,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-multiple-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 3,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "views/_public/PublicLandingView.vue",
+        "views/_user/UserDevicesView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 343,
+          "element": "script"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 50,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/UserDevicesView.vue",
+          "line": 29,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-logout",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 3,
+      "files": [
+        "components/admin/AdminShell.vue",
+        "components/shell/AccountProfileMenu.vue",
+        "components/shell/MapSidebar.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 56,
+          "element": "v-list-item"
+        },
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 76,
+          "element": "v-btn"
+        },
+        {
+          "file": "components/shell/MapSidebar.vue",
+          "line": 85,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-shield-key-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 3,
+      "files": [
+        "App.vue",
+        "views/_auth/ForgotPasswordView.vue",
+        "views/_user/CompleteSecurityQuestionsView.vue"
+      ],
+      "uses": [
+        {
+          "file": "App.vue",
+          "line": 303,
+          "element": "script"
+        },
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 26,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_user/CompleteSecurityQuestionsView.vue",
+          "line": 19,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-cancel-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 2,
+      "files": [
+        "components/admin/AdminUserDrawer.vue",
+        "views/_admin/AdminUsersView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 260,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 276,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-check-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 2,
+      "files": [
+        "components/admin/AdminUserDrawer.vue",
+        "views/_admin/AdminUsersView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminUserDrawer.vue",
+          "line": 261,
+          "element": "v-icon"
+        },
+        {
+          "file": "views/_admin/AdminUsersView.vue",
+          "line": 276,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-heart-outline",
+      "role": "account",
+      "roles": [
+        "account",
+        "navigation"
+      ],
+      "count": 2,
+      "files": [
+        "views/_admin/AdminDashboardView.vue",
+        "views/_public/PublicLandingView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 296,
+          "element": "script"
+        },
+        {
+          "file": "views/_public/PublicLandingView.vue",
+          "line": 28,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-plus-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 2,
+      "files": [
+        "components/map/LiveCompanionPanel.vue",
+        "views/_auth/RegisterView.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/map/LiveCompanionPanel.vue",
+          "line": 33,
+          "element": "v-btn"
+        },
+        {
+          "file": "views/_auth/RegisterView.vue",
+          "line": 25,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-alert-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "views/_admin/AdminDashboardView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_admin/AdminDashboardView.vue",
+          "line": 303,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-circle-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/AccountProfileMenu.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 46,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-eye-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "components/sharing/ShareLists.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/sharing/ShareLists.vue",
+          "line": 109,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-key-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/LoginView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 29,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-account-search-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminStatePanel.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminStatePanel.vue",
+          "line": 55,
+          "element": "script"
+        }
+      ]
+    },
+    {
+      "name": "mdi-eye-off-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/LoginView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/LoginView.vue",
+          "line": 69,
+          "element": "v-text-field"
+        }
+      ]
+    },
+    {
+      "name": "mdi-key-chain-variant",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/ForgotPasswordView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 17,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-lock-reset",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "views/_auth/ForgotPasswordView.vue"
+      ],
+      "uses": [
+        {
+          "file": "views/_auth/ForgotPasswordView.vue",
+          "line": 26,
+          "element": "v-icon"
+        }
+      ]
+    },
+    {
+      "name": "mdi-login",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "components/shell/AccountProfileMenu.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/shell/AccountProfileMenu.vue",
+          "line": 82,
+          "element": "v-btn"
+        }
+      ]
+    },
+    {
+      "name": "mdi-shield-account-outline",
+      "role": "account",
+      "roles": [
+        "account"
+      ],
+      "count": 1,
+      "files": [
+        "components/admin/AdminShell.vue"
+      ],
+      "uses": [
+        {
+          "file": "components/admin/AdminShell.vue",
+          "line": 45,
+          "element": "v-list-item"
+        }
+      ]
+    }
+  ],
+  "roles": {
+    "actions": 47,
+    "fields": 8,
+    "navigation": 8,
+    "status": 9,
+    "cards": 32,
+    "map": 17,
+    "media": 4,
+    "account": 21
+  },
+  "totals": {
+    "icons": 146,
+    "usages": 375,
+    "files": 51
+  }
+}

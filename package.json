@@ -1,16 +1,39 @@
 {
   "name": "borobiya",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.4.3",
-  "workspaces": [
-    "packages/*"
-  ],
+  "description": "Borobiya — clean rebuild of the offline location, SOS and dispatch platform",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "bun run --parallel --no-orphans --filter @borobiya/server --filter @borobiya/client dev"
+    "setup": "node scripts/boro.mjs setup",
+    "assets": "node scripts/build-assets.mjs",
+    "dev": "node scripts/boro.mjs dev",
+    "start": "node --experimental-transform-types --disable-warning=ExperimentalWarning src/index.ts",
+    "doctor": "node scripts/boro.mjs doctor",
+    "typecheck": "tsc -p tsconfig.json",
+    "typecheck:client": "tsc -p tsconfig.client.json",
+    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/*.test.ts",
+    "test:core": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/core.test.ts",
+    "test:api": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/api.test.ts tests/auth.test.ts tests/security.test.ts",
+    "test:sockets": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/realtime.test.ts",
+    "test:journeys": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/journeys.test.ts",
+    "test:architecture": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/architecture.test.ts",
+    "test:assets": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test --test-concurrency=1 tests/assets.test.ts",
+    "check": "node scripts/boro.mjs check",
+    "verify": "node scripts/boro.mjs verify",
+    "bench": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/bench.mjs",
+    "smoke": "node --experimental-transform-types --disable-warning=ExperimentalWarning scripts/smoke.mjs",
+    "acceptance": "node scripts/acceptance.mjs",
+    "deploy:check": "node scripts/boro.mjs deploy:check",
+    "db:seed": "node scripts/boro.mjs db:seed",
+    "db:reset": "node scripts/boro.mjs db:reset",
+    "clean": "node scripts/boro.mjs clean"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
   }
 }

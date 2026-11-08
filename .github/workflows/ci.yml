@@ -1,0 +1,41 @@
+name: Borobiya quality gate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: '22.22.3'
+          cache: npm
+      - run: npm ci
+      - run: npm run assets
+      - run: npm run verify
+      - run: npm run bench
+      - run: npm run smoke
+      - run: npm run acceptance
+      - name: Validate production configuration
+        env:
+          NODE_ENV: production
+          COOKIE_SECURE: '1'
+          TRUST_PROXY: '1'
+          SEED_DEMO_USERS: '0'
+          ADMIN_PASSWORD: CIGeneratedPass!2026-A
+          ALLOWED_ORIGINS: https://borobiya.example.test
+          FRAME_ANCESTORS: https://borobiya.example.test
+        run: npm run deploy:check
