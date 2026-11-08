@@ -28,7 +28,7 @@ describe("private map position bar (no Vue mount)", () => {
     expect(bar).toContain('api.stop()');
     expect(bar).toContain("emit('center')");
     expect(bar).toContain('v-if="api.position.value && ready"');
-    expect(bar).toContain('role="status" aria-live="polite"');
+    expect(bar).toContain('class="sr-only" role="status" aria-atomic="true"');
   });
 
   it("compiles dark text and card-width actions with accessible small targets", () => {

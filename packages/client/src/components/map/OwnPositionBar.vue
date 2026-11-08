@@ -4,10 +4,13 @@
       <span class="own-position__indicator" aria-hidden="true" />
       <div class="own-position__copy">
         <h2 class="own-position__headline">موقعیت من</h2>
-        <p class="own-position__detail" role="status" aria-live="polite">
+        <p class="own-position__detail">
           {{ !ready && !api.active.value && !api.error.value
             ? 'پس از بارگذاری نقشه می‌توانید موقعیت خود را نمایش دهید.'
             : ownPositionLabel(api.position.value, api.active.value, api.error.value) }}
+        </p>
+        <p class="sr-only" role="status" aria-atomic="true">
+          {{ ownPositionAnnouncement(api.position.value, api.active.value, api.error.value, ready) }}
         </p>
       </div>
       <div class="own-position__actions">
@@ -54,7 +57,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { useOwnMapPosition } from "@/composables/use-own-map-position";
-import { ownPositionLabel, ownPositionTone } from "@/map/own-position";
+import { ownPositionAnnouncement, ownPositionLabel, ownPositionTone } from "@/map/own-position";
 
 /** Renderer only: the map view owns the GPS watch and camera; this card never publishes location. */
 const props = defineProps<{ api: ReturnType<typeof useOwnMapPosition>; ready: boolean }>();

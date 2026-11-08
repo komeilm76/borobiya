@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Announce private map position state, not GPS coordinates (T4.4.3 partial)
+
+- The private “موقعیت من” card exposed its coordinate and accuracy sentence as a live status. A changing GPS fix could therefore trigger repeated screen-reader announcements. Kept coordinates and accuracy visible and readable on demand, but moved automatic speech to a separate atomic status with only map-loading, off, waiting, acquired (explicitly private/not shared), and error phases. Pure and nonmounted source regressions failed before the edit; the existing card contract was updated to the new announcement boundary. This is not a rendered assistive-technology or real GPS run, and the site-wide keyboard/contrast/WCAG AA audit stays open.
+
 ### 2026-10-23 — Bound priority reads before starting live broadcast (T4.4.2 partial)
 
 - The app-scoped broadcast Start waits for a device/owned-share snapshot before starting GPS. A hung device or share request could hold Start in “connecting” without a recovery path. Added one 12-second deadline spanning the snapshot and 401 recovery, with abort signals forwarded to both requests, cancellation on session change/superseding refresh/disposal, and late-result fencing even for transports that ignore abort. A failure preserves the last verified same-session answer and releases the pending Start; the server still determines which device may publish to each share. Two stalled-read regressions timed out before the fix and now pass alongside signal-forwarding and late-401 checks; 32 focused tests, all 1,297 client tests and client typecheck passed. No browser/network/GPS/device acceptance was performed; T4.4.2 remains open.
