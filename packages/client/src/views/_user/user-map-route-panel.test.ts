@@ -326,7 +326,7 @@ describe("progressive trip planning and editing", () => {
     expect(route).toContain('routesVisible.value = false');
     expect(route).toContain('routesVisible.value = true');
     expect(map).toContain('journey.point.value && journey.routesVisible.value ? routeGeometries.value : []');
-    expect(map).toContain('pointRouteFeatures(geometries, journey.index.value, journey.navigating.value)');
+    expect(map).toContain('pointRouteFeatures(geometries, journey.index.value, journey.navigating.value, completedRouteMetres)');
     expect(map).toContain('instance.on("click", ROUTE_ALT_LAYER, onAlternativeRouteClick)');
     expect(map).toContain('journey.choose(index)');
     expect(map).toContain('syncRouteOriginMarker()');

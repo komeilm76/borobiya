@@ -275,7 +275,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
-import { pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
+import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
 import { previousRouteIndex } from "@/map/route-choice-snapshot";
@@ -283,7 +283,7 @@ import { transportOptions } from "@/map/transport-options";
 import PointRouteSheet from "@/components/map/PointRouteSheet.vue";
 import PointRouteChoicesSheet from "@/components/map/PointRouteChoicesSheet.vue";
 import PointTransportChoicesSheet from "@/components/map/PointTransportChoicesSheet.vue";
-import type { TransportProfile } from "@/api/mission-routing";
+import type { RouteChoice, TransportProfile } from "@/api/mission-routing";
 import { createHoldToSelect, type HoldPointer } from "@/map/hold-to-select";
 import { usePointRoute } from "@/composables/use-point-route";
 import { decodeRoutePolyline, formatRouteDistance } from "@/sos/route-preview";
@@ -598,7 +598,7 @@ function focusOwnIfRequested(): void {
   automaticFocus = false;
   centerOnOwnLocation(false); // Recenter once, not on every update.
 }
-watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(true); focusOwnIfRequested(); });
+watch(() => own.position.value, () => { recenterError.value = null; syncOwnMarker(true); updateRouteProgress(); focusOwnIfRequested(); });
 watch(reducedMotion, () => syncOwnMarker()); // A changed accessibility preference stops a running interpolation.
 watch(() => own.active.value, (active) => { if (!active) { focusOnNextFix = false; automaticFocus = false; } });
 // Start only after the authenticated map is ready. Watch owner as well: the map
@@ -773,8 +773,11 @@ let detachHold: (() => void) | null = null;
 const ROUTE_SOURCE = "user-selected-destination-route";
 const ROUTE_LAYER = "user-selected-destination-route-line";
 const ROUTE_ALT_LAYER = "user-selected-destination-route-alternatives";
+const ROUTE_COMPLETED_LAYER = "user-selected-destination-route-completed";
 let routePaintDeferred = false;
 const routeGeometries = computed(() => journey.routes.value.map((route) => decodeRoutePolyline(route.polyline)));
+let progressRoute: RouteChoice | null = null;
+let completedRouteMetres = 0;
 let routeChoiceSnapshot: { routes: typeof journey.routes.value; index: number } | null = null;
 watch(() => journey.routes.value, (routes) => {
   // A newly calculated batch has its own default route. Treat that as the
@@ -1361,7 +1364,8 @@ function repaintOverlays(): void {
   if (!instance) return;
   const routeActive = !!journey.point.value && journey.routesVisible.value && !!journey.selectedRoute.value;
   if (routePaintDeferred || pointRouteOverlayNeedsSync(routeActive, !!instance.getLayer(ROUTE_LAYER),
-    !!instance.getLayer(ROUTE_ALT_LAYER), !!instance.getSource(ROUTE_SOURCE))) paintPointRoute();
+    !!instance.getLayer(ROUTE_ALT_LAYER), !!instance.getLayer(ROUTE_COMPLETED_LAYER),
+    !!instance.getSource(ROUTE_SOURCE))) paintPointRoute();
   const state = mapState(instance);
   const styles = journey.point.value || historySuppressedAfterRouteClear.value
     ? [liveStyle.value] : [liveStyle.value, playbackStyle.value];
@@ -1415,12 +1419,13 @@ function paintPointRoute(): void {
   const geometries = journey.point.value && journey.routesVisible.value ? routeGeometries.value : [];
   if (!geometries.length) {
     if (instance.getLayer(ROUTE_LAYER)) instance.removeLayer(ROUTE_LAYER);
+    if (instance.getLayer(ROUTE_COMPLETED_LAYER)) instance.removeLayer(ROUTE_COMPLETED_LAYER);
     if (instance.getLayer(ROUTE_ALT_LAYER)) instance.removeLayer(ROUTE_ALT_LAYER);
     if (instance.getSource(ROUTE_SOURCE)) instance.removeSource(ROUTE_SOURCE);
     return;
   }
   const features = journey.navigationPending.value || journey.replanning.value || journey.rerouteWaitingForFix.value ? [] :
-    pointRouteFeatures(geometries, journey.index.value, journey.navigating.value);
+    pointRouteFeatures(geometries, journey.index.value, journey.navigating.value, completedRouteMetres);
   const data = { type: "FeatureCollection", features } as const;
   const source = instance.getSource(ROUTE_SOURCE) as { setData(data: unknown): void } | undefined;
   if (source) source.setData(data);
@@ -1428,9 +1433,28 @@ function paintPointRoute(): void {
   if (!instance.getLayer(ROUTE_ALT_LAYER)) instance.addLayer({ id: ROUTE_ALT_LAYER, source: ROUTE_SOURCE,
     type: "line", filter: ["==", ["get", "selected"], false],
     paint: { "line-color": "#a95010", "line-width": 6, "line-opacity": .8 } });
+  if (!instance.getLayer(ROUTE_COMPLETED_LAYER)) instance.addLayer({ id: ROUTE_COMPLETED_LAYER, source: ROUTE_SOURCE,
+    type: "line", filter: ["==", ["get", "completed"], true],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#82949e", "line-width": 5, "line-opacity": .55 }
+  }, instance.getLayer(ROUTE_LAYER) ? ROUTE_LAYER : undefined);
   if (!instance.getLayer(ROUTE_LAYER)) instance.addLayer({ id: ROUTE_LAYER, source: ROUTE_SOURCE,
-    type: "line", filter: ["==", ["get", "selected"], true],
-    paint: { "line-color": "#0d7770", "line-width": 7, "line-opacity": .95 } });
+    type: "line", filter: ["all", ["==", ["get", "selected"], true], ["==", ["get", "completed"], false]],
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: { "line-color": "#0d7770", "line-width": 8, "line-opacity": .98 } });
+}
+/** GPS updates only advance the completed line on the same selected route. Weak,
+ * missing or off-route fixes retain the last trustworthy progress, not a guess. */
+function updateRouteProgress(): void {
+  const route = journey.selectedRoute.value;
+  if (route !== progressRoute) { progressRoute = route; completedRouteMetres = 0; }
+  if (!route || !journey.navigating.value || journey.navigationPending.value ||
+    journey.replanning.value || journey.rerouteWaitingForFix.value) return;
+  const next = advanceRouteProgress(journey.routePoints.value, own.position.value, completedRouteMetres);
+  if (next > completedRouteMetres) {
+    completedRouteMetres = next;
+    paintPointRoute();
+  }
 }
 function onAlternativeRouteClick(event: { features?: Array<{ properties?: { index?: unknown } }> }): void {
   if (journey.navigating.value || !journey.sheetOpen.value || !journey.routesVisible.value) return;
@@ -1533,16 +1557,18 @@ function fitPointRoute(): void {
   userControlledCamera.value = true;
 }
 watch([routeChoicesOpen, transportChoicesOpen], async () => { await nextTick(); fitPointRoute(); });
-watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
+watch(() => journey.selectedRoute.value, () => { syncOwnMarker(); syncRouteOriginMarker(); updateRouteProgress(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch(() => journey.routesVisible.value, () => { syncRouteOriginMarker(); paintPointRoute(); void nextTick(fitPointRoute); });
 watch([() => journey.navigationPending.value, () => journey.replanning.value, () => journey.rerouteWaitingForFix.value],
-  () => { syncOwnMarker(); syncRouteOriginMarker(); paintPointRoute(); }, { flush: "sync" });
+  () => { syncOwnMarker(); syncRouteOriginMarker(); updateRouteProgress(); paintPointRoute(); }, { flush: "sync" });
 watch(() => journey.sheetOpen.value, async () => {
   if (!journey.navigating.value || !navigationFollowEnabled.value) return;
   await nextTick(); // The compact bar and bottom sheet exchange DOM positions.
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
 });
 watch(() => journey.navigating.value, (active) => {
+  progressRoute = null; completedRouteMetres = 0;
+  if (active) updateRouteProgress();
   navigationSearchOpen.value = false;
   showNavigationSearchResults.value = false;
   if (active && activeTool.value) closeTool(false);

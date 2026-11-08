@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Distinguish remaining and traveled route during map guidance
+
+- The selected route is now split at a trustworthy, near-route GPS projection during active `/_user/map` guidance: the remaining segment is drawn as a prominent green 8px line, and the completed segment as a thinner, lower-opacity slate line beneath it. Route alternatives and the full selected line remain unchanged in planning, and no distance is marked traveled from weak/missing/off-route fixes. Progress only moves forward on the same selected route; starting again or receiving a new reroute resets it. The completed MapLibre layer participates in style-reload restoration and route cleanup. Pure geometry/GPS tests and nonmounted view contracts cover the split, jitter and teardown; rendered map and live GPS acceptance remain open.
+
 ### 2026-10-23 — Bug hunt: revoke stale rescuer route data and reject mismatched targets
 
 - The rescuer mission route picker previously depended on its view calling `reset()` on account, mission or bearer changes; without that call, it kept the previous incident/GPS origin and left in-flight route requests alive. It now clears and aborts synchronously at those identity boundaries, while preserving the picker across an ordinary nonempty bearer refresh. The navigation-target API also rejected invalid coordinates but accepted a valid target belonging to a different mission ID; it now fails closed if the response does not match the requested mission. Nonmounted tests reproduced both failures before the fix. This is a client-side regression/safety check, not a live server/device validation.

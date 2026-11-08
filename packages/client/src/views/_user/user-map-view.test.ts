@@ -306,6 +306,23 @@ describe("hold-to-select destination and map navigation", () => {
     expect(view).not.toContain('<ReverseAddressSheet');
   });
 
+  it("paints the remaining route over a subdued completed layer and updates only on reliable GPS progress", () => {
+    const paint = body("paintPointRoute");
+    const progress = body("updateRouteProgress");
+    expect(paint).toContain('id: ROUTE_COMPLETED_LAYER');
+    expect(paint).toContain('"line-color": "#82949e", "line-width": 5, "line-opacity": .55');
+    expect(paint).toContain('instance.getLayer(ROUTE_LAYER) ? ROUTE_LAYER : undefined');
+    expect(paint).toContain('"line-color": "#0d7770", "line-width": 8, "line-opacity": .98');
+    expect(paint).toContain('pointRouteFeatures(geometries, journey.index.value, journey.navigating.value, completedRouteMetres)');
+    expect(paint).toContain('instance.removeLayer(ROUTE_COMPLETED_LAYER)');
+    expect(body("repaintOverlays")).toContain('!!instance.getLayer(ROUTE_COMPLETED_LAYER)');
+    expect(progress).toContain('route !== progressRoute');
+    expect(progress).toContain('advanceRouteProgress(journey.routePoints.value, own.position.value, completedRouteMetres)');
+    expect(progress).toContain('next > completedRouteMetres');
+    expect(view).toContain('syncOwnMarker(true); updateRouteProgress(); focusOwnIfRequested()');
+    expect(view).toContain('progressRoute = null; completedRouteMetres = 0;');
+  });
+
   it("keeps the selected pin, route and private GPS arrow on the full map", () => {
     expect(body("syncDestinationMarker")).toContain('new markerConstructor({ color: "#d97706" })');
     expect(body("syncDestinationMarker")).toContain('aria-controls');
