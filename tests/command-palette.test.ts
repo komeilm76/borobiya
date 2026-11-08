@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { defineComponent, effectScope, h, nextTick } from 'vue';
@@ -7,6 +7,8 @@ import { vuetify } from '../src/client/plugins/vuetify.ts';
 import CommandPalette from '../src/client/components/CommandPalette.vue';
 import { useCommandPalette, type CommandEntry } from '../src/client/composables/useCommandPalette.ts';
 import { useAuthStore } from '../src/client/stores/auth.ts';
+import { useSettingsStore } from '../src/client/stores/settings.ts';
+import { useSosStore } from '../src/client/stores/sos.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 import { ROLES } from '../src/shared/protocol.ts';
 
@@ -75,12 +77,16 @@ async function mountPalette() {
   const router = testRouter();
   await router.push({ name: ROUTE_NAMES.map });
   await router.isReady();
+  // Set this Pinia active: a store obtained from a *different* instance records nothing, so a test
+  // that spies on a store the component actually uses must share this one.
+  const pinia = createPinia();
+  setActivePinia(pinia);
   const wrapper = mount(
     defineComponent({ setup: () => () => h(CommandPalette) }),
-    { attachTo: document.body, global: { plugins: [createPinia(), vuetify, router] } }
+    { attachTo: document.body, global: { plugins: [pinia, vuetify, router] } }
   );
   await nextTick();
-  return { wrapper, router };
+  return { wrapper, router, pinia };
 }
 
 afterEach(() => {
@@ -293,6 +299,117 @@ describe('command palette component', () => {
     expect(live.exists()).toBe(true);
     expect(live.attributes('aria-live')).toBe('polite');
     expect(live.text()).toContain('0');
+    wrapper.unmount();
+  });
+});
+
+/**
+ * Every command's label is a promise about what running it does. The index arithmetic above is well
+ * covered, but selecting an entry had never been checked beyond one navigation — so a command bound
+ * to the wrong action, or to a no-op, would still look correct in every existing test.
+ */
+describe('command effects', () => {
+  /** Signs a user in, so the router guard admits the destinations these commands target. */
+  function signIn(role: string = ROLES.USER): void {
+    useAuthStore().user = { id: 'usr_test', username: 'tester', role, displayName: 'Tester' } as never;
+  }
+
+  /** Opens the palette and clicks the option carrying a label. */
+  async function runCommand(label: string, role: string = ROLES.USER) {
+    const { wrapper, router } = await mountPalette();
+    // Spy before the click: `runCommand` asserts the destination the command asked for.
+    vi.spyOn(router, 'push');
+    signIn(role);
+    await nextTick();
+    await chord('Control', 'k');
+    await nextTick();
+    const option = wrapper.findAll('[role="option"]').find((item) => item.text().includes(label));
+    expect(option, `no command labelled ${label}`).toBeTruthy();
+    await option!.trigger('click');
+    // The command's `run` calls `router.push` without awaiting it, so the navigation settles a few
+    // ticks after the click rather than by the end of it.
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="command-palette"]').exists()).toBe(false));
+    await flushPromises();
+    return { wrapper, router };
+  }
+
+  it('navigates to each user destination', async () => {
+    for (const [label, route] of [
+      ['نقشه', ROUTE_NAMES.map],
+      ['درخواست امداد', ROUTE_NAMES.sos],
+      ['مأموریت', ROUTE_NAMES.mission],
+      ['همراهان', ROUTE_NAMES.companions],
+      ['تاریخچه', ROUTE_NAMES.history],
+      ['نمایه و دستگاه‌ها', ROUTE_NAMES.profile]
+    ] as const) {
+      const { wrapper, router } = await runCommand(label);
+      // A command's `run` calls `router.push` without awaiting it, and an unawaited push does not
+      // settle `currentRoute` under this harness. Assert the destination it was given instead.
+      const pushed = vi.mocked(router.push).mock.calls.at(-1)?.[0] as { name?: string } | undefined;
+      expect(pushed?.name, label).toBe(route);
+      wrapper.unmount();
+    }
+  });
+
+  it('navigates to each administrator destination', async () => {
+    for (const [label, route] of [
+      ['نمای کلی', ROUTE_NAMES.adminOverview],
+      ['تخته اعزام', ROUTE_NAMES.adminDispatch],
+      ['کاربران', ROUTE_NAMES.adminUsers],
+      ['هشدارها', ROUTE_NAMES.adminAlerts],
+      ['تنظیمات', ROUTE_NAMES.adminSettings]
+    ] as const) {
+      const { wrapper, router } = await runCommand(label, ROLES.ADMIN);
+      const pushed = vi.mocked(router.push).mock.calls.at(-1)?.[0] as { name?: string } | undefined;
+      expect(pushed?.name, label).toBe(route);
+      wrapper.unmount();
+    }
+  });
+
+  it('cycles the theme rather than merely closing', async () => {
+    const { wrapper } = await runCommand('تغییر پوسته');
+    // The command is the only way to change theme without the sidebar, so a no-op here strands a
+    // keyboard-only user on whatever theme they were given.
+    expect(useSettingsStore().themeChoice).not.toBe('system');
+    wrapper.unmount();
+  });
+
+  it('reloads the data instead of leaving the map stale', async () => {
+    const { wrapper } = await runCommand('به‌روزرسانی داده‌ها');
+    // The spy shares the mount's Pinia, so it observes the store the command actually calls.
+    expect(useSosStore().loading).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('runs the entry that survives filtering, not the one that was highlighted before it', async () => {
+    const { wrapper, router } = await mountPalette();
+    const push = vi.spyOn(router, 'push');
+    signIn();
+    await nextTick();
+    await chord('Control', 'k');
+    await nextTick();
+
+    // Highlight moves down while the full list is showing.
+    press('ArrowDown');
+    await nextTick();
+
+    // Then the query narrows the list to a single unrelated entry, so the old index points past the
+    // end of it. The highlight has to be pulled back inside the list, or nothing is selected.
+    await wrapper.find('[data-testid="command-search"]').setValue('تاریخچه');
+    await nextTick();
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(1);
+    expect(wrapper.find('[role="option"]').attributes('aria-selected')).toBe('true');
+
+    // Arrow navigation from here must move within the narrowed list, not jump to the top.
+    press('ArrowDown');
+    await nextTick();
+    expect(wrapper.find('[role="option"]').attributes('aria-selected')).toBe('true');
+
+    press('Enter');
+    await nextTick();
+    // Enter must run the entry that is on screen now, not the one highlighted before filtering.
+    expect(vi.mocked(push).mock.calls.at(-1)?.[0]).toEqual({ name: ROUTE_NAMES.history });
+    expect(wrapper.find('[data-testid="command-palette"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });

@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useMagicKeys, whenever, useEventListener } from '@vueuse/core';
 
 /** One entry in the command palette. */
@@ -30,6 +30,20 @@ export function useCommandPalette(entries: () => CommandEntry[]) {
     if (!term) return all;
     return all.filter((entry) => `${entry.label} ${entry.group}`.toLowerCase().includes(term));
   });
+
+  // Narrowing the list must pull the highlight back inside it. Without this the index keeps
+  // pointing past the end of a shorter result set: nothing renders as selected, Enter runs nothing,
+  // and the first arrow press jumps to the top — the user sees a dialog that ignores them.
+  watch(
+    () => results.value.length,
+    (total) => {
+      if (total === 0) {
+        activeIndex.value = 0;
+        return;
+      }
+      if (activeIndex.value > total - 1) activeIndex.value = total - 1;
+    }
+  );
 
   const show = (): void => {
     open.value = true;
