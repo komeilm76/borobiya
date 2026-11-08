@@ -47,12 +47,13 @@ export default defineConfig({
         // Set from the *worst* observed run, not a single measurement: two views were previously
         // only exercised by the generic mount sweep, so how much of them executed depended on
         // timing and the suite's statement total moved between identical runs (87.06-87.32%).
-        // Each of those views now has its own deterministic suite, and these thresholds sit below
-        // the stable figure (87.27 / 91.19 / 87.73 / 74.21).
+        // Each of those views now has its own deterministic suite. The push-to-talk floor suite
+        // then lifted branches on its own, and these thresholds sit below the figure measured
+        // across three clean runs (88.09 / 91.73 / 88.66 / 75.71).
         lines: 91,
         functions: 88,
         statements: 87,
-        branches: 74
+        branches: 75
 
       }
     }

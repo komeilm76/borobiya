@@ -180,6 +180,7 @@ describe('architecture guards', () => {
       'companions-view.test.ts',
       'realtime-store.test.ts',
       'motion.test.ts',
+      'talk-floor.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
