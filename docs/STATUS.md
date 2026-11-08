@@ -18,7 +18,7 @@ The automated suite covers core rules, API envelopes and endpoints, authenticati
 
 ## Acceptance closure
 
-`docs/ACCEPTANCE.md` maps the original foundation, authentication, map, location, SOS, mission, administration, polish, legacy and release targets to this implementation. Every applicable item is checked; obsolete PostgreSQL/PostGIS, MapLibre, OSRM, Photon, Docker map pipeline and Android targets are explicitly marked superseded by the clean architecture. The automated suite now includes accessibility contrast checks, release-performance budgets and a full login-to-rating journey. Professional visual acceptance against the canonical PNG references remains a separate human review.
+`docs/ACCEPTANCE.md` maps the original foundation, authentication, map, location, SOS, mission, administration, polish, legacy and release targets to this implementation. A targeted review of the legacy root README, `TASKS.md`, `ROADMAP.md` and `PROGRESS.md` is recorded in `docs/LEGACY_REVIEW.md`, and the old mandatory geocoding, routing, navigation, Android, Docker/VM and virtual-scroll families are explicitly marked outside the clean-rebuild contract. Every applicable item is checked; obsolete PostgreSQL/PostGIS, MapLibre, OSRM, Photon, Docker map pipeline and Android targets are marked superseded. The automated suite includes accessibility contrast checks, release-performance budgets, acceptance invariants and a full login-to-rating journey. Professional visual acceptance against the canonical PNG references remains a separate human review.
 
 ## Operational readiness
 

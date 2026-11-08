@@ -21,6 +21,7 @@ function walk(directory: string, extensions: string[]): string[] {
 test('generated cache manifest uses web-root paths, a stable version and existing files', () => {
   const manifest = JSON.parse(read('public/assets/cache-manifest.json'));
   assert.match(manifest.version, /^[a-f0-9]{16}$/);
+  assert.equal(Object.hasOwn(manifest, 'generatedAt'), false);
   assert.equal(manifest.runtime.apiCaching, false);
   assert.equal(manifest.runtime.tileLimit, 256);
   assert.ok(manifest.precache.includes('/'));

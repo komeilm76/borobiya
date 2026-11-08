@@ -13,9 +13,14 @@ test('the acceptance checklist is closed and covers all target groups', () => {
   assert.doesNotMatch(text, /^\s*-\s*\[ \]/m);
   for (const heading of ['Foundation and contracts', 'Authentication and account lifecycle',
     'Map, location and offline behavior', 'SOS, missions and dispatch',
-    'Administration and operations', 'Acceptance polish', 'Superseded legacy targets', 'Release evidence']) {
+    'Administration and operations', 'Acceptance polish', 'Superseded legacy targets',
+    'Legacy feature scope reconciliation', 'Release evidence']) {
     assert.match(text, new RegExp(`## ${heading}`));
   }
+  const legacy = read('docs/LEGACY_REVIEW.md');
+  assert.match(legacy, /## Scope reconciliation/);
+  assert.match(legacy, /git show e1a7e91\^:docs\/TASKS\.md/);
+  assert.doesNotMatch(legacy, /clean branch stages those deletions while `HEAD` retains/);
 });
 
 test('release evidence, notes, operations runbook and automation commands exist', () => {

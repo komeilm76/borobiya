@@ -25,7 +25,7 @@ The GitHub Actions workflow uses Node 22.22.3 and `npm ci`, then runs asset gene
 
 ## Asset generation
 
-`scripts/build-assets.mjs` reads canonical design fonts and icon mappings, writes self-hosted assets into `public/assets`, and computes a stable cache version from the generated static file set. It writes `/`-rooted precache paths, never `/public/...`. The service worker reads that manifest at install time, precaches all listed files, cleans old static caches and keeps a bounded runtime tile cache. Always rerun asset generation after adding a browser module or changing icon usage.
+`scripts/build-assets.mjs` reads canonical design fonts and icon mappings, writes self-hosted assets into `public/assets`, and computes a stable cache version from the generated static file set. The manifest is deterministic and timestamp-free, so regenerating unchanged assets does not dirty the checkout. It writes `/`-rooted precache paths, never `/public/...`. The service worker reads that manifest at install time, precaches all listed files, cleans old static caches and keeps a bounded runtime tile cache. Always rerun asset generation after adding a browser module or changing icon usage.
 
 ## Release sequence
 

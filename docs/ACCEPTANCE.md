@@ -10,6 +10,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] A declarative route table generates OpenAPI and owns every body, query, auth and rate-limit declaration.
 - [x] One SQLite schema replaces the former PostgreSQL/PostGIS/Drizzle migration stack.
 - [x] Native HTTP, native WebSockets, Node SQLite and direct TypeScript execution replace Fastify, Socket.IO, an ORM and a bundler.
+- [x] Generated assets and the service-worker cache manifest are deterministic and timestamp-free, so unchanged builds do not dirty the checkout.
 
 ## Authentication and account lifecycle
 
@@ -68,6 +69,19 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Android/Capacitor workflow and LAN HTTPS HMR acceptance are superseded by one responsive browser application.
 - [x] Vue/Vuetify/Pinia/Vite component tests are superseded by the new native browser module suite.
 - [x] Playwright login-to-rating acceptance is represented by an automated API/realtime journey test; professional browser-driven UI acceptance remains deferred.
+
+## Legacy feature scope reconciliation
+
+The old root README and roadmap described a multi-service product. The clean rebuild deliberately replaces that contract with one responsive browser application and one Node process, so the following old mandatory features are superseded rather than silently treated as open work. The canonical PNG images remain the visual contract, and professional visual acceptance remains deferred.
+
+- [x] Photon/Nominatim geocoding, reverse geocoding, address bottom sheets and debounced place autocomplete are superseded by deterministic in-process map data and saved places.
+- [x] OSRM/Valhalla/GraphHopper routing, car/bicycle/foot profiles, multi-destination routes, navigation camera modes and elevation charts are superseded by the simplified SOS-to-mission workflow.
+- [x] The priority-device chooser and PostGIS-backed multi-device GPS arbitration are superseded by session-bound authentication, active device visibility and one authenticated realtime channel.
+- [x] Ionic/Capacitor Android packaging, signed APK artifacts and mobile LAN HTTPS HMR are superseded by one responsive progressive web application.
+- [x] Docker Compose deployment, GHCR images, SSH cutover, Lefthook/Husky hooks and Windows/Ubuntu VM runbooks are superseded by dependency-free Node startup, CI gates and the new operations runbook.
+- [x] MapLibre theme-switch latency, eight-zoom Cache Storage, 512-resource map outage fallback and virtual-scroll user lists are superseded by generated SVG tiles, a versioned static precache, lazy view loading and benchmark budgets.
+- [x] Playwright/SSE browser acceptance and screenshot/diagram sign-off are superseded by API/realtime journey, accessibility, asset, architecture and performance tests; human screenshot review remains deferred.
+- [x] `PROGRESS.md` is a dated legacy work log with no open checkboxes; its later UI follow-ups do not redefine the clean-rebuild acceptance contract.
 
 ## Release evidence
 

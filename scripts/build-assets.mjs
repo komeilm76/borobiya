@@ -141,7 +141,6 @@ function writeManifest() {
   const precache = ['/', ...files.filter((file) => file !== '/index.html')];
   const manifest = {
     version: hash.digest('hex').slice(0, 16),
-    generatedAt: new Date().toISOString(),
     precache: [...new Set(precache)].sort(),
     runtime: { tileLimit: 256, apiCaching: false }
   };

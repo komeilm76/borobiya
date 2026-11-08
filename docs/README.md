@@ -22,8 +22,8 @@ This folder contains practical English documentation for the clean Borobiya rebu
 
 - `AUTOMATION.md` documents the `boro` CLI, asset generation, CI workflow, doctor, check, verify and deployment checks.
 - `TESTING.md` describes the automated suite, its harness, focused commands and coverage intent.
-- `LEGACY_REVIEW.md` records what was learned from the previous architecture and why the clean rebuild is smaller.
-- `STATUS.md` summarizes the implemented subsystems and the validation commands that define readiness.
+- `LEGACY_REVIEW.md` records what was learned from the previous architecture, why the clean rebuild is smaller, and how old mandatory feature families were reconciled with the new scope.
+- `STATUS.md` summarizes the implemented subsystems, the closed target matrix and the validation commands that define readiness.
 - `ACCEPTANCE.md` maps the original specification and roadmap targets to the clean rebuild and records their closure.
 - `RELEASE_NOTES.md` records the 1.0.0 clean-rebuild release and its validation evidence.
 - `OPERATIONS.md` is the startup, health, incident, backup, outage and release runbook.

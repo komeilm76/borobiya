@@ -11,10 +11,10 @@ The automated suite is written for the Node test runner and executes TypeScript 
 - `realtime.test.ts` checks one-use tickets, hello, ping, sync, room authorization, committed event publication, live-location fan-out, snapshot, one-to-one PTT floor control, ordered binary frames and malformed audio headers.
 - `journeys.test.ts` checks complete requester, companion and administrator journeys from API calls through state transitions and exports.
 - `architecture.test.ts` checks zero runtime dependencies, pure domain boundaries, route declarations, shared protocol, required documentation, English-only Markdown and canonical design images.
-- `assets.test.ts` checks generated cache manifest paths, self-hosted fonts, icon inventory, HTML shell, web app manifest and service-worker caching rules.
+- `assets.test.ts` checks the deterministic, timestamp-free generated cache manifest, precache paths, self-hosted fonts, icon inventory, HTML shell, web app manifest and service-worker caching rules.
 - `accessibility.test.ts` checks WCAG AA contrast for light-theme text and semantic colors, skip navigation, focusable landmarks, reduced motion, lazy view loading, modal focus handling and keyboard palette behavior.
 - `performance.test.ts` records generous budgets for validation, deterministic tiles, concurrent public reads and WebSocket live-location fan-out.
-- `acceptance.test.ts` checks the closed target checklist, release evidence, automation scripts and CI coverage.
+- `acceptance.test.ts` checks the closed target checklist, legacy scope reconciliation, release evidence, automation scripts and CI coverage.
 - `database.test.ts` verifies the idempotent migration for older SQLite databases and the production configuration guards.
 - `security.test.ts` also verifies that forwarded preview-host headers produce matching CSP WebSocket and CORS origins.
 - `journeys.test.ts` includes a full login-to-rating journey from registration and sharing through SOS, dispatch, acceptance, mission status and rating.
