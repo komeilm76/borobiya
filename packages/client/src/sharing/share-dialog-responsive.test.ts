@@ -50,6 +50,23 @@ describe("location-share mobile dialog (source-pinned; no Vue mount)", () => {
     expect(source).toMatch(/invalidateSubmission\(\);\s*recipients\.value = \[\];\s*searchTerm\.value = "";\s*cancelPending\(\);/);
   });
 
+  it("does not dismiss an in-flight live or history grant with Escape/backdrop while its server write may still commit", () => {
+    const main = source.split("</v-dialog>")[0];
+    expect(main).toContain(':persistent="submitting"');
+    expect(main).toContain(':disabled="submitting" @click="close"');
+    expect(source).toContain('if (!value) invalidateSubmission();'); // Route/session teardown still fences late replies.
+  });
+
+  it("shows a failed device-pinned retry in the chooser, not only behind its persistent overlay", () => {
+    const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
+    expect(chooser).toBeDefined();
+    expect(source).toContain('v-if="formError && !deviceChooserOpen"');
+    expect(chooser).toContain('v-if="formError"');
+    expect(chooser).toContain('role="alert"');
+    expect(chooser).toContain('{{ formError }}');
+    expect(source).toContain('friendlyErrorMessage(error, "اشتراک ثبت نشد. دوباره تلاش کنید.")'); // Rejection path remains visible.
+  });
+
   it("keeps the multi-device chooser scrollable with reachable actions on short phones", () => {
     const chooser = source.split('<v-dialog v-model="deviceChooserOpen"')[1]?.split('</v-dialog>')[0];
     expect(chooser).toBeDefined();

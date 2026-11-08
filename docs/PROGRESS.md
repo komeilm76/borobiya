@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Keep share creation and retry feedback visible (T4.4.2 partial)
+
+- The live/history share form disabled its Close action while posting a grant but Vuetify's default Escape/backdrop/Back behavior could still dismiss it, even though the server write might commit. Its multi-device chooser also obscured errors from a failed device-pinned retry, because the error was rendered only in the underlying form. Bound the main dialog's persistent state to the pending write and put retry errors in the chooser while hiding the duplicate underlying alert. Two nonmounted source regressions failed before the edit; 13 focused tests, all 1,293 client tests, client typecheck and repository lint passed. This does not undo already-posted grants. Browser/keyboard, live multi-device/API and wider T4.4.2 acceptance remain open.
+
 ### 2026-10-23 — Keep confirmed writes visible while pending (T4.4.2 partial)
 
 - Audited destructive/partially atomic confirmations against the installed Vuetify overlay: Back buttons were disabled while privacy revocation, multi-share device reassignment or remote-session termination ran, but Escape/backdrop/Back could still dismiss those dialogs; warned manual SOS dispatch also left its Back button enabled. The operations might still commit after dismissal. Bound each dialog's persistent state to its actual pending-write flag and disabled manual dispatch's Back while submitting. Programmatic close on settled result or context change remains possible. Four source-level regressions failed before the edit and now cover those bindings without mounting Vue. No browser keyboard/back navigation or real server/device confirmation was performed; T4.4.2 and the full rescue workflow stay open.

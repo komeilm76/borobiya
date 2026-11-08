@@ -3,6 +3,7 @@
     :model-value="modelValue"
     max-width="660"
     scrollable
+    :persistent="submitting"
     :fullscreen="fullscreen ?? $vuetify.display.xs"
     :close-on-back="!fullscreen"
     aria-labelledby="share-dialog-title"
@@ -29,7 +30,7 @@
           </template>
         </p>
 
-        <v-alert v-if="formError" class="mb-4" type="error" variant="tonal" density="compact" role="alert">
+        <v-alert v-if="formError && !deviceChooserOpen" class="mb-4" type="error" variant="tonal" density="compact" role="alert">
           {{ formError }}
         </v-alert>
 
@@ -298,6 +299,9 @@
           حساب شما روی چند دستگاه هم‌زمان فعال است. برای این اشتراک باید یک دستگاه را مشخص کنید؛
           تا وقتی این اشتراک باز است، فقط همان دستگاه موقعیت می‌فرستد.
         </p>
+        <v-alert v-if="formError" class="mb-4" type="error" variant="tonal" density="compact" role="alert">
+          {{ formError }}
+        </v-alert>
         <v-radio-group v-model="chosenDeviceId" density="compact" hide-details>
           <v-radio
             v-for="(deviceId, index) in deviceIds"
