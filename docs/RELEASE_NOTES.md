@@ -37,6 +37,7 @@ Version 2.0.0 replaces the Node.js runtime and the hand-written browser modules 
 - An expired session during the profile device read clears the local session and redirects instead of raising an unhandled rejection.
 - In the command palette, holding Ctrl/Cmd and pressing K registered the chord, and one arrow press moved the highlight two rows because both the window handler and the search-field handler counted the same event; the field now owns the step and stops the event.
 - The palette announces its match count in a polite live region, so filtering to no results is no longer silent for a screen reader.
+- Password recovery checks the password policy before submitting, so a short or digit-free password is explained in place instead of being posted to earn an uninformative "Invalid request." from the server.
 - The Vitest suite is hermetic: `tests/setup.ts` strips the repository `.env` from the environment, so `./boro check` and `bunx --bun vitest` agree.
 - Full authentication, recovery, onboarding, SOS, dispatch, mission, administration, CSV export and audit behavior, with the production safety guards (`SEED_DEMO_USERS=0`, `COOKIE_SECURE=1`, `TRUST_PROXY=1`, unique administrator password).
 - Service-worker versioned precache, stale-while-revalidate, private-route bypass and a bounded 256-entry tile cache.

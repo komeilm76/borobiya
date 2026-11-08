@@ -159,6 +159,7 @@ describe('architecture guards', () => {
       'map-shell.test.ts',
       'command-palette.test.ts',
       'sos-store.test.ts',
+      'recovery-view.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {

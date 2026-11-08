@@ -40,14 +40,14 @@ export default defineConfig({
         'src/client/service-worker/**'
       ],
       // Raised after the view, layout, route-guard, browser-transport, push-to-talk and mobile-shell
-      // command-palette and SOS-store suites landed (59% → 79% statements, 83% lines); the guard sits a few points below the
+      // command-palette, SOS-store and recovery suites landed (59% → 80% statements, 84% lines); the guard sits a few points below the
       // measured figures so an unrelated small change cannot fail it by rounding alone, while a
       // genuine coverage loss still does.
       thresholds: {
-        lines: 79,
-        functions: 68,
-        statements: 75,
-        branches: 61
+        lines: 80,
+        functions: 69,
+        statements: 76,
+        branches: 62
       }
     }
   }
