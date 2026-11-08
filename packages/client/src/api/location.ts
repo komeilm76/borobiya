@@ -139,12 +139,13 @@ export async function listLocationHistoryShares(
  */
 export async function fetchSharedLocationHistory(
   shareId: string,
-  accessToken: string
+  accessToken: string,
+  signal?: AbortSignal
 ): Promise<LocationHistoryResponse> {
   const params = sharePathParamsSchema.parse({ shareId });
   const response = await requestJson<unknown>(
     apiRoutes.location.getSharedHistory.url.replace(":shareId", encodeURIComponent(params.shareId)),
-    { accessToken }
+    { accessToken, signal }
   );
   return locationHistoryResponseSchema.parse(response);
 }
@@ -175,12 +176,13 @@ export interface LocationHistoryWindow {
  */
 export async function fetchMyLocationHistory(
   window: LocationHistoryWindow,
-  accessToken: string
+  accessToken: string,
+  signal?: AbortSignal
 ): Promise<LocationHistoryResponse> {
   const query = locationHistoryQuerySchema.parse(window);
   const response = await requestJson<unknown>(
     `${apiRoutes.location.getHistory.url}?${new URLSearchParams(query).toString()}`,
-    { accessToken }
+    { accessToken, signal }
   );
   return locationHistoryResponseSchema.parse(response);
 }

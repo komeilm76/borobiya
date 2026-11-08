@@ -3,7 +3,7 @@ import { effectScope, nextTick, ref, type Ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocationHistoryPoint } from "@shared/index";
 import {
-  HISTORY_GRANT_READ_DEADLINE_MS,
+  HISTORY_READ_DEADLINE_MS,
   PLAYBACK_MAX_TICK_DELTA_MS,
   PLAYBACK_TICK_MS,
   useHistoryPlayback
@@ -164,6 +164,7 @@ describe("JWT login boundary", () => {
       await settle();
       expect(calls).toHaveLength(2);
       token.value = bearer("owner-a", "session-b");
+      expect(calls[0]?.signal?.aborted).toBe(true);
       expect(calls[1]?.signal?.aborted).toBe(true);
       calls[0]!.resolve(track());
       calls[1]!.resolve({ owned: [], sharedWithMe: [grantRow("c")] });
@@ -536,7 +537,7 @@ describe("the two sources", () => {
       await settle();
       expect(calls).toHaveLength(1);
       expect(api.grantsLoading.value).toBe(true);
-      await vi.advanceTimersByTimeAsync(HISTORY_GRANT_READ_DEADLINE_MS);
+      await vi.advanceTimersByTimeAsync(HISTORY_READ_DEADLINE_MS);
       expect(api.grantsLoading.value).toBe(false);
       await stalled;
       expect(api.grantsFailed.value).toBe(true);
@@ -749,6 +750,50 @@ describe("reloading a track", () => {
     expect(api.cursorMs.value).toBe(NOW - 6 * HOUR);
   });
 
+  it("ends a stalled own-history read and ignores its late response after retry", async () => {
+    const { api, scope } = mount();
+    try {
+      const old = api.selectPreset(7);
+      await settle();
+      expect(api.loading.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(HISTORY_READ_DEADLINE_MS);
+      expect(api.loading.value).toBe(false);
+      await old;
+      expect(api.failed.value).toBe(true);
+      expect(api.loadIssue.value).toBe("request_failed");
+      expect(calls[0]?.signal?.aborted).toBe(true);
+      const retry = api.selectPreset(1);
+      await settle();
+      calls[1]!.resolve(historyBody([point(37, 53, new Date(NOW - HOUR).toISOString())]));
+      await retry;
+      calls[0]!.resolve(historyBody([point(35, 51, new Date(NOW - 2 * HOUR).toISOString())]));
+      await settle();
+      expect(api.points.value[0]?.lat).toBe(37);
+      expect(api.failed.value).toBe(false);
+    } finally { scope.stop(); }
+  });
+
+  it("ends a stalled shared-history read without claiming its grant was revoked", async () => {
+    const { api, scope } = mount();
+    try {
+      autoRespond = () => ({ owned: [], sharedWithMe: [grantRow("c")] });
+      api.selectSource("grant");
+      await settle();
+      autoRespond = null;
+      api.selectGrant(grantRow("c").id);
+      await settle();
+      const old = calls.at(-1)!;
+      expect(old.url).toContain("/history/shared/");
+      expect(api.loading.value).toBe(true);
+      await vi.advanceTimersByTimeAsync(HISTORY_READ_DEADLINE_MS);
+      expect(api.loading.value).toBe(false);
+      expect(api.failed.value).toBe(true);
+      expect(api.loadIssue.value).toBe("request_failed");
+      expect(api.grants.value).toHaveLength(1);
+      expect(old.signal?.aborted).toBe(true);
+    } finally { scope.stop(); }
+  });
+
   it("keeps the newer response when an older request answers last", async () => {
     const { api } = mount();
     autoRespond = null;
@@ -757,6 +802,7 @@ describe("reloading a track", () => {
     const second = api.selectPreset(7);
     await nextTick();
     expect(calls).toHaveLength(2);
+    expect(calls[0]?.signal?.aborted).toBe(true);
     calls[1]!.resolve(historyBody([point(37, 53, new Date(NOW - HOUR).toISOString())], 1));
     await second;
     await settle();
@@ -801,6 +847,7 @@ describe("reloading a track", () => {
       expect(list.url).not.toBe(oldHistory.url);
       list.resolve({ owned: [], sharedWithMe: [] });
       await refresh;
+      expect(oldHistory.signal?.aborted).toBe(true);
       expect(api.grantId.value).toBe("");
       expect(api.hasTrack.value).toBe(false);
       expect(api.loadIssue.value).toBe("grant_gone");

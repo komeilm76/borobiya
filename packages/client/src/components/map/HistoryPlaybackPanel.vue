@@ -233,6 +233,16 @@
       />
 
       <p class="history-playback__status" role="status" aria-live="polite">{{ statusLine }}</p>
+      <v-btn
+        v-if="api.loadIssue.value === 'request_failed' && !api.loading.value"
+        class="history-playback__retry"
+        variant="tonal"
+        color="primary"
+        size="small"
+        @click="api.load()"
+      >
+        دوباره تلاش کنید
+      </v-btn>
     </div>
   </v-card>
 </template>
@@ -589,6 +599,8 @@ function scrub(value: number | readonly number[]): void {
   font-size: 0.82rem;
   line-height: 1.6;
 }
+
+.history-playback__retry { min-height: 44px; align-self: flex-start; }
 
 .history-playback__status {
   margin: 0;

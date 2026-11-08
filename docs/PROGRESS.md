@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bound history-track reads (T4.4.2 partial)
+
+- Own-history and shared-history track fetches could remain loading forever on a half-open request, blocking playback controls with no visible recovery. Both now share the grant-list's 12-second deadline; timeout exposes the request failure and a 44px Retry action for the same range or selected grant, while distinguishing it from a server-confirmed revoked grant. Abort signals reach both API calls, and replacing a range/source, revoking a selected grant, switching accounts, signing out or disposing the panel cancels the old track request. Late responses cannot repaint a successful retry. Fake-timer regressions failed before the fix and pass for both routes without mounting Vue; browser/device network behavior and wider T4.4.2 acceptance remain open.
+
 ### 2026-10-23 — Bound shared-history grant reads (T4.4.2 partial)
 
 - The history playback panel has its own received-grants list: a stalled fetch could leave its loading state active indefinitely and block the refresh/retry control. That read now has a 12-second deadline and an abort signal, exposing the existing failure/Refresh feedback even if the transport ignores abort. Late responses cannot overwrite a successful retry; account replacement, sign-out and disposal cancel the old read. A fake-timer test reproduced the stalled state before the fix; composable and API tests now cover cancellation and signal forwarding. No Vue component was mounted; live browser/device network behavior and wider T4.4.2 feedback remain open.

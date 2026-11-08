@@ -51,8 +51,8 @@ export type PlaybackSourceKind = "own" | "grant";
 export const PLAYBACK_TICK_MS = 50;
 /** Ceiling for one tick's advance, in wall-clock ms. See the note above. */
 export const PLAYBACK_MAX_TICK_DELTA_MS = 250;
-/** Keep a stalled history-grant read from permanently blocking the panel's Refresh control. */
-export const HISTORY_GRANT_READ_DEADLINE_MS = 12_000;
+/** Bound grant-list and track reads even when a transport ignores cancellation. */
+export const HISTORY_READ_DEADLINE_MS = 12_000;
 
 /** Everything the panel and the view share; the component's only prop. */
 export type HistoryPlayback = ReturnType<typeof useHistoryPlayback>;
@@ -118,27 +118,32 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
 
   let requestId = 0;
   let grantsRequestId = 0;
-  let grantsReadController: AbortController | null = null;
-  async function readGrants(token: string) {
+  const grantsReads = new Set<AbortController>();
+  const trackReads = new Set<AbortController>();
+  function abortReads(controllers: Set<AbortController>): void {
+    for (const controller of controllers) controller.abort();
+  }
+  async function boundedRead<T>(read: (signal: AbortSignal) => Promise<T>, controllers: Set<AbortController>): Promise<T> {
     const controller = new AbortController();
-    grantsReadController = controller;
+    controllers.add(controller);
     let timeout: ReturnType<typeof setTimeout> | null = null;
     let onAbort = () => {};
     const deadline = new Promise<never>((_, reject) => {
-      onAbort = () => reject(new Error("HISTORY_GRANT_READ_ABORTED"));
+      onAbort = () => reject(new Error("HISTORY_READ_ABORTED"));
       controller.signal.addEventListener("abort", onAbort, { once: true });
       timeout = setTimeout(() => {
-        reject(new Error("HISTORY_GRANT_READ_TIMEOUT"));
+        reject(new Error("HISTORY_READ_TIMEOUT"));
         controller.abort();
-      }, HISTORY_GRANT_READ_DEADLINE_MS);
+      }, HISTORY_READ_DEADLINE_MS);
     });
-    try { return await Promise.race([listLocationHistoryShares(token, controller.signal), deadline]); }
+    try { return await Promise.race([read(controller.signal), deadline]); }
     finally {
       if (timeout !== null) clearTimeout(timeout);
       controller.signal.removeEventListener("abort", onAbort);
-      if (grantsReadController === controller) grantsReadController = null;
+      controllers.delete(controller);
     }
   }
+  const readGrants = (token: string) => boundedRead((signal) => listLocationHistoryShares(token, signal), grantsReads);
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastTickAt = 0;
 
@@ -217,6 +222,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
         // A history read started before this revocation may still resolve afterward.
         // Revoke its authority to repaint even if the request cannot be aborted.
         ++requestId;
+        abortReads(trackReads);
         stopTimer();
         grantId.value = "";
         clearTrack();
@@ -240,6 +246,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     // Invalidate the previous read *before* session refresh or window validation: even an
     // invalid next range must prevent an older response from repainting the map.
     const requestIdForThisLoad = ++requestId;
+    abortReads(trackReads);
     stopTimer();
     loading.value = true;
     windowIssue.value = null;
@@ -296,10 +303,12 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
       plan = { kind: "grant", shareId: grantId.value };
     }
 
-    const runPlan = (token: string) =>
-      plan.kind === "own"
-        ? fetchMyLocationHistory(plan.window, token)
-        : fetchSharedLocationHistory(plan.shareId, token);
+    const runPlan = (token: string) => boundedRead(
+      (signal) => plan.kind === "own"
+        ? fetchMyLocationHistory(plan.window, token, signal)
+        : fetchSharedLocationHistory(plan.shareId, token, signal),
+      trackReads
+    );
     try {
       let response;
       try {
@@ -423,7 +432,8 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
     if (next === previous || (previous === null && next !== null)) return;
     ++requestId;
     ++grantsRequestId;
-    grantsReadController?.abort();
+    abortReads(grantsReads);
+    abortReads(trackReads);
     stopTimer();
     clearTrack();
     loading.value = false;
@@ -438,7 +448,8 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   onScopeDispose(() => {
     ++requestId;
     ++grantsRequestId;
-    grantsReadController?.abort();
+    abortReads(grantsReads);
+    abortReads(trackReads);
     stopTimer();
   });
 

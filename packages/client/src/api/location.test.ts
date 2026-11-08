@@ -4,6 +4,7 @@ import {
   createLocationHistoryShare,
   createLocationShare,
   fetchMyLocationHistory,
+  fetchSharedLocationHistory,
   listLocationHistoryShares,
   listLocationShares,
   revokeLocationHistoryShare,
@@ -240,17 +241,30 @@ describe("history share and read calls", () => {
     expect(init.method).toBe("DELETE");
   });
 
+  it("reads a shared track without widening its grant and forwards cancellation", async () => {
+    const signal = new AbortController().signal;
+    const fetchMock = stubFetch(() => jsonResponse({ points: [], totalPoints: 0 }));
+    const shareId = historyCreated.shares[0]!.id;
+    await expect(fetchSharedLocationHistory(shareId, token, signal)).resolves.toEqual({ points: [], totalPoints: 0 });
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(`/api/_user/location/history/shared/${shareId}`);
+    expect(init.signal).toBe(signal);
+  });
+
   it("reads the caller's own track for a window", async () => {
     const fetchMock = stubFetch(() => jsonResponse({ points: [], totalPoints: 0 }));
+    const signal = new AbortController().signal;
     await expect(
       fetchMyLocationHistory(
         { from: "2026-10-21T00:00:00.000Z", to: "2026-10-22T00:00:00.000Z" },
-        token
+        token,
+        signal
       )
     ).resolves.toEqual({ points: [], totalPoints: 0 });
-    const [url] = fetchMock.mock.calls[0] as unknown as [string];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe(
       "/api/_user/location/history?from=2026-10-21T00%3A00%3A00.000Z&to=2026-10-22T00%3A00%3A00.000Z"
     );
+    expect(init.signal).toBe(signal);
   });
 });
