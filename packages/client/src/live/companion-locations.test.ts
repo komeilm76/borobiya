@@ -145,7 +145,7 @@ describe("applyShareList", () => {
     ]);
     const status = liveStatus(registry, { connected: true, nowMs: NOW, shareCount: 2 });
     expect(status).toMatchObject({ peerCount: 1, awaitingCount: 1 });
-    expect(status.line).toContain("1 نفر هنوز موقعیتی نفرستاده");
+    expect(status.line).toContain("1 نفر منتظر موقعیت تازه");
   });
 
   it("keeps a live fix when a list read carries an older one", () => {
@@ -185,10 +185,34 @@ describe("staleness", () => {
     };
     const result = pruneRegistry(registry, NOW);
     expect(result.changed).toBe(true);
-    expect(Object.keys(result.registry)).toEqual([BOB]);
+    expect(Object.keys(result.registry)).toEqual([ALICE, BOB]); // Keep the grant, not the old coordinates.
+    expect(result.registry[ALICE]?.fix).toBeNull();
+    expect(peersOf(result.registry, NOW).map((peer) => peer.userId)).toEqual([BOB]);
+    expect(pruneRegistry(result.registry, NOW + 60_000)).toMatchObject({ changed: false });
   });
 
-  it("removes a revoked dot, an expired-share dot, and a silence-discarded dot through the exact same rule", () => {
+  it("does not resurrect a discarded location on the next share-list refresh", () => {
+    const oldFix = NOW - DISCARD_AFTER_MS - 1;
+    const initial = applyShareList(emptyRegistry, [
+      { id: "share-alice", owner: { id: ALICE, username: "مریم", lastLocation: { lat: 35.7, lon: 51.4 } } }
+    ]);
+    const live = applyPeerUpdate(initial, { userId: ALICE, lat: 35.75, lon: 51.42, timestamp: oldFix }, ME).registry;
+    const discarded = pruneRegistry(live, NOW);
+    expect(peersOf(discarded.registry, NOW)).toEqual([]);
+    const refreshed = applyShareList(discarded.registry, [
+      { id: "share-alice", owner: { id: ALICE, username: "مریم", lastLocation: { lat: 35.75, lon: 51.42 } } }
+    ]);
+    expect(peersOf(refreshed, NOW)).toEqual([]);
+    expect(refreshed[ALICE]?.fix).toBeNull(); // Still authorised to receive the next live fix.
+    expect(applyPeerUpdate(refreshed, { userId: ALICE, lat: 35.75, lon: 51.42, timestamp: oldFix }, ME).reason)
+      .toBe("stale-replay");
+    const renewed = applyPeerUpdate(refreshed, { userId: ALICE, lat: 35.76, lon: 51.43, timestamp: NOW }, ME);
+    expect(renewed.reason).toBe("applied");
+    expect(peersOf(renewed.registry, NOW)[0]?.position).toEqual([51.43, 35.76]);
+    expect(renewed.registry[ALICE]?.lastDiscardedAtMs).toBeUndefined();
+  });
+
+  it("removes revoked/expired grants but keeps a silent peer authorised without showing a dot", () => {
     const initial = {
       ...registryWith({ userId: ALICE, observedAtMs: NOW - DISCARD_AFTER_MS - 1 }),
       ...registryWith({ userId: BOB, observedAtMs: NOW - 1_000 })
@@ -208,10 +232,13 @@ describe("staleness", () => {
 
     expect(byRevoke).toMatchObject({ changed: true, shareEnded: true, reason: "removed" });
     expect(byExpiry).toMatchObject({ changed: true, shareEnded: true, reason: "removed" });
-    expect(byRevoke.registry).toEqual(bySilence.registry);
-    expect(byExpiry.registry).toEqual(bySilence.registry);
-    expect(peersOf(byRevoke.registry, NOW)).toEqual(peersOf(byExpiry.registry, NOW));
-    expect(peersOverlay(byRevoke.registry, NOW)).toEqual(peersOverlay(byExpiry.registry, NOW));
+    expect(byRevoke.registry).toEqual(byExpiry.registry);
+    expect(byRevoke.registry[ALICE]).toBeUndefined();
+    expect(bySilence.registry[ALICE]?.fix).toBeNull();
+    expect(peersOf(byRevoke.registry, NOW)).toEqual(peersOf(bySilence.registry, NOW));
+    expect(peersOverlay(byRevoke.registry, NOW)).toEqual(peersOverlay(bySilence.registry, NOW));
+    expect(applyShareEnded(bySilence.registry, { shareId: "share-alice", userId: ALICE, reason: "expired" }).registry[ALICE])
+      .toBeUndefined();
   });
 
   it("ignores stale share ids once a fresh share has replaced them, and ignores malformed payloads", () => {
@@ -381,7 +408,7 @@ describe("status copy", () => {
   it("names the open shares while waiting for the first fix", () => {
     const status = liveStatus(emptyRegistry, { connected: true, nowMs: NOW, shareCount: 2 });
     expect(status.line).toContain("2 اشتراک زنده باز است");
-    expect(status.line).toContain("منتظر اولین به‌روزرسانی");
+    expect(status.line).toContain("منتظر موقعیت تازه");
   });
 
   it("explains an empty map when the live connection is down, which is a different reason", () => {

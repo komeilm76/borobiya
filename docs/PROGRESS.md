@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: do not redraw discarded companion locations after share refresh
+
+- A live companion fix disappeared after 30 minutes, but the minute-by-minute share-list refresh would re-add the same `owner.lastLocation` without its timestamp. The obsolete dot could then remain on the live map indefinitely. Expiry now clears the position while retaining the verified share membership and last discarded observation time: refreshes cannot revive the old location, late socket replays are ignored, and a genuinely newer fix restores the peer immediately. Revoked/expired shares still remove membership entirely. Updated the waiting text to say "fresh position" rather than falsely claiming every waiting peer has never sent a fix. A focused pure-model regression failed before the fix; model/composable tests now cover refresh, replay, recovery and revocation without mounting Vue components. Rendered-device review remains open.
+
 ### 2026-10-23 — Map labels: Vazirmatn first, Noto fallback
 
 - Added the official OFL-licensed Vazirmatn Regular TTF (v33.003) and upstream license to Martin's local font directory. Both map styles now request the `Borobiya Vazirmatn` stack, which prioritizes Vazirmatn for Persian and English while retaining Noto Sans and Noto Naskh Arabic for missing glyphs. The renamed stack avoids reusing browser/service-worker cached glyphs from the old Noto-first alias without clearing offline tiles. No road/contrast styling changed. Verified the TrueType face name with fontTools; added a nonmounted client contract for the font checksum/license, real TrueType cmap coverage of Persian letters/digits and Latin map names (plus extra Noto fallback glyphs), Martin alias, and all light/dark label layers. The local style validator also passes. A live Martin glyph response, actual map-label appearance on devices, and iOS Safari review remain open because Docker/Martin is not installed in this workspace.

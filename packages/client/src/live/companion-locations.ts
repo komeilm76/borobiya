@@ -65,11 +65,13 @@ export interface CompanionPeer {
   readonly userId: string;
   readonly name: string;
   /**
-   * `null` for a peer with an open share and no position yet. Membership is what authorises their fixes;
+   * `null` for an open share with no position yet, or after its live fix aged out. Membership authorises fixes;
    * an empty position must not remove them from the allow-list, or the first fix they ever send — which is
    * exactly the "share created a moment ago" case — would be dropped as unlisted, forever.
    */
   readonly fix: CompanionFix | null;
+  /** Keep the time of a discarded fix without keeping its unsafe position on the map. */
+  readonly lastDiscardedAtMs?: number;
   /** Active share ids backing this peer when seeded from full `sharedWithMe` rows. */
   readonly shareIds?: readonly string[];
 }
@@ -181,13 +183,13 @@ export function applyPeerUpdate(
 
   const observedAtMs = parseTime(update.timestamp);
   if (observedAtMs === null) return { registry, changed: false, reason: "invalid" };
-  const previous = known.fix?.observedAtMs ?? null;
-  // A seeded fix (no time) is always replaced; a live one only by something newer. Same-instant
-  // duplicates from the double fan-out are dropped so the avatar does not re-render on every echo.
+  const previous = known.fix?.observedAtMs ?? known.lastDiscardedAtMs ?? null;
+  // A seeded fix (no time) is always replaced; a live or discarded fix only by something newer.
+  // Otherwise a late socket replay could restore a position we deliberately hid after 30 minutes.
   if (previous !== null && observedAtMs <= previous) return { registry, changed: false, reason: "stale-replay" };
-
+  const { lastDiscardedAtMs: _discarded, ...active } = known;
   return {
-    registry: { ...registry, [userId]: { ...known, fix: { lat, lon, accuracy: finiteNumber(update.accuracy), observedAtMs } } },
+    registry: { ...registry, [userId]: { ...active, fix: { lat, lon, accuracy: finiteNumber(update.accuracy), observedAtMs } } },
     changed: true,
     reason: "applied"
   };
@@ -322,12 +324,21 @@ export function applyShareEnded(
   return { ...dropped, shareEnded: dropped.changed, reason: "removed" };
 }
 
-/** Drops peers whose last live fix is too old to call live. Seeded peers are kept: nothing says how old they are. */
+/** Hide expired live fixes, not their grants: a refresh must not re-seed the same old lastLocation.
+ * Keep the last observation time so delayed/replayed socket events cannot bring the dot back either.
+ * Seeded positions have no age and cannot be judged by this timer. */
 export function pruneRegistry(registry: CompanionRegistry, nowMs: number, discardAfterMs = DISCARD_AFTER_MS): { registry: CompanionRegistry; changed: boolean } {
-  return dropPeers(registry, (peer) => {
+  let changed = false;
+  const next: Record<string, CompanionPeer> = {};
+  for (const [userId, peer] of Object.entries(registry)) {
     const age = ageOf(peer.fix, nowMs);
-    return age !== null && age > discardAfterMs;
-  });
+    const observedAtMs = peer.fix?.observedAtMs;
+    if (age !== null && age > discardAfterMs && observedAtMs !== null && observedAtMs !== undefined) {
+      next[userId] = { ...peer, fix: null, lastDiscardedAtMs: observedAtMs };
+      changed = true;
+    } else next[userId] = peer;
+  }
+  return changed ? { registry: next, changed: true } : { registry, changed: false };
 }
 
 export function peersOf(registry: CompanionRegistry, nowMs: number): CompanionView[] {
@@ -454,7 +465,7 @@ export function liveStatus(
     }
     return {
       line: options.connected
-        ? `${options.shareCount} اشتراک زنده باز است و منتظر اولین به‌روزرسانی هستیم.`
+        ? `${options.shareCount} اشتراک زنده باز است و منتظر موقعیت تازه هستیم.`
         : `${options.shareCount} اشتراک زنده باز است، اما اتصال زنده برقرار نیست.`,
       peerCount: 0,
       staleCount: 0,
@@ -463,7 +474,7 @@ export function liveStatus(
   }
   const parts = [`${peers.length} همراه روی نقشه`];
   if (staleCount > 0) parts.push(`${staleCount} نفر آخرین موقعیت شناخته‌شده`);
-  if (awaiting > 0) parts.push(`${awaiting} نفر هنوز موقعیتی نفرستاده`);
+  if (awaiting > 0) parts.push(`${awaiting} نفر منتظر موقعیت تازه`);
   parts.push(options.connected ? "اتصال زنده" : "بدون اتصال زنده");
   return { line: parts.join(" · "), peerCount: peers.length, staleCount, awaitingCount: awaiting };
 }

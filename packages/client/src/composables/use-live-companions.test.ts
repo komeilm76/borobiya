@@ -347,7 +347,7 @@ describe("useLiveCompanions", () => {
     await harness.api.refresh();
     await settle();
     // علی had no `lastLocation` at all, so the map holds them as "waiting" until their first fix arrives.
-    expect(harness.api.status.value.line).toContain("1 نفر هنوز موقعیتی نفرستاده");
+    expect(harness.api.status.value.line).toContain("1 نفر منتظر موقعیت تازه");
     harness.socket.dispatch("location:peer-update", { userId: BOB, lat: 36.1, lon: 50.3, accuracy: null, timestamp: Date.now() });
     // The path a brand-new share takes: the list read makes them known, and the next fix puts them on the map.
     expect(harness.api.status.value.awaitingCount).toBe(0);
@@ -469,6 +469,16 @@ describe("useLiveCompanions", () => {
     expect(harness.api.status.value.line).toContain("1 اشتراک زنده باز است");
     expect(harness.api.status.value.line).toContain("اتصال زنده برقرار نیست");
     expect(harness.api.status.value.line).not.toContain("خوانده نشد");
+    // A minute verification / manual refresh still reports the owner's old lastLocation.
+    // It must not re-seed that position after the live fix was discarded.
+    const readsBefore = harness.reads();
+    await harness.api.refresh();
+    await settle();
+    expect(harness.reads()).toBeGreaterThan(readsBefore);
+    expect(harness.peers()).toEqual([]);
+    expect(harness.api.registry.value[ALICE]?.fix).toBeNull();
+    harness.socket.dispatch("location:peer-update", { userId: ALICE, lat: 35.76, lon: 51.43, timestamp: Date.now() });
+    expect(harness.peers()[0]?.position).toEqual([51.43, 35.76]);
     harness.scope.stop();
   });
 
