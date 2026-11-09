@@ -31,20 +31,9 @@
 
 /* RTL-aware logical utilities used across the layout. */
 @layer utilities {
-  .bb-safe-top { padding-block-start: env(safe-area-inset-top, 0px); }
-  .bb-safe-bottom { padding-block-end: env(safe-area-inset-bottom, 0px); }
-  .bb-mobile-frame { inline-size: 393px; block-size: 852px; }
   .bb-admin-sidebar { inline-size: 264px; }
   .bb-admin-topbar { block-size: 68px; }
   .bb-admin-pad { padding: 28px; }
-  .bb-sr-only {
-    position: absolute;
-    inline-size: 1px;
-    block-size: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
 }
 
 /* Reduced motion is enforced globally; Vue transitions and motion-v also read the preference. */
