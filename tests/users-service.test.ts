@@ -215,3 +215,21 @@ describe('mission readiness', () => {
     expect(response.status).toBe(400);
   });
 });
+
+describe('explicit and defaulted place ranks', () => {
+  it('honors an explicit rank and defaults the update rank to 1', async () => {
+    const withRank = await createPlace(userCookie, { rank: 7 });
+    const listed = await apiFetch(server, '/_user/places', { cookie: userCookie });
+    expect(listed.json.data.items.find((item: any) => item.id === withRank).rank).toBe(7);
+
+    const updated = await apiFetch(server, `/_user/places/${withRank}`, {
+      method: 'PATCH',
+      cookie: userCookie,
+      body: { ...PLACE }
+    });
+    expect(updated.status, updated.text).toBe(200);
+
+    const after = await apiFetch(server, '/_user/places', { cookie: userCookie });
+    expect(after.json.data.items.find((item: any) => item.id === withRank).rank).toBe(1);
+  });
+});

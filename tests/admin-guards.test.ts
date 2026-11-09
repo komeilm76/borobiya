@@ -353,3 +353,65 @@ describe('CSV formula injection', () => {
     }
   });
 });
+
+describe('administrator self-service refusals', () => {
+  const adminIdentity = {
+    userId: 'usr_admin', sessionId: 'sess_edge', username: 'admin',
+    role: 'admin', deviceId: 'edge-device', ip: '127.0.0.1'
+  };
+
+  it('refuses a role-only patch that demotes an administrator', () => {
+    expect(() =>
+      server.app.context.services.admin.updateUser(adminIdentity, 'usr_admin', { role: 'user' })
+    ).toThrow('Administrators cannot suspend or demote their own active account.');
+  });
+
+  it('refuses a self-suspension through the service boundary', () => {
+    expect(() =>
+      server.app.context.services.admin.updateUser(adminIdentity, 'usr_admin', { active: false })
+    ).toThrow('Administrators cannot suspend or demote their own active account.');
+  });
+
+  it('patches the role without touching the active flag', async () => {
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { username: 'role.only', password: 'RoleOnlyPass!2026', role: 'user' }
+    });
+    expect(created.status, created.text).toBe(201);
+    const userId = created.json.data.userId;
+
+    const patched = await apiFetch(server, `/_admin/users/${userId}`, {
+      method: 'PATCH',
+      cookie: adminCookie,
+      body: { role: 'responder' }
+    });
+    expect(patched.status, patched.text).toBe(200);
+
+    const after = await apiFetch(server, `/_admin/users/${userId}`, { cookie: adminCookie });
+    expect(after.json.data.user.role).toBe('responder');
+    expect(after.json.data.user.isActive).toBe(true);
+  });
+
+  it('creates a group with the default status and keeps it on update', async () => {
+    const created = await apiFetch(server, '/_admin/groups', {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { name: 'گروه پیش‌فرض', color: '#123456', capacity: 7, incidentIds: ['inc_medical'] }
+    });
+    expect(created.status, created.text).toBe(201);
+    const groupId = created.json.data.groupId;
+
+    const updated = await apiFetch(server, `/_admin/groups/${groupId}`, {
+      method: 'PATCH',
+      cookie: adminCookie,
+      body: { name: 'گروه پیش‌فرض دو', color: '#123457', capacity: 8, incidentIds: ['inc_medical'] }
+    });
+    expect(updated.status, updated.text).toBe(200);
+
+    const groups = await apiFetch(server, '/_admin/groups', { cookie: adminCookie });
+    const group = groups.json.data.items.find((item: any) => item.id === groupId);
+    expect(group.status).toBe('active');
+    expect(group.capacity).toBe(8);
+  });
+});
