@@ -3,7 +3,6 @@ import { computed } from 'vue';
 import { useMapStore } from '@/stores/map.ts';
 import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
-import type { MotionPreferences } from '@/composables/useMotionPreferences.ts';
 import { visibleTileRange, worldCoordinate } from '@shared/geo.ts';
 
 /**
@@ -17,7 +16,6 @@ import { visibleTileRange, worldCoordinate } from '@shared/geo.ts';
  * renderer never finished. Using the shared helper keeps the clamp — and keeps the map and the
  * distance calculations agreeing about where a place is.
  */
-const props = defineProps<{ motion: MotionPreferences }>();
 const map = useMapStore();
 const sos = useSosStore();
 const format = useFormatters();

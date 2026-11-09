@@ -107,7 +107,7 @@ async function logout(): Promise<void> {
         </RouterLink>
       </nav>
 
-      <MapCanvas :motion="motion" />
+      <MapCanvas />
 
       <Transition name="bb-sheet" mode="out-in" :duration="motion.base.value">
         <section :key="String(route.name)" class="sheet" :data-detent="map.detent">

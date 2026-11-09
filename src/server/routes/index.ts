@@ -24,7 +24,6 @@ const RATE = {
   emergency: { name: 'emergency', capacity: 10, refillPerSecond: 0.2, windowMs: 60_000 }
 };
 
-const requestIdField = optional(text({ max: 80, allowEmpty: true }));
 const optionalLimit = optional(number({ min: 1, max: 200, integer: true }));
 const optionalTimestamp = optional(number({ min: 0, max: Number.MAX_SAFE_INTEGER, integer: true }));
 

@@ -24,13 +24,9 @@ const VIEW_WIDTH = 393;
 const VIEW_HEIGHT = 852;
 const TILE_SIZE = 256;
 
-/** The props every mount needs: real durations so the surface is not in its reduced state. */
-const MOTION = { reduced: false, duration: 160, fast: 100, slow: 360 } as never;
-
 interface Seed {
   map?: (map: ReturnType<typeof useMapStore>) => void;
   sos?: (sos: ReturnType<typeof useSosStore>) => void;
-  motion?: typeof MOTION;
 }
 
 /** Mounts the canvas against freshly seeded stores. */
@@ -43,7 +39,6 @@ async function render(seed: Seed = {}) {
   seed.sos?.(sos);
   const wrapper = mount(MapCanvas, {
     attachTo: document.body,
-    props: { motion: seed.motion ?? MOTION },
     global: { plugins: [pinia] }
   });
   await flushPromises();

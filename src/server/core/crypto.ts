@@ -3,8 +3,6 @@
  * `Bun.password` (Argon2id) and the Web Crypto random source.
  */
 
-const KEY_BYTES = 32;
-
 /**
  * Generates a URL-safe random token.
  *

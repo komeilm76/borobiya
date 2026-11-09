@@ -5,7 +5,6 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { defineComponent, h } from 'vue';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import { useToast } from '../src/client/composables/useToast.ts';
-import { useMotionPreferences } from '../src/client/composables/useMotionPreferences.ts';
 import AppToastHost from '../src/client/components/AppToastHost.vue';
 import CommandPalette from '../src/client/components/CommandPalette.vue';
 import MapCanvas from '../src/client/components/MapCanvas.vue';
@@ -77,8 +76,7 @@ describe('application shell components', () => {
     const host = defineComponent({
       components: { MapCanvas },
       setup() {
-        const motion = useMotionPreferences();
-        return () => h(MapCanvas, { motion });
+        return () => h(MapCanvas);
       }
     });
     const wrapper = await mountWithPlugins(host);
