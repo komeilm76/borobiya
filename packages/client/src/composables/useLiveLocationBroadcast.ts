@@ -19,6 +19,8 @@ export interface BroadcastGeolocationSource {
     accuracy: number | null;
   } | null>;
   readonly error?: Ref<{ readonly code?: number; readonly message?: string } | null>;
+  /** VueUse publishes position.timestamp before updating coords; use it to reject a late old-watch callback. */
+  readonly locatedAt?: Ref<number | null>;
   readonly isSupported: Ref<boolean> | ComputedRef<boolean>;
   resume?: () => void;
   pause?: () => void;
@@ -74,6 +76,10 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
 
   const sampledAt = ref<number | null>(null);
   let hasLiveFix = false;
+  // VueUse pause() stops the watch but retains coords.value. A new Start must wait
+  // for a new GPS callback, not turn that cached coordinate into a fresh broadcast.
+  let geolocationWatching = false;
+  let watchStartedAt: number | null = null;
   let client: RealtimeClient | null = null;
   let ticker: ReturnType<typeof setInterval> | null = null;
   let generation = 0;
@@ -106,6 +112,14 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       clearInterval(ticker);
       ticker = null;
     }
+  }
+
+  function pauseGeolocation(): void {
+    geolocationWatching = false;
+    watchStartedAt = null;
+    hasLiveFix = false;
+    sampledAt.value = null;
+    try { geolocation.pause?.(); } catch { /* Do not retain consent or a stale fix if the bridge fails to pause. */ }
   }
 
   async function tryRecoverAuth(): Promise<boolean> {
@@ -168,7 +182,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     }
     if (status.value === "connecting" || status.value === "broadcasting") {
       clearTicker();
-      geolocation.pause?.();
+      pauseGeolocation();
       lastErrorCode.value = code;
       status.value = "rejected";
     }
@@ -212,7 +226,9 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     const activeClient = client;
     if (status.value !== "broadcasting" || !activeClient?.socket.connected ||
       !belongsToOwner(requireToken(), options.ownerId.value)) return;
-    if (geolocation.error?.value) return;
+    // Without a callback from this watch, coords.value may be a fix left over from a
+    // previous Start (or even a previous account). Never re-date it as a heartbeat.
+    if (!geolocationWatching || !hasLiveFix || sampledAt.value === null || geolocation.error?.value) return;
 
     const currentNow = clock();
     const deviceId = ownDeviceId(requireToken());
@@ -254,7 +270,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       status.value = outcome.ok ? "broadcasting" : "rejected";
       if (!outcome.ok) {
         clearTicker();
-        geolocation.pause?.();
+        pauseGeolocation();
         return;
       }
       lastSentAt.value = currentNow;
@@ -291,9 +307,18 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     }
     consentSession = loginKey(token, owner);
 
-    hasLiveFix = geolocation.coords.value !== null && Number.isFinite(geolocation.coords.value.latitude);
-    if (hasLiveFix && sampledAt.value === null) sampledAt.value = clock();
-    geolocation.resume?.();
+    hasLiveFix = false;
+    sampledAt.value = null;
+    watchStartedAt = clock();
+    geolocationWatching = true;
+    try {
+      geolocation.resume?.();
+    } catch {
+      pauseGeolocation();
+      status.value = "rejected";
+      lastErrorCode.value = "GEOLOCATION_UNAVAILABLE";
+      return;
+    }
     ticker ??= setInterval(sendPendingUpdate, intervalMs);
 
     try {
@@ -301,7 +326,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       if (attempt !== broadcastAttempt || options.ownerId.value !== owner || status.value !== "connecting") return;
       if (!activeClient) {
         clearTicker();
-        geolocation.pause?.();
+        pauseGeolocation();
         status.value = "rejected";
         lastErrorCode.value = "UNAUTHORIZED";
         return;
@@ -319,7 +344,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
       if (attempt !== broadcastAttempt || options.ownerId.value !== owner ||
         (status.value !== "connecting" && status.value !== "broadcasting")) return;
       clearTicker();
-      geolocation.pause?.();
+      pauseGeolocation();
       teardownClient();
       lastErrorCode.value = "SOCKET_UNAVAILABLE";
       status.value = "rejected";
@@ -331,8 +356,7 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     generation++; // a socket opened for a cancelled start must not attach later
     consentSession = null;
     clearTicker();
-    hasLiveFix = false;
-    geolocation.pause?.();
+    pauseGeolocation();
     if (status.value !== "rejected") status.value = "stopped";
   }
 
@@ -375,27 +399,34 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   watch(
     () => geolocation.coords.value,
     (coords) => {
+      if (!geolocationWatching || (status.value !== "connecting" && status.value !== "broadcasting")) return;
+      const observedAt = geolocation.locatedAt?.value;
+      if (observedAt != null && (watchStartedAt === null || !Number.isFinite(observedAt) ||
+        observedAt < watchStartedAt || observedAt > clock() + 1_000)) return;
       if (coords && Number.isFinite(coords.latitude) && Number.isFinite(coords.longitude)) {
         hasLiveFix = true;
-        sampledAt.value = clock();
+        sampledAt.value = observedAt ?? clock();
         if (status.value === "broadcasting") sendPendingUpdate();
       }
     },
-    { deep: true }
+    // Process a callback in the consent state it arrived in, not on the next tick
+    // when a Stop → Start may already have begun a different GPS watch.
+    { deep: true, flush: "sync" }
   );
 
   if (geolocation.error) {
     watch(
       () => geolocation.error!.value,
       (geoError) => {
-        if (!geoError) return;
+        if (!geoError || !geolocationWatching) return;
         if (status.value === "connecting" || status.value === "broadcasting") {
           clearTicker();
-          geolocation.pause?.();
+          pauseGeolocation();
           lastErrorCode.value = geolocationErrorCode(geoError);
           status.value = "rejected";
         }
-      }
+      },
+      { flush: "sync" }
     );
   }
 

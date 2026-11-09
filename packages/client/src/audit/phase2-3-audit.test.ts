@@ -153,6 +153,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     const reconnect = vi.fn();
     const updateToken = vi.fn();
     const sock = makeFakeSocket();
+    const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 8 });
 
     const scope = effectScope();
     const broadcast = scope.run(() =>
@@ -170,7 +171,7 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
           close: vi.fn()
         }),
         geolocation: {
-          coords: ref({ latitude: 35.7, longitude: 51.4, accuracy: 8 }),
+          coords,
           error: ref(null),
           isSupported: ref(true),
           resume: vi.fn(),
@@ -180,6 +181,8 @@ describe("Phase 2 & 3 client cross-cutting bug regression suite", () => {
     )!;
 
     await broadcast.start();
+    // Consent alone does not make preloaded coordinates a fresh GPS observation.
+    coords.value = { latitude: 35.71, longitude: 51.41, accuracy: 8 };
     await new Promise((r) => setTimeout(r, 20));
 
     expect(updateToken).toHaveBeenLastCalledWith(currentToken.value);

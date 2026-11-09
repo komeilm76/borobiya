@@ -241,6 +241,8 @@ describe("useLiveLocationBroadcast", () => {
     try {
       await api.start();
       expect(api.status.value).toBe("broadcasting");
+      coords.value = { latitude: 35.71, longitude: 51.41, accuracy: 5 }; // New observation after Start.
+      await flush();
       ownerId.value = "user-2";
       expect(api.status.value).not.toBe("broadcasting");
       expect(pause).toHaveBeenCalled();
@@ -440,6 +442,94 @@ describe("useLiveLocationBroadcast", () => {
     vi.useRealTimers();
   });
 
+  it("rejects a synchronous GPS resume failure without leaving a connecting broadcaster", async () => {
+    vi.useFakeTimers();
+    const resume = vi.fn().mockImplementationOnce(() => { throw new Error("GPS bridge unavailable"); })
+      .mockImplementationOnce(() => {});
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const openSocket = vi.fn(() => transport.client);
+    const scope = effectScope();
+    try {
+      const api = scope.run(() => useLiveLocationBroadcast({
+        accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+        geolocation: { coords: ref(null), isSupported: ref(true), resume, pause }, openSocket
+      }))!;
+      await expect(api.start()).resolves.toBeUndefined();
+      expect(api.status.value).toBe("rejected");
+      expect(api.lastErrorCode.value).toBe("GEOLOCATION_UNAVAILABLE");
+      expect(openSocket).not.toHaveBeenCalled();
+      expect(vi.getTimerCount()).toBe(0);
+      await api.start();
+      expect(api.status.value).toBe("broadcasting");
+      expect(resume).toHaveBeenCalledTimes(2);
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("does not treat preloaded coordinates as a new observation on first Start", async () => {
+    const coords = ref({ latitude: 35.7, longitude: 51.4, accuracy: 5 });
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    try {
+      const api = scope.run(() => useLiveLocationBroadcast({
+        accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+        geolocation: { coords, isSupported: ref(true), resume: vi.fn() }, openSocket: () => transport.client
+      }))!;
+      await api.start();
+      expect(api.status.value).toBe("broadcasting");
+      expect(transport.emitted).toHaveLength(0);
+      coords.value = { latitude: 35.8, longitude: 51.5, accuracy: 5 };
+      await flush();
+      expect(transport.emitted[0]?.payload).toMatchObject({ lat: 35.8, lon: 51.5 });
+    } finally { scope.stop(); }
+  });
+
+  it("does not rebroadcast a cached GPS fix when sharing restarts after a pause", async () => {
+    vi.useFakeTimers();
+    let now = 1_700_000_000_000;
+    const coords = ref<{ latitude: number | null; longitude: number | null; accuracy: number | null } | null>(null);
+    const locatedAt = ref<number | null>(null);
+    const error = ref<{ code?: number } | null>(null);
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    try {
+      const api = scope.run(() => useLiveLocationBroadcast({
+        accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+        geolocation: { coords, locatedAt, error, isSupported: ref(true), resume: vi.fn(), pause: vi.fn() },
+        openSocket: () => transport.client, now: () => now, intervalMs: 4_000
+      }))!;
+      await api.start();
+      locatedAt.value = now;
+      coords.value = { latitude: 35.7, longitude: 51.4, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(1);
+      transport.emitted[0]!.ack(null, { ok: true, peers: [] });
+      api.stop(); // VueUse pause() retains coords.value, but that is no longer a live observation.
+      now += 120_000;
+      vi.advanceTimersByTime(120_000);
+      await api.start();
+      await flush();
+      expect(transport.emitted).toHaveLength(1); // No re-dated old coordinates before another GPS callback.
+      locatedAt.value = now - 120_000;
+      coords.value = { latitude: 35.75, longitude: 51.45, accuracy: 5 }; // Old watch's late callback.
+      await flush();
+      expect(transport.emitted).toHaveLength(1);
+      locatedAt.value = now;
+      coords.value = { latitude: 35.8, longitude: 51.5, accuracy: 5 };
+      await flush();
+      expect(transport.emitted).toHaveLength(2);
+      expect(transport.emitted[1]?.payload).toMatchObject({ lat: 35.8, lon: 51.5 });
+      api.stop();
+      coords.value = { latitude: 36, longitude: 52, accuracy: 5 }; // Late callback from the paused watch.
+      error.value = { code: 2 }; // The paused watch also reported a transient failure.
+      // Restart in the same tick: async watchers must not misclassify either old callback.
+      await api.start();
+      await flush();
+      expect(api.status.value).toBe("broadcasting");
+      expect(transport.emitted).toHaveLength(2);
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("ignores late location acknowledgements after stop, restart, and sign-out", async () => {
     let now = Date.now();
     const token = ref<string | null>(makeJwt("device-alpha"));
@@ -469,6 +559,9 @@ describe("useLiveLocationBroadcast", () => {
       expect(api.lastErrorCode.value).toBeNull();
 
       await api.start();
+      await flush();
+      expect(transport.emitted).toHaveLength(1); // Restart waits for a fresh GPS observation.
+      coords.value = { latitude: 35.705, longitude: 51.405, accuracy: 5 };
       await flush();
       expect(transport.emitted).toHaveLength(2);
       oldAck(null, { ok: true, peers: ["stale-peer"] });

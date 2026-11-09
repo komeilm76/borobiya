@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: never re-date cached GPS coordinates when live sharing restarts
+
+- VueUse's paused geolocation watch retains its last `coords`. Starting broadcast again treated that cached coordinate as a fresh fix, and the stationary heartbeat could send it with a new timestamp even minutes later; a late callback processed after Stop could also appear to belong to the next Start. Broadcast now waits for a coordinate callback after Start, rejects callbacks whose VueUse observation timestamp predates the current watch, clears observation state on pause/rejection, and handles coordinate/error changes synchronously so a Stop→Start in one tick cannot reclassify an old callback. A synchronous GPS-resume exception now rejects cleanly and allows retry instead of leaving the broadcaster stuck in Connecting. Focused regressions for stale restart, the same-tick callback and bridge failure failed before their fixes; first-Start preload is covered too. A real-device GPS restart check remains open.
+
 ### 2026-10-23 — Bug hunt: keep the navigation marker visible on short landscape screens
 
 - The follow-camera offset reserved a fixed 16 px margin above and below the unobstructed map. When a guidance sheet and top bar left less than 32 px visible (for example a 320 px landscape canvas with a 14–20 px gap), it returned zero offset and placed the GPS marker at screen center **behind** the overlays. The margin now shrinks with the genuinely visible corridor, preserving the existing offset on ordinary screens and returning the neutral offset only if there is no clear corridor at all. A focused regression failed before implementation; pure camera tests and client typecheck now pass. A rendered-device landscape check remains open.
