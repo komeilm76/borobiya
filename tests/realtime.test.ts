@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 import {
   apiFetch, audioFrame, closeSocket, createTestServer, issueTicket, login, openSocket,
   openSocketWithHello, sendJson, waitForBinary, waitForMessage, websocketUrl, type TestServer

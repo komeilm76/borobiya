@@ -1,6 +1,5 @@
 import * as sqlite from 'bun:sqlite';
 import type { Config } from '../core/config.ts';
-import { pathResolve } from '../core/config.ts';
 import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 

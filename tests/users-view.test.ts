@@ -4,7 +4,6 @@ import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import UsersView from '../src/client/views/admin/UsersView.vue';
-import { useAdminStore } from '../src/client/stores/admin.ts';
 import { useToast } from '../src/client/composables/useToast.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 

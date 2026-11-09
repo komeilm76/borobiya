@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 import { apiFetch, createTestServer, login, sessionCookie, type TestServer } from './helpers.ts';
 import { SECURITY_QUESTIONS } from '../src/server/domain/catalog.ts';
 

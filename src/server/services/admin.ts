@@ -3,7 +3,7 @@ import { badRequest, conflict, forbidden, notFound } from '../core/errors.ts';
 import { hashPassword, newId } from '../core/crypto.ts';
 import type { SqlValue } from '../db/repository.ts';
 import type { Repository } from '../db/repository.ts';
-import { HTTP_EVENTS, MISSION_STATUS, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
+import { HTTP_EVENTS, MISSION_STATUS, ROLES } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
 export interface UserFilters { q?: string; role?: string; active?: boolean; page: number; limit: number }

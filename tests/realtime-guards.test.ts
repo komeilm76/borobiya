@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   apiFetch, audioFrame, closeSocket, createTestServer, issueTicket, login, openSocketWithHello,
-  sendJson, waitForBinary, waitForMessage, websocketUrl, type TestServer
+  sendJson, waitForMessage, websocketUrl, type TestServer
 } from './helpers.ts';
 import { WS_EVENTS } from '../src/shared/protocol.ts';
 

@@ -6,10 +6,6 @@
  * The generated `sw.js` is treated as build output, not hand-authored source.
  */
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-
-
 /** Bounded cache for deterministic SVG tiles. */
 const TILE_CACHE = 'borobiya-tiles-v1';
 const TILE_LIMIT = 256;
@@ -32,7 +28,6 @@ const scope = globalThis as unknown as WorkerScope;
 interface CacheManifest {
   version: string;
   precache: string[];
-  runtime?: { tileLimit?: number; apiCaching?: boolean };
 }
 
 type CacheLike = {

@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
-import { createApp, type App } from 'vue';
+import { createApp } from 'vue';
 import { MotionPlugin } from '@vueuse/motion';
 import { installMotion, revealTimeline } from '../src/client/motion/index.ts';
 import { useMotionPreferences } from '../src/client/composables/useMotionPreferences.ts';
