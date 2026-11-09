@@ -1705,6 +1705,10 @@ function onAlternativeRouteClick(event: { features?: Array<{ properties?: { inde
 
 function attachHold(instance: MapLibreMap): () => void {
   const canvas = instance.getCanvasContainer();
+  // DOM markers are siblings of the map canvas inside this container. Listen on
+  // the drawing surface so a long press on a result/route marker cannot choose
+  // the unrelated point behind that interactive marker.
+  const surface = instance.getCanvas();
   let suppressContextUntil = 0;
   const hold = createHoldToSelect((x, y, type) => {
     if (type === "touch") suppressContextUntil = Date.now() + 900; // Native contextmenu can follow the timer.
@@ -1719,6 +1723,7 @@ function attachHold(instance: MapLibreMap): () => void {
     // A hold uses the held coordinates, not the last gesture's camera center.
     // Preserve the user's zoom; the selected pin lands in the exact map center.
     routeChoicesOpen.value = false;
+    placeSearch.deselect();
     journey.select({ lat: location.lat, lon: location.lng });
     instance.easeTo({ center: [location.lng, location.lat], duration: 450 }, { placeSearchSelection: true });
   });
@@ -1728,17 +1733,17 @@ function attachHold(instance: MapLibreMap): () => void {
   const move = (event: PointerEvent) => hold.move(pointer(event));
   const up = (event: PointerEvent) => hold.up(event.pointerId);
   const context = (event: Event) => { if (hold.isTouchPending() || Date.now() < suppressContextUntil) event.preventDefault(); };
-  canvas.addEventListener("pointerdown", down);
+  surface.addEventListener("pointerdown", down);
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
   window.addEventListener("blur", hold.cancel);
-  canvas.addEventListener("contextmenu", context);
+  surface.addEventListener("contextmenu", context);
   return () => {
-    hold.cancel(); canvas.removeEventListener("pointerdown", down);
+    hold.cancel(); surface.removeEventListener("pointerdown", down);
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up); window.removeEventListener("blur", hold.cancel);
-    canvas.removeEventListener("contextmenu", context);
+    surface.removeEventListener("contextmenu", context);
   };
 }
 function resumePointFollowing(): void {

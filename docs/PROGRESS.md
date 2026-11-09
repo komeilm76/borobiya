@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: hand-picked destinations after search selections
+
+- MapLibre places DOM markers inside the canvas container. The long-press handler previously listened on that container, so holding a result, cluster or route marker could select the unrelated ground coordinate underneath. Holds now begin only on the drawing canvas; marker buttons keep their own click/keyboard actions, and the context-menu suppression stays on the same drawing surface. Selecting a point by hand also clears the previous search-result highlight and red selected pin without discarding the query, map mode or other results; tapping a result again still works. The composable and nonmounted view regressions failed before the fix and now pass. Rendered touch/pen/mouse verification remains open.
+
 ### 2026-10-23 — Bug hunt: refresh search when installed map coverage arrives late
 
 - If `/map-config` completed after a place search, the map could replace its fallback bounds without moving the camera, leaving out-of-coverage results and pins in the list and on the map. MapCanvas now reports an actual coverage change; the search immediately filters existing hits to the newly installed bounds, discards a selected out-of-bounds search hit and refreshes the active library or viewport scope while retaining map mode. Unchanged bounds do not cause an extra request. A composable regression and nonmounted map wiring contract failed before implementation and now pass; rendered-device verification remains open.

@@ -223,6 +223,12 @@ export function usePlaceSearch(options: {
     else void run(mapActive.value);
   }
 
+  /** A hand-picked map destination replaces the highlighted search hit, not the
+   * query or its valid results. A later search-result tap can select it again. */
+  function deselect(): void {
+    if (!disposed) selectedPlaceId.value = null;
+  }
+
   /** Only a current list/map hit may be selected; prior-bbox IDs are not valid. */
   function select(place: GeocodeResult): boolean {
     if (disposed || !results.value.some(result => result.placeId === place.placeId) &&
@@ -233,5 +239,5 @@ export function usePlaceSearch(options: {
 
   onScopeDispose(() => { disposed = true; invalidate(); });
   return { term, scope, results, mapResults, mapActive, selectedPlaceId, loading, failed, diagnostic, searched,
-    run, update, clear, setScope, pruneForViewport, refreshForViewport, refreshForAreaChange, retry, showOnMap, select };
+    run, update, clear, setScope, pruneForViewport, refreshForViewport, refreshForAreaChange, retry, showOnMap, select, deselect };
 }

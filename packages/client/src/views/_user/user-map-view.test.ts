@@ -298,6 +298,15 @@ describe("UserMapView live overlay", () => {
 });
 
 describe("hold-to-select destination and map navigation", () => {
+  it("lets a hand-picked point replace a selected search destination without starting a hold on marker buttons", () => {
+    const hold = body("attachHold");
+    expect(hold).toContain('const surface = instance.getCanvas()');
+    expect(hold).toContain('surface.addEventListener("pointerdown", down)');
+    expect(hold).toContain('surface.removeEventListener("pointerdown", down)');
+    expect(hold).not.toContain('canvas.addEventListener("pointerdown", down)');
+    expect(hold).toMatch(/placeSearch\.deselect\(\);\s*journey\.select\(\{ lat: location\.lat, lon: location\.lng \}\)/);
+  });
+
   it("replaces tap-to-address with stationary primary pointer holds on the canvas", () => {
     const ready = body("onMapReady");
     const hold = body("attachHold");
@@ -306,7 +315,7 @@ describe("hold-to-select destination and map navigation", () => {
     expect(ready).not.toContain('instance.on("click", onMapClick)');
     expect(hold).toContain('createHoldToSelect(');
     expect(hold).toContain('instance.getCanvasContainer()');
-    expect(hold).toContain('canvas.addEventListener("pointerdown", down)');
+    expect(hold).toContain('surface.addEventListener("pointerdown", down)');
     expect(hold).toContain('window.addEventListener("pointercancel", up)');
     expect(hold).toContain('window.addEventListener("blur", hold.cancel)');
     expect(hold).toContain('instance.unproject([x - rect.left, y - rect.top])');

@@ -72,6 +72,21 @@ describe("place search UI decisions", () => {
     scope.stop();
   });
 
+  it("deselects an old search destination after a hand-picked map point without losing results", async () => {
+    const places = [...hit("first"), ...hit("second")];
+    const { api, scope } = mount(async () => places);
+    api.update("square"); await vi.advanceTimersByTimeAsync(300);
+    expect(api.showOnMap()).toBe(true);
+    expect(api.select(places[0]!)).toBe(true);
+    api.deselect();
+    expect(api.selectedPlaceId.value).toBeNull();
+    expect(api.term.value).toBe("square");
+    expect(api.mapActive.value).toBe(true);
+    expect(api.results.value).toEqual(places);
+    expect(api.mapResults.value).toEqual(places);
+    scope.stop();
+  });
+
   it("retains results and term while switching between multiple selected places", async () => {
     const places = [...hit("first"), ...hit("second")];
     const { api, scope } = mount(async () => places);
