@@ -75,16 +75,25 @@ export const ROOT = resolveRoot();
  * @returns A normalised absolute path.
  */
 export function pathResolve(base: string, ...segments: string[]): string {
-  const joined = [base, ...segments].join('/');
-  const absolute = joined.startsWith('/');
+  let absolute = base.startsWith('/');
   const parts: string[] = [];
-  for (const part of joined.split('/')) {
-    if (!part || part === '.') continue;
-    if (part === '..') {
-      parts.pop();
-      continue;
+  for (const item of [base, ...segments]) {
+    // POSIX semantics: an absolute segment discards everything accumulated so far, otherwise an
+    // absolute DATA_DIR would silently land inside the repository and a deployment writing its
+    // database there would lose it to the next checkout.
+    if (item.startsWith('/')) {
+      absolute = true;
+      parts.length = 0;
     }
-    parts.push(part);
+    for (const part of item.split('/')) {
+      if (!part || part === '.') continue;
+      if (part === '..') {
+        // `..` clamps at the root instead of walking above it.
+        if (parts.length) parts.pop();
+        continue;
+      }
+      parts.push(part);
+    }
   }
   return `${absolute ? '/' : ''}${parts.join('/')}`;
 }
