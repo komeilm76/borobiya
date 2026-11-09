@@ -1735,11 +1735,17 @@ function attachHold(instance: MapLibreMap): () => void {
   });
   const pointer = (event: PointerEvent): HoldPointer => ({ id: event.pointerId, x: event.clientX, y: event.clientY,
     button: event.button, primary: event.isPrimary, type: event.pointerType });
-  const down = (event: PointerEvent) => { if (!journey.navigating.value) hold.down(pointer(event)); };
+  // A hold must use the same camera frame for pointerdown and unprojection.
+  // Reject a hold during a flight and cancel one as soon as any pan/zoom begins,
+  // even if pointer movement stayed inside the touch-jitter tolerance.
+  const down = (event: PointerEvent) => {
+    if (!journey.navigating.value && !instance.isMoving()) hold.down(pointer(event));
+  };
   const move = (event: PointerEvent) => hold.move(pointer(event));
   const up = (event: PointerEvent) => hold.up(event.pointerId);
   const context = (event: Event) => { if (hold.isTouchPending() || Date.now() < suppressContextUntil) event.preventDefault(); };
   surface.addEventListener("pointerdown", down);
+  instance.on("movestart", hold.cancel);
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
@@ -1747,6 +1753,7 @@ function attachHold(instance: MapLibreMap): () => void {
   surface.addEventListener("contextmenu", context);
   return () => {
     hold.cancel(); surface.removeEventListener("pointerdown", down);
+    instance.off("movestart", hold.cancel);
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up); window.removeEventListener("blur", hold.cancel);
     surface.removeEventListener("contextmenu", context);

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: prevent hand-picking from a moving map
+
+- A pointer could begin a 550 ms hold, move less than the 12 px touch-jitter allowance, and still start a MapLibre camera pan (or begin during an existing camera flight). The timeout then unprojected the old screen coordinate against a new camera frame and selected the wrong destination. Holds now reject an already moving map and cancel on any `movestart`; the extra map listener is removed with the other hold listeners. A nonmounted view contract failed before the fix, and a pure timer test pins cancellation despite minor pointer jitter. Rendered mouse/touch/pen gesture verification remains open.
+
 ### 2026-10-23 — Bug hunt: clear orphaned selected pins when a route ends
 
 - Confirming the planner's destructive X deletes the route inside `PointRouteSheet`, bypassing the map's Stop handler. The selected search ID previously survived, leaving a red “selected” pin that reopened the supposedly deleted destination; Stop/reset and arrival had the same issue. A batched route-point watcher now clears only that selection when the route settles with no destination, preserving the query, other results and map mode. It deliberately ignores the transient null during a replacement `journey.select()`, so a newly chosen search result remains highlighted. A nonmounted view contract reproduced the missing handoff before the fix; a composable/Vue batching test covers replacement versus deletion. Rendered map verification remains open.

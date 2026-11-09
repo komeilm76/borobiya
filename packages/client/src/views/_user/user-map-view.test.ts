@@ -307,6 +307,15 @@ describe("hold-to-select destination and map navigation", () => {
     expect(hold).toMatch(/placeSearch\.deselect\(\);\s*journey\.select\(\{ lat: location\.lat, lon: location\.lng \}\)/);
   });
 
+  it("cancels a pending hand-picked point if the camera starts moving or is already animating", () => {
+    const hold = body("attachHold");
+    expect(hold).toContain('!journey.navigating.value && !instance.isMoving()');
+    expect(hold).toContain('instance.on("movestart", hold.cancel)');
+    expect(hold).toContain('instance.off("movestart", hold.cancel)');
+    expect(hold.indexOf('instance.on("movestart", hold.cancel)'))
+      .toBeLessThan(hold.indexOf('return () => {'));
+  });
+
   it("replaces tap-to-address with stationary primary pointer holds on the canvas", () => {
     const ready = body("onMapReady");
     const hold = body("attachHold");

@@ -21,6 +21,17 @@ describe("hold to select destination", () => {
     hold.down(point("pen")); hold.cancel();
     vi.advanceTimersByTime(1500); expect(select).not.toHaveBeenCalled();
   });
+  it("does not select at an old screen coordinate after camera motion cancels a jittering hold", () => {
+    vi.useFakeTimers();
+    const select = vi.fn(); const hold = createHoldToSelect(select);
+    hold.down(point());
+    hold.move(point("mouse", 0, 1, 18, 20)); // Within the touch-jitter allowance, but the map can still move.
+    vi.advanceTimersByTime(400);
+    hold.cancel(); // The map's movestart event must call this while the timer is pending.
+    vi.advanceTimersByTime(300);
+    expect(select).not.toHaveBeenCalled();
+  });
+
   it("allows tiny jitter but cancels when another pointer starts or a gesture leaves", () => {
     vi.useFakeTimers(); const select = vi.fn(); const hold = createHoldToSelect(select);
     hold.down(point("touch")); expect(hold.isTouchPending()).toBe(true);
