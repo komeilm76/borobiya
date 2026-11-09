@@ -267,6 +267,214 @@ function installAudioMocks(options: { microphone?: boolean } = {}) {
   return { sent, started, closed, stopTrack };
 }
 
+describe('realtime client failure paths', () => {
+  it('keeps the connection when a listener throws', async () => {
+    const client = new RealtimeClient();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const surviving: string[] = [];
+    client.on('status', () => { throw new Error('listener exploded'); });
+    client.on('status', (value) => surviving.push(String(value)));
+
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    // One bad listener must not stop the others, or a single broken subscriber would silently
+    // detach the whole status channel.
+    expect(surviving).toContain('connecting');
+    expect(error).toHaveBeenCalled();
+    client.close();
+  });
+
+  it('refuses to connect while a connect is already in flight', async () => {
+    const client = new RealtimeClient();
+    const first = client.connect();
+    const second = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await Promise.all([first, second]);
+    // Two sockets would double every subscription and every cursor advance.
+    expect(FakeSocket.instances).toHaveLength(1);
+    client.close();
+  });
+
+  it('refuses to connect after close', async () => {
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    client.close();
+    await client.connect();
+    // A closed client that reconnects would keep a ghost session alive on the server.
+    expect(FakeSocket.instances).toHaveLength(1);
+  });
+
+  it('does not open a second socket for a connected client', async () => {
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    FakeSocket.instances[0].open();
+    await client.connect();
+    expect(FakeSocket.instances).toHaveLength(1);
+    client.close();
+  });
+
+  it('uses a wss scheme when the page is served over https', async () => {
+    const originalWindow = globalThis.window;
+    vi.stubGlobal('window', {
+      ...originalWindow,
+      location: { protocol: 'https:', host: 'app.borobiya.test' }
+    });
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    // A ws:// upgrade on an https page is blocked as mixed content; the ticket would be minted
+    // and then refused by the browser.
+    expect(FakeSocket.instances[0].url.startsWith('wss://app.borobiya.test/')).toBe(true);
+    vi.stubGlobal('window', originalWindow);
+    client.close();
+  });
+
+  it('emits a status error when the socket reports an error', async () => {
+    const client = new RealtimeClient();
+    const statuses: string[] = [];
+    client.on('status', (value) => statuses.push(String(value)));
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    FakeSocket.instances[0].onerror?.();
+    expect(statuses).toContain('error');
+    client.close();
+  });
+
+  it('ignores a message whose data is neither string nor ArrayBuffer', async () => {
+    const client = new RealtimeClient();
+    const messages: unknown[] = [];
+    client.on('message', (message) => messages.push(message));
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    // Blob payloads arrive when binaryType is left at its default; the client switches to
+    // arraybuffer on open. Anything that still is not a string or a buffer is dropped rather
+    // than JSON-parsed as "[object Blob]".
+    socket.message({ blob: true });
+    expect(messages).toHaveLength(0);
+    client.close();
+  });
+
+  it('reads a hello without cursor and heartbeat falling back to the defaults', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({
+        ok: true,
+        requestId: 'req_rt',
+        data: { ...TICKET, heartbeatMs: undefined }
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    ));
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    // A HELLO without `eventCursor` means "no durable state yet", not `NaN`.
+    socket.message(JSON.stringify({ type: WS_EVENTS.HELLO }));
+    expect(client.cursor).toBe(0);
+    // The ticket carried no heartbeatMs, so the fallback is the 25s default — *not* a NaN
+    // interval and not a fast retry. No ping may be sent before 12.5s have elapsed.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(socket.sent.some((payload) => String(payload).includes(WS_EVENTS.PING))).toBe(false);
+    await vi.advanceTimersByTimeAsync(7_500);
+    expect(socket.sent.some((payload) => String(payload).includes(WS_EVENTS.PING))).toBe(true);
+    client.close();
+  });
+
+  it('reads a durable event without an id without producing NaN', async () => {
+    const client = new RealtimeClient();
+    const events: unknown[] = [];
+    client.on('event', (event) => events.push(event));
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    socket.message(JSON.stringify({ type: WS_EVENTS.HELLO, eventCursor: 5, heartbeatMs: 4000 }));
+    socket.message(JSON.stringify({
+      type: WS_EVENTS.EVENT,
+      event: { type: HTTP_EVENTS.SOS_CREATED, payload: {} }
+    }));
+    // The cursor never moves backwards, even for an id-less event.
+    expect(client.cursor).toBe(5);
+    expect(events).toHaveLength(1);
+    client.close();
+  });
+
+  it('keeps at most one reconnect timer pending across repeated closes', async () => {
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    socket.serverClose(1006);
+    socket.serverClose(1006);
+    // Two close frames must not schedule two reconnect timers. The heartbeat was stopped on
+    // close, so the pending reconnect is the only timer left.
+    expect(vi.getTimerCount()).toBe(1);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(FakeSocket.instances.length).toBe(2);
+    client.close();
+  });
+
+  it('does not schedule a reconnect for a closed client', () => {
+    const client = new RealtimeClient();
+    client.close();
+    // The internal scheduleReconnect guard keeps a closed client from waking itself every few
+    // hundred milliseconds.
+    (client as unknown as { scheduleReconnect: () => void }).scheduleReconnect();
+    expect((client as unknown as { reconnectTimer: unknown }).reconnectTimer).toBe(null);
+  });
+
+  it('reports a failed write without taking the caller down', async () => {
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    // A socket that is OPEN but throws mid-write (dead TCP, backpressure) must surface as `false`.
+    (socket as unknown as { send: () => void }).send = () => { throw new Error('dead'); };
+    expect(client.sendJson({ type: 'x' })).toBe(false);
+    expect(client.sendBinary(new ArrayBuffer(4))).toBe(false);
+    client.close();
+  });
+
+  it('returns false when sending before any socket was ever opened', () => {
+    const client = new RealtimeClient();
+    expect(client.sendBinary(new ArrayBuffer(4))).toBe(false);
+  });
+
+  it('requests events from the current cursor when sync is called bare', async () => {
+    const client = new RealtimeClient();
+    const connecting = client.connect();
+    await vi.advanceTimersByTimeAsync(0);
+    await connecting;
+    const socket = FakeSocket.instances[0];
+    socket.open();
+    socket.message(JSON.stringify({ type: WS_EVENTS.HELLO, eventCursor: 41, heartbeatMs: 4000 }));
+    client.sync();
+    const syncFrame = socket.sent.map((payload) => JSON.parse(String(payload))).find((frame) => frame.type === 'sync');
+    // The catch-up request must start from what we have seen, or the server either replays
+    // everything or skips the events we missed.
+    expect(syncFrame).toMatchObject({ since: 41, limit: 100 });
+    client.close();
+  });
+});
+
 describe('push-to-talk audio', () => {
   it('encodes captured samples with the shared binary header', async () => {
     const mocks = installAudioMocks();
