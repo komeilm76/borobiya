@@ -26,45 +26,58 @@ describe("show all current POIs on the map", () => {
     expect(css.code).toContain(".place-search__show-all");
     expect(css.code).toContain("min-height: 44px");
   });
-  it("shows named, keyboard-reachable place callouts rather than number-only circles", () => {
+  it("shows compact category-colored, keyboard-reachable pins and a persistent selected name", () => {
     const sync = body("syncResultMarkers");
-    for (const part of ['document.createElement("bdi")', 'name.textContent = place.name',
-      'button.append(badge, copy, affordance)', 'anchor: "bottom"',
-      'button.setAttribute("aria-label"', '${place.name}، ${place.address}؛ انتخاب مقصد',
+    for (const part of ['resultAppearance(place)', 'clusterAppearance(group)',
+      'button.append(icon)', 'anchor: "bottom"', 'button.setAttribute("aria-label"',
+      '${place.name}، ${place.address}؛ انتخاب مقصد',
       'placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId)',
-      'button.addEventListener("keydown"']) {
+      'button.addEventListener("keydown"', 'count.textContent = `+']) {
       expect(sync).toContain(part);
     }
-    expect(sync).not.toContain('button.innerHTML'); // Never render Photon strings as markup.
+    expect(sync).not.toContain('button.innerHTML'); // Photon strings never become markup.
     expect(view).toContain('class="user-map-view__search-map-actions"');
     expect(view).toContain('aria-label="بازگشت به فهرست نتایج جست‌وجو"');
     expect(view).toContain('@click="selectTool(\'search\')"');
+    const selected = body("syncSelectedPlaceMarker");
+    expect(selected).toContain('label.textContent = place.name');
+    expect(body("syncDestinationMarker")).toContain('label.textContent = namedSearch ? journey.title.value : ""');
+    expect(view).toContain('syncDestinationMarker(); // A named search callout belongs to planning, not active guidance.');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);
-    for (const part of ['.user-map-view__result-marker__badge', '.user-map-view__result-marker__name',
-      '.user-map-view__result-marker:focus-visible', 'text-overflow: ellipsis',
-      ':root.dark .user-map-view .user-map-view__result-marker', '@media (forced-colors: active)']) {
-      expect(css.code).toContain(part);
-    }
+    for (const part of ['.user-map-view__result-marker__icon', '.user-map-view__selected-place-label',
+      '.user-map-view__result-marker:focus-visible', '.user-map-view__result-cluster:focus-visible',
+      '@media (forced-colors: active)']) expect(css.code).toContain(part);
   });
 
-  it("shows no extra content or style on hover or focus, while retaining readable text and a keyboard outline", () => {
+  it("has no hover-only result content, keeps full accessible names and keyboard outlines", () => {
     const sync = body("syncResultMarkers");
-    expect(sync).not.toContain('button.setAttribute("title"'); // No native hover tooltip either.
+    expect(sync).not.toContain('button.setAttribute("title"');
     expect(sync).not.toContain('user-map-view__result-marker__tooltip');
-    expect(sync).not.toContain('tooltipName.textContent');
-    expect(sync).not.toContain('address.textContent');
+    expect(sync).not.toContain('button.innerHTML');
+    expect(body("syncSelectedPlaceMarker")).not.toContain('setAttribute("title"');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);
     const style = descriptor.styles[0]!.content;
     expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*font-family:\s*var\(--bb-font-family/s);
     expect(style).not.toContain('.user-map-view__result-marker__tooltip');
-    expect(style).not.toContain('.user-map-view__result-marker__address');
     expect(style).not.toContain('.user-map-view__result-marker:hover');
-    expect(css.code).toContain('.user-map-view__result-marker:focus-visible');
     expect(css.code).toContain('outline: 3px solid');
+  });
+
+  it("passes only the matching selected result to the existing route card, without invented place data", () => {
+    const card = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    expect(view).toContain(':search-place="isSelectedSearchDestination ? selectedSearchPlace : null"');
+    expect(card).toContain("resultAppearance(searchPlace).icon");
+    expect(card).toContain("resultAppearance(searchPlace).label");
+    expect(card).toContain("{{ api.title.value }}");
+    expect(card).toContain("{{ destinationAddress }}");
+    expect(card).toContain("@click=\"sendPoint\"");
+    expect(card).toContain("@click=\"showPlan\"");
+    expect(card).not.toContain("rating");
+    expect(card).not.toContain("verified");
   });
 
   it("regroups on camera changes and opens a current-results chooser for overlapping hits", () => {

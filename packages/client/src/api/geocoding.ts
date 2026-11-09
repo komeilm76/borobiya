@@ -42,6 +42,7 @@ export function photonPlaces(payload: unknown, limit: number): GeocodeResponse {
       ? `osm:${osmType}:${osmId}` : `geo:${lon}:${lat}:${name}`;
     const candidate = geocodeResultSchema.safeParse({ placeId, name, address, lon, lat,
       type: text(properties.osm_key) ?? "place",
+      ...(text(properties.osm_value) ? { subtype: text(properties.osm_value) } : {}),
       ...(typeof properties.importance === "number" && Number.isFinite(properties.importance)
         ? { importance: properties.importance } : {}) });
     if (!candidate.success || ids.has(placeId)) continue;

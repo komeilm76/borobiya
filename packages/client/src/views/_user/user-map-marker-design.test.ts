@@ -57,7 +57,7 @@ describe("own and companion marker design", () => {
     expect(own).not.toContain('mdi-navigation-variant');
     expect(own).toContain('ownMarkerMotion.move({ lon: fix.lon, lat: fix.lat,');
     expect(own).not.toContain('new markerConstructor({ color:');
-    expect(body("syncSelectedPlaceMarker")).toContain('new markerConstructor({ color: "#7c3aed" })');
+    expect(body("syncSelectedPlaceMarker")).toContain('new markerConstructor({ color: "#dc483e" })');
     expect(body("onMapReady")).toContain('ownMarker?.remove(); ownMarker = null;');
     expect(rule(":global(.user-map-view .user-map-view__own-marker)")).toContain("width: 48px; height: 48px;");
     expect(rule(":global(.user-map-view .user-map-view__own-marker-icon)")).toContain("background: rgb(var(--v-theme-primary));");

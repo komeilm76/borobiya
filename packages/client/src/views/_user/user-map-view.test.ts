@@ -111,7 +111,8 @@ describe("UserMapView live overlay", () => {
     expect(marker).toContain("setLngLat([place.lon, place.lat]).addTo(instance)");
     expect(marker).toContain("else selectedPlaceMarker.setLngLat([place.lon, place.lat])");
     expect(marker).toContain('setAttribute("aria-label",');
-    expect(marker).toContain('setAttribute("title", place.name)');
+    expect(marker).toContain('label.textContent = place.name');
+    expect(marker).not.toContain('setAttribute("title", place.name)');
     expect(view).toContain('watch(() => placeSearch.selectedPlaceId.value, () => {');
     expect(view).toContain('syncSelectedPlaceMarker();');
     expect(body("selectPlace")).toContain("placeSearch.select(place)");

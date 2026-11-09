@@ -12,19 +12,23 @@ describe("map search result geometry", () => {
     expect(resultExtent([place("one", 51.4, 35.7)])).toEqual([[51.4, 35.7], [51.4, 35.7]]);
     expect(resultExtent([place("a", 51.4, 35.7), place("b", 51.3, 35.8)])).toEqual([[51.3, 35.7], [51.4, 35.8]]);
   });
-  it("groups overlapping named callouts using projected screen pixels, not just identical coordinates", () => {
-    const hits = [place("a", 0, 0), place("b", 120, 20), place("c", 420, 200)];
+  it("groups only nearby compact pins using projected screen pixels, not just identical coordinates", () => {
+    const hits = [place("a", 0, 0), place("b", 48, 20), place("c", 420, 200)];
     expect(groupSearchResults(hits, project).map(group => group.map(hit => hit.placeId)))
       .toEqual([["a", "b"], ["c"]]);
     expect(groupSearchResults(hits, p => ({ x: p.lon * 3, y: p.lat * 3 })).map(group => group.map(hit => hit.placeId)))
       .toEqual([["a"], ["b"], ["c"]]);
   });
-  it("does not group vertically separated chips even when they share a longitude", () => {
+  it("keeps diagonally separate pin targets visible", () => {
+    const hits = [place("a", 0, 0), place("b", 50, 50)];
+    expect(groupSearchResults(hits, project).map(group => group.length)).toEqual([1, 1]);
+  });
+  it("does not group vertically separated pins even when they share a longitude", () => {
     const hits = [place("a", 0, 0), place("b", 0, 80)];
     expect(groupSearchResults(hits, project).map(group => group.length)).toEqual([1, 1]);
   });
-  it("respects larger text zoom so two apparently separate chips do not cover each other", () => {
-    const hits = [place("a", 0, 0), place("b", 220, 10)];
+  it("respects an explicitly enlarged footprint without changing the compact default", () => {
+    const hits = [place("a", 0, 0), place("b", 120, 10)];
     expect(groupSearchResults(hits, project).map(group => group.length)).toEqual([1, 1]);
     expect(groupSearchResults(hits, project, 240, 64)).toEqual([hits]);
   });
@@ -36,7 +40,7 @@ describe("map search result geometry", () => {
     expect(resultExtent(groups[0]!)).toEqual([[51.4, 35.7], [51.4, 35.7]]);
   });
   it("merges collision chains even when neighboring groups would otherwise cover each other", () => {
-    const hits = [place("a", 0, 0), place("b", 160, 0), place("c", 320, 0)];
+    const hits = [place("a", 0, 0), place("b", 60, 0), place("c", 120, 0)];
     expect(groupSearchResults(hits, project)).toEqual([hits]);
   });
   it("reserves phone header and dock space without squeezing short screens to zero", () => {

@@ -40,8 +40,13 @@
       <ul class="user-map-view__nearby-list" aria-label="مکان‌های نزدیک">
         <li v-for="place in nearbyPlaces" :key="place.placeId">
           <button type="button" @click="chooseNearbyResult(place)">
-            <bdi dir="auto" class="user-map-view__nearby-name">{{ place.name }}</bdi>
-            <bdi dir="auto" class="user-map-view__nearby-address">{{ place.address }}</bdi>
+            <span class="user-map-view__nearby-icon" :style="{ '--result-color': resultAppearance(place).color }" aria-hidden="true">
+              <v-icon :icon="resultAppearance(place).icon" size="20" />
+            </span>
+            <span class="user-map-view__nearby-copy">
+              <bdi dir="auto" class="user-map-view__nearby-name">{{ place.name }}</bdi>
+              <bdi dir="auto" class="user-map-view__nearby-address">{{ place.address }}</bdi>
+            </span>
           </button>
         </li>
       </ul>
@@ -180,7 +185,8 @@
       </v-card>
     </div>
     <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
-      :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone" v-model:confirm-delete-open="routeDeleteConfirmOpen"
+      :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"
+      :search-place="isSelectedSearchDestination ? selectedSearchPlace : null" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices" @choose-transport="openTransportChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"
@@ -295,6 +301,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
+import { clusterAppearance, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
@@ -949,14 +956,16 @@ function syncResultMarkers(): void {
   const places = showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value) &&
     instance && markerConstructor && auth.user?.id
     ? placeSearch.mapResults.value : [];
-  // A selected place already has its purple or amber pin, except in the
-  // explicit navigation overview where it is still a search result.
+  // The selected result has a named callout or an amber route pin, except in
+  // the explicit navigation overview where it is still a search result.
   const excludedId = journey.navigating.value && showNavigationSearchResults.value && !isSelectedSearchDestination.value
     ? null : placeSearch.selectedPlaceId.value;
   const visiblePlaces = places.filter(place => place.placeId !== excludedId);
   const rem = typeof document === "undefined" ? 16 : parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  const chipWidth = Math.max(44, Math.min(10.5 * rem, window.innerWidth - 1.5 * rem));
-  const chipHeight = Math.max(48, rem * (0.875 * 1.5 + 0.6) + 2);
+  // Compact icon pins occupy ~48px; count bubbles are 54px. Only genuinely
+  // close hits should collapse, not every pair of once-wide text callouts.
+  const chipWidth = Math.max(56, rem * 3.5);
+  const chipHeight = chipWidth;
   const groups = instance ? groupSearchResults(visiblePlaces,
     place => instance.project([place.lon, place.lat]), chipWidth, chipHeight) : [];
   const singles = new Set(groups.filter(group => group.length === 1).map(group => group[0]!.placeId));
@@ -993,10 +1002,7 @@ function syncResultMarkers(): void {
         const count = document.createElement("span");
         count.className = "user-map-view__result-cluster__count";
         count.setAttribute("aria-hidden", "true");
-        const label = document.createElement("span");
-        label.textContent = "مکان نزدیک";
-        label.setAttribute("aria-hidden", "true");
-        button.append(count, label);
+        button.append(count);
         button.addEventListener("click", event => {
           event.stopPropagation();
           openNearbyResults(group.map(hit => hit.placeId), button);
@@ -1011,11 +1017,11 @@ function syncResultMarkers(): void {
       const button = marker.getElement();
       button.setAttribute("aria-label", `${group.length.toLocaleString("fa-IR")} نتیجهٔ نزدیک؛ نمایش فهرست مکان‌ها`);
       const count = button.querySelector<HTMLElement>(".user-map-view__result-cluster__count");
-      if (count) count.textContent = group.length.toLocaleString("fa-IR");
+      if (count) count.textContent = `+${group.length.toLocaleString("fa-IR")}`;
+      button.style.setProperty("--result-color", clusterAppearance(group).color);
       continue;
     }
     const place = group[0]!;
-    const index = places.indexOf(place);
     let marker = resultMarkers.get(place.placeId);
     if (!marker) {
       const button = document.createElement("button");
@@ -1023,21 +1029,10 @@ function syncResultMarkers(): void {
       button.className = "user-map-view__result-marker";
       button.dir = "rtl";
       button.setAttribute("aria-controls", "map-point-route-sheet");
-      const badge = document.createElement("span");
-      badge.className = "user-map-view__result-marker__badge";
-      badge.setAttribute("aria-hidden", "true");
-      const number = document.createElement("span");
-      badge.append(number);
-      const copy = document.createElement("span");
-      copy.className = "user-map-view__result-marker__copy";
-      const name = document.createElement("bdi");
-      name.className = "user-map-view__result-marker__name";
-      name.dir = "auto";
-      copy.append(name);
-      const affordance = document.createElement("span");
-      affordance.className = "user-map-view__result-marker__affordance mdi mdi-chevron-left";
-      affordance.setAttribute("aria-hidden", "true");
-      button.append(badge, copy, affordance);
+      const icon = document.createElement("span");
+      icon.className = "user-map-view__result-marker__icon mdi";
+      icon.setAttribute("aria-hidden", "true");
+      button.append(icon);
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         // Never act on a captured hit after a viewport request invalidated it.
@@ -1052,12 +1047,11 @@ function syncResultMarkers(): void {
       resultMarkers.set(place.placeId, marker);
     } else marker.setLngLat([place.lon, place.lat]);
     const button = marker.getElement();
-    button.classList.toggle("user-map-view__result-marker--dense", places.length > 12);
-    button.setAttribute("aria-label", `نتیجهٔ ${(index + 1).toLocaleString("fa-IR")} از ${places.length.toLocaleString("fa-IR")}: ${place.name}، ${place.address}؛ انتخاب مقصد`);
-    const number = button.querySelector<HTMLElement>(".user-map-view__result-marker__badge span");
-    if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
-    const name = button.querySelector<HTMLElement>(".user-map-view__result-marker__name");
-    if (name) name.textContent = place.name;
+    const appearance = resultAppearance(place);
+    button.style.setProperty("--result-color", appearance.color);
+    button.setAttribute("aria-label", `${appearance.label}: ${place.name}، ${place.address}؛ انتخاب مقصد`);
+    const icon = button.querySelector<HTMLElement>(".user-map-view__result-marker__icon");
+    if (icon) icon.className = `user-map-view__result-marker__icon mdi ${appearance.icon}`;
   }
 }
 async function showAllSearchResults(): Promise<void> {
@@ -1118,15 +1112,20 @@ function syncSelectedPlaceMarker(): void {
     selectedPlaceMarker = null;
     return;
   }
-  // Selected POI stays distinct from the optional set of numbered result markers.
+  // Selected POI stays distinct from the optional set of category result pins.
   // Marker is supplied by MapCanvas after its lazy MapLibre import; no eager map chunk here.
   if (!selectedPlaceMarker) {
-    selectedPlaceMarker = new markerConstructor({ color: "#7c3aed" })
+    selectedPlaceMarker = new markerConstructor({ color: "#dc483e" })
       .setLngLat([place.lon, place.lat]).addTo(instance);
     const element = selectedPlaceMarker.getElement();
     element.setAttribute("role", "button");
     element.setAttribute("tabindex", "0");
     element.setAttribute("aria-controls", "map-point-route-sheet");
+    element.classList.add("user-map-view__selected-place");
+    const label = document.createElement("bdi");
+    label.className = "user-map-view__selected-place-label";
+    label.dir = "auto";
+    element.append(label);
     element.addEventListener("click", (event) => { event.stopPropagation(); openSelectedPlaceRoute(); });
     element.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -1134,11 +1133,14 @@ function syncSelectedPlaceMarker(): void {
     });
   } else selectedPlaceMarker.setLngLat([place.lon, place.lat]);
   selectedPlaceMarker.getElement().setAttribute("aria-label", `مکان انتخاب‌شده: ${place.name}؛ نمایش مسیر`);
-  selectedPlaceMarker.getElement().setAttribute("title", place.name);
+  // DOM text, never HTML or a hover-only/native tooltip.
+  const label = selectedPlaceMarker.getElement().querySelector<HTMLElement>(".user-map-view__selected-place-label");
+  if (label) label.textContent = place.name;
 }
-watch(() => isSelectedSearchDestination.value, syncSelectedPlaceMarker);
+watch(() => isSelectedSearchDestination.value, () => { syncSelectedPlaceMarker(); syncDestinationMarker(); });
 watch(() => placeSearch.selectedPlaceId.value, () => {
   syncSelectedPlaceMarker();
+  syncDestinationMarker();
   syncResultMarkers();
 }, { flush: "sync" });
 watch(() => placeSearch.mapResults.value, () => {
@@ -1508,12 +1510,17 @@ function syncDestinationMarker(): void {
   const instance = map.value, point = journey.point.value;
   if (!instance || !markerConstructor || !point) { destinationMarker?.remove(); destinationMarker = null; return; }
   if (!destinationMarker) {
-    // MapLibre's standard bottom-anchored destination pin; selected search POIs have their own marker.
+    // The existing amber route pin owns a selected POI; do not stack two pins.
     destinationMarker = new markerConstructor({ color: "#d97706" }).setLngLat([point.lon, point.lat]).addTo(instance);
     const element = destinationMarker.getElement();
     element.classList.add("user-map-view__destination-marker");
     element.setAttribute("role", "button"); element.setAttribute("tabindex", "0");
     element.setAttribute("aria-controls", "map-point-route-sheet");
+    element.classList.add("user-map-view__selected-place");
+    const label = document.createElement("bdi");
+    label.className = "user-map-view__selected-place-label";
+    label.dir = "auto";
+    element.append(label);
     element.addEventListener("click", (event) => { event.stopPropagation(); journey.sheetOpen.value = true; });
     element.addEventListener("keydown", (event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
@@ -1521,7 +1528,13 @@ function syncDestinationMarker(): void {
     });
   } else destinationMarker.setLngLat([point.lon, point.lat]);
   destinationMarker.getElement().setAttribute("aria-label", `مقصد انتخاب‌شده: ${journey.title.value}؛ نمایش جزئیات مسیر`);
-  destinationMarker.getElement().setAttribute("title", journey.title.value);
+  const element = destinationMarker.getElement();
+  const label = element.querySelector<HTMLElement>(".user-map-view__selected-place-label");
+  const namedSearch = isSelectedSearchDestination.value && !journey.navigating.value;
+  if (label) { label.hidden = !namedSearch; label.textContent = namedSearch ? journey.title.value : ""; }
+  // No native hover tooltip on a selected search result.
+  if (namedSearch) element.removeAttribute("title");
+  else element.setAttribute("title", journey.title.value);
 }
 function syncRouteOriginMarker(): void {
   const instance = map.value, origin = journey.plannedFrom.value;
@@ -1694,6 +1707,7 @@ watch(() => journey.sheetOpen.value, async () => {
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
 });
 watch(() => journey.navigating.value, (active) => {
+  syncDestinationMarker(); // A named search callout belongs to planning, not active guidance.
   progressRoute = null; completedRouteMetres = 0;
   if (active) updateRouteProgress();
   navigationSearchOpen.value = false;
@@ -1877,72 +1891,56 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
 .user-map-view__search-map-actions { display: none; }
 
-/* Search callouts show a place name and a numbered pin without confusing them
-   with the purple selection, teal companions or the blue private GPS icon. */
+/* Compact category pins leave the map visible; the selected pin alone has a
+   persistent name. Photon names and addresses remain in each button's aria-label. */
 :global(.user-map-view .user-map-view__route-origin) {
   display: grid; place-items: center; width: 32px; height: 32px; border: 3px solid #fff;
   border-radius: 50%; color: #fff;
   background: #2563eb; box-shadow: 0 2px 9px rgba(4, 24, 40, .5); font-weight: 900;
 }
 :global(.user-map-view .user-map-view__result-marker) {
-  display: flex; align-items: center; gap: .4rem; width: max-content;
-  max-width: min(10.5rem, calc(100vw - 1.5rem)); min-width: 44px; min-height: 48px;
-  padding: .3rem .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .22);
-  border-radius: .85rem; color: rgb(var(--v-theme-on-surface));
-  background: rgba(var(--v-theme-surface), .98);
-  box-shadow: 0 3px 14px rgba(3, 29, 31, .3); backdrop-filter: blur(8px);
-  cursor: pointer; text-align: start; touch-action: manipulation;
+  display: grid; place-items: center; width: 48px; height: 48px; padding: 0;
+  border: 3px solid #fff; border-radius: 16px 16px 16px 5px;
+  background: var(--result-color, #475569); color: #fff;
+  box-shadow: 0 4px 12px rgba(3, 29, 31, .34), 0 0 0 1px rgba(5, 31, 44, .12);
+  cursor: pointer; touch-action: manipulation;
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
   font-synthesis: none; letter-spacing: normal;
 }
-:global(.user-map-view .user-map-view__result-marker::after) {
-  content: ""; position: absolute; bottom: -.4rem; left: calc(50% - .38rem);
-  width: .76rem; height: .42rem; background: rgb(var(--v-theme-surface));
-  clip-path: polygon(0 0, 100% 0, 50% 100%); pointer-events: none;
+:global(.user-map-view .user-map-view__result-marker__icon) { font-size: 1.55rem; line-height: 1; }
+:global(.user-map-view .user-map-view__result-marker:focus-visible),
+:global(.user-map-view .user-map-view__selected-place:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px;
 }
-:global(.user-map-view .user-map-view__result-marker__badge) {
-  display: grid; place-items: center; flex: 0 0 auto; min-width: 2rem; height: 2rem;
-  padding-inline: .25rem; border-radius: .6rem; background: #a95010; color: #fff;
-  font-size: .85rem; font-weight: 800; font-variant-numeric: tabular-nums;
-}
-:global(.user-map-view .user-map-view__result-marker__copy) { display: grid; min-width: 0; flex: 1 1 auto; }
-:global(.user-map-view .user-map-view__result-marker__name) {
-  display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  font-size: .875rem; line-height: 1.5; font-weight: 700;
-}
-:global(.user-map-view .user-map-view__result-marker__affordance) {
-  flex: 0 0 auto; font-size: .9rem; color: rgb(var(--v-theme-primary));
-}
-:global(.user-map-view .user-map-view__result-marker--dense) { max-width: min(8rem, calc(100vw - 1.5rem)); }
-:global(.user-map-view .user-map-view__result-marker:focus-visible) {
-  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
-}
-:global(:root.dark .user-map-view .user-map-view__result-marker) {
-  border-color: rgba(var(--v-theme-on-surface), .32); background: rgba(var(--v-theme-surface), .98);
+:global(.user-map-view .user-map-view__selected-place) { cursor: pointer; z-index: 3; }
+:global(.user-map-view .user-map-view__selected-place-label:not([hidden])) {
+  position: absolute; bottom: calc(100% + .45rem); left: 50%; transform: translateX(-50%);
+  display: block; width: max-content; max-width: min(15rem, calc(100vw - 2rem));
+  padding: .45rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid rgba(var(--v-theme-on-surface), .16); border-radius: .8rem;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 5px 18px rgba(3, 29, 31, .28); pointer-events: none;
+  font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
 }
 @media (forced-colors: active) {
-  :global(.user-map-view .user-map-view__result-marker) { border-color: CanvasText; box-shadow: none; }
-  :global(.user-map-view .user-map-view__result-marker__badge) { background: Highlight; color: HighlightText; }
+  :global(.user-map-view .user-map-view__result-marker),
+  :global(.user-map-view .user-map-view__selected-place-label) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
 }
 
-/* A count replaces overlapping callouts; activating it exposes the actual
-   current hits, including identical coordinates that zoom cannot separate. */
+/* Count bubbles correspond to actual overlapping hits. The chooser retains
+   every place, including different places at identical coordinates. */
 :global(.user-map-view .user-map-view__result-cluster) {
-  display: flex; align-items: center; gap: .4rem; min-width: 44px; min-height: 48px;
-  padding: .3rem .6rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
-  border-radius: .85rem; background: rgb(var(--v-theme-surface));
-  color: rgb(var(--v-theme-on-surface)); box-shadow: 0 3px 14px rgba(3, 29, 31, .3);
-  cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  display: grid; place-items: center; width: 54px; height: 54px; padding: 0;
+  border: 3px solid #fff; border-radius: 50%;
+  background: var(--result-color, #4059a9); color: #fff;
+  box-shadow: 0 4px 14px rgba(3, 29, 31, .3), 0 0 0 5px color-mix(in srgb, var(--result-color, #4059a9) 25%, transparent);
+  cursor: pointer; touch-action: manipulation;
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
-  font-size: .875rem; font-weight: 700; letter-spacing: normal;
+  font-size: 1rem; font-weight: 800; letter-spacing: normal;
 }
-:global(.user-map-view .user-map-view__result-cluster__count) {
-  display: grid; place-items: center; min-width: 2rem; height: 2rem;
-  padding-inline: .25rem; border-radius: .6rem; background: #a95010;
-  color: #fff; font-weight: 800;
-}
+:global(.user-map-view .user-map-view__result-cluster__count) { font-variant-numeric: tabular-nums; }
 :global(.user-map-view .user-map-view__result-cluster:focus-visible) {
-  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 6px;
 }
 .user-map-view__nearby-results {
   position: absolute; z-index: 8; top: calc(5rem + env(safe-area-inset-top, 0px));
@@ -1960,9 +1958,12 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__nearby-header button { width: 44px; height: 44px; border: 0; border-radius: .7rem;
   background: transparent; cursor: pointer; color: inherit; font: inherit; }
 .user-map-view__nearby-list { margin: 0; padding: .25rem; overflow-y: auto; list-style: none; }
-.user-map-view__nearby-list button { display: grid; width: 100%; min-height: 44px; gap: .1rem;
-  padding: .45rem .6rem; border: 0; border-radius: .6rem; background: transparent;
+.user-map-view__nearby-list button { display: flex; align-items: center; width: 100%; min-height: 52px; gap: .65rem;
+  padding: .45rem .6rem; border: 0; border-radius: .75rem; background: transparent;
   text-align: start; color: inherit; font: inherit; cursor: pointer; }
+.user-map-view__nearby-icon { display: grid; place-items: center; flex: 0 0 36px; height: 36px;
+  border-radius: .7rem; background: var(--result-color, #475569); color: #fff; }
+.user-map-view__nearby-copy { display: grid; min-width: 0; gap: .1rem; }
 .user-map-view__nearby-list button:focus-visible,
 .user-map-view__nearby-header button:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); }
 .user-map-view__nearby-name { font-size: .875rem; font-weight: 700; overflow-wrap: anywhere; }

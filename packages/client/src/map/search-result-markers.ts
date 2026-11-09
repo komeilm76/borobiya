@@ -1,12 +1,12 @@
 import type { GeocodeResult } from "@shared/index";
 
-/** Group projected hits whose named callouts would overlap at the current zoom.
+/** Group projected hits whose compact category pins/count bubbles would overlap.
  * Connected components ensure a chain cannot leave two cluster buttons atop
  * each other. Keep the snapshot order (and every hit) for stable list selection.
  */
 export function groupSearchResults(
   places: readonly GeocodeResult[], project: (place: GeocodeResult) => { x: number; y: number },
-  chipWidth = 168, chipHeight = 48
+  chipWidth = 56, chipHeight = 56
 ): GeocodeResult[][] {
   const points = places.map(project);
   const parent = places.map((_, index) => index);
@@ -16,10 +16,10 @@ export function groupSearchResults(
   };
   for (let i = 0; i < places.length; i++) {
     for (let j = i + 1; j < places.length; j++) {
-      // Using the widest callout (dense ones are smaller) plus an 8px gap
-      // keeps labels from covering other result targets at the current zoom.
-      if (Math.abs(points[i]!.x - points[j]!.x) >= chipWidth + 8 ||
-          Math.abs(points[i]!.y - points[j]!.y) >= chipHeight + 8) continue;
+      // Reserve an 8px gap around pins/count bubbles at the current zoom.
+      const dx = (points[i]!.x - points[j]!.x) / (chipWidth + 8);
+      const dy = (points[i]!.y - points[j]!.y) / (chipHeight + 8);
+      if (Math.hypot(dx, dy) >= 1) continue;
       parent[root(j)] = root(i);
     }
   }

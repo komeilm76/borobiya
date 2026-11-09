@@ -1,12 +1,14 @@
 <template>
   <!-- The same nonmodal point -> travel flow on phones, tablets and desktops. -->
   <section v-if="api.point.value && api.sheetOpen.value && !choicesOpen"
-    class="point-route-shell" :class="{ 'point-route-shell--expanded': step === 'plan' }"
+    class="point-route-shell" :class="{ 'point-route-shell--expanded': step === 'plan', 'point-route-shell--search-place': !!searchPlace && step === 'point' }"
     role="region" aria-label="مقصد و برنامه‌ریزی سفر" @keydown.esc.stop.prevent="onEscape">
     <v-card id="map-point-route-sheet" class="point-route bb-floating-card bb-map-navigation-card" elevation="3" rounded="xl" dir="rtl" tabindex="-1">
       <header class="point-route__header">
-        <v-icon icon="mdi-map-marker" size="23" aria-hidden="true" />
-        <div class="point-route__headings"><small>{{ step === 'plan' ? 'برنامه‌ریزی سفر' : 'مقصد انتخاب‌شده' }}</small>
+        <span class="point-route__place-icon" :style="searchPlace && step === 'point' ? { '--result-color': resultAppearance(searchPlace).color } : undefined">
+          <v-icon :icon="searchPlace && step === 'point' ? resultAppearance(searchPlace).icon : 'mdi-map-marker'" size="23" aria-hidden="true" />
+        </span>
+        <div class="point-route__headings"><small>{{ step === 'plan' ? 'برنامه‌ریزی سفر' : searchPlace ? resultAppearance(searchPlace).label : 'مقصد انتخاب‌شده' }}</small>
           <strong :title="api.title.value">{{ api.title.value }}</strong></div>
         <v-btn v-if="showSearch" icon="mdi-magnify" variant="text" aria-label="جست‌وجوی مکان" title="جست‌وجوی مکان"
           @click="emit('search')" />
@@ -94,6 +96,8 @@ import type { usePointRoute } from "@/composables/use-point-route";
 import type { OwnMapFix } from "@/composables/use-own-map-position";
 import { createShareAttemptFence, selectedPointShare } from "@/map/selected-point-share";
 import { transportLabel } from "@/map/transport-options";
+import { resultAppearance } from "@/map/search-result-presentation";
+import type { GeocodeResult } from "@shared/index";
 const props = defineProps<{
   api: ReturnType<typeof usePointRoute>;
   reverse: ReturnType<typeof useReversePlace>;
@@ -101,6 +105,7 @@ const props = defineProps<{
   ownPosition: OwnMapFix | null;
   choicesOpen: boolean;
   showSearch: boolean;
+  searchPlace?: GeocodeResult | null;
 }>();
 const emit = defineEmits<{ start: []; dismiss: []; search: []; 'choose-route': []; 'choose-transport': []; 'layout-change': [] }>();
 const confirmDeleteOpen = defineModel<boolean>("confirmDeleteOpen", { default: false });
@@ -216,6 +221,11 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
 .point-route { pointer-events: auto; display: flex; flex-direction: column; max-height: min(70dvh, 36rem); overflow: hidden; }
 .point-route__header { display: flex; flex: 0 0 auto; align-items: center; gap: .35rem;
   min-height: 54px; padding: .25rem .6rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
+.point-route__place-icon { display: grid; place-items: center; flex: 0 0 42px; height: 42px;
+  border-radius: 14px; color: var(--result-color, rgb(var(--v-theme-primary)));
+  background: color-mix(in srgb, var(--result-color, rgb(var(--v-theme-primary))) 13%, transparent); }
+.point-route-shell--search-place .point-route__header { min-height: 70px; padding-inline: .85rem; }
+.point-route-shell--search-place .point-route__headings strong { font-size: 1.12rem; }
 .point-route__headings { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
 .point-route__headings small { font-size: .8rem; color: rgb(var(--v-theme-primary)); }
 .point-route__headings strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1rem; }

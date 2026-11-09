@@ -118,6 +118,8 @@ export const geocodeResultSchema = z.strictObject({
   lat: latitudeSchema,
   lon: longitudeSchema,
   type: z.string().min(1),
+  // Photon osm_value; optional for older gateways and results without a mapped value.
+  subtype: z.string().trim().min(1).optional(),
   importance: z.number().finite().optional()
 });
 export type GeocodeResult = z.infer<typeof geocodeResultSchema>;

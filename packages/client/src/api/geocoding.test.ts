@@ -124,6 +124,15 @@ describe("local Photon place search", () => {
     expect(() => photonPlaces({ type: "Feature", features: [] }, 5)).toThrow();
   });
 
+  it("preserves only a present Photon OSM value for honest map-pin classification", () => {
+    const [cafe, plain] = photonPlaces(collection([
+      feature("Cafe", [51.4, 35.7], { osm_key: "amenity", osm_value: "cafe" }),
+      feature("Other", [51.5, 35.8], { osm_id: 789, osm_key: "amenity", osm_value: " " })
+    ]), 5);
+    expect(cafe).toMatchObject({ type: "amenity", subtype: "cafe" });
+    expect(plain).not.toHaveProperty("subtype");
+  });
+
   it("uses a bounded local fallback identity for Photon features without an OSM id", () => {
     const [item] = photonPlaces(collection([feature("Bazar", [51.4, 35.6], { osm_type: null, osm_id: null,
       street: "Bazar St", housenumber: "12" })]), 5);

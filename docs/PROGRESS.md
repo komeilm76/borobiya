@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Screenshot-inspired map search result presentation
+
+- Adapted the selected Persian map reference to the existing offline search/route UI: compact 48px colored icon pins in place of always-wide result labels, circular `+N` collision counts with a short keyboard-accessible chooser, and a persistent name callout above the selected map pin. The selected destination card now shows the supported place category and its icon alongside the existing real title/address, Send → Travel → Guidance actions and deletion confirmation. Photon `osm_key` + optional `osm_value` drive a deliberately small verified icon palette; unknown/ambiguous categories use a neutral pin. No photos, ratings, verification claims or global category filters were invented. Search queries, result invalidation, mobile full-screen controls, SOS and navigation remain unchanged. Nonmounted contracts, parser/presentation/geometry tests and repo gates cover this increment; authenticated browser/device visual and accessibility review remain open.
+
 ### 2026-10-23 — Group nearby map search results by visible spacing
 
 - Search-result callouts now group when their projected screen-space footprints would collide, including different coordinates that become close during zoom-out. A group is a numbered count button, not a pile of displaced names; activating it opens a short, keyboard-reachable list of the **current** places and addresses for direct selection, so identical-coordinate results remain available even at maximum zoom. Individual nonoverlapping hits keep their always-visible numbered names, with no hover content. Groups are recalculated after camera movement, fit/fly and resize; stale group buttons/list items cannot select removed results, and replacement-map/unmount cleanup removes both marker types. Pure geometry tests and nonmounted view contracts passed; actual browser rendering, map gestures and assistive-technology acceptance remain open.
