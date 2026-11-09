@@ -281,3 +281,177 @@ describe('push-to-talk', () => {
     wrapper.unmount();
   });
 });
+
+describe('push-to-talk failure paths', () => {
+  it('sends a captured audio frame to the realtime channel', async () => {
+    const contexts: FakeAudioContext[] = [];
+    class CapturingAudioContext extends FakeAudioContext {
+      constructor(options?: { sampleRate?: number }) {
+        super(options);
+        contexts.push(this);
+      }
+    }
+    vi.stubGlobal('AudioContext', CapturingAudioContext);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) }
+    });
+    const { wrapper, binary } = await renderPatched();
+    await selectPeer(wrapper);
+
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+    // Drive the capture callback exactly the way the Web Audio runtime would during a hold.
+    // The first context is playback, the second capture; find whichever installed the recorder.
+    const capture = contexts.map((context) => context.processor).find((processor) => processor.onaudioprocess);
+    expect(capture, 'capture callback must be installed once the turn opens').toBeTruthy();
+    capture!.onaudioprocess!({ inputBuffer: { getChannelData: () => new Float32Array(512) } });
+
+    expect(binary).toHaveLength(1);
+    expect(binary[0]).toBeInstanceOf(ArrayBuffer);
+    wrapper.unmount();
+  });
+
+  it('ignores a stop when no turn is open', async () => {
+    installAudioMocks();
+    const { wrapper, sent } = await renderPatched();
+    await selectPeer(wrapper);
+    // Release without press: must not emit TALK_STOP for a turn that never opened.
+    await wrapper.find('.talk-button').trigger('pointerup');
+    await flushPromises();
+    expect(sent.some((message) => message.type === WS_EVENTS.TALK_STOP)).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('ignores an ACK of a different kind', async () => {
+    installAudioMocks();
+    const { wrapper, sent, realtime } = await renderPatched();
+    await selectPeer(wrapper);
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+    // A stop-ack must not be mistaken for a start-ack and adopt a bogus talk id.
+    deliver(realtime, WS_EVENTS.ACK, { kind: WS_EVENTS.TALK_STOP, accepted: true, talkId: 999 });
+    await flushPromises();
+    await wrapper.find('.talk-button').trigger('pointerup');
+    await flushPromises();
+    expect(sent.some((message) => message.type === WS_EVENTS.TALK_STOP && message.talkId === 999)).toBe(false);
+    expect(useToast().messages.value).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('shows a distinct message when the floor refuses for a non-busy reason', async () => {
+    installAudioMocks();
+    const { wrapper, realtime } = await renderPatched();
+    await selectPeer(wrapper);
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+    deliver(realtime, WS_EVENTS.ACK, { kind: WS_EVENTS.TALK_START, accepted: false, reason: 'malformed-request' });
+    await flushPromises();
+    // The user must see that the call did not start, with a neutral explanation rather than the
+    // "busy" wording.
+    expect(useToast().messages.value.some((message) => message.message.includes('گفت‌وگو آغاز نشد'))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('adopts the talk id the floor assigned for both control frames and audio frames', async () => {
+    const contexts: FakeAudioContext[] = [];
+    class CapturingAudioContext extends FakeAudioContext {
+      constructor(options?: { sampleRate?: number }) {
+        super(options);
+        contexts.push(this);
+      }
+    }
+    vi.stubGlobal('AudioContext', CapturingAudioContext);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: vi.fn() }] })) }
+    });
+    const { wrapper, sent, binary, realtime } = await renderPatched();
+    await selectPeer(wrapper);
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+
+    deliver(realtime, WS_EVENTS.ACK, { kind: WS_EVENTS.TALK_START, accepted: true, talkId: 777 });
+    await flushPromises();
+    await wrapper.find('.talk-button').trigger('pointerup');
+    await flushPromises();
+    // The control plane carries the server-assigned id.
+    expect(sent.some((message) => message.type === WS_EVENTS.TALK_STOP && message.talkId === 777)).toBe(true);
+
+    // The data plane must carry it too: after adoption the next captured frame encodes 777 in its
+    // header, or the floor drops every frame as talk-not-active.
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+    deliver(realtime, WS_EVENTS.ACK, { kind: WS_EVENTS.TALK_START, accepted: true, talkId: 778 });
+    await flushPromises();
+    const capture = contexts.map((context) => context.processor).find((processor) => processor.onaudioprocess);
+    capture!.onaudioprocess!({ inputBuffer: { getChannelData: () => new Float32Array(512) } });
+    expect(binary.length).toBeGreaterThan(0);
+    const frame = binary[binary.length - 1] as ArrayBuffer;
+    expect(new DataView(frame).getUint32(2, false)).toBe(778);
+    wrapper.unmount();
+  });
+
+  it('accepts a floor ack that carries no talk id', async () => {
+    installAudioMocks();
+    const { wrapper, realtime } = await renderPatched();
+    await selectPeer(wrapper);
+    await wrapper.find('.talk-button').trigger('pointerdown');
+    await flushPromises();
+    // An accept without a talk id must not crash nor adopt a falsy id.
+    deliver(realtime, WS_EVENTS.ACK, { kind: WS_EVENTS.TALK_START, accepted: true });
+    await flushPromises();
+    expect(wrapper.text()).toContain('در حال ارسال');
+    wrapper.unmount();
+  });
+
+  it('surfaces a realtime error as a toast', async () => {
+    installAudioMocks();
+    const { wrapper, realtime } = await renderPatched();
+    deliver(realtime, WS_EVENTS.ERROR, { message: 'boom' });
+    await flushPromises();
+    expect(useToast().messages.value.some((message) => message.message === 'boom')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('shows a generic talk error when the server sends none', async () => {
+    installAudioMocks();
+    const { wrapper, realtime } = await renderPatched();
+    // The payload is not guaranteed to carry a message; the banner must not print "undefined".
+    deliver(realtime, WS_EVENTS.ERROR, {});
+    await flushPromises();
+    expect(useToast().messages.value.some((message) => message.message === 'خطای گفت‌وگو')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('starts and stops with the Enter key and on blur', async () => {
+    installAudioMocks();
+    const { wrapper, sent } = await renderPatched();
+    await selectPeer(wrapper);
+    await wrapper.find('.talk-button').trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(sent.some((message) => message.type === WS_EVENTS.TALK_START)).toBe(true);
+    await wrapper.find('.talk-button').trigger('keyup', { key: 'Enter' });
+    await flushPromises();
+    expect(sent.some((message) => message.type === WS_EVENTS.TALK_STOP)).toBe(true);
+
+    await wrapper.find('.talk-button').trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    // A focused hold that loses focus must end the turn, or the button keeps streaming.
+    await wrapper.find('.talk-button').trigger('blur');
+    await flushPromises();
+    expect(wrapper.text()).toContain('آماده');
+    wrapper.unmount();
+  });
+
+  it('falls back to the user id when a peer has no username', async () => {
+    installAudioMocks();
+    const { wrapper } = await render();
+    const map = useMapStore();
+    map.liveFixes = { usr_noname: { userId: 'usr_noname', username: undefined, latitude: 35.7, longitude: 51.3, accuracy: 4, recordedAt: Date.now() } } as never;
+    await flushPromises();
+    const option = wrapper.findAll('#talk-target option').find((entry) => entry.text().includes('usr_noname'));
+    expect(option, 'peer without username must still be selectable by id').toBeTruthy();
+    wrapper.unmount();
+  });
+});
