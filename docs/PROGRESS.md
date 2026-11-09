@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: retain keyboard focus after selecting a map result
+
+- Choosing an individual map result or a place from the maximum-zoom cluster dialog previously removed the focused button/list entry as the point-route sheet opened, leaving keyboard focus on the page body. Once a valid map-origin selection has rendered, focus now moves to the route sheet's existing `tabindex="-1"` target. A map/route identity guard prevents an older deferred focus callback from stealing focus after a different selection or map replacement. Search-dialog selections are unchanged, avoiding interference with the phone dialog's close transition. Nonmounted source contracts failed before the fix and now pass; rendered keyboard and screen-reader review remains open.
+
 ### 2026-10-23 — Bug hunt: keep selected-place names visible at map edges
 
 - The always-visible selected-place name previously used a fixed centered position, so a pin near the top or either side of the clipped map canvas could hide its label. Both the stand-alone search pin and the route-owned destination pin now cap the label to the map width, shift it horizontally inside the canvas and place it below the pin when there is no space above. Positions are recalculated after marker updates, camera moves and resizes; the 48px category pins, hover-only result names, cluster zoom and route actions are unchanged. The hover tooltip shares the tested edge-shift geometry. Pure edge cases and nonmounted view contracts failed before implementation and now pass; rendered-map/device visual acceptance remains open.

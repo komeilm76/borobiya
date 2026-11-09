@@ -112,6 +112,19 @@ describe("show all current POIs on the map", () => {
     expect(card).not.toContain("verified");
   });
 
+  it("moves keyboard focus into the current route sheet when a selected map pin disappears", () => {
+    const select = body("selectPlace");
+    expect(select).toContain('if (fromMap) void nextTick(() => {');
+    expect(select).toContain('map.value === instance && journey.sheetOpen.value');
+    expect(select).toContain('matchesSelectedSearchDestination(place, journey.knownPlace.value, journey.point.value)');
+    expect(select).toContain('document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true })');
+    expect(select.indexOf('journey.select({ lat: place.lat, lon: place.lon }, place)'))
+      .toBeLessThan(select.indexOf('if (fromMap) void nextTick(() => {'));
+    const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    expect(sheet).toContain('id="map-point-route-sheet"');
+    expect(sheet).toContain('tabindex="-1"');
+  });
+
   it("zooms a current cluster before opening its chooser at maximum zoom", () => {
     const activate = body("activateResultCluster");
     expect(activate).toContain('resultClusterMarkers.get(key)');

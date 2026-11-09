@@ -1262,6 +1262,14 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   navigationSearchOpen.value = false;
   removeSelectedCompanion();
   journey.select({ lat: place.lat, lon: place.lon }, place);
+  // The source marker or cluster dialog disappears as soon as this result is
+  // selected. Do not strand keyboard focus on body, and never steal it if a
+  // different destination or map replaces this one before the sheet renders.
+  if (fromMap) void nextTick(() => {
+    if (map.value === instance && journey.sheetOpen.value &&
+        matchesSelectedSearchDestination(place, journey.knownPlace.value, journey.point.value))
+      document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true });
+  });
 }
 
 const playbackStyle = computed(() => historyPlaybackStyle(theme.isDark));
