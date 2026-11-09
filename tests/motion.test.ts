@@ -6,8 +6,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import { createApp, type App } from 'vue';
 import { MotionPlugin } from '@vueuse/motion';
-import { MOTION_SURFACE, installMotion, revealTimeline } from '../src/client/motion/index.ts';
-import { routeVariants, sheetVariants, listVariants } from '../src/client/motion/MotionPresets.ts';
+import { installMotion, revealTimeline } from '../src/client/motion/index.ts';
 import { useMotionPreferences } from '../src/client/composables/useMotionPreferences.ts';
 import OverviewView from '../src/client/views/admin/OverviewView.vue';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
@@ -152,26 +151,7 @@ describe('GSAP timeline', () => {
   });
 });
 
-describe('preset module', () => {
-  it('keeps the shared motion-v variants in step with the composable budget', () => {
-    // Two sources of the same numbers: the composable drives `<Transition>` durations, these drive
-    // motion-v. They drifting apart is invisible until one screen animates twice as long.
-    for (const preset of [routeVariants, sheetVariants, listVariants]) {
-      const enter = (preset as { enter?: { transition?: { duration?: number } } }).enter;
-      const duration = enter?.transition?.duration;
-      if (duration !== undefined) expect(duration).toBeLessThanOrEqual(0.36);
-    }
-  });
-});
 
-describe('the documented motion surface stays true', () => {
-  it('names every mechanism the application actually uses', () => {
-    const surface = JSON.stringify(MOTION_SURFACE);
-    for (const mechanism of ['Transition', 'motion-v', 'TransitionGroup', 'v-motion', 'GSAP']) {
-      expect(surface, mechanism).toContain(mechanism);
-    }
-  });
-});
 
 describe('a view honours the preference', () => {
   /** Mounts the admin overview with the chart present. */

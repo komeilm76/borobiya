@@ -9,7 +9,6 @@ import { useFormatters } from '../src/client/composables/useFormatters.ts';
 import { useMotionPreferences } from '../src/client/composables/useMotionPreferences.ts';
 import { useSosHold } from '../src/client/composables/useSosHold.ts';
 import { useCommandPalette } from '../src/client/composables/useCommandPalette.ts';
-import { listVariants, pulseVariants, routeVariants, sheetVariants } from '../src/client/motion/MotionPresets.ts';
 import { errorMessage } from '../src/client/api/client.ts';
 
 beforeEach(() => {
@@ -174,13 +173,14 @@ describe('motion preferences', () => {
     expect(motion.presets.value.list.enter).toBeTruthy();
   });
 
-  it('keeps the shared variant table short and documented', () => {
-    for (const [name, variant] of Object.entries({ routeVariants, sheetVariants, listVariants, pulseVariants })) {
+  it('keeps the shared variant table short and under the motion budget', () => {
+    const { page, sheet, list } = useMotionPreferences().presets.value;
+    for (const [name, variant] of Object.entries({ page, sheet, list })) {
       expect(variant, name).toBeTruthy();
       expect(Object.keys(variant).length, name).toBeGreaterThanOrEqual(2);
     }
     // Durations stay inside the 360ms motion budget so emergencies are never delayed by motion.
-    const json = JSON.stringify({ routeVariants, sheetVariants, listVariants, pulseVariants });
+    const json = JSON.stringify({ page, sheet, list });
     for (const duration of json.matchAll(/"duration":([\d.]+)/g)) {
       expect(Number(duration[1])).toBeLessThanOrEqual(0.36);
     }

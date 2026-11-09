@@ -1,6 +1,6 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
-import { MotionPlugin } from '@vueuse/motion';
+import { installMotion } from './motion/index.ts';
 import App from './App.vue';
 import { router } from './router/index.ts';
 import { vuetify } from './plugins/vuetify.ts';
@@ -18,7 +18,7 @@ const pinia = createPinia();
 app.use(pinia);
 app.use(router);
 app.use(vuetify);
-app.use(MotionPlugin);
+installMotion(app);
 
 const settings = useSettingsStore(pinia);
 settings.apply(settings.themeChoice);

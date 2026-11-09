@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import { useLocalStorage, useMediaQuery, usePreferredReducedMotion } from '@vueuse/core';
 
 /** Theme choice persisted in local storage. */
-export type ThemeChoice = 'system' | 'light' | 'dark';
+type ThemeChoice = 'system' | 'light' | 'dark';
 
 /** Canonical design tokens from `design/` — the single source of visual truth. */
 export const DESIGN_TOKENS = Object.freeze({

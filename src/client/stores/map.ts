@@ -5,7 +5,7 @@ import type { LiveFixView, MapConfigView, SavedPlaceView, ShareView } from '@/ap
 import { useGeolocation } from '@vueuse/core';
 
 /** Bottom-sheet detents of the mobile map. */
-export type SheetDetent = 'closed' | 'half' | 'open';
+type SheetDetent = 'closed' | 'half' | 'open';
 
 /**
  * Map state: the deterministic tile configuration, saved places, live shares,

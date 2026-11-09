@@ -1,13 +1,13 @@
 import type { AuthIdentity } from '../core/router.ts';
 import { badRequest, conflict, forbidden, notFound } from '../core/errors.ts';
 import { newId, sha256 } from '../core/crypto.ts';
-import { haversineMeters, type Point } from '../domain/geo.ts';
+import { haversineMeters, type Point } from '../../shared/geo.ts';
 import { transitionMission, transitionSos } from '../domain/state.ts';
 import type { SqlValue } from '../db/repository.ts';
 import { HTTP_EVENTS, MISSION_STATUS, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-export interface SosInput {
+interface SosInput {
   incidentTypeId: string;
   severity: 'low' | 'medium' | 'high';
   description: string;
@@ -18,7 +18,7 @@ export interface SosInput {
   photoDataUrl?: string;
 }
 
-export interface DispatchInput { groupId: string; responderIds: string[] }
+interface DispatchInput { groupId: string; responderIds: string[] }
 
 const SOS_SELECT = `
   SELECT s.*, i.label AS incidentLabel, i.icon AS incidentIcon, i.color AS incidentColor,

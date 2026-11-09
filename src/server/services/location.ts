@@ -3,11 +3,12 @@ import type { Peer } from '../core/websocket.ts';
 import { LruTtlCache } from '../core/cache.ts';
 import { newId } from '../core/crypto.ts';
 import { badRequest, forbidden, notFound } from '../core/errors.ts';
-import { isStale, isValidPoint, type Point } from '../domain/geo.ts';
+import { isStale, type Point } from '../../shared/geo.ts';
+import { isValidPoint } from '../domain/geo.ts';
 import { HTTP_EVENTS, ROLES, WS_EVENTS } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-export interface LiveFix extends Point {
+interface LiveFix extends Point {
   userId: string;
   accuracy: number;
   heading: number | null;
@@ -15,7 +16,7 @@ export interface LiveFix extends Point {
   recordedAt: number;
 }
 
-export interface ShareInput {
+interface ShareInput {
   recipientId: string;
   kind: 'live' | 'history';
   durationSeconds?: number;

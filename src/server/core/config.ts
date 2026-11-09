@@ -4,7 +4,7 @@
  * because every hosting provider, container image and reverse proxy already sets it;
  * the process itself is Bun.
  */
-export type RuntimeEnvironment = 'development' | 'production' | 'test';
+type RuntimeEnvironment = 'development' | 'production' | 'test';
 
 /** Fully resolved, validated runtime configuration. */
 export interface Config {
@@ -229,7 +229,7 @@ function frameAncestorSources(value: string): string[] {
 }
 
 /** Minimal request shape needed to derive the externally visible origin. */
-export interface OriginRequestLike {
+interface OriginRequestLike {
   headers: Headers;
 }
 

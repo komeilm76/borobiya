@@ -5,7 +5,7 @@ interface Bucket {
   updatedAt: number;
 }
 
-export interface RateLimitResult {
+interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterMs: number;

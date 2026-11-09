@@ -13,13 +13,13 @@ export interface TalkState {
   reason?: string;
 }
 
-export interface TalkStartResult {
+interface TalkStartResult {
   ok: boolean;
   state?: TalkState;
   reason?: string;
 }
 
-export interface AudioAuthorization {
+interface AudioAuthorization {
   ok: boolean;
   targetId?: string;
   reason?: string;

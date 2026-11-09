@@ -5,7 +5,7 @@ import type { RealtimeEvent } from '../../shared/protocol.ts';
 export type SqlValue = string | number | bigint | boolean | null | Uint8Array;
 export type Row = Record<string, unknown>;
 
-export interface RunResult {
+interface RunResult {
   changes: number;
   lastInsertRowid: number;
 }
@@ -18,7 +18,7 @@ interface EventRow extends Row {
   created_at: string;
 }
 
-export interface SyncIdentity {
+interface SyncIdentity {
   userId: string;
   role: string;
   sessionId: string;

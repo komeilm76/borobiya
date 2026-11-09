@@ -1,10 +1,10 @@
 import { readonly, ref } from 'vue';
 
 /** Visual tone of a toast message. */
-export type ToastTone = 'info' | 'success' | 'warning' | 'error';
+type ToastTone = 'info' | 'success' | 'warning' | 'error';
 
 /** A single toast notification. */
-export interface ToastMessage {
+interface ToastMessage {
   id: number;
   message: string;
   tone: ToastTone;

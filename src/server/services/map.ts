@@ -4,7 +4,7 @@ import { MAP_BOUNDS, MAP_CENTER, MAP_ORIGIN, MAP_ZOOM, renderMapTile } from '../
 import { CACHE } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-export interface CachedTile { svg: string; etag: string }
+interface CachedTile { svg: string; etag: string }
 
 export class MapService {
   private readonly tiles: LruTtlCache<string, CachedTile>;

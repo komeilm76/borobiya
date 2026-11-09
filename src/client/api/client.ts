@@ -23,7 +23,7 @@ export class ApiError extends Error {
 }
 
 /** Options accepted by {@link api}. */
-export interface ApiOptions {
+interface ApiOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   query?: Record<string, string | number | boolean | null | undefined>;

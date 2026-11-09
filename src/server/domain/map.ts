@@ -1,5 +1,5 @@
 import { worldCoordinate } from '../../shared/geo.ts';
-import { tileKey, validateTile, type TileCoordinate } from './geo.ts';
+import { validateTile, type TileCoordinate } from './geo.ts';
 
 export const MAP_CENTER = Object.freeze({ latitude: 35.7219, longitude: 51.3347 });
 export const MAP_ZOOM = 14;
@@ -130,7 +130,3 @@ export function renderMapTile(z: number, x: number, y: number): string | null {
     `</svg>`;
 }
 
-export function mapTileKey(z: number, x: number, y: number): string {
-  const tile = validateTile(z, x, y);
-  return tile ? tileKey(tile) : 'invalid';
-}

@@ -25,16 +25,15 @@ import {
   unsupportedMedia
 } from '../src/server/core/errors.ts';
 import {
-  cryptoRuntimeInfo,
   parseCookieHeader,
   randomInt,
   safeHexEqual,
   splitSessionToken,
   verifyPassword
 } from '../src/server/core/crypto.ts';
-import { boundingBox, tileKey, validateTile } from '../src/server/domain/geo.ts';
-import { mapTileKey, renderMapTile } from '../src/server/domain/map.ts';
-import { canCancelSos, missionStageIndex, transitionSos } from '../src/server/domain/state.ts';
+import { validateTile } from '../src/server/domain/geo.ts';
+import { renderMapTile } from '../src/server/domain/map.ts';
+import { transitionSos } from '../src/server/domain/state.ts';
 import {
   array,
   boolean,
@@ -46,8 +45,7 @@ import {
   password,
   queryObject,
   shape,
-  text,
-  withDefault
+  text
 } from '../src/server/core/validate.ts';
 import { displayText } from '../src/server/core/validate.ts';
 import { Repository } from '../src/server/db/repository.ts';
@@ -114,10 +112,6 @@ describe('crypto refusal paths', () => {
     expect(await verifyPassword('Whatever!2026', '$argon2id$v=19$corrupted')).toBe(false);
   });
 
-  it('describes the runtime without leaking parameters', () => {
-    expect(cryptoRuntimeInfo()).toEqual({ hasher: 'Bun.CryptoHasher', passwordAlgorithm: 'argon2id' });
-  });
-
   it('caps randomInt at the requested bound', () => {
     expect(randomInt(0)).toBe(0);
     expect(randomInt(-5)).toBe(0);
@@ -154,18 +148,6 @@ describe('domain state refusal paths', () => {
   it('refuses transitions from an unknown role', () => {
     expect(transitionSos('pending', 'cancel', 'audience')).toEqual({ ok: false, reason: 'unknown role' });
   });
-
-  it('indexes mission stages and reports unknown stages as -1', () => {
-    expect(missionStageIndex('on_the_way')).toBe(1);
-    expect(missionStageIndex('not_a_stage')).toBe(-1);
-  });
-
-  it('knows a terminal SOS can no longer be cancelled', () => {
-    expect(canCancelSos('pending')).toBe(true);
-    expect(canCancelSos('in_progress')).toBe(true);
-    expect(canCancelSos('completed')).toBe(false);
-    expect(canCancelSos('cancelled')).toBe(false);
-  });
 });
 
 describe('tile math edges', () => {
@@ -174,14 +156,6 @@ describe('tile math edges', () => {
     expect(validateTile(1.5, 0, 0)).toBe(null);
     expect(validateTile(10, -1, 0)).toBe(null);
     expect(validateTile(10.5, 0, 0)).toBe(null);
-  });
-
-  it('renders the canonical tile key', () => {
-    expect(tileKey({ z: 14, x: 1000, y: 1000 })).toBe('14/1000/1000');
-  });
-
-  it('returns null for an empty point set instead of InfiniteBounds', () => {
-    expect(boundingBox([])).toBe(null);
   });
 });
 
@@ -211,19 +185,10 @@ describe('validator refusal paths', () => {
     expect(() => parse(shape({ a: text() }), null, 'body')).toThrow('Invalid request.');
   });
 
-  it('omits absent optional keys and fills them only through withDefault', () => {
+  it('omits absent optional keys entirely from the parsed body', () => {
     const optionalOnly = shape({ required: text({ min: 1 }), maybe: optional(text({ min: 1 })) });
     expect(parse(optionalOnly, { required: 'x' }, 'body')).toEqual({ required: 'x' });
-
-    const withFallback = shape({ required: text({ min: 1 }), maybe: withDefault(text({ min: 1 }), 'fallback') });
-    expect(parse(withFallback, { required: 'x' }, 'body')).toEqual({ required: 'x', maybe: 'fallback' });
-    expect(parse(withFallback, { required: 'x', maybe: 'value' }, 'body')).toEqual({ required: 'x', maybe: 'value' });
-  });
-
-  it('withDefault falls back on undefined and null but keeps real values', () => {
-    expect(withDefault(text({ min: 1 }), 'fb')(undefined, 'field')).toBe('fb');
-    expect(withDefault(text({ min: 1 }), 'fb')(null, 'field')).toBe('fb');
-    expect(withDefault(text({ min: 1 }), 'fb')('real', 'field')).toBe('real');
+    expect(parse(optionalOnly, { required: 'x', maybe: 'value' }, 'body')).toEqual({ required: 'x', maybe: 'value' });
   });
 });
 
@@ -688,13 +653,6 @@ describe('share expiry maintenance', () => {
 });
 
 describe('map tile rendering edges', () => {
-  it('renders the SPA-time tile key and refuses invalid coordinates', () => {
-    expect(mapTileKey(14, 10533, 6459)).toBe('14/10533/6459');
-    expect(mapTileKey(-1, 0, 0)).toBe('invalid');
-    expect(mapTileKey(3.5, 0, 0)).toBe('invalid');
-    expect(mapTileKey(0, 0, 1)).toBe('invalid');
-  });
-
   it('draws the Persian street labels only for tiles that contain them', () => {
     // Deterministic vector tiles: the tile covering the دانشگاه label must carry it, an
     // out-of-bounds neighbour must validate to null instead of rendering a corrupt SVG.

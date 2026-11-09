@@ -8,8 +8,8 @@ import type { AppContext } from './context.ts';
 
 export interface UserFilters { q?: string; role?: string; active?: boolean; page: number; limit: number }
 export interface AuditFilters { from: number; to: number; action?: string; q?: string; limit: number }
-export interface GroupInput { name: string; color: string; capacity: number; incidentIds: string[]; status?: string }
-export interface NewUserInput { username: string; password: string; role: string }
+interface GroupInput { name: string; color: string; capacity: number; incidentIds: string[]; status?: string }
+interface NewUserInput { username: string; password: string; role: string }
 
 const SETTINGS_KEYS = new Set(['sos_auto_dispatch', 'default_dispatch_radius_m', 'mission_ready_required', 'maintenance_mode']);
 

@@ -4,7 +4,7 @@ import { useMapStore } from '@/stores/map.ts';
 import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import type { MotionPreferences } from '@/composables/useMotionPreferences.ts';
-import { worldCoordinate } from '@shared/geo.ts';
+import { visibleTileRange, worldCoordinate } from '@shared/geo.ts';
 
 /**
  * Deterministic vector map surface. Tiles come from the same in-process SVG renderer the
@@ -30,13 +30,7 @@ const VIEW_WIDTH = 393;
 const VIEW_HEIGHT = 852;
 
 const tiles = computed(() => {
-  const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
-  const centerX = origin.x;
-  const centerY = origin.y;
-  const xMin = Math.floor((centerX - VIEW_WIDTH / 2) / TILE_SIZE);
-  const xMax = Math.floor((centerX + VIEW_WIDTH / 2) / TILE_SIZE);
-  const yMin = Math.floor((centerY - VIEW_HEIGHT / 2) / TILE_SIZE);
-  const yMax = Math.floor((centerY + VIEW_HEIGHT / 2) / TILE_SIZE);
+  const { xMin, xMax, yMin, yMax, centerX, centerY } = visibleTileRange(center.value, zoom.value, VIEW_WIDTH, VIEW_HEIGHT, TILE_SIZE);
   const output: Array<{ key: string; url: string; left: number; top: number }> = [];
   const max = 2 ** zoom.value;
   for (let x = xMin; x <= xMax; x++) {

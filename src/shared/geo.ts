@@ -10,13 +10,13 @@ export interface Point {
 }
 
 /** Web Mercator pixel coordinate at a given zoom level. */
-export interface WorldCoordinate {
+interface WorldCoordinate {
   x: number;
   y: number;
 }
 
 /** Inclusive tile range covering a viewport, with the centre in world pixels. */
-export interface TileRange {
+interface TileRange {
   xMin: number;
   xMax: number;
   yMin: number;
@@ -88,22 +88,6 @@ export function visibleTileRange(center: Point, zoom: number, width: number, hei
     centerX: centerWorld.x,
     centerY: centerWorld.y
   };
-}
-
-/**
- * Initial bearing from one point to another, in degrees clockwise from north.
- *
- * @param from Origin point.
- * @param to Destination point.
- * @returns Bearing in degrees in the range 0-360.
- */
-export function bearingDegrees(from: Point, to: Point): number {
-  const lat1 = from.latitude * DEG_TO_RAD;
-  const lat2 = to.latitude * DEG_TO_RAD;
-  const delta = (to.longitude - from.longitude) * DEG_TO_RAD;
-  const y = Math.sin(delta) * Math.cos(lat2);
-  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(delta);
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
 }
 
 /**

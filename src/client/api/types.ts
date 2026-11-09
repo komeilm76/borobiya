@@ -81,7 +81,6 @@ export interface SosView {
   accuracy: number;
   status: SosStatus;
   cancellationReasonId?: string | null;
-  stageIndex?: number;
   createdAt: number;
   updatedAt: number;
   mission?: MissionView | null;
@@ -90,7 +89,7 @@ export interface SosView {
 }
 
 /** One entry in the SOS timeline. */
-export interface TimelineEntry {
+interface TimelineEntry {
   action: string;
   fromStatus: string;
   toStatus: string;

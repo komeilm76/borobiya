@@ -32,7 +32,7 @@ import { createServices } from './services/index.ts';
 import { registerRoutes } from './routes/index.ts';
 
 /** Address information returned by {@link BorobiyaApp.listen}. */
-export interface ListenResult {
+interface ListenResult {
   host: string;
   port: number;
   url: string;

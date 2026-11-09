@@ -4,7 +4,7 @@ import { RealtimeClient } from '@/utils/realtime-client.ts';
 import type { RealtimeEvent } from '@shared/protocol.ts';
 
 /** Connection state surfaced to offline and status surfaces. */
-export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
+type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'disconnected' | 'error';
 
 /**
  * Owns the single authenticated WebSocket for the signed-in session.

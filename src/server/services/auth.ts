@@ -9,10 +9,10 @@ import { SECURITY_QUESTIONS } from '../domain/catalog.ts';
 import { HTTP_EVENTS, ROLES } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-export interface RegisterQuestion { questionId: string; answer: string }
-export interface RegisterInput { username: string; password: string; securityQuestions: RegisterQuestion[] }
-export interface LoginInput { username: string; password: string; deviceId?: string; deviceName?: string }
-export interface RecoveryAnswer { questionId: string; answer: string }
+interface RegisterQuestion { questionId: string; answer: string }
+interface RegisterInput { username: string; password: string; securityQuestions: RegisterQuestion[] }
+interface LoginInput { username: string; password: string; deviceId?: string; deviceName?: string }
+interface RecoveryAnswer { questionId: string; answer: string }
 
 export interface SessionView extends AuthIdentity {
   tokenHash: string;

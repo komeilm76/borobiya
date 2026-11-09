@@ -23,7 +23,7 @@ export interface Peer {
 }
 
 /** Options accepted by {@link WebSocketHub}. */
-export interface WebSocketHubOptions {
+interface WebSocketHubOptions {
   path: string;
   maxFrameBytes: number;
   heartbeatMs: number;

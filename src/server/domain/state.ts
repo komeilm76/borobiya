@@ -1,6 +1,6 @@
-import { MISSION_STATUS, MISSION_STAGES, ROLES, SOS_STATUS, SOS_STAGES } from '../../shared/protocol.ts';
+import { MISSION_STATUS, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
 
-export type TransitionResult =
+type TransitionResult =
   | { ok: true; next: string }
   | { ok: false; reason?: string };
 
@@ -33,35 +33,3 @@ export function transitionMission(status: string, action: string): TransitionRes
   return next ? { ok: true, next } : { ok: false, reason: `transition ${status} + ${action} is not allowed` };
 }
 
-export function sosStageIndex(status: string): number {
-  const mapping: Record<string, number> = {
-    [SOS_STATUS.PENDING]: 0,
-    [SOS_STATUS.DISPATCHED]: 1,
-    [SOS_STATUS.ACCEPTED]: 2,
-    [SOS_STATUS.IN_PROGRESS]: 3,
-    [SOS_STATUS.COMPLETED]: 4,
-    [SOS_STATUS.CANCELLED]: -1,
-    [SOS_STATUS.EXPIRED]: -1
-  };
-  return mapping[status] ?? -1;
-}
-
-export function missionStageIndex(status: string): number {
-  return (MISSION_STAGES as readonly string[]).indexOf(status);
-}
-
-export const SOS_STAGE_COUNT = SOS_STAGES.length;
-export const MISSION_STAGE_COUNT = MISSION_STAGES.length;
-
-const TERMINAL_STATUSES: readonly string[] = [
-  SOS_STATUS.COMPLETED, SOS_STATUS.CANCELLED, SOS_STATUS.EXPIRED,
-  MISSION_STATUS.COMPLETED, MISSION_STATUS.CANCELLED
-];
-
-export function isTerminal(status: string): boolean {
-  return TERMINAL_STATUSES.includes(status);
-}
-
-export function canCancelSos(status: string): boolean {
-  return !isTerminal(status);
-}

@@ -8,7 +8,7 @@ import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, SECUR
 export const SCHEMA_VERSION = 2;
 
 /** A Bun SQLite database handle. */
-export type SqliteDatabase = sqlite.Database;
+type SqliteDatabase = sqlite.Database;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS meta (

@@ -1,5 +1,3 @@
-import type { Config } from './config.ts';
-
 /**
  * Cryptographic helpers built on Bun primitives only: `Bun.CryptoHasher`,
  * `Bun.password` (Argon2id) and the Web Crypto random source.
@@ -169,19 +167,3 @@ export function randomInt(max: number): number {
   return Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * max);
 }
 
-/** Number of random bytes used by password hashes; exported for diagnostics. */
-export const PASSWORD_KEY_BYTES = KEY_BYTES;
-
-/** Runtime environment descriptor surfaced by the health endpoint. */
-export interface CryptoRuntimeInfo {
-  hasher: 'Bun.CryptoHasher';
-  passwordAlgorithm: 'argon2id';
-}
-
-/** Describes the active crypto implementation for health output and documentation tests. */
-export function cryptoRuntimeInfo(): CryptoRuntimeInfo {
-  return { hasher: 'Bun.CryptoHasher', passwordAlgorithm: 'argon2id' };
-}
-
-/** Re-exported so callers can reference the runtime config type without another import. */
-export type { Config };

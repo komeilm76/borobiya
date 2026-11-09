@@ -11,8 +11,8 @@ import {
 import { loadConfig, originAllowed, parseDotEnv } from '../src/server/core/config.ts';
 import { RateLimiters } from '../src/server/core/rate-limit.ts';
 import { boolean, number, oneOf, parse, shape, text } from '../src/server/core/validate.ts';
-import { boundingBox, isValidPoint, tileBounds, validateTile } from '../src/server/domain/geo.ts';
-import { isTerminal, sosStageIndex, transitionMission, transitionSos } from '../src/server/domain/state.ts';
+import { isValidPoint, validateTile } from '../src/server/domain/geo.ts';
+import { transitionMission, transitionSos } from '../src/server/domain/state.ts';
 import { MAP_CENTER, MAP_ZOOM, renderMapTile } from '../src/server/domain/map.ts';
 import {
   formatDistance,
@@ -89,18 +89,12 @@ describe('core primitives', () => {
     expect(range.yMax).toBeGreaterThanOrEqual(range.yMin);
     expect(isValidPoint({ latitude: 91, longitude: 10 })).toBe(false);
     expect(validateTile(14, 2 ** 14, 0)).toBeNull();
-    const box = boundingBox([tehran, nearby]);
-    expect(box && box.maxLatitude >= box.minLatitude).toBe(true);
     expect(formatDistance(1250)).toMatch(/[۰-۹]/);
     expect(toPersianDigits(2026)).toBe('۲۰۲۶');
   });
 
-  it('tile validation, bounds and offline SVG rendering are deterministic', () => {
-    const tile = validateTile(14, 1000, 1000);
-    expect(tile).toBeTruthy();
-    const bounds = tileBounds(tile!);
-    expect(bounds.east).toBeGreaterThan(bounds.west);
-    expect(bounds.north).toBeGreaterThan(bounds.south);
+  it('tile validation and offline SVG rendering are deterministic', () => {
+    expect(validateTile(14, 1000, 1000)).toBeTruthy();
     const first = renderMapTile(14, 1000, 1000);
     const second = renderMapTile(14, 1000, 1000);
     expect(first?.startsWith('<svg')).toBe(true);
@@ -109,14 +103,11 @@ describe('core primitives', () => {
     expect(first?.includes(MAP_CENTER.latitude.toString()) || first?.includes('bb-map-land')).toBe(true);
   });
 
-  it('state machines reject impossible transitions and expose stage indices', () => {
+  it('state machines reject impossible transitions', () => {
     expect(transitionSos(SOS_STATUS.PENDING, 'dispatch', ROLES.ADMIN)).toEqual({ ok: true, next: SOS_STATUS.DISPATCHED });
     expect(transitionSos(SOS_STATUS.COMPLETED, 'dispatch', ROLES.ADMIN).ok).toBe(false);
     expect(transitionSos(SOS_STATUS.PENDING, 'cancel', ROLES.RESPONDER).ok).toBe(false);
     expect(transitionMission(MISSION_STATUS.ON_THE_WAY, 'arrive')).toEqual({ ok: true, next: MISSION_STATUS.ARRIVED });
-    expect(sosStageIndex(SOS_STATUS.ACCEPTED)).toBe(2);
-    expect(isTerminal(SOS_STATUS.CANCELLED)).toBe(true);
-    expect(isTerminal(SOS_STATUS.PENDING)).toBe(false);
   });
 
   it('configuration enforces explicit origins and safe defaults', () => {
@@ -189,8 +180,3 @@ describe('dotenv parsing', () => {
   });
 });
 
-describe('stage index fallback', () => {
-  it('reports -1 for a status the mapping does not know', () => {
-    expect(sosStageIndex('definitely-not-a-status')).toBe(-1);
-  });
-});

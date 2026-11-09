@@ -2,7 +2,7 @@ import type { WebSocketHub } from '../core/websocket.ts';
 import type { RealtimeEvent } from '../../shared/protocol.ts';
 import type { Repository } from './repository.ts';
 
-export interface Transaction {
+interface Transaction {
   readonly repo: Repository;
   event(type: string, payload: unknown, audience: string[]): RealtimeEvent;
 }

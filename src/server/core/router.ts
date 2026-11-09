@@ -2,7 +2,7 @@ import type { Config } from './config.ts';
 import type { Validator } from './validate.ts';
 import type { RateRule } from './rate-limit.ts';
 
-export type AuthMode = 'none' | 'user' | 'admin';
+type AuthMode = 'none' | 'user' | 'admin';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface AuthIdentity {
@@ -33,7 +33,7 @@ export interface RequestContext<App = unknown> {
 }
 
 /** JSON envelope result. The handler must say the status; payloads may be empty (void endpoints). */
-export interface JsonRouteResult {
+interface JsonRouteResult {
   status: number;
   data?: unknown;
   headers?: Record<string, string>;
@@ -41,7 +41,7 @@ export interface JsonRouteResult {
 }
 
 /** Raw (non-envelope) result, e.g. CSV, SVG or other downloads. Raw responses never set cookies. */
-export interface RawRouteResult {
+interface RawRouteResult {
   status: number;
   raw: string;
   contentType: string;
@@ -51,9 +51,9 @@ export interface RawRouteResult {
   headers?: Record<string, string>;
 }
 
-export type RouteResult = JsonRouteResult | RawRouteResult;
+type RouteResult = JsonRouteResult | RawRouteResult;
 
-export interface RouteDefinition<App = unknown> {
+interface RouteDefinition<App = unknown> {
   method: HttpMethod;
   path: string;
   auth: AuthMode;
@@ -65,7 +65,7 @@ export interface RouteDefinition<App = unknown> {
   tags?: string[];
 }
 
-export interface RouteMatch<App = unknown> {
+interface RouteMatch<App = unknown> {
   route: RouteDefinition<App>;
   params: Record<string, string>;
 }

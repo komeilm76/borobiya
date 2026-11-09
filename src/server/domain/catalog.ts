@@ -1,5 +1,5 @@
 /** Stable catalog values shared by the database seed and the browser. UI labels follow the Persian reference designs. */
-export interface CatalogItem {
+interface CatalogItem {
   id: string;
   label: string;
   icon?: string;

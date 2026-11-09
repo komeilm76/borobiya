@@ -5,7 +5,7 @@ import type { CancellationReasonView, IncidentTypeView, MissionView, SosView } f
 import { MISSION_STATUS, SOS_STATUS } from '@shared/protocol.ts';
 
 /** Four-step SOS composition draft. */
-export interface SosDraft {
+interface SosDraft {
   step: number;
   severity: 'low' | 'medium' | 'high';
   incidentTypeId: string;

@@ -12,7 +12,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
-export interface TextOptions {
+interface TextOptions {
   min?: number;
   max?: number;
   pattern?: RegExp;
@@ -58,7 +58,7 @@ export const password: Validator<string> = (value, path = 'password') => {
 export const loginSecret: Validator<string> = (value, path = 'password') =>
   text({ min: 1, max: 128, trim: false })(value, path);
 
-export interface NumberOptions { min?: number; max?: number; integer?: boolean }
+interface NumberOptions { min?: number; max?: number; integer?: boolean }
 export function number(options: NumberOptions = {}): Validator<number> {
   const { min = -Number.MAX_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, integer = false } = options;
   return (value, path = 'value') => {
@@ -126,10 +126,6 @@ export function shape<T extends ShapeSpec>(spec: T, options: { allowUnknown?: bo
 
 export function optional<T>(validator: Validator<T>): Validator<T | undefined> {
   return (value, path) => (value === undefined || value === null ? undefined : validator(value, path));
-}
-
-export function withDefault<T>(validator: Validator<T>, fallback: T): Validator<T> {
-  return (value, path) => (value === undefined || value === null ? fallback : validator(value, path));
 }
 
 export function queryObject(searchParams: URLSearchParams): Record<string, string> {

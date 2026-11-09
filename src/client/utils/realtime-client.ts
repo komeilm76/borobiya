@@ -2,7 +2,7 @@ import { post } from '@/api/client.ts';
 import { WS_CLOSE, WS_EVENTS, type RealtimeEvent } from '@shared/protocol.ts';
 
 /** Listener signature for every realtime channel. */
-export type RealtimeListener = (payload: any) => void;
+type RealtimeListener = (payload: any) => void;
 
 /** Ticket payload returned by `POST /_user/realtime/ticket`. */
 interface TicketResponse {

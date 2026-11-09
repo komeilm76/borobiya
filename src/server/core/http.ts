@@ -4,7 +4,7 @@ import { forbidden, payloadTooLarge, publicError, unsupportedMedia } from './err
 import { sha256 } from './crypto.ts';
 
 /** Options controlling a buffered response write. */
-export interface WriteOptions {
+interface WriteOptions {
   contentType?: string;
   cacheControl?: string;
   etag?: string;

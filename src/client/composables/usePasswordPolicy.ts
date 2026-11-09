@@ -11,13 +11,13 @@
  */
 
 /** Shortest accepted password. */
-export const PASSWORD_MIN_LENGTH = 12;
+const PASSWORD_MIN_LENGTH = 12;
 
 /** Longest accepted password. */
-export const PASSWORD_MAX_LENGTH = 128;
+const PASSWORD_MAX_LENGTH = 128;
 
 /** A named rule violation, so a caller can place the message where it belongs. */
-export type PasswordIssue = 'length' | 'composition' | null;
+type PasswordIssue = 'length' | 'composition' | null;
 
 /**
  * Checks a candidate password against the policy.

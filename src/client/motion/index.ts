@@ -2,15 +2,6 @@ import type { App } from 'vue';
 import { MotionPlugin } from '@vueuse/motion';
 import { gsap } from 'gsap';
 
-/** Motion features used by the application; documented for the performance gate. */
-export const MOTION_SURFACE = Object.freeze({
-  route: 'Vue <Transition> with a 160–240ms fade/slide that collapses to 0ms under reduced motion',
-  sheet: 'motion-v spring transition for the mobile map sheet',
-  list: '<TransitionGroup> for live SOS, mission and alert rows',
-  directive: '@vueuse/motion v-motion directives on cards and command palette',
-  timeline: 'GSAP timelines for the SOS rail and administrator chart reveals only'
-});
-
 /**
  * Installs the VueUse motion plugin (v-motion directives and variants).
  *

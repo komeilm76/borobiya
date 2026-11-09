@@ -4,7 +4,7 @@ import { newId } from '../core/crypto.ts';
 import { HTTP_EVENTS, ROLES } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
-export interface PlaceInput {
+interface PlaceInput {
   name: string;
   label: string;
   latitude: number;

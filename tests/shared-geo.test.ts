@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  bearingDegrees,
   clamp,
   formatClock,
   formatDistance,
@@ -16,7 +15,7 @@ import {
 /**
  * The shared geometry and Persian display helpers are the one module both the Bun server and the
  * Vue client import. They are pure, so these tests pin down exact, checkable properties rather than
- * smoke behaviour: cardinal bearings, polar clamping, Persian digit rendering and the stale-fix
+ * smoke behaviour: polar clamping, Persian digit rendering and the stale-fix
  * policy.
  */
 
@@ -78,30 +77,6 @@ describe('visibleTileRange', () => {
   });
 });
 
-describe('bearingDegrees', () => {
-  it('points due north, east, south and west', () => {
-    const origin = TEHRAN;
-    expect(bearingDegrees(origin, { latitude: origin.latitude + 0.5, longitude: origin.longitude })).toBeCloseTo(0, 1);
-    // A great-circle bearing due east is not exactly 90° away from the equator; 89.85° is correct.
-    expect(bearingDegrees(origin, { latitude: origin.latitude, longitude: origin.longitude + 0.5 })).toBeCloseTo(90, 0);
-    expect(bearingDegrees(origin, { latitude: origin.latitude - 0.5, longitude: origin.longitude })).toBeCloseTo(180, 1);
-    expect(bearingDegrees(origin, { latitude: origin.latitude, longitude: origin.longitude - 0.5 })).toBeCloseTo(270, 0);
-  });
-
-  it('always returns a value in [0, 360)', () => {
-    const far = { latitude: 36.0, longitude: 52.5 };
-    const bearing = bearingDegrees(TEHRAN, far);
-    expect(bearing).toBeGreaterThanOrEqual(0);
-    expect(bearing).toBeLessThan(360);
-    // A point to the north-east must land in the first quadrant.
-    expect(bearing).toBeGreaterThan(0);
-    expect(bearing).toBeLessThan(90);
-    // A point to the south-east lands in the second quadrant.
-    const southEast = bearingDegrees(TEHRAN, { latitude: 34.0, longitude: 52.5 });
-    expect(southEast).toBeGreaterThan(90);
-    expect(southEast).toBeLessThan(180);
-  });
-});
 
 describe('isStale', () => {
   const now = 1_800_000_000_000;

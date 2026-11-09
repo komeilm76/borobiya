@@ -3,7 +3,7 @@ import { useAuthStore } from '@/stores/auth.ts';
 import { ROLES } from '@shared/protocol.ts';
 
 /** Layout a route renders into. */
-export type RouteLayout = 'auth' | 'map' | 'admin';
+type RouteLayout = 'auth' | 'map' | 'admin';
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -42,7 +42,7 @@ export const ROUTE_NAMES = Object.freeze({
   adminSettings: 'admin-settings'
 } as const);
 
-export type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES];
+type RouteName = (typeof ROUTE_NAMES)[keyof typeof ROUTE_NAMES];
 
 /**
  * The route table. Views are lazily loaded so the initial shell stays small,
