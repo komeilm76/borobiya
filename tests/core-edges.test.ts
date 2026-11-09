@@ -219,6 +219,24 @@ describe('validator refusal paths', () => {
   });
 });
 
+describe('repository event append edges', () => {
+  it('normalises a null payload to an empty object on write and on return', () => {
+    const database = new Database(':memory:');
+    database.exec(`CREATE TABLE events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL,
+      payload_json TEXT NOT NULL,
+      audience_json TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    )`);
+    const repo = new Repository(database);
+    const event = repo.appendEvent('test.edge', null, ['all']);
+    expect(event.payload).toEqual({});
+    const stored = database.prepare('SELECT payload_json FROM events WHERE type=?').get('test.edge') as { payload_json: string };
+    expect(JSON.parse(stored.payload_json)).toEqual({});
+  });
+});
+
 describe('repository corruption tolerance', () => {
   function seedCorruptEvents(): Repository {
     const database = new Database(':memory:');

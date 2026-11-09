@@ -344,3 +344,46 @@ describe('admin store resilience', () => {
     expect(calls.some((entry) => entry.startsWith('GET /_admin/dispatch'))).toBe(true);
   });
 });
+
+describe('admin store envelope resilience', () => {
+  it('falls back to empty arrays when a list envelope carries no items', async () => {
+    const admin = useAdminStore();
+    vi.stubGlobal('fetch', vi.fn(async () => envelope({})));
+
+    await admin.loadGroups();
+    expect(admin.groups).toEqual([]);
+    await admin.loadAlerts();
+    expect(admin.alerts).toEqual([]);
+    await admin.loadSettings();
+    expect(admin.settings).toEqual([]);
+    await admin.loadIncidentTypes();
+    expect(admin.incidentTypes).toEqual([]);
+
+    // The dispatch board carries three list envelopes; an items-less one must not leak undefined.
+    await admin.loadDispatch();
+    expect(admin.groups).toEqual([]);
+    expect(admin.incidentTypes).toEqual([]);
+  });
+
+  const failingLoaders = [
+    { name: 'loadOverview', run: (admin: any) => admin.loadOverview(), isUntouched: (admin: any) => admin.overview === null },
+    { name: 'loadDispatch', run: (admin: any) => admin.loadDispatch(), isUntouched: (admin: any) => admin.dispatchQueue === null },
+    { name: 'loadUsers', run: (admin: any) => admin.loadUsers(), isUntouched: (admin: any) => admin.users === null },
+    { name: 'loadAudit', run: (admin: any) => admin.loadAudit(), isUntouched: (admin: any) => admin.audit === null },
+    { name: 'loadSettings', run: (admin: any) => admin.loadSettings(), isUntouched: (admin: any) => admin.settings.length === 0 },
+    { name: 'loadIncidentTypes', run: (admin: any) => admin.loadIncidentTypes(), isUntouched: (admin: any) => admin.incidentTypes.length === 0 },
+    { name: 'loadHealth', run: (admin: any) => admin.loadHealth(), isUntouched: (admin: any) => admin.health === null }
+  ];
+
+  for (const { name, run, isUntouched } of failingLoaders) {
+    it(`keeps prior state and reports the failure when ${name} cannot reach the server`, async () => {
+      const admin = useAdminStore();
+      vi.stubGlobal('fetch', vi.fn(async () => failure(503, 'UNAVAILABLE', 'خدمات در دسترس نیست.')));
+
+      await run(admin);
+      expect(admin.error).toBe('خدمات در دسترس نیست.');
+      expect(admin.loading).toBe(false);
+      expect(isUntouched(admin)).toBe(true);
+    });
+  }
+});
