@@ -11,11 +11,23 @@ export function resultMarkerOffsets(places: readonly GeocodeResult[]): Map<strin
   }
   const offsets = new Map<string, [number, number]>();
   for (const group of groups.values()) {
+    if (group.length === 1) { offsets.set(group[0]!.placeId, [0, 0]); continue; }
+    // All callouts in a duplicate group use the same radius. An individual
+    // radius per result can pull two neighboring labels back into each other.
+    const angles = group.map((_, index) => 2 * Math.PI * index / group.length - Math.PI / 2);
+    const width = group.length > 12 ? 128 : 168; // Matches the capped CSS widths.
+    let radius = 0;
+    for (let i = 0; i < group.length; i++) {
+      for (let j = i + 1; j < group.length; j++) {
+        const dx = Math.abs(Math.cos(angles[i]!) - Math.cos(angles[j]!));
+        const dy = Math.abs(Math.sin(angles[i]!) - Math.sin(angles[j]!));
+        // Clearing either axis separates these 48px-tall rectangles. Add a
+        // gap before rounding the pixel offsets and cap name width in CSS.
+        radius = Math.max(radius, Math.min(dx ? (width + 12) / dx : Infinity, dy ? 60 / dy : Infinity));
+      }
+    }
     group.forEach((place, index) => {
-      if (group.length === 1) { offsets.set(place.placeId, [0, 0]); return; }
-      const angle = 2 * Math.PI * index / group.length - Math.PI / 2;
-      // Keep 44px targets separated among hits within this bbox snapshot.
-      const radius = group.length < 4 ? 32 : Math.max(44, Math.ceil(group.length * 48 / (2 * Math.PI)));
+      const angle = angles[index]!;
       offsets.set(place.placeId, [Math.round(radius * Math.cos(angle)), Math.round(radius * Math.sin(angle))]);
     });
   }

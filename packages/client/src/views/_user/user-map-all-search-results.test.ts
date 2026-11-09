@@ -26,6 +26,30 @@ describe("show all current POIs on the map", () => {
     expect(css.code).toContain(".place-search__show-all");
     expect(css.code).toContain("min-height: 44px");
   });
+  it("shows named, keyboard-reachable place callouts rather than number-only circles", () => {
+    const sync = body("syncResultMarkers");
+    for (const part of ['document.createElement("bdi")', 'name.textContent = place.name',
+      'address.textContent = place.address', 'button.append(badge, copy, affordance)',
+      'anchor: "bottom"', 'button.setAttribute("aria-label"',
+      'placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId)',
+      'button.addEventListener("keydown"', 'button.setAttribute("title",']) {
+      expect(sync).toContain(part);
+    }
+    expect(sync).not.toContain('button.innerHTML'); // Never render Photon strings as markup.
+    expect(view).toContain('class="user-map-view__search-map-actions"');
+    expect(view).toContain('aria-label="بازگشت به فهرست نتایج جست‌وجو"');
+    expect(view).toContain('@click="selectTool(\'search\')"');
+    const { descriptor } = parse(view, { filename: "UserMapView.vue" });
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
+    expect(css.errors).toEqual([]);
+    for (const part of ['.user-map-view__result-marker__badge', '.user-map-view__result-marker__name',
+      '.user-map-view__result-marker__address', '.user-map-view__result-marker:hover',
+      '.user-map-view__result-marker:focus-visible', 'text-overflow: ellipsis',
+      ':root.dark .user-map-view .user-map-view__result-marker', '@media (forced-colors: active)']) {
+      expect(css.code).toContain(part);
+    }
+  });
+
   it("validates the current snapshot, fits all in-bounds POIs and dismisses only the phone dialog", () => {
     const show = body("showAllSearchResults");
     expect(show).toContain("placeSearch.results.value");

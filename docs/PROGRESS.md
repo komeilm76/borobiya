@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Name the search results on the map
+
+- After «نمایش همهٔ نتایج روی نقشه», each result is now a numbered, always-visible place-name callout instead of an anonymous numbered circle. Names truncate within a capped chip; address detail appears on hover/keyboard focus, the full address remains in the button's accessible name and title, and selection still opens the existing place/route flow. On phones a compact count and «فهرست نتایج» action reopen the search list without discarding the current map results; the refit action remains. Exact-coordinate duplicates spread according to the callout footprint rather than a 44px circle, while invalidated results and map teardown retain their existing cleanup. Strings are inserted as DOM text, never HTML. Nonmounted source/CSS and geometry regressions cover the change; large duplicate groups may extend beyond a small viewport, where the list is the reliable fallback. Rendered map, touch, screen-reader and real search acceptance remain open.
+
 ### 2026-10-23 — Distinguish remaining and traveled route during map guidance
 
 - The selected route is now split at a trustworthy, near-route GPS projection during active `/_user/map` guidance: the remaining segment is drawn as a prominent green 8px line, and the completed segment as a thinner, lower-opacity slate line beneath it. Route alternatives and the full selected line remain unchanged in planning, and no distance is marked traveled from weak/missing/off-route fixes. Progress only moves forward on the same selected route; starting again or receiving a new reroute resets it. The completed MapLibre layer participates in style-reload restoration and route cleanup. Pure geometry/GPS tests and nonmounted view contracts cover the split, jitter and teardown; rendered map and live GPS acceptance remain open.

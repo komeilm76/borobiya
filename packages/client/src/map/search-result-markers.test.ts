@@ -23,6 +23,19 @@ describe("map search result geometry", () => {
     expect(new Set([...offsets.values()].map(([x, y]) => `${x}:${y}`)).size).toBe(5);
     expect(resultExtent(hits)).toEqual([[51.4, 35.7], [51.4, 35.7]]);
   });
+  it("keeps named callouts at repeated coordinates from covering one another", () => {
+    for (const count of [2, 3, 5, 12, 30]) {
+      const hits = Array.from({ length: count }, (_, i) => place(`repeat-${i}`, 51.4, 35.7));
+      const offsets = [...resultMarkerOffsets(hits).values()];
+      const width = count > 12 ? 128 : 168;
+      for (let i = 0; i < offsets.length; i++) {
+        for (let j = i + 1; j < offsets.length; j++) {
+          const [x, y] = offsets[i]!, [otherX, otherY] = offsets[j]!;
+          expect(Math.abs(x - otherX) >= width + 8 || Math.abs(y - otherY) >= 48 + 8).toBe(true);
+        }
+      }
+    }
+  });
   it("spreads a bounded collection of repeated coordinates into distinct tappable positions", () => {
     const hits = Array.from({ length: 30 }, (_, i) => place(`repeat-${i}`, 51.4, 35.7));
     const offsets = [...resultMarkerOffsets(hits).values()];

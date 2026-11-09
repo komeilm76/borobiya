@@ -12,12 +12,13 @@
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
          again after zooming into one without reopening the full-screen dialog. -->
     <div v-if="isPhone && showAllResultsOnMap && !journey.sheetOpen.value && !journey.navigating.value" v-show="!activeTool"
-      class="user-map-view__search-map-actions">
+      class="user-map-view__search-map-actions" role="group" aria-label="نتایج جست‌وجو روی نقشه">
+      <span class="user-map-view__search-map-count">{{ placeSearch.mapResults.value.length.toLocaleString('fa-IR') }} نتیجه روی نقشه</span>
+      <v-btn color="primary" variant="tonal" prepend-icon="mdi-format-list-bulleted" size="small"
+        aria-label="بازگشت به فهرست نتایج جست‌وجو" @click="selectTool('search')">فهرست نتایج</v-btn>
       <v-btn color="primary" variant="flat" prepend-icon="mdi-map-marker-multiple" size="small"
         :disabled="!placeSearch.mapResults.value.length" aria-label="نمایش دوبارهٔ همهٔ نتایج روی نقشه"
-        @click="showAllSearchResults">
-        همهٔ نتایج ({{ placeSearch.mapResults.value.length.toLocaleString('fa-IR') }})
-      </v-btn>
+        @click="showAllSearchResults">نمایش همه</v-btn>
       <span v-if="placeSearch.loading.value" role="status">در حال به‌روزرسانی نتایج…</span>
       <template v-else-if="placeSearch.failed.value">
         <span role="alert">به‌روزرسانی ناموفق؛ فقط نتایج داخل محدوده.</span>
@@ -910,11 +911,26 @@ function syncResultMarkers(): void {
       const button = document.createElement("button");
       button.type = "button";
       button.className = "user-map-view__result-marker";
-      button.setAttribute("aria-haspopup", "dialog");
+      button.dir = "rtl";
       button.setAttribute("aria-controls", "map-point-route-sheet");
+      const badge = document.createElement("span");
+      badge.className = "user-map-view__result-marker__badge";
+      badge.setAttribute("aria-hidden", "true");
       const number = document.createElement("span");
-      number.setAttribute("aria-hidden", "true");
-      button.append(number);
+      badge.append(number);
+      const copy = document.createElement("span");
+      copy.className = "user-map-view__result-marker__copy";
+      const name = document.createElement("bdi");
+      name.className = "user-map-view__result-marker__name";
+      name.dir = "auto";
+      const address = document.createElement("bdi");
+      address.className = "user-map-view__result-marker__address";
+      address.dir = "auto";
+      copy.append(name, address);
+      const affordance = document.createElement("span");
+      affordance.className = "user-map-view__result-marker__affordance mdi mdi-chevron-left";
+      affordance.setAttribute("aria-hidden", "true");
+      button.append(badge, copy, affordance);
       button.addEventListener("click", (event) => {
         event.stopPropagation(); // Do not reverse-geocode a POI tap as an arbitrary map click.
         // Read the current result, never the captured response: a new query may have invalidated it.
@@ -924,15 +940,24 @@ function syncResultMarkers(): void {
       button.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") event.stopPropagation();
       }); // Native button keyboard activation fires click once; Tab must still move focus.
-      marker = new markerConstructor({ element: button, anchor: "center", offset: offsets.get(place.placeId) })
+      const [x, y] = offsets.get(place.placeId) ?? [0, 0];
+      marker = new markerConstructor({ element: button, anchor: "bottom", offset: [x, y - 6] })
         .setLngLat([place.lon, place.lat]).addTo(instance);
       resultMarkers.set(place.placeId, marker);
-    } else marker.setLngLat([place.lon, place.lat]).setOffset(offsets.get(place.placeId) ?? [0, 0]);
+    } else {
+      const [x, y] = offsets.get(place.placeId) ?? [0, 0];
+      marker.setLngLat([place.lon, place.lat]).setOffset([x, y - 6]);
+    }
     const button = marker.getElement();
-    button.setAttribute("aria-label", `نتیجهٔ ${(index + 1).toLocaleString("fa-IR")} از ${places.length.toLocaleString("fa-IR")}: ${place.name}، ${place.address}`);
-    button.setAttribute("title", place.name);
-    const number = button.firstElementChild;
+    button.classList.toggle("user-map-view__result-marker--dense", places.length > 12);
+    button.setAttribute("aria-label", `نتیجهٔ ${(index + 1).toLocaleString("fa-IR")} از ${places.length.toLocaleString("fa-IR")}: ${place.name}، ${place.address}؛ انتخاب مقصد`);
+    button.setAttribute("title", `${place.name} — ${place.address}`);
+    const number = button.querySelector<HTMLElement>(".user-map-view__result-marker__badge span");
     if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
+    const name = button.querySelector<HTMLElement>(".user-map-view__result-marker__name");
+    if (name) name.textContent = place.name;
+    const address = button.querySelector<HTMLElement>(".user-map-view__result-marker__address");
+    if (address) address.textContent = place.address;
   }
 }
 async function showAllSearchResults(): Promise<void> {
@@ -1746,21 +1771,63 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 
 .user-map-view__search-map-actions { display: none; }
 
-/* Numbered search pins are a separate keyboard/touch layer from purple selection,
-   teal companion avatars and the blue private GPS icon. */
+/* Search callouts show a place name and a numbered pin without confusing them
+   with the purple selection, teal companions or the blue private GPS icon. */
 :global(.user-map-view .user-map-view__route-origin) {
   display: grid; place-items: center; width: 32px; height: 32px; border: 3px solid #fff;
   border-radius: 50%; color: #fff;
   background: #2563eb; box-shadow: 0 2px 9px rgba(4, 24, 40, .5); font-weight: 900;
 }
 :global(.user-map-view .user-map-view__result-marker) {
-  display: grid; place-items: center; width: 44px; height: 44px; padding: 0;
-  border: 3px solid rgb(var(--v-theme-surface)); border-radius: 50%;
-  color: #fff; background: #a95010; box-shadow: 0 2px 8px rgba(3, 29, 31, 0.38);
-  cursor: pointer; font-size: 0.92rem; font-weight: 800;
+  display: flex; align-items: center; gap: .4rem; width: max-content;
+  max-width: min(10.5rem, calc(100vw - 1.5rem)); min-width: 44px; min-height: 48px;
+  padding: .3rem .45rem; border: 1px solid rgba(var(--v-theme-on-surface), .22);
+  border-radius: .85rem; color: rgb(var(--v-theme-on-surface));
+  background: rgba(var(--v-theme-surface), .98);
+  box-shadow: 0 3px 14px rgba(3, 29, 31, .3); backdrop-filter: blur(8px);
+  cursor: pointer; text-align: start; touch-action: manipulation;
+}
+:global(.user-map-view .user-map-view__result-marker::after) {
+  content: ""; position: absolute; bottom: -.4rem; left: calc(50% - .38rem);
+  width: .76rem; height: .42rem; background: rgb(var(--v-theme-surface));
+  clip-path: polygon(0 0, 100% 0, 50% 100%); pointer-events: none;
+}
+:global(.user-map-view .user-map-view__result-marker__badge) {
+  display: grid; place-items: center; flex: 0 0 auto; min-width: 2rem; height: 2rem;
+  padding-inline: .25rem; border-radius: .6rem; background: #a95010; color: #fff;
+  font-size: .85rem; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+:global(.user-map-view .user-map-view__result-marker__copy) { display: grid; min-width: 0; flex: 1 1 auto; }
+:global(.user-map-view .user-map-view__result-marker__name) {
+  display: block; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: .8rem; line-height: 1.35; font-weight: 800;
+}
+:global(.user-map-view .user-map-view__result-marker__address) {
+  display: none; color: rgb(var(--v-theme-on-surface)); opacity: .76;
+  font-size: .8rem; line-height: 1.35; overflow-wrap: anywhere;
+}
+:global(.user-map-view .user-map-view__result-marker__affordance) {
+  flex: 0 0 auto; font-size: .9rem; color: rgb(var(--v-theme-primary));
+}
+:global(.user-map-view .user-map-view__result-marker--dense) { max-width: min(8rem, calc(100vw - 1.5rem)); }
+:global(.user-map-view .user-map-view__result-marker:hover),
+:global(.user-map-view .user-map-view__result-marker:focus-visible) {
+  z-index: 10; max-width: min(15rem, calc(100vw - 1.5rem));
+  border-color: rgb(var(--v-theme-primary)); box-shadow: 0 5px 18px rgba(3, 29, 31, .4);
+}
+:global(.user-map-view .user-map-view__result-marker:hover .user-map-view__result-marker__address),
+:global(.user-map-view .user-map-view__result-marker:focus-visible .user-map-view__result-marker__address) {
+  display: block; max-height: 2.8rem; overflow: hidden; margin-top: .15rem;
 }
 :global(.user-map-view .user-map-view__result-marker:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+}
+:global(:root.dark .user-map-view .user-map-view__result-marker) {
+  border-color: rgba(var(--v-theme-on-surface), .32); background: rgba(var(--v-theme-surface), .98);
+}
+@media (forced-colors: active) {
+  :global(.user-map-view .user-map-view__result-marker) { border-color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__result-marker__badge) { background: Highlight; color: HighlightText; }
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
