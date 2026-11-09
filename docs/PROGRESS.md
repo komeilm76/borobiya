@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Remove map search hover content
+
+- The separate address/name tooltip introduced in the previous map-results pass was not wanted. Result chips now show only their stable, numbered place names: no content or native browser title appears on hover or keyboard focus, and there are no hover-only styles. Keyboard focus retains its visible outline, the full address stays in each button's accessible name, and tapping/clicking still opens the existing place detail and route flow. Nonmounted source/CSS checks cover the absence of tooltip markup and hover rules; rendered-map acceptance remains open.
+
 ### 2026-10-23 — Keep map search callouts steady on hover
 
 - Follow-up to the named map results: hover no longer widens, changes the border/shadow of, or inserts an address into the place-name chip. A separate pointer-transparent address tooltip appears above the unchanged chip on hover or keyboard focus. It uses the workspace Persian font token and readable name/address weights; the native browser `title` tooltip (whose font cannot be styled) was removed. The full place and address remain in the button's accessible name, and tapping still selects the result. Nonmounted SFC/CSS contracts cover the unchanged hover geometry, safe text updates, typography and focus reveal; rendered/assistive-technology checks remain open.

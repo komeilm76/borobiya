@@ -927,19 +927,9 @@ function syncResultMarkers(): void {
       const affordance = document.createElement("span");
       affordance.className = "user-map-view__result-marker__affordance mdi mdi-chevron-left";
       affordance.setAttribute("aria-hidden", "true");
-      // Keep the tappable chip the same size on hover. The full name/address
-      // live in a separate visual hint; the button's accessible name has both.
-      const tooltip = document.createElement("span");
-      tooltip.className = "user-map-view__result-marker__tooltip";
-      tooltip.setAttribute("aria-hidden", "true");
-      const tooltipName = document.createElement("bdi");
-      tooltipName.className = "user-map-view__result-marker__tooltip-name";
-      tooltipName.dir = "auto";
-      const address = document.createElement("bdi");
-      address.className = "user-map-view__result-marker__address";
-      address.dir = "auto";
-      tooltip.append(tooltipName, address);
-      button.append(badge, copy, affordance, tooltip);
+      // Keep only the always-visible place name on the map. The button's
+      // accessible name includes the address; tapping opens the full detail.
+      button.append(badge, copy, affordance);
       button.addEventListener("click", (event) => {
         event.stopPropagation(); // Do not reverse-geocode a POI tap as an arbitrary map click.
         // Read the current result, never the captured response: a new query may have invalidated it.
@@ -964,10 +954,7 @@ function syncResultMarkers(): void {
     if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
     const name = button.querySelector<HTMLElement>(".user-map-view__result-marker__name");
     if (name) name.textContent = place.name;
-    const tooltipName = button.querySelector<HTMLElement>(".user-map-view__result-marker__tooltip-name");
-    if (tooltipName) tooltipName.textContent = place.name;
-    const address = button.querySelector<HTMLElement>(".user-map-view__result-marker__address");
-    if (address) address.textContent = place.address;
+
   }
 }
 async function showAllSearchResults(): Promise<void> {
@@ -1818,34 +1805,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   flex: 0 0 auto; font-size: .9rem; color: rgb(var(--v-theme-primary));
 }
 :global(.user-map-view .user-map-view__result-marker--dense) { max-width: min(8rem, calc(100vw - 1.5rem)); }
-/* A separate, non-interactive tooltip leaves the button's size, border and
-   shadow untouched on hover. The full text is also on the button's aria-label. */
-:global(.user-map-view .user-map-view__result-marker__tooltip) {
-  position: absolute; bottom: calc(100% + .65rem); left: 50%; transform: translateX(-50%);
-  display: grid; gap: .15rem; width: max-content; max-width: min(17rem, calc(100vw - 1.5rem));
-  padding: .55rem .7rem; border: 1px solid rgba(var(--v-theme-on-surface), .22);
-  border-radius: .75rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
-  box-shadow: 0 3px 14px rgba(3, 29, 31, .3); text-align: start;
-  font-family: inherit; font-size: .875rem; font-weight: 500; line-height: 1.6; letter-spacing: normal;
-  white-space: normal; overflow-wrap: anywhere; pointer-events: none; visibility: hidden;
-}
-:global(.user-map-view .user-map-view__result-marker__tooltip::after) {
-  content: ""; position: absolute; bottom: -.4rem; left: calc(50% - .38rem);
-  width: .76rem; height: .42rem; background: rgb(var(--v-theme-surface));
-  clip-path: polygon(0 0, 100% 0, 50% 100%); pointer-events: none;
-}
-:global(.user-map-view .user-map-view__result-marker__tooltip-name) {
-  display: block; font-weight: 700;
-}
-:global(.user-map-view .user-map-view__result-marker__address) {
-  display: block; font-size: .8125rem; line-height: 1.6; overflow-wrap: anywhere;
-}
-:global(.user-map-view .user-map-view__result-marker:hover),
-:global(.user-map-view .user-map-view__result-marker:focus-visible) { z-index: 10; }
-:global(.user-map-view .user-map-view__result-marker:hover .user-map-view__result-marker__tooltip),
-:global(.user-map-view .user-map-view__result-marker:focus-visible .user-map-view__result-marker__tooltip) {
-  visibility: visible;
-}
 :global(.user-map-view .user-map-view__result-marker:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
 }
@@ -1855,9 +1814,6 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker) { border-color: CanvasText; box-shadow: none; }
   :global(.user-map-view .user-map-view__result-marker__badge) { background: Highlight; color: HighlightText; }
-  :global(.user-map-view .user-map-view__result-marker__tooltip) {
-    border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none;
-  }
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */
