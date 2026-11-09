@@ -38,8 +38,8 @@ function normalizeAnswer(answer: string): string {
   return answer.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fa-IR');
 }
 
-function deviceName(userAgent: string | undefined): string {
-  const value = (userAgent ?? '').slice(0, 200);
+function deviceName(userAgent: string): string {
+  const value = userAgent.slice(0, 200);
   if (/android/i.test(value)) return 'Android device';
   if (/iphone|ipad/i.test(value)) return 'iOS device';
   if (/windows/i.test(value)) return 'Windows device';
@@ -142,7 +142,7 @@ export class AuthService {
     const token = `${sessionId}.${secret}`;
     this.sessionCache.set(`${sessionId}:${hash}`, {
       ...identity, tokenHash: hash, deviceName: resolvedName, expiresAt, lastSeenAt: now,
-      active: 1, securityReady: Number(user.security_ready ?? 1), mustCompleteSecurityQuestions: Number(user.must_complete_security_questions ?? 0)
+      active: 1, securityReady: Number(user.security_ready), mustCompleteSecurityQuestions: Number(user.must_complete_security_questions)
     });
     return {
       token,
@@ -187,7 +187,7 @@ export class AuthService {
     if (Number(user.locked_until ?? 0) > now) throw tooMany('Account is temporarily locked.', Math.ceil((Number(user.locked_until) - now) / 1000));
     const valid = await verifyPassword(input.password, String(user.password_hash));
     if (!valid) {
-      const failures = Number(user.failed_logins ?? 0) + 1;
+      const failures = Number(user.failed_logins) + 1;
       const lockUntil = failures >= 5 ? now + 15 * 60_000 : null;
       this.ctx.repo.transaction(() => {
         this.ctx.repo.run('UPDATE users SET failed_logins = ?, locked_until = ?, updated_at = ? WHERE id = ?', failures, lockUntil, now, user.id);
@@ -289,7 +289,7 @@ export class AuthService {
     const expected = JSON.parse(String(challenge.answers_hash)) as Record<string, string>;
     const questionIds = JSON.parse(String(challenge.question_ids)) as string[];
     const submitted = new Map(answers.map((answer) => [answer.questionId, normalizeAnswer(answer.answer)]));
-    const checks = await Promise.all(questionIds.map((id) => verifyPassword(submitted.get(id) ?? '', expected[id] ?? DUMMY_HASH)));
+    const checks = await Promise.all(questionIds.map((id) => verifyPassword(submitted.get(id) ?? '', expected[id])));
     if (!checks.every(Boolean)) {
       const attempts = Number(challenge.attempts) + 1;
       this.ctx.repo.run('UPDATE recovery_challenges SET attempts = ? WHERE id = ?', attempts, recoveryId);
@@ -341,11 +341,11 @@ export class AuthService {
       username: String(row.username),
       role: String(row.role),
       isActive: Boolean(row.active),
-      securityReady: Boolean(row.security_ready ?? row.securityReady ?? 0),
-      mustCompleteSecurityQuestions: Boolean(row.must_complete_security_questions ?? row.mustCompleteSecurityQuestions ?? 0),
-      readyForMission: Boolean(row.ready_for_mission ?? 0),
-      averageRating: Number(row.average_rating ?? 0),
-      createdAt: Number(row.created_at ?? row.createdAt ?? 0)
+      securityReady: Boolean(row.security_ready),
+      mustCompleteSecurityQuestions: Boolean(row.must_complete_security_questions),
+      readyForMission: Boolean(row.ready_for_mission),
+      averageRating: Number(row.average_rating),
+      createdAt: Number(row.created_at)
     };
   }
 }

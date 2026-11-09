@@ -47,11 +47,12 @@ export class LruTtlCache<K, V> {
   set(key: K, value: V, ttlMs = this.ttlMs): V {
     if (this.map.has(key)) this.map.delete(key);
     this.map.set(key, { value, expiresAt: this.clock() + ttlMs });
-    while (this.map.size > this.max) {
-      const oldest = this.map.keys().next();
-      if (oldest.done) break;
-      this.map.delete(oldest.value);
+    let excess = this.map.size - this.max;
+    for (const key of this.map.keys()) {
+      if (excess <= 0) break;
+      this.map.delete(key);
       this.evictions++;
+      excess--;
     }
     return value;
   }

@@ -97,7 +97,6 @@ export class RealtimeService {
     const record = this.tickets.get(digest);
     if (!record) return null;
     this.tickets.delete(digest);
-    if (record.expiresAt <= this.ctx.clock()) return null;
     if (record.ip !== this.ctx.hubClientIp(request)) return null;
     return record.identity;
   }
@@ -345,7 +344,7 @@ export class RealtimeService {
     });
   }
 
-  private sendAck(peer: Peer, request: string | null | undefined, kind: string, extra: Record<string, unknown> = {}): void {
+  private sendAck(peer: Peer, request: string | null | undefined, kind: string, extra: Record<string, unknown>): void {
     peer.sendJson({ type: WS_EVENTS.ACK, requestId: request ?? null, kind, accepted: true, serverTime: this.ctx.clock(), ...extra });
   }
 

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { get } from '@/api/client.ts';
+import { errorMessage, get } from '@/api/client.ts';
 import type { LiveFixView, MapConfigView, SavedPlaceView, ShareView } from '@/api/types.ts';
 import { useGeolocation } from '@vueuse/core';
 
@@ -62,7 +62,7 @@ export const useMapStore = defineStore('map', () => {
       if (mapConfig?.center) center.value = { latitude: mapConfig.center.latitude, longitude: mapConfig.center.longitude };
       if (mapConfig?.defaultZoom) zoom.value = mapConfig.defaultZoom;
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : 'داده‌های نقشه خوانده نشد.';
+      error.value = errorMessage(caught);
     } finally {
       loading.value = false;
     }

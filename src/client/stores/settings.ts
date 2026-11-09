@@ -48,7 +48,6 @@ export const useSettingsStore = defineStore('settings', () => {
    */
   function apply(choice: ThemeChoice): void {
     persisted.value = choice;
-    if (typeof document === 'undefined') return;
     document.documentElement.setAttribute('data-theme-choice', choice);
     document.documentElement.setAttribute('data-theme', resolvedTheme.value);
   }
@@ -61,7 +60,7 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   watch(resolvedTheme, (value) => {
-    if (typeof document !== 'undefined') document.documentElement.setAttribute('data-theme', value);
+    document.documentElement.setAttribute('data-theme', value);
   }, { immediate: true });
 
   return { themeChoice, resolvedTheme, prefersReducedMotion, compactViewport, apply, cycle, tokens: DESIGN_TOKENS };

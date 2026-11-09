@@ -144,12 +144,9 @@ export async function createApp(overrides: ConfigOverrides = {}): Promise<Borobi
       let auth: AuthIdentity | null = null;
       if (route.auth !== 'none') {
         const session = context.services.auth.resolveSession(cookies.bb_session, ip);
-        if (route.auth === 'optional') auth = session;
-        else {
-          if (!session) throw unauthorized('A valid session is required.');
-          if (route.auth === 'admin' && session.role !== ROLES.ADMIN) throw forbidden('Administrator permission is required.');
-          auth = session;
-        }
+        if (!session) throw unauthorized('A valid session is required.');
+        if (route.auth === 'admin' && session.role !== ROLES.ADMIN) throw forbidden('Administrator permission is required.');
+        auth = session;
       }
       const rawBody = MUTATING_METHODS.has(method) ? await readJsonBody(request, config.maxBodyBytes) : {};
       const validatedBody = route.body ? parse(route.body, rawBody, 'body') : rawBody;
@@ -172,20 +169,17 @@ export async function createApp(overrides: ConfigOverrides = {}): Promise<Borobi
         auth
       };
       const result = await route.handler(requestContext);
-      if (result.envelope === false && result.raw !== undefined) {
-        return textResponse(request, result.status ?? 200, result.raw, result.contentType ?? 'application/octet-stream', {
+      if ('raw' in result) {
+        return textResponse(request, result.status, result.raw, result.contentType, {
           cacheControl: result.cacheControl,
           etag: result.etag,
           compress: result.compress,
-          headers: {
-            ...(result.headers ?? {}),
-            ...(result.cookies?.length ? { 'Set-Cookie': result.cookies } : {})
-          }
+          headers: result.headers
         });
       }
       return jsonResponse(
         request,
-        result.status ?? 200,
+        result.status,
         { ok: true, requestId, data: result.data ?? null },
         {
           ...(result.headers ?? {}),

@@ -202,8 +202,7 @@ export class LocationService {
       'SELECT * FROM location_shares WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at <= ?', now);
     for (const share of expired) {
       this.ctx.uow.commit((tx) => {
-        const changed = tx.repo.run('UPDATE location_shares SET revoked_at=? WHERE id=? AND revoked_at IS NULL', now, String(share.id)).changes;
-        if (!changed) return null;
+        tx.repo.run('UPDATE location_shares SET revoked_at=? WHERE id=? AND revoked_at IS NULL', now, String(share.id));
         tx.event(HTTP_EVENTS.LOCATION_SHARE_ENDED, {
           shareId: String(share.id), ownerId: String(share.owner_id), recipientId: String(share.recipient_id), reason: 'expired'
         }, [`user:${share.owner_id}`, `user:${share.recipient_id}`]);
@@ -230,8 +229,8 @@ export class LocationService {
   private publicShare(row: Record<string, any>): Record<string, unknown> {
     return {
       id: String(row.id), ownerId: String(row.owner_id), recipientId: String(row.recipient_id),
-      ownerUsername: row.ownerUsername ? String(row.ownerUsername) : undefined,
-      recipientUsername: row.recipientUsername ? String(row.recipientUsername) : undefined,
+      ownerUsername: String(row.ownerUsername),
+      recipientUsername: String(row.recipientUsername),
       kind: String(row.kind), durationSeconds: row.duration_seconds === null ? null : Number(row.duration_seconds),
       expiresAt: row.expires_at === null ? null : Number(row.expires_at),
       historyFrom: row.history_from === null ? null : Number(row.history_from),

@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { del, get, post, ApiError } from '@/api/client.ts';
+import { ApiError, del, errorMessage, get, post } from '@/api/client.ts';
 import type { SecurityQuestionView, SessionView, UserView } from '@/api/types.ts';
 import { ROLES } from '@shared/protocol.ts';
 
@@ -35,7 +35,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
         return null;
       }
-      error.value = caught instanceof Error ? caught.message : 'وضعیت نشست خوانده نشد.';
+      error.value = errorMessage(caught);
       return null;
     } finally {
       loading.value = false;
@@ -120,7 +120,7 @@ export const useAuthStore = defineStore('auth', () => {
         devices.value = [];
         return [];
       }
-      error.value = caught instanceof Error ? caught.message : 'فهرست دستگاه‌ها خوانده نشد.';
+      error.value = errorMessage(caught);
       return devices.value;
     }
   }

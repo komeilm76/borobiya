@@ -145,7 +145,7 @@ export class SosService {
     const existing = this.ctx.repo.one('SELECT id FROM missions WHERE sos_id=?', sosId);
     if (existing) throw conflict('This request already has a mission.');
     const assigned = !sos.assigned_responder_id || String(sos.assigned_responder_id) === identity.userId ||
-      this.ctx.repo.one('SELECT user_id FROM group_members WHERE group_id=? AND user_id=?', String(sos.assigned_group_id ?? ''), identity.userId);
+      this.ctx.repo.one('SELECT user_id FROM group_members WHERE group_id=? AND user_id=?', String(sos.assigned_group_id), identity.userId);
     if (!assigned) throw forbidden('This responder was not assigned to the request.');
     const transition = transitionSos(String(sos.status), 'accept', identity.role);
     if (!transition.ok) throw conflict('This request cannot be accepted.', { reason: transition.reason });
@@ -236,7 +236,7 @@ export class SosService {
       return {
         id: userId,
         username: String(row.username),
-        averageRating: Number(row.average_rating ?? 0),
+        averageRating: Number(row.average_rating),
         readyForMission: Boolean(row.ready_for_mission),
         latitude: fix?.latitude ?? null,
         longitude: fix?.longitude ?? null,
@@ -264,24 +264,24 @@ export class SosService {
     const id = String(row.id ?? row.sosId);
     return {
       id, sosId: id, trackingCode: Number(row.trackingCode ?? trackingCode(id)),
-      requesterId: String(row.requester_id ?? row.requesterId ?? ''),
-      incidentTypeId: String(row.incident_type_id ?? row.incidentTypeId ?? ''),
+      requesterId: String(row.requester_id ?? row.requesterId),
+      incidentTypeId: String(row.incident_type_id ?? row.incidentTypeId),
       incidentLabel: row.incidentLabel ? String(row.incidentLabel) : null,
       incidentIcon: row.incidentIcon ? String(row.incidentIcon) : null,
       incidentColor: row.incidentColor ? String(row.incidentColor) : null,
-      severity: String(row.severity), description: String(row.description ?? ''),
+      severity: String(row.severity), description: String(row.description),
       photoDataUrl: row.photo_data_url ? String(row.photo_data_url) : null,
-      latitude: Number(row.latitude), longitude: Number(row.longitude), accuracy: Number(row.accuracy ?? 0),
-      isManual: Boolean(row.is_manual ?? row.isManual ?? 0), status: String(row.status),
+      latitude: Number(row.latitude), longitude: Number(row.longitude), accuracy: Number(row.accuracy),
+      isManual: Boolean(row.is_manual), status: String(row.status),
       cancellationReasonId: row.cancellation_reason_id ? String(row.cancellation_reason_id) : null,
       cancellationDetail: row.cancellation_detail ? String(row.cancellation_detail) : null,
       assignedGroupId: row.assigned_group_id ? String(row.assigned_group_id) : null,
       assignedResponderId: row.assigned_responder_id ? String(row.assigned_responder_id) : null,
-      createdAt: Number(row.created_at ?? row.createdAt ?? 0), updatedAt: Number(row.updated_at ?? row.updatedAt ?? 0),
-      expiresAt: Number(row.expires_at ?? row.expiresAt ?? 0),
+      createdAt: Number(row.created_at ?? row.createdAt), updatedAt: Number(row.updated_at ?? row.updatedAt),
+      expiresAt: Number(row.expires_at),
       completedAt: row.completed_at ? Number(row.completed_at) : null,
       mission: row.missionId ? {
-        id: String(row.missionId), status: String(row.missionStatus), responderId: String(row.missionResponderId ?? ''), rating: row.missionRating === null ? null : Number(row.missionRating)
+        id: String(row.missionId), status: String(row.missionStatus), responderId: String(row.missionResponderId), rating: row.missionRating === null ? null : Number(row.missionRating)
       } : null
     };
   }
@@ -289,8 +289,8 @@ export class SosService {
   private publicMission(row: Record<string, any>): Record<string, unknown> {
     return {
       id: String(row.missionId), sosId: String(row.id), trackingCode: trackingCode(String(row.id)),
-      status: String(row.missionStatus), responderId: String(row.missionResponderId ?? ''),
-      requesterId: String(row.requester_id), incidentLabel: row.incidentLabel ? String(row.incidentLabel) : null,
+      status: String(row.missionStatus), responderId: String(row.missionResponderId),
+      requesterId: String(row.requester_id), incidentLabel: String(row.incidentLabel),
       rating: row.missionRating === null || row.missionRating === undefined ? null : Number(row.missionRating),
       createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
     };

@@ -25,9 +25,10 @@ export class TalkAudio {
   constructor(private readonly sendBinary: (frame: ArrayBuffer) => boolean) {}
 
   /** Creates or resumes the playback context from a user gesture. */
-  preparePlayback(): void {
+  preparePlayback(): AudioContext {
     if (!this.playback || this.playback.state === 'closed') this.playback = new AudioContext({ sampleRate: SAMPLE_RATE });
     if (this.playback.state === 'suspended') void this.playback.resume();
+    return this.playback;
   }
 
   /**
@@ -74,7 +75,7 @@ export class TalkAudio {
     if (samples.length * 2 > AUDIO.MAX_PAYLOAD_BYTES) return null;
     const payload = new Int16Array(samples.length);
     for (let index = 0; index < samples.length; index++) {
-      const clamped = Math.max(-1, Math.min(1, samples[index] ?? 0));
+      const clamped = Math.max(-1, Math.min(1, samples[index]));
       payload[index] = clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff;
     }
     const frame = new ArrayBuffer(AUDIO.HEADER_BYTES + payload.byteLength);
@@ -94,16 +95,13 @@ export class TalkAudio {
    */
   play(frame: ArrayBuffer): void {
     if (frame.byteLength <= AUDIO.HEADER_BYTES) return;
-    this.preparePlayback();
-    const context = this.playback;
-    if (!context) return;
-    const view = new DataView(frame);
+    const context = this.preparePlayback();
     const samples = new Int16Array(frame.byteLength - AUDIO.HEADER_BYTES);
     const payload = new Uint8Array(frame, AUDIO.HEADER_BYTES);
     new Uint8Array(samples.buffer).set(payload);
     const buffer = context.createBuffer(1, samples.length, SAMPLE_RATE);
     const channel = buffer.getChannelData(0);
-    for (let index = 0; index < samples.length; index++) channel[index] = (samples[index] ?? 0) / 0x8000;
+    for (let index = 0; index < samples.length; index++) channel[index] = samples[index] / 0x8000;
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.connect(context.destination);
@@ -114,7 +112,6 @@ export class TalkAudio {
     source.onended = () => {
       this.sources = this.sources.filter((item) => item !== source);
     };
-    void view;
   }
 
   /**

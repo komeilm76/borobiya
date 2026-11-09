@@ -81,8 +81,8 @@ export class AdminService {
       items: rows.map((row) => ({
         id: String(row.id), username: String(row.username), role: String(row.role), active: Boolean(row.active),
         securityReady: Boolean(row.security_ready), mustCompleteSecurityQuestions: Boolean(row.must_complete_security_questions),
-        readyForMission: Boolean(row.ready_for_mission), averageRating: Number(row.average_rating ?? 0),
-        sessionCount: Number(row.sessionCount ?? 0), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
+        readyForMission: Boolean(row.ready_for_mission), averageRating: Number(row.average_rating),
+        sessionCount: Number(row.sessionCount), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
         online: this.ctx.services.realtime.isUserOnline(String(row.id))
       })),
       total, page: filters.page, limit, hasMore: offset + rows.length < total
@@ -168,8 +168,8 @@ export class AdminService {
        GROUP BY g.id ORDER BY g.rank`);
     const items = rows.map((row) => ({
       id: String(row.id), name: String(row.name), color: String(row.color), capacity: Number(row.capacity),
-      status: String(row.status), rank: Number(row.rank), memberCount: Number(row.memberCount ?? 0),
-      coverageCount: Number(row.coverageCount ?? 0),
+      status: String(row.status), rank: Number(row.rank), memberCount: Number(row.memberCount),
+      coverageCount: Number(row.coverageCount),
       incidentIds: this.ctx.repo.all<{ incident_type_id: string }>(
         'SELECT incident_type_id FROM group_incident_types WHERE group_id=?', String(row.id)).map((item) => String(item.incident_type_id)),
       // Dispatch must name responders that belong to this group: the server rejects the whole

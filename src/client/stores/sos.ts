@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { get, post } from '@/api/client.ts';
+import { errorMessage, get, post } from '@/api/client.ts';
 import type { CancellationReasonView, IncidentTypeView, MissionView, SosView } from '@/api/types.ts';
 import { MISSION_STATUS, SOS_STATUS } from '@shared/protocol.ts';
 
@@ -74,7 +74,7 @@ export const useSosStore = defineStore('sos', () => {
       missions.value = missionList.items ?? [];
       if (!draft.value.incidentTypeId && incidentTypes.value.length) draft.value.incidentTypeId = incidentTypes.value[0].id;
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : 'داده‌های امداد خوانده نشد.';
+      error.value = errorMessage(caught);
     } finally {
       loading.value = false;
     }
@@ -160,7 +160,7 @@ export const useSosStore = defineStore('sos', () => {
       else requests.value = [detail, ...requests.value];
       return detail;
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : 'جزئیات درخواست خوانده نشد.';
+      error.value = errorMessage(caught);
       return null;
     }
   }

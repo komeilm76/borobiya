@@ -59,7 +59,6 @@ export const useOfflineStore = defineStore('offline', () => {
   });
 
   watch(offline, (value) => {
-    if (typeof document === 'undefined') return;
     if (value) document.documentElement.setAttribute('data-offline', 'true');
     else document.documentElement.removeAttribute('data-offline');
   }, { immediate: true });

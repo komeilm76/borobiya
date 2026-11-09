@@ -86,7 +86,7 @@ export class UserService {
     return {
       items: rows.map((row) => ({
         id: String(row.id), username: String(row.username), role: String(row.role),
-        readyForMission: Boolean(row.ready_for_mission), averageRating: Number(row.average_rating ?? 0),
+        readyForMission: Boolean(row.ready_for_mission), averageRating: Number(row.average_rating),
         online: this.ctx.services.realtime.isUserOnline(String(row.id))
       })),
       total: rows.length
@@ -186,7 +186,7 @@ export class UserService {
     return {
       id: String(row.id), name: String(row.name), label: String(row.label),
       latitude: Number(row.latitude), longitude: Number(row.longitude), address: String(row.address),
-      icon: String(row.icon), rank: Number(row.rank), createdAt: Number(row.created_at ?? 0), updatedAt: Number(row.updated_at ?? 0)
+      icon: String(row.icon), rank: Number(row.rank), createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
     };
   }
 }

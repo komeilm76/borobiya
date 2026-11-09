@@ -2,7 +2,7 @@ import type { Config } from './config.ts';
 import type { Validator } from './validate.ts';
 import type { RateRule } from './rate-limit.ts';
 
-export type AuthMode = 'none' | 'optional' | 'user' | 'admin';
+export type AuthMode = 'none' | 'user' | 'admin';
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface AuthIdentity {
@@ -32,18 +32,26 @@ export interface RequestContext<App = unknown> {
   auth: AuthIdentity | null;
 }
 
-export interface RouteResult {
-  status?: number;
+/** JSON envelope result. The handler must say the status; payloads may be empty (void endpoints). */
+export interface JsonRouteResult {
+  status: number;
   data?: unknown;
-  raw?: string;
-  envelope?: boolean;
-  contentType?: string;
+  headers?: Record<string, string>;
+  cookies?: string[];
+}
+
+/** Raw (non-envelope) result, e.g. CSV, SVG or other downloads. Raw responses never set cookies. */
+export interface RawRouteResult {
+  status: number;
+  raw: string;
+  contentType: string;
   cacheControl?: string;
   etag?: string;
   compress?: boolean;
   headers?: Record<string, string>;
-  cookies?: string[];
 }
+
+export type RouteResult = JsonRouteResult | RawRouteResult;
 
 export interface RouteDefinition<App = unknown> {
   method: HttpMethod;
@@ -67,8 +75,8 @@ export const created = (data: unknown): RouteResult => ({ status: 201, data });
 export const raw = (
   body: string,
   contentType: string,
-  options: Omit<RouteResult, 'raw' | 'contentType' | 'data'> = {}
-): RouteResult => ({ status: 200, raw: body, envelope: false, contentType, ...options });
+  options: Omit<RawRouteResult, 'status' | 'raw' | 'contentType'> = {}
+): RawRouteResult => ({ status: 200, raw: body, contentType, ...options });
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -128,7 +136,7 @@ export class Router<App = unknown> {
         operationId: `${route.method.toLowerCase()}${route.path.replace(/[^A-Za-z0-9]+/g, '_')}`,
         summary: route.summary ?? `${route.method} ${route.path}`,
         tags: route.tags ?? ['api'],
-        security: route.auth === 'none' || route.auth === 'optional' ? [] : [{ sessionCookie: [] }],
+        security: route.auth === 'none' ? [] : [{ sessionCookie: [] }],
         responses: {
           '200': { description: 'Success' },
           '400': { description: 'Invalid input' },

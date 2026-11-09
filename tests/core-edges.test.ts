@@ -253,7 +253,9 @@ describe('router edge paths', () => {
   it('answers raw without options and refuses a percent-broken path parameter', () => {
     const bare = raw('plain', 'text/plain');
     expect(bare.status).toBe(200);
-    expect(bare.envelope).toBe(false);
+    // Raw results are not JSON envelopes: the discriminant is the raw body itself.
+    expect('raw' in bare).toBe(true);
+    expect('data' in bare).toBe(false);
     expect(bare.contentType).toBe('text/plain');
 
     const router = new Router<object>();

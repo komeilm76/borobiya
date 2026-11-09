@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 import { defineStore } from 'pinia';
-import { get, post, put, patch } from '@/api/client.ts';
+import { errorMessage, get, patch, post, put } from '@/api/client.ts';
 import type {
   AdminUserView,
   AlertView,
@@ -50,13 +50,13 @@ export const useAdminStore = defineStore('admin', () => {
   const userFilters = ref<UserFilters>({ page: 1, limit: 20 });
   const auditFilters = ref<AuditFilters>({ limit: 100 });
 
-  async function guard<T>(label: string, task: () => Promise<T>): Promise<T | null> {
+  async function guard<T>(task: () => Promise<T>): Promise<T | null> {
     loading.value = true;
     error.value = null;
     try {
       return await task();
     } catch (caught) {
-      error.value = caught instanceof Error ? caught.message : `${label} خوانده نشد.`;
+      error.value = errorMessage(caught);
       return null;
     } finally {
       loading.value = false;
@@ -65,13 +65,13 @@ export const useAdminStore = defineStore('admin', () => {
 
   /** Loads the operations overview used by the dashboard and report screens. */
   async function loadOverview(): Promise<void> {
-    const result = await guard('نمای کلی', () => get<OverviewView>('/_admin/overview'));
+    const result = await guard(() => get<OverviewView>('/_admin/overview'));
     if (result) overview.value = result;
   }
 
   /** Loads the dispatch board queue. */
   async function loadDispatch(): Promise<void> {
-    const result = await guard('تخته اعزام', () =>
+    const result = await guard(() =>
       get<{ queue: ListView<SosView>; groups: ListView<GroupView>; incidentTypes: ListView<IncidentTypeView> }>('/_admin/dispatch')
     );
     if (result) {
@@ -87,7 +87,7 @@ export const useAdminStore = defineStore('admin', () => {
   /** Loads a page of users with the active filters. */
   async function loadUsers(filters: UserFilters = userFilters.value): Promise<void> {
     userFilters.value = filters;
-    const result = await guard('کاربران', () =>
+    const result = await guard(() =>
       get<ListView<AdminUserView>>('/_admin/users', {
         q: filters.q,
         role: filters.role,
@@ -113,7 +113,7 @@ export const useAdminStore = defineStore('admin', () => {
 
   /** Loads service groups. */
   async function loadGroups(): Promise<void> {
-    const result = await guard('گروه‌ها', () => get<{ items: GroupView[] }>('/_admin/groups'));
+    const result = await guard(() => get<{ items: GroupView[] }>('/_admin/groups'));
     if (result) groups.value = result.items ?? [];
   }
 
@@ -134,7 +134,7 @@ export const useAdminStore = defineStore('admin', () => {
 
   /** Loads open (and optionally resolved) alerts. */
   async function loadAlerts(includeResolved = false): Promise<void> {
-    const result = await guard('هشدارها', () => get<{ items: AlertView[] }>('/_admin/alerts', { includeResolved }));
+    const result = await guard(() => get<{ items: AlertView[] }>('/_admin/alerts', { includeResolved }));
     if (result) alerts.value = result.items ?? [];
   }
 
@@ -147,13 +147,13 @@ export const useAdminStore = defineStore('admin', () => {
   /** Loads the audit log. */
   async function loadAudit(filters: AuditFilters = auditFilters.value): Promise<void> {
     auditFilters.value = filters;
-    const result = await guard('گزارش رویدادها', () => get<ListView<AuditEntryView>>('/_admin/audit', { ...filters }));
+    const result = await guard(() => get<ListView<AuditEntryView>>('/_admin/audit', { ...filters }));
     if (result) audit.value = result;
   }
 
   /** Loads system settings. */
   async function loadSettings(): Promise<void> {
-    const result = await guard('تنظیمات', () => get<{ items: SettingView[] }>('/_admin/settings'));
+    const result = await guard(() => get<{ items: SettingView[] }>('/_admin/settings'));
     if (result) settings.value = result.items ?? [];
   }
 
@@ -165,13 +165,13 @@ export const useAdminStore = defineStore('admin', () => {
 
   /** Loads the incident-type catalog. */
   async function loadIncidentTypes(): Promise<void> {
-    const result = await guard('نوع حادثه', () => get<{ items: IncidentTypeView[] }>('/_admin/incident-types'));
+    const result = await guard(() => get<{ items: IncidentTypeView[] }>('/_admin/incident-types'));
     if (result) incidentTypes.value = result.items ?? [];
   }
 
   /** Loads the system health snapshot. */
   async function loadHealth(): Promise<void> {
-    const result = await guard('سلامت سیستم', () => get<Record<string, unknown>>('/_admin/system/health'));
+    const result = await guard(() => get<Record<string, unknown>>('/_admin/system/health'));
     if (result) health.value = result;
   }
 

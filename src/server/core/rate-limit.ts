@@ -29,7 +29,7 @@ class TokenBucketLimiter {
     this.cache = new LruTtlCache<string, Bucket>(10000, Math.max(windowMs, 60_000) * 2, clock);
   }
 
-  consume(key: string, cost = 1, now = Date.now()): RateLimitResult {
+  consume(key: string, cost: number, now: number): RateLimitResult {
     const previous = this.cache.get(key);
     const tokensBefore = previous ? previous.tokens : this.capacity;
     const elapsedMs = previous ? Math.max(0, now - previous.updatedAt) : 0;
