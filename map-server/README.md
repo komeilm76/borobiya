@@ -6,7 +6,7 @@ The Compose `map-server` service runs Martin 1.16.1 from `map-server/martin.yaml
 
 - `styles/light.json` and `styles/dark.json` share one vector source and layer structure; only paint values differ by theme.
 - `sprites/borobiya/*.svg` are source artwork for the `borobiya` sprite set; Martin produces the sprite sheet dynamically.
-- `fonts/` contains Noto Sans Regular and Noto Naskh Arabic Regular. Martin's `Borobiya Sans` alias uses Arabic/Persian as a fallback; see `fonts/README.md` and `fonts/OFL.txt` for sources and licensing.
+- `fonts/` contains Vazirmatn Regular for both Persian and Latin map labels, plus Noto Sans and Noto Naskh Arabic as fallbacks. The `Borobiya Vazirmatn` stack uses a new glyph URL so cached Noto-first glyphs cannot mask the change; see `fonts/README.md`, `fonts/Vazirmatn-OFL.txt`, and `fonts/OFL.txt` for provenance and licensing.
 - Map content is not stored in this checkout by default. The standardized external library (`MAP_LIBRARY_DIR`, default `~/.local/share/borobiya/map-library`) holds Geofabrik sources and Osmium crops by continent/country/source-or-city/snapshot date, plus the active dataset's merged PBF, provenance manifest, and PMTiles. Martin serves `borobiya.pmtiles` as `/borobiya/{z}/{x}/{y}` whatever areas the dataset contains. See [`../docs/MAP_LIBRARY.md`](../docs/MAP_LIBRARY.md).
 - `photon/` contains the checked-in Dockerfile and its ignored tool JAR. The Photon index is part of the active external dataset (`$MAP_DATASET_DIR/geocoding`); the temporary Nominatim database remains a Docker volume and is not map-library content.
 - Both styles and the app footer show linked `© OpenStreetMap contributors` attribution to the ODbL/copyright page.

@@ -23,6 +23,8 @@ fonts:
   paths:
     - /fonts
   aliases:
-    Borobiya Sans:
+    # New stack name prevents old cached Noto glyph PBFs from masking the font change.
+    Borobiya Vazirmatn:
+      - Vazirmatn Regular
       - Noto Sans Regular
       - Noto Naskh Arabic Regular

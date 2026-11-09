@@ -161,7 +161,7 @@ The style resources use root-relative URLs, not hard-coded hosts. This works bot
 
 The tile source uses the default Planetiler OpenMapTiles profile (`water`, `transportation`, `place`, `poi`, and related layers). Sprite source files live in `map-server/sprites/borobiya/*.svg`; Martin builds and caches the PNG/JSON sprites at request time, for example `/sprite/borobiya.json` and `/sprite/borobiya.png`. No generated sprite binaries are committed.
 
-The style uses the `Borobiya Sans` font alias. `map-server/fonts/` contains Noto Sans Regular for Latin and Noto Naskh Arabic Regular as its Arabic/Persian fallback. Martin reads the licensed TTFs and dynamically serves requested glyph ranges at `/font/{fontstack}/{range}`; pre-generated glyph PBFs and `font-maker` are not required. Font provenance, checksums, copyright, and the SIL Open Font License 1.1 are documented alongside the files in `map-server/fonts/README.md` and `OFL.txt`.
+Both styles use the `Borobiya Vazirmatn` font alias: Martin tries Vazirmatn Regular for Persian **and** Latin labels first, then the existing Noto Sans Regular and Noto Naskh Arabic Regular fallbacks for missing glyphs. The alias has a new name so old cached `Borobiya Sans` glyph PBFs cannot hide the font change. Martin dynamically serves requested ranges at `/font/{fontstack}/{range}` from locally licensed TTFs; pre-generated glyph PBFs and `font-maker` are not required. The client's self-hosted UI WOFF files are separate from this glyph pipeline. Sources, checksums and SIL Open Font License 1.1 notices are in `map-server/fonts/README.md`, `Vazirmatn-OFL.txt` and `OFL.txt`. Run `bun --filter @borobiya/client test --run src/map/map-style-font.test.ts` to check the bundled font, license, Persian/Latin glyph coverage, fallbacks, alias and every light/dark label layer (no mounted Vue components). A live Martin glyph request and rendered Persian/English map review still require a running map server/browser.
 
 Run the dependency-free style/source/layer/SVG consistency check with `python3 map-server/scripts/verify-styles.py`. The JSON style documents were also checked against MapLibre's style specification during implementation.
 
@@ -182,7 +182,7 @@ sprites:
 fonts:
   paths: [/fonts]
   aliases:
-    Borobiya Sans: [Noto Sans Regular, Noto Naskh Arabic Regular]
+    Borobiya Vazirmatn: [Vazirmatn Regular, Noto Sans Regular, Noto Naskh Arabic Regular]
 ```
 
 The actual file is `map-server/martin.yaml`. Compose mounts the active library dataset directory (`MAP_DATASET_DIR`) at `/data`, where Martin discovers PMTiles sources; the dataset archive is always named `borobiya.pmtiles`, so its source ID is `borobiya` and its MVT route is `/borobiya/{z}/{x}/{y}` (an optional `.pbf` suffix redirects) regardless of which areas the dataset contains — the committed styles therefore never change when the selection does. `styles.paths` publishes JSON files by filename, so they are available at `/style/light` and `/style/dark`. The configured SVG folder and TTF fonts back the `/sprite/` and `/font/` APIs. Martin is deliberately **not connected to PostgreSQL**: it publishes no database tile sources, so the connection contributed only failure modes (Martin exited whenever application-database credentials drifted) and risk—Martin's default auto-publish would otherwise expose spatial application tables, including private `users.last_location` data, as public tile sources. If a reviewed public Postgres tile source is ever needed, add it explicitly with `auto_publish: false` and named tables/functions only.
@@ -198,7 +198,8 @@ Verify the style and dynamically served assets (these can be checked before tile
 ```bash
 curl http://localhost:8000/style/light | jq .sources
 curl http://localhost:8000/sprite/borobiya.json | jq
-curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
+curl -f 'http://localhost:8000/font/Borobiya%20Vazirmatn/0-255' -o /tmp/glyphs-latin.pbf
+curl -f 'http://localhost:8000/font/Borobiya%20Vazirmatn/1536-1791' -o /tmp/glyphs-persian.pbf
 # Through the Nginx /map/ prefix:
 curl http://localhost:8080/map/style/dark | jq .name
 ```

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Map labels: Vazirmatn first, Noto fallback
+
+- Added the official OFL-licensed Vazirmatn Regular TTF (v33.003) and upstream license to Martin's local font directory. Both map styles now request the `Borobiya Vazirmatn` stack, which prioritizes Vazirmatn for Persian and English while retaining Noto Sans and Noto Naskh Arabic for missing glyphs. The renamed stack avoids reusing browser/service-worker cached glyphs from the old Noto-first alias without clearing offline tiles. No road/contrast styling changed. Verified the TrueType face name with fontTools; added a nonmounted client contract for the font checksum/license, real TrueType cmap coverage of Persian letters/digits and Latin map names (plus extra Noto fallback glyphs), Martin alias, and all light/dark label layers. The local style validator also passes. A live Martin glyph response, actual map-label appearance on devices, and iOS Safari review remain open because Docker/Martin is not installed in this workspace.
+
 ### 2026-10-23 — Bug hunt: cancel map holds on an off-canvas second touch
 
 - Long-press selection was correctly limited to the drawing canvas so marker buttons cannot select the point behind them. That left a multi-touch gap: after the first finger began a valid hold, a second finger on a DOM marker, map control or other UI never reached the canvas listener and the original timer could still select a destination. A window pointerdown listener now cancels the pending hold only when the new target is outside the drawing canvas; ordinary canvas pointerdown still follows the existing multi-touch cancellation path. The listener is removed with the hold's other subscriptions. A nonmounted map-view contract failed before the fix; focused gesture/view tests and full checks cover it. Physical iOS touch verification remains open.

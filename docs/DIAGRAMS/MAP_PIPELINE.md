@@ -112,7 +112,8 @@ eval "$(python3 map-server/scripts/regions.py resolve "$MAP_REGION_IDS" --snapsh
 # Style and runtime-generated assets
 curl http://localhost:8000/style/light | jq .sources
 curl http://localhost:8000/sprite/borobiya.json | jq
-curl 'http://localhost:8000/font/Borobiya%20Sans/0-255' -o /tmp/glyphs.pbf
+curl -f 'http://localhost:8000/font/Borobiya%20Vazirmatn/0-255' -o /tmp/glyphs-latin.pbf
+curl -f 'http://localhost:8000/font/Borobiya%20Vazirmatn/1536-1791' -o /tmp/glyphs-persian.pbf
 # Public map settings through the same-origin gateway
 curl http://localhost:8080/map-config | jq
 # Route (after approved OSRM graphs are built)
