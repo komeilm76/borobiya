@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Refine cluster taps and café pin color
+
+- Replaced the brown café pin with a cool teal (`#087988`) while keeping distinct verified OSM category icons and neutral unknowns. Activating a result-count bubble now moves the map camera to that group's actual anchored place and zooms in up to two levels per tap without exceeding the installed map's maximum zoom; the flight suppresses an automatic geocoder read and retains existing viewport-pruning semantics, as with other selection flights. When the group is still overlapping at max zoom (including identical coordinates), activating it opens the existing accessible chooser instead. Count-button labels distinguish zoom versus list, a polite status announces zoom to assistive technology, and keyboard focus returns to an available pin or the map canvas if the old cluster disappears. Pure zoom-limit and nonmounted interaction contracts cover these cases; authenticated browser/device visual and gesture checks remain open.
+
 ### 2026-10-23 — Screenshot-inspired map search result presentation
 
 - Adapted the selected Persian map reference to the existing offline search/route UI: compact 48px colored icon pins in place of always-wide result labels, circular `+N` collision counts with a short keyboard-accessible chooser, and a persistent name callout above the selected map pin. The selected destination card now shows the supported place category and its icon alongside the existing real title/address, Send → Travel → Guidance actions and deletion confirmation. Photon `osm_key` + optional `osm_value` drive a deliberately small verified icon palette; unknown/ambiguous categories use a neutral pin. No photos, ratings, verification claims or global category filters were invented. Search queries, result invalidation, mobile full-screen controls, SOS and navigation remain unchanged. Nonmounted contracts, parser/presentation/geometry tests and repo gates cover this increment; authenticated browser/device visual and accessibility review remain open.

@@ -80,14 +80,32 @@ describe("show all current POIs on the map", () => {
     expect(card).not.toContain("verified");
   });
 
-  it("regroups on camera changes and opens a current-results chooser for overlapping hits", () => {
+  it("zooms a current cluster before opening its chooser at maximum zoom", () => {
+    const activate = body("activateResultCluster");
+    expect(activate).toContain('resultClusterMarkers.get(key)');
+    expect(activate).toContain('marker.getElement() !== button');
+    expect(activate).toContain('ids.some(id => !placeSearch.mapResults.value.some');
+    expect(activate).toContain('nextClusterZoom(instance.getZoom(), instance.getMaxZoom())');
+    expect(activate).toContain('if (zoom === null)');
+    expect(activate).toContain('openNearbyResults(ids, button)');
+    expect(activate).toContain('const center = marker.getLngLat()');
+    expect(activate).toContain('bounds.contains(center)');
+    expect(activate).toContain('instance.easeTo({ center: [center.lng, center.lat], zoom, duration: 450 }, { placeSearchSelection: true })');
+    expect(body("onMapMoveEnd")).toContain('restoreClusterKeyboardFocus()');
+    expect(body("restoreClusterKeyboardFocus")).toContain('pending.instance.getCanvas()');
+    expect(view).toContain('aria-live="polite">{{ clusterZoomAnnouncement }}');
+  });
+
+  it("regroups on camera changes and opens a current-results chooser for overlaps at max zoom", () => {
     const sync = body("syncResultMarkers");
     expect(sync).toContain('instance.project([place.lon, place.lat])');
     expect(sync).toContain('groupSearchResults(visiblePlaces');
     expect(sync).toContain('resultClusterMarkers');
     expect(sync).toContain('button.setAttribute("aria-haspopup", "dialog")');
     expect(sync).toContain('button.setAttribute("aria-controls", "map-nearby-results")');
-    expect(sync).toContain('openNearbyResults(group.map(hit => hit.placeId)');
+    expect(sync).toContain('activateResultCluster(group.map(hit => hit.placeId)');
+    expect(sync).toContain('button.removeAttribute("aria-haspopup")');
+    expect(sync).toContain('button.removeAttribute("aria-controls")');
     expect(body("onMapMoveEnd")).toContain('syncResultMarkers()');
     expect(body("onMapResize")).toContain('syncResultMarkers()');
     expect(body("clearResultMarkers")).toContain('resultClusterMarkers');

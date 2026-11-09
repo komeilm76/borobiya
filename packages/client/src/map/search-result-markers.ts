@@ -33,6 +33,15 @@ export function groupSearchResults(
   return [...groups.values()];
 }
 
+/** Cluster taps zoom in by two levels, bounded by the installed map's max zoom.
+ * At max zoom, identical-coordinate (or still-overlapping) hits need the list.
+ */
+export function nextClusterZoom(current: number, max: number): number | null {
+  if (!Number.isFinite(current) || !Number.isFinite(max)) return null;
+  const target = Math.min(current + 2, max);
+  return target - current >= 0.05 ? target : null;
+}
+
 /** Keep the camera bounded to the displayed snapshot, never to stale/unvalidated hits. */
 export function resultExtent(places: readonly GeocodeResult[]): [[number, number], [number, number]] | null {
   if (!places.length) return null;

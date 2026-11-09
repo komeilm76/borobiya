@@ -6,7 +6,7 @@ export type ResultAppearance = { icon: string; color: string; label: string };
 const generic: ResultAppearance = { icon: "mdi-map-marker", color: "#475569", label: "مکان" };
 const mixed: ResultAppearance = { icon: "mdi-map-marker-multiple", color: "#4059a9", label: "مکان‌های نزدیک" };
 const styles: Record<string, ResultAppearance> = {
-  "amenity:cafe": { icon: "mdi-coffee", color: "#925323", label: "کافه" },
+  "amenity:cafe": { icon: "mdi-coffee", color: "#087988", label: "کافه" },
   "amenity:restaurant": { icon: "mdi-silverware-fork-knife", color: "#c54b35", label: "رستوران" },
   "amenity:fast_food": { icon: "mdi-food", color: "#c54b35", label: "غذاخوری" },
   "tourism:hotel": { icon: "mdi-bed", color: "#7050ae", label: "هتل" },

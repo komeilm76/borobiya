@@ -28,8 +28,9 @@
       <span v-else-if="!placeSearch.results.value.length" role="status">در این محدوده نتیجهٔ جدیدی نیست.</span>
     </div>
 
-    <!-- A cluster represents nearby results at this zoom, including exact duplicates.
-         Keep their individual selection in a bounded, nonmodal list, not hover UI. -->
+    <span class="sr-only" role="status" aria-live="polite">{{ clusterZoomAnnouncement }}</span>
+    <!-- A cluster zooms to its area first; at maximum zoom, the list keeps
+         identical-coordinate results individually selectable without hover UI. -->
     <section v-if="nearbyPlaces.length > 1 && showAllResultsOnMap && !activeTool" id="map-nearby-results"
       class="user-map-view__nearby-results" role="dialog" aria-modal="false" aria-labelledby="map-nearby-title"
       tabindex="-1" @keydown.esc.stop.prevent="closeNearbyResults(true)">
@@ -300,7 +301,7 @@ import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
-import { groupSearchResults, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
+import { groupSearchResults, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
 import { clusterAppearance, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
@@ -914,6 +915,8 @@ const nearbyPlaces = computed(() => showAllResultsOnMap.value ? nearbyResultIds.
   .filter((hit): hit is GeocodeResult => !!hit) : []);
 let nearbyReturnFocus: HTMLElement | null = null;
 let nearbyFocusGeneration = 0;
+const clusterZoomAnnouncement = ref("");
+let clusterKeyboardFocus: { button: HTMLElement; ids: string[]; instance: MapLibreMap } | null = null;
 function closeNearbyResults(restoreFocus = false): void {
   nearbyResultIds.value = [];
   const target = nearbyReturnFocus;
@@ -934,6 +937,39 @@ function openNearbyResults(ids: string[], button: HTMLElement): void {
   nearbyReturnFocus = button;
   void nextTick(() => document.getElementById("map-nearby-results")?.focus());
 }
+function activateResultCluster(ids: string[], button: HTMLElement, keyboard: boolean): void {
+  const instance = map.value;
+  const key = JSON.stringify(ids);
+  const marker = resultClusterMarkers.get(key);
+  // A camera move, query change or map replacement may have invalidated this button.
+  if (!instance || !auth.user?.id || !showAllResultsOnMap.value ||
+      !marker || marker.getElement() !== button ||
+      ids.some(id => !placeSearch.mapResults.value.some(hit => hit.placeId === id))) return;
+  const zoom = nextClusterZoom(instance.getZoom(), instance.getMaxZoom());
+  if (zoom === null) {
+    openNearbyResults(ids, button);
+    return;
+  }
+  const center = marker.getLngLat(); // Anchor is an actual place nearest the group's screen center.
+  const bounds = instance.getMaxBounds();
+  if (bounds && !bounds.contains(center)) return;
+  closeNearbyResults();
+  clusterKeyboardFocus = keyboard ? { button, ids, instance } : null;
+  clusterZoomAnnouncement.value = `بزرگ‌نمایی روی ${ids.length.toLocaleString("fa-IR")} مکان نزدیک؛ سطح ${zoom.toLocaleString("fa-IR", { maximumFractionDigits: 1 })}`;
+  userControlledCamera.value = true;
+  if (journey.navigating.value) navigationFollowEnabled.value = false;
+  instance.easeTo({ center: [center.lng, center.lat], zoom, duration: 450 }, { placeSearchSelection: true });
+}
+function restoreClusterKeyboardFocus(): void {
+  const pending = clusterKeyboardFocus;
+  clusterKeyboardFocus = null;
+  if (!pending) return;
+  void nextTick(() => {
+    if (map.value !== pending.instance || pending.button.isConnected || document.activeElement !== document.body) return;
+    const firstVisible = pending.ids.map(id => resultMarkers.get(id)?.getElement()).find(element => element?.isConnected);
+    (firstVisible ?? pending.instance.getCanvas()).focus({ preventScroll: true });
+  });
+}
 function chooseNearbyResult(place: GeocodeResult): void {
   // A viewport change may have replaced the snapshot after the chooser opened.
   const current = placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId);
@@ -945,6 +981,8 @@ function chooseNearbyResult(place: GeocodeResult): void {
 // restart hides them again so they cannot clutter the live route or linger.
 const showNavigationSearchResults = ref(false);
 function clearResultMarkers(): void {
+  clusterKeyboardFocus = null;
+  clusterZoomAnnouncement.value = "";
   for (const marker of resultMarkers.values()) marker.remove();
   resultMarkers.clear();
   for (const marker of resultClusterMarkers.values()) marker.remove();
@@ -997,15 +1035,13 @@ function syncResultMarkers(): void {
         button.type = "button";
         button.className = "user-map-view__result-cluster";
         button.dir = "rtl";
-        button.setAttribute("aria-haspopup", "dialog");
-        button.setAttribute("aria-controls", "map-nearby-results");
         const count = document.createElement("span");
         count.className = "user-map-view__result-cluster__count";
         count.setAttribute("aria-hidden", "true");
         button.append(count);
         button.addEventListener("click", event => {
           event.stopPropagation();
-          openNearbyResults(group.map(hit => hit.placeId), button);
+          activateResultCluster(group.map(hit => hit.placeId), button, event.detail === 0);
         });
         button.addEventListener("keydown", event => {
           if (event.key === "Enter" || event.key === " ") event.stopPropagation();
@@ -1015,7 +1051,15 @@ function syncResultMarkers(): void {
         resultClusterMarkers.set(key, marker);
       } else marker.setLngLat([place.lon, place.lat]);
       const button = marker.getElement();
-      button.setAttribute("aria-label", `${group.length.toLocaleString("fa-IR")} نتیجهٔ نزدیک؛ نمایش فهرست مکان‌ها`);
+      const canZoom = nextClusterZoom(instance.getZoom(), instance.getMaxZoom()) !== null;
+      button.setAttribute("aria-label", `${group.length.toLocaleString("fa-IR")} نتیجهٔ نزدیک؛ ${canZoom ? "بزرگ‌نمایی روی مکان‌ها" : "نمایش فهرست مکان‌ها"}`);
+      if (canZoom) {
+        button.removeAttribute("aria-haspopup");
+        button.removeAttribute("aria-controls");
+      } else {
+        button.setAttribute("aria-haspopup", "dialog");
+        button.setAttribute("aria-controls", "map-nearby-results");
+      }
       const count = button.querySelector<HTMLElement>(".user-map-view__result-cluster__count");
       if (count) count.textContent = `+${group.length.toLocaleString("fa-IR")}`;
       button.style.setProperty("--result-color", clusterAppearance(group).color);
@@ -1744,6 +1788,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
   // Screen-space collisions change with zoom, pan, fitBounds and flyTo, even
   // when the search snapshot itself did not change.
   syncResultMarkers();
+  restoreClusterKeyboardFocus();
   if (journey.navigating.value) return;
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
   // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.

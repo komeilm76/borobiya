@@ -84,8 +84,9 @@ describe("UserMapView live overlay", () => {
     expect(teardown).toContain("planOverlayRemoval");
   });
 
-  it("never moves the camera for a peer; only explicit selection, track framing and private GPS guidance move it", () => {
-    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(9);
+  it("never moves the camera for a peer; only explicit selection, cluster drill-in, track framing and private GPS guidance move it", () => {
+    expect(view.match(/instance\.(fitBounds|easeTo|flyTo)\(/g)).toHaveLength(10);
+    expect(body("activateResultCluster")).toContain("instance.easeTo(");
     expect(view).toContain("if (!instance || journey.point.value || track.length === 0");
     expect(body("showAllSearchResults")).toContain("instance.fitBounds(");
     expect(body("frameCamera")).toContain("fitBounds");

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GeocodeResult } from "@shared/index";
-import { groupSearchResults, resultCameraPadding, resultExtent } from "./search-result-markers";
+import { groupSearchResults, nextClusterZoom, resultCameraPadding, resultExtent } from "./search-result-markers";
 
 const place = (placeId: string, lon: number, lat: number): GeocodeResult =>
   ({ placeId, lon, lat, name: placeId, address: "street", type: "place" });
@@ -42,6 +42,15 @@ describe("map search result geometry", () => {
   it("merges collision chains even when neighboring groups would otherwise cover each other", () => {
     const hits = [place("a", 0, 0), place("b", 60, 0), place("c", 120, 0)];
     expect(groupSearchResults(hits, project)).toEqual([hits]);
+  });
+  it("zooms progressively within map limits, then hands overlapping hits to the chooser", () => {
+    expect(nextClusterZoom(8, 16)).toBe(10);
+    expect(nextClusterZoom(15.2, 16)).toBe(16);
+    expect(nextClusterZoom(16, 16)).toBeNull();
+    expect(nextClusterZoom(15.99, 16)).toBeNull();
+    expect(nextClusterZoom(16, 15)).toBeNull();
+    expect(nextClusterZoom(NaN, 16)).toBeNull();
+    expect(nextClusterZoom(8, Infinity)).toBeNull();
   });
   it("reserves phone header and dock space without squeezing short screens to zero", () => {
     for (const [w, h] of [[320, 400], [360, 640], [568, 320]]) {

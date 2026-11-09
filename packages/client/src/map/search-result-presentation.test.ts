@@ -8,7 +8,7 @@ const hit = (type: string, subtype?: string): GeocodeResult => ({
 
 describe("search-result pin appearance", () => {
   it("uses verified Photon OSM key/value, not guesses from names or broad amenity keys", () => {
-    expect(resultAppearance(hit("amenity", "cafe")).icon).toBe("mdi-coffee");
+    expect(resultAppearance(hit("amenity", "cafe"))).toMatchObject({ icon: "mdi-coffee", color: "#087988" });
     expect(resultAppearance(hit("amenity", "restaurant")).icon).toBe("mdi-silverware-fork-knife");
     expect(resultAppearance(hit("tourism", "hotel")).icon).toBe("mdi-bed");
     expect(resultAppearance(hit("amenity", "fuel")).icon).toBe("mdi-gas-station");
