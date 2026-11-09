@@ -234,3 +234,12 @@ describe('command palette', () => {
     wrapper.unmount();
   });
 });
+
+describe('toast queue edge cases', () => {
+  it('skips the auto-dismiss timer when the timeout is zero', () => {
+    const toast = useToast();
+    const id = toast.push('بدون تایمر', 'info', 0);
+    expect(toast.messages.value.some((message) => message.id === id)).toBe(true);
+    toast.dismiss(id);
+  });
+});

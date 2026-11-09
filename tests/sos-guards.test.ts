@@ -345,3 +345,23 @@ describe('nearby responder search', () => {
   });
 });
 
+
+describe('admin SOS reads', () => {
+  it('serves the filtered admin list and the single-request detail', async () => {
+    // The shared fixture keeps the emergency-creation budget intact.
+    const sosId = sharedSos;
+    const list = await apiFetch(server, '/_admin/sos?status=pending&limit=5', { cookie: adminCookie });
+    expect(list.status).toBe(200);
+    expect(list.json.data.items.some((item: any) => item.id === sosId)).toBe(true);
+    for (const item of list.json.data.items) expect(item.status).toBe('pending');
+
+    const detail = await apiFetch(server, `/_admin/sos/${sosId}`, { cookie: adminCookie });
+    expect(detail.status).toBe(200);
+    expect(detail.json.data.id).toBe(sosId);
+  });
+
+  it('answers 404 for the detail of an SOS that does not exist', async () => {
+    const detail = await apiFetch(server, '/_admin/sos/sos_missing', { cookie: adminCookie });
+    expect(detail.status).toBe(404);
+  });
+});

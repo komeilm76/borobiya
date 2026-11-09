@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { apiFetch, createTestServer, login, type TestServer } from './helpers.ts';
+import { tokenHash } from '../src/server/core/crypto.ts';
 
 /**
  * Guard paths of the users and location services over HTTP: login history, account search, the
@@ -151,5 +152,24 @@ describe('username change', () => {
     expect(() => server.app.context.services.users.me(
       { userId: 'usr_ghost', sessionId: 'sess_x', username: 'ghost', role: 'user', deviceId: 'dev', ip: '127.0.0.1' }
     )).toThrow('Account not found.');
+  });
+});
+
+describe('session freshness', () => {
+  it('advances last_seen_at once the session is older than the refresh window', async () => {
+    const context = server.app.context;
+    const token = decodeURIComponent(requesterCookie.split('=')[1]!);
+    const [sessionId, secret] = token.split('.') as [string, string];
+    const stale = Date.now() - 60_000;
+    // The auth service caches verified sessions; evict the cached entry so the freshness
+    // window is evaluated against the database row we age below.
+    context.services.auth.sessionCache.delete(`${sessionId}:${tokenHash(secret)}`);
+    context.repo.run('UPDATE sessions SET last_seen_at = ? WHERE id = ?', stale, sessionId);
+
+    const response = await apiFetch(server, '/_user/me', { cookie: requesterCookie });
+    expect(response.status).toBe(200);
+
+    const row = context.repo.one<{ last_seen_at: number }>('SELECT last_seen_at FROM sessions WHERE id = ?', sessionId);
+    expect(Number(row?.last_seen_at)).toBeGreaterThan(stale);
   });
 });

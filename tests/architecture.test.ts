@@ -191,6 +191,8 @@ describe('architecture guards', () => {
       'sos-guards.test.ts',
       'core-edges.test.ts',
       'router-guard.test.ts',
+      'toast-host.test.ts',
+      'api-client.test.ts',
       'shared-geo.test.ts',
       'offline-store.test.ts',
       'websocket-hub.test.ts',

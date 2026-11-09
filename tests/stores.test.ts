@@ -288,3 +288,59 @@ describe('admin store request paths', () => {
     ]);
   });
 });
+
+describe('admin store resilience', () => {
+  it('keeps the previous state and reports the failure when a loader errors', async () => {
+    const admin = useAdminStore();
+    admin.groups = [{ id: 'grp_old', name: 'قدیمی', color: '#000', capacity: 4, incidentIds: [], status: 'active' } as never];
+    vi.stubGlobal('fetch', vi.fn(async () => failure(500, 'INTERNAL', 'سرور در دسترس نیست.')));
+
+    await admin.loadGroups();
+    expect(admin.error).toBe('سرور در دسترس نیست.');
+    expect(admin.groups).toHaveLength(1);
+    expect(admin.loading).toBe(false);
+  });
+
+  it('loads audit, settings, incident types and health without losing the filters', async () => {
+    const admin = useAdminStore();
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : String(input);
+        calls.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url.startsWith('/_admin/audit')) return envelope({ items: [{ id: 'aud_1' }], total: 1, page: 1, limit: 50 });
+        if (url.startsWith('/_admin/settings')) return envelope({ items: [{ key: 'region', value: 'tehran' }] });
+        if (url.startsWith('/_admin/incident-types')) return envelope({ items: [{ id: 'inc_1', name: 'آتش‌سوزی' }] });
+        if (url.startsWith('/_admin/system/health')) return envelope({ ok: true, db: 'up' });
+        if (url.startsWith('/_admin/dispatch')) return envelope({ items: [], total: 0 });
+        if (url.startsWith('/_admin/sos/')) return envelope({ ok: true });
+        return envelope({});
+      })
+    );
+
+    await admin.loadAudit({ action: 'LOGIN', limit: 50 });
+    const auditUrl = calls.find((entry) => entry.startsWith('GET /_admin/audit'))!;
+    expect(auditUrl).toContain('action=LOGIN');
+    expect(auditUrl).toContain('limit=50');
+    expect((admin.audit as any)?.items?.[0]?.id).toBe('aud_1');
+
+    await admin.loadSettings();
+    expect(admin.settings[0]?.key).toBe('region');
+
+    await admin.saveSettings({ region: 'isfahan' });
+    expect(calls).toContain('PUT /_admin/settings');
+    // Saving reloads the settings so the screen reflects the persisted values.
+    expect(calls.filter((entry) => entry.startsWith('GET /_admin/settings'))).toHaveLength(2);
+
+    await admin.loadIncidentTypes();
+    expect(admin.incidentTypes[0]?.id).toBe('inc_1');
+
+    await admin.loadHealth();
+    expect((admin.health as any)?.db).toBe('up');
+
+    await admin.dispatch('sos_777', 'grp_1', ['usr_responder']);
+    expect(calls).toContain('POST /_admin/sos/sos_777/dispatch');
+    expect(calls.some((entry) => entry.startsWith('GET /_admin/dispatch'))).toBe(true);
+  });
+});
