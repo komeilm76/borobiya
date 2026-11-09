@@ -29,10 +29,10 @@ describe("show all current POIs on the map", () => {
   it("shows named, keyboard-reachable place callouts rather than number-only circles", () => {
     const sync = body("syncResultMarkers");
     for (const part of ['document.createElement("bdi")', 'name.textContent = place.name',
-      'address.textContent = place.address', 'button.append(badge, copy, affordance)',
+      'address.textContent = place.address', 'button.append(badge, copy, affordance, tooltip)',
       'anchor: "bottom"', 'button.setAttribute("aria-label"',
       'placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId)',
-      'button.addEventListener("keydown"', 'button.setAttribute("title",']) {
+      'button.addEventListener("keydown"', 'tooltip.setAttribute("aria-hidden", "true")']) {
       expect(sync).toContain(part);
     }
     expect(sync).not.toContain('button.innerHTML'); // Never render Photon strings as markup.
@@ -48,6 +48,24 @@ describe("show all current POIs on the map", () => {
       ':root.dark .user-map-view .user-map-view__result-marker', '@media (forced-colors: active)']) {
       expect(css.code).toContain(part);
     }
+  });
+
+  it("keeps the chip fixed on hover and uses the workspace font in a separate address tooltip", () => {
+    const sync = body("syncResultMarkers");
+    expect(sync).not.toContain('button.setAttribute("title"'); // Native browser tooltips cannot use our Persian font.
+    expect(sync).toContain('tooltipName.textContent = place.name');
+    expect(sync).toContain('address.textContent = place.address');
+    const { descriptor } = parse(view, { filename: "UserMapView.vue" });
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
+    expect(css.errors).toEqual([]);
+    const style = descriptor.styles[0]!.content;
+    expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*font-family:\s*var\(--bb-font-family/s);
+    expect(style).toMatch(/\.user-map-view__result-marker__tooltip\)\s*\{[^}]*position:\s*absolute/s);
+    expect(style).toMatch(/\.user-map-view__result-marker__tooltip\)\s*\{[^}]*font-family:\s*inherit/s);
+    expect(style).toMatch(/\.user-map-view__result-marker:hover \.user-map-view__result-marker__tooltip\)/);
+    expect(style).toMatch(/\.user-map-view__result-marker:focus-visible \.user-map-view__result-marker__tooltip\)/);
+    expect(style).not.toMatch(/\.user-map-view__result-marker:hover\),\s*\n:global\(\.user-map-view \.user-map-view__result-marker:focus-visible\)\s*\{[^}]*(?:max-width|border-color|box-shadow|background)/s);
+    expect(css.code).toContain("pointer-events: none");
   });
 
   it("validates the current snapshot, fits all in-bounds POIs and dismisses only the phone dialog", () => {

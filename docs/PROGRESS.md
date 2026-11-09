@@ -4,9 +4,13 @@
 
 ---
 
+### 2026-10-23 — Keep map search callouts steady on hover
+
+- Follow-up to the named map results: hover no longer widens, changes the border/shadow of, or inserts an address into the place-name chip. A separate pointer-transparent address tooltip appears above the unchanged chip on hover or keyboard focus. It uses the workspace Persian font token and readable name/address weights; the native browser `title` tooltip (whose font cannot be styled) was removed. The full place and address remain in the button's accessible name, and tapping still selects the result. Nonmounted SFC/CSS contracts cover the unchanged hover geometry, safe text updates, typography and focus reveal; rendered/assistive-technology checks remain open.
+
 ### 2026-10-23 — Name the search results on the map
 
-- After «نمایش همهٔ نتایج روی نقشه», each result is now a numbered, always-visible place-name callout instead of an anonymous numbered circle. Names truncate within a capped chip; address detail appears on hover/keyboard focus, the full address remains in the button's accessible name and title, and selection still opens the existing place/route flow. On phones a compact count and «فهرست نتایج» action reopen the search list without discarding the current map results; the refit action remains. Exact-coordinate duplicates spread according to the callout footprint rather than a 44px circle, while invalidated results and map teardown retain their existing cleanup. Strings are inserted as DOM text, never HTML. Nonmounted source/CSS and geometry regressions cover the change; large duplicate groups may extend beyond a small viewport, where the list is the reliable fallback. Rendered map, touch, screen-reader and real search acceptance remain open.
+- After «نمایش همهٔ نتایج روی نقشه», each result is now a numbered, always-visible place-name callout instead of an anonymous numbered circle. Names truncate within a capped chip; address detail appears on hover/keyboard focus, the full address remains in the button's accessible name, and selection still opens the existing place/route flow. On phones a compact count and «فهرست نتایج» action reopen the search list without discarding the current map results; the refit action remains. Exact-coordinate duplicates spread according to the callout footprint rather than a 44px circle, while invalidated results and map teardown retain their existing cleanup. Strings are inserted as DOM text, never HTML. Nonmounted source/CSS and geometry regressions cover the change; large duplicate groups may extend beyond a small viewport, where the list is the reliable fallback. Rendered map, touch, screen-reader and real search acceptance remain open.
 
 ### 2026-10-23 — Distinguish remaining and traveled route during map guidance
 
