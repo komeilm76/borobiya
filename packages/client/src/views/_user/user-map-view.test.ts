@@ -307,6 +307,17 @@ describe("hold-to-select destination and map navigation", () => {
     expect(hold).toMatch(/placeSearch\.deselect\(\);\s*journey\.select\(\{ lat: location\.lat, lon: location\.lng \}\)/);
   });
 
+  it("cancels a pending map hold when another finger lands on a marker or other UI", () => {
+    const hold = body("attachHold");
+    // The surface-only pointerdown listener intentionally excludes marker buttons.
+    // A second touch on one of those buttons must still revoke the first hold.
+    expect(hold).toContain('surface.addEventListener("pointerdown", down)');
+    expect(hold).toContain('const outsideDown = (event: PointerEvent) => {');
+    expect(hold).toContain('if (event.target !== surface) hold.cancel();');
+    expect(hold).toContain('window.addEventListener("pointerdown", outsideDown)');
+    expect(hold).toContain('window.removeEventListener("pointerdown", outsideDown)');
+  });
+
   it("cancels a pending hand-picked point if the camera starts moving or is already animating", () => {
     const hold = body("attachHold");
     expect(hold).toContain('!journey.navigating.value && !instance.isMoving()');

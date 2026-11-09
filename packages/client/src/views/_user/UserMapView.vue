@@ -1747,11 +1747,17 @@ function attachHold(instance: MapLibreMap): () => void {
   const down = (event: PointerEvent) => {
     if (!journey.navigating.value && !instance.isMoving()) hold.down(pointer(event));
   };
+  // Markers and map controls are siblings of the canvas. A second finger on
+  // one of them must cancel a canvas hold without starting a hold of its own.
+  const outsideDown = (event: PointerEvent) => {
+    if (event.target !== surface) hold.cancel();
+  };
   const move = (event: PointerEvent) => hold.move(pointer(event));
   const up = (event: PointerEvent) => hold.up(event.pointerId);
   const context = (event: Event) => { if (hold.isTouchPending() || Date.now() < suppressContextUntil) event.preventDefault(); };
   surface.addEventListener("pointerdown", down);
   instance.on("movestart", hold.cancel);
+  window.addEventListener("pointerdown", outsideDown);
   window.addEventListener("pointermove", move);
   window.addEventListener("pointerup", up);
   window.addEventListener("pointercancel", up);
@@ -1760,6 +1766,7 @@ function attachHold(instance: MapLibreMap): () => void {
   return () => {
     hold.cancel(); surface.removeEventListener("pointerdown", down);
     instance.off("movestart", hold.cancel);
+    window.removeEventListener("pointerdown", outsideDown);
     window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up);
     window.removeEventListener("pointercancel", up); window.removeEventListener("blur", hold.cancel);
     surface.removeEventListener("contextmenu", context);
