@@ -55,14 +55,16 @@ export default defineConfig({
         // files import the same single-file component, so it is instrumented more than once with
         // different statement ids, and the v8 remap then reports one record or the other rather
         // than their union. The result is a whole-file difference that appears in a minority of
-        // runs — `MissionView.vue` reports 45 or 43 covered lines. Disabling `fileParallelism`,
-        // enabling `experimentalAstAwareRemapping`, and importing the components statically instead
-        // of through a computed specifier were each measured and none removed it. So the guards sit
-        // below the *lowest* figure seen in a clean checkout (90.18 / 93.55 / 90.24 / 77.91)
-        // rather than below the typical one. A threshold between the two would be a coin flip,
-        // which is how this cost a red build once already.
+        // runs — `MissionView.vue` reports 45 or 43 covered lines, and the same merge loses whole
+        // functions: a symlinked-modules run measured 90.24% functions while a frozen install
+        // measured 89.96%, below an earlier 90% guard (89.86% on another run). Disabling
+        // `fileParallelism`, enabling `experimentalAstAwareRemapping`, and importing the components
+        // statically instead of through a computed specifier were each measured and none removed it.
+        // So the guards sit below the *lowest* figure seen in the closest emulation of CI (90.02 /
+        // 93.43 / 89.86 / 77.84) rather than below the typical one. A threshold between the two
+        // would be a coin flip, which is how this cost a red build once already.
         lines: 92,
-        functions: 90,
+        functions: 89,
         statements: 89,
         branches: 77
 
