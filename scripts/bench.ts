@@ -20,7 +20,7 @@ import {
 } from '../tests/helpers.ts';
 
 /** Upper bounds for every measured value, in milliseconds. */
-export const BUDGETS = Object.freeze({
+const BUDGETS = Object.freeze({
   validationMs: 250,
   tilesMs: 700,
   healthMs: 1000,
@@ -28,7 +28,7 @@ export const BUDGETS = Object.freeze({
 });
 
 /** Result payload printed by the benchmark. */
-export interface BenchResult {
+interface BenchResult {
   validation1000Ms: number;
   tiles100Ms: number;
   concurrentHealth50Ms: number;
@@ -41,7 +41,7 @@ export interface BenchResult {
  *
  * @returns Measurements rounded to two decimals.
  */
-export async function bench(): Promise<BenchResult> {
+async function bench(): Promise<BenchResult> {
   const schema = shape({
     username: text({ min: 3, max: 32, lower: true }),
     count: number({ min: 1, max: 100, integer: true })

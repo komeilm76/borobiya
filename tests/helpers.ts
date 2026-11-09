@@ -13,7 +13,7 @@ export interface TestServer {
 }
 
 /** Parsed HTTP response with both JSON and text views. */
-export interface ApiResponse {
+interface ApiResponse {
   status: number;
   headers: Headers;
   json: any;
@@ -264,7 +264,3 @@ export function closeSocket(socket: WebSocket): Promise<void> {
   });
 }
 
-/** Resolves after a delay. */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}

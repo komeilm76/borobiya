@@ -11,7 +11,7 @@ import path from 'node:path';
 import { ROOT as REPOSITORY_ROOT } from '../src/server/core/config.ts';
 
 /** Repository root; resolved from the server config so scripts and tests agree. */
-export const ROOT = REPOSITORY_ROOT;
+const ROOT = REPOSITORY_ROOT;
 const PUBLIC = path.join(ROOT, 'public');
 const ASSETS = path.join(PUBLIC, 'assets');
 const FONTS = path.join(ASSETS, 'fonts');
@@ -77,7 +77,7 @@ async function readText(target: string): Promise<string> {
  *
  * @returns Sorted icon names without the `mdi-` prefix.
  */
-export async function iconNames(): Promise<string[]> {
+async function iconNames(): Promise<string[]> {
   const names = new Set(EXTRA_ICONS);
   const inventory = JSON.parse(await readText(ICON_INVENTORY)) as { icons?: Array<{ name: string }> };
   for (const icon of inventory.icons ?? []) names.add(String(icon.name).replace(/^mdi-/, ''));
@@ -101,7 +101,7 @@ export async function iconNames(): Promise<string[]> {
  * @returns The generated CSS text.
  * @throws When the interface references an icon the canonical font does not define.
  */
-export async function buildIconCss(): Promise<string> {
+async function buildIconCss(): Promise<string> {
   const css = await readText(MDI_CSS);
   const rules = new Map(
     [...css.matchAll(/\.mdi-([a-z0-9-]+)::before\s*\{\s*content:\s*"([^"]+)";/g)].map((match) => [match[1], match[2]] as const)
@@ -181,7 +181,7 @@ export async function staticFiles(): Promise<string[]> {
 }
 
 /** Shape of the generated service-worker cache manifest. */
-export interface CacheManifest {
+interface CacheManifest {
   version: string;
   precache: string[];
   runtime: { tileLimit: number; apiCaching: boolean };

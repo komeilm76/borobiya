@@ -9,7 +9,7 @@ import { ROOT as REPOSITORY_ROOT } from '../src/server/core/config.ts';
 const ROOT = REPOSITORY_ROOT;
 
 /** Documents every release must ship, in English. */
-export const REQUIRED_DOCUMENTS = [
+const REQUIRED_DOCUMENTS = [
   'README.md', 'design/README.md', 'design/auth/README.md', 'design/icons/README.md',
   'design/admin-panel/README.md', 'design/map-page/README.md',
   'docs/README.md', 'docs/ARCHITECTURE.md', 'docs/API.md', 'docs/WEBSOCKET.md',
@@ -30,7 +30,7 @@ async function read(relative: string): Promise<string> {
 }
 
 /** Lists every Markdown document below a directory. */
-export async function markdownFiles(directory: string): Promise<string[]> {
+async function markdownFiles(directory: string): Promise<string[]> {
   const glob = new Bun.Glob('**/*.md');
   const output: string[] = [];
   for await (const relative of glob.scan({ cwd: directory, onlyFiles: true })) output.push(path.join(directory, relative));
@@ -38,7 +38,7 @@ export async function markdownFiles(directory: string): Promise<string[]> {
 }
 
 /** Counts canonical design images (PNG and SVG). */
-export async function countDesignImages(directory: string): Promise<number> {
+async function countDesignImages(directory: string): Promise<number> {
   const glob = new Bun.Glob('**/*.{png,svg}');
   let total = 0;
   for await (const _ of glob.scan({ cwd: directory, onlyFiles: true })) total++;
@@ -46,7 +46,7 @@ export async function countDesignImages(directory: string): Promise<number> {
 }
 
 /** Counts legacy Python design tests, which must not return. */
-export async function countLegacyDesignTests(directory: string): Promise<number> {
+async function countLegacyDesignTests(directory: string): Promise<number> {
   const glob = new Bun.Glob('**/{test_*,*_test}.py');
   let total = 0;
   for await (const _ of glob.scan({ cwd: directory, onlyFiles: true })) total++;
@@ -58,7 +58,7 @@ export async function countLegacyDesignTests(directory: string): Promise<number>
  *
  * @returns A process exit code: 0 when everything passes.
  */
-export async function checkDocs(): Promise<number> {
+async function checkDocs(): Promise<number> {
   let failed = false;
   const fail = (message: string): void => {
     console.error(`check-docs: ${message}`);

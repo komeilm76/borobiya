@@ -11,7 +11,7 @@ const read = (relative: string): Promise<string> => Bun.file(path.join(ROOT, rel
 const exists = (relative: string): Promise<boolean> => Bun.file(path.join(ROOT, relative)).exists();
 
 /** Result of one acceptance check. */
-export interface AcceptanceCheck {
+interface AcceptanceCheck {
   label: string;
   passed: boolean;
 }
@@ -30,7 +30,7 @@ async function countFiles(pattern: string, filter?: (file: string) => boolean): 
  *
  * @returns One entry per checked requirement.
  */
-export async function acceptanceChecks(): Promise<AcceptanceCheck[]> {
+async function acceptanceChecks(): Promise<AcceptanceCheck[]> {
   const checklist = await read('docs/ACCEPTANCE.md');
   const manifest = JSON.parse(await read('package.json')) as {
     scripts: Record<string, string>;

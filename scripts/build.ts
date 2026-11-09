@@ -31,7 +31,7 @@ async function cleanPreviousBundle(): Promise<void> {
  *
  * @returns The byte size of the generated worker.
  */
-export async function buildServiceWorker(): Promise<number> {
+async function buildServiceWorker(): Promise<number> {
   const result = await Bun.build({
     entrypoints: ['src/client/service-worker/sw.ts'],
     target: 'browser',
