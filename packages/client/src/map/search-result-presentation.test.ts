@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GeocodeResult } from "@shared/index";
-import { resultAppearance, clusterAppearance } from "./search-result-presentation";
+import { resultAppearance, clusterAppearance, matchesSelectedSearchDestination } from "./search-result-presentation";
 
 const hit = (type: string, subtype?: string): GeocodeResult => ({
   placeId: `${type}:${subtype}`, lat: 35, lon: 51, name: "نام", address: "نشانی", type, ...(subtype ? { subtype } : {})
@@ -17,6 +17,17 @@ describe("search-result pin appearance", () => {
     expect(resultAppearance(hit("amenity")).icon).toBe("mdi-map-marker");
     expect(resultAppearance(hit("amenity", "hospital")).icon).toBe("mdi-map-marker");
     expect(resultAppearance(hit("place", "cafe")).icon).toBe("mdi-map-marker");
+  });
+  it("does not stack a second pin when the same destination gets refreshed metadata", () => {
+    const route = hit("amenity", "cafe");
+    const updated = { ...route, name: "نام تازه", address: "نشانی تازه", subtype: "restaurant" };
+    expect(matchesSelectedSearchDestination(updated, route, { lat: route.lat, lon: route.lon })).toBe(true);
+    expect(matchesSelectedSearchDestination(null, route, route)).toBe(false);
+    expect(matchesSelectedSearchDestination(updated, null, route)).toBe(false);
+    expect(matchesSelectedSearchDestination(updated, route, null)).toBe(false);
+    expect(matchesSelectedSearchDestination({ ...updated, placeId: "other" }, route, route)).toBe(false);
+    expect(matchesSelectedSearchDestination({ ...updated, lon: 51.01 }, route, route)).toBe(false);
+    expect(matchesSelectedSearchDestination(updated, route, { lat: route.lat + 0.01, lon: route.lon })).toBe(false);
   });
   it("shares a category color only for homogenous known groups", () => {
     const cafe = hit("amenity", "cafe"), park = hit("leisure", "park");

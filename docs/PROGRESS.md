@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: avoid duplicate selected-place pins after search refresh
+
+- A refreshed Photon result could keep the same OSM ID and coordinates while changing its name, address or category. The former strict metadata comparison then treated it as a different selected place, drawing a second red pin directly on top of the route's amber pin and potentially mixing fresh category text with the route's saved title. Ownership now depends on identity and coordinates, not mutable display text; the route card takes its category/icon from the route's original place snapshot. A genuinely moved result or different ID still remains distinct. Pure identity tests first reproduced the failure; nonmounted view contracts and typecheck cover the integration. Rendered-map acceptance remains open.
+
 ### 2026-10-23 — Show result names on hover and keyboard focus
 
 - Individual category pins now reveal a lightweight label containing only the current result's real place name on pointer hover or keyboard focus. It uses the app's Persian font and bidi isolation rather than an unstyled native `title`, never inserts Photon text as HTML, and remains pointer-transparent so the 48px pin and selection behavior do not change. The label wraps long names and repositions within the map canvas near its top/side edges; full name and address remain available to assistive technology through the existing button label. Cluster zoom/list behavior, selected-place callouts and mobile map controls are unchanged. Nonmounted SFC contracts and client checks cover the implementation; authenticated browser/device visual acceptance remains open.

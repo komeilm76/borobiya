@@ -82,7 +82,9 @@ describe("show all current POIs on the map", () => {
 
   it("passes only the matching selected result to the existing route card, without invented place data", () => {
     const card = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
-    expect(view).toContain(':search-place="isSelectedSearchDestination ? selectedSearchPlace : null"');
+    expect(view).toContain(':search-place="isSelectedSearchDestination ? journey.knownPlace.value : null"');
+    expect(view).toContain('matchesSelectedSearchDestination(\n  selectedSearchPlace.value, journey.knownPlace.value, journey.point.value)');
+    expect(view).not.toContain('selected.name === place.name && selected.address === place.address');
     expect(card).toContain("resultAppearance(searchPlace).icon");
     expect(card).toContain("resultAppearance(searchPlace).label");
     expect(card).toContain("{{ api.title.value }}");

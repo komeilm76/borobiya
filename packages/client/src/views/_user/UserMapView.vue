@@ -187,7 +187,7 @@
     </div>
     <PointRouteSheet ref="pointSheetRef" :api="journey" :reverse="reverse" :origin-reverse="originReverse" :own-position="own.position.value"
       :choices-open="routeChoicesOpen || transportChoicesOpen" :show-search="isPhone"
-      :search-place="isSelectedSearchDestination ? selectedSearchPlace : null" v-model:confirm-delete-open="routeDeleteConfirmOpen"
+      :search-place="isSelectedSearchDestination ? journey.knownPlace.value : null" v-model:confirm-delete-open="routeDeleteConfirmOpen"
       @start="startPointNavigation" @search="openRouteSearch" @choose-route="openRouteChoices" @choose-transport="openTransportChoices"
       @dismiss="focusDestinationMarker" @layout-change="onPointRouteLayoutChange" />
     <PointRouteChoicesSheet :api="journey" :open="routeChoicesOpen" :show-search="isPhone"
@@ -302,7 +302,7 @@ import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
 import { groupSearchResults, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
-import { clusterAppearance, resultAppearance } from "@/map/search-result-presentation";
+import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
@@ -1159,14 +1159,11 @@ async function showAllSearchResults(): Promise<void> {
 const selectedSearchPlace = computed(() => placeSearch.results.value.find(
   result => result.placeId === placeSearch.selectedPlaceId.value) ??
   placeSearch.mapResults.value.find(result => result.placeId === placeSearch.selectedPlaceId.value) ?? null);
-// Hide the purple search pin only while the same result has an amber route pin.
-// The route retains its own POI snapshot even if the search list is pruned.
-const isSelectedSearchDestination = computed(() => {
-  const selected = selectedSearchPlace.value, place = journey.knownPlace.value, point = journey.point.value;
-  return !!selected && !!place && !!point && place.lat === point.lat && place.lon === point.lon &&
-    selected.placeId === place.placeId && selected.lat === place.lat && selected.lon === place.lon &&
-    selected.name === place.name && selected.address === place.address;
-});
+// The route pin owns this OSM place at the same coordinates even when a later
+// search refresh changes its name/address/category. The route retains its own
+// selected-place snapshot; never stack a second pin over the same destination.
+const isSelectedSearchDestination = computed(() => matchesSelectedSearchDestination(
+  selectedSearchPlace.value, journey.knownPlace.value, journey.point.value));
 
 function openSelectedPlaceRoute(): void {
   if (selectedSearchPlace.value) selectPlace(selectedSearchPlace.value, true);

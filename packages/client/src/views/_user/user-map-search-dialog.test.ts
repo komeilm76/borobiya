@@ -78,8 +78,8 @@ describe("map place search handoff", () => {
 
   it("keeps the route pin distinct from search results and accessible after list refresh", () => {
     expect(view).toContain('const selectedSearchPlace = computed(');
-    expect(view).toContain('journey.knownPlace.value, point = journey.point.value');
-    expect(view).toContain('selected.placeId === place.placeId');
+    expect(view).toContain('matchesSelectedSearchDestination(\n  selectedSearchPlace.value, journey.knownPlace.value, journey.point.value)');
+    expect(view).toContain(':search-place="isSelectedSearchDestination ? journey.knownPlace.value : null"');
     expect(body('syncSelectedPlaceMarker')).toContain('isSelectedSearchDestination.value ? null : selectedSearchPlace.value');
     expect(body('syncSelectedPlaceMarker')).toContain('openSelectedPlaceRoute()');
     expect(body('openSelectedPlaceRoute')).toContain('selectPlace(selectedSearchPlace.value, true)');

@@ -20,6 +20,20 @@ const styles: Record<string, ResultAppearance> = {
 export function resultAppearance(place: GeocodeResult): ResultAppearance {
   return styles[`${place.type}:${place.subtype ?? ""}`] ?? generic;
 }
+/** A geocoder may refresh a name, address or category without moving the
+ * selected OSM place. The route owns that pin until its identity/point changes;
+ * its independently saved label must not be overwritten by a search refresh.
+ */
+export function matchesSelectedSearchDestination(
+  selected: GeocodeResult | null, routePlace: GeocodeResult | null,
+  point: { lat: number; lon: number } | null
+): boolean {
+  return !!selected && !!routePlace && !!point &&
+    selected.placeId === routePlace.placeId &&
+    selected.lat === routePlace.lat && selected.lon === routePlace.lon &&
+    point.lat === routePlace.lat && point.lon === routePlace.lon;
+}
+
 export function clusterAppearance(places: readonly GeocodeResult[]): ResultAppearance {
   const first = places[0] && resultAppearance(places[0]);
   return first && first !== generic && places.every(place => resultAppearance(place) === first) ? first : mixed;
