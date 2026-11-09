@@ -38,8 +38,10 @@ describe('device labels recorded at sign-in', () => {
       });
       expect(response.status, response.text).toBe(200);
 
+      // created_at is millisecond INTEGER; back-to-back logins can share a value, so tie-break on
+      // insertion order instead of relying on an unspecified sort.
       const row = server.app.context.repo.one<{ device_name: string }>(
-        'SELECT device_name FROM sessions ORDER BY created_at DESC LIMIT 1');
+        'SELECT device_name FROM sessions ORDER BY rowid DESC LIMIT 1');
       expect(row?.device_name).toBe(expected);
     });
   }
