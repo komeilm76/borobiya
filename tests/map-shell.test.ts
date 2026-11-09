@@ -284,3 +284,54 @@ describe('mobile shell', () => {
     }
   });
 });
+
+describe('shell interactions', () => {
+  it('reloads the SOS rail when dispatched and accepted events arrive', async () => {
+    const shell = await mountShell();
+    const before = shell.spies.sosLoad.mock.calls.length;
+    // Each event type has its own handler because the SOS rail sources differ; a missing
+    // subscription would leave a responder's view stale after the operation moves on.
+    await shell.emit(HTTP_EVENTS.SOS_DISPATCHED, { sosId: 'sos_1' });
+    await shell.emit(HTTP_EVENTS.SOS_ACCEPTED, { sosId: 'sos_1' });
+    await shell.emit(HTTP_EVENTS.MISSION_UPDATED, { missionId: 'm_1' });
+    expect(shell.spies.sosLoad.mock.calls.length).toBe(before + 3);
+    shell.wrapper.unmount();
+  });
+
+  it('cancels the SOS hold when the pointer slides off the button', async () => {
+    const shell = await mountShell();
+    const button = shell.wrapper.find('[data-testid="sos-hold"]');
+
+    await button.trigger('pointerdown');
+    expect(button.classes()).toContain('is-holding');
+    // Sliding off cancels the hold — same contract as pointerup/pointercancel.
+    await button.trigger('pointerleave');
+    await shell.advance(2000);
+    expect(button.classes()).not.toContain('is-holding');
+    expect(shell.navigations).not.toHaveBeenCalledWith({ name: ROUTE_NAMES.sos });
+    shell.wrapper.unmount();
+  });
+
+  it('navigates to the map when the search form is submitted', async () => {
+    const shell = await mountShell('/_user/companions');
+    const form = shell.wrapper.find('form.search-bar');
+    await form.trigger('submit');
+    expect(shell.navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.map });
+    shell.wrapper.unmount();
+  });
+
+  it('navigates to the profile when the avatar is pressed', async () => {
+    const shell = await mountShell('/_user/map');
+    await shell.wrapper.find('.avatar-control').trigger('click');
+    expect(shell.navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile });
+    shell.wrapper.unmount();
+  });
+
+  it('recenters the map when the crosshairs control is pressed', async () => {
+    const shell = await mountShell();
+    const before = shell.spies.startLocation.mock.calls.length;
+    await shell.wrapper.find('[aria-label="مرکز نقشه"]').trigger('click');
+    expect(shell.spies.startLocation.mock.calls.length).toBe(before + 1);
+    shell.wrapper.unmount();
+  });
+});
