@@ -83,6 +83,14 @@ describe('auth store', () => {
     await expect(auth.login('saeed.k', 'DemoPass!2026', 'Vitest')).rejects.toBeInstanceOf(ApiError);
   });
 
+  it('refuses a register whose follow-up refresh cannot establish a session', async () => {
+    const auth = useAuthStore();
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      String(url).includes('/_auth/register') ? envelope({ userId: 'usr_new' }) : failure(401, 'UNAUTHORIZED')
+    ));
+    await expect(auth.register('new.user', 'NewUser!2026', [])).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
   it('caches the security-question catalog between calls', async () => {
     const auth = useAuthStore();
     const fetchMock = vi.fn(async () => envelope({ items: [{ id: 'q1', label: 'پرسش' }] }));

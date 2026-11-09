@@ -37,14 +37,22 @@ import { mapTileKey, renderMapTile } from '../src/server/domain/map.ts';
 import { canCancelSos, missionStageIndex, transitionSos } from '../src/server/domain/state.ts';
 import {
   array,
+  boolean,
+  loginSecret,
   number,
+  oneOf,
   optional,
   parse,
+  password,
+  queryObject,
   shape,
   text,
   withDefault
 } from '../src/server/core/validate.ts';
+import { displayText } from '../src/server/core/validate.ts';
 import { Repository } from '../src/server/db/repository.ts';
+import { ok, raw, Router } from '../src/server/core/router.ts';
+import { RateLimiters } from '../src/server/core/rate-limit.ts';
 import { apiFetch, createTestServer, type TestServer } from './helpers.ts';
 
 /**
@@ -216,6 +224,42 @@ describe('validator refusal paths', () => {
     expect(withDefault(text({ min: 1 }), 'fb')(undefined, 'field')).toBe('fb');
     expect(withDefault(text({ min: 1 }), 'fb')(null, 'field')).toBe('fb');
     expect(withDefault(text({ min: 1 }), 'fb')('real', 'field')).toBe('real');
+  });
+});
+
+describe('rate limiter defaults', () => {
+  it('consumes a single token per call and defaults the bucket window', () => {
+    const clock = (): number => 1_000_000;
+    const limiters = new RateLimiters(clock);
+    const rule = { name: 'test-default', capacity: 2, refillPerSecond: 1 }; // no windowMs: the default window applies
+    expect(limiters.consume(rule, 'k').allowed).toBe(true);
+    expect(limiters.consume(rule, 'k').allowed).toBe(true);
+    // Third call exhausts the bucket and reports a retry delay.
+    expect(limiters.consume(rule, 'k').allowed).toBe(false);
+  });
+});
+
+describe('router edge paths', () => {
+  it('generates an operation summary and api tag for routes that declare neither', () => {
+    const router = new Router<object>();
+    router.add({ method: 'GET', path: '/_public/thing', auth: 'none', handler: () => ok({ ok: true }) });
+    const doc = router.openapi('Test API', '1.0.0') as any;
+    const operation = doc.paths['/_public/thing'].get;
+    expect(operation.summary).toBe('GET /_public/thing');
+    expect(operation.tags).toEqual(['api']);
+    expect(operation.security).toEqual([]);
+  });
+
+  it('answers raw without options and refuses a percent-broken path parameter', () => {
+    const bare = raw('plain', 'text/plain');
+    expect(bare.status).toBe(200);
+    expect(bare.envelope).toBe(false);
+    expect(bare.contentType).toBe('text/plain');
+
+    const router = new Router<object>();
+    router.add({ method: 'GET', path: '/_user/sos/:id', auth: 'user', handler: () => ok({ ok: true }) });
+    expect(router.match('GET', '/_user/sos/%E0%A4%A')).toBe(null);
+    expect(router.match('GET', '/_user/sos/abc123')?.params).toEqual({ id: 'abc123' });
   });
 });
 
@@ -565,6 +609,12 @@ describe('HTTP response primitives', () => {
     expect(await response.text()).toBe('');
   });
 
+  it('decorates a bare response when no options are given', () => {
+    const response = bufferResponse(new Request('http://test.example/'), 418, new TextEncoder().encode('teapot'));
+    expect(response.status).toBe(418);
+    expect(response.headers.get('Content-Type')).toBe('application/octet-stream');
+  });
+
   it('appends repeated headers given as arrays and skips compression for small bodies', () => {
     const response = bufferResponse(new Request('http://test.example/'), 200, new TextEncoder().encode('hi'), {
       headers: { 'Set-Cookie': ['a=1; Path=/', 'b=2; Path=/'] }
@@ -651,5 +701,31 @@ describe('map tile rendering edges', () => {
     expect(labeled).toContain('دانشگاه');
     expect(renderMapTile(14, 1, 1)).toContain('<svg');
     expect(renderMapTile(14, 99_999, 0)).toBe(null);
+  });
+});
+
+describe('validator acceptance paths without a path argument', () => {
+  it('accepts validators called with no field path at all', () => {
+    // Each factory below defaults the path argument; every one of them must still validate.
+    expect(text({ min: 1 })('ok')).toBe('ok');
+    expect(number({ min: 0 })(3)).toBe(3);
+    expect(boolean()(true)).toBe(true);
+    expect(oneOf(['a', 'b'] as const)('a')).toBe('a');
+    expect(array(number())([1, 2])).toEqual([1, 2]);
+    expect(password('Str0ngPassword')).toBe('Str0ngPassword');
+    expect(loginSecret('whatever-goes')).toBe('whatever-goes');
+    expect(displayText()('x')).toBe('x');
+    expect(shape({ a: text({ min: 1 }) })({ a: 'x' })).toEqual({ a: 'x' });
+  });
+
+  it('accepts a null-prototype object as a plain object body', () => {
+    const body = Object.create(null);
+    body.a = 'x';
+    expect(parse(shape({ a: text({ min: 1 }) }), body, 'body')).toEqual({ a: 'x' });
+  });
+
+  it('keeps the first value when a query string carries a repeated key', () => {
+    const parsed = queryObject(new URLSearchParams('a=first&a=second&b=only'));
+    expect(parsed).toEqual({ a: 'first', b: 'only' });
   });
 });

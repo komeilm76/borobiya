@@ -81,6 +81,26 @@ describe('requestId-less messages', () => {
   });
 });
 
+describe('unexpected handler failures', () => {
+  it('answers with an internal error frame and keeps the socket usable', async () => {
+    const users = server.app.context.services.users;
+    const original = users.sync;
+    users.sync = () => { throw new TypeError('synthetic handler failure'); };
+    try {
+      const error = waitForMessage(ownerSocket, (message) => message.type === WS_EVENTS.ERROR && message.code === 'INTERNAL');
+      sendJson(ownerSocket, { type: 'sync' });
+      const message = await error;
+      expect(message.message).toBe('Realtime handler failed.');
+    } finally {
+      users.sync = original;
+    }
+    // The connection survives the failure.
+    const pong = waitForMessage(ownerSocket, (message) => message.type === WS_EVENTS.PONG);
+    sendJson(ownerSocket, { type: WS_EVENTS.PING });
+    expect((await pong).type).toBe(WS_EVENTS.PONG);
+  });
+});
+
 describe('final session disconnect', () => {
   it('tears down the talk floor when the far end vanishes for good', async () => {
     const started = waitForMessage(ownerSocket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.TALK_START);

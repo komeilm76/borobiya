@@ -174,8 +174,9 @@ describe('mission and SOS state drift', () => {
       });
       expect(step.status, `${action}: ${step.text}`).toBe(200);
     }
+    // The note arm lives in sos-guards (it rates with a note); here the note is omitted.
     const rated = await apiFetch(server, `/_user/missions/${missionId}/rating`, {
-      method: 'POST', cookie: requesterCookie, body: { rating: 5, note: 'سریع و مؤدب رسیدند.' }
+      method: 'POST', cookie: requesterCookie, body: { rating: 5 }
     });
     expect(rated.status, rated.text).toBe(200);
     expect(rated.json.data.rating).toBe(5);
@@ -190,6 +191,13 @@ describe('cancellation reason requirements', () => {
     });
     expect(thin.status).toBe(400);
     expect(thin.json.error.details.field).toBe('body.detail');
+
+    // Omitting the detail entirely passes the body schema and must be refused by the service itself.
+    const missing = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
+      method: 'POST', cookie: requesterCookie, body: { reasonId: 'cancel_other' }
+    });
+    expect(missing.status).toBe(400);
+    expect(missing.json.error.details.field).toBe('detail');
 
     const proper = await apiFetch(server, `/_user/sos/${sosId}/cancel`, {
       method: 'POST', cookie: requesterCookie, body: { reasonId: 'cancel_other', detail: 'همسرم رسید و نیازی به نیرو نبود.' }

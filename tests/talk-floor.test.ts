@@ -317,3 +317,12 @@ describe('inspection', () => {
     expect(f.floor.stats()).toEqual({ active: 1, users: 2 });
   });
 });
+
+describe('floor bookkeeping', () => {
+  it('releases nothing when the by-user index dangles above a retired talk', () => {
+    const state = startTalk(f.floor);
+    // Simulate a partially torn-down floor: the index entry survives, the talk does not.
+    (f.floor as unknown as { talks: Map<number, unknown> }).talks.delete(state.talkId);
+    expect(f.floor.releaseUser(SPEAKER, 'disconnected')).toEqual([]);
+  });
+});

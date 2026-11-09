@@ -128,6 +128,29 @@ describe('connection state', () => {
   });
 });
 
+describe('store teardown', () => {
+  it('runs the registered unsubscribe functions when the owning pinia is disposed', () => {
+    // The store's disposer lives on pinia's store scope, so disposal goes through $dispose.
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const store = useRealtimeStore();
+    const offs: string[] = [];
+    const client = store.client as unknown as {
+      on: (type: string, listener: (payload: unknown) => void) => () => void;
+    };
+    const original = client.on.bind(client);
+    vi.spyOn(client, 'on').mockImplementation((type: string, listener: (payload: unknown) => void) => {
+      const off = original(type, listener);
+      return () => { offs.push(type); off(); };
+    });
+
+    store.on('sos.created', () => undefined);
+    expect(offs).toEqual([]);
+    store.$dispose();
+    expect(offs).toEqual(['sos.created']);
+  });
+});
+
 describe('durable cursor', () => {
   it('adopts the cursor the server sends in its hello', async () => {
     const { store, stop } = await connectedStore();

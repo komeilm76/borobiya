@@ -39,6 +39,23 @@ describe('session rotation refusals', () => {
     context.repo.run('UPDATE users SET active = 1 WHERE username = ?', 'saeed.k');
   });
 
+  it('refuses a session cached under a key whose stored hash was corrupted', async () => {
+    const cookie = await login(server, 'reza.m', 'DemoPass!2026');
+    const token = decodeURIComponent(cookie.split('=')[1]!);
+    const [sessionId, secret] = token.split('.') as [string, string];
+    const key = `${sessionId}:${tokenHash(secret)}`;
+    const cache = server.app.context.services.auth.sessionCache;
+    const cached = cache.get(key);
+    expect(cached).toBeTruthy();
+    // Poison the entry: same key, a hash the presented token cannot match.
+    cache.set(key, { ...cached!, tokenHash: '00'.repeat(32) });
+
+    const response = await apiFetch(server, '/_user/logins', { cookie });
+    expect(response.status).toBe(401);
+    // The poisoned entry was evicted, not served.
+    expect(cache.get(key)).toBeFalsy();
+  });
+
   it('clears the cookie on logout even when no session exists', async () => {
     const response = await apiFetch(server, '/_auth/logout', { method: 'POST', cookie: 'bb_session=garbage.signature' });
     expect(response.status).toBe(200);

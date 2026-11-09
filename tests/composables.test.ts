@@ -243,3 +243,30 @@ describe('toast queue edge cases', () => {
     toast.dismiss(id);
   });
 });
+
+describe('async action success reporting', () => {
+  it('toasts the configured success message when the action resolves', async () => {
+    const toast = useToast();
+    const before = toast.messages.value.length;
+    const action = useAsyncAction(async () => 'done', { successMessage: 'انجام شد' });
+    expect(await action.run()).toBe('done');
+    expect(toast.messages.value.slice(before).some((item) => item.message === 'انجام شد')).toBe(true);
+  });
+});
+
+describe('SOS hold re-entry', () => {
+  it('ignores a second start while a hold is already in progress', () => {
+    vi.useFakeTimers();
+    const fired: number[] = [];
+    const hold = useSosHold(() => fired.push(Date.now()), 300);
+    hold.start();
+    expect(hold.holding.value).toBe(true);
+    // A second start must not restart the hold.
+    hold.start();
+    expect(hold.holding.value).toBe(true);
+    vi.advanceTimersByTime(120);
+    expect(fired.length).toBe(0);
+    hold.stop();
+    vi.useRealTimers();
+  });
+});

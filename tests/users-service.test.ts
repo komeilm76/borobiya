@@ -233,3 +233,13 @@ describe('explicit and defaulted place ranks', () => {
     expect(after.json.data.items.find((item: any) => item.id === withRank).rank).toBe(1);
   });
 });
+
+describe('place rank defaults', () => {
+  it('assigns the next rank after the current maximum when none is supplied', async () => {
+    const first = await apiFetch(server, '/_user/places', { method: 'POST', cookie: otherCookie, body: PLACE });
+    expect(first.status, first.text).toBe(201);
+    const second = await apiFetch(server, '/_user/places', { method: 'POST', cookie: otherCookie, body: PLACE });
+    expect(second.status, second.text).toBe(201);
+    expect(second.json.data.rank).toBe(first.json.data.rank + 1);
+  });
+});
