@@ -183,6 +183,7 @@ describe('architecture guards', () => {
       'talk-floor.test.ts',
       'map-canvas.test.ts',
       'offline-store.test.ts',
+      'websocket-hub.test.ts',
       'realtime-client.test.ts',
       'smoke.test.ts'
     ]) {
