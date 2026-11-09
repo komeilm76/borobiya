@@ -1,37 +1,36 @@
 import type { GeocodeResult } from "@shared/index";
 
-/** Displace only exact-coordinate duplicates so every result remains independently tappable. */
-export function resultMarkerOffsets(places: readonly GeocodeResult[]): Map<string, [number, number]> {
-  const groups = new Map<string, GeocodeResult[]>();
-  for (const place of places) {
-    const key = `${place.lon}:${place.lat}`;
-    const group = groups.get(key) ?? [];
-    group.push(place);
-    groups.set(key, group);
-  }
-  const offsets = new Map<string, [number, number]>();
-  for (const group of groups.values()) {
-    if (group.length === 1) { offsets.set(group[0]!.placeId, [0, 0]); continue; }
-    // All callouts in a duplicate group use the same radius. An individual
-    // radius per result can pull two neighboring labels back into each other.
-    const angles = group.map((_, index) => 2 * Math.PI * index / group.length - Math.PI / 2);
-    const width = group.length > 12 ? 128 : 168; // Matches the capped CSS widths.
-    let radius = 0;
-    for (let i = 0; i < group.length; i++) {
-      for (let j = i + 1; j < group.length; j++) {
-        const dx = Math.abs(Math.cos(angles[i]!) - Math.cos(angles[j]!));
-        const dy = Math.abs(Math.sin(angles[i]!) - Math.sin(angles[j]!));
-        // Clearing either axis separates these 48px-tall rectangles. Add a
-        // gap before rounding the pixel offsets and cap name width in CSS.
-        radius = Math.max(radius, Math.min(dx ? (width + 12) / dx : Infinity, dy ? 60 / dy : Infinity));
-      }
+/** Group projected hits whose named callouts would overlap at the current zoom.
+ * Connected components ensure a chain cannot leave two cluster buttons atop
+ * each other. Keep the snapshot order (and every hit) for stable list selection.
+ */
+export function groupSearchResults(
+  places: readonly GeocodeResult[], project: (place: GeocodeResult) => { x: number; y: number },
+  chipWidth = 168, chipHeight = 48
+): GeocodeResult[][] {
+  const points = places.map(project);
+  const parent = places.map((_, index) => index);
+  const root = (index: number): number => {
+    while (parent[index] !== index) index = parent[index]!;
+    return index;
+  };
+  for (let i = 0; i < places.length; i++) {
+    for (let j = i + 1; j < places.length; j++) {
+      // Using the widest callout (dense ones are smaller) plus an 8px gap
+      // keeps labels from covering other result targets at the current zoom.
+      if (Math.abs(points[i]!.x - points[j]!.x) >= chipWidth + 8 ||
+          Math.abs(points[i]!.y - points[j]!.y) >= chipHeight + 8) continue;
+      parent[root(j)] = root(i);
     }
-    group.forEach((place, index) => {
-      const angle = angles[index]!;
-      offsets.set(place.placeId, [Math.round(radius * Math.cos(angle)), Math.round(radius * Math.sin(angle))]);
-    });
   }
-  return offsets;
+  const groups = new Map<number, GeocodeResult[]>();
+  places.forEach((place, index) => {
+    const id = root(index);
+    const group = groups.get(id) ?? [];
+    group.push(place);
+    groups.set(id, group);
+  });
+  return [...groups.values()];
 }
 
 /** Keep the camera bounded to the displayed snapshot, never to stale/unvalidated hits. */

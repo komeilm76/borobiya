@@ -28,6 +28,25 @@
       <span v-else-if="!placeSearch.results.value.length" role="status">در این محدوده نتیجهٔ جدیدی نیست.</span>
     </div>
 
+    <!-- A cluster represents nearby results at this zoom, including exact duplicates.
+         Keep their individual selection in a bounded, nonmodal list, not hover UI. -->
+    <section v-if="nearbyPlaces.length > 1 && showAllResultsOnMap && !activeTool" id="map-nearby-results"
+      class="user-map-view__nearby-results" role="dialog" aria-modal="false" aria-labelledby="map-nearby-title"
+      tabindex="-1" @keydown.esc.stop.prevent="closeNearbyResults(true)">
+      <header class="user-map-view__nearby-header">
+        <h2 id="map-nearby-title">{{ nearbyPlaces.length.toLocaleString('fa-IR') }} مکان نزدیک</h2>
+        <button type="button" aria-label="بستن فهرست مکان‌های نزدیک" @click="closeNearbyResults(true)">✕</button>
+      </header>
+      <ul class="user-map-view__nearby-list" aria-label="مکان‌های نزدیک">
+        <li v-for="place in nearbyPlaces" :key="place.placeId">
+          <button type="button" @click="chooseNearbyResult(place)">
+            <bdi dir="auto" class="user-map-view__nearby-name">{{ place.name }}</bdi>
+            <bdi dir="auto" class="user-map-view__nearby-address">{{ place.address }}</bdi>
+          </button>
+        </li>
+      </ul>
+    </section>
+
     <!-- Isolate Vuetify's layout registration from the app shell: the map must stay full-screen. -->
     <div v-if="isPhone && !journey.navigating.value" class="user-map-view__dock-frame" @keydown.esc.stop="closeTool()">
       <v-layout class="user-map-view__dock-layout">
@@ -275,7 +294,7 @@ import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
-import { resultCameraPadding, resultExtent, resultMarkerOffsets } from "@/map/search-result-markers";
+import { groupSearchResults, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
 import { createNavigationAlert } from "@/map/navigation-alert";
@@ -411,6 +430,7 @@ async function selectTool(next: MapTool | null | undefined): Promise<void> {
   const selected = next ?? null;
   const previous = activeTool.value;
   if (selected === previous) return;
+  if (selected) closeNearbyResults();
   activeTool.value = selected;
   if (selected === "history") { historySuppressedAfterRouteClear.value = false; paintPlayback(); }
   await nextTick();
@@ -879,33 +899,123 @@ const userControlledCamera = ref(false);
 const historySuppressedAfterRouteClear = ref(false);
 let selectedPlaceMarker: Marker | null = null;
 const resultMarkers = new Map<string, Marker>();
+const resultClusterMarkers = new Map<string, Marker>();
 const showAllResultsOnMap = placeSearch.mapActive;
+const nearbyResultIds = ref<string[]>([]);
+const nearbyPlaces = computed(() => showAllResultsOnMap.value ? nearbyResultIds.value
+  .map(id => placeSearch.mapResults.value.find(hit => hit.placeId === id))
+  .filter((hit): hit is GeocodeResult => !!hit) : []);
+let nearbyReturnFocus: HTMLElement | null = null;
+let nearbyFocusGeneration = 0;
+function closeNearbyResults(restoreFocus = false): void {
+  nearbyResultIds.value = [];
+  const target = nearbyReturnFocus;
+  nearbyReturnFocus = null;
+  const generation = ++nearbyFocusGeneration;
+  if (restoreFocus) void nextTick(() => {
+    // A selection or tool switch can dismiss this chooser again before focus returns.
+    if (generation !== nearbyFocusGeneration) return;
+    if (target?.isConnected) target.focus();
+    else (document.getElementById("map-tool-search") ?? document.getElementById("map-search-panel"))?.focus();
+  });
+}
+function openNearbyResults(ids: string[], button: HTMLElement): void {
+  if (!showAllResultsOnMap.value || ids.length < 2 ||
+      ids.some(id => !placeSearch.mapResults.value.some(hit => hit.placeId === id))) return;
+  nearbyFocusGeneration++;
+  nearbyResultIds.value = ids;
+  nearbyReturnFocus = button;
+  void nextTick(() => document.getElementById("map-nearby-results")?.focus());
+}
+function chooseNearbyResult(place: GeocodeResult): void {
+  // A viewport change may have replaced the snapshot after the chooser opened.
+  const current = placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId);
+  if (!current || current !== place) return;
+  closeNearbyResults();
+  selectPlace(current, true);
+}
 // Only an explicit Show All request during guidance exposes POI pins. A follow
 // restart hides them again so they cannot clutter the live route or linger.
 const showNavigationSearchResults = ref(false);
 function clearResultMarkers(): void {
   for (const marker of resultMarkers.values()) marker.remove();
   resultMarkers.clear();
+  for (const marker of resultClusterMarkers.values()) marker.remove();
+  resultClusterMarkers.clear();
+  closeNearbyResults();
 }
 function syncResultMarkers(): void {
   const instance = map.value;
   const places = showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value) &&
     instance && markerConstructor && auth.user?.id
     ? placeSearch.mapResults.value : [];
-  // While following, the selected POI pin is suppressed. In an explicit
-  // overview show it as a numbered result unless the amber destination pin
-  // already represents that same place.
+  // A selected place already has its purple or amber pin, except in the
+  // explicit navigation overview where it is still a search result.
   const excludedId = journey.navigating.value && showNavigationSearchResults.value && !isSelectedSearchDestination.value
     ? null : placeSearch.selectedPlaceId.value;
-  const current = new Set(places.filter(place => place.placeId !== excludedId)
-    .map(place => place.placeId));
+  const visiblePlaces = places.filter(place => place.placeId !== excludedId);
+  const rem = typeof document === "undefined" ? 16 : parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const chipWidth = Math.max(44, Math.min(10.5 * rem, window.innerWidth - 1.5 * rem));
+  const chipHeight = Math.max(48, rem * (0.875 * 1.5 + 0.6) + 2);
+  const groups = instance ? groupSearchResults(visiblePlaces,
+    place => instance.project([place.lon, place.lat]), chipWidth, chipHeight) : [];
+  const singles = new Set(groups.filter(group => group.length === 1).map(group => group[0]!.placeId));
+  const clusters = new Set(groups.filter(group => group.length > 1).map(group => JSON.stringify(group.map(hit => hit.placeId))));
   for (const [id, marker] of resultMarkers) {
-    if (!current.has(id)) { marker.remove(); resultMarkers.delete(id); }
+    if (!singles.has(id)) { marker.remove(); resultMarkers.delete(id); }
   }
+  for (const [key, marker] of resultClusterMarkers) {
+    if (!clusters.has(key)) { marker.remove(); resultClusterMarkers.delete(key); }
+  }
+  if (nearbyResultIds.value.length && !groups.some(group => group.length > 1 &&
+      JSON.stringify(group.map(hit => hit.placeId)) === JSON.stringify(nearbyResultIds.value))) closeNearbyResults(true);
   if (!instance || !markerConstructor) return;
-  const offsets = resultMarkerOffsets(places);
-  for (const [index, place] of places.entries()) {
-    if (place.placeId === excludedId) continue; // The selected POI or amber route pin already represents it.
+  for (const group of groups) {
+    if (group.length > 1) {
+      const key = JSON.stringify(group.map(hit => hit.placeId));
+      // Place the count on an actual result nearest the screen-space center,
+      // not at an invented coordinate or the far end of a collision chain.
+      const points = group.map(hit => instance.project([hit.lon, hit.lat]));
+      const center = points.reduce((sum, point) => ({ x: sum.x + point.x / points.length,
+        y: sum.y + point.y / points.length }), { x: 0, y: 0 });
+      const anchorIndex = points.reduce((best, point, index) =>
+        Math.hypot(point.x - center.x, point.y - center.y) <
+        Math.hypot(points[best]!.x - center.x, points[best]!.y - center.y) ? index : best, 0);
+      const place = group[anchorIndex]!;
+      let marker = resultClusterMarkers.get(key);
+      if (!marker) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "user-map-view__result-cluster";
+        button.dir = "rtl";
+        button.setAttribute("aria-haspopup", "dialog");
+        button.setAttribute("aria-controls", "map-nearby-results");
+        const count = document.createElement("span");
+        count.className = "user-map-view__result-cluster__count";
+        count.setAttribute("aria-hidden", "true");
+        const label = document.createElement("span");
+        label.textContent = "مکان نزدیک";
+        label.setAttribute("aria-hidden", "true");
+        button.append(count, label);
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          openNearbyResults(group.map(hit => hit.placeId), button);
+        });
+        button.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") event.stopPropagation();
+        });
+        marker = new markerConstructor({ element: button, anchor: "bottom", offset: [0, -6] })
+          .setLngLat([place.lon, place.lat]).addTo(instance);
+        resultClusterMarkers.set(key, marker);
+      } else marker.setLngLat([place.lon, place.lat]);
+      const button = marker.getElement();
+      button.setAttribute("aria-label", `${group.length.toLocaleString("fa-IR")} نتیجهٔ نزدیک؛ نمایش فهرست مکان‌ها`);
+      const count = button.querySelector<HTMLElement>(".user-map-view__result-cluster__count");
+      if (count) count.textContent = group.length.toLocaleString("fa-IR");
+      continue;
+    }
+    const place = group[0]!;
+    const index = places.indexOf(place);
     let marker = resultMarkers.get(place.placeId);
     if (!marker) {
       const button = document.createElement("button");
@@ -927,26 +1037,20 @@ function syncResultMarkers(): void {
       const affordance = document.createElement("span");
       affordance.className = "user-map-view__result-marker__affordance mdi mdi-chevron-left";
       affordance.setAttribute("aria-hidden", "true");
-      // Keep only the always-visible place name on the map. The button's
-      // accessible name includes the address; tapping opens the full detail.
       button.append(badge, copy, affordance);
       button.addEventListener("click", (event) => {
-        event.stopPropagation(); // Do not reverse-geocode a POI tap as an arbitrary map click.
-        // Read the current result, never the captured response: a new query may have invalidated it.
+        event.stopPropagation();
+        // Never act on a captured hit after a viewport request invalidated it.
         const currentPlace = placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId);
         if (showAllResultsOnMap.value && currentPlace) selectPlace(currentPlace, true);
       });
       button.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") event.stopPropagation();
-      }); // Native button keyboard activation fires click once; Tab must still move focus.
-      const [x, y] = offsets.get(place.placeId) ?? [0, 0];
-      marker = new markerConstructor({ element: button, anchor: "bottom", offset: [x, y - 6] })
+      }); // Native button activation; Tab still moves focus.
+      marker = new markerConstructor({ element: button, anchor: "bottom", offset: [0, -6] })
         .setLngLat([place.lon, place.lat]).addTo(instance);
       resultMarkers.set(place.placeId, marker);
-    } else {
-      const [x, y] = offsets.get(place.placeId) ?? [0, 0];
-      marker.setLngLat([place.lon, place.lat]).setOffset([x, y - 6]);
-    }
+    } else marker.setLngLat([place.lon, place.lat]);
     const button = marker.getElement();
     button.classList.toggle("user-map-view__result-marker--dense", places.length > 12);
     button.setAttribute("aria-label", `نتیجهٔ ${(index + 1).toLocaleString("fa-IR")} از ${places.length.toLocaleString("fa-IR")}: ${place.name}، ${place.address}؛ انتخاب مقصد`);
@@ -954,7 +1058,6 @@ function syncResultMarkers(): void {
     if (number) number.textContent = (index + 1).toLocaleString("fa-IR");
     const name = button.querySelector<HTMLElement>(".user-map-view__result-marker__name");
     if (name) name.textContent = place.name;
-
   }
 }
 async function showAllSearchResults(): Promise<void> {
@@ -963,6 +1066,7 @@ async function showAllSearchResults(): Promise<void> {
   const bounds = instance.getMaxBounds();
   if (bounds && placeSearch.results.value.some(place => !bounds.contains([place.lon, place.lat]))) return;
   if (!placeSearch.showOnMap()) return;
+  closeNearbyResults();
   const places = placeSearch.mapResults.value;
   if (bounds && places.some(place => !bounds.contains([place.lon, place.lat]))) return;
   const extent = resultExtent(places);
@@ -1053,6 +1157,7 @@ function selectPlace(place: GeocodeResult, fromMap = false): void {
   const current = placeSearch.results.value.find(hit => hit.placeId === place.placeId) ??
     (showAllResultsOnMap.value ? placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId) : null);
   if (current !== place || !placeSearch.select(place)) return;
+  closeNearbyResults();
   userControlledCamera.value = true;
   // MapLibre forwards eventData to moveend. This camera flight must keep the other search
   // results selectable; an actual pan/zoom afterwards will refresh the visible-bbox search.
@@ -1622,6 +1727,9 @@ function onMapMoving(event: MapMovementEvent): void {
 
 function onMapMoveEnd(event: MapMovementEvent): void {
   markUserCameraMove(event); // Also cover gestures whose start preceded this listener.
+  // Screen-space collisions change with zoom, pan, fitBounds and flyTo, even
+  // when the search snapshot itself did not change.
+  syncResultMarkers();
   if (journey.navigating.value) return;
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
   // discard the other hits. A subsequent physical map move can refresh the visible-bbox list.
@@ -1637,6 +1745,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 }
 
 function onMapResize(): void {
+  syncResultMarkers();
   frameCamera();
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
   else if (journey.sheetOpen.value) fitPointRoute();
@@ -1814,6 +1923,54 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker) { border-color: CanvasText; box-shadow: none; }
   :global(.user-map-view .user-map-view__result-marker__badge) { background: Highlight; color: HighlightText; }
+}
+
+/* A count replaces overlapping callouts; activating it exposes the actual
+   current hits, including identical coordinates that zoom cannot separate. */
+:global(.user-map-view .user-map-view__result-cluster) {
+  display: flex; align-items: center; gap: .4rem; min-width: 44px; min-height: 48px;
+  padding: .3rem .6rem; border: 1px solid rgba(var(--v-theme-on-surface), .3);
+  border-radius: .85rem; background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface)); box-shadow: 0 3px 14px rgba(3, 29, 31, .3);
+  cursor: pointer; touch-action: manipulation; white-space: nowrap;
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+  font-size: .875rem; font-weight: 700; letter-spacing: normal;
+}
+:global(.user-map-view .user-map-view__result-cluster__count) {
+  display: grid; place-items: center; min-width: 2rem; height: 2rem;
+  padding-inline: .25rem; border-radius: .6rem; background: #a95010;
+  color: #fff; font-weight: 800;
+}
+:global(.user-map-view .user-map-view__result-cluster:focus-visible) {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+}
+.user-map-view__nearby-results {
+  position: absolute; z-index: 8; top: calc(5rem + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%); width: min(22rem, calc(100vw - 1.5rem));
+  max-height: min(55dvh, 24rem); display: flex; flex-direction: column;
+  border: 1px solid rgba(var(--v-theme-on-surface), .2); border-radius: 1rem;
+  background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: var(--bb-shadow-overlay); font-family: var(--bb-font-family, "Vazirmatn", Tahoma, sans-serif);
+  direction: rtl;
+}
+.user-map-view__nearby-results:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); }
+.user-map-view__nearby-header { display: flex; align-items: center; justify-content: space-between;
+  gap: .5rem; padding: .45rem .75rem; border-bottom: 1px solid rgba(var(--v-theme-on-surface), .12); }
+.user-map-view__nearby-header h2 { margin: 0; font-size: 1rem; font-weight: 700; }
+.user-map-view__nearby-header button { width: 44px; height: 44px; border: 0; border-radius: .7rem;
+  background: transparent; cursor: pointer; color: inherit; font: inherit; }
+.user-map-view__nearby-list { margin: 0; padding: .25rem; overflow-y: auto; list-style: none; }
+.user-map-view__nearby-list button { display: grid; width: 100%; min-height: 44px; gap: .1rem;
+  padding: .45rem .6rem; border: 0; border-radius: .6rem; background: transparent;
+  text-align: start; color: inherit; font: inherit; cursor: pointer; }
+.user-map-view__nearby-list button:focus-visible,
+.user-map-view__nearby-header button:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); }
+.user-map-view__nearby-name { font-size: .875rem; font-weight: 700; overflow-wrap: anywhere; }
+.user-map-view__nearby-address { font-size: .8rem; opacity: .8; overflow-wrap: anywhere; }
+@media (forced-colors: active) {
+  :global(.user-map-view .user-map-view__result-cluster),
+  .user-map-view__nearby-results { border-color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__result-cluster__count) { background: Highlight; color: HighlightText; }
 }
 
 /* Without boxes, desktop absolute offsets and tablet flex order stay unchanged. */

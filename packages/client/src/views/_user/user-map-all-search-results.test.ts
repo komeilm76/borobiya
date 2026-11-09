@@ -67,6 +67,33 @@ describe("show all current POIs on the map", () => {
     expect(css.code).toContain('outline: 3px solid');
   });
 
+  it("regroups on camera changes and opens a current-results chooser for overlapping hits", () => {
+    const sync = body("syncResultMarkers");
+    expect(sync).toContain('instance.project([place.lon, place.lat])');
+    expect(sync).toContain('groupSearchResults(visiblePlaces');
+    expect(sync).toContain('resultClusterMarkers');
+    expect(sync).toContain('button.setAttribute("aria-haspopup", "dialog")');
+    expect(sync).toContain('button.setAttribute("aria-controls", "map-nearby-results")');
+    expect(sync).toContain('openNearbyResults(group.map(hit => hit.placeId)');
+    expect(body("onMapMoveEnd")).toContain('syncResultMarkers()');
+    expect(body("onMapResize")).toContain('syncResultMarkers()');
+    expect(body("clearResultMarkers")).toContain('resultClusterMarkers');
+    expect(view).toContain('class="user-map-view__nearby-results"');
+    expect(view).toContain('v-for="place in nearbyPlaces"');
+    expect(view).toContain('@click="chooseNearbyResult(place)"');
+    expect(view).toContain('@keydown.esc.stop.prevent="closeNearbyResults(true)"');
+    expect(body("chooseNearbyResult")).toContain('placeSearch.mapResults.value.find');
+    expect(body("chooseNearbyResult")).toContain('selectPlace(current, true)');
+    expect(body("openNearbyResults")).toContain('ids.some(id => !placeSearch.mapResults.value.some');
+    expect(body("onMapReady")).toContain('clearResultMarkers()');
+    const { descriptor } = parse(view, { filename: "UserMapView.vue" });
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
+    expect(css.errors).toEqual([]);
+    expect(css.code).toContain('.user-map-view__result-cluster:focus-visible');
+    expect(css.code).toContain('.user-map-view__nearby-results');
+    expect(css.code).toContain('overflow-y: auto');
+  });
+
   it("validates the current snapshot, fits all in-bounds POIs and dismisses only the phone dialog", () => {
     const show = body("showAllSearchResults");
     expect(show).toContain("placeSearch.results.value");
@@ -85,7 +112,7 @@ describe("show all current POIs on the map", () => {
   it("uses independently selectable, labeled, 44px DOM POIs and cleans them on invalidation, map replacement and unmount", () => {
     const sync = body("syncResultMarkers");
     expect(sync).toContain("showAllResultsOnMap.value");
-    expect(sync).toContain("resultMarkerOffsets(places)");
+    expect(sync).toContain("groupSearchResults(visiblePlaces");
     expect(sync).toContain('document.createElement("button")');
     expect(sync).toContain('button.type = "button"');
     expect(sync).toContain('button.setAttribute("aria-label"');

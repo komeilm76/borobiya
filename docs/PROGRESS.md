@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Group nearby map search results by visible spacing
+
+- Search-result callouts now group when their projected screen-space footprints would collide, including different coordinates that become close during zoom-out. A group is a numbered count button, not a pile of displaced names; activating it opens a short, keyboard-reachable list of the **current** places and addresses for direct selection, so identical-coordinate results remain available even at maximum zoom. Individual nonoverlapping hits keep their always-visible numbered names, with no hover content. Groups are recalculated after camera movement, fit/fly and resize; stale group buttons/list items cannot select removed results, and replacement-map/unmount cleanup removes both marker types. Pure geometry tests and nonmounted view contracts passed; actual browser rendering, map gestures and assistive-technology acceptance remain open.
+
 ### 2026-10-23 — Remove map search hover content
 
 - The separate address/name tooltip introduced in the previous map-results pass was not wanted. Result chips now show only their stable, numbered place names: no content or native browser title appears on hover or keyboard focus, and there are no hover-only styles. Keyboard focus retains its visible outline, the full address stays in each button's accessible name, and tapping/clicking still opens the existing place detail and route flow. Nonmounted source/CSS checks cover the absence of tooltip markup and hover rules; rendered-map acceptance remains open.
