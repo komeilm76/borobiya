@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: keep the navigation marker visible on short landscape screens
+
+- The follow-camera offset reserved a fixed 16 px margin above and below the unobstructed map. When a guidance sheet and top bar left less than 32 px visible (for example a 320 px landscape canvas with a 14–20 px gap), it returned zero offset and placed the GPS marker at screen center **behind** the overlays. The margin now shrinks with the genuinely visible corridor, preserving the existing offset on ordinary screens and returning the neutral offset only if there is no clear corridor at all. A focused regression failed before implementation; pure camera tests and client typecheck now pass. A rendered-device landscape check remains open.
+
 ### 2026-10-23 — Bug hunt: do not redraw discarded companion locations after share refresh
 
 - A live companion fix disappeared after 30 minutes, but the minute-by-minute share-list refresh would re-add the same `owner.lastLocation` without its timestamp. The obsolete dot could then remain on the live map indefinitely. Expiry now clears the position while retaining the verified share membership and last discarded observation time: refreshes cannot revive the old location, late socket replays are ignored, and a genuinely newer fix restores the peer immediately. Revoked/expired shares still remove membership entirely. Updated the waiting text to say "fresh position" rather than falsely claiming every waiting peer has never sent a fix. A focused pure-model regression failed before the fix; model/composable tests now cover refresh, replay, recovery and revocation without mounting Vue components. Rendered-device review remains open.

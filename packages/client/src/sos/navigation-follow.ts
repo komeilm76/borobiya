@@ -67,10 +67,14 @@ const LOOK_AHEAD_METRES: Record<TransportProfile, number> = { car: 220, bicycle:
 export function navigationCameraOffset(profile: TransportProfile, height: number,
   topOcclusion: number, bottomOcclusion: number): [number, number] {
   if (!Number.isFinite(height) || height <= 0) return [0, 0];
-  const top = Math.max(0, Math.min(height, topOcclusion)) + 16;
-  const bottom = Math.max(0, Math.min(height, bottomOcclusion)) + 16;
-  if (top + bottom >= height) return [0, 0];
-  return [0, Math.round(top + (height - top - bottom) * FOLLOW_FRACTION[profile] - height / 2)];
+  const top = Math.max(0, Math.min(height, topOcclusion));
+  const bottom = Math.max(0, Math.min(height, bottomOcclusion));
+  const visible = height - top - bottom;
+  if (visible <= 0) return [0, 0];
+  // Fixed 16px margins fit on a normal screen. On a short landscape canvas they may
+  // consume the entire visible strip, hiding the GPS marker behind the sheet instead.
+  const margin = Math.min(16, visible / 4);
+  return [0, Math.round(top + margin + (visible - 2 * margin) * FOLLOW_FRACTION[profile] - height / 2)];
 }
 
 /** Approximate the forward ground visible above the GPS marker using the viewport's unobstructed

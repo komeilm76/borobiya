@@ -35,6 +35,7 @@ describe("route-follow camera math (T3.5.6)", () => {
     const car = navigationCameraOffset("car", 640, 160, 56)[1];
     const bike = navigationCameraOffset("bicycle", 640, 160, 56)[1];
     const walk = navigationCameraOffset("foot", 640, 160, 56)[1];
+    expect(car).toBe(123); // Normal-screen camera composition stays exactly as before.
     expect(car).toBeGreaterThan(bike);
     expect(bike).toBeGreaterThan(walk);
     for (const offset of [car, bike, walk]) {
@@ -44,6 +45,20 @@ describe("route-follow camera math (T3.5.6)", () => {
     expect(navigationCameraOffset("car", 320, 190, 56)[1] + 160).toBeGreaterThanOrEqual(190);
     expect(navigationCameraOffset("foot", 0, 0, 0)).toEqual([0, 0]);
   });
+  it("keeps the GPS marker in a narrow visible corridor on landscape phones", () => {
+    // A tall guidance sheet can leave 14–20px of exposed canvas. Fixed 16px margins on both
+    // sides previously returned [0, 0], which put the marker behind the top bar or sheet.
+    const height = 320;
+    const betweenBarAndSheet = height / 2 + navigationCameraOffset("car", height, 190, 116)[1];
+    expect(betweenBarAndSheet).toBeGreaterThan(190);
+    expect(betweenBarAndSheet).toBeLessThan(204);
+    const aboveSheet = height / 2 + navigationCameraOffset("foot", height, 0, 300)[1];
+    expect(aboveSheet).toBeGreaterThan(0);
+    expect(aboveSheet).toBeLessThan(20);
+    // A completely covered map has no safe camera target to invent.
+    expect(navigationCameraOffset("car", height, 190, 140)).toEqual([0, 0]);
+  });
+
   it("adapts all three guidance zooms to usable screen space and preserves mode separation under a zoom cap", () => {
     const modes = ["car", "bicycle", "foot"] as const;
     const portrait = modes.map(mode => navigationFollowZoom(mode, 35.68, 640, 160, 56, 0, 18));
