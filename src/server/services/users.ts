@@ -181,9 +181,6 @@ export class UserService {
     return this.ctx.services.realtime.issueTicket(identity, ip);
   }
 
-  snapshot(identity: AuthIdentity): Record<string, unknown> {
-    return this.ctx.services.location.snapshot(identity.userId);
-  }
 
   private publicPlace(row: Record<string, any>): Record<string, unknown> {
     return {
