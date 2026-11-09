@@ -901,6 +901,12 @@ const placeSearch = usePlaceSearch({
     return placeSearchArea(library, scope === "viewport" ? map.value?.getBounds() ?? null : library);
   }
 });
+// Confirmed X, Stop/reset and arrival all clear the route through different
+// paths. Drop the old search highlight only when the route actually settles at
+// no destination; select() briefly clears before installing a new point.
+watch(() => journey.point.value, (point) => {
+  if (!point) placeSearch.deselect();
+});
 let fittedFor: string | null = null;
 const userControlledCamera = ref(false);
 // A removed navigation line must not appear to survive because the teal history track

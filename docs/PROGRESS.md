@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: clear orphaned selected pins when a route ends
+
+- Confirming the planner's destructive X deletes the route inside `PointRouteSheet`, bypassing the map's Stop handler. The selected search ID previously survived, leaving a red “selected” pin that reopened the supposedly deleted destination; Stop/reset and arrival had the same issue. A batched route-point watcher now clears only that selection when the route settles with no destination, preserving the query, other results and map mode. It deliberately ignores the transient null during a replacement `journey.select()`, so a newly chosen search result remains highlighted. A nonmounted view contract reproduced the missing handoff before the fix; a composable/Vue batching test covers replacement versus deletion. Rendered map verification remains open.
+
 ### 2026-10-23 — Bug hunt: hand-picked destinations after search selections
 
 - MapLibre places DOM markers inside the canvas container. The long-press handler previously listened on that container, so holding a result, cluster or route marker could select the unrelated ground coordinate underneath. Holds now begin only on the drawing canvas; marker buttons keep their own click/keyboard actions, and the context-menu suppression stays on the same drawing surface. Selecting a point by hand also clears the previous search-result highlight and red selected pin without discarding the query, map mode or other results; tapping a result again still works. The composable and nonmounted view regressions failed before the fix and now pass. Rendered touch/pen/mouse verification remains open.

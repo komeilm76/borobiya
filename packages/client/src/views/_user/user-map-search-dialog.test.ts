@@ -48,6 +48,17 @@ describe("map place search handoff", () => {
     expect(css.code).toContain("overflow-y: auto");
   });
 
+  it("removes a deleted route's search selection without clearing a newly selected result", () => {
+    const sheet = readFileSync(new URL("../../components/map/PointRouteSheet.vue", import.meta.url), "utf8");
+    expect(sheet).toContain('props.api.clear(); emit("dismiss")'); // Confirmed X bypasses the view's Stop handler.
+    expect(body("clearPointRoute")).toContain('journey.clear()'); // Stop/reset uses the same route state.
+    const binding = 'watch(() => journey.point.value, (point) => {\n  if (!point) placeSearch.deselect();\n});';
+    expect(view).toContain(binding);
+    expect(view.indexOf(binding)).toBeGreaterThan(view.indexOf('const placeSearch = usePlaceSearch('));
+    expect(view).not.toContain('watch(() => journey.point.value, (point) => {\n  if (!point) placeSearch.deselect();\n}, { flush: "sync" });');
+    expect(body("selectPlace")).toContain('journey.select({ lat: place.lat, lon: place.lon }, place)');
+  });
+
   it("routes a current search hit to one navigation sheet without a duplicate POI modal", () => {
     const selection = body("selectPlace");
     expect(selection).toContain('bounds.contains([place.lon, place.lat])');

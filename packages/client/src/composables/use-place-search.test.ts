@@ -1,4 +1,4 @@
-import { effectScope } from "vue";
+import { effectScope, nextTick, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GeocodeResponse } from "@shared/index";
 import { PlaceSearchError } from "@/api/geocoding";
@@ -84,6 +84,28 @@ describe("place search UI decisions", () => {
     expect(api.mapActive.value).toBe(true);
     expect(api.results.value).toEqual(places);
     expect(api.mapResults.value).toEqual(places);
+    scope.stop();
+  });
+
+  it("keeps a new search hit selected across route replacement but drops it on actual route deletion", async () => {
+    const place = hit("first")[0]!;
+    const route = ref<{ lat: number; lon: number } | null>({ lat: 35, lon: 51 });
+    const scope = effectScope();
+    const api = scope.run(() => {
+      const search = usePlaceSearch({ search: async () => [place], area: () => ({ bbox: "50,34,52,36", contains: () => true }) });
+      // A batched watcher observes the settled route, not the transient null inside select().
+      watch(route, (point) => { if (!point) search.deselect(); });
+      return search;
+    })!;
+    api.update("place"); await vi.advanceTimersByTimeAsync(300);
+    expect(api.select(place)).toBe(true);
+    route.value = null; route.value = { lat: place.lat, lon: place.lon };
+    await nextTick();
+    expect(api.selectedPlaceId.value).toBe(place.placeId);
+    route.value = null;
+    await nextTick();
+    expect(api.selectedPlaceId.value).toBeNull();
+    expect(api.results.value).toEqual([place]);
     scope.stop();
   });
 
