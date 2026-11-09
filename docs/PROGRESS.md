@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Self-host Vazirmatn on browsers without the OS font
+
+- The UI previously only named Vazirmatn in `font-family` and shipped no `@font-face` or font files. Windows machines with a locally installed copy looked correct, while iOS Safari and other browsers fell back to a different family. The OFL-licensed `@fontsource/vazirmatn` 5.3.0 package now supplies locally bundled Arabic/Persian, Latin and Latin-ext faces for the six used 400–900 weights; each face has WOFF2 and older-Safari WOFF fallback with `font-display: swap`. The base page, Vuetify app shell and its typography utilities now use the same family on public, auth, user and admin routes, without changing the workspace-only letter-spacing policy. Source/asset tests failed before implementation; production build emits 36 hashed WOFF2/WOFF assets and references them from its same-origin CSS. Physical iOS Safari and other-device font/network inspection remains open; a first visit without access to the app's own assets still cannot load an uncached font.
+
 ### 2026-10-23 — Bug hunt: close the cluster chooser after a hand-picked destination
 
 - At maximum zoom, the nearby-results chooser is nonmodal and could stay visible when the user long-pressed a different spot on the canvas; its cluster still existed after the camera recentered, so it overlapped the new route sheet and could retain keyboard focus on the obsolete choice. Hand selection now closes that chooser and moves focus to the new route sheet after rendering, guarded by the same map and exact route-point identity so a later selection cannot receive stale focus. The chooser/pin zoom flow and search results are unchanged. A nonmounted view contract failed before the fix; rendered keyboard/touch verification remains open.

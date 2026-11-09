@@ -83,7 +83,7 @@ To sign out, open the account menu in the top bar (or the map's top-left menu), 
 
 ![Persian login screen at phone width: empty username and password fields, recovery link, sign-in button and create-account link.](./screenshots/login-mobile.png)
 
-These are captures of the **production client build** at `/_auth/login` in headless Chromium 141 (1280 × 800 desktop; 390 × 844 phone viewport, full-page image 390 × 959). No credentials were entered, no API/database was running, and neither sign-in nor the post-login map is verified by these images. Persian text uses this environment's available font fallback; appearance may differ on a device with Vazirmatn installed.
+These are captures of the **production client build** at `/_auth/login` in headless Chromium 141 (1280 × 800 desktop; 390 × 844 phone viewport, full-page image 390 × 959). No credentials were entered, no API/database was running, and neither sign-in nor the post-login map is verified by these images. These screenshots predate the self-hosted Vazirmatn font; Persian text may use this environment's fallback and can differ from the current build, which now bundles Vazirmatn for devices without it installed.
 
 Errors:
 

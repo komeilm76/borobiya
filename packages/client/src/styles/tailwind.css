@@ -105,13 +105,18 @@ a {
   box-shadow: var(--bb-shadow-item-hover);
 }
 
-/* Vuetify sets Roboto on v-app and its text utilities. Keep Persian text in the
-   same type family as the rest of the UI on user/admin routes only. */
-.v-application.app-shell--workspace {
+/* Vuetify sets Roboto on v-app and its typography utilities. Apply the bundled
+   Persian family to guest/auth pages as well as the signed-in workspace. Keep
+   the workspace-only letter-spacing adjustment scoped to those pages. */
+.v-application.app-shell {
+  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif) !important;
+}
+.app-shell :is(.text-h1, .text-h2, .text-h3, .text-h4, .text-h5, .text-h6,
+  .text-subtitle-1, .text-subtitle-2, .text-body-1, .text-body-2,
+  .text-button, .text-caption, .text-overline) {
   font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif) !important;
 }
 .app-shell--workspace :is(.text-h5, .text-subtitle-1, .text-subtitle-2, .text-body-2, .text-caption) {
-  font-family: var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif) !important;
   letter-spacing: normal !important;
 }
 

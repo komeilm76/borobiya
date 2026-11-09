@@ -22,11 +22,11 @@ describe("user/admin workspace typography", () => {
     expect(users).not.toContain("letter-spacing: -0.035em");
   });
 
-  it("keeps Persian-first type on workspace routes and leaves public/auth routes alone", () => {
+  it("uses the Persian font on all routes while keeping the workspace letter-spacing scoped", () => {
     expect(read("App.vue")).toContain("'app-shell--workspace': !isAuthRoute && !isPublicRoute");
-    expect(workspace).toContain(".v-application.app-shell--workspace {");
-    expect(workspace).toContain(".app-shell--workspace :is(.text-h5, .text-subtitle-1, .text-subtitle-2, .text-body-2, .text-caption)");
-    expect(workspace).toContain("letter-spacing: normal !important;");
+    expect(workspace).toContain(".v-application.app-shell {");
+    expect(workspace).toContain(".app-shell :is(.text-h1, .text-h2, .text-h3, .text-h4, .text-h5, .text-h6,");
+    expect(workspace).toContain(".app-shell--workspace :is(.text-h5, .text-subtitle-1, .text-subtitle-2, .text-body-2, .text-caption) {\n  letter-spacing: normal !important;");
   });
 
   it("eliminates illegible explicit sub-0.8rem text across user/admin pages and their widgets", () => {
