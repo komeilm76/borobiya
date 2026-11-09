@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Show result names on hover and keyboard focus
+
+- Individual category pins now reveal a lightweight label containing only the current result's real place name on pointer hover or keyboard focus. It uses the app's Persian font and bidi isolation rather than an unstyled native `title`, never inserts Photon text as HTML, and remains pointer-transparent so the 48px pin and selection behavior do not change. The label wraps long names and repositions within the map canvas near its top/side edges; full name and address remain available to assistive technology through the existing button label. Cluster zoom/list behavior, selected-place callouts and mobile map controls are unchanged. Nonmounted SFC contracts and client checks cover the implementation; authenticated browser/device visual acceptance remains open.
+
 ### 2026-10-23 — Refine cluster taps and café pin color
 
 - Replaced the brown café pin with a cool teal (`#087988`) while keeping distinct verified OSM category icons and neutral unknowns. Activating a result-count bubble now moves the map camera to that group's actual anchored place and zooms in up to two levels per tap without exceeding the installed map's maximum zoom; the flight suppresses an automatic geocoder read and retains existing viewport-pruning semantics, as with other selection flights. When the group is still overlapping at max zoom (including identical coordinates), activating it opens the existing accessible chooser instead. Count-button labels distinguish zoom versus list, a polite status announces zoom to assistive technology, and keyboard focus returns to an available pin or the map canvas if the old cluster disappears. Pure zoom-limit and nonmounted interaction contracts cover these cases; authenticated browser/device visual and gesture checks remain open.

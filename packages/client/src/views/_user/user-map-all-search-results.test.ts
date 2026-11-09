@@ -29,7 +29,7 @@ describe("show all current POIs on the map", () => {
   it("shows compact category-colored, keyboard-reachable pins and a persistent selected name", () => {
     const sync = body("syncResultMarkers");
     for (const part of ['resultAppearance(place)', 'clusterAppearance(group)',
-      'button.append(icon)', 'anchor: "bottom"', 'button.setAttribute("aria-label"',
+      'button.append(icon, tooltip)', 'anchor: "bottom"', 'button.setAttribute("aria-label"',
       '${place.name}، ${place.address}؛ انتخاب مقصد',
       'placeSearch.mapResults.value.find(hit => hit.placeId === place.placeId)',
       'button.addEventListener("keydown"', 'count.textContent = `+']) {
@@ -51,19 +51,32 @@ describe("show all current POIs on the map", () => {
       '@media (forced-colors: active)']) expect(css.code).toContain(part);
   });
 
-  it("has no hover-only result content, keeps full accessible names and keyboard outlines", () => {
+  it("shows only the real place name on hover and keyboard focus without moving the pin", () => {
     const sync = body("syncResultMarkers");
-    expect(sync).not.toContain('button.setAttribute("title"');
-    expect(sync).not.toContain('user-map-view__result-marker__tooltip');
+    expect(sync).toContain('document.createElement("bdi")');
+    expect(sync).toContain('tooltip.dir = "auto"');
+    expect(sync).toContain('tooltip.setAttribute("aria-hidden", "true")');
+    expect(sync).toContain('tooltip.textContent = place.name');
+    expect(sync).not.toContain('tooltip.textContent = place.address');
+    expect(sync).not.toContain('button.setAttribute("title"'); // Native tooltip ignores the Persian font.
     expect(sync).not.toContain('button.innerHTML');
+    expect(sync).toContain('button.addEventListener("pointerenter", () => positionResultTooltip(button, instance))');
+    expect(sync).toContain('button.addEventListener("focus", () => positionResultTooltip(button, instance))');
     expect(body("syncSelectedPlaceMarker")).not.toContain('setAttribute("title"');
+    const position = body("positionResultTooltip");
+    expect(position).toContain('instance.getCanvas().getBoundingClientRect()');
+    expect(position).toContain('canvas.width - 16');
+    expect(position).toContain('tooltip.getBoundingClientRect().top < canvas.top + 8');
+    expect(position).toContain('canvas.right - 8 - rect.right');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);
     const style = descriptor.styles[0]!.content;
-    expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*font-family:\s*var\(--bb-font-family/s);
-    expect(style).not.toContain('.user-map-view__result-marker__tooltip');
-    expect(style).not.toContain('.user-map-view__result-marker:hover');
+    expect(style).toMatch(/\.user-map-view__result-marker\)\s*\{[^}]*width:\s*48px; height:\s*48px/s);
+    expect(style).toContain('.user-map-view__result-marker:hover .user-map-view__result-marker__tooltip');
+    expect(style).toContain('.user-map-view__result-marker:focus-visible .user-map-view__result-marker__tooltip');
+    expect(style).toContain('pointer-events: none;');
+    expect(css.code).toContain('font: 700 .9rem/1.5 var(--bb-font-family');
     expect(css.code).toContain('outline: 3px solid');
   });
 

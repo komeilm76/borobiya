@@ -989,6 +989,21 @@ function clearResultMarkers(): void {
   resultClusterMarkers.clear();
   closeNearbyResults();
 }
+function positionResultTooltip(button: HTMLElement, instance: MapLibreMap): void {
+  const tooltip = button.querySelector<HTMLElement>(".user-map-view__result-marker__tooltip");
+  if (!tooltip) return;
+  const canvas = instance.getCanvas().getBoundingClientRect();
+  // The map viewport (not the whole browser) clips markers. Keep long titles
+  // readable at its edges without moving or resizing the pin itself.
+  button.style.setProperty("--result-tooltip-map-width", `${Math.max(44, canvas.width - 16)}px`);
+  button.classList.remove("user-map-view__result-marker--tooltip-below");
+  button.style.removeProperty("--result-tooltip-shift");
+  if (tooltip.getBoundingClientRect().top < canvas.top + 8)
+    button.classList.add("user-map-view__result-marker--tooltip-below");
+  const rect = tooltip.getBoundingClientRect();
+  const shift = Math.max(canvas.left + 8 - rect.left, Math.min(0, canvas.right - 8 - rect.right));
+  button.style.setProperty("--result-tooltip-shift", `${shift}px`);
+}
 function syncResultMarkers(): void {
   const instance = map.value;
   const places = showAllResultsOnMap.value && (!journey.navigating.value || showNavigationSearchResults.value) &&
@@ -1076,7 +1091,13 @@ function syncResultMarkers(): void {
       const icon = document.createElement("span");
       icon.className = "user-map-view__result-marker__icon mdi";
       icon.setAttribute("aria-hidden", "true");
-      button.append(icon);
+      const tooltip = document.createElement("bdi");
+      tooltip.className = "user-map-view__result-marker__tooltip";
+      tooltip.dir = "auto";
+      tooltip.setAttribute("aria-hidden", "true"); // The button already names the place for assistive technology.
+      button.append(icon, tooltip);
+      button.addEventListener("pointerenter", () => positionResultTooltip(button, instance));
+      button.addEventListener("focus", () => positionResultTooltip(button, instance));
       button.addEventListener("click", (event) => {
         event.stopPropagation();
         // Never act on a captured hit after a viewport request invalidated it.
@@ -1096,6 +1117,9 @@ function syncResultMarkers(): void {
     button.setAttribute("aria-label", `${appearance.label}: ${place.name}، ${place.address}؛ انتخاب مقصد`);
     const icon = button.querySelector<HTMLElement>(".user-map-view__result-marker__icon");
     if (icon) icon.className = `user-map-view__result-marker__icon mdi ${appearance.icon}`;
+    const tooltip = button.querySelector<HTMLElement>(".user-map-view__result-marker__tooltip");
+    if (tooltip) tooltip.textContent = place.name; // No address or other details in the hover label.
+    if (button.matches(":hover, :focus-visible")) positionResultTooltip(button, instance);
   }
 }
 async function showAllSearchResults(): Promise<void> {
@@ -1953,6 +1977,33 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   font-synthesis: none; letter-spacing: normal;
 }
 :global(.user-map-view .user-map-view__result-marker__icon) { font-size: 1.55rem; line-height: 1; }
+/* A title-only label lives outside the fixed 48px pin. No native browser title
+   tooltip (which cannot use the app's Persian font) and no hover hitbox change. */
+:global(.user-map-view .user-map-view__result-marker__tooltip) {
+  position: absolute; bottom: calc(100% + .5rem); left: 50%;
+  transform: translateX(calc(-50% + var(--result-tooltip-shift, 0px)));
+  display: block; width: max-content;
+  max-width: min(16rem, calc(100vw - 2rem), var(--result-tooltip-map-width, 16rem));
+  padding: .35rem .7rem; border: 1px solid rgba(var(--v-theme-on-surface), .16);
+  border-radius: .75rem; background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
+  box-shadow: 0 4px 14px rgba(3, 29, 31, .24);
+  font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+  letter-spacing: normal; text-align: center; white-space: normal; overflow-wrap: anywhere;
+  visibility: hidden; opacity: 0; pointer-events: none;
+}
+:global(.user-map-view .user-map-view__result-marker--tooltip-below .user-map-view__result-marker__tooltip) {
+  top: calc(100% + .5rem); bottom: auto;
+}
+@media (hover: hover) {
+  :global(.user-map-view .user-map-view__result-marker:hover) { z-index: 4; }
+  :global(.user-map-view .user-map-view__result-marker:hover .user-map-view__result-marker__tooltip) {
+    visibility: visible; opacity: 1;
+  }
+}
+:global(.user-map-view .user-map-view__result-marker:focus-visible) { z-index: 4; }
+:global(.user-map-view .user-map-view__result-marker:focus-visible .user-map-view__result-marker__tooltip) {
+  visibility: visible; opacity: 1;
+}
 :global(.user-map-view .user-map-view__result-marker:focus-visible),
 :global(.user-map-view .user-map-view__selected-place:focus-visible) {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px;
@@ -1969,7 +2020,8 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker),
-  :global(.user-map-view .user-map-view__selected-place-label) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
+  :global(.user-map-view .user-map-view__selected-place-label),
+  :global(.user-map-view .user-map-view__result-marker__tooltip) { border-color: CanvasText; background: Canvas; color: CanvasText; box-shadow: none; }
 }
 
 /* Count bubbles correspond to actual overlapping hits. The chooser retains
