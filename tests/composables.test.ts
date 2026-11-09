@@ -270,3 +270,57 @@ describe('SOS hold re-entry', () => {
     vi.useRealTimers();
   });
 });
+
+describe('formatter date-instance input', () => {
+  it('accepts Date instances for both date and date-time', () => {
+    const format = useFormatters();
+    expect(format.date(new Date(Date.UTC(2026, 10, 8)))).not.toBe('—');
+    expect(format.dateTime(new Date(Date.UTC(2026, 10, 8, 12, 0, 0)))).not.toBe('—');
+  });
+});
+
+describe('toast defaults', () => {
+  it('uses the informational tone and a finite timeout when none are given', () => {
+    const toast = useToast();
+    const before = toast.messages.value.length;
+    const id = toast.push('فقط پیام');
+    const pushed = toast.messages.value.find((item) => item.id === id)!;
+    expect(pushed.tone).toBe('info');
+    expect(pushed.timeout).toBe(3600);
+    expect(toast.messages.value.length).toBe(before + 1);
+    toast.dismiss(id);
+  });
+});
+
+describe('SOS hold teardown', () => {
+  it('stopping a hold that never started is a no-op', () => {
+    const hold = useSosHold(() => undefined, 300);
+    expect(() => hold.stop()).not.toThrow();
+    expect(hold.holding.value).toBe(false);
+    expect(hold.progress.value).toBe(0);
+  });
+});
+
+describe('settings store system dark', () => {
+  it('resolves the system choice to dark when the OS prefers dark', () => {
+    const original = window.matchMedia;
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      matches: media.includes('dark'),
+      media,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false
+    }));
+    try {
+      localStorage.setItem('bb-theme', 'system');
+      const settings = useSettingsStore();
+      expect(settings.resolvedTheme).toBe('dark');
+    } finally {
+      vi.stubGlobal('matchMedia', original);
+      vi.unstubAllGlobals();
+    }
+  });
+});

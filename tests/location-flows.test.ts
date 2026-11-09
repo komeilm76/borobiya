@@ -194,3 +194,67 @@ describe('route defaults', () => {
     expect(incidentTypes.json.data.items.length).toBeGreaterThan(0);
   });
 });
+
+describe('share without an expiry', () => {
+  it('lists a live share whose expires_at was never set', async () => {
+    // Rows restored from a backup or written before expiry was mandatory can carry NULL.
+    const context = server.app.context;
+    const me = context.repo.one<{ id: string }>("SELECT id FROM users WHERE username = 'saeed.k'");
+    expect(me).toBeTruthy();
+    context.repo.run(
+      "INSERT INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at)"
+      + " VALUES('shr_unexpiring', ?, 'usr_companion', 'live', NULL, NULL, NULL, NULL, ?, NULL)",
+      me!.id, Date.now());
+    try {
+      const listed = await apiFetch(server, '/_user/location/shares', { cookie: requesterCookie });
+      expect(listed.status, listed.text).toBe(200);
+      const share = listed.json.data.items.find((item: any) => item.id === 'shr_unexpiring');
+      expect(share).toBeTruthy();
+      expect(share.expiresAt).toBeNull();
+      expect(share.durationSeconds).toBeNull();
+    } finally {
+      context.repo.run("DELETE FROM location_shares WHERE id = 'shr_unexpiring'");
+    }
+  });
+});
+
+describe('publish with no audience', () => {
+  it('acknowledges with zero recipients when nobody shares with the publisher', async () => {
+    const cookie = await login(server, 'maryam.a', 'DemoPass!2026');
+    const { socket } = await openSocketWithHello(websocketUrl(server, (await issueTicket(server, cookie)).ticket));
+    try {
+      const ack = waitForMessage(socket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.LOCATION_UPDATE);
+      sendJson(socket, {
+        type: WS_EVENTS.LOCATION_UPDATE,
+        latitude: 35.7000, longitude: 51.4100, accuracy: 12
+      });
+      expect((await ack).recipients).toBe(0);
+    } finally {
+      await closeSocket(socket);
+    }
+  });
+});
+
+describe('nearest responders with a cached fix', () => {
+  it('serves a live fix for a responder that just published one', async () => {
+    const cookie = await login(server, 'reza.m', 'DemoPass!2026');
+    const { socket } = await openSocketWithHello(websocketUrl(server, (await issueTicket(server, cookie)).ticket));
+    try {
+      const ack = waitForMessage(socket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.LOCATION_UPDATE);
+      sendJson(socket, {
+        type: WS_EVENTS.LOCATION_UPDATE,
+        latitude: 35.72, longitude: 51.33, accuracy: 8
+      });
+      expect((await ack).accepted).toBe(true);
+
+      const fresh = await apiFetch(server, '/_admin/sos/sos_unassigned/nearest?latitude=35.72&longitude=51.33', { cookie: adminCookie });
+      expect(fresh.status, fresh.text).toBe(200);
+      const responder = fresh.json.data.items.find((item: any) => item.username === 'reza.m');
+      expect(responder?.recordedAt).not.toBeNull();
+      expect(responder?.distanceMeters).not.toBeNull();
+
+    } finally {
+      await closeSocket(socket);
+    }
+  });
+});

@@ -62,3 +62,4 @@ describe('session rotation refusals', () => {
     expect(response.headers.get('set-cookie')).toContain('bb_session=');
   });
 });
+

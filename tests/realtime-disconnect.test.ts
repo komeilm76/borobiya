@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   closeSocket, createTestServer, issueTicket, login, openSocketWithHello, sendJson,
   waitForMessage, websocketUrl, type TestServer
@@ -116,5 +116,20 @@ describe('final session disconnect', () => {
     expect(state.speakerUserId).toBe('usr_requester');
     expect(state.targetUserId).toBe('usr_companion');
     expect(state.talkId).toBe(startAck.talkId);
+  }, 10_000);
+});
+
+describe('shutdown', () => {
+  it('skips disconnect bookkeeping once the server has begun to close', async () => {
+    const closing = await createTestServer({});
+    const cookie = await login(closing, 'saeed.k', 'DemoPass!2026');
+    const { socket } = await openSocketWithHello(websocketUrl(closing, (await issueTicket(closing, cookie)).ticket));
+    const handleDisconnect = vi.spyOn(closing.app.context.services.realtime, 'handleDisconnect');
+
+    await closing.close();
+    // Wait for the close handshake the server-side close handler observes.
+    await new Promise<void>((resolve) => socket.addEventListener('close', () => resolve(), { once: true }));
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+    expect(handleDisconnect).not.toHaveBeenCalled();
   }, 10_000);
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clientIpFromRequest, loadConfig, originAllowed, requestOrigin, ROOT, type Config } from '../src/server/core/config.ts';
+import { clientIpFromRequest, loadConfig, originAllowed, pathResolve, requestOrigin, ROOT, type Config } from '../src/server/core/config.ts';
 
 /**
  * Configuration is where a bad default becomes a security incident. These tests pin the parsing
@@ -179,5 +179,13 @@ describe('clientIpFromRequest', () => {
   it('strips the IPv4-mapped prefix from a direct peer address', () => {
     const request = Object.assign(new Request('http://x/'), { ip: '::ffff:127.0.0.1' });
     expect(clientIpFromRequest(request, direct)).toBe('127.0.0.1');
+  });
+});
+
+describe('path resolution', () => {
+  it('clamps `..` at the root instead of walking above it', () => {
+    // A relative base has no absolute marker in the output, and a `..` with nothing to pop must
+    // not reach above the root.
+    expect(pathResolve('relative', '..', '..', 'assets')).toBe('assets');
   });
 });

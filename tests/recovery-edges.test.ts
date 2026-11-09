@@ -71,3 +71,4 @@ describe('recovery challenge refusals', () => {
     expect(response.json.error.message).toBe('Recovery challenge is no longer active.');
   });
 });
+

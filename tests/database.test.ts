@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as sqlite from 'bun:sqlite';
@@ -128,5 +128,26 @@ describe('SQLite persistence and production safety', () => {
     expect(config.seedDemoUsers).toBe(false);
     expect(config.cookieSecure).toBe(true);
     expect(config.trustProxy).toBe(false);
+  });
+});
+
+describe('bare database filename', () => {
+  it('opens a database with no parent directory without running mkdir', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'borobiya-bare-'));
+    const previous = process.cwd();
+    process.chdir(directory);
+    try {
+      const config = loadConfig({
+        environment: 'test',
+        databasePath: 'bare.sqlite',
+        dataDir: directory,
+        seedDemoUsers: false
+      });
+      openDatabase(config);
+      expect(existsSync(path.join(directory, 'bare.sqlite'))).toBe(true);
+    } finally {
+      process.chdir(previous);
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

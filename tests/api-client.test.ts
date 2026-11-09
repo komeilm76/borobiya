@@ -148,3 +148,11 @@ describe('errorMessage', () => {
     expect(errorMessage(undefined)).toBe('خطای غیرمنتظره رخ داد.');
   });
 });
+
+describe('helper defaults', () => {
+  it('sends an empty object body on PUT when none is provided', async () => {
+    const calls = stubFetch(() => envelope({ ok: true }));
+    await put('/_e');
+    expect(calls[0]!.init?.body).toBe('{}');
+  });
+});

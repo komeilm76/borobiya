@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { effectScope } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { useRealtimeStore } from '../src/client/stores/realtime.ts';
@@ -125,6 +125,16 @@ describe('connection state', () => {
     store.disconnect();
     expect(store.status).toBe('disconnected');
     stop();
+  });
+});
+
+describe('event cursor', () => {
+  it('never rewinds when an event arrives without an id', async () => {
+    const { store, stop } = scopedStore();
+    onTestFinished(stop);
+    await store.connect();
+    deliver(store, 'event', { type: 'sos.created' });
+    expect(store.cursor).toBe(0);
   });
 });
 

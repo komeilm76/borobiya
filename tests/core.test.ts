@@ -188,3 +188,9 @@ describe('dotenv parsing', () => {
     expect(parseDotEnv('')).toEqual({});
   });
 });
+
+describe('stage index fallback', () => {
+  it('reports -1 for a status the mapping does not know', () => {
+    expect(sosStageIndex('definitely-not-a-status')).toBe(-1);
+  });
+});

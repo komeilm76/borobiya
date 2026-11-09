@@ -297,6 +297,37 @@ describe('admin store request paths', () => {
   });
 });
 
+describe('admin alert loading', () => {
+  it('keeps the previous alerts when the reload fails and reports the error', async () => {
+    const admin = useAdminStore();
+    admin.alerts = [{ id: 'alt_keep', title: 'همچنان باز', resolved: false } as never];
+    vi.stubGlobal('fetch', vi.fn(async () => failure(500, 'INTERNAL', 'بارگذاری هشدارها ناموفق بود.')));
+
+    await admin.loadAlerts();
+    expect(admin.alerts).toHaveLength(1);
+    expect(admin.alerts[0]!.id).toBe('alt_keep');
+    expect(admin.error).toBe('بارگذاری هشدارها ناموفق بود.');
+  });
+
+  it('treats a response without an items array as an empty list', async () => {
+    const admin = useAdminStore();
+    vi.stubGlobal('fetch', vi.fn(async () => envelope({})));
+
+    await admin.loadAlerts();
+    expect(admin.alerts).toEqual([]);
+  });
+});
+
+describe('device list edge', () => {
+  it('falls back to an empty list when the response carries no items array', async () => {
+    const auth = useAuthStore();
+    vi.stubGlobal('fetch', vi.fn(async () => envelope({})));
+
+    await expect(auth.loadDevices()).resolves.toEqual([]);
+    expect(auth.devices).toEqual([]);
+  });
+});
+
 describe('admin store resilience', () => {
   it('keeps the previous state and reports the failure when a loader errors', async () => {
     const admin = useAdminStore();
@@ -394,4 +425,13 @@ describe('admin store envelope resilience', () => {
       expect(isUntouched(admin)).toBe(true);
     });
   }
+});
+
+describe('security catalog edges', () => {
+  it('falls back to an empty list when the response carries no items array', async () => {
+    const auth = useAuthStore();
+    vi.stubGlobal('fetch', vi.fn(async () => envelope({})));
+
+    await expect(auth.loadSecurityQuestions()).resolves.toEqual([]);
+  });
 });

@@ -253,7 +253,10 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  */
 export function openDatabase(config: Config): SqliteDatabase {
   if (config.databasePath !== ':memory:') {
-    const directory = config.databasePath.slice(0, config.databasePath.lastIndexOf('/'));
+    // A path with no parent component ("bare.sqlite") means the current directory; slicing to
+    // lastIndexOf === -1 would otherwise chop the last character and mkdir a bogus one.
+    const slash = config.databasePath.lastIndexOf('/');
+    const directory = slash > 0 ? config.databasePath.slice(0, slash) : '';
     if (directory) {
       Bun.spawnSync(['mkdir', '-p', directory], { stdout: 'ignore', stderr: 'ignore' });
     }

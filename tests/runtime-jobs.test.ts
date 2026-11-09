@@ -68,3 +68,24 @@ describe('maintenance jobs', () => {
     expect(health.status).toBe(200);
   }, 10_000);
 });
+
+describe('maintenance failure', () => {
+  it('logs a failing maintenance pass and keeps the server healthy', async () => {
+    // The slow interval is registered at listen() time, so the fake clock must be installed
+    // before the server is created.
+    vi.useFakeTimers();
+    const jobServer = await createTestServer({ startJobs: true });
+    try {
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.spyOn(jobServer.app.context.services.location, 'purgePoints').mockImplementation(() => {
+        throw new Error('synthetic maintenance failure');
+      });
+
+      vi.advanceTimersByTime(61_000);
+      expect(console.error).toHaveBeenCalledWith('[jobs] maintenance failed', expect.any(Error));
+    } finally {
+      vi.useRealTimers();
+      await jobServer.close();
+    }
+  }, 10_000);
+});

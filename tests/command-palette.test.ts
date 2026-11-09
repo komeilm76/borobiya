@@ -108,6 +108,33 @@ beforeEach(() => {
   );
 });
 
+describe('command palette edge arms', () => {
+  it('keeps the index when widening the result set', async () => {
+    const palette = scopedPalette(fixtureEntries([]));
+    palette.show();
+    palette.query.value = 'تاریخچه';
+    await nextTick();
+    expect(palette.results.value.length).toBe(1);
+    expect(palette.activeIndex.value).toBe(0);
+    // Widening the list back must not trigger the clamp arm — the index is already inside it.
+    palette.query.value = '';
+    await nextTick();
+    expect(palette.results.value.length).toBe(3);
+    expect(palette.activeIndex.value).toBe(0);
+  });
+
+  it('ignores Enter when the index points past the end of the list', async () => {
+    const ran: string[] = [];
+    const palette = scopedPalette(fixtureEntries(ran));
+    palette.show();
+    await nextTick();
+    palette.activeIndex.value = 99;
+    press('Enter');
+    await nextTick();
+    expect(ran).toEqual([]);
+  });
+});
+
 describe('command palette composable', () => {
   it('toggles with Ctrl+K and with Meta+K on macOS', async () => {
     const palette = scopedPalette(fixtureEntries([]));

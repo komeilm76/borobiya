@@ -107,3 +107,32 @@ describe('account role patches', () => {
     expect(suspended.json.data.active).toBe(false);
   });
 });
+
+describe('account reactivation', () => {
+  it('restores a suspended account with an active-only patch', async () => {
+    const created = await apiFetch(server, '/_admin/users', {
+      method: 'POST', cookie: adminCookie,
+      body: { username: 'revive.two', password: 'ReviveTwo!2026', role: 'user' }
+    });
+    expect(created.status, created.text).toBe(201);
+    const userId = created.json.data.userId;
+
+    const suspended = await apiFetch(server, `/_admin/users/${userId}`, {
+      method: 'PATCH', cookie: adminCookie, body: { active: false }
+    });
+    expect(suspended.status, suspended.text).toBe(200);
+    expect(suspended.json.data.active).toBe(false);
+
+    const revived = await apiFetch(server, `/_admin/users/${userId}`, {
+      method: 'PATCH', cookie: adminCookie, body: { active: true }
+    });
+    expect(revived.status, revived.text).toBe(200);
+    expect(revived.json.data.active).toBe(true);
+
+    const loginResponse = await apiFetch(server, '/_auth/login', {
+      method: 'POST',
+      body: { username: 'revive.two', password: 'ReviveTwo!2026' }
+    });
+    expect(loginResponse.status).toBe(200);
+  });
+});
