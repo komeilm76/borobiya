@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: refresh search when installed map coverage arrives late
+
+- If `/map-config` completed after a place search, the map could replace its fallback bounds without moving the camera, leaving out-of-coverage results and pins in the list and on the map. MapCanvas now reports an actual coverage change; the search immediately filters existing hits to the newly installed bounds, discards a selected out-of-bounds search hit and refreshes the active library or viewport scope while retaining map mode. Unchanged bounds do not cause an extra request. A composable regression and nonmounted map wiring contract failed before implementation and now pass; rendered-device verification remains open.
+
 ### 2026-10-23 — Bug hunt: retain keyboard focus after selecting a map result
 
 - Choosing an individual map result or a place from the maximum-zoom cluster dialog previously removed the focused button/list entry as the point-route sheet opened, leaving keyboard focus on the page body. Once a valid map-origin selection has rendered, focus now moves to the route sheet's existing `tabindex="-1"` target. A map/route identity guard prevents an older deferred focus callback from stealing focus after a different selection or map replacement. Search-dialog selections are unchanged, avoiding interference with the phone dialog's close transition. Nonmounted source contracts failed before the fix and now pass; rendered keyboard and screen-reader review remains open.

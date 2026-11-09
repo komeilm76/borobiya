@@ -37,6 +37,14 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain('if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.value);');
     expect(view).not.toContain('watch(\n  () => auth.accessToken,');
   });
+  it("refreshes active place searches when installed coverage replaces fallback bounds", () => {
+    expect(canvas).toContain('"coverage-changed": [map: MapLibreMap]');
+    expect(canvas).toContain('emit("coverage-changed", instance)');
+    expect(view).toContain('@coverage-changed="onMapCoverageChanged"');
+    expect(body("onMapCoverageChanged")).toContain('if (map.value !== instance) return;');
+    expect(body("onMapCoverageChanged")).toContain('placeSearch.refreshForAreaChange()');
+  });
+
   it("keeps the large MapLibre chunk lazy until MapCanvas mounts while retaining own-position markers", () => {
     // A value import of Marker here makes the route depend on the 1MB+ chunk before mount,
     // defeating MapCanvas's concurrent dynamic import and worker startup.

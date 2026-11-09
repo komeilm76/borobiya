@@ -102,9 +102,9 @@ export function usePlaceSearch(options: {
     lastRequestBbox = area?.bbox ?? null;
     lastPrunedBbox = lastRequestBbox;
     needsRefresh = false;
-    if (preserve && scope.value === "viewport") {
-      // As soon as the camera enters another bbox, drop out-of-area hits even while
-      // Photon is pending/offline. Keep only still-visible pins until the new answer.
+    if (preserve) {
+      // A camera move or late-installed library coverage can shrink the safe area.
+      // Drop out-of-area hits immediately, even while Photon is pending/offline.
       results.value = area ? results.value.filter(area.contains) : [];
       if (mapActive.value) mapResults.value = area ? mapResults.value.filter(area.contains) : [];
       if (selectedPlaceId.value && !results.value.some(place => place.placeId === selectedPlaceId.value) &&
@@ -207,6 +207,15 @@ export function usePlaceSearch(options: {
     void run(true);
   }
 
+  /** Map config can replace fallback coverage without moving the camera. Refresh
+   * the active scope while keeping only hits inside the new installed bounds. */
+  function refreshForAreaChange(): void {
+    if (disposed || term.value.trim().length < 2 || timer !== null) return;
+    const bbox = options.area(scope.value)?.bbox ?? null;
+    if (bbox === lastRequestBbox && !needsRefresh) return;
+    void run(true);
+  }
+
   /** Retry in-place so a failed pan does not discard still-in-bbox POIs. */
   function retry(): void {
     if (scope.value === "viewport" && (mapActive.value || results.value.length))
@@ -224,5 +233,5 @@ export function usePlaceSearch(options: {
 
   onScopeDispose(() => { disposed = true; invalidate(); });
   return { term, scope, results, mapResults, mapActive, selectedPlaceId, loading, failed, diagnostic, searched,
-    run, update, clear, setScope, pruneForViewport, refreshForViewport, retry, showOnMap, select };
+    run, update, clear, setScope, pruneForViewport, refreshForViewport, refreshForAreaChange, retry, showOnMap, select };
 }

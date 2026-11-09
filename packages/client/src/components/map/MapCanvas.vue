@@ -55,6 +55,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   ready: [map: MapLibreMap, marker: typeof import("maplibre-gl").Marker];
+  "coverage-changed": [map: MapLibreMap];
   "config-error": [error: Error];
   "map-error": [error: Error];
 }>();
@@ -157,6 +158,10 @@ function fetchRuntimeConfig(controller: AbortController): void {
     configFailed = false;
     instance.setMinZoom(config.minZoom);
     instance.setMaxZoom(config.maxZoom);
+    const oldBounds = props.constrainBounds ? instance.getMaxBounds() : null;
+    const changed = props.constrainBounds && (!oldBounds ||
+      oldBounds.getWest() !== config.bbox[0] || oldBounds.getSouth() !== config.bbox[1] ||
+      oldBounds.getEast() !== config.bbox[2] || oldBounds.getNorth() !== config.bbox[3]);
     if (props.constrainBounds) instance.setMaxBounds(config.bbox);
     // The map starts on fallback bounds. Move once if the configured library is elsewhere.
     if (!props.center && props.constrainBounds) {
@@ -165,6 +170,7 @@ function fetchRuntimeConfig(controller: AbortController): void {
         instance.jumpTo({ center: bboxCenter(config.bbox) });
       }
     }
+    if (changed) emit("coverage-changed", instance);
   }).catch((error: unknown) => {
     if (controller.signal.aborted || map.value !== instance) return;
     configFailed = true;

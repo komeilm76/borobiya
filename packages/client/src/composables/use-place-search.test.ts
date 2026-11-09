@@ -485,6 +485,52 @@ describe("place search UI decisions", () => {
     scope.stop();
   });
 
+  it("drops hits outside late-installed map coverage before refreshing a library-wide search", async () => {
+    const inside = { ...hit("inside")[0]!, lon: 51.4 };
+    const outside = { ...hit("outside")[0]!, lon: 50.9 };
+    const pending = deferred<GeocodeResponse>();
+    const search = vi.fn().mockResolvedValueOnce([outside, inside]).mockResolvedValueOnce([outside, inside])
+      .mockImplementationOnce(() => pending.promise);
+    let west = 50.8;
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => ({
+      bbox: `${west},35,51.7,36`, contains: place => place.lon >= west && place.lon <= 51.7
+    }) }))!;
+    api.update("کافه"); await vi.advanceTimersByTimeAsync(300);
+    await api.setScope("library"); // A library-wide answer is visible before /map-config finishes.
+    expect(api.results.value).toEqual([outside, inside]);
+    expect(api.showOnMap()).toBe(true);
+    expect(api.select(outside)).toBe(true);
+
+    west = 51.2; // The installed coverage is smaller than the fallback bounds.
+    api.refreshForAreaChange();
+    expect(search.mock.calls[2]?.[0]).toEqual({ q: "کافه", limit: 30, bbox: "51.2,35,51.7,36" });
+    expect(api.scope.value).toBe("library");
+    expect(api.mapActive.value).toBe(true);
+    expect(api.results.value).toEqual([inside]);
+    expect(api.mapResults.value).toEqual([inside]);
+    expect(api.selectedPlaceId.value).toBeNull();
+    expect(api.select(outside)).toBe(false);
+    pending.resolve([outside, inside]); await Promise.resolve(); await Promise.resolve();
+    expect(api.results.value).toEqual([inside]);
+    scope.stop();
+  });
+
+  it("does not requery an unchanged viewport when map config repeats its coverage", async () => {
+    let bbox = "51,35,52,36";
+    const search = vi.fn(async (_input: unknown, _signal?: AbortSignal) => hit("inside"));
+    const scope = effectScope();
+    const api = scope.run(() => usePlaceSearch({ search, area: () => ({ bbox, contains: () => true }) }))!;
+    api.update("park"); await vi.advanceTimersByTimeAsync(300);
+    api.refreshForAreaChange();
+    expect(search).toHaveBeenCalledOnce();
+    bbox = "51.1,35,52,36";
+    api.refreshForAreaChange(); await Promise.resolve(); await Promise.resolve();
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(search.mock.calls[1]?.[0]).toMatchObject({ bbox });
+    scope.stop();
+  });
+
   it("filters against the request's bbox snapshot even if the viewport changes while loading", async () => {
     const pending = deferred<GeocodeResponse>();
     let current = "old";

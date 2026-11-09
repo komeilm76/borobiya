@@ -7,6 +7,7 @@
       :show-zoom="false"
       aria-label="نقشهٔ تعاملی"
       @ready="onMapReady"
+      @coverage-changed="onMapCoverageChanged"
     />
 
     <!-- On phones Search is modal; this map-side action makes other POIs reachable
@@ -1854,6 +1855,11 @@ function onMapMoveEnd(event: MapMovementEvent): void {
   const followViewport = !!event.originalEvent || showAllResultsOnMap.value;
   placeSearch.pruneForViewport(followViewport);
   placeSearch.refreshForViewport(followViewport);
+}
+
+function onMapCoverageChanged(instance: MapLibreMap): void {
+  if (map.value !== instance) return;
+  placeSearch.refreshForAreaChange();
 }
 
 function onMapResize(): void {
