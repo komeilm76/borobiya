@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: close the cluster chooser after a hand-picked destination
+
+- At maximum zoom, the nearby-results chooser is nonmodal and could stay visible when the user long-pressed a different spot on the canvas; its cluster still existed after the camera recentered, so it overlapped the new route sheet and could retain keyboard focus on the obsolete choice. Hand selection now closes that chooser and moves focus to the new route sheet after rendering, guarded by the same map and exact route-point identity so a later selection cannot receive stale focus. The chooser/pin zoom flow and search results are unchanged. A nonmounted view contract failed before the fix; rendered keyboard/touch verification remains open.
+
 ### 2026-10-23 — Bug hunt: prevent hand-picking from a moving map
 
 - A pointer could begin a 550 ms hold, move less than the 12 px touch-jitter allowance, and still start a MapLibre camera pan (or begin during an existing camera flight). The timeout then unprojected the old screen coordinate against a new camera frame and selected the wrong destination. Holds now reject an already moving map and cancel on any `movestart`; the extra map listener is removed with the other hold listeners. A nonmounted view contract failed before the fix, and a pure timer test pins cancellation despite minor pointer jitter. Rendered mouse/touch/pen gesture verification remains open.

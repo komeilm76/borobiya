@@ -112,6 +112,15 @@ describe("show all current POIs on the map", () => {
     expect(card).not.toContain("verified");
   });
 
+  it("dismisses a maximum-zoom chooser when a hand-picked point replaces it and focuses the new route", () => {
+    const hold = body("attachHold");
+    expect(view).toContain('v-if="nearbyPlaces.length > 1 && showAllResultsOnMap && !activeTool"');
+    expect(hold).toContain('closeNearbyResults();');
+    expect(hold.indexOf('closeNearbyResults();')).toBeLessThan(hold.indexOf('journey.select({ lat: location.lat, lon: location.lng })'));
+    expect(hold).toContain('if (map.value === instance && journey.sheetOpen.value && journey.point.value === point)');
+    expect(hold).toContain('document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true })');
+  });
+
   it("moves keyboard focus into the current route sheet when a selected map pin disappears", () => {
     const select = body("selectPlace");
     expect(select).toContain('if (fromMap) void nextTick(() => {');

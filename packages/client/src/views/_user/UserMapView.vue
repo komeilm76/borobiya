@@ -1729,9 +1729,15 @@ function attachHold(instance: MapLibreMap): () => void {
     // A hold uses the held coordinates, not the last gesture's camera center.
     // Preserve the user's zoom; the selected pin lands in the exact map center.
     routeChoicesOpen.value = false;
+    closeNearbyResults(); // A maximum-zoom chooser must not cover the new point's route sheet.
     placeSearch.deselect();
     journey.select({ lat: location.lat, lon: location.lng });
+    const point = journey.point.value;
     instance.easeTo({ center: [location.lng, location.lat], duration: 450 }, { placeSearchSelection: true });
+    if (point) void nextTick(() => {
+      if (map.value === instance && journey.sheetOpen.value && journey.point.value === point)
+        document.getElementById("map-point-route-sheet")?.focus({ preventScroll: true });
+    });
   });
   const pointer = (event: PointerEvent): HoldPointer => ({ id: event.pointerId, x: event.clientX, y: event.clientY,
     button: event.button, primary: event.isPrimary, type: event.pointerType });
