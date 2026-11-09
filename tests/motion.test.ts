@@ -4,7 +4,9 @@ import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
-import { MOTION_SURFACE, revealTimeline } from '../src/client/motion/index.ts';
+import { createApp, type App } from 'vue';
+import { MotionPlugin } from '@vueuse/motion';
+import { MOTION_SURFACE, installMotion, revealTimeline } from '../src/client/motion/index.ts';
 import { routeVariants, sheetVariants, listVariants } from '../src/client/motion/MotionPresets.ts';
 import { useMotionPreferences } from '../src/client/composables/useMotionPreferences.ts';
 import OverviewView from '../src/client/views/admin/OverviewView.vue';
@@ -236,5 +238,16 @@ describe('a view honours the preference', () => {
     expect(card.style.opacity).toBe('');
     expect(card.style.transform).toBe('');
     wrapper.unmount();
+  });
+});
+
+describe('motion plugin installation', () => {
+  it('installs the VueUse motion plugin on the host application', () => {
+    const app = createApp({ render: () => null });
+    const use = vi.spyOn(app, 'use');
+    installMotion(app);
+    // installMotion must hand the real plugin to the Vue app — nothing more, nothing less.
+    expect(use).toHaveBeenCalledTimes(1);
+    expect(use).toHaveBeenCalledWith(MotionPlugin);
   });
 });

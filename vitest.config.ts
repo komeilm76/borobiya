@@ -39,34 +39,24 @@ export default defineConfig({
         'src/server/index.ts',
         'src/client/service-worker/**'
       ],
-      // Raised after the view, layout, route-guard, browser-transport, push-to-talk and mobile-shell
-      // command-palette, SOS-store, recovery, device-list, API-contract, mission, composer, registration push-to-talk and sign-in suites landed (59% → 84% statements, 88% lines, 81% functions); the guard sits a few points below the
+      // Raised after the core-primitive edge suite (cache, crypto, validate, state, geo, repository
+      // corruption tolerance, lifecycle, static fallbacks) landed — the suite now sits at ~97%
+      // statements/lines and ~97%/87% functions/branches. The guard stays a few points below the
       // measured figures so an unrelated small change cannot fail it by rounding alone, while a
       // genuine coverage loss still does.
       thresholds: {
-        // Set from the *worst* observed run, not a single measurement: two views were previously
-        // only exercised by the generic mount sweep, so how much of them executed depended on
-        // timing and the suite's statement total moved between identical runs (87.06-87.32%).
-        // Each of those views now has its own deterministic suite. Later suites then raised the
-        // floor again — the push-to-talk floor, and the map canvas, whose duplicate projection was
-        // deleted when the canvas was given one.
-        //
-        // The figure is still not perfectly reproducible, and the cause is understood: several spec
-        // files import the same single-file component, so it is instrumented more than once with
-        // different statement ids, and the v8 remap then reports one record or the other rather
-        // than their union. The result is a whole-file difference that appears in a minority of
-        // runs — `MissionView.vue` reports 45 or 43 covered lines, and the same merge loses whole
-        // functions: a symlinked-modules run measured 90.24% functions while a frozen install
-        // measured 89.96%, below an earlier 90% guard (89.86% on another run). Disabling
-        // `fileParallelism`, enabling `experimentalAstAwareRemapping`, and importing the components
-        // statically instead of through a computed specifier were each measured and none removed it.
-        // So the guards sit below the *lowest* figure seen in the closest emulation of CI (90.02 /
-        // 93.43 / 89.86 / 77.84) rather than below the typical one. A threshold between the two
-        // would be a coin flip, which is how this cost a red build once already.
-        lines: 92,
-        functions: 89,
-        statements: 89,
-        branches: 77
+        // The guards still sit a few points below the *lowest* figures measured in this workspace
+        // (97.1 / 97.7 / 98.3 / 87.4 at the time they were raised) rather than at them, because a
+        // minority of runs report one of the SFC-instrumented records instead of their union —
+        // `MissionView.vue` in particular flips whole functions in and out between runs, and a
+        // frozen install measured slightly lower than a symlinked one. Disabling
+        // `fileParallelism`, enabling `experimentalAstAwareRemapping` and static SFC imports were
+        // each measured and none removed the variance. The margin here keeps an unlucky merge from
+        // failing CI while a genuine coverage loss still does.
+        lines: 95,
+        functions: 94,
+        statements: 94,
+        branches: 83
 
       }
     }

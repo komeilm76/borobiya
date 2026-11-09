@@ -118,14 +118,8 @@ export class StaticFiles {
         compress: !/\.(png|jpg|jpeg|webp|ttf|woff2)$/i.test(relative)
       });
     } catch {
-      if (fallbackToIndex && !pathname.includes('.')) {
-        const index = await this.load(pathResolve(this.config.publicDir, 'index.html'));
-        return bufferResponse(request, 200, index.body, {
-          contentType: index.contentType,
-          etag: index.etag,
-          cacheControl: 'no-cache'
-        });
-      }
+      // The SPA fallback already ran above for extension-less paths (the resolver refuses paths
+      // whose extension is missing or unknown), so anything reaching this point is a genuine miss.
       throw notFound('File not found.');
     }
   }

@@ -346,3 +346,46 @@ describe('SOS store realtime updates', () => {
     expect(calls.slice(before)).toContain('GET /_user/sos');
   });
 });
+
+describe('SOS store detail merging', () => {
+  it('merges the timeline payload onto the cached request in place', async () => {
+    const sos = useSosStore();
+    sos.requests = [{ id: 'sos_9', status: 'pending', timeline: undefined } as never];
+    stubApi((path) => {
+      if (path === '/_user/sos/sos_9') {
+        return json({ id: 'sos_9', status: 'in_progress', timeline: [{ at: 1, label: 'dispatched' }] });
+      }
+      return json(route(path));
+    });
+
+    const detail = await sos.loadDetail('sos_9');
+    expect(sos.requests).toHaveLength(1);
+    expect((sos.requests as any[])[0].status).toBe('in_progress');
+    expect((sos.requests as any[])[0].timeline).toEqual([{ at: 1, label: 'dispatched' }]);
+    expect(detail?.id).toBe('sos_9');
+    expect(sos.error).toBe(null);
+  });
+
+  it('prepends a request that was not in the cached list', async () => {
+    const sos = useSosStore();
+    sos.requests = [];
+    stubApi((path) => {
+      if (path === '/_user/sos/sos_10') return json({ id: 'sos_10', status: 'pending' });
+      return json(route(path));
+    });
+
+    await sos.loadDetail('sos_10');
+    expect((sos.requests as any[]).map((item) => item.id)).toEqual(['sos_10']);
+  });
+
+  it('surfaces a read failure through the error ref and returns null', async () => {
+    const sos = useSosStore();
+    sos.requests = [];
+    stubApi(() => fail(500, 'INTERNAL', 'خواندن انجام نشد.'));
+
+    const result = await sos.loadDetail('sos_11');
+    expect(result).toBe(null);
+    expect(sos.error).toBeTruthy();
+    expect(sos.requests).toHaveLength(0);
+  });
+});

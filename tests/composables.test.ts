@@ -129,6 +129,36 @@ describe('formatters', () => {
     expect(format.relative(Date.now() - 5000)).toBe('همین حالا');
     expect(format.relative(Date.now() - 120_000)).toMatch(/[۰-۹]/);
     expect(format.clock(Date.now())).toMatch(/[۰-۹]/);
+    expect(format.date('not-a-date')).toBe('—');
+    expect(format.dateTime('not-a-date')).toBe('—');
+    expect(format.date(0)).not.toBe('—');
+  });
+
+  it('falls back to ISO output when the locale formatter throws', () => {
+    // Intl is stubbed so both the date and the date-time catch arms run; the ISO fallback is the
+    // last resort that keeps a Persian UI readable on exotic runtimes.
+    const original = globalThis.Intl;
+    vi.stubGlobal('Intl', {
+      ...original,
+      DateTimeFormat: class {
+        format(): string {
+          throw new Error('locale unavailable');
+        }
+      }
+    });
+    try {
+      const format = useFormatters();
+      expect(format.date(0)).toBe('1970-01-01');
+      expect(format.dateTime(0)).toBe(new Date(0).toISOString());
+    } finally {
+      vi.stubGlobal('Intl', original);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('renders Persian date-times for valid instants', () => {
+    const format = useFormatters();
+    expect(format.dateTime(Date.UTC(2026, 10, 8, 12, 0, 0))).toMatch(/[۰-۹]/);
   });
 });
 

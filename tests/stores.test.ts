@@ -245,3 +245,46 @@ describe('map, SOS, realtime and admin stores', () => {
     }
   });
 });
+
+describe('admin store request paths', () => {
+  it('patches a group and reloads the list afterwards', async () => {
+    const admin = useAdminStore();
+    const calls: Array<{ method: string; path: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+        const path = url.split('?')[0];
+        calls.push({ method: init?.method ?? 'GET', path });
+        return envelope({ items: [{ id: 'grp_1', name: 'گروه اول', color: '#0E6666', capacity: 8, incidentIds: ['inc_1'], status: 'active' }] });
+      })
+    );
+
+    await admin.updateGroup('grp_1', { name: 'گروه اول', color: '#0E6666', capacity: 8, incidentIds: ['inc_1'] });
+    expect(calls).toEqual([
+      { method: 'PATCH', path: '/_admin/groups/grp_1' },
+      { method: 'GET', path: '/_admin/groups' }
+    ]);
+    expect(admin.groups).toHaveLength(1);
+  });
+
+  it('posts an alert resolution and reloads the open list', async () => {
+    const admin = useAdminStore();
+    const calls: Array<{ method: string; path: string }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+        const path = url.split('?')[0];
+        calls.push({ method: init?.method ?? 'GET', path });
+        return envelope({ items: [] });
+      })
+    );
+
+    await admin.resolveAlert('alt_9');
+    expect(calls).toEqual([
+      { method: 'POST', path: '/_admin/alerts/alt_9/resolve' },
+      { method: 'GET', path: '/_admin/alerts' }
+    ]);
+  });
+});

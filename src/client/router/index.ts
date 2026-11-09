@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import { createRouter, createWebHistory, type NavigationGuard, type RouteLocationNormalizedLoaded, type RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '@/stores/auth.ts';
 import { ROLES } from '@shared/protocol.ts';
 
@@ -199,7 +199,16 @@ export function landingRoute(role: string | undefined, mustOnboard: boolean): Ro
   return ROUTE_NAMES.map;
 }
 
-router.beforeEach(async (to) => {
+/**
+ * The navigation guard, exported so the role/onboarding matrix can be pinned down directly
+ * instead of only through the mounted shell.
+ *
+ * @param to The target route.
+ * @returns `true` to continue, or a redirect to a named route.
+ */
+export async function authGuard(
+  to: Pick<RouteLocationNormalizedLoaded, 'name' | 'meta'>
+): Promise<true | { name: RouteName }> {
   const auth = useAuthStore();
   let user = auth.user;
   if (!user && !auth.loading) user = await auth.refresh();
@@ -218,7 +227,9 @@ router.beforeEach(async (to) => {
     if (user.role !== ROLES.ADMIN) return { name: ROUTE_NAMES.map };
   }
   return true;
-});
+}
+
+router.beforeEach(authGuard as NavigationGuard);
 
 /** Exported for tests that assert the guard table without mounting the app. */
 export function routeTable(): Array<{ path: string; name: string; access: string; layout: string }> {
