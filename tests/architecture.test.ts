@@ -184,6 +184,8 @@ describe('architecture guards', () => {
       'map-canvas.test.ts',
       'map-store.test.ts',
       'config.test.ts',
+      'admin-views.test.ts',
+      'admin-guards.test.ts',
       'shared-geo.test.ts',
       'offline-store.test.ts',
       'websocket-hub.test.ts',
