@@ -301,7 +301,7 @@ import type { Map as MapLibreMap, MapMovementEvent, Marker } from "maplibre-gl";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import HistoryPlaybackPanel from "@/components/map/HistoryPlaybackPanel.vue";
 import PlaceSearchPanel from "@/components/map/PlaceSearchPanel.vue";
-import { groupSearchResults, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
+import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "@/map/search-result-markers";
 import { clusterAppearance, matchesSelectedSearchDestination, resultAppearance } from "@/map/search-result-presentation";
 import { advanceRouteProgress, pointRouteFeatures, pointRouteOverviewPadding, pointRouteOverlayNeedsSync,
   pointRouteSelectionExtent } from "@/map/point-route-preview";
@@ -1001,8 +1001,29 @@ function positionResultTooltip(button: HTMLElement, instance: MapLibreMap): void
   if (tooltip.getBoundingClientRect().top < canvas.top + 8)
     button.classList.add("user-map-view__result-marker--tooltip-below");
   const rect = tooltip.getBoundingClientRect();
-  const shift = Math.max(canvas.left + 8 - rect.left, Math.min(0, canvas.right - 8 - rect.right));
+  const shift = mapLabelShift(rect.left, rect.right, canvas.left, canvas.right);
   button.style.setProperty("--result-tooltip-shift", `${shift}px`);
+}
+function positionSelectedPlaceLabel(marker: Marker | null, instance: MapLibreMap): void {
+  if (!marker) return;
+  const element = marker.getElement();
+  const label = element.querySelector<HTMLElement>(".user-map-view__selected-place-label");
+  if (!label || label.hidden) return;
+  const canvas = instance.getCanvas().getBoundingClientRect();
+  element.style.setProperty("--selected-label-map-width", `${Math.max(44, canvas.width - 16)}px`);
+  element.classList.remove("user-map-view__selected-place--label-below");
+  element.style.removeProperty("--selected-label-shift");
+  if (label.getBoundingClientRect().top < canvas.top + 8)
+    element.classList.add("user-map-view__selected-place--label-below");
+  const rect = label.getBoundingClientRect();
+  element.style.setProperty("--selected-label-shift", `${mapLabelShift(rect.left, rect.right, canvas.left, canvas.right)}px`);
+}
+function positionSelectedPlaceLabels(): void {
+  const instance = map.value;
+  if (!instance) return;
+  positionSelectedPlaceLabel(selectedPlaceMarker, instance);
+  if (isSelectedSearchDestination.value && !journey.navigating.value)
+    positionSelectedPlaceLabel(destinationMarker, instance);
 }
 function syncResultMarkers(): void {
   const instance = map.value;
@@ -1201,6 +1222,7 @@ function syncSelectedPlaceMarker(): void {
   // DOM text, never HTML or a hover-only/native tooltip.
   const label = selectedPlaceMarker.getElement().querySelector<HTMLElement>(".user-map-view__selected-place-label");
   if (label) label.textContent = place.name;
+  positionSelectedPlaceLabel(selectedPlaceMarker, instance);
 }
 watch(() => isSelectedSearchDestination.value, () => { syncSelectedPlaceMarker(); syncDestinationMarker(); });
 watch(() => placeSearch.selectedPlaceId.value, () => {
@@ -1597,6 +1619,7 @@ function syncDestinationMarker(): void {
   const label = element.querySelector<HTMLElement>(".user-map-view__selected-place-label");
   const namedSearch = isSelectedSearchDestination.value && !journey.navigating.value;
   if (label) { label.hidden = !namedSearch; label.textContent = namedSearch ? journey.title.value : ""; }
+  if (namedSearch) positionSelectedPlaceLabel(destinationMarker, instance);
   // No native hover tooltip on a selected search result.
   if (namedSearch) element.removeAttribute("title");
   else element.setAttribute("title", journey.title.value);
@@ -1809,6 +1832,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
   // Screen-space collisions change with zoom, pan, fitBounds and flyTo, even
   // when the search snapshot itself did not change.
   syncResultMarkers();
+  positionSelectedPlaceLabels();
   restoreClusterKeyboardFocus();
   if (journey.navigating.value) return;
   // Choosing a search hit already marks the camera as user-chosen, but its own flyTo must not
@@ -1826,6 +1850,7 @@ function onMapMoveEnd(event: MapMovementEvent): void {
 
 function onMapResize(): void {
   syncResultMarkers();
+  positionSelectedPlaceLabels();
   frameCamera();
   if (journey.navigating.value && navigationFollowEnabled.value) journey.focus();
   else if (journey.sheetOpen.value) fitPointRoute();
@@ -2007,13 +2032,18 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 }
 :global(.user-map-view .user-map-view__selected-place) { cursor: pointer; z-index: 3; }
 :global(.user-map-view .user-map-view__selected-place-label:not([hidden])) {
-  position: absolute; bottom: calc(100% + .45rem); left: 50%; transform: translateX(-50%);
-  display: block; width: max-content; max-width: min(15rem, calc(100vw - 2rem));
+  position: absolute; bottom: calc(100% + .45rem); left: 50%;
+  transform: translateX(calc(-50% + var(--selected-label-shift, 0px)));
+  display: block; width: max-content;
+  max-width: min(15rem, calc(100vw - 2rem), var(--selected-label-map-width, 15rem));
   padding: .45rem .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   border: 1px solid rgba(var(--v-theme-on-surface), .16); border-radius: .8rem;
   background: rgb(var(--v-theme-surface)); color: rgb(var(--v-theme-on-surface));
   box-shadow: 0 5px 18px rgba(3, 29, 31, .28); pointer-events: none;
   font: 700 .9rem/1.5 var(--bb-font-family, "Vazirmatn", "Segoe UI", Tahoma, sans-serif);
+}
+:global(.user-map-view .user-map-view__selected-place--label-below .user-map-view__selected-place-label:not([hidden])) {
+  top: calc(100% + .45rem); bottom: auto;
 }
 @media (forced-colors: active) {
   :global(.user-map-view .user-map-view__result-marker),

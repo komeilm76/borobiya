@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: keep selected-place names visible at map edges
+
+- The always-visible selected-place name previously used a fixed centered position, so a pin near the top or either side of the clipped map canvas could hide its label. Both the stand-alone search pin and the route-owned destination pin now cap the label to the map width, shift it horizontally inside the canvas and place it below the pin when there is no space above. Positions are recalculated after marker updates, camera moves and resizes; the 48px category pins, hover-only result names, cluster zoom and route actions are unchanged. The hover tooltip shares the tested edge-shift geometry. Pure edge cases and nonmounted view contracts failed before implementation and now pass; rendered-map/device visual acceptance remains open.
+
 ### 2026-10-23 — Bug hunt: avoid duplicate selected-place pins after search refresh
 
 - A refreshed Photon result could keep the same OSM ID and coordinates while changing its name, address or category. The former strict metadata comparison then treated it as a different selected place, drawing a second red pin directly on top of the route's amber pin and potentially mixing fresh category text with the route's saved title. Ownership now depends on identity and coordinates, not mutable display text; the route card takes its category/icon from the route's original place snapshot. A genuinely moved result or different ID still remains distinct. Pure identity tests first reproduced the failure; nonmounted view contracts and typecheck cover the integration. Rendered-map acceptance remains open.

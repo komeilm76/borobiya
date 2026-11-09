@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GeocodeResult } from "@shared/index";
-import { groupSearchResults, nextClusterZoom, resultCameraPadding, resultExtent } from "./search-result-markers";
+import { groupSearchResults, mapLabelShift, nextClusterZoom, resultCameraPadding, resultExtent } from "./search-result-markers";
 
 const place = (placeId: string, lon: number, lat: number): GeocodeResult =>
   ({ placeId, lon, lat, name: placeId, address: "street", type: "place" });
@@ -51,6 +51,14 @@ describe("map search result geometry", () => {
     expect(nextClusterZoom(16, 15)).toBeNull();
     expect(nextClusterZoom(NaN, 16)).toBeNull();
     expect(nextClusterZoom(8, Infinity)).toBeNull();
+  });
+  it("keeps centered names inside the clipped map canvas at either edge", () => {
+    expect(mapLabelShift(40, 280, 0, 320)).toBe(0);
+    expect(mapLabelShift(-100, 140, 0, 320)).toBe(108);
+    expect(mapLabelShift(240, 480, 0, 320)).toBe(-168);
+    expect(mapLabelShift(60, 100, 50, 130)).toBe(0);
+    // A pathological overwide label cannot fit: center its unavoidable overflow.
+    expect(mapLabelShift(-40, 360, 0, 320)).toBe(0);
   });
   it("reserves phone header and dock space without squeezing short screens to zero", () => {
     for (const [w, h] of [[320, 400], [360, 640], [568, 320]]) {

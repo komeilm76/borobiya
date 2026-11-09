@@ -51,6 +51,23 @@ describe("show all current POIs on the map", () => {
       '@media (forced-colors: active)']) expect(css.code).toContain(part);
   });
 
+  it("keeps the always-visible selected name inside the map after selection, movement and resize", () => {
+    const position = body("positionSelectedPlaceLabel");
+    expect(position).toContain('instance.getCanvas().getBoundingClientRect()');
+    expect(position).toContain('mapLabelShift(');
+    expect(position).toContain('label.getBoundingClientRect().top < canvas.top + 8');
+    expect(body("syncSelectedPlaceMarker")).toContain('positionSelectedPlaceLabel(selectedPlaceMarker, instance)');
+    expect(body("syncDestinationMarker")).toContain('positionSelectedPlaceLabel(destinationMarker, instance)');
+    expect(body("onMapMoveEnd")).toContain('positionSelectedPlaceLabels()');
+    expect(body("onMapResize")).toContain('positionSelectedPlaceLabels()');
+    const { descriptor } = parse(view, { filename: "UserMapView.vue" });
+    const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
+    expect(css.errors).toEqual([]);
+    expect(css.code).toContain('--selected-label-shift');
+    expect(css.code).toContain('--selected-label-map-width');
+    expect(css.code).toContain('user-map-view__selected-place--label-below');
+  });
+
   it("shows only the real place name on hover and keyboard focus without moving the pin", () => {
     const sync = body("syncResultMarkers");
     expect(sync).toContain('document.createElement("bdi")');
@@ -67,7 +84,7 @@ describe("show all current POIs on the map", () => {
     expect(position).toContain('instance.getCanvas().getBoundingClientRect()');
     expect(position).toContain('canvas.width - 16');
     expect(position).toContain('tooltip.getBoundingClientRect().top < canvas.top + 8');
-    expect(position).toContain('canvas.right - 8 - rect.right');
+    expect(position).toContain('mapLabelShift(rect.left, rect.right, canvas.left, canvas.right)');
     const { descriptor } = parse(view, { filename: "UserMapView.vue" });
     const css = compileStyle({ source: descriptor.styles[0]!.content, filename: "UserMapView.vue", id: "data-v-results", scoped: true });
     expect(css.errors).toEqual([]);

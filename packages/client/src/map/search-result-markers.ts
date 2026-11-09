@@ -33,6 +33,17 @@ export function groupSearchResults(
   return [...groups.values()];
 }
 
+/** Offset a centered name label to the clipped map canvas, not the browser.
+ * Callers cap the label's max-width to the map's inner width first; if an
+ * exceptionally large label still cannot fit, center its overflow instead.
+ */
+export function mapLabelShift(labelLeft: number, labelRight: number, mapLeft: number, mapRight: number): number {
+  if (![labelLeft, labelRight, mapLeft, mapRight].every(Number.isFinite) || mapLeft >= mapRight) return 0;
+  const min = mapLeft + 8 - labelLeft;
+  const max = mapRight - 8 - labelRight;
+  return min > max ? (min + max) / 2 : Math.max(min, Math.min(0, max));
+}
+
 /** Cluster taps zoom in by two levels, bounded by the installed map's max zoom.
  * At max zoom, identical-coordinate (or still-overlapping) hits need the list.
  */
