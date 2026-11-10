@@ -90,6 +90,26 @@ test("geocode and reverse reject malformed/unknown query parameters before upstr
   assert.equal(calls, 0);
 });
 
+test("a Photon response that stalls after headers cannot hold a private search open forever", async () => {
+  const lines = [];
+  const stalled = new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode('{"type":"FeatureCollection"'));
+    // Never close: an upstream may send headers and a partial body before hanging.
+  } }));
+  const response = await Promise.race([
+    handleGeocodeRequest(get("/geocode?q=Private%20Home%20Address"), {
+      fetchImpl: async () => stalled, timeoutMs: 20, log: (line) => lines.push(line)
+    }),
+    new Promise((resolve) => setTimeout(() => resolve(null), 500))
+  ]);
+  assert.ok(response, "gateway must finish after the body deadline, not wait indefinitely");
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.error, "invalid_geocoder_response");
+  assert.equal(body.upstream_body, null);
+  assert.doesNotMatch(JSON.stringify(body) + lines.join("\n"), /Private|Home|Address|q=/);
+});
+
 test("geocode transport failures identify Photon without logging the user's search or exception URL", async () => {
   const lines = [];
   const response = await handleGeocodeRequest(get("/geocode?q=Private%20Home%20Address"), {

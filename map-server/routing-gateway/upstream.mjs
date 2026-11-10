@@ -23,14 +23,23 @@ function isRecord(value) {
 }
 
 // Read the upstream once, as text, and try to parse it. `response.json()` cannot be used here: it consumes
-// the body, so the fallback path had nothing left to show. `readFailed` is for the case where reading the
-// body itself threw (a reset mid-response), which is a different fault from "not JSON".
-async function readUpstreamBody(response) {
+// the body, so the fallback path had nothing left to show. A fetch timeout alone is not sufficient after
+// headers: a broken upstream/adapter can leave response.text() pending even when its signal expires.
+// `readFailed` covers both a reset mid-response and a stalled body, distinct from "not JSON".
+async function readUpstreamBody(response, timeoutMs) {
   let text;
+  let timer;
   try {
-    text = await response.text();
+    text = await Promise.race([
+      response.text(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error("UPSTREAM_BODY_TIMEOUT")), timeoutMs);
+      })
+    ]);
   } catch {
     return { text: "", parsed: undefined, readFailed: true };
+  } finally {
+    clearTimeout(timer);
   }
   try {
     return { text, parsed: JSON.parse(text), readFailed: false };

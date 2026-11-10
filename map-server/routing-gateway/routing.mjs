@@ -222,7 +222,7 @@ export async function handleRoutingRequest(request, {
     return json({ error: "routing_unavailable", profile: input.profile }, 503);
   }
 
-  const { text, parsed, readFailed } = await readUpstreamBody(response);
+  const { text, parsed, readFailed } = await readUpstreamBody(response, timeoutMs);
   // An OSRM error body can also echo the GET path. Only report status and code for trips.
   const safeParsed = optimized ? (parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? { code: parsed.code } : undefined) : parsed;

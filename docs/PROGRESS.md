@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: bound stalled routing and geocoding response bodies
+
+- The routing gateway bounded connecting to OSRM/Photon but waited without its own deadline when an upstream returned headers and then stalled mid-body. Both route planning and place searches could therefore remain pending despite the configured timeout, including with adapters that ignore fetch cancellation. The shared upstream reader now bounds the body read and reports a safe unreadable-upstream 502, without echoing private search text. Focused stalled-stream tests for both endpoints failed before the change and pass afterward. Live upstream/proxy timing remains unverified.
+
 ### 2026-10-23 — Bug hunt: keep exact preset instants through a repeated DST hour
 
 - Strict local-time validation correctly rejects a manually selected hour that occurs twice when clocks fall back, but it also rejected a history playback/share preset whose exact UTC instant was already known before the shortcut rendered it in a minute-only local field. During that hour a seven-day playback shortcut produced no request, and a preset history share could not submit. Both flows now retain the preset's original ISO window only while the displayed fields still match it; manual edits still use the strict ambiguous-time guard. The focused playback regression failed before the fix, and pure converter plus nonmounted share-dialog contract tests cover both fall-hour instants and manual changes. Physical browser/device timezone verification remains open.

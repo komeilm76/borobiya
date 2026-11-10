@@ -65,7 +65,7 @@ async function proxyPhotonRequest(target, { fetchImpl, timeoutMs, log = console.
     return json({ error: "geocoding_unavailable" }, 503);
   }
 
-  const { text, parsed: body, readFailed } = await readUpstreamBody(response);
+  const { text, parsed: body, readFailed } = await readUpstreamBody(response, timeoutMs);
   const upstream = describeUpstream({ endpoint: target, status: response.status, text, parsed: body, readFailed });
   const report = (error, fallback) => {
     // Photon error bodies are untrusted and may echo its GET query. Keep diagnostic

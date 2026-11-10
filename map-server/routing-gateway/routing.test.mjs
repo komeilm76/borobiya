@@ -120,6 +120,23 @@ test("returns a useful no-route response", async () => {
   assert.deepEqual(await response.json(), { error: "no_route", message: "No route found" });
 });
 
+test("a stalled OSRM response body returns an error instead of hanging route planning", async () => {
+  const stalled = new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode('{"code":"Ok"'));
+  } }));
+  const response = await Promise.race([
+    handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => stalled, timeoutMs: 20, log: () => {}
+    }),
+    new Promise((resolve) => setTimeout(() => resolve(null), 500))
+  ]);
+  assert.ok(response, "gateway must finish after the body deadline");
+  assert.equal(response.status, 502);
+  const body = await response.json();
+  assert.equal(body.error, "invalid_upstream_response");
+  assert.equal(body.upstream_body, null);
+});
+
 test("reports local OSRM unavailability as 503", async () => {
   const response = await handleRoutingRequest(postRoute(validInput), {
     fetchImpl: async () => { throw new Error("connection refused"); }
