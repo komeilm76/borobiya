@@ -1,0 +1,259 @@
+# Design-to-implementation match matrix
+
+Living cross-reference between the canonical references in `design/` and the code on this branch.
+Canonical images only: 141 screens and references (154 PNG files minus 13 `design/*/_generator/_preview-*.png` artifacts).
+
+**Status legend**
+
+- `done` — implemented and wired end to end; pixel-level fidelity against the PNG is unverified (visual acceptance is a deferred human review, see `docs/ACCEPTANCE.md`).
+- `partial` — implemented but materially different from, or incomplete against, the design.
+- `missing` — no implementation exists.
+- `superseded` — out of contract by a documented product decision (`docs/ACCEPTANCE.md`, "Legacy feature scope reconciliation").
+- `reference` — design guidance or a spec sheet, not a screen to build.
+
+**Phases** refer to the execution plan in the phase-0 report (`P1` critical wiring, `P2` app experience, `P3` admin console, `P4` test validation, `P5` visual acceptance). Priority: `C` critical, `H` high, `M` medium, `L` low.
+
+## Authentication (`design/auth/`, 16)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| 01-login.png | partial | P2/M | Functional (Vuetify card, typed server errors, role redirect). Missing designed top bar, back-to-home, heading/icon lockup, floating labels, social/quick sign-in variants; demo-account panel is a code-only extra. |
+| 02-login-empty.png | missing | P2/L | No dedicated empty-state composition; form renders plainly. |
+| 03-register.png | partial | P2/M | Five catalog-backed security questions implemented and re-validated server-side; simpler styling than the design (strength hints, show-password row, numbered question cards with dropdowns exist in code but differ visually). |
+| 04-register-error.png | partial | P2/L | Inline `VAlert` covers the error; no designed inline-field error presentation. |
+| 05-recovery-account.png | partial | P2/M | Three-step recovery (account, questions, password) exists client+server; simpler visual treatment. |
+| 06-recovery-account-error.png | deviation | P2/M | Design shows "enter a valid username" for unknown accounts, which enables user enumeration. Implementation intentionally answers with decoy challenges; see DEV-01. No code change planned. |
+| 07-recovery-questions.png | partial | P2/L | Implemented with attempt limits and expiry; simplified UI. |
+| 08-recovery-questions-error.png | partial | P2/L | Limit-exceeded path exists server-side; no dedicated designed error card. |
+| 09-recovery-password.png | partial | P2/L | Implemented; simplified UI. |
+| 10-recovery-done.png | partial | P2/L | Completion screen is minimal vs design. |
+| 11-onboarding.png | partial | P2/L | Security-question onboarding implemented (`auth/09…`, `/_auth/onboarding`); simplified UI. |
+| 12-onboarding-loading.png | missing | P2/L | No dedicated loading state. |
+| 13-anatomy.png | reference | — | Layout anatomy sheet for the auth family. |
+| 14-states.png | reference | — | Auth states overview sheet. |
+| 15-dark.png | partial | P2/L | Dark theme exists via system preference + cycle; auth surface not verified against the dark reference. |
+| 16-responsive.png | partial | P2/L | ≤900px collapses to single column (brand panel hidden); not yet verified against the reference. |
+
+## Icons (`design/icons/`, 8)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| 01-overview.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 02-actions.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 03-actions-fields.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 04-fields-navigation-status.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 05-cards.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 06-cards-map.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 07-media-account.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+| 08-account.png | done | P5/M | Client renders the generated glyph subset produced from `design/icons/icons.json`; `tests/assets.test.ts` fails the build on a missing glyph. Visual sizing/placement parity deferred to P5. |
+
+## Mobile map — design system and guides (7)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| design-system/colors.png | done | P5/M | Tokens implemented in `src/client/app.css` (`#0E6666` primary family). |
+| design-system/typography.png | done | P5/M | Self-hosted Vazirmatn, Persian digits helpers in shared geo utils. |
+| design-system/controls.png | done | P5/M | Buttons, chips, pills, round controls in shared CSS. |
+| design-system/bottom-sheet.png | partial | P2/M | Detents (`closed`/`half`/`open`) wired via `map.detent`; 28/52/76 percentages not validated against the sheet rendering. |
+| design-system/sos-parts.png | reference | — | SOS component anatomy. |
+| design-system/mission-state.png | reference | — | Mission state rail anatomy. |
+| guides/00-sos-flow.png | reference | — | Whole-flow guide; its flow is only partially implemented (see sos/* rows). |
+
+## Mobile map — navigation (20)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, search that searches, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). |
+| navigation/02-map-press-hold.png | partial | P2/H | Hold gesture works (0.8s, progress bar); SOS dock is centered horizontally, design places it bottom-left; quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
+| navigation/03-bookmark-form.png | missing | P2/M | Saved-places create UI absent (server CRUD + store exist). |
+| navigation/04-bookmark-saved.png | missing | P2/M | Saved-places list/manage UI absent. |
+| navigation/05-search-open.png | missing | P1/H | Search input exists but re-pushes the map route; no results, no offline source. |
+| navigation/06-destination-selected.png | missing | P2/H | No selected-destination sheet. |
+| navigation/07-destination-details.png | missing | P2/M | No destination detail sheet. |
+| navigation/08-trip-transport-selection.png | superseded | — | Turn-by-turn trip planning superseded (docs/ACCEPTANCE.md). |
+| navigation/09-manual-origin-selection.png | superseded | — | See above. |
+| navigation/10-route-options.png | superseded | — | See above. |
+| navigation/11-route-selected.png | superseded | — | See above. |
+| navigation/12-navigation-active.png | superseded | — | See above. |
+| navigation/13-navigation-alternatives.png | superseded | — | See above. |
+| navigation/14-navigation-full-route.png | superseded | — | See above. |
+| navigation/15-navigation-off-route.png | superseded | — | See above. |
+| navigation/16-multi-destination.png | superseded | — | See above. |
+| navigation/17-destination-reordering.png | superseded | — | See above. (Saved-place reordering API exists; wiring tracked under bookmarks.) |
+| navigation/18-sos-confirmation.png | missing | P1/M | SOS review step covers confirmation generally; no designed confirmation sheet from trip context (trip context superseded). |
+| navigation/19-trip-cancel.png | superseded | — | Trip superseded; the underlying SOS cancel gap is tracked under sos/13. |
+| navigation/20-trip-completed.png | superseded | — | Trip superseded. |
+
+## Mobile map — SOS (20)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| sos/01-sos-entry.png | partial | P2/H | SOS button present; position/style differ from reference (centered, not bottom-left dock 104×56). |
+| sos/02-sos-hold-to-open.png | partial | P2/H | 0.8s hold implemented with progress bar; not the designed ring; placement differs. |
+| sos/03-sos-compose.png | partial | P1/H | Four-section composer implemented (severity, type, description, location, photo, review) with counters and inline validation; visual parity pending P5. |
+| sos/04-sos-location-picker.png | missing | P2/H | Step 2 offers only "use current location"; no tap-to-place incident pin, no accuracy feedback, no "return to current location" recovery. Server accepts `isManual`. |
+| sos/05-sos-photo.png | partial | P1/C | Attach + preview work; **no client-side compression or resize**. Server caps data URLs at 160000 chars (`jpeg|png` base64), so real camera photos are rejected with "Invalid request.". Design promises a bounded, browser-compressed photo. |
+| sos/06-sos-review.png | done | P2/M | Review step submits to the API; disabled state + inline error surface. |
+| sos/07-sos-sending.png | missing | P2/M | No sending progress surface (only a disabled button while submitting). |
+| sos/08-sos-pending.png | missing | P2/M | No dedicated pending surface; the mission rail approximates it. |
+| sos/09-sos-dispatched.png | missing | P2/M | No dedicated dispatched surface. |
+| sos/10-sos-rescuer-en-route.png | missing | P2/M | No en-route surface/ETA (ETA needs routing data — superseded area; a status-only surface remains possible). |
+| sos/11-sos-rescuer-arrived.png | missing | P2/L | Rail covers it only. |
+| sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. |
+| sos/13-sos-cancel-reason.png | missing | P1/C | `sos.cancel()` and the cancellation-reason catalog are loaded in the store but **no view renders them**; the design shows reason selection with requires-text handling. |
+| sos/14-sos-cancelled.png | missing | P1/H | No cancelled surface. |
+| sos/15-sos-photo-retry.png | missing | P1/H | Upload failure/retry path absent (ties to the photo fix). |
+| sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
+| sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests (incident, date, status, tracking code); not the designed SOS history screen. |
+| sos/18-sos-history-detail.png | missing | P2/M | No per-request detail view. |
+| sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
+| sos/20-sos-history-empty.png | partial | P2/L | Plain empty text exists in HistoryView. |
+
+## Mobile map — mission (19)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| mission/01-mission-ready-on.png | missing | P2/H | No responder availability UI. `POST /_user/ready` exists and is server-tested; unwired. Design adds radius + team chips. |
+| mission/02-mission-ready-off.png | missing | P2/H | Same screen, toggle off. |
+| mission/03-mission-offer.png | missing | P1/C | **Core emergency loop open in the client.** Dispatched SOS assigned to the responder arrives via realtime/`sos.load()`; `sos.accept()` and `POST /_user/sos/:id/accept` exist; no view renders the offer (type, severity, distance, requester, accept/decline). Server prevents double-accept (mission-exists conflict + state machine). |
+| mission/04-mission-offer-details.png | missing | P1/H | No offer details sheet (part of the offer screen). |
+| mission/05-mission-accepted.png | missing | P1/H | No accepted confirmation state/transition. |
+| mission/06-mission-dispatch.png | partial | P2/M | Admin dispatch exists; responder-side "dispatched" status only via rail. |
+| mission/07-mission-navigation-active.png | superseded | — | Turn-by-turn navigation superseded. |
+| mission/08-mission-route-alternatives.png | superseded | — | See above. |
+| mission/09-mission-arrived.png | partial | P2/L | Arrive action implemented (arrive/start/complete state machine). |
+| mission/10-mission-in-progress.png | partial | P2/L | Start/complete implemented. |
+| mission/11-support-request.png | missing | P2/M | No support-request concept anywhere in the server (schema, routes, events). Greenfield; needs product decision before build. |
+| mission/12-support-pending.png | missing | P2/M | Depends on the above. |
+| mission/13-support-accepted-notification.png | missing | P2/M | Depends on the above. |
+| mission/14-team-leader-dashboard.png | missing | P2/M | No TEAM_LEADER role/scope exists (roles: user, responder, admin). Needs product + permission decision. |
+| mission/15-mission-cancel.png | missing | P1/H | `MISSION_ACTIONS` includes `cancel` server-side; no client surface. (SOS cancel tracked under sos/13.) |
+| mission/16-mission-report.png | missing | P2/M | Only 1–5 star rating exists; no report form/notes. |
+| mission/17-mission-completed.png | partial | P2/M | Completed missions reachable (rating shown); no designed completion/report surface. |
+| mission/18-mission-no-offer.png | missing | P2/M | Designed "no active offer" state (refresh + radius change) not implemented; pairs with ready toggle. |
+| mission/19-mission-offline.png | missing | P2/M | Generic offline banner only. |
+
+## Mobile map — history (11)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| history/01-history-trips.png | superseded | — | Trip history presupposes routing (superseded). |
+| history/02-history-missions.png | partial | P2/H | Flat SOS-request list only; no tab structure, no missions merged from `/_user/missions`. |
+| history/03-history-missions-agent.png | missing | P2/M | Responder mission history view absent. |
+| history/04-history-companions.png | missing | P2/M | Companion/share history absent. |
+| history/05-history-filter.png | missing | P2/M | No filter UI. |
+| history/06-history-details.png | missing | P2/M | No detail view. |
+| history/07-history-playback.png | missing | P2/H | Authorized history endpoint exists (`/_user/location/history/:userId`); no playback surface. |
+| history/08-history-companion.png | missing | P2/M | No per-companion history. |
+| history/09-history-loading.png | missing | P2/L | No skeleton/loading state. |
+| history/10-history-empty.png | partial | P2/L | Plain empty text exists. |
+| history/11-history-error.png | missing | P2/M | No error state with retry. |
+
+## Mobile map — companions (10)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| companions/01-companions-hub.png | partial | P2/H | Peers + shares lists render; missing online banner, path summary, add/share rows, management entry. |
+| companions/02-companion-add.png | missing | P2/H | No add flow. |
+| companions/03-companions-live.png | partial | P2/M | Live peer fixes render (WS fan-out wired); freshness/status treatment absent. |
+| companions/04-companion-talk.png | done | P2/M | PTT press-and-hold talk implemented (binary frames, floor control, no recording). |
+| companions/05-companion-status.png | missing | P2/M | Freshness rings/status card absent. |
+| companions/06-share-location.png | missing | P2/H | Server endpoints exist and are tested (`POST /_user/location/shares`); no create UI (recipient picker, kind, TTL). |
+| companions/07-share-history.png | missing | P2/H | Same endpoint with kind=history + from/to; no UI. |
+| companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; UI renders one flat list without direction distinction. |
+| companions/09-companions-empty.png | partial | P2/L | Plain empty texts exist. |
+| companions/10-companions-offline.png | missing | P2/L | No offline-specific companion state. |
+
+## Mobile map — profile (9)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| profile/01-profile-home.png | partial | P2/H | Username/role/rating, theme cycle, offline dataset version, security readiness card, devices with revoke. Missing: member-since, stats cards, account-information rows, logout action, version footer. |
+| profile/02-profile-edit.png | missing | P2/H | `PATCH /_user/me` (username change) exists; no client UI. |
+| profile/03-login-history.png | missing | P2/M | `GET /_user/logins` exists; client never calls it. |
+| profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
+| profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |
+| profile/06-logout-confirm.png | missing | P2/L | Logout is one control elsewhere; no confirmation sheet. |
+| profile/07-map-entry.png | partial | P2/L | Role-aware landing works; designed entry composition absent. |
+| profile/08-bookmarks.png | missing | P2/H | Saved-places UI absent (server CRUD + store exist, unused). |
+| profile/09-bookmark-edit.png | missing | P2/M | Part of saved-places UI. |
+
+## Administrator console — dashboard (3)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/dashboard/01-overview.png | partial | P3/H | KPIs + 7-day trend sparkline + recent requests render. Missing: deltas, delta icons, live operations map with markers, readiness/group availability panel, alerts panel, export/refresh controls, designed grouped sidebar and user footer card. |
+| admin-panel/dashboard/02-dispatch-board.png | partial | P1/H | Queue + groups render; dispatch works (skips memberless/inactive groups). Missing: 3-column board, incident detail panel, **nearest-responders table (`GET /_admin/sos/:id/nearest` exists, server-tested, never called by the client)**, map, manual group/responder selection, cancel. |
+| admin-panel/dashboard/03-reports.png | missing | P3/H | No KPI deltas, no period selector, no donut, no 30-day trend, no incidents-by-type, no group-performance table; only status distribution list + two CSV links. |
+
+## Administrator console — design system (3)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/design-system/01-foundations.png | done | P5/M | Tokens + shell geometry (264px sidebar, 68px top bar, padded content) implemented. |
+| admin-panel/design-system/02-controls.png | done | P5/M | Tables, pills, action buttons, selects. |
+| admin-panel/design-system/03-patterns.png | partial | P3/L | Empty/error/loading patterns partially applied per view. |
+
+## Administrator console — states (5)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/states/01-loading.png | missing | P3/M | No skeletons anywhere in the console. |
+| admin-panel/states/02-empty.png | partial | P3/L | Plain empty texts per view. |
+| admin-panel/states/03-error.png | partial | P3/M | Inline error only on overview; no retry pattern elsewhere. |
+| admin-panel/states/04-offline.png | missing | P3/M | No cached-data offline banner + retry; only the tiny realtime status pill. |
+| admin-panel/states/05-forbidden.png | partial | P3/L | Router guard redirects non-admins; no designed 403 surface. |
+
+## Administrator console — services/groups (4)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/services/01-groups.png | partial | P3/H | List + create (client-side rule hints) works; no edit. |
+| admin-panel/services/02-group-edit.png | missing | P3/H | No edit UI (name/color/capacity/status/coverage). |
+| admin-panel/services/03-members.png | missing | P3/H | No member add/remove UI (`memberIds` used by dispatch but unmanageable in UI). |
+| admin-panel/services/04-incident-types.png | partial | P3/M | Read-only list; no create/edit. |
+
+## Administrator console — system (3)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/system/01-audit-log.png | partial | P3/M | Table + filter + CSV (formula-escaped, no-store) works; no detail drawer/severity. |
+| admin-panel/system/02-alerts.png | partial | P3/M | List + resolve + severity tones; no designed detail/ack patterns. |
+| admin-panel/system/03-settings.png | partial | P3/L | Boolean settings toggles; designed grouping/explanation copy absent. |
+
+## Administrator console — users (3)
+
+| Reference | Status | Phase/Pri | Notes |
+|---|---|---|---|
+| admin-panel/users/01-list.png | partial | P3/H | Search/role filter/toggle/create implemented; missing avatars, phone, last-seen, detail links, designed empty state. |
+| admin-panel/users/02-account.png | missing | P3/M | No account detail/edit panel. |
+| admin-panel/users/03-roles.png | missing | P3/M | No roles/permissions view. |
+
+## Excluded artifacts
+
+`design/*/_generator/_preview-*.png` (13 files) are generator previews, not canonical acceptance references.
+
+## Documented intentional deviations
+
+- **DEV-01 — Recovery account error (auth/06).** The reference shows an explicit "unknown username" error, which is a user-enumeration oracle. Implementation answers unknown usernames with decoy challenges (enumeration-safe), consistent with `docs/SECURITY.md` and the decoy-resistant recovery design. The design image is retained as reference; implementation deliberately diverges.
+- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — its behavior must stay honest (see phase-0 report, Scope).
+- **DEV-03 — Photo without compression (sos/05).** The design implies a bounded compressed photo; the implementation currently ships no compression, so the feature is broken for real photos rather than merely different. Tracked as a P1 defect, not a design decision.
+- **DEV-04 — SOS dock placement.** The reference places the SOS dock bottom-left; implementation centers it. Deviation to be either aligned to the design or documented as a deliberate choice in P5.
+- **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; the product has no trips. P2 must replace them with SOS/mission/sharing counts (see design-flaw register).
+
+## Summary tally (canonical 141)
+
+Counts over the 141 canonical rows above: `done` 16, `partial` 47, `missing` 57, `superseded` 15, `reference` 5, intentional `deviation` 1.
+
+## Design flaws found in the reference material (to fix or consciously keep)
+
+| ID | Reference | Flaw | Recommendation |
+|---|---|---|---|
+| DF-01 | auth/06-recovery-account-error.png | Explicit unknown-username error = user enumeration oracle. | Keep implementation (decoys); do not port the screen. |
+| DF-02 | mission/03-mission-offer.png | A 52-second countdown and "3 offers active" imply a server-enforced offer TTL; the data model has no offer-expiry and no offers endpoint. | Drop the countdown, or add offer TTL to the backend as a product decision. Do not fake it client-side. |
+| DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/companion metrics in P2; document the swap. |
+| DF-04 | history/07-history-playback.png | Playback UI does not communicate authorization scope/expiry although the API is share-gated. | Add an authorization note; never show playback without an active authorized share. |
+| DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. |
+| DF-06 | navigation/* (all) | The navigation family contradicts the offline/deterministic-tile architecture and the documented product scope; keeping it as silent reference invites accidental scope creep. | Keep files as visual identity reference; exclude from acceptance scope; revisit only via explicit product decision. |
+| DF-07 | design/icons vs client | Client consumes generated subset; canonical set allows aliases. Verify in P5 that no ad-hoc icon appears outside the inventory. | Guard via existing asset test; extend if needed. |
+| DF-08 | map-page/navigation/02 | The 350-metre scale bar appears only in the press-hold reference, not in idle. | Treat the scale bar as a permanent map affordance if confirmed with the design owner; otherwise drop. |
