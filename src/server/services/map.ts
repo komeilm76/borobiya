@@ -1,6 +1,6 @@
 import { LruTtlCache } from '../core/cache.ts';
 import { sha256 } from '../core/crypto.ts';
-import { MAP_BOUNDS, MAP_CENTER, MAP_ORIGIN, MAP_ZOOM, renderMapTile } from '../domain/map.ts';
+import { MAP_BOUNDS, MAP_CENTER, MAP_ORIGIN, MAP_POIS, MAP_ZOOM, renderMapTile } from '../domain/map.ts';
 import { CACHE } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
@@ -28,6 +28,7 @@ export class MapService {
       vector: true,
       raster: false,
       worldOrigin: MAP_ORIGIN,
+      pois: MAP_POIS,
       styles: {
         light: { land: '#F0F2EC', water: '#B6D7E4', park: '#D3E6C6', route: '#0E6666', text: '#122A2A' },
         dark: { land: '#0C1617', water: '#173C46', park: '#17372A', route: '#71C7BE', text: '#EDF5F2' }

@@ -19,6 +19,8 @@ export const useMapStore = defineStore('map', () => {
   const detent = ref<SheetDetent>('half');
   const zoom = ref(14);
   const center = ref({ latitude: 35.7219, longitude: 51.3347 });
+  /** Where a search sent the map; rendered as a distinct pin until cleared. */
+  const searchPin = ref<{ latitude: number; longitude: number; label: string | null } | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -99,6 +101,21 @@ export const useMapStore = defineStore('map', () => {
     geolocation.pause();
   }
 
+  /**
+   * Moves the map to a searched point and drops a marker there. Recentres at a zoom that
+   * actually shows the place — searching a road while zoomed out to 14 still feels like flying.
+   */
+  function focusOn(point: { latitude: number; longitude: number }, label?: string): void {
+    center.value = { latitude: point.latitude, longitude: point.longitude };
+    zoom.value = Math.max(zoom.value, 16);
+    searchPin.value = { latitude: point.latitude, longitude: point.longitude, label: label ?? null };
+  }
+
+  /** Clears the search marker (e.g. when the user searches again or pans away). */
+  function clearSearchPin(): void {
+    searchPin.value = null;
+  }
+
   /** Adds or updates a saved place locally after a successful API call. */
   function upsertPlace(place: SavedPlaceView): void {
     places.value = [...places.value.filter((item) => item.id !== place.id), place].sort((a, b) => a.rank - b.rank);
@@ -118,6 +135,7 @@ export const useMapStore = defineStore('map', () => {
     detent,
     zoom,
     center,
+    searchPin,
     loading,
     error,
     geolocation,
@@ -128,6 +146,8 @@ export const useMapStore = defineStore('map', () => {
     setDetent,
     startLocation,
     stopLocation,
+    focusOn,
+    clearSearchPin,
     upsertPlace,
     removePlace
   };

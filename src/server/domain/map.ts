@@ -1,4 +1,4 @@
-import { worldCoordinate } from '../../shared/geo.ts';
+import { coordinateFromWorld, worldCoordinate } from '../../shared/geo.ts';
 import { validateTile, type TileCoordinate } from './geo.ts';
 
 export const MAP_CENTER = Object.freeze({ latitude: 35.7219, longitude: 51.3347 });
@@ -23,6 +23,24 @@ const LABELS: Array<{ x: number; y: number; text: string; rotate: number }> = [
   { x: 3400, y: 3020, text: 'خیابان شهید مصدق', rotate: -3 },
   { x: 700, y: 3260, text: 'کوچه لاله', rotate: 4 }
 ];
+
+/**
+ * The road names the renderer draws, promoted to first-class searchable points of interest.
+ * The labels live in "world pixels at the map zoom, offset by MAP_ORIGIN" — the same space the
+ * tiles are drawn in — so exposing them requires undoing that offset and the Mercator projection.
+ */
+export const MAP_POIS = Object.freeze(
+  LABELS.map((label, index) => {
+    const point = coordinateFromWorld(MAP_ORIGIN.x + label.x, MAP_ORIGIN.y + label.y, MAP_ZOOM);
+    return Object.freeze({
+      id: `poi_${index}`,
+      name: label.text,
+      kind: 'road' as const,
+      latitude: Math.round(point.latitude * 1e6) / 1e6,
+      longitude: Math.round(point.longitude * 1e6) / 1e6
+    });
+  })
+);
 
 function noise(a: number, b: number, c: number): number {
   let value = Math.imul(a + 1, 73856093) ^ Math.imul(b + 1, 19349663) ^ Math.imul(c + 1, 83492791);

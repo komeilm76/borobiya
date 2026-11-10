@@ -7,6 +7,7 @@ import {
   haversineMeters,
   isStale,
   round,
+  coordinateFromWorld,
   toPersianDigits,
   visibleTileRange,
   worldCoordinate
@@ -46,6 +47,24 @@ describe('worldCoordinate', () => {
     const center = worldCoordinate(0, 0, 10);
     expect(center.x).toBeCloseTo(scale / 2, 6);
     expect(center.y).toBeCloseTo(scale / 2, 6);
+  });
+});
+
+describe('coordinateFromWorld', () => {
+  it('round-trips world pixels back into degrees', () => {
+    for (const [latitude, longitude] of [[35.7219, 51.3347], [0, 0], [-33.8688, 151.2093], [51.5074, -0.1278]]) {
+      const world = worldCoordinate(latitude, longitude, 14);
+      const point = coordinateFromWorld(world.x, world.y, 14);
+      expect(point.latitude).toBeCloseTo(latitude, 6);
+      expect(point.longitude).toBeCloseTo(longitude, 6);
+    }
+  });
+
+  it('inverts the map seam at the antimeridian clamp', () => {
+    const world = worldCoordinate(0, 180, 10);
+    const point = coordinateFromWorld(world.x, world.y, 10);
+    expect(point.latitude).toBeCloseTo(0, 6);
+    expect(point.longitude).toBeCloseTo(180, 6);
   });
 });
 

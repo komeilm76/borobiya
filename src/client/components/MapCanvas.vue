@@ -53,6 +53,7 @@ const markers = computed(() => {
   };
   return {
     self: map.ownFix ? place(map.ownFix.latitude, map.ownFix.longitude) : null,
+    search: map.searchPin ? { label: map.searchPin.label, ...place(map.searchPin.latitude, map.searchPin.longitude) } : null,
     places: map.places.map((item) => ({ id: item.id, label: item.label, icon: item.icon, ...place(item.latitude, item.longitude) })),
     peers: map.peers.map((item) => ({ id: item.userId, label: item.username ?? item.userId, ...place(item.latitude, item.longitude) })),
     requests: sos.requests
@@ -100,6 +101,15 @@ const scaleLabel = computed(() => format.distance(250));
         <span class="mdi mdi-account" aria-hidden="true" />
       </span>
       <span
+        v-if="markers.search"
+        class="map-marker map-marker--search"
+        :style="{ insetInlineStart: `${markers.search.x}px`, insetBlockStart: `${markers.search.y}px` }"
+        :title="markers.search.label ?? 'نتیجه جست‌وجو'"
+        data-testid="search-pin"
+      >
+        <span class="mdi mdi-map-marker" aria-hidden="true" />
+      </span>
+      <span
         v-for="request in markers.requests"
         :key="request.id"
         class="map-marker map-marker--incident"
@@ -141,6 +151,7 @@ const scaleLabel = computed(() => format.distance(250));
 .map-marker--place { background: var(--info); }
 .map-marker--peer { background: var(--primary); }
 .map-marker--incident { background: var(--danger); }
+.map-marker--search { background: var(--info); }
 .user-marker { position: absolute; translate: -50% -50%; display: grid; place-items: center; }
 .user-marker__accuracy {
   position: absolute;

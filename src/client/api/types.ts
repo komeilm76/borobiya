@@ -13,6 +13,15 @@ export interface UserView {
   createdAt: number;
 }
 
+/** One offline point of interest from the map configuration. */
+export interface MapPoiView {
+  id: string;
+  name: string;
+  kind: string;
+  latitude: number;
+  longitude: number;
+}
+
 /** One incident type from the catalog. */
 export interface IncidentTypeView {
   id: string;
@@ -143,6 +152,8 @@ export interface MapConfigView {
   offline: boolean;
   attribution: string;
   dataVersion: string;
+  /** Offline points of interest the search can offer; absent on older servers. */
+  pois?: MapPoiView[];
 }
 
 /** Administrator overview payload. */

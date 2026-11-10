@@ -51,6 +51,23 @@ export function worldCoordinate(latitude: number, longitude: number, zoom: numbe
 }
 
 /**
+ * Converts Web Mercator world pixels back to geographic coordinates.
+ * Exact inverse of {@link worldCoordinate} (same clamping on the latitude edge).
+ *
+ * @param x World pixel x at the given zoom.
+ * @param y World pixel y at the given zoom.
+ * @param zoom Web Mercator zoom level.
+ * @returns The geographic point the pixel belongs to.
+ */
+export function coordinateFromWorld(x: number, y: number, zoom: number): Point {
+  const scale = 256 * 2 ** zoom;
+  const longitude = (x / scale) * 360 - 180;
+  const n = Math.PI - (2 * Math.PI * y) / scale;
+  const latitude = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+  return { latitude: clamp(latitude, -85.05112878, 85.05112878), longitude };
+}
+
+/**
  * Great-circle distance between two points in metres.
  *
  * @param a First point.

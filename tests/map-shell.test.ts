@@ -93,6 +93,102 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+describe('map search', () => {
+  const PLACE = {
+    id: 'plc_1', name: 'خانه', label: 'خانه مادر', latitude: 35.73, longitude: 51.39,
+    address: 'خیابان ولیعصر', icon: 'home-outline', rank: 1
+  };
+  const POIS = [
+    { id: 'poi_0', name: 'بلوار ولیعصر', kind: 'road', latitude: 35.6392, longitude: 51.4809 },
+    { id: 'poi_3', name: 'بلوار چمران', kind: 'road', latitude: 35.62, longitude: 51.4 }
+  ];
+
+  it('finds a saved place by name and moves the map to it', async () => {
+    const shell = await mountShell();
+    shell.map.places = [PLACE] as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('خانه');
+    await shell.advance(400);
+
+    const results = shell.wrapper.find('[data-testid="search-results"]');
+    expect(results.exists()).toBe(true);
+    expect(results.text()).toContain('خانه');
+
+    await shell.wrapper.find('.search-results__option').trigger('click');
+    expect(shell.map.searchPin?.latitude).toBeCloseTo(35.73, 6);
+    expect(shell.map.searchPin?.longitude).toBeCloseTo(51.39, 6);
+    expect(shell.map.center.latitude).toBeCloseTo(35.73, 6);
+    expect(shell.map.searchPin?.label).toBe('خانه');
+    shell.wrapper.unmount();
+  });
+
+  it('finds a point of interest from the map configuration, offline', async () => {
+    const shell = await mountShell();
+    shell.map.config = { pois: POIS } as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('ولیعصر');
+    await shell.advance(400);
+
+    expect(shell.wrapper.text()).toContain('بلوار ولیعصر');
+    await shell.wrapper.find('.search-results__option').trigger('click');
+    expect(shell.map.searchPin?.latitude).toBeCloseTo(35.6392, 4);
+    expect(shell.map.searchPin?.longitude).toBeCloseTo(51.4809, 4);
+    shell.wrapper.unmount();
+  });
+
+  it('normalizes Arabic letter shapes and digits before matching', async () => {
+    const shell = await mountShell();
+    shell.map.config = { pois: POIS } as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    // "ولي‌عصر" typed with Arabic yeh and a ZWJ — must still match "ولیعصر".
+    await input.setValue('ولي\u200Cعصر'.replace('\\u200C', '\u200C'));
+    await shell.advance(400);
+
+    expect(shell.wrapper.text()).toContain('بلوار ولیعصر');
+    shell.wrapper.unmount();
+  });
+
+  it('shows an honest empty state when nothing matches', async () => {
+    const shell = await mountShell();
+    shell.map.config = { pois: POIS } as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('نام این خیابان وجود ندارد');
+    await shell.advance(400);
+
+    expect(shell.wrapper.text()).toContain('نتیجه‌ای یافت نشد');
+    shell.wrapper.unmount();
+  });
+
+  it('survives corrupt local data with an error state and a working retry', async () => {
+    const shell = await mountShell();
+    shell.map.config = { pois: [{ id: 'poi_x', name: undefined as never, kind: 'road', latitude: 1, longitude: 1 }] } as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('ولیعصر');
+    await shell.advance(400);
+
+    expect(shell.wrapper.find('[data-testid="search-retry"]').exists()).toBe(true);
+    // Fixing the data and pressing retry must recover without a reload.
+    shell.map.config = { pois: POIS } as never;
+    await shell.wrapper.find('[data-testid="search-retry"]').trigger('click');
+    await shell.advance(100);
+    expect(shell.wrapper.text()).toContain('بلوار ولیعصر');
+    shell.wrapper.unmount();
+  });
+
+  it('selects the first result on Enter without leaving the page', async () => {
+    const shell = await mountShell();
+    shell.map.places = [PLACE] as never;
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('خانه');
+    await shell.advance(400);
+    await input.trigger('keydown.enter');
+
+    expect(shell.map.searchPin?.latitude).toBeCloseTo(35.73, 6);
+    expect(shell.navigations).not.toHaveBeenCalled();
+    shell.wrapper.unmount();
+  });
+});
+
 describe('mobile shell', () => {
   it('starts geolocation, loads data and connects realtime once on mount', async () => {
     const shell = await mountShell();
@@ -312,11 +408,13 @@ describe('shell interactions', () => {
     shell.wrapper.unmount();
   });
 
-  it('navigates to the map when the search form is submitted', async () => {
+  it('does not navigate anywhere when a submitted search has no match', async () => {
     const shell = await mountShell('/_user/companions');
-    const form = shell.wrapper.find('form.search-bar');
-    await form.trigger('submit');
-    expect(shell.navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.map });
+    const input = shell.wrapper.find('[data-testid="map-search"]');
+    await input.setValue('چنین جایی وجود ندارد');
+    await shell.advance(400);
+    await shell.wrapper.find('form.search-bar').trigger('submit');
+    expect(shell.navigations).not.toHaveBeenCalledWith({ name: ROUTE_NAMES.map });
     shell.wrapper.unmount();
   });
 
