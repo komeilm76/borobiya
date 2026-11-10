@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: unblock stalled mission-timeline SSE fallback
+
+- The authenticated mission event stream bounded a silent body read to 45 seconds, but its cleanup awaited `reader.cancel()`. A broken stream whose cancellation never settles could leave the fallback pending forever, preventing the failure state and retry; aborting a mission during an already-open silent body read also waited for that deadline if the stream ignored the fetch signal. Body reads now race the caller's abort as well as the silence deadline; cleanup aborts the request and observes cancellation without awaiting it. Focused stream-adapter regressions reproduced both hangs before the fix and pass afterward. Browser/proxy behavior on a live device remains unverified.
+
 ### 2026-10-23 — Bug hunt: ignore obsolete live-location acknowledgements
 
 - Broadcasts run every four seconds while a Socket.IO acknowledgment may take five seconds. A newer fix could succeed before an older send's timeout, but the late timeout previously changed the broadcaster to Rejected and stopped GPS despite the confirmed newer fix; late successes could also overwrite newer peer counts and send times. A monotonic send/ack sequence now lets only the latest *answered* send change broadcast state; an unanswered newer send does not hide a real timeout. Focused composable regressions reproduced the out-of-order rejection before the fix and cover both orderings afterward. Real mobile/network timing remains unverified.

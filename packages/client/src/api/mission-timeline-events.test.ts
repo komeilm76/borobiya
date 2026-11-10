@@ -129,6 +129,47 @@ describe("authenticated mission SSE parser", () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it("reports a stalled stream even if its underlying cancel never settles", async () => {
+    vi.useFakeTimers();
+    try {
+      const cancelled = vi.fn(() => new Promise<void>(() => {}));
+      const body = new ReadableStream<Uint8Array>({ cancel: cancelled });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {
+        headers: { "content-type": "text/event-stream" }
+      })));
+      let outcome = "pending";
+      void followMissionTimelineEvents("token", id, new AbortController().signal, vi.fn())
+        .then(() => { outcome = "resolved"; }, (error: Error) => { outcome = error.message; });
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(45_000);
+      await Promise.resolve();
+      expect(cancelled).toHaveBeenCalledOnce();
+      expect(outcome).toBe("MISSION_STREAM_STALLED");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("leaves a stalled body read promptly when the mission is cancelled", async () => {
+    vi.useFakeTimers();
+    try {
+      const cancelled = vi.fn(() => new Promise<void>(() => {}));
+      const body = new ReadableStream<Uint8Array>({ cancel: cancelled });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(body, {
+        headers: { "content-type": "text/event-stream" }
+      })));
+      const controller = new AbortController();
+      let outcome = "pending";
+      void followMissionTimelineEvents("token", id, controller.signal, vi.fn())
+        .then(() => { outcome = "resolved"; }, (error: Error) => { outcome = error.name; });
+      await vi.advanceTimersByTimeAsync(0); // Headers have arrived; reader.read is pending.
+      controller.abort();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(cancelled).toHaveBeenCalledOnce();
+      expect(outcome).toBe("AbortError");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+
   it("accepts periodic keepalives instead of timing out an idle but healthy stream", async () => {
     vi.useFakeTimers();
     try {

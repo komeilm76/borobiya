@@ -9,9 +9,11 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
   // Fetch can hang before headers (e.g. a proxy accepts the connection but never
   // responds). Abort the actual request and race even a transport that ignores abort.
   const request = new AbortController();
-  let rejectConnecting: ((reason: Error) => void) | null = null;
+  let rejectPending: ((reason: Error) => void) | null = null;
   const onAbort = () => {
-    rejectConnecting?.(new DOMException("Mission stream cancelled", "AbortError"));
+    // Abort the reader as well as fetch. Some fetch/stream adapters ignore the
+    // request signal once headers arrive and leave reader.read() pending forever.
+    rejectPending?.(new DOMException("Mission stream cancelled", "AbortError"));
     request.abort();
   };
   signal.addEventListener("abort", onAbort, { once: true });
@@ -20,7 +22,7 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
     let response: Response;
     try {
       const connectionDeadline = new Promise<never>((_, reject) => {
-        rejectConnecting = reject;
+        rejectPending = reject;
         connectTimer = setTimeout(() => {
           reject(new Error("MISSION_STREAM_CONNECT_TIMEOUT"));
           request.abort();
@@ -39,7 +41,7 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
       ]);
     } finally {
       if (connectTimer !== null) clearTimeout(connectTimer);
-      rejectConnecting = null;
+      rejectPending = null;
     }
     if (!response.ok || !response.body || !response.headers.get("content-type")?.startsWith("text/event-stream")) {
       throw new Error("MISSION_STREAM_UNAVAILABLE");
@@ -56,10 +58,16 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
         return await Promise.race([
           reader.read(),
           new Promise<never>((_, reject) => {
+            rejectPending = reject;
+            // The caller may have aborted between the loop check and this read.
+            if (signal.aborted) reject(new DOMException("Mission stream cancelled", "AbortError"));
+          }),
+          new Promise<never>((_, reject) => {
             timer = setTimeout(() => reject(new Error("MISSION_STREAM_STALLED")), 45_000);
           })
         ]);
       } finally {
+        rejectPending = null;
         if (timer !== null) clearTimeout(timer);
       }
     }
@@ -91,7 +99,10 @@ export async function followMissionTimelineEvents(token: string, missionId: stri
         if (refreshNeeded && !signal.aborted) onRefresh();
       }
     } finally {
-      await reader.cancel().catch(() => {});
+      request.abort();
+      // Cancel is best-effort. A broken stream can leave the underlying cancel()
+      // promise pending forever; awaiting it would block the error/reconnect path.
+      void reader.cancel().catch(() => {});
     }
   } finally {
     signal.removeEventListener("abort", onAbort);
