@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: reject invalid or ambiguous history window times
+
+- The shared local-date converter accepted JavaScript's normalized dates, silently turning 30 February into 2 March and a skipped spring DST hour into a different wall-clock hour when reading or sharing history. It also chose the earlier instant for a repeated fall DST hour even though the picker cannot distinguish the two. Conversion now requires a minute-precision date/time that round-trips to the selected local wall time and rejects repeated hours until an offset-aware picker is available. Focused regressions reproduced both normalized dates and ambiguous fall times before their guards and pass afterward; browser/device timezone verification remains open.
+
 ### 2026-10-23 — Bug hunt: disable playback when the track has no time span
 
 - Two location fixes can have different coordinates but the same observation timestamp. History playback previously treated any two-row track as playable, so Play started a timer that immediately stopped without moving the cursor. The playback control now requires a strictly positive interval between the earliest and latest fixes; the final point remains visible and history data is unchanged. A focused composable regression reproduced the enabled-but-motionless Play state before the fix and now passes. Rendered-device review remains open.

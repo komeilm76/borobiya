@@ -404,9 +404,25 @@ export function samplingState(shown: number, total: number): { sampled: boolean;
  * an instant the server reads as UTC, four and a half hours off for a Tehran user.
  */
 export function localInputToIso(value: string): string | null {
-  if (!value) return null;
+  // A datetime-local control supplies minute-precision wall time without a zone.
+  // Date.parse normalizes impossible dates and skipped DST hours (03:30 → 04:30),
+  // which could silently share or request a different window from the one shown.
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
   const ms = Date.parse(value);
-  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+  if (!Number.isFinite(ms)) return null;
+  const instant = new Date(ms);
+  const iso = instant.toISOString();
+  if (isoToLocalInput(iso) !== value) return null;
+  // During a fall-back transition the same clock reading names two instants.
+  // Our picker has no UTC-offset choice, so refuse that hour instead of silently
+  // granting access to the earlier one. Compare offsets on both sides of the day;
+  // the difference gives the other possible UTC instant, including half-hour shifts.
+  const dayMs = 36 * 60 * 60_000;
+  for (const nearby of [ms - dayMs, ms + dayMs]) {
+    const alternative = ms + (new Date(nearby).getTimezoneOffset() - instant.getTimezoneOffset()) * 60_000;
+    if (alternative !== ms && isoToLocalInput(new Date(alternative).toISOString()) === value) return null;
+  }
+  return iso;
 }
 
 /** The mirror of {@link localInputToIso}, for seeding the inputs from a window. */

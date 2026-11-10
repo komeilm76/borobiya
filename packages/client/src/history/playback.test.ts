@@ -341,6 +341,24 @@ describe("local wall time in the range inputs", () => {
     expect(localInputToIso("2026-13-45T99:99")).toBeNull();
     expect(isoToLocalInput("not a date")).toBe("");
   });
+
+  it("rejects impossible dates and DST gaps or folds instead of silently changing a history window", () => {
+    expect(localInputToIso("2026-02-30T12:00")).toBeNull();
+    const previousZone = process.env.TZ;
+    try {
+      process.env.TZ = "Europe/Helsinki";
+      // On 29 March 2026 Helsinki clocks jump from 02:59 to 04:00.
+      expect(localInputToIso("2026-03-29T03:30")).toBeNull();
+      expect(localInputToIso("2026-03-29T04:30")).toBe("2026-03-29T01:30:00.000Z");
+      // The repeated 03:30 on 25 October maps to two UTC instants. The picker
+      // offers no offset choice, so choosing either one silently is unsafe.
+      expect(localInputToIso("2026-10-25T03:30")).toBeNull();
+      expect(localInputToIso("2026-10-25T04:30")).toBe("2026-10-25T02:30:00.000Z");
+    } finally {
+      if (previousZone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousZone;
+    }
+  });
 });
 
 /**
