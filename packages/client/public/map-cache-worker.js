@@ -28,40 +28,51 @@ async function notifyCachedFallback(request) {
   }
 }
 
-async function respondWithMapResource(request) {
-  let cache;
-  try {
-    cache = await caches.open(CACHE_NAME);
-  } catch {
-    cache = null;
-  }
-
+async function respondWithMapResource(request, retain) {
+  // Start the network request independently of Cache Storage. A slow/opening
+  // cache must never hold up a healthy online tile, style, sprite or glyph.
+  const cacheReady = Promise.resolve().then(() => caches.open(CACHE_NAME)).catch(() => null);
   try {
     const response = await fetch(request);
-    if (cache && response.status === 200 && response.ok) {
+    if (response.status === 200 && response.ok) {
       try {
-        await cache.put(request, response.clone());
-        await trimCache(cache);
+        // Clone while the live body is still available. The fetch event retains
+        // this write without delaying respondWith's reply.
+        const copy = response.clone();
+        retain((async () => {
+          const cache = await cacheReady;
+          if (!cache) return;
+          try {
+            await cache.put(request, copy);
+            await trimCache(cache);
+          } catch {
+            // Quota/Cache API failures must not prevent the live map response.
+          }
+        })());
       } catch {
-        // Quota/Cache API failures must not prevent the live map response.
+        // An unavailable Cache API must not affect a successful network response.
       }
       return response;
     }
 
-    if (cache && response.status >= 500) {
-      try {
-        const cachedResponse = await cache.match(request);
-        if (cachedResponse) {
-          await notifyCachedFallback(request);
-          return cachedResponse;
+    if (response.status >= 500) {
+      const cache = await cacheReady;
+      if (cache) {
+        try {
+          const cachedResponse = await cache.match(request);
+          if (cachedResponse) {
+            await notifyCachedFallback(request);
+            return cachedResponse;
+          }
+        } catch {
+          // Keep the upstream error if reading Cache Storage fails.
         }
-      } catch {
-        // Keep the upstream error if reading Cache Storage fails.
       }
     }
 
     return response;
   } catch {
+    const cache = await cacheReady;
     if (cache) {
       try {
         const cachedResponse = await cache.match(request);
@@ -105,5 +116,10 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin || !isMapResource(url.pathname)) return;
 
-  event.respondWith(respondWithMapResource(request));
+  let background = Promise.resolve();
+  const response = respondWithMapResource(request, (work) => { background = work; });
+  event.respondWith(response);
+  // Register during dispatch, not after fetch resolves: some browsers reject
+  // late waitUntil calls. The background work is attached before response settles.
+  event.waitUntil(response.then(() => background, () => background));
 });

@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: do not block online map tiles on Cache Storage
+
+- The map service worker waited for `caches.open`, `cache.put` and eviction before returning a successful network response. A stalled cache operation could therefore leave online tiles/styles/glyphs loading forever despite a healthy map server. Network fetch now runs independently of cache opening, and successful responses return immediately while a cloned response is saved in background work retained with a synchronously registered `FetchEvent.waitUntil`. Network failures and 5xx responses still wait for the cache to serve an offline fallback. A worker regression reproduced the stall before the fix for both slow open and slow write; existing offline and 5xx fallback tests pass. Physical browser/device and offline-map acceptance remain open.
+
 ### 2026-10-23 — Bug hunt: reject incomplete OSRM route legs
 
 - The gateway checked the leg count only for routes with more than two stops. An upstream `code=Ok` reply with a valid polyline but zero or two legs for a two-stop route was returned as HTTP 200, even though the gateway exposes `legs` as the stop-to-stop segments and requests navigation steps. It also accepted null legs or legs without finite metrics/steps. Every route now requires exactly one complete leg per consecutive stop pair; malformed alternatives return a scoped 502 rather than a success with incomplete navigation data. Focused gateway regressions failed before the guards, and the synthetic elevation fixture now models a complete route. Live OSRM/VM verification remains open under T3.5.5.
