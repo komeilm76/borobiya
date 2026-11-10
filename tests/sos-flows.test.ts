@@ -94,6 +94,11 @@ describe('responder visibility of group dispatches', () => {
     expect(item.status).toBe('dispatched');
     expect(item.requesterUsername).toBe('saeed.k');
     expect(item.isManual).toBe(false);
+    // The list shows the dispatch to the member, so the detail call must not 404 either:
+    // the offer card loads the timeline from it.
+    const detail = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: responderCookie });
+    expect(detail.status, detail.text).toBe(200);
+    expect(detail.json.data.id).toBe(sosId);
   });
 });
 

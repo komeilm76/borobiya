@@ -71,6 +71,9 @@ export class SosService {
       // accept path enforces the same rule), so the list must not hide it from them either.
       clauses.push('(s.requester_id = ? OR s.assigned_responder_id = ? OR m.responder_id = ? OR s.assigned_group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))');
       params.push(identity.userId, identity.userId, identity.userId, identity.userId);
+    } else if (identity.role !== ROLES.ADMIN) {
+      // Fail closed: any role that is not one of the three known ones sees nothing, not everything.
+      clauses.push('1 = 0');
     }
     if (status) { clauses.push('s.status = ?'); params.push(status); }
     const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
@@ -258,10 +261,17 @@ export class SosService {
   }
 
   private canView(identity: AuthIdentity, row: Record<string, any>): boolean {
-    return identity.role === ROLES.ADMIN ||
-      String(row.requester_id) === identity.userId ||
-      String(row.assigned_responder_id ?? '') === identity.userId ||
-      String(row.missionResponderId ?? '') === identity.userId;
+    if (identity.role === ROLES.ADMIN) return true;
+    if (String(row.requester_id) === identity.userId) return true;
+    if (String(row.assigned_responder_id ?? '') === identity.userId) return true;
+    if (String(row.missionResponderId ?? '') === identity.userId) return true;
+    // A group dispatch is visible to every member of that group — the same rule listSos and
+    // acceptSos enforce. Without this arm they saw the offer but not the request behind it.
+    if (identity.role === ROLES.RESPONDER && row.assigned_group_id) {
+      return Boolean(this.ctx.repo.one('SELECT user_id FROM group_members WHERE group_id = ? AND user_id = ?',
+        String(row.assigned_group_id), identity.userId));
+    }
+    return false;
   }
 
   private publicSos(row: Record<string, any>): Record<string, unknown> {
