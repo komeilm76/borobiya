@@ -365,7 +365,9 @@ async function logout(): Promise<void> {
 .bb-sheet-leave-active { transition: opacity 200ms var(--ease), transform 200ms var(--ease); }
 .bb-sheet-enter-from,
 .bb-sheet-leave-to { opacity: 0; transform: translateY(16px); }
-.sos-button { position: absolute; inset-inline-start: 50%; transform: translateX(50%); inset-block-end: 92px; }
+/* Approved decision 5: the SOS dock lives on the physical left edge, above the search bar.
+   Physical positioning on purpose — the sheet opens from the bottom and the end side of an RTL row is the left, so a logical inset would silently move with document direction. */
+.sos-button { position: absolute; inset-block-end: 92px; left: 14px; }
 .offline-banner {
   position: absolute;
   inset-block-start: 54px;
