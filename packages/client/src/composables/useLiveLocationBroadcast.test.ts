@@ -442,6 +442,67 @@ describe("useLiveLocationBroadcast", () => {
     vi.useRealTimers();
   });
 
+  it("ignores older GPS acknowledgements after a newer fix has succeeded", async () => {
+    vi.useFakeTimers();
+    let now = 1_700_000_000_000;
+    const coords = ref<{ latitude: number | null; longitude: number | null; accuracy: number | null } | null>(null);
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    try {
+      const api = scope.run(() => useLiveLocationBroadcast({
+        accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+        geolocation: { coords, isSupported: ref(true), pause },
+        openSocket: () => transport.client, now: () => now, intervalMs: 4_000
+      }))!;
+      await api.start();
+      coords.value = { latitude: 35.7, longitude: 51.4, accuracy: 6 };
+      expect(transport.emitted).toHaveLength(1);
+      now += 4_000;
+      vi.advanceTimersByTime(4_000);
+      expect(transport.emitted).toHaveLength(2);
+      now += 4_000;
+      vi.advanceTimersByTime(4_000);
+      expect(transport.emitted).toHaveLength(3);
+      // A later acknowledgement arrives first, while the oldest send times out.
+      transport.emitted[2]!.ack(null, { ok: true, peers: ["current"] });
+      expect(api.lastSentAt.value).toBe(now);
+      transport.emitted[0]!.ack(new Error("old timeout"), undefined);
+      transport.emitted[1]!.ack(null, { ok: true, peers: ["stale"] });
+      await flush();
+      expect(api.status.value).toBe("broadcasting");
+      expect(api.lastErrorCode.value).toBeNull();
+      expect(api.lastSentAt.value).toBe(now);
+      expect(api.peerCount.value).toBe(1);
+      expect(pause).not.toHaveBeenCalled();
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
+  it("does not hide a timed-out fix just because a newer send is still unanswered", async () => {
+    vi.useFakeTimers();
+    let now = 1_700_000_000_000;
+    const coords = ref<{ latitude: number | null; longitude: number | null; accuracy: number | null } | null>(null);
+    const pause = vi.fn();
+    const transport = makeFakeSocket();
+    const scope = effectScope();
+    try {
+      const api = scope.run(() => useLiveLocationBroadcast({
+        accessToken: ref(makeJwt("device-alpha")), ownerId: ref("user-1"),
+        geolocation: { coords, isSupported: ref(true), pause },
+        openSocket: () => transport.client, now: () => now, intervalMs: 4_000
+      }))!;
+      await api.start();
+      coords.value = { latitude: 35.7, longitude: 51.4, accuracy: 6 };
+      now += 4_000;
+      vi.advanceTimersByTime(4_000);
+      expect(transport.emitted).toHaveLength(2);
+      transport.emitted[0]!.ack(new Error("timeout"), undefined);
+      expect(api.status.value).toBe("rejected");
+      expect(api.lastErrorCode.value).toBe("SOCKET_TIMEOUT");
+      expect(pause).toHaveBeenCalledOnce();
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("rejects a synchronous GPS resume failure without leaving a connecting broadcaster", async () => {
     vi.useFakeTimers();
     const resume = vi.fn().mockImplementationOnce(() => { throw new Error("GPS bridge unavailable"); })

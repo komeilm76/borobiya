@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: ignore obsolete live-location acknowledgements
+
+- Broadcasts run every four seconds while a Socket.IO acknowledgment may take five seconds. A newer fix could succeed before an older send's timeout, but the late timeout previously changed the broadcaster to Rejected and stopped GPS despite the confirmed newer fix; late successes could also overwrite newer peer counts and send times. A monotonic send/ack sequence now lets only the latest *answered* send change broadcast state; an unanswered newer send does not hide a real timeout. Focused composable regressions reproduced the out-of-order rejection before the fix and cover both orderings afterward. Real mobile/network timing remains unverified.
+
 ### 2026-10-23 — Bug hunt: retire all legacy live-share duplicates when changing modes
 
 - Live-share creation chose a keeper from at most four active rows per owner/recipient pair, then retired only the sibling IDs in that bounded result. A fifth legacy duplicate could remain active, including a permanent share after the owner switched to a timed one. The bounded keeper selection remains, but retirement now uses a pair-scoped, active-only SQL update excluding the keeper, so it covers every duplicate without loading them all. A focused regression failed on the old ID-list predicate and executes the new predicate against five duplicates plus unrelated, expired and already-revoked rows in PGlite. Live PostgreSQL/VM verification remains open.

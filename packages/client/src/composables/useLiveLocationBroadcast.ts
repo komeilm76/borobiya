@@ -83,8 +83,13 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
   let client: RealtimeClient | null = null;
   let ticker: ReturnType<typeof setInterval> | null = null;
   let generation = 0;
-  // An ack may arrive after Stop, logout or a new broadcast attempt with the same socket.
+  // Acks can also arrive out of order *within* one attempt: a 5s timeout can
+  // follow a newer 4s send's success. Only the most recently answered send may
+  // change the broadcaster state, but an unanswered newer send does not mask a
+  // real timeout (otherwise a broken socket could keep broadcasting forever).
   let broadcastAttempt = 0;
+  let nextUpdateSequence = 0;
+  let lastHandledUpdateSequence = 0;
   let refreshingAuth = false;
   // Consent belongs to one JWT login, not merely to an account: a new session for
   // the same user must not inherit the old session's GPS watcher and socket room.
@@ -254,17 +259,19 @@ export function useLiveLocationBroadcast(options: UseLiveLocationBroadcastOption
     if (!shouldSendUpdate({ lastSentAt: lastSentAt.value, now: currentNow, intervalMs })) return;
 
     const attempt = broadcastAttempt;
+    const sequence = ++nextUpdateSequence;
     const sentToken = requireToken();
     const owner = options.ownerId.value;
     const stillCurrent = () => attempt === broadcastAttempt && client === activeClient &&
       status.value === "broadcasting" && owner === options.ownerId.value &&
       !!sentToken && requireToken() === sentToken;
     activeClient.socket.timeout(5_000).emit(LOCATION_UPDATE_EVENT, payload, async (error: Error | null, ack: unknown) => {
-      if (!stillCurrent()) return;
+      if (!stillCurrent() || sequence <= lastHandledUpdateSequence) return;
+      lastHandledUpdateSequence = sequence;
       const outcome = error ? { ok: false, code: "SOCKET_TIMEOUT" } : describeAck(ack);
       if (!outcome.ok && (outcome.code === "UNAUTHORIZED" || outcome.code === "INVALID_ACCESS_TOKEN")) {
         if (await tryRecoverAuth()) return;
-        if (!stillCurrent()) return;
+        if (!stillCurrent() || sequence !== lastHandledUpdateSequence) return;
       }
       lastErrorCode.value = outcome.code;
       status.value = outcome.ok ? "broadcasting" : "rejected";
