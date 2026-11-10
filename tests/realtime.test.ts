@@ -107,6 +107,9 @@ it('live location updates fan out only to active authorized companions', async (
   const [peerMessage, ackMessage] = await Promise.all([peer, ack]);
   expect(peerMessage.fix.latitude).toBe(35.7222);;
   expect(peerMessage.fix.accuracy).toBe(9);;
+  // The companions screen renders the sender's name; the payload must carry it.
+  expect(typeof peerMessage.username).toBe('string');;
+  expect(peerMessage.username.length).toBeGreaterThan(0);;
   expect(ackMessage.recipients >= 1).toBeTruthy();;
 
   const snapshot = waitForMessage(companionSocket, (message) => message.type === WS_EVENTS.SNAPSHOT && message.requestId === 'snap-1');

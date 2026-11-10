@@ -154,7 +154,7 @@ export class LocationService {
     const recipients = this.activeLiveRecipients(identity.userId);
     if (recipients.length) {
       this.ctx.hub.sendToUsers(recipients, {
-        type: WS_EVENTS.LOCATION_PEER, userId: identity.userId, fix: value, serverTime: now
+        type: WS_EVENTS.LOCATION_PEER, userId: identity.userId, username: identity.username, fix: value, serverTime: now
       }, peer);
     }
     peer.sendJson({

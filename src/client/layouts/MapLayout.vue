@@ -70,9 +70,9 @@ onMounted(async () => {
     realtime.on(HTTP_EVENTS.SOS_ACCEPTED, () => void sos.load()),
     realtime.on(HTTP_EVENTS.MISSION_UPDATED, () => void sos.load()),
     realtime.on(HTTP_EVENTS.LOCATION_SHARE_CREATED, () => void map.load()),
-    realtime.on(WS_EVENTS.LOCATION_PEER, (payload: { userId: string; fix: Record<string, number> }) => {
+    realtime.on(WS_EVENTS.LOCATION_PEER, (payload: { userId: string; username?: string; fix: Record<string, number> }) => {
       if (!payload?.userId || !payload.fix) return;
-      map.applyLiveFix({ userId: payload.userId, ...payload.fix } as never);
+      map.applyLiveFix({ userId: payload.userId, username: payload.username, ...payload.fix } as never);
     })
   );
 });

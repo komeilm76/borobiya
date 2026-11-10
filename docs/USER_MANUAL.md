@@ -26,7 +26,7 @@ A responder follows the mission rail through travel, arrival, response and compl
 
 ## Companions and talk
 
-Companion rows show freshness, presence and sharing state. Search for an account before granting live sharing. One-to-one talk is press-and-hold: hold the amber microphone while speaking and release to stop. Only the current speaker sends audio, and the panel explicitly states that no audio is recorded. If the connection drops, the app reconnects with a fresh ticket and catches up through the durable event cursor.
+Companion rows show freshness, presence and sharing state. Each active share lists the counterpart and the direction of the share, and outgoing shares can be revoked from the same list. Search for an account before granting live sharing. One-to-one talk is press-and-hold: hold the amber microphone while speaking and release to stop. Only the current speaker sends audio, and the panel explicitly states that no audio is recorded. If the connection drops, the app reconnects with a fresh ticket and catches up through the durable event cursor.
 
 ## Profile
 

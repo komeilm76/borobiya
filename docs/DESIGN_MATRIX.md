@@ -104,7 +104,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
 | sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with a remove-photo button or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
 | sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
-| sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests (incident, date, status, tracking code); not the designed SOS history screen. |
+| sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests and responder missions (incident, date, Persian status label); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | missing | P2/M | No per-request detail view. |
 | sos/19-sos-validation.png | partial | P2/L | Inline validation exists (10–500 description, Persian messages); designed field-level presentation absent. |
 | sos/20-sos-history-empty.png | partial | P2/L | Plain empty text exists in HistoryView. |
@@ -138,8 +138,8 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | history/01-history-trips.png | superseded | — | Trip history presupposes routing (superseded). |
-| history/02-history-missions.png | partial | P2/H | Flat SOS-request list only; no tab structure, no missions merged from `/_user/missions`. |
-| history/03-history-missions-agent.png | missing | P2/M | Responder mission history view absent. |
+| history/02-history-missions.png | partial | P2/H | SOS requests and missions from `/_user/missions` now both render with Persian status labels; no tab structure yet. |
+| history/03-history-missions-agent.png | partial | P2/M | Responder missions render alongside requests with localized status; dedicated agent view absent. |
 | history/04-history-companions.png | missing | P2/M | Companion/share history absent. |
 | history/05-history-filter.png | missing | P2/M | No filter UI. |
 | history/06-history-details.png | missing | P2/M | No detail view. |
@@ -153,9 +153,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| companions/01-companions-hub.png | partial | P2/H | Peers + shares lists render; missing online banner, path summary, add/share rows, management entry. |
+| companions/01-companions-hub.png | partial | P2/H | Peers (with server-provided usernames over WS) + shares with counterpart, direction and revoke for outgoing shares render; missing online banner, path summary, add/share rows, management entry. |
 | companions/02-companion-add.png | missing | P2/H | No add flow. |
-| companions/03-companions-live.png | partial | P2/M | Live peer fixes render (WS fan-out wired); freshness/status treatment absent. |
+| companions/03-companions-live.png | partial | P2/M | Live peer fixes render with sender username from the WS payload (was raw user id); freshness/status treatment absent. |
 | companions/04-companion-talk.png | done | P2/M | PTT press-and-hold talk implemented (binary frames, floor control, no recording). |
 | companions/05-companion-status.png | missing | P2/M | Freshness rings/status card absent. |
 | companions/06-share-location.png | missing | P2/H | Server endpoints exist and are tested (`POST /_user/location/shares`); no create UI (recipient picker, kind, TTL). |

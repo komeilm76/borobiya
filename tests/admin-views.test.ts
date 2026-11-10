@@ -212,7 +212,7 @@ describe('responder history', () => {
     });
     expect(wrapper.text()).toContain('آتش‌سوزی');
     expect(wrapper.text()).toContain('حادثه رانندگی');
-    expect(wrapper.text()).toContain('۲ درخواست ثبت‌شده');
+    expect(wrapper.text()).toContain('۲ رویداد ثبت‌شده');
     wrapper.unmount();
   });
 
@@ -220,7 +220,7 @@ describe('responder history', () => {
     const { wrapper, router } = await render(HistoryView, ROUTE_NAMES.history, ({ sos }) => {
       sos.requests = [] as never;
     });
-    expect(wrapper.text()).toContain('تاریخچه‌ای ثبت نشده است.');
+    expect(wrapper.text()).toContain('درخواستی ثبت نشده است.');
     const navigations = vi.spyOn(router, 'push');
     await wrapper.find('.sheet__expand').trigger('click');
     expect(navigations).toHaveBeenCalledWith({ name: ROUTE_NAMES.profile });

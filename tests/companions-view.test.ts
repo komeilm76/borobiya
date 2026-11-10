@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import CompanionsView from '../src/client/views/map/CompanionsView.vue';
 import { useMapStore } from '../src/client/stores/map.ts';
+import { useAuthStore } from '../src/client/stores/auth.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 
 /**
@@ -31,11 +32,23 @@ const PEER = {
 const LIVE_SHARE = { id: 'shr_live', kind: 'live', expiresAt: 1794136403220 };
 /** One history-window share, which has no expiry. */
 const HISTORY_SHARE = { id: 'shr_history', kind: 'history', expiresAt: null };
+/** Full shares, as the list endpoint returns them (with direction and counterpart). */
+const OUTGOING_SHARE = { id: 'shr_out', ownerId: 'usr_self', recipientId: 'usr_other', recipientUsername: 'maryam.a', kind: 'live', expiresAt: 1794136403220, createdAt: 1794136000000 };
+const INCOMING_SHARE = { id: 'shr_in', ownerId: 'usr_other', ownerUsername: 'reza.m', recipientId: 'usr_self', kind: 'history', expiresAt: null, createdAt: 1794136000000 };
+
+const SELF = {
+  id: 'usr_self', username: 'saeed.k', role: 'user' as const, isActive: true,
+  securityReady: true, mustCompleteSecurityQuestions: false, readyForMission: false,
+  averageRating: 0, createdAt: 1794000000000
+};
 
 /** Mounts the screen on its route with a seeded store. */
-async function render(seed: (map: ReturnType<typeof useMapStore>) => void = () => {}) {
+async function render(seed: (map: ReturnType<typeof useMapStore>) => void = () => {}, options: { withSelf?: boolean } = {}) {
   const pinia = createPinia();
   setActivePinia(pinia);
+  if (options.withSelf) {
+    useAuthStore().$patch({ user: { ...SELF } });
+  }
   const map = useMapStore();
   seed(map);
 
@@ -56,6 +69,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   document.body.innerHTML = '';
 });
 
@@ -132,6 +146,52 @@ describe('active shares', () => {
   it('says there is no active share rather than showing an empty list', async () => {
     const { wrapper } = await render();
     expect(wrapper.text()).toContain('اشتراک فعالی وجود ندارد');
+    wrapper.unmount();
+  });
+
+  it('shows the counterpart and direction of each share', async () => {
+    const { wrapper } = await render((map) => {
+      map.shares = [OUTGOING_SHARE, INCOMING_SHARE] as never;
+    }, { withSelf: true });
+    const rows = wrapper.findAll('.share-list .share-row');
+    expect(rows).toHaveLength(2);
+    expect(rows[0].text()).toContain('maryam.a');
+    expect(rows[0].text()).toContain('ارسال موقعیت شما');
+    expect(rows[1].text()).toContain('reza.m');
+    expect(rows[1].text()).toContain('دریافت موقعیت');
+    wrapper.unmount();
+  });
+
+  it('offers revoke only for outgoing shares', async () => {
+    const { wrapper } = await render((map) => {
+      map.shares = [OUTGOING_SHARE, INCOMING_SHARE] as never;
+    }, { withSelf: true });
+    const buttons = wrapper.findAll('[data-testid="revoke-share"]');
+    expect(buttons).toHaveLength(1);
+    wrapper.unmount();
+  });
+
+  it('revokes an outgoing share and reloads the list', async () => {
+    const calls: Array<{ method: string; path: string }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      calls.push({ method: init?.method ?? 'GET', path });
+      const data = path === '/_public/map/config' ? { pois: [] }
+        : path === '/_user/places' ? { items: [] }
+        : { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const { wrapper } = await render((map) => {
+      map.shares = [OUTGOING_SHARE] as never;
+    }, { withSelf: true });
+    await wrapper.find('[data-testid="revoke-share"]').trigger('click');
+    await flushPromises();
+    // The DELETE must target the share; the store is then re-fetched so the row disappears.
+    expect(calls.some((call) => call.method === 'DELETE' && call.path === '/_user/location/shares/shr_out')).toBe(true);
+    expect(calls.some((call) => call.method === 'GET' && call.path === '/_user/location/shares')).toBe(true);
     wrapper.unmount();
   });
 });
