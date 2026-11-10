@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: include the newest fix in sampled history
+
+- The SQL history reader used a fixed stride that sometimes omitted the last recorded fix: for six rows at a three-point cap it returned rows 1, 3 and 5, so a completed replay could appear to stop before the actual end. Sampling now distributes slots across the ordered window, keeps both endpoints when the cap is at least two, takes the newest fix at a one-point cap, and still returns every row when the window fits. A PGlite regression executed the real generated query at caps 1, 2, 3, 4, 6 and 8; it failed before the fix and passes afterward. Production PostgreSQL/VM verification remains open.
+
 ### 2026-10-23 — Bug hunt: refit history after geometry, viewport and map replacement changes
 
 - The history camera memo key contained only first/last timestamps, point count and broad phone/tablet flags. A reloaded trace with changed coordinates but the same timing/length could keep the old camera bounds; rotation or resizing inside a breakpoint reused stale padding/extent too. The key now includes track bounds (or stationary center), actual canvas dimensions and computed padding. Replacing the MapLibre instance also clears the prior fit and old-instance gesture lock so the new map can frame the track. A nonmounted view contract failed before the fix, and a pure key test covers changed geometry, viewport and padding. Rendered rotation/map-replacement verification remains open.

@@ -1,3 +1,4 @@
+import { PGlite } from "@electric-sql/pglite";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -268,20 +269,48 @@ describe("historyWindowQuery", () => {
     expect(query.sql).toContain('from "location_history"');
     expect(query.sql).toContain('row_number() over (order by "timestamp", "id")');
     expect(query.sql).toContain('count(*) over ()');
-    expect(query.sql).toContain('% greatest(1, ("totalPoints" + $4 - 1) / $5) = 0');
-    expect(query.sql).toContain('order by "sampled"."timestamp" asc');
+    expect(query.sql).toContain('when "totalPoints" <= $4 then true');
+    expect(query.sql).toContain('when $5 = 1 then "position" = "totalPoints"');
+    expect(query.sql).toContain('(("position" - 1) * ($6 - 1)) / ("totalPoints" - 1) >');
+    expect(query.sql).toContain('order by "sampled"."timestamp" asc, "position" asc');
     expect(query.params).toEqual([
       ownerId,
       "2026-10-14T00:00:00.000Z",
       "2026-10-21T00:00:00.000Z",
-      250,
-      250
+      250, 250, 250, 250
     ]);
   });
 
+  it("keeps the newest fix within the cap even when stride sampling would omit it", async () => {
+    const pg = new PGlite();
+    try {
+      await pg.exec(`create table location_history (
+        id uuid primary key, user_id uuid not null, lat double precision not null,
+        lon double precision not null, accuracy double precision,
+        timestamp timestamptz not null
+      )`);
+      for (let index = 0; index < 6; index++) {
+        await pg.query(
+          `insert into location_history (id, user_id, lat, lon, timestamp) values ($1, $2, $3, $4, $5)`,
+          [randomUUID(), ownerId, index, 51, new Date(Date.parse("2026-10-20T00:00:00.000Z") + index * 60_000).toISOString()]
+        );
+      }
+      for (const cap of [1, 2, 3, 4, 6, 8]) {
+        const query = historyWindowQuery(offlineDb, { userId: ownerId, fromTime, toTime, maxPoints: cap }).toSQL();
+        const { rows } = await pg.query<{ lat: number; totalPoints: number }>(query.sql, query.params);
+        const latitudes = rows.map((row) => row.lat);
+        expect(latitudes.length).toBe(Math.min(cap, 6));
+        expect(latitudes.at(-1)).toBe(5);
+        if (cap >= 2) expect(latitudes[0]).toBe(0);
+        expect(rows.every((row) => Number(row.totalPoints) === 6)).toBe(true);
+      }
+    } finally {
+      await pg.close();
+    }
+  });
+
   it("keeps every point when the window is smaller than the target", () => {
-    // stride = greatest(1, (total + cap - 1) / cap): with total <= cap that is 1, and (position-1) % 1
-    // is 0 for every row, so a short window comes back whole rather than thinned.
+    // The query keeps every row when total <= cap, so a short window is not thinned.
     const rows = Array.from({ length: 3 }, (_, index) => ({
       lat: 35.7 + index / 10_000,
       lon: 51.3,

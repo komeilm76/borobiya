@@ -381,14 +381,14 @@ describe("P2-A2 execution against real PostgreSQL (PGlite)", () => {
     });
     expect(window?.totalPoints).toBe(2);
     expect(window?.points).toHaveLength(1);
-    expect(window?.points[0]?.lat).toBe(35.7);
+    expect(window?.points[0]?.lat).toBe(35.8); // A one-point sample keeps the newest fix.
     expect(await historyStore.deleteHistoryShare({ shareId, ownerId: aliceId })).toBe(true);
     expect(await historyStore.readSharedHistoryWindow({
       shareId, targetUserId: bobId, defaultReadPoints: 100
     })).toBeNull();
   });
 
-  it("executes historyWindowQuery window functions, stride sampling, and revokeShare ownership checks on PostgreSQL", async () => {
+  it("executes historyWindowQuery window functions, endpoint sampling, and revokeShare ownership checks on PostgreSQL", async () => {
     const start = new Date("2026-10-20T00:00:00.000Z");
     const end = new Date("2026-10-20T01:00:00.000Z");
 
@@ -411,13 +411,14 @@ describe("P2-A2 execution against real PostgreSQL (PGlite)", () => {
     expect(sampled.totalPoints).toBe(25);
     expect(sampled.points.length).toBeLessThanOrEqual(6);
     expect(sampled.points[0]?.lat).toBeCloseTo(35.0, 6);
-    // Stride = ceil(25 / 6) = 5 -> indices 0, 5, 10, 15, 20.
+    // Six slots spread over 25 points retain both ends of the recorded window.
     expect(sampled.points.map((point) => Number(point.lat.toFixed(2)))).toEqual([
       35.0,
       35.05,
       35.1,
       35.15,
-      35.2
+      35.2,
+      35.24
     ]);
 
     const share = await shareStore.createShares({

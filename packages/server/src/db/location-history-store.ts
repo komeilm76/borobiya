@@ -173,9 +173,10 @@ export function locationFixQueries(db: Database, input: LocationFixInput) {
  *
  * The sampling happens in SQL on purpose. `row_number()` and `count(*) OVER ()` are computed over the
  * window filtered by `(user_id, timestamp)` — the index T2.2.1 added for exactly these reads — so the
- * database never ships a 30-day firehose to Node just so the route could drop 99% of it. Stride is
- * `ceil(total / maxPoints)`, integer arithmetic that keeps the first point, aims for `maxPoints` rows,
- * and degenerates to "everything" when the window already holds fewer.
+ * database never ships a 30-day firehose to Node just so the route could drop 99% of it.
+ * Spread at most `maxPoints` slots across the ordered rows, including both endpoints when the cap
+ * permits. A one-point sample takes the newest fix. Stride-only sampling could omit the final fix,
+ * making completed playback appear to stop before the real end of the window.
  */
 export function historyWindowQuery(db: Database, input: ReadLocationHistoryWindowInput) {
   const sampled = db.$with("sampled").as(
@@ -198,14 +199,21 @@ export function historyWindowQuery(db: Database, input: ReadLocationHistoryWindo
       ))
   );
 
-  const stride = sql`greatest(1, (${sampled.totalPoints} + ${input.maxPoints} - 1) / ${input.maxPoints})`;
-
+  // For total > cap > 1, integer division assigns rows to cap ordered slots.
+  // Keep the first row and each row that crosses into the next slot; the last
+  // row always crosses into slot cap-1. CASE avoids a zero denominator at total=1.
   return db
     .with(sampled)
     .select({ lat: sampled.lat, lon: sampled.lon, accuracy: sampled.accuracy, timestamp: sampled.timestamp, totalPoints: sampled.totalPoints })
     .from(sampled)
-    .where(sql`(${sampled.position} - 1) % ${stride} = 0`)
-    .orderBy(asc(sampled.timestamp));
+    .where(sql`case
+      when ${sampled.totalPoints} <= ${input.maxPoints} then true
+      when ${input.maxPoints} = 1 then ${sampled.position} = ${sampled.totalPoints}
+      else ${sampled.position} = 1 or
+        ((${sampled.position} - 1) * (${input.maxPoints} - 1)) / (${sampled.totalPoints} - 1) >
+        ((${sampled.position} - 2) * (${input.maxPoints} - 1)) / (${sampled.totalPoints} - 1)
+      end`)
+    .orderBy(asc(sampled.timestamp), asc(sampled.position));
 }
 
 /** Maps sampled rows onto the window result. Pure, because `totalPoints` coming from row zero is the part worth pinning. */
