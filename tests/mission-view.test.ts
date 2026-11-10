@@ -5,6 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
 import MissionView from '../src/client/views/map/MissionView.vue';
 import { useSosStore } from '../src/client/stores/sos.ts';
+import { useAuthStore } from '../src/client/stores/auth.ts';
 import { useToast } from '../src/client/composables/useToast.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 import { MISSION_STATUS, SOS_STATUS } from '../src/shared/protocol.ts';
@@ -26,6 +27,11 @@ const SOS_LIST_ITEM = {
   latitude: 35.72,
   longitude: 51.33,
   accuracy: 12,
+  isManual: true,
+  incidentIcon: 'fire',
+  incidentColor: '#B35A18',
+  requesterUsername: 'saeed.k',
+  assignedResponderId: 'usr_self',
   status: SOS_STATUS.DISPATCHED,
   createdAt: 1794136000000,
   updatedAt: 1794136000000
@@ -45,7 +51,7 @@ const SOS_DETAIL = {
  * `sos: false` models an account with no request at all; the mission is separate because the list
  * keeps them apart too.
  */
-function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string } = {}) {
+function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string; acceptFails?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   const mission = options.mission === undefined
     ? { id: 'mis_1', sosId: 'sos_1', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
@@ -58,6 +64,13 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
       const path = url.split('?')[0];
       const method = init?.method ?? 'GET';
       calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+
+      if (options.acceptFails && path === '/_user/sos/sos_1/accept' && method === 'POST') {
+        return new Response(
+          JSON.stringify({ ok: false, requestId: 'r', error: { code: 'CONFLICT', message: 'درخواست از قبل مأمور شده است.' } }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        );
+      }
 
       if (options.failPath && path === options.failPath && method !== 'GET') {
         return new Response(
@@ -86,12 +99,27 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
  * The shell (`MapLayout`) is what normally calls `sos.load()`; mounting the view on its own would
  * otherwise render the empty state for every scenario and prove nothing.
  */
-async function render() {
+async function render(options: { role?: 'user' | 'responder' | 'admin' } = {}) {
   const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
   await router.push({ name: ROUTE_NAMES.mission });
   await router.isReady();
   const pinia = createPinia();
   setActivePinia(pinia);
+  if (options.role) {
+    useAuthStore().$patch({
+      user: {
+        id: 'usr_self',
+        username: 'reza.m',
+        role: options.role,
+        isActive: true,
+        securityReady: true,
+        mustCompleteSecurityQuestions: false,
+        readyForMission: true,
+        averageRating: 4.5,
+        createdAt: 1794000000000
+      }
+    });
+  }
   await useSosStore().load();
   const wrapper = mount(MissionView, {
     attachTo: document.body,
@@ -276,6 +304,56 @@ describe('mission screen', () => {
     const { wrapper } = await render();
     const detailCalls = calls.filter((call) => call.path === '/_user/sos/sos_1');
     expect(detailCalls.length).toBeLessThanOrEqual(1);
+    wrapper.unmount();
+  });
+});
+
+
+describe('responder offer', () => {
+  it('shows the dispatched request with the facts a responder needs', async () => {
+    stubApi();
+    const { wrapper } = await render({ role: 'responder' });
+    const offer = wrapper.find('[data-testid="mission-offer"]');
+    expect(offer.exists()).toBe(true);
+    expect(offer.text()).toContain('آتش‌سوزی');
+    expect(offer.text()).toContain('دود از پنجره');
+    expect(offer.text()).toContain('شدید');
+    expect(offer.text()).toContain('saeed.k');
+    // The manual-fix flag must be visible: a pin dropped far from GPS is an abuse vector.
+    expect(offer.text()).toContain('موقعیت توسط درخواست‌کننده دستی');
+    wrapper.unmount();
+  });
+
+  it('accepts through the store and reloads the authoritative state', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render({ role: 'responder' });
+    await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
+    await flushPromises();
+
+    const accept = calls.find((entry) => entry.path === '/_user/sos/sos_1/accept');
+    expect(accept?.method).toBe('POST');
+    expect(useToast().messages.value.some((message) => message.message === 'مأموریت پذیرفته شد.')).toBe(true);
+    // The offer list is re-fetched: the accepted SOS must leave the dispatched state.
+    expect(calls.filter((entry) => entry.path === '/_user/sos' && entry.method !== 'POST').length).toBeGreaterThanOrEqual(2);
+    wrapper.unmount();
+  });
+
+  it('reports a lost race instead of pretending acceptance worked', async () => {
+    const calls = stubApi({ acceptFails: true });
+    const { wrapper } = await render({ role: 'responder' });
+    await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
+    await flushPromises();
+
+    expect(useToast().messages.value.some((message) => message.message.includes('درخواست از قبل مأمور'))).toBe(true);
+    expect(useToast().messages.value.some((message) => message.message === 'مأموریت پذیرفته شد.')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('never shows the offer to a plain user', async () => {
+    stubApi();
+    const { wrapper } = await render({ role: 'user' });
+    expect(wrapper.find('[data-testid="mission-offer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="mission-offer-accept"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });

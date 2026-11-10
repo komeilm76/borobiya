@@ -82,6 +82,21 @@ describe('SOS creation extras', () => {
   });
 });
 
+describe('responder visibility of group dispatches', () => {
+  it('lets every active group member see a dispatch aimed at the group, with the requester alias', async () => {
+    const sosId = await createSos();
+    await dispatchTo(sosId, [fieldopsId]);
+    // reza.m is a group member but neither the named responder nor the requester.
+    const listed = await apiFetch(server, '/_user/sos', { cookie: responderCookie });
+    expect(listed.status, listed.text).toBe(200);
+    const item = listed.json.data.items.find((entry: any) => entry.id === sosId);
+    expect(item, 'an unnamed group member must see the dispatch').toBeTruthy();
+    expect(item.status).toBe('dispatched');
+    expect(item.requesterUsername).toBe('saeed.k');
+    expect(item.isManual).toBe(false);
+  });
+});
+
 describe('acceptance through group membership', () => {
   it('lets an unassigned member of the group accept a dispatch aimed at a colleague', async () => {
     const sosId = await createSos();

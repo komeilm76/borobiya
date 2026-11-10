@@ -22,10 +22,12 @@ interface DispatchInput { groupId: string; responderIds: string[] }
 
 const SOS_SELECT = `
   SELECT s.*, i.label AS incidentLabel, i.icon AS incidentIcon, i.color AS incidentColor,
-    m.id AS missionId, m.status AS missionStatus, m.responder_id AS missionResponderId, m.rating AS missionRating
+    m.id AS missionId, m.status AS missionStatus, m.responder_id AS missionResponderId, m.rating AS missionRating,
+    ru.username AS requesterUsername
   FROM sos_requests s
   JOIN incident_types i ON i.id = s.incident_type_id
-  LEFT JOIN missions m ON m.sos_id = s.id`;
+  LEFT JOIN missions m ON m.sos_id = s.id
+  LEFT JOIN users ru ON ru.id = s.requester_id`;
 
 function trackingCode(id: string): number {
   return 1000 + Number.parseInt(sha256(id).slice(0, 4), 16) % 9000;
@@ -65,8 +67,10 @@ export class SosService {
       clauses.push('s.requester_id = ?');
       params.push(identity.userId);
     } else if (identity.role === ROLES.RESPONDER) {
-      clauses.push('(s.requester_id = ? OR s.assigned_responder_id = ? OR m.responder_id = ?)');
-      params.push(identity.userId, identity.userId, identity.userId);
+      // A dispatch aimed at a group is actionable by every active member of that group (the
+      // accept path enforces the same rule), so the list must not hide it from them either.
+      clauses.push('(s.requester_id = ? OR s.assigned_responder_id = ? OR m.responder_id = ? OR s.assigned_group_id IN (SELECT group_id FROM group_members WHERE user_id = ?))');
+      params.push(identity.userId, identity.userId, identity.userId, identity.userId);
     }
     if (status) { clauses.push('s.status = ?'); params.push(status); }
     const where = clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '';
@@ -265,6 +269,7 @@ export class SosService {
     return {
       id, sosId: id, trackingCode: Number(row.trackingCode ?? trackingCode(id)),
       requesterId: String(row.requester_id ?? row.requesterId),
+      requesterUsername: row.requesterUsername ? String(row.requesterUsername) : null,
       incidentTypeId: String(row.incident_type_id ?? row.incidentTypeId),
       incidentLabel: row.incidentLabel ? String(row.incidentLabel) : null,
       incidentIcon: row.incidentIcon ? String(row.incidentIcon) : null,

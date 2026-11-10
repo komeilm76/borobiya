@@ -70,15 +70,20 @@ export interface SosView {
   /** Tracking number as the server serializes it: an integer, not a string. */
   trackingCode: number;
   requesterId: string;
-  requesterUsername?: string;
+  requesterUsername?: string | null;
   incidentTypeId: string;
   incidentLabel: string;
+  incidentIcon?: string | null;
+  incidentColor?: string | null;
   severity: 'low' | 'medium' | 'high';
   description: string;
   photoDataUrl?: string | null;
   latitude: number;
   longitude: number;
   accuracy: number;
+  isManual: boolean;
+  assignedGroupId?: string | null;
+  assignedResponderId?: string | null;
   status: SosStatus;
   cancellationReasonId?: string | null;
   createdAt: number;
