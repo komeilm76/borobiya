@@ -4,7 +4,7 @@ import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
-import type { GroupView, NearestResponderView, SosView } from '@/api/types.ts';
+import type { NearestResponderView, SosView } from '@/api/types.ts';
 
 /** Dispatch board: pending SOS requests on the right, groups on the left. */
 const admin = useAdminStore();
@@ -59,10 +59,6 @@ function toggleResponder(id: string, checked: boolean): void {
   if (checked) next.add(id);
   else next.delete(id);
   selectedResponderIds.value = [...next];
-}
-
-function isMember(id: string): boolean {
-  return Boolean(selectedGroup.value?.memberIds?.includes(id));
 }
 
 async function openPanel(item: SosView): Promise<void> {

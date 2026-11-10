@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useEventListener, watchDebounced } from '@vueuse/core';
 import { useAuthStore } from '@/stores/auth.ts';
@@ -92,6 +92,11 @@ interface SearchResult {
   longitude: number;
 }
 
+/** Search sources carry a hidden haystack used only for matching. */
+interface SearchSourceEntry extends SearchResult {
+  haystack: string;
+}
+
 /** Persian/Arabic-insensitive comparison key: unify letter shapes, drop diacritics, fold digits. */
 function normalizeSearchText(value: string): string {
   return value
@@ -116,7 +121,7 @@ const activeIndex = ref(-1);
 const searchOpen = ref(false);
 let searchToken = 0;
 
-function searchSources(): SearchResult[] {
+function searchSources(): SearchSourceEntry[] {
   const fromPlaces = map.places.map((place) => ({
     id: `place-${place.id}`,
     name: place.name,

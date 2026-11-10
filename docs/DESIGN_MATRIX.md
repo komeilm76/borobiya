@@ -102,7 +102,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. |
 | sos/13-sos-cancel-reason.png | done | P1/C | Mission view offers the requester an inline cancel panel: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. |
 | sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
-| sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with «حذف عکس» or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
+| sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with a remove-photo button or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
 | sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests (incident, date, status, tracking code); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | missing | P2/M | No per-request detail view. |
@@ -236,7 +236,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 ## Documented intentional deviations
 
 - **DEV-01 — Recovery account error (auth/06).** The reference shows an explicit "unknown username" error, which is a user-enumeration oracle. Implementation answers unknown usernames with decoy challenges (enumeration-safe), consistent with `docs/SECURITY.md` and the decoy-resistant recovery design. The design image is retained as reference; implementation deliberately diverges.
-- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — the pill now reads «نقشه» and its behavior is exactly what it says (P1 rename, decision 3).
+- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — the pill now reads "Map" (its screen is the offline map with the SOS composer, nothing more) and its behavior is exactly what it says (P1 rename, decision 3).
 - **DEV-03 — Photo without compression (sos/05).** RESOLVED in P1 — the composer validates, downscales and re-encodes client-side under the server's wire cap. Kept for the record.
 - **DEV-04 — SOS dock placement.** RESOLVED in P1 — the dock now hugs the physical left edge (decision 5), above the search bar, clear of the home indicator.
 - **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; the product has no trips. P2 must replace them with SOS/mission/sharing counts (see design-flaw register).
