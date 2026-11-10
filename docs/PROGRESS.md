@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: disable playback when the track has no time span
+
+- Two location fixes can have different coordinates but the same observation timestamp. History playback previously treated any two-row track as playable, so Play started a timer that immediately stopped without moving the cursor. The playback control now requires a strictly positive interval between the earliest and latest fixes; the final point remains visible and history data is unchanged. A focused composable regression reproduced the enabled-but-motionless Play state before the fix and now passes. Rendered-device review remains open.
+
 ### 2026-10-23 — Bug hunt: do not block online map tiles on Cache Storage
 
 - The map service worker waited for `caches.open`, `cache.put` and eviction before returning a successful network response. A stalled cache operation could therefore leave online tiles/styles/glyphs loading forever despite a healthy map server. Network fetch now runs independently of cache opening, and successful responses return immediately while a cloned response is saved in background work retained with a synchronously registered `FetchEvent.waitUntil`. Network failures and 5xx responses still wait for the cache to serve an offline fallback. A worker regression reproduced the stall before the fix for both slow open and slow write; existing offline and 5xx fallback tests pass. Physical browser/device and offline-map acceptance remain open.

@@ -109,8 +109,9 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   const frames = computed(() => buildFrames(points.value));
   const bounds = computed(() => timelineBounds(frames.value));
   const hasTrack = computed(() => frames.value.length > 0);
-  /** A single recorded fix is a position, not a path: there is nothing to play between. */
-  const canPlay = computed(() => frames.value.length > 1);
+  /** Play needs elapsed observation time, not just multiple rows: several fixes at
+   * one timestamp are a snapshot with no interval for the cursor to traverse. */
+  const canPlay = computed(() => !!bounds.value && bounds.value.endMs > bounds.value.startMs);
   const progress = computed(() => cursorProgress(cursorMs.value, bounds.value));
   const position = computed(() => positionAt(frames.value, cursorMs.value));
   // A cursor tick changes only the played prefix and head, not the full 1000-point trace.

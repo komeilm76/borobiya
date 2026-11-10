@@ -674,6 +674,23 @@ describe("the transport loop", () => {
     expect(api.cursorMs.value).toBe(NOW - HOUR);
   });
 
+  it("does not offer Play for multiple fixes at the same observation instant", async () => {
+    const { api, scope } = mount();
+    const at = new Date(NOW - HOUR).toISOString();
+    autoRespond = () => historyBody([point(35, 51, at), point(36, 52, at)]);
+    try {
+      await api.selectPreset(7);
+      await settle();
+      expect(api.frames.value).toHaveLength(2);
+      expect(api.bounds.value?.startMs).toBe(api.bounds.value?.endMs);
+      expect(api.position.value).toEqual([52, 36]); // The final fix remains visible.
+      expect(api.canPlay.value).toBe(false);
+      api.play();
+      expect(api.playing.value).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { scope.stop(); }
+  });
+
   it("clears the interval when the view goes away", async () => {
     const { scope, api } = mount();
     autoRespond = () => historyBody([point(35, 51, new Date(NOW - 3 * HOUR).toISOString()), point(36, 52, new Date(NOW - HOUR).toISOString())]);
