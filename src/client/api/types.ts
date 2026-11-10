@@ -164,6 +164,18 @@ export interface OverviewView {
   alerts: AlertView[];
 }
 
+/** One responder entry in the admin "nearest responders" result. */
+export interface NearestResponderView {
+  id: string;
+  username: string;
+  averageRating: number;
+  readyForMission: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  distanceMeters: number | null;
+  recordedAt: number | null;
+}
+
 /** A service group. */
 export interface GroupView {
   id: string;

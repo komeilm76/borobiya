@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useAdminStore } from '@/stores/admin.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
+import type { GroupView, NearestResponderView, SosView } from '@/api/types.ts';
 
 /** Dispatch board: pending SOS requests on the right, groups on the left. */
 const admin = useAdminStore();
@@ -11,24 +12,109 @@ const format = useFormatters();
 const toast = useToast();
 const queue = computed(() => admin.dispatchQueue?.items ?? []);
 
+/** active groups that actually have members — the server refuses everything else. */
+const staffedGroups = computed(() => admin.groups.filter((group) => group.status === 'active' && (group.memberIds?.length ?? 0) > 0));
+
 /**
- * Dispatches a request to the first active group that actually has responders.
- *
- * Sending a responder id that is not a member of the chosen group is rejected as a whole by the
- * server, so an empty group would have produced a failure with no explanation. A seeded demo id was
- * hardcoded here, which only worked on a database with demo users and never in production.
+ * The panel is deliberately explicit: the dispatcher picks the group, then ticks the responders.
+ * Auto-picking the first staffed group (the old behavior) sent whoever happened to come first in
+ * the membership list, with no chance to match the responder to the incident at hand.
  */
-async function dispatch(sosId: string): Promise<void> {
-  const group = admin.groups.find((candidate) => candidate.status === 'active' && (candidate.memberIds?.length ?? 0) > 0);
-  if (!group) {
-    toast.push('گروهی با امدادگر فعال برای اعزام تعریف نشده است.', 'warning', 3600);
+const openId = ref<string | null>(null);
+const selectedGroupId = ref('');
+const selectedResponderIds = ref<string[]>([]);
+const nearest = ref<{ loading: boolean; error: string | null; items: NearestResponderView[] }>({ loading: false, error: null, items: [] });
+const dispatching = ref(false);
+
+const openItem = computed(() => queue.value.find((item) => item.id === openId.value) ?? null);
+const selectedGroup = computed(() => staffedGroups.value.find((group) => group.id === selectedGroupId.value) ?? null);
+const nearestById = computed(() => new Map(nearest.value.items.map((item) => [item.id, item])));
+
+/**
+ * The panel lists every member of the chosen group, enriched with the nearest-responders
+ * payload (distance, rating, readiness) where a fix exists. A member without a recent fix still
+ * appears — the dispatcher may know better than the last beacon does.
+ */
+const memberRows = computed(() => {
+  const group = selectedGroup.value;
+  if (!group) return [];
+  return (group.memberIds ?? [])
+    .map((id) => nearestById.value.get(id) ?? { id, username: id, averageRating: null, readyForMission: null, latitude: null, longitude: null, distanceMeters: null, recordedAt: null })
+    .sort((a, b) => (a.distanceMeters ?? Number.MAX_SAFE_INTEGER) - (b.distanceMeters ?? Number.MAX_SAFE_INTEGER));
+});
+
+/** Nearest responders, shown read-only until a group is chosen; selection is always explicit. */
+const nearestRows = computed(() => nearest.value.items);
+
+function formatDistance(value: number | null): string {
+  return value === null ? 'بدون موقعیت ثبت‌شده' : format.distance(value);
+}
+
+function rowChecked(id: string): boolean {
+  return selectedResponderIds.value.includes(id);
+}
+
+function toggleResponder(id: string, checked: boolean): void {
+  const next = new Set(selectedResponderIds.value);
+  if (checked) next.add(id);
+  else next.delete(id);
+  selectedResponderIds.value = [...next];
+}
+
+function isMember(id: string): boolean {
+  return Boolean(selectedGroup.value?.memberIds?.includes(id));
+}
+
+async function openPanel(item: SosView): Promise<void> {
+  if (openId.value === item.id) {
+    openId.value = null;
     return;
   }
+  openId.value = item.id;
+  selectedGroupId.value = '';
+  selectedResponderIds.value = [];
+  nearest.value = { loading: true, error: null, items: [] };
+  await loadNearest(item);
+}
+
+async function loadNearest(item: SosView): Promise<void> {
+  nearest.value.loading = true;
+  nearest.value.error = null;
   try {
-    await admin.dispatch(sosId, group.id, group.memberIds!);
-    toast.push('درخواست اعزام شد.', 'success', 2400);
+    nearest.value.items = await admin.nearestResponders(item.id, { latitude: item.latitude, longitude: item.longitude }, item.incidentTypeId);
   } catch (caught) {
+    nearest.value.items = [];
+    nearest.value.error = errorMessage(caught);
+  } finally {
+    nearest.value.loading = false;
+  }
+}
+
+function chooseGroup(event: Event): void {
+  selectedGroupId.value = (event.target as HTMLSelectElement).value;
+  // Selection is per group: carrying ticks across groups would dispatch people nobody chose.
+  selectedResponderIds.value = [];
+}
+
+const canDispatch = computed(() => Boolean(selectedGroup.value) && selectedResponderIds.value.length > 0 && !dispatching.value);
+
+async function dispatch(): Promise<void> {
+  const item = openItem.value;
+  const group = selectedGroup.value;
+  if (!item || !group || !canDispatch.value) return;
+  dispatching.value = true;
+  try {
+    await admin.dispatch(item.id, group.id, [...selectedResponderIds.value]);
+    toast.push('درخواست اعزام شد.', 'success', 2400);
+    openId.value = null;
+    selectedGroupId.value = '';
+    selectedResponderIds.value = [];
+  } catch (caught) {
+    // The panel stays open with the same selection: the dispatcher sees the server's reason and can
+    // fix the choice (e.g. a responder who lost membership between loading and dispatching).
     toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    dispatching.value = false;
   }
 }
 
@@ -43,14 +129,71 @@ onMounted(() => void admin.loadDispatch());
         <span class="panel__hint">{{ format.number(queue.length) }} درخواست</span>
       </header>
       <ul class="admin-list">
-        <li v-for="item in queue" :key="item.id">
+        <template v-for="item in queue" :key="item.id">
+        <li>
           <span class="mdi mdi-alarm-light-outline" aria-hidden="true" />
           <div>
             <strong>{{ item.incidentLabel }} · {{ item.severity }}</strong>
             <small>{{ item.description }}</small>
           </div>
-          <button type="button" class="admin-action" @click="dispatch(item.id)">اعزام</button>
+          <button type="button" class="admin-action" data-testid="open-dispatch" @click="openPanel(item)">{{ openId === item.id ? 'بستن' : 'اعزام' }}</button>
         </li>
+        <li v-if="openItem?.id === item.id" class="dispatch-panel" data-testid="dispatch-panel">
+          <strong class="dispatch-panel__title">اعزام درخواست</strong>
+
+          <label class="dispatch-panel__field">
+            <span>گروه امداد</span>
+            <select :value="selectedGroupId" data-testid="dispatch-group" @change="chooseGroup">
+              <option value="">{{ staffedGroups.length ? 'انتخاب کنید…' : 'گروهی با امدادگر فعال تعریف نشده است' }}</option>
+              <option v-for="group in staffedGroups" :key="group.id" :value="group.id">{{ group.name }} ({{ format.number(group.memberIds?.length ?? 0) }} امدادگر)</option>
+            </select>
+          </label>
+
+          <div v-if="staffedGroups.length === 0" class="dispatch-panel__warn" role="alert">گروهی با امدادگر فعال برای اعزام تعریف نشده است.</div>
+
+          <div class="dispatch-panel__nearest">
+            <span class="dispatch-panel__label">نزدیک‌ترین امدادگرها (نسبت به موقعیت درخواست)</span>
+            <p v-if="nearest.loading" class="dispatch-panel__hint"><span class="mdi mdi-loading is-spinning" aria-hidden="true" /> در حال یافتن نزدیک‌ترین امدادگرها…</p>
+            <div v-else-if="nearest.error" class="dispatch-panel__warn" role="alert">
+              <span>بارگذاری نزدیک‌ترین امدادگرها ناموفق بود: {{ nearest.error }}</span>
+              <button type="button" class="ghost-button dispatch-panel__retry" data-testid="nearest-retry" @click="loadNearest(openItem)">تلاش دوباره</button>
+            </div>
+            <p v-else-if="!nearest.items.length" class="dispatch-panel__hint">هیچ امدادگری یافت نشد.</p>
+            <ul v-else-if="!selectedGroup" class="dispatch-rows" data-testid="nearest-readonly">
+              <li v-for="row in nearestRows" :key="row.id" class="dispatch-row">
+                <span class="mdi mdi-account" aria-hidden="true" />
+                <div>
+                  <strong>{{ row.username }}</strong>
+                  <small>فاصله: {{ formatDistance(row.distanceMeters) }} · امتیاز {{ format.number(row.averageRating) }} · {{ row.readyForMission ? 'آماده' : 'مشغول' }}</small>
+                </div>
+                <span class="status-pill status-pill--neutral">انتخاب پس از انتخاب گروه</span>
+              </li>
+            </ul>
+          </div>
+
+          <ul v-if="selectedGroup" class="dispatch-rows" data-testid="dispatch-members">
+            <li v-for="row in memberRows" :key="row.id" class="dispatch-row">
+              <label class="dispatch-row__pick">
+                <input type="checkbox" :checked="rowChecked(row.id)" :data-testid="`responder-${row.id}`" @change="toggleResponder(row.id, ($event.target as HTMLInputElement).checked)">
+                <span class="mdi mdi-account" aria-hidden="true" />
+                <span>
+                  <strong>{{ nearestById.get(row.id)?.username ?? row.id }}</strong>
+                  <small>فاصله: {{ formatDistance(row.distanceMeters) }} · امتیاز {{ row.averageRating === null ? '—' : format.number(row.averageRating) }} · {{ row.readyForMission === null ? 'بدون وضعیت' : row.readyForMission ? 'آماده' : 'مشغول' }}</small>
+                </span>
+              </label>
+            </li>
+            <li v-if="!memberRows.length" class="dispatch-panel__hint">گروه انتخاب‌شده امدادگر ندارد.</li>
+          </ul>
+
+          <div class="action-row">
+            <button type="button" class="primary-button" :disabled="!canDispatch" data-testid="confirm-dispatch" @click="dispatch">
+              <span class="mdi mdi-send" aria-hidden="true" />
+              <span>{{ dispatching ? 'در حال اعزام…' : `اعزام${selectedResponderIds.length ? ` (${format.number(selectedResponderIds.length)} نفر)` : ''}` }}</span>
+            </button>
+            <button type="button" class="ghost-button" data-testid="close-dispatch" @click="openId = null">انصراف</button>
+          </div>
+        </li>
+        </template>
       </ul>
       <p v-if="!queue.length" class="panel__empty">صف اعزام خالی است.</p>
     </article>

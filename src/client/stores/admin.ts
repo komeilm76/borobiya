@@ -8,6 +8,7 @@ import type {
   GroupView,
   IncidentTypeView,
   ListView,
+  NearestResponderView,
   OverviewView,
   SettingView,
   SosView
@@ -175,6 +176,21 @@ export const useAdminStore = defineStore('admin', () => {
     if (result) health.value = result;
   }
 
+  /**
+   * Returns the responders nearest to a point, nearest first. Unlike the guarded actions this
+   * throws on failure: the dispatch panel shows its own retry affordance instead of a toast.
+   * Distances are null when no location fix is available for a responder.
+   */
+  async function nearestResponders(sosId: string, point: { latitude: number; longitude: number }, incidentTypeId?: string): Promise<NearestResponderView[]> {
+    const result = await get<{ items: NearestResponderView[]; total: number }>(`/_admin/sos/${sosId}/nearest`, {
+      latitude: point.latitude,
+      longitude: point.longitude,
+      limit: 10,
+      ...(incidentTypeId ? { incidentTypeId } : {})
+    });
+    return result.items ?? [];
+  }
+
   /** Dispatches responders to an SOS request. */
   async function dispatch(sosId: string, groupId: string, responderIds: string[]): Promise<void> {
     await post(`/_admin/sos/${sosId}/dispatch`, { groupId, responderIds });
@@ -216,6 +232,7 @@ export const useAdminStore = defineStore('admin', () => {
     loadIncidentTypes,
     loadHealth,
     dispatch,
+    nearestResponders,
     loadAll
   };
 });

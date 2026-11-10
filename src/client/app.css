@@ -719,3 +719,18 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .cancel-panel__field { display: grid; gap: 6px; font-size: 13px; }
 .cancel-panel__field select, .cancel-panel__field textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--r8); padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
 .cancel-panel__field.is-required span { color: var(--danger); font-weight: 700; }
+.dispatch-panel { display: grid; gap: 12px; margin: 4px 0 10px; padding: 12px; border: 1px solid var(--border); border-radius: var(--r16); background: var(--surface-2); }
+.dispatch-panel__title { font-size: 14px; }
+.dispatch-panel__field { display: grid; gap: 6px; font-size: 13px; }
+.dispatch-panel__field select { width: 100%; border: 1px solid var(--border); border-radius: var(--r8); padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
+.dispatch-panel__label { font-size: 12px; color: var(--muted); font-weight: 700; }
+.dispatch-panel__nearest { display: grid; gap: 8px; }
+.dispatch-panel__hint { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin: 0; }
+.dispatch-panel__warn { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--danger); background: rgba(175,52,56,.08); border: 1px solid rgba(175,52,56,.25); border-radius: var(--r8); padding: 8px 10px; font-size: 12px; }
+.dispatch-panel__retry { min-height: 34px; padding: 0 12px; font-size: 12px; }
+.dispatch-rows { display: grid; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.dispatch-row { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--border); border-radius: var(--r8); background: var(--surface); }
+.dispatch-row__pick { display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1; }
+.dispatch-row__pick input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--danger); }
+.dispatch-row strong { display: block; font-size: 13px; }
+.dispatch-row small { color: var(--muted); font-size: 11px; }

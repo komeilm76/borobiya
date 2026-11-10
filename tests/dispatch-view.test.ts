@@ -11,10 +11,10 @@ import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
  * The dispatch board is the one screen that turns a pending SOS into a mission.
  *
  * The server rejects a dispatch outright when any named responder is not an active member of the
- * chosen group, so the board must name responders the group actually has. It used to send a
- * hardcoded seeded demo id to `groups[0]`; that only worked on a database that had the demo users
- * and only while the member group happened to sort first, which is why it looked fine in the demo
- * and always failed in production, where demo users are not seeded.
+ * chosen group, so the board must name responders the group actually has — explicitly, chosen by
+ * the dispatcher, never auto-picked. The old board dispatched to the first staffed group with its
+ * whole membership; that sent whoever came first in the list, with no chance to match the
+ * responder to the incident, and it is why this suite now drives the panel instead of one button.
  */
 
 const PENDING = {
@@ -24,8 +24,17 @@ const PENDING = {
   incidentLabel: 'آتش‌سوزی',
   requesterUsername: 'saeed.k',
   description: 'دود از طبقه سوم',
+  latitude: 35.7219,
+  longitude: 51.3347,
+  incidentTypeId: 'inc_fire',
   createdAt: 1794136403220
 };
+
+/** What the nearest-responders endpoint returns for the pending request above. */
+const NEAREST = [
+  { id: 'usr_responder', username: 'reza.m', averageRating: 4.8, readyForMission: true, latitude: 35.72, longitude: 51.33, distanceMeters: 320, recordedAt: 1794136200000 },
+  { id: 'usr_responder2', username: 'farid.n', averageRating: 4.1, readyForMission: false, latitude: 35.73, longitude: 51.34, distanceMeters: 1500, recordedAt: 1794136200000 }
+];
 
 /** A group with members, as `GET /_admin/groups` serializes it. */
 const STAFFED_GROUP = {
@@ -68,8 +77,8 @@ function json(data: unknown): Response {
   });
 }
 
-/** Installs a fetch double for the board and the dispatch call. */
-function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails?: boolean } = {}) {
+/** Installs a fetch double for the board, the nearest-responders call and the dispatch call. */
+function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails?: boolean; nearestFails?: boolean; nearestItems?: unknown[] } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   vi.stubGlobal(
     'fetch',
@@ -86,6 +95,15 @@ function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails
           incidentTypes: { items: [], total: 0 }
         });
       }
+      if (path === '/_admin/sos/sos_1/nearest' && method === 'GET') {
+        if (options.nearestFails) {
+          return new Response(
+            JSON.stringify({ ok: false, requestId: 'r', error: { code: 'INTERNAL', message: 'nearest unavailable' } }),
+            { status: 500, headers: { 'content-type': 'application/json' } }
+          );
+        }
+        return json({ items: options.nearestItems ?? NEAREST, total: (options.nearestItems ?? NEAREST).length });
+      }
       if (path.endsWith('/dispatch') && method === 'POST') {
         if (options.dispatchFails) {
           return new Response(
@@ -99,6 +117,12 @@ function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails
     })
   );
   return calls;
+}
+
+/** Opens the dispatch panel for the first queue item and waits for the nearest responders to load. */
+async function openPanel(wrapper: Awaited<ReturnType<typeof render>>['wrapper']) {
+  await wrapper.find('[data-testid="open-dispatch"]').trigger('click');
+  await flushPromises();
 }
 
 /** Mounts the dispatch board; it loads its own queue. */
@@ -166,74 +190,163 @@ describe('queue', () => {
 });
 
 describe('dispatching', () => {
-  it('names only responders the chosen group actually has', async () => {
+  it('opens an explicit panel instead of dispatching on one click', async () => {
     const calls = stubApi();
     const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
+    await openPanel(wrapper);
+
+    expect(wrapper.find('[data-testid="dispatch-panel"]').exists()).toBe(true);
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('asks for a group before anyone can be picked or sent', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+
+    // Nearest responders are shown read-only; no selection is possible before a group is chosen.
+    expect(wrapper.find('[data-testid="nearest-readonly"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="confirm-dispatch"]').attributes('disabled')).toBeDefined();
+    expect(calls.some((call) => call.method === 'POST')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('refuses to offer inactive groups or memberless groups in the picker', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+
+    const options = wrapper.findAll('[data-testid="dispatch-group"] option').map((option) => (option.element as HTMLOptionElement).value);
+    expect(options).toContain('grp_medical');
+    expect(options).not.toContain('grp_fire'); // memberless
+    expect(options).not.toContain('grp_retired'); // inactive
+    wrapper.unmount();
+  });
+
+  it('names only responders the chosen group actually has, after an explicit tick', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+
+    // Confirm stays disabled until at least one responder is ticked — explicit, always.
+    expect(wrapper.find('[data-testid="confirm-dispatch"]').attributes('disabled')).toBeDefined();
+    await wrapper.find('[data-testid="responder-usr_responder"]').setValue(true);
+    expect(wrapper.find('[data-testid="confirm-dispatch"]').attributes('disabled')).toBeUndefined();
+
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
     await flushPromises();
 
     const dispatched = calls.find((call) => call.method === 'POST' && call.path.endsWith('/dispatch'));
     expect(dispatched?.path).toBe('/_admin/sos/sos_1/dispatch');
-    expect(dispatched?.body.groupId).toBe('grp_medical');
-    // The server rejects the request if any id is not a member, so these must come from the group.
-    expect(dispatched?.body.responderIds).toEqual(['usr_responder', 'usr_responder2']);
+    expect(dispatched?.body).toEqual({ groupId: 'grp_medical', responderIds: ['usr_responder'] });
     wrapper.unmount();
   });
 
-  it('skips a group that has no responders and picks one that does', async () => {
-    // The memberless group sorts first here, which is what a real database looks like as soon as an
-    // administrator reorders the groups. Dispatching to it would fail with a server-side rejection.
-    const calls = stubApi({ groups: [EMPTY_GROUP, STAFFED_GROUP, INACTIVE_GROUP] });
+  it('shows distance, rating and readiness for the nearest responders', async () => {
+    stubApi();
     const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
-    await flushPromises();
+    await openPanel(wrapper);
 
-    const dispatched = calls.find((call) => call.method === 'POST' && call.path.endsWith('/dispatch'));
-    expect(dispatched?.body.groupId).toBe('grp_medical');
+    const text = wrapper.find('[data-testid="nearest-readonly"]').text();
+    expect(text).toContain('reza.m');
+    expect(text).toContain('farid.n');
+    expect(text).toContain('آماده');
+    expect(text).toContain('مشغول');
     wrapper.unmount();
   });
 
-  it('skips an inactive group even when it has responders', async () => {
-    const calls = stubApi({ groups: [INACTIVE_GROUP, STAFFED_GROUP] });
-    const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
-    await flushPromises();
-
-    const dispatched = calls.find((call) => call.method === 'POST' && call.path.endsWith('/dispatch'));
-    // An inactive group is refused by the server as unknown.
-    expect(dispatched?.body.groupId).toBe('grp_medical');
-    wrapper.unmount();
-  });
-
-  it('explains that no staffed group exists instead of sending a doomed request', async () => {
+  it('explains when no staffed group exists instead of sending a doomed request', async () => {
     const calls = stubApi({ groups: [EMPTY_GROUP, INACTIVE_GROUP] });
     const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
-    await flushPromises();
+    await openPanel(wrapper);
 
+    expect(wrapper.find('[data-testid="dispatch-group"]').text()).toContain('گروهی با امدادگر فعال');
+    expect(wrapper.find('.dispatch-panel__warn').text()).toContain('گروهی با امدادگر فعال');
+    expect(wrapper.find('[data-testid="confirm-dispatch"]').attributes('disabled')).toBeDefined();
     expect(calls.some((call) => call.method === 'POST')).toBe(false);
-    expect(useToast().messages.value.some((message) => message.message.includes('گروهی با امدادگر فعال'))).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('offers a retry when the nearest-responders call fails, and recovers with one', async () => {
+    let nearestCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+        const path = url.split('?')[0];
+        const method = init?.method ?? 'GET';
+        if (path === '/_admin/sos/sos_1/nearest') {
+          nearestCalls += 1;
+          if (nearestCalls === 1) {
+            return new Response(
+              JSON.stringify({ ok: false, requestId: 'r', error: { code: 'INTERNAL', message: 'nearest unavailable' } }),
+              { status: 500, headers: { 'content-type': 'application/json' } }
+            );
+          }
+          return json({ items: NEAREST, total: NEAREST.length });
+        }
+        // Fall back to the standard double for everything else.
+        return stubApiFallback(path, method, init);
+      })
+    );
+    function stubApiFallback(path: string, method: string, init?: RequestInit): Response {
+      if (path === '/_admin/dispatch' && method === 'GET') {
+        return json({
+          queue: { items: [PENDING], total: 1 },
+          groups: { items: [STAFFED_GROUP], total: 1 },
+          incidentTypes: { items: [], total: 0 }
+        });
+      }
+      return json({ items: [], total: 0 });
+    }
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+
+    expect(wrapper.find('[data-testid="nearest-retry"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="nearest-retry"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('reza.m');
+    wrapper.unmount();
+  });
+
+  it('says when the nearest list is empty instead of spinning forever', async () => {
+    stubApi({ nearestItems: [] });
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+
+    expect(wrapper.text()).toContain('هیچ امدادگری یافت نشد');
     wrapper.unmount();
   });
 
   it('confirms a successful dispatch', async () => {
     stubApi();
     const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await wrapper.find('[data-testid="responder-usr_responder"]').setValue(true);
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
     await flushPromises();
+
     expect(useToast().messages.value.some((message) => message.message === 'درخواست اعزام شد.')).toBe(true);
     wrapper.unmount();
   });
 
-  it('surfaces a server-side rejection rather than reporting success', async () => {
+  it('surfaces a server-side rejection and keeps the panel open for a fix', async () => {
     stubApi({ dispatchFails: true });
     const { wrapper } = await render();
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await wrapper.find('[data-testid="responder-usr_responder"]').setValue(true);
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
     await flushPromises();
 
     const messages = useToast().messages.value;
     expect(messages.some((message) => message.message.includes('active member'))).toBe(true);
     expect(messages.some((message) => message.message === 'درخواست اعزام شد.')).toBe(false);
+    // The panel must survive the refusal: the dispatcher corrects the selection, not the browser tab.
+    expect(wrapper.find('[data-testid="dispatch-panel"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
@@ -241,7 +354,10 @@ describe('dispatching', () => {
     const calls = stubApi();
     const { wrapper } = await render();
     const before = calls.filter((call) => call.method === 'GET' && call.path === '/_admin/dispatch').length;
-    await wrapper.find('.admin-list button.admin-action').trigger('click');
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await wrapper.find('[data-testid="responder-usr_responder"]').setValue(true);
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
     await flushPromises();
 
     const after = calls.filter((call) => call.method === 'GET' && call.path === '/_admin/dispatch').length;
