@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: keep history playback head on the played route at duplicate timestamps
+
+- When multiple recorded fixes shared one observation timestamp, the played prefix already included all of them, but `positionAt` returned the first fix at that instant. The map head could jump backward off the end of the route, including at the beginning of a trace. Playback now uses the final fix at an exact duplicate timestamp, preserving interpolation between distinct instants. A pure playback regression for duplicate fixes at the start and middle of a trace failed before the fix and now passes; rendered map verification remains open.
+
 ### 2026-10-23 — Bug hunt: refuse project cleanup through a changed checkout parent
 
 - `vm.py clear-tools` checked the tool JAR and its parent directories only as far as the checkout root. Replacing an ancestor of the checkout with a symlink after the `CLEAR TOOLS` prompt redirected its final unlink to an unrelated JAR. The same guard protects `clear-caches`' browser-build deletion. It now rechecks every checkout ancestor as well as each project-local path before cleanup. A temporary-directory regression reproduced outside JAR deletion before the fix; it now refuses the changed path. No actual VM files were removed.

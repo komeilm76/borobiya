@@ -106,6 +106,17 @@ describe("positionAt", () => {
     expect(position!.every(Number.isFinite)).toBe(true);
   });
 
+  it("keeps the head at the last fix when multiple fixes share an observation time", () => {
+    const track = frames(
+      [0, 35, 51], [0, 36, 52], [1000, 37, 53], [1000, 38, 54], [2000, 39, 55]
+    );
+    expect(positionAt(track, 0)).toEqual([52, 36]);
+    expect(playedCoordinates(track, 0)).toEqual([[51, 35], [52, 36]]);
+    expect(positionAt(track, 1000)).toEqual([54, 38]);
+    expect(playedCoordinates(track, 1000)).toEqual([[51, 35], [52, 36], [53, 37], [54, 38]]);
+    expect(positionAt(track, 1500)).toEqual([54.5, 38.5]);
+  });
+
   it("places a single-frame trace exactly on that frame", () => {
     const single = frames([1000, 35.7, 51.4]);
     expect(positionAt(single, 1000)).toEqual([51.4, 35.7]);

@@ -118,7 +118,7 @@ export function timelineBounds(frames: readonly PlaybackFrame[]): TimelineBounds
 export function positionAt(frames: readonly PlaybackFrame[], ms: number): MapPosition | null {
   const first = frames[0];
   if (!first) return null;
-  if (ms <= first.ms) return ms === first.ms ? [first.lon, first.lat] : null;
+  if (ms < first.ms) return null;
 
   const last = frames[frames.length - 1]!;
   if (ms >= last.ms) return [last.lon, last.lat];
@@ -130,6 +130,14 @@ export function positionAt(frames: readonly PlaybackFrame[], ms: number): MapPos
     const previous = frames[index - 1]!;
     const current = frames[index]!;
     if (ms > current.ms) continue;
+    // The played prefix includes every fix at this instant. Use its last fix
+    // for the head as well, or the marker detaches from the end of the line.
+    if (ms === current.ms) {
+      let lastAtInstant = index;
+      while (lastAtInstant + 1 < frames.length && frames[lastAtInstant + 1]!.ms === ms) lastAtInstant++;
+      const fix = frames[lastAtInstant]!;
+      return [fix.lon, fix.lat];
+    }
     const span = current.ms - previous.ms;
     // Identical timestamps are possible (two devices fixing at the same instant), and dividing by zero
     // would put `NaN` in the geometry.
