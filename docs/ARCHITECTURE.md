@@ -6,7 +6,7 @@ Borobiya is a single-process Bun application. `Bun.serve` handles HTTP and WebSo
 
 `src/server/core` contains infrastructure primitives: strict validators, typed errors, deterministic LRU caches, password and cookie helpers, configuration, token-bucket rate limiting, HTTP response helpers, a declarative router, safe static file serving and the WebSocket hub built on `Bun.serve` upgrades. These modules depend only on Bun and the shared protocol.
 
-`src/server/domain` contains pure rules: geometry, state transitions, catalogs and deterministic SVG vector tiles. It does not import the database, services or Bun-specific modules. Geometry helpers are re-exported from `src/shared/geo.ts` so browser and server agree on coordinate conversion, distance, staleness and visible tile ranges.
+`src/server/domain` contains pure rules: geometry, state transitions, catalogs and deterministic SVG vector tiles. It does not import the database, services or Bun-specific modules. Server services import the shared geometry helpers from `src/shared/geo.ts` directly, so browser and server agree on coordinate conversion, distance, staleness and visible tile ranges; `domain/geo.ts` keeps only the server-side tile primitives.
 
 `src/server/db` contains one SQLite schema, a typed repository and `UnitOfWork`. The repository owns SQL, event appending, event filtering and transaction execution. `UnitOfWork` wraps every state-changing use case: it opens a SQLite transaction, appends durable events inside that transaction, commits, and only then publishes those events through the WebSocket hub. A failed transaction publishes nothing.
 
