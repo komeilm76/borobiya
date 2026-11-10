@@ -106,6 +106,67 @@ describe("active rescuer mission route picker", () => {
     } finally { scope.stop(); }
   });
 
+  it("drops the incident and route at a JWT session switch before the displayed profile catches up", async () => {
+    const bearer = (sub: string, sessionId: string, revision = 0) =>
+      `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub, sessionId, revision }))}.signature`;
+    const owner = ref("rescuer");
+    const token = ref(bearer("rescuer", "login-a"));
+    const getTarget = vi.fn(async () => target);
+    const getRoutes = vi.fn(async () => [route]);
+    const scope = effectScope();
+    const picker = scope.run(() => useMissionRoutes(token, owner, ref(mission), undefined, {
+      getTarget, getPosition: async () => from, getRoutes
+    }))!;
+    try {
+      await picker.open();
+      await picker.findRoutes();
+      expect(picker.target.value).toEqual(target);
+      expect(picker.selectedRoute.value).toEqual(route);
+
+      token.value = bearer("rescuer", "login-a", 1);
+      expect(picker.target.value).toEqual(target); // Routine bearer renewal is not a new login.
+      token.value = bearer("another-account", "login-b");
+      expect(picker.visible.value).toBe(false);
+      expect(picker.target.value).toBeNull();
+      expect(picker.selectedRoute.value).toBeNull();
+      await picker.open(); // Do not request an incident with a bearer for another account.
+      expect(getTarget).toHaveBeenCalledTimes(1);
+
+      token.value = bearer("rescuer", "login-b");
+      await picker.open();
+      await picker.findRoutes();
+      expect(picker.target.value).toEqual(target);
+      token.value = bearer("rescuer", "login-c");
+      expect(picker.target.value).toBeNull();
+      expect(picker.selectedRoute.value).toBeNull();
+    } finally { scope.stop(); }
+  });
+
+  it("aborts an in-flight route when the same account signs in with a different JWT session", async () => {
+    const bearer = (sessionId: string) =>
+      `eyJhbGciOiJIUzI1NiJ9.${btoa(JSON.stringify({ sub: "rescuer", sessionId }))}.signature`;
+    const token = ref(bearer("login-a"));
+    const delayed = deferred<typeof route[]>();
+    let routeSignal: AbortSignal | undefined;
+    const scope = effectScope();
+    const picker = scope.run(() => useMissionRoutes(token, ref("rescuer"), ref(mission), undefined, {
+      getTarget: async () => target,
+      getPosition: async () => from,
+      getRoutes: async (_from, _to, _profile, signal) => { routeSignal = signal; return delayed.promise; }
+    }))!;
+    try {
+      await picker.open();
+      const pending = picker.findRoutes();
+      await vi.waitFor(() => expect(routeSignal).toBeDefined());
+      token.value = bearer("login-b");
+      expect(routeSignal?.aborted).toBe(true);
+      expect(picker.target.value).toBeNull();
+      delayed.resolve([route]);
+      await pending;
+      expect(picker.routes.value).toEqual([]);
+    } finally { delayed.resolve([route]); scope.stop(); }
+  });
+
   it("aborts and ignores pending private replies on account switch without requiring a view reset", async () => {
     const scope = effectScope();
     const userId = ref<string | null>("rescuer");

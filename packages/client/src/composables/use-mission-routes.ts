@@ -4,6 +4,7 @@ import {
   getMissionNavigationTarget, getMissionRouteChoices, getMissionRoutePlan, type RouteChoice, type RoutePoint, type TransportProfile
 } from "@/api/mission-routing";
 import { decodeRoutePolyline } from "@/sos/route-preview";
+import { accountSessionKey } from "./device-identity";
 
 export interface MissionRoutingRuntime {
   getTarget?: typeof getMissionNavigationTarget;
@@ -45,6 +46,9 @@ export function useMissionRoutes(
   let generation = 0;
   let controller: AbortController | null = null;
   const selectedRoute = computed(() => routes.value[selectedIndex.value] ?? null);
+  // A renewed bearer in one login keeps the picker; a new login (even for the
+  // same account) or a bearer/profile mismatch revokes its private incident now.
+  const sessionKey = computed(() => accountSessionKey(userId.value, token.value));
 
   function invalidate(): number {
     controller?.abort();
@@ -68,12 +72,12 @@ export function useMissionRoutes(
     profile.value = "car";
   }
   // The caller may close its panel on navigation, but privacy must not depend on
-  // remembering to call reset. A new mission/account or a lost bearer immediately
-  // drops the previous incident, GPS origin and alternatives and aborts old work.
-  // A bearer refresh while still signed in keeps the same route picker open.
-  watch([userId, missionId, () => !!token.value], reset, { flush: "sync" });
+  // remembering to call reset. A new mission/account/login or mismatched bearer
+  // immediately drops the previous incident, GPS origin and alternatives.
+  // A bearer refresh in the same session keeps the route picker open.
+  watch([userId, missionId, sessionKey], reset, { flush: "sync" });
   async function open(): Promise<void> {
-    if (!missionId.value || !token.value || !userId.value) return;
+    if (!missionId.value || !sessionKey.value || !token.value || !userId.value) return;
     const mission = missionId.value;
     const owner = userId.value;
     const current = invalidate();
@@ -150,7 +154,7 @@ export function useMissionRoutes(
     const incident = target.value?.incident;
     const mission = missionId.value;
     const owner = userId.value;
-    if (!incident || !mission || !owner || !token.value || loading.value) return;
+    if (!incident || !mission || !owner || !sessionKey.value || !token.value || loading.value) return;
     const current = invalidate();
     const signal = (controller = new AbortController()).signal;
     // An explicit GPS refresh supersedes the old starting point immediately. If

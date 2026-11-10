@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: clear rescuer routes on JWT login replacement
+
+- The rescuer's mission route picker watched only whether the bearer was present, so replacing a JWT with another session (including a bearer for a different account while the displayed profile caught up) left the prior incident point, GPS origin and route visible. It now derives the same account/session identity used by other private composables, resets synchronously when that identity changes or mismatches, and refuses new target/route reads until the bearer matches. Routine bearer renewal within one session keeps the route. Focused regressions reproduced the stale incident before the fix and cover both an in-flight route abort and same-session continuity afterward. Browser/account-transition verification remains open.
+
 ### 2026-10-23 — Bug hunt: bound stalled routing and geocoding response bodies
 
 - The routing gateway bounded connecting to OSRM/Photon but waited without its own deadline when an upstream returned headers and then stalled mid-body. Both route planning and place searches could therefore remain pending despite the configured timeout, including with adapters that ignore fetch cancellation. The shared upstream reader now bounds the body read and reports a safe unreadable-upstream 502, without echoing private search text. Focused stalled-stream tests for both endpoints failed before the change and pass afterward. Live upstream/proxy timing remains unverified.
