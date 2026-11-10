@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: refuse project cleanup through a changed checkout parent
+
+- `vm.py clear-tools` checked the tool JAR and its parent directories only as far as the checkout root. Replacing an ancestor of the checkout with a symlink after the `CLEAR TOOLS` prompt redirected its final unlink to an unrelated JAR. The same guard protects `clear-caches`' browser-build deletion. It now rechecks every checkout ancestor as well as each project-local path before cleanup. A temporary-directory regression reproduced outside JAR deletion before the fix; it now refuses the changed path. No actual VM files were removed.
+
 ### 2026-10-23 — Bug hunt: protect map-cache cleanup when a library parent changes
 
 - After the cache plan was printed, a parent of `MAP_LIBRARY_DIR` could be replaced by a symlink before `--apply` confirmation. The deletion guard checked the library directory and target, but not ancestors above the library, so it could follow the new parent and delete unrelated `sources` content. Cleanup now rechecks every ancestor of each plan boundary before removing anything. A temporary-directory regression reproduced the outside deletion before the fix and now confirms it is refused; no live VM cleanup was run.

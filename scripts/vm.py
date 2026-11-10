@@ -437,8 +437,11 @@ def require_project_cache_path(path: Path) -> None:
         parts = path.relative_to(ROOT).parts
     except ValueError:
         fail(f"refusing project cache path outside checkout: {path}")
-    if ROOT.is_symlink():
-        fail(f"refusing symlinked project cache path: {ROOT}")
+    # The checkout's parent may change after the preview/confirmation too;
+    # checking only components *below* ROOT would then follow it outside.
+    for ancestor in (ROOT, *ROOT.parents):
+        if ancestor.is_symlink():
+            fail(f"refusing symlinked project cache path: {ancestor}")
     current = ROOT
     for part in parts:
         current = current / part

@@ -940,6 +940,61 @@ class OperationsTests(unittest.TestCase):
             self.assertEqual(extra.read_text(), "keep")
             self.assertEqual(protected.read_bytes(), b"external jar")
 
+    def test_clear_caches_refuses_checkout_parent_swapped_after_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            parent = base / "configured"
+            root = parent / "repo"
+            dist = root / "packages/client/dist"
+            dist.mkdir(parents=True)
+            (dist / "index.html").write_text("local build")
+            outside = base / "outside"
+            outside_dist = outside / "repo/packages/client/dist"
+            outside_dist.mkdir(parents=True)
+            protected = outside_dist / "index.html"
+            protected.write_text("external build")
+
+            def replace_checkout_parent(_phrase):
+                parent.rename(base / "old-configured")
+                parent.symlink_to(outside, target_is_directory=True)
+
+            with patch.object(vm, "ROOT", root), patch.object(vm, "run") as run, \
+                 patch.object(vm, "confirm", side_effect=replace_checkout_parent), \
+                 patch.object(vm, "vm_compose") as compose:
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_caches(True)
+                run.assert_called_once()  # preview only; do not run the apply cleaner
+                compose.assert_not_called()
+
+            self.assertEqual(protected.read_text(), "external build")
+
+    def test_clear_tools_refuses_checkout_parent_swapped_after_confirmation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            parent = base / "configured"
+            root = parent / "repo"
+            tools = root / "map-server/tools"
+            tools.mkdir(parents=True)
+            (tools / "planetiler-1.20.0.jar").write_bytes(b"local jar")
+            outside = base / "outside"
+            outside_tools = outside / "repo/map-server/tools"
+            outside_tools.mkdir(parents=True)
+            protected = outside_tools / "planetiler-1.20.0.jar"
+            protected.write_bytes(b"external jar")
+
+            def replace_checkout_parent(_phrase):
+                parent.rename(base / "old-configured")
+                parent.symlink_to(outside, target_is_directory=True)
+
+            with patch.object(vm, "ROOT", root), \
+                 patch.object(vm, "confirm", side_effect=replace_checkout_parent):
+                with self.assertRaisesRegex(SystemExit, "symlink"):
+                    vm.clear_tools(True)
+
+            self.assertEqual(protected.read_bytes(), b"external jar")
+            self.assertEqual((base / "old-configured/repo/map-server/tools/planetiler-1.20.0.jar")
+                             .read_bytes(), b"local jar")
+
     def test_backup_is_private_valid_pg_dump_and_refuses_overwrite(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "new.dump"
