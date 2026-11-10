@@ -724,6 +724,52 @@ class OperationsTests(unittest.TestCase):
                 stop_edge.assert_called()
                 compose.assert_called_once_with("up", "-d", "--no-build", "--pull", "never")
                 compose.reset_mock()
+                # A graph file can be regular while its profile directory is an external symlink.
+                # Strict offline launch must not mistake that for a verified library artifact.
+                with tempfile.TemporaryDirectory() as outside_directory:
+                    outside = Path(outside_directory)
+                    (outside / "borobiya.osrm").write_bytes(b"external graph")
+                    car = dataset / "routing/car"
+                    original = dataset / "routing/old-car"
+                    car.rename(original)
+                    car.symlink_to(outside, target_is_directory=True)
+                    try:
+                        with self.assertRaisesRegex(SystemExit, "symlink"):
+                            vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                        compose.assert_not_called()
+                    finally:
+                        car.unlink()
+                        original.rename(car)
+                # A malformed map slug must not turn the artifact checks into a
+                # probe of files in the library but outside the selected dataset.
+                values["MAP_REGION"] = "../borobiya"
+                for suffix in ("pmtiles", "osm.pbf", "source.json"):
+                    (library / "datasets" / f"borobiya.{suffix}").write_bytes(b"outside selected dataset")
+                (dataset / "routing/borobiya.osrm").write_bytes(b"outside profile")
+                with self.assertRaisesRegex(SystemExit, "MAP_REGION"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values["MAP_REGION"] = "borobiya"
+                # A lexical child of datasets can resolve to a different directory
+                # via '..'; requiring canonical paths makes the root check meaningful.
+                alias = str(dataset / ".." / dataset.name)
+                values.update({"MAP_DATASET_DIR": alias, "MAP_DATA_DIR": alias,
+                               "MAP_OSRM_DATA_DIR": f"{alias}/routing",
+                               "MAP_PHOTON_DATA_DIR": f"{alias}/geocoding"})
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": alias,
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
+                with self.assertRaisesRegex(SystemExit, "canonical"):
+                    vm.launch(SimpleNamespace(serve_only=True, offline=False))
+                compose.assert_not_called()
+                values.update({"MAP_DATASET_DIR": str(dataset), "MAP_DATA_DIR": str(dataset),
+                               "MAP_OSRM_DATA_DIR": str(dataset / "routing"),
+                               "MAP_PHOTON_DATA_DIR": str(dataset / "geocoding")})
+                (library / "current.json").write_text(json.dumps({"areas": ["ir-tehran"],
+                                                                   "datasetDir": str(dataset),
+                                                                   "snapshotDate": "2026-10-18",
+                                                                   "bbox": [51.0, 35.5, 51.7, 35.9]}))
                 # A seemingly complete dataset may still describe a different
                 # release/bbox to the browser or point outside the verified library.
                 values["MAP_BBOX"] = "0,0,1,1"

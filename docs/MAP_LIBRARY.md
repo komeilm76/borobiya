@@ -30,8 +30,9 @@ both fields against the saved selection (`pinned` means the repository's
 reviewed date), `.env`'s `MAP_SNAPSHOT`, and the active map pointer. It also
 compares `.env`'s `MAP_BBOX` numerically with the active pointer's union bbox;
 otherwise the gateway could advertise bounds for a different area. It refuses
-symlinked library paths/artifacts rather than serving outside the selected
-library. When `vm.py launch` completes the setup pipeline
+symlinked library paths/artifacts (including routing profile directories) and noncanonical
+library/dataset paths rather than serving outside the selected library. It also rejects a
+`MAP_REGION` value that is not one safe filename slug. When `vm.py launch` completes the setup pipeline
 for a saved `latest` selection, it also atomically saves that verified date to
 `.vm-map.json`; a failed setup leaves `latest` pending for retry. Ordinary
 re-runs keep the installed date **while its sources remain cached**. To request a

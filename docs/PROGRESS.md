@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: close strict offline map-artifact path escapes
+
+- `vm.py launch --serve-only` refused symlinked graph *files* and the routing root, but an intermediate `routing/car` directory could point outside the selected map library and still pass as a complete graph. A crafted `MAP_REGION` with `../` could also steer file checks outside the selected dataset; noncanonical dataset paths weakened the lexical root check. Offline verification now rejects symlinked routing profile directories, requires a safe single-segment map slug and canonical library/dataset paths before starting containers. Temporary-directory regressions reproduced the graph-symlink and path-alias passes before their guards. No live VM launch was run.
+
 ### 2026-10-23 — Bug hunt: include the newest fix in sampled history
 
 - The SQL history reader used a fixed stride that sometimes omitted the last recorded fix: for six rows at a three-point cap it returned rows 1, 3 and 5, so a completed replay could appear to stop before the actual end. Sampling now distributes slots across the ordered window, keeps both endpoints when the cap is at least two, takes the newest fix at a one-point cap, and still returns every row when the window fits. A PGlite regression executed the real generated query at caps 1, 2, 3, 4, 6 and 8; it failed before the fix and passes afterward. Production PostgreSQL/VM verification remains open.

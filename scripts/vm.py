@@ -254,6 +254,8 @@ def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> Non
         fail("active map dataset is missing; run launch while online first")
     if any(path.is_symlink() for path in (library, *library.parents, dataset, *dataset.parents)):
         fail("map library/dataset path traverses a symlink; run full launch to inspect it")
+    if library != library.resolve() or dataset != dataset.resolve():
+        fail("map library/dataset paths must be canonical; run full launch to inspect them")
     try:
         dataset.relative_to(library / "datasets")
     except ValueError:
@@ -280,6 +282,12 @@ def verify_serving_artifacts(env: dict[str, str], config: dict[str, str]) -> Non
     if not bbox_matches_pointer(env.get("MAP_BBOX"), pointer.get("bbox")):
         fail("MAP_BBOX differs from the active map pointer; rerun full launch")
     slug = env.get("MAP_REGION", "borobiya")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
+        fail("MAP_REGION must be a single lowercase map slug; refusing paths outside the dataset")
+    # The graph file can be regular even when its profile directory is a symlink
+    # out of the verified library. The routing root is checked above via MAP_OSRM_DATA_DIR.
+    if any((dataset / "routing" / profile).is_symlink() for profile in ("car", "bicycle", "foot")):
+        fail("routing graph path traverses a symlink; run full launch to inspect it")
     files = [dataset / f"{slug}.pmtiles", dataset / f"{slug}.osm.pbf",
              dataset / f"{slug}.source.json",
              *(dataset / "routing" / profile / f"{slug}.osrm" for profile in ("car", "bicycle", "foot"))]
