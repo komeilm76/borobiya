@@ -298,7 +298,7 @@ describe('SOS composer submission', () => {
 });
 
 describe('SOS composer photo', () => {
-  it('attaches a photo the browser can read and shows the preview', async () => {
+  it('shows the compression pipeline error instead of attaching an unreadable image', async () => {
     stubApi();
     const { wrapper } = await render();
     // Walk to the photo step (step 3).
@@ -308,19 +308,16 @@ describe('SOS composer photo', () => {
 
     const input = wrapper.find('#sos-photo');
     expect(input.exists()).toBe(true);
+    // happy-dom has no image decoder, so the pipeline fails and the view must say so —
+    // and must not smuggle an uncompressed data URL into the draft.
     const file = new File([new Uint8Array([1, 2, 3, 4])], 'scene.png', { type: 'image/png' });
     Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
     await input.trigger('change');
-    // FileReader is asynchronous; let the onload handler run.
-    await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 20));
     await flushPromises();
 
     const draft = useSosStore().draft;
-    expect(draft.photoDataUrl).toMatch(/^data:/);
-    const preview = wrapper.find('img[alt="پیش‌نمایش عکس"]');
-    expect(preview.exists()).toBe(true);
-    expect(preview.attributes('src')).toBe(draft.photoDataUrl!);
+    expect(draft.photoDataUrl ?? null).toBe(null);
+    expect(wrapper.text()).toContain('عکس پیوست نشد');
     wrapper.unmount();
   });
 
@@ -338,16 +335,7 @@ describe('SOS composer photo', () => {
     wrapper.unmount();
   });
 
-  it('stores no photo when the browser reads the file with no result', async () => {
-    class NullResultFileReader {
-      result: string | null = null;
-      onload: (() => void) | null = null;
-      readAsDataURL() {
-        // The read "succeeds" but yields no data (corrupt image, aborted read).
-        this.onload?.();
-      }
-    }
-    vi.stubGlobal('FileReader', NullResultFileReader);
+  it('stores no photo when the chosen image cannot be processed at all', async () => {
     stubApi();
     const { wrapper } = await render();
     await writeDescription(wrapper, 'دود غلیظ از پنجره طبقه سوم');
@@ -358,7 +346,7 @@ describe('SOS composer photo', () => {
     Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
     await input.trigger('change');
     await flushPromises();
-    // An empty result must not become "data:undefined" in the draft.
+    // A failed pipeline must not become "data:undefined" in the draft.
     expect(useSosStore().draft.photoDataUrl).toBe(null);
     wrapper.unmount();
   });

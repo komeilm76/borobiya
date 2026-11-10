@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { VAlert, VBtn, VTextarea } from 'vuetify/components';
 import { useSosStore } from '@/stores/sos.ts';
@@ -9,6 +9,7 @@ import { useToast } from '@/composables/useToast.ts';
 import { errorMessage } from '@/api/client.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { toPersianDigits } from '@shared/geo.ts';
+import { compressImageFile, ImageProcessingError, SERVER_DATA_URL_LIMIT, type ImageErrorCode } from '@/utils/image.ts';
 
 /**
  * Four-step SOS composer: severity and incident type, location confirmation, optional photo,
@@ -39,15 +40,51 @@ function seedLocation(): void {
   sos.draft.accuracy = fix.accuracy;
 }
 
+const photoState = ref<'idle' | 'processing' | 'error'>('idle');
+const photoError = ref<string | null>(null);
+
+/** Maps the compressor's stable error codes onto actionable Persian messages. */
+function photoErrorMessage(code: ImageErrorCode | undefined): string {
+  switch (code) {
+    case 'unsupported-type': return 'این قالب تصویر پشتیبانی نمی‌شود؛ عکس JPEG، PNG یا WebP انتخاب کنید.';
+    case 'empty-file': return 'فایل انتخابی خالی است؛ عکس دیگری انتخاب کنید.';
+    case 'source-too-large': return 'حجم عکس انتخابی بیش از حد مجاز است.';
+    case 'decode-failed': return 'خواندن تصویر ممکن نشد؛ ممکن است فایل آسیب دیده باشد.';
+    case 'canvas-unavailable': return 'این مرورگر امکان فشرده‌سازی تصویر ندارد.';
+    default: return 'فشرده‌سازی تصویر به نتیجه نرسید؛ عکس دیگری انتخاب کنید.';
+  }
+}
+
+/**
+ * Reads the picked file through the compression pipeline and attaches the result.
+ *
+ * A raw phone frame is far larger than the 160,000-character data URL the server accepts, so the
+ * browser decodes, downscales and re-encodes it as JPEG first; nothing reaches the draft until the
+ * compressed payload passes the same limit the server enforces.
+ */
 async function onPhoto(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
+  // Allow picking the same file again after a failure or a removal.
+  input.value = '';
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    sos.draft.photoDataUrl = String(reader.result ?? '') || null;
-  };
-  reader.readAsDataURL(file);
+  photoState.value = 'processing';
+  photoError.value = null;
+  try {
+    const result = await compressImageFile(file);
+    sos.draft.photoDataUrl = result.dataUrl;
+    photoState.value = 'idle';
+  } catch (caught) {
+    sos.draft.photoDataUrl = null;
+    photoState.value = 'error';
+    photoError.value = caught instanceof ImageProcessingError ? photoErrorMessage(caught.code) : photoErrorMessage(undefined);
+  }
+}
+
+function removePhoto(): void {
+  sos.draft.photoDataUrl = null;
+  photoState.value = 'idle';
+  photoError.value = null;
 }
 
 /**
@@ -58,6 +95,11 @@ async function onPhoto(event: Event): Promise<void> {
 const DESCRIPTION_MIN = 10;
 
 async function submit(): Promise<void> {
+  if (sos.draft.photoDataUrl && sos.draft.photoDataUrl.length > SERVER_DATA_URL_LIMIT) {
+    // Defence in depth: the pipeline already caps this, so reaching here means something bypassed it.
+    sos.error = 'حجم عکس پیوست‌شده از حد مجاز بیشتر است؛ عکس را حذف کنید و دوباره انتخاب کنید.';
+    return;
+  }
   const description = sos.draft.description.trim();
   if (description.length < DESCRIPTION_MIN) {
     // Persian digits, like every other message in the app.
@@ -146,15 +188,28 @@ async function submit(): Promise<void> {
     <template v-else-if="draft.step === 3">
       <div class="sos-section">
         <div class="sos-label">عکس اختیاری</div>
-        <label class="photo-drop" for="sos-photo">
+        <label class="photo-drop" :class="{ 'is-processing': photoState === 'processing' }" for="sos-photo">
           <img v-if="draft.photoDataUrl" :src="draft.photoDataUrl" alt="پیش‌نمایش عکس">
+          <template v-else-if="photoState === 'processing'">
+            <span class="mdi mdi-loading is-spinning" aria-hidden="true" />
+            <strong>در حال فشرده‌سازی عکس…</strong>
+            <span>چند لحظه صبر کنید.</span>
+          </template>
+          <template v-else-if="photoState === 'error'">
+            <span class="mdi mdi-alert-circle-outline" aria-hidden="true" />
+            <strong>عکس پیوست نشد</strong>
+            <span>{{ photoError }}</span>
+            <small>برای تلاش دوباره روی همین‌جا بزنید.</small>
+          </template>
           <template v-else>
             <span class="mdi mdi-camera-outline" aria-hidden="true" />
             <strong>افزودن عکس از صحنه</strong>
-            <span>عکس به درخواست امداد پیوست می‌شود.</span>
+            <span>عکس پیش از ارسال فشرده می‌شود.</span>
           </template>
         </label>
-        <input id="sos-photo" type="file" accept="image/*" capture="environment" hidden @change="onPhoto">
+        <input id="sos-photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" hidden :disabled="photoState === 'processing'" @change="onPhoto">
+        <button v-if="draft.photoDataUrl" type="button" class="text-link" @click="removePhoto">حذف عکس</button>
+        <p v-if="photoState !== 'error' && photoError" class="sheet__status">{{ photoError }}</p>
       </div>
     </template>
 
