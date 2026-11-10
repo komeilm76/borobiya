@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useMapStore } from '@/stores/map.ts';
 import { useSosStore } from '@/stores/sos.ts';
 import { useFormatters } from '@/composables/useFormatters.ts';
-import { visibleTileRange, worldCoordinate } from '@shared/geo.ts';
+import { coordinateFromWorld, visibleTileRange, worldCoordinate } from '@shared/geo.ts';
 
 /**
  * Deterministic vector map surface. Tiles come from the same in-process SVG renderer the
@@ -24,11 +24,35 @@ const zoom = computed(() => map.zoom);
 const center = computed(() => map.center);
 
 const TILE_SIZE = 256;
-const VIEW_WIDTH = 393;
-const VIEW_HEIGHT = 852;
+/** Fallback viewport until the frame is measured; the frame is min(393px,100vw) by min(852px,100vh). */
+const view = ref({ width: 393, height: 852 });
+const root = ref<HTMLElement | null>(null);
+let resizeObserver: ResizeObserver | null = null;
+
+function measure(): void {
+  const el = root.value;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0) view.value = { width: rect.width, height: rect.height };
+}
+
+onMounted(() => {
+  measure();
+  if (typeof ResizeObserver === 'function' && root.value) {
+    resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(root.value);
+  }
+});
+onUnmounted(() => {
+  resizeObserver?.disconnect();
+  resizeObserver = null;
+});
+
+const width = computed(() => view.value.width);
+const height = computed(() => view.value.height);
 
 const tiles = computed(() => {
-  const { xMin, xMax, yMin, yMax, centerX, centerY } = visibleTileRange(center.value, zoom.value, VIEW_WIDTH, VIEW_HEIGHT, TILE_SIZE);
+  const { xMin, xMax, yMin, yMax, centerX, centerY } = visibleTileRange(center.value, zoom.value, width.value, height.value, TILE_SIZE);
   const output: Array<{ key: string; url: string; left: number; top: number }> = [];
   const max = 2 ** zoom.value;
   for (let x = xMin; x <= xMax; x++) {
@@ -37,8 +61,8 @@ const tiles = computed(() => {
       output.push({
         key: `${zoom.value}/${x}/${y}`,
         url: `/_public/map/tiles/${zoom.value}/${x}/${y}.svg`,
-        left: x * TILE_SIZE - centerX + VIEW_WIDTH / 2,
-        top: y * TILE_SIZE - centerY + VIEW_HEIGHT / 2
+        left: x * TILE_SIZE - centerX + width.value / 2,
+        top: y * TILE_SIZE - centerY + height.value / 2
       });
     }
   }
@@ -49,24 +73,42 @@ const markers = computed(() => {
   const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
   const place = (latitude: number, longitude: number) => {
     const world = worldCoordinate(latitude, longitude, zoom.value);
-    return { x: world.x - origin.x + VIEW_WIDTH / 2, y: world.y - origin.y + VIEW_HEIGHT / 2 };
+    return { x: world.x - origin.x + width.value / 2, y: world.y - origin.y + height.value / 2 };
   };
+  const manualPin = sos.draft.isManual || sos.placementArmed ? { ...place(sos.draft.latitude, sos.draft.longitude) } : null;
+
   return {
     self: map.ownFix ? place(map.ownFix.latitude, map.ownFix.longitude) : null,
     search: map.searchPin ? { label: map.searchPin.label, ...place(map.searchPin.latitude, map.searchPin.longitude) } : null,
     places: map.places.map((item) => ({ id: item.id, label: item.label, icon: item.icon, ...place(item.latitude, item.longitude) })),
     peers: map.peers.map((item) => ({ id: item.userId, label: item.username ?? item.userId, ...place(item.latitude, item.longitude) })),
+    incident: manualPin,
     requests: sos.requests
       .filter((item) => item.status === 'pending' || item.status === 'dispatched')
       .map((item) => ({ id: item.id, label: item.incidentLabel, ...place(item.latitude, item.longitude) }))
   };
 });
 
+const placing = computed(() => sos.placementArmed);
+
+/** Converts a click on the canvas into a geographic point and drops the incident pin. */
+function onTap(event: MouseEvent): void {
+  if (!sos.placementArmed) return;
+  const el = root.value;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const px = event.clientX - rect.left;
+  const py = event.clientY - rect.top;
+  const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
+  const world = { x: origin.x - width.value / 2 + px, y: origin.y - height.value / 2 + py };
+  sos.placeManualLocation(coordinateFromWorld(world.x, world.y, zoom.value));
+}
+
 const scaleLabel = computed(() => format.distance(250));
 </script>
 
 <template>
-  <div class="map-canvas" role="img" aria-label="نقشه شهر" data-testid="map-canvas">
+  <div ref="root" class="map-canvas" :class="{ 'is-placing': placing }" role="img" aria-label="نقشه شهر" data-testid="map-canvas" @click="onTap">
     <div class="map-tiles">
       <img
         v-for="tile in tiles"
@@ -99,6 +141,15 @@ const scaleLabel = computed(() => format.distance(250));
         :title="peer.label"
       >
         <span class="mdi mdi-account" aria-hidden="true" />
+      </span>
+      <span
+        v-if="markers.incident"
+        class="map-marker map-marker--incident-pin"
+        :style="{ insetInlineStart: `${markers.incident.x}px`, insetBlockStart: `${markers.incident.y}px` }"
+        :title="'موقعیت ثبت‌شده حادثه'"
+        data-testid="incident-pin"
+      >
+        <span class="mdi mdi-alarm-light" aria-hidden="true" />
       </span>
       <span
         v-if="markers.search"
@@ -134,6 +185,7 @@ const scaleLabel = computed(() => format.distance(250));
 
 <style scoped>
 .map-canvas { position: absolute; inset: 0; overflow: hidden; background: var(--map-land); }
+.map-canvas.is-placing { cursor: crosshair; }
 .map-tiles img { position: absolute; inline-size: 256px; block-size: 256px; will-change: transform; }
 .map-markers { position: absolute; inset: 0; pointer-events: none; }
 .map-marker {
@@ -151,6 +203,7 @@ const scaleLabel = computed(() => format.distance(250));
 .map-marker--place { background: var(--info); }
 .map-marker--peer { background: var(--primary); }
 .map-marker--incident { background: var(--danger); }
+.map-marker--incident-pin { background: var(--danger); outline: 3px dashed rgba(255,255,255,.85); outline-offset: 2px; }
 .map-marker--search { background: var(--info); }
 .user-marker { position: absolute; translate: -50% -50%; display: grid; place-items: center; }
 .user-marker__accuracy {

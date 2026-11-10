@@ -30,6 +30,8 @@ export const useSosStore = defineStore('sos', () => {
   const requests = ref<SosView[]>([]);
   const missions = ref<MissionView[]>([]);
   const draft = ref<SosDraft>(createDraft());
+  /** True while the next map tap should drop the incident pin for a manual location. */
+  const placementArmed = ref(false);
   const loading = ref(false);
   const submitting = ref(false);
   const error = ref<string | null>(null);
@@ -83,6 +85,29 @@ export const useSosStore = defineStore('sos', () => {
   /** Resets the composer, optionally seeding it with the current fix. */
   function resetDraft(fix?: { latitude: number; longitude: number; accuracy: number }): void {
     draft.value = { ...createDraft(), incidentTypeId: incidentTypes.value[0]?.id ?? '', ...(fix ?? {}) };
+    placementArmed.value = false;
+  }
+
+  /** Arms tap-to-place for the SOS composer (step 2). */
+  function armPlacement(): void {
+    placementArmed.value = true;
+  }
+
+  /** Cancels tap-to-place without touching the draft. */
+  function disarmPlacement(): void {
+    placementArmed.value = false;
+  }
+
+  /**
+   * Drops the incident pin at a tapped point. A manual pin carries no honest GPS accuracy,
+   * so the wire value becomes 0 (coarsest the API accepts) alongside `isManual: true`.
+   */
+  function placeManualLocation(point: { latitude: number; longitude: number }): void {
+    draft.value.latitude = point.latitude;
+    draft.value.longitude = point.longitude;
+    draft.value.accuracy = 0;
+    draft.value.isManual = true;
+    placementArmed.value = false;
   }
 
   /** Moves the composer forward one step. */
@@ -183,7 +208,11 @@ export const useSosStore = defineStore('sos', () => {
     activeRequest,
     activeMission,
     activeMissionId,
+    placementArmed,
     stepTotal,
+    armPlacement,
+    disarmPlacement,
+    placeManualLocation,
     load,
     loadDetail,
     resetDraft,

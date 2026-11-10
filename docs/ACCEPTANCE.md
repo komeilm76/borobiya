@@ -36,7 +36,7 @@ This checklist maps the original technical specification and roadmap targets to 
 
 ## SOS, missions and dispatch
 
-- [x] Four-step SOS composition includes description, location, optional compressed photo and review. The photo is validated (JPEG/PNG/WebP, 15 MB ceiling), downscaled and re-encoded as JPEG in the browser against the server's 160,000-character data-url cap, with a retryable error state.
+- [x] Four-step SOS composition includes description, location, optional compressed photo and review. The location step supports a manual incident pin: tap-to-place on the map with a dashed incident marker, a manual flag carried to the review and responder surfaces, and a recovery action back to GPS. The photo is validated (JPEG/PNG/WebP, 15 MB ceiling), downscaled and re-encoded as JPEG in the browser against the server's 160,000-character data-url cap, with a retryable error state.
 - [x] SOS creation, cancellation reasons, dispatch, acceptance, mission progress, completion and one-time rating are implemented.
 - [x] SOS and mission state machines reject impossible transitions and expose stage indices.
 - [x] Nearest responders, group selection, dispatch board data and administrator exports are implemented. The dispatch board now calls `GET /_admin/sos/:id/nearest`, shows distance/rating/readiness, and requires an explicit active, staffed group plus explicit member selection before dispatch.

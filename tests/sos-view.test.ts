@@ -202,6 +202,42 @@ describe('SOS composer location', () => {
     wrapper.unmount();
   });
 
+  it('arms tap-to-place, records a manual pin and disarms itself', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await writeDescription(wrapper, 'دود غلیظ از پنجره طبقه سوم');
+    await advance(wrapper);
+
+    const pin = wrapper.find('[data-testid="manual-placement"]');
+    expect(pin.exists()).toBe(true);
+    await pin.trigger('click');
+    expect(useSosStore().placementArmed).toBe(true);
+    expect(wrapper.text()).toContain('روی نقشه ضربه بزنید');
+
+    // Arm then leave the step: the arm must not survive onto another step.
+    useSosStore().placeManualLocation({ latitude: 35.7, longitude: 51.4 });
+    await flushPromises();
+    expect(useSosStore().placementArmed).toBe(false);
+    const draft = useSosStore().draft;
+    expect(draft.isManual).toBe(true);
+    expect(draft.accuracy).toBe(0);
+    expect(wrapper.text()).toContain('موقعیت دستی');
+    wrapper.unmount();
+  });
+
+  it('disarms placement when navigating away from step 2', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await writeDescription(wrapper, 'دود غلیظ از پنجره طبقه سوم');
+    await advance(wrapper);
+    await wrapper.find('[data-testid="manual-placement"]').trigger('click');
+    expect(useSosStore().placementArmed).toBe(true);
+    await advance(wrapper); // back through to step 3 via the ادامه button
+    expect(useSosStore().draft.step).toBe(3);
+    expect(useSosStore().placementArmed).toBe(false);
+    wrapper.unmount();
+  });
+
   it('leaves the previous coordinates alone when there is no fix yet', async () => {
     stubApi();
     const { wrapper } = await render();

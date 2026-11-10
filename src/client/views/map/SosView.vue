@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { VAlert, VBtn, VTextarea } from 'vuetify/components';
 import { useSosStore } from '@/stores/sos.ts';
@@ -38,7 +38,19 @@ function seedLocation(): void {
   sos.draft.latitude = fix.latitude;
   sos.draft.longitude = fix.longitude;
   sos.draft.accuracy = fix.accuracy;
+  sos.draft.isManual = false;
 }
+
+/** Arms (or cancels) tap-to-place for a manual incident pin. Disarms itself once placed. */
+function togglePlacement(): void {
+  if (sos.placementArmed) sos.disarmPlacement();
+  else sos.armPlacement();
+}
+
+// Leaving step 2 must never leave the canvas armed: a stale arm turns an innocent tap
+// on the map into a moved incident report.
+watch(() => draft.value.step, (step) => { if (step !== 2) sos.disarmPlacement(); });
+onUnmounted(() => sos.disarmPlacement());
 
 const photoState = ref<'idle' | 'processing' | 'error'>('idle');
 const photoError = ref<string | null>(null);
@@ -176,12 +188,18 @@ async function submit(): Promise<void> {
     <template v-else-if="draft.step === 2">
       <div class="sos-section">
         <div class="sos-label">موقعیت دقیق حادثه</div>
-        <div class="location-preview">
+        <div class="location-preview" :class="{ 'is-manual': draft.isManual }">
           <span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" />
           <strong>{{ format.number(draft.latitude.toFixed(4)) }} ، {{ format.number(draft.longitude.toFixed(4)) }}</strong>
-          <span>دقت {{ format.distance(draft.accuracy) }}</span>
+          <span v-if="draft.isManual">موقعیت دستی روی نقشه ثبت شده است</span>
+          <span v-else>دقت {{ format.distance(draft.accuracy) }}</span>
         </div>
-        <VBtn variant="tonal" block class="mt-2" @click="seedLocation">استفاده از موقعیت کنونی</VBtn>
+        <VBtn v-if="draft.isManual" variant="tonal" block class="mt-2" @click="seedLocation">بازگردانی به موقعیت کنونی</VBtn>
+        <VBtn v-else variant="tonal" block class="mt-2" @click="seedLocation">استفاده از موقعیت کنونی</VBtn>
+        <VBtn variant="outlined" block class="mt-2" :class="{ 'placement-armed': sos.placementArmed }" data-testid="manual-placement" @click="togglePlacement">
+          {{ sos.placementArmed ? 'انصراف از تعیین دستی' : 'تعیین دستی موقعیت روی نقشه' }}
+        </VBtn>
+        <p v-if="sos.placementArmed" class="sheet__status" role="status">روی نقشه ضربه بزنید تا موقعیت حادثه ثبت شود.</p>
       </div>
     </template>
 
@@ -220,7 +238,7 @@ async function submit(): Promise<void> {
           <div><span>نوع حادثه</span><strong>{{ incident?.label ?? 'سایر' }}</strong></div>
           <div><span>شدت</span><strong>{{ severity?.label ?? 'متوسط' }}</strong></div>
           <div><span>شرح</span><strong>{{ draft.description || '—' }}</strong></div>
-          <div><span>موقعیت</span><strong>{{ format.number(draft.latitude.toFixed(4)) }} و {{ format.number(draft.longitude.toFixed(4)) }}</strong></div>
+          <div><span>موقعیت</span><strong>{{ format.number(draft.latitude.toFixed(4)) }} و {{ format.number(draft.longitude.toFixed(4)) }}{{ draft.isManual ? ' (دستی)' : '' }}</strong></div>
         </div>
       </div>
     </template>

@@ -29,6 +29,41 @@ interface Seed {
   sos?: (sos: ReturnType<typeof useSosStore>) => void;
 }
 
+/** A point at the rendered frame's centre must round-trip to the store centre. */
+describe('manual placement', () => {
+  it('ignores taps while not armed', async () => {
+    const before = { latitude: 35.7219, longitude: 51.3347 };
+    const { wrapper, sos } = await render({ map: (map) => { map.center = { ...before }; map.zoom = 14; } });
+    const canvas = wrapper.find('[data-testid="map-canvas"]');
+    await canvas.trigger('click', { clientX: 100, clientY: 100 });
+    expect(sos.draft.isManual).toBe(false);
+    expect(sos.draft.latitude).toBeCloseTo(35.7219, 6);
+    wrapper.unmount();
+  });
+
+  it('drops the incident pin where the user taps when armed', async () => {
+    const { wrapper, sos } = await render({ map: (map) => { map.center = { latitude: 35.7219, longitude: 51.3347 }; map.zoom = 16; } });
+    // jsdom reports a zero rect, so the tap point is used verbatim as canvas pixels.
+    sos.armPlacement();
+    await flushPromises();
+    const canvas = wrapper.find('[data-testid="map-canvas"]');
+    // Tapping the exact centre of the frame must land on the current centre coordinate.
+    await canvas.trigger('click', { clientX: 393 / 2, clientY: 852 / 2 });
+    expect(sos.draft.isManual).toBe(true);
+    expect(sos.placementArmed).toBe(false);
+    expect(sos.draft.latitude).toBeCloseTo(35.7219, 3);
+    expect(sos.draft.longitude).toBeCloseTo(51.3347, 3);
+    expect(sos.draft.accuracy).toBe(0);
+    wrapper.unmount();
+  });
+
+  it('renders the manual incident pin while armed or placed', async () => {
+    const { wrapper } = await render({ sos: (sos) => { sos.draft.isManual = true; sos.draft.latitude = 35.7219; sos.draft.longitude = 51.3347; } });
+    expect(wrapper.find('[data-testid="incident-pin"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
 /** Mounts the canvas against freshly seeded stores. */
 async function render(seed: Seed = {}) {
   const pinia = createPinia();

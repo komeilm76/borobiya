@@ -250,7 +250,8 @@ async function confirmMissionCancel(): Promise<void> {
           <span class="status-pill status-pill--danger">{{ SEVERITY_LABEL[offer.severity] }}</span>
         </div>
         <ul class="offer-facts">
-          <li><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> دقت {{ format.distance(offer.accuracy) }}</li>
+          <li v-if="!offer.isManual"><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> دقت {{ format.distance(offer.accuracy) }}</li>
+          <li v-else><span class="mdi mdi-pencil-outline" aria-hidden="true" /> موقعیت دستی (بدون دقت GPS)</li>
           <li v-if="offerDistance(offer) !== null"><span class="mdi mdi-map-marker-distance" aria-hidden="true" /> فاصله {{ format.distance(offerDistance(offer)!) }}</li>
           <li v-if="offer.isManual" class="offer-facts__manual"><span class="mdi mdi-pencil-outline" aria-hidden="true" /> موقعیت توسط درخواست‌کننده دستی ثبت شده است</li>
           <li v-if="offer.requesterUsername"><span class="mdi mdi-account" aria-hidden="true" /> درخواست‌کننده: {{ offer.requesterUsername }}</li>
