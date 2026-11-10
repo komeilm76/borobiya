@@ -51,10 +51,15 @@ const SOS_DETAIL = {
  * `sos: false` models an account with no request at all; the mission is separate because the list
  * keeps them apart too.
  */
-function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string; acceptFails?: boolean } = {}) {
+const CANCELLATION_REASONS = [
+  { id: 'cancel_mistake', label: 'اشتباه بود', requiresText: false },
+  { id: 'cancel_other', label: 'سایر', requiresText: true }
+];
+
+function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string; acceptFails?: boolean; cancelFails?: boolean; progressFails?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   const mission = options.mission === undefined
-    ? { id: 'mis_1', sosId: 'sos_1', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
+    ? { id: 'mis_1', sosId: 'sos_1', responderId: 'usr_self', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
     : options.mission;
 
   vi.stubGlobal(
@@ -64,6 +69,20 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
       const path = url.split('?')[0];
       const method = init?.method ?? 'GET';
       calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+
+      if (options.cancelFails && path === '/_user/sos/sos_1/cancel' && method === 'POST') {
+        return new Response(
+          JSON.stringify({ ok: false, requestId: 'r', error: { code: 'CONFLICT', message: 'این درخواست دیگر قابل لغو نیست.' } }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        );
+      }
+
+      if (options.progressFails && path === '/_user/missions/mis_1/progress' && method === 'POST') {
+        return new Response(
+          JSON.stringify({ ok: false, requestId: 'r', error: { code: 'CONFLICT', message: 'این مأموریت دیگر قابل لغو نیست.' } }),
+          { status: 409, headers: { 'content-type': 'application/json' } }
+        );
+      }
 
       if (options.acceptFails && path === '/_user/sos/sos_1/accept' && method === 'POST') {
         return new Response(
@@ -83,6 +102,7 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
       if (path === '/_user/sos') data = { items: options.sos === false ? [] : [SOS_LIST_ITEM] };
       else if (path === '/_user/missions') data = { items: mission ? [mission] : [] };
       else if (path === '/_user/sos/sos_1') data = SOS_DETAIL;
+      else if (path === '/_public/cancellation-reasons') data = { items: CANCELLATION_REASONS };
 
       return new Response(JSON.stringify({ ok: true, requestId: 'req_mis', data }), {
         status: 200,
@@ -99,7 +119,7 @@ function stubApi(options: { mission?: Record<string, unknown> | null; sos?: bool
  * The shell (`MapLayout`) is what normally calls `sos.load()`; mounting the view on its own would
  * otherwise render the empty state for every scenario and prove nothing.
  */
-async function render(options: { role?: 'user' | 'responder' | 'admin' } = {}) {
+async function render(options: { role?: 'user' | 'responder' | 'admin'; userId?: string } = {}) {
   const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
   await router.push({ name: ROUTE_NAMES.mission });
   await router.isReady();
@@ -108,7 +128,7 @@ async function render(options: { role?: 'user' | 'responder' | 'admin' } = {}) {
   if (options.role) {
     useAuthStore().$patch({
       user: {
-        id: 'usr_self',
+        id: options.userId ?? 'usr_self',
         username: 'reza.m',
         role: options.role,
         isActive: true,
@@ -354,6 +374,103 @@ describe('responder offer', () => {
     const { wrapper } = await render({ role: 'user' });
     expect(wrapper.find('[data-testid="mission-offer"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="mission-offer-accept"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+
+describe('cancellation', () => {
+  it('lets the requester cancel with a catalog reason and posts it', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    await wrapper.find('[data-testid="cancel-request"]').trigger('click');
+    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_mistake');
+    // No detail required for this reason; the confirm button must arm on the reason alone.
+    const confirm = wrapper.find('[data-testid="confirm-cancel-request"]');
+    expect(confirm.attributes('disabled')).toBeUndefined();
+    await confirm.trigger('click');
+    await flushPromises();
+
+    const call = calls.find((entry) => entry.path === '/_user/sos/sos_1/cancel');
+    expect(call?.body).toEqual({ reasonId: 'cancel_mistake' });
+    expect(useToast().messages.value.some((message) => message.message === 'درخواست امداد لغو شد.')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('demands a 10-character detail for reasons that require one', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    await wrapper.find('[data-testid="cancel-request"]').trigger('click');
+    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_other');
+    // Nine characters are not enough — the server would refuse with 400.
+    await wrapper.find('[data-testid="cancel-detail"]').setValue('فقط نه');
+    const confirm = wrapper.find('[data-testid="confirm-cancel-request"]');
+    expect(confirm.attributes('disabled')).toBeDefined();
+
+    await wrapper.find('[data-testid="cancel-detail"]').setValue('تعداد کاراکترها کافی است');
+    expect(wrapper.find('[data-testid="confirm-cancel-request"]').attributes('disabled')).toBeUndefined();
+    await wrapper.find('[data-testid="confirm-cancel-request"]').trigger('click');
+    await flushPromises();
+
+    const call = calls.find((entry) => entry.path === '/_user/sos/sos_1/cancel');
+    expect(call?.body.detail).toBe('تعداد کاراکترها کافی است');
+    wrapper.unmount();
+  });
+
+  it('surfaces a conflict instead of pretending the cancellation landed', async () => {
+    stubApi({ cancelFails: true });
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    await wrapper.find('[data-testid="cancel-request"]').trigger('click');
+    await wrapper.find('[data-testid="cancel-reason"]').setValue('cancel_mistake');
+    await wrapper.find('[data-testid="confirm-cancel-request"]').trigger('click');
+    await flushPromises();
+
+    const messages = useToast().messages.value;
+    expect(messages.some((message) => message.message.includes('دیگر قابل لغو نیست'))).toBe(true);
+    expect(messages.some((message) => message.message === 'درخواست امداد لغو شد.')).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('hides the requester cancellation from someone else entirely', async () => {
+    stubApi();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_somebody_else' });
+    expect(wrapper.find('[data-testid="cancel-request"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('lets the assigned responder cancel the mission with an optional note', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render({ role: 'responder' });
+    await wrapper.find('[data-testid="cancel-mission"]').trigger('click');
+    await wrapper.find('[data-testid="mission-cancel-note"]').setValue('امکان حضور در صحنه را ندارم');
+    await wrapper.find('[data-testid="confirm-cancel-mission"]').trigger('click');
+    await flushPromises();
+
+    const call = calls.find((entry) => entry.path === '/_user/missions/mis_1/progress');
+    expect(call?.body).toEqual({ action: 'cancel', note: 'امکان حضور در صحنه را ندارم' });
+    expect(useToast().messages.value.some((message) => message.message === 'مأموریت لغو شد.')).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('reports a refused mission cancellation without clearing the screen state', async () => {
+    stubApi({ progressFails: true });
+    const { wrapper } = await render({ role: 'responder' });
+    await wrapper.find('[data-testid="cancel-mission"]').trigger('click');
+    await wrapper.find('[data-testid="confirm-cancel-mission"]').trigger('click');
+    await flushPromises();
+
+    const messages = useToast().messages.value;
+    expect(messages.some((message) => message.message.includes('دیگر قابل لغو نیست'))).toBe(true);
+    expect(messages.some((message) => message.message === 'مأموریت لغو شد.')).toBe(false);
+    // The mission is not finished; the cancel affordance must still be there after the refusal.
+    expect(wrapper.find('[data-testid="cancel-mission"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('hides the mission cancellation from a user who is not the assignee', async () => {
+    stubApi();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    expect(wrapper.find('[data-testid="cancel-mission"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });

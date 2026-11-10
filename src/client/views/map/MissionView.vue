@@ -112,6 +112,93 @@ async function rate(value: number): Promise<void> {
     toast.push(errorMessage(caught), 'error', 3800);
   }
 }
+
+/**
+ * Cancellation: two distinct server paths, kept distinct in the UI.
+ *
+ * The requester cancels their own SOS through the catalog endpoint (`/_user/sos/:id/cancel`),
+ * which requires a catalog reason and — when the reason says so — a written detail of at least
+ * 10 characters. The mission cancellation rides the mission state machine
+ * (`/_user/missions/:id/progress`), takes only an optional free-text note, and exists for the
+ * responder who cannot or will not take the mission any further. Both reload from the server
+ * afterwards, so the screen never shows a locally-invented state.
+ */
+const CANCELLABLE_REQUEST_STATUSES = new Set<string>([SOS_STATUS.PENDING, SOS_STATUS.DISPATCHED, SOS_STATUS.ACCEPTED, SOS_STATUS.IN_PROGRESS]);
+const CANCELLABLE_MISSION_STATUSES = new Set<string>([MISSION_STATUS.ON_THE_WAY, MISSION_STATUS.ARRIVED, MISSION_STATUS.IN_PROGRESS]);
+
+const cancelTarget = ref<'request' | 'mission' | null>(null);
+const requestReasonId = ref('');
+const requestDetail = ref('');
+const missionNote = ref('');
+const cancelling = ref(false);
+
+const selectedReason = computed(() => sos.cancellationReasons.find((reason) => reason.id === requestReasonId.value) ?? null);
+const requestDetailRequired = computed(() => Boolean(selectedReason.value?.requiresText));
+
+const canCancelRequest = computed(() => {
+  const current = request.value;
+  const user = auth.user;
+  if (!current || !user) return false;
+  if (!CANCELLABLE_REQUEST_STATUSES.has(current.status)) return false;
+  return current.requesterId === user.id || user.role === ROLES.ADMIN;
+});
+
+const canCancelMission = computed(() => {
+  const current = mission.value;
+  const user = auth.user;
+  if (!current || !user) return false;
+  if (!CANCELLABLE_MISSION_STATUSES.has(current.status)) return false;
+  return current.responderId === user.id || user.role === ROLES.ADMIN;
+});
+
+/** Mirror of the server rule: 10+ trimmed characters when the reason demands a detail. */
+const requestDetailValid = computed(() => {
+  if (!requestDetailRequired.value) return true;
+  return requestDetail.value.trim().length >= 10;
+});
+
+const canConfirmRequestCancel = computed(() => Boolean(requestReasonId.value) && requestDetailValid.value && !cancelling.value);
+
+function openCancel(target: 'request' | 'mission'): void {
+  cancelTarget.value = target;
+  requestReasonId.value = '';
+  requestDetail.value = '';
+  missionNote.value = '';
+}
+
+async function confirmRequestCancel(): Promise<void> {
+  const current = request.value;
+  if (!current || !canConfirmRequestCancel.value) return;
+  cancelling.value = true;
+  const detail = requestDetail.value.trim();
+  try {
+    await sos.cancel(current.id, requestReasonId.value, detail || undefined);
+    toast.push('درخواست امداد لغو شد.', 'success', 2600);
+  } catch (caught) {
+    // A conflict means the server already moved on (e.g. completed meanwhile); the reload
+    // inside the store repaints the truth either way.
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    cancelling.value = false;
+    cancelTarget.value = null;
+  }
+}
+
+async function confirmMissionCancel(): Promise<void> {
+  const current = mission.value;
+  if (!current || cancelling.value) return;
+  cancelling.value = true;
+  const note = missionNote.value.trim();
+  try {
+    await sos.progress(current.id, 'cancel', note || undefined);
+    toast.push('مأموریت لغو شد.', 'success', 2600);
+  } catch (caught) {
+    toast.push(errorMessage(caught), 'error', 3800);
+  } finally {
+    cancelling.value = false;
+    cancelTarget.value = null;
+  }
+}
 </script>
 
 <template>
@@ -170,6 +257,35 @@ async function rate(value: number): Promise<void> {
           <small>{{ format.dateTime(entry.createdAt) }}</small>
         </li>
       </ul>
+      <div v-if="canCancelRequest" class="cancel-block">
+        <button v-if="cancelTarget !== 'request'" type="button" class="danger-button" data-testid="cancel-request" @click="openCancel('request')">
+          <span class="mdi mdi-close-circle" aria-hidden="true" />
+          <span>لغو درخواست امداد</span>
+        </button>
+        <div v-else class="cancel-panel" data-testid="cancel-request-panel" role="group" aria-label="لغو درخواست امداد">
+          <strong>لغو درخواست امداد</strong>
+          <label class="cancel-panel__field">
+            <span>دلیل لغو</span>
+            <select v-model="requestReasonId" data-testid="cancel-reason">
+              <option value="">انتخاب کنید…</option>
+              <option v-for="reason in sos.cancellationReasons" :key="reason.id" :value="reason.id">{{ reason.label }}</option>
+            </select>
+          </label>
+          <label class="cancel-panel__field" :class="{ 'is-required': requestDetailRequired }">
+            <span>توضیحات{{ requestDetailRequired ? ' (الزامی، حداقل ۱۰ نویسه)' : ' (اختیاری)' }}</span>
+            <textarea v-model="requestDetail" rows="2" data-testid="cancel-detail" placeholder="کوتاه و روشن بنویسید…" />
+          </label>
+          <div class="action-row">
+            <button type="button" class="danger-button" :disabled="!canConfirmRequestCancel" data-testid="confirm-cancel-request" @click="confirmRequestCancel">
+              <span class="mdi mdi-check" aria-hidden="true" />
+              <span>{{ cancelling ? 'در حال لغو…' : 'تأیید لغو' }}</span>
+            </button>
+            <button type="button" class="ghost-button" data-testid="abort-cancel-request" @click="cancelTarget = null">
+              <span>بازگشت</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <template v-if="mission">
@@ -195,6 +311,28 @@ async function rate(value: number): Promise<void> {
         </button>
       </div>
       <p v-if="mission.rating" class="sheet__status">امتیاز ثبت‌شده: {{ format.number(mission.rating) }} از ۵</p>
+      <div v-if="canCancelMission" class="cancel-block">
+        <button v-if="cancelTarget !== 'mission'" type="button" class="danger-button" data-testid="cancel-mission" @click="openCancel('mission')">
+          <span class="mdi mdi-close-circle" aria-hidden="true" />
+          <span>لغو مأموریت</span>
+        </button>
+        <div v-else class="cancel-panel" data-testid="cancel-mission-panel" role="group" aria-label="لغو مأموریت">
+          <strong>لغو مأموریت</strong>
+          <label class="cancel-panel__field">
+            <span>یادداشت برای درخواست‌کننده (اختیاری)</span>
+            <textarea v-model="missionNote" rows="2" data-testid="mission-cancel-note" placeholder="مثلاً چرا امکان رسیدگی ندارید…" />
+          </label>
+          <div class="action-row">
+            <button type="button" class="danger-button" :disabled="cancelling" data-testid="confirm-cancel-mission" @click="confirmMissionCancel">
+              <span class="mdi mdi-check" aria-hidden="true" />
+              <span>{{ cancelling ? 'در حال لغو…' : 'تأیید لغو مأموریت' }}</span>
+            </button>
+            <button type="button" class="ghost-button" data-testid="abort-cancel-mission" @click="cancelTarget = null">
+              <span>بازگشت</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <p v-if="!request && !mission" class="sheet__status">هنوز درخواستی ندارید. با دکمه SOS درخواست تازه بسازید.</p>

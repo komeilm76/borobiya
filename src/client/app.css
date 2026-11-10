@@ -714,3 +714,8 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .offer-facts .mdi { color: var(--muted); }
 .offer-facts__manual { color: var(--warning); font-weight: 600; }
 .offer-facts__manual .mdi { color: var(--warning); }
+.cancel-block { display: grid; gap: 8px; margin-block-start: 10px; }
+.cancel-panel { display: grid; gap: 10px; padding: 12px; border: 1px solid rgba(175,52,56,.35); border-radius: var(--r16); background: rgba(175,52,56,.06); }
+.cancel-panel__field { display: grid; gap: 6px; font-size: 13px; }
+.cancel-panel__field select, .cancel-panel__field textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--r8); padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; }
+.cancel-panel__field.is-required span { color: var(--danger); font-weight: 700; }
