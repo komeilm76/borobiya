@@ -90,8 +90,11 @@ def is_present(path: Path) -> bool:
 
 def validate_components(path: Path, boundary: Path) -> None:
     """Require a lexical child of boundary and reject symlinks in its path."""
-    if boundary.is_symlink():
-        raise RuntimeError(f"refusing to clear through symlink boundary: {boundary}")
+    # A parent may have been swapped for a symlink after the preview (or
+    # confirmation), even when the boundary itself remains a real directory.
+    for component in (boundary, *boundary.parents):
+        if component.is_symlink():
+            raise RuntimeError(f"refusing to clear through symlink boundary: {component}")
     try:
         relative = path.relative_to(boundary)
     except ValueError as error:

@@ -112,6 +112,28 @@ class ClearMapCacheTests(unittest.TestCase):
 
             self.assertEqual(protected.read_bytes(), b"do not delete")
 
+    def test_apply_refuses_library_parent_replaced_by_symlink_after_preview(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary)
+            parent = base / "configured"
+            library = parent / "library"
+            repo = base / "repo"
+            (library / "sources").mkdir(parents=True)
+            (library / "sources" / "source.pbf").write_bytes(b"managed cache")
+            plan = clear_map_cache.build_cache_plan(library, repo)
+
+            outside = base / "outside"
+            (outside / "library" / "sources").mkdir(parents=True)
+            protected = outside / "library" / "sources" / "source.pbf"
+            protected.write_bytes(b"do not delete")
+            parent.rename(base / "old-configured")
+            parent.symlink_to(outside, target_is_directory=True)
+
+            with self.assertRaises(RuntimeError):
+                clear_map_cache.apply_cache_plan(plan)
+
+            self.assertEqual(protected.read_bytes(), b"do not delete")
+
     def test_library_with_only_unknown_files_is_preserved(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             base = Path(temporary)

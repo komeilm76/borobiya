@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: protect map-cache cleanup when a library parent changes
+
+- After the cache plan was printed, a parent of `MAP_LIBRARY_DIR` could be replaced by a symlink before `--apply` confirmation. The deletion guard checked the library directory and target, but not ancestors above the library, so it could follow the new parent and delete unrelated `sources` content. Cleanup now rechecks every ancestor of each plan boundary before removing anything. A temporary-directory regression reproduced the outside deletion before the fix and now confirms it is refused; no live VM cleanup was run.
+
 ### 2026-10-23 — Bug hunt: never re-date cached GPS coordinates when live sharing restarts
 
 - VueUse's paused geolocation watch retains its last `coords`. Starting broadcast again treated that cached coordinate as a fresh fix, and the stationary heartbeat could send it with a new timestamp even minutes later; a late callback processed after Stop could also appear to belong to the next Start. Broadcast now waits for a coordinate callback after Start, rejects callbacks whose VueUse observation timestamp predates the current watch, clears observation state on pause/rejection, and handles coordinate/error changes synchronously so a Stop→Start in one tick cannot reclassify an old callback. A synchronous GPS-resume exception now rejects cleanly and allows retry instead of leaving the broadcaster stuck in Connecting. Focused regressions for stale restart, the same-tick callback and bridge failure failed before their fixes; first-Start preload is covered too. A real-device GPS restart check remains open.
