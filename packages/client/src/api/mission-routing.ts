@@ -46,6 +46,9 @@ export async function getMissionNavigationTarget(token: string, missionId: strin
 
 export type RoutePoint = { lat: number; lon: number };
 
+/** Keep a stalled proxy or unreadable body from holding the rescuer's route picker indefinitely. */
+export const MISSION_ROUTE_DEADLINE_MS = 15_000;
+
 /** Same-origin local routing only. Endpoints are fixed; optimization may reorder intermediate stops. */
 export async function getMissionRoutePlan(
   from: RoutePoint, to: RoutePoint, profile: TransportProfile, via: RoutePoint[], optimize: boolean,
@@ -59,15 +62,45 @@ export async function getMissionRoutePlan(
     ...(via.length ? { via: via.map((point) => coordinatesSchema.parse(point)) } : {}),
     ...(optimize ? { optimize: true } : { alternatives: 2 })
   };
-  const response = await fetch("/route", {
-    method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
-    credentials: "same-origin", body: JSON.stringify(request), signal
-  });
-  if (!response.ok) {
-    if (response.status === 422) throw new Error("NO_ROUTE");
-    throw new Error("ROUTING_UNAVAILABLE");
+  if (signal?.aborted) throw new DOMException("Route request cancelled", "AbortError");
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let rejectPending: ((reason: DOMException) => void) | null = null;
+  const onAbort = () => {
+    controller.abort();
+    rejectPending?.(new DOMException("Route request cancelled", "AbortError"));
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+  let parsed: z.infer<typeof routesResponseSchema>;
+  try {
+    const deadline = new Promise<never>((_, reject) => {
+      rejectPending = reject;
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("ROUTING_UNAVAILABLE"));
+      }, MISSION_ROUTE_DEADLINE_MS);
+    });
+    // A caller may cancel between the initial check and listener registration.
+    if (signal?.aborted) onAbort();
+    parsed = await Promise.race([
+      (async () => {
+        const response = await fetch("/route", {
+          method: "POST", headers: { "content-type": "application/json", accept: "application/json" },
+          credentials: "same-origin", body: JSON.stringify(request), signal: controller.signal
+        });
+        if (!response.ok) {
+          if (response.status === 422) throw new Error("NO_ROUTE");
+          throw new Error("ROUTING_UNAVAILABLE");
+        }
+        return routesResponseSchema.parse(await response.json());
+      })(),
+      deadline
+    ]);
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    rejectPending = null;
+    signal?.removeEventListener("abort", onAbort);
   }
-  const parsed = routesResponseSchema.parse(await response.json());
   if (parsed.profile !== profile) throw new Error("ROUTING_UNAVAILABLE");
   const expected = Array.from({ length: via.length + 2 }, (_, index) => index);
   const order = parsed.order ?? expected;

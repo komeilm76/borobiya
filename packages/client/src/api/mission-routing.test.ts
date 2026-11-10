@@ -6,7 +6,7 @@ const from = { lat: 35.68, lon: 51.38 };
 const to = { lat: 35.7, lon: 51.4 };
 const reply = { profile: "bicycle", routes: [{ distance_m: 1420, duration_s: 300,
   polyline: "_p~iF~ps|U_ulLnnqC", legs: [] }], waypoints: [] };
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("mission navigation APIs", () => {
   it("fetches the exact rescuer-scoped target with bearer and validates coordinates", async () => {
@@ -63,6 +63,49 @@ describe("mission navigation APIs", () => {
       await expect(getMissionRouteChoices(from, to, "bicycle")).rejects.toThrow();
     }
   });
+  it("ends a stalled route connection even if fetch ignores its abort signal", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    }));
+    const outcome = getMissionRouteChoices(from, to, "car").then(() => "unexpected success", (error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([outcome, Promise.resolve("still pending")])).toBe("ROUTING_UNAVAILABLE");
+  });
+
+  it("ends a route response stalled after headers and does not wait forever for JSON", async () => {
+    vi.useFakeTimers();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+        controller.enqueue(new TextEncoder().encode('{"profile":"car"'));
+      } }));
+    }));
+    const outcome = getMissionRouteChoices(from, to, "car").then(() => "unexpected success", (error: Error) => error.message);
+    await vi.advanceTimersByTimeAsync(15_001);
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([outcome, Promise.resolve("still pending")])).toBe("ROUTING_UNAVAILABLE");
+  });
+
+  it("drops a caller-aborted route promptly even when fetch does not settle", async () => {
+    const caller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>(() => {});
+    }));
+    const outcome = getMissionRouteChoices(from, to, "car", caller.signal)
+      .then(() => "unexpected success", (error: Error) => error.name);
+    caller.abort();
+    expect(requestSignal?.aborted).toBe(true);
+    expect(await Promise.race([outcome, new Promise((resolve) => setTimeout(() => resolve("still pending"), 500))]))
+      .toBe("AbortError");
+  });
+
   it("reports no route separately from an unavailable gateway", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 422 })));
     await expect(getMissionRouteChoices(from, to, "car")).rejects.toThrow("NO_ROUTE");

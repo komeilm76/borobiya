@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: bound rescuer route requests across stalled proxies
+
+- The rescuer's mission route picker called `/route` without a deadline. A proxy that never finished connecting or stopped sending the JSON body could leave the planner loading indefinitely, even if an adapter ignored the caller's abort signal. The route API now aborts the transport and races both headers and body parsing against a 15-second deadline; a caller cancellation still ends promptly, and normal no-route errors remain distinct. Focused API regressions reproduced both stalls and ignored cancellation before the fix and pass afterward. Real browser/proxy timeout behavior remains unverified.
+
 ### 2026-10-23 — Bug hunt: clear rescuer routes on JWT login replacement
 
 - The rescuer's mission route picker watched only whether the bearer was present, so replacing a JWT with another session (including a bearer for a different account while the displayed profile caught up) left the prior incident point, GPS origin and route visible. It now derives the same account/session identity used by other private composables, resets synchronously when that identity changes or mismatches, and refuses new target/route reads until the bearer matches. Routine bearer renewal within one session keeps the route. Focused regressions reproduced the stale incident before the fix and cover both an in-flight route abort and same-session continuity afterward. Browser/account-transition verification remains open.
