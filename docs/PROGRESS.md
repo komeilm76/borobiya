@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: do not zoom into a stationary playback track
+
+- Multiple history fixes at the same coordinate created a zero-size `trackBounds` extent, yet the view still called `fitBounds` and zoomed into that building. A stationary track now returns no camera bounds just like a single fix; the existing view fallback centers that point without changing zoom. A focused pure playback test failed before the fix and passes now. Rendered-map acceptance remains open.
+
 ### 2026-10-23 — Bug hunt: keep history playback head on the played route at duplicate timestamps
 
 - When multiple recorded fixes shared one observation timestamp, the played prefix already included all of them, but `positionAt` returned the first fix at that instant. The map head could jump backward off the end of the route, including at the beginning of a trace. Playback now uses the final fix at an exact duplicate timestamp, preserving interpolation between distinct instants. A pure playback regression for duplicate fixes at the start and middle of a trace failed before the fix and now passes; rendered map verification remains open.

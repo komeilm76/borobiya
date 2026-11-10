@@ -250,9 +250,9 @@ export function emptyCollection(): OverlayCollection {
 /**
  * The extent of a trace, for framing the camera on load.
  *
- * `null` for an empty track *and* for a single point: `fitBounds` on a zero-area box is how a map ends up
- * zoomed to max level inside one building, and the caller already has a better answer for one fix — move
- * the camera there at the current zoom.
+ * `null` for an empty track or a stationary one: `fitBounds` on a zero-size box is how a map ends up
+ * zoomed inside one building, and the caller already has a better answer — move the camera
+ * to that coordinate at the current zoom.
  */
 export function trackBounds(frames: readonly PlaybackFrame[]): [MapPosition, MapPosition] | null {
   if (frames.length < 2) return null;
@@ -266,6 +266,7 @@ export function trackBounds(frames: readonly PlaybackFrame[]): [MapPosition, Map
     minLat = Math.min(minLat, frame.lat);
     maxLat = Math.max(maxLat, frame.lat);
   }
+  if (minLon === maxLon && minLat === maxLat) return null;
   return [[minLon, minLat], [maxLon, maxLat]];
 }
 

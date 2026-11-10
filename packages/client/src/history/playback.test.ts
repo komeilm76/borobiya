@@ -211,6 +211,10 @@ describe("trackBounds", () => {
     expect(trackBounds(frames([0, 35, 51]))).toBeNull();
   });
 
+  it("does not fit a zero-size extent when several fixes share one location", () => {
+    expect(trackBounds(frames([0, 35, 51], [1000, 35, 51], [2000, 35, 51]))).toBeNull();
+  });
+
   it("returns the southwest and northeast corners in map order", () => {
     const bounds = trackBounds(frames([0, 35, 51], [1000, 36, 52], [2000, 35.5, 50]));
     expect(bounds).toEqual([[50, 35], [52, 36]]);
