@@ -172,6 +172,15 @@ describe("UserMapView live overlay", () => {
     expect(view).toContain(':show-return-to-track="userControlledCamera && playback.frames.value.length > 0"');
   });
 
+  it("refits history after geometry or viewport changes and when MapLibre replaces the map", () => {
+    const camera = body("frameCamera");
+    expect(camera).toContain("historyCameraKey(");
+    expect(camera).toContain("playback.boundsForMap.value");
+    expect(camera).toContain("instance.getCanvas()");
+    expect(body("onMapReady")).toMatch(/if \(map\.value !== instance\) \{\s*fittedFor = null;/);
+    expect(body("onMapReady")).toMatch(/if \(map\.value !== instance\) \{[\s\S]*?userControlledCamera\.value = false;/);
+  });
+
   it("updates visible-bbox results on map moveend but preserves the list after selecting a POI", () => {
     expect(body("onMapReady")).toContain('instance.on("moveend", onMapMoveEnd)');
     expect(view.slice(view.indexOf("onBeforeUnmount("))).toContain('instance.off("moveend", onMapMoveEnd)');

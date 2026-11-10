@@ -1,3 +1,24 @@
+import type { MapPosition } from "@/map/overlay-sync";
+import type { PlaybackFrame } from "./playback";
+
+/** Camera-fit identity includes visible geometry and canvas size, not only timestamps.
+ * Two history reads may have identical timestamps/counts but different positions, and a
+ * resize may change the useful map corridor without changing phone/tablet breakpoints.
+ */
+export function historyCameraKey(
+  frames: readonly PlaybackFrame[],
+  bounds: [MapPosition, MapPosition] | null,
+  padding: ReturnType<typeof historyCameraPadding>,
+  viewport: { width: number; height: number }
+): string {
+  const first = frames[0];
+  const last = frames[frames.length - 1];
+  return JSON.stringify([
+    first?.ms, last?.ms, frames.length, bounds,
+    first?.lon, first?.lat, padding, viewport.width, viewport.height
+  ]);
+}
+
 /** Reserve space for the controls that actually cover each map layout. */
 export function historyCameraPadding(compact: boolean, phoneHeight?: number): { top: number; bottom: number; left: number; right: number } {
   if (phoneHeight !== undefined) {

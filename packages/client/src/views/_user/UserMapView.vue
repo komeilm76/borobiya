@@ -333,7 +333,7 @@ import { mapStyleForTheme } from "@/components/map/map-canvas-options";
 import { shareSessionKey } from "@/sharing/share-submission-fence";
 import { useHistoryPlayback } from "@/composables/use-history-playback";
 import { historyPlaybackStyle } from "@/history/playback";
-import { historyCameraPadding } from "@/history/camera-padding";
+import { historyCameraKey, historyCameraPadding } from "@/history/camera-padding";
 import { planPlaybackRemoval, planPlaybackSync, type PlaybackPaintSnapshot } from "@/history/playback-map-sync";
 import { LIVE_BOTTOM_LAYER_ID, liveCompanionsStyle } from "@/live/companion-locations";
 import { planOverlayRemoval, planOverlaySync, pointsOverlay, type OverlayOp } from "@/map/overlay-sync";
@@ -1564,13 +1564,17 @@ function frameCamera(): void {
   const track = playback.frames.value;
   if (!instance || journey.point.value || track.length === 0 || userControlledCamera.value) return;
   const compact = window.matchMedia("(max-width: 1023px)").matches;
-  const key = `${track[0]!.ms}:${track[track.length - 1]!.ms}:${track.length}:${compact}:${isPhone.value}`;
+  const bounds = playback.boundsForMap.value;
+  // The canvas may shrink within one breakpoint (e.g. phone rotation), and a
+  // refreshed history can have new geometry with the same timestamps/count.
+  const padding = historyCameraPadding(compact, isPhone.value ? window.innerHeight : undefined);
+  const canvas = instance.getCanvas();
+  const key = historyCameraKey(track, bounds, padding,
+    { width: canvas.clientWidth, height: canvas.clientHeight });
   if (fittedFor === key) return;
   fittedFor = key;
-  const bounds = playback.boundsForMap.value;
   if (bounds) {
     // Tablet controls are in flow; phone chrome and SOS sit over the full-screen canvas.
-    const padding = historyCameraPadding(compact, isPhone.value ? window.innerHeight : undefined);
     instance.fitBounds(bounds, { padding, maxZoom: 15, duration: 700 });
     return;
   }
@@ -1904,6 +1908,8 @@ function onMapReady(instance: MapLibreMap, MarkerClass: typeof Marker): void {
   // A replacement or reloaded basemap may carry new sources under familiar IDs.
   lastPlaybackPaint = null;
   if (map.value !== instance) {
+    fittedFor = null; // The new MapLibre instance has not received this track's camera fit.
+    userControlledCamera.value = false; // A gesture on the old instance cannot control the new one.
     map.value?.off("click", ROUTE_ALT_LAYER, onAlternativeRouteClick);
     detachHold?.(); detachHold = null;
     ownMarkerMotion.reset(); ownMarker?.remove(); ownMarker = null;

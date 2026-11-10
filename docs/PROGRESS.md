@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: refit history after geometry, viewport and map replacement changes
+
+- The history camera memo key contained only first/last timestamps, point count and broad phone/tablet flags. A reloaded trace with changed coordinates but the same timing/length could keep the old camera bounds; rotation or resizing inside a breakpoint reused stale padding/extent too. The key now includes track bounds (or stationary center), actual canvas dimensions and computed padding. Replacing the MapLibre instance also clears the prior fit and old-instance gesture lock so the new map can frame the track. A nonmounted view contract failed before the fix, and a pure key test covers changed geometry, viewport and padding. Rendered rotation/map-replacement verification remains open.
+
 ### 2026-10-23 — Bug hunt: do not zoom into a stationary playback track
 
 - Multiple history fixes at the same coordinate created a zero-size `trackBounds` extent, yet the view still called `fitBounds` and zoomed into that building. A stationary track now returns no camera bounds just like a single fix; the existing view fallback centers that point without changing zoom. A focused pure playback test failed before the fix and passes now. Rendered-map acceptance remains open.
