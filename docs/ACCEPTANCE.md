@@ -28,6 +28,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Deterministic offline SVG vector tiles replace Martin, Planetiler, PMTiles and MapLibre.
 - [x] Tile configuration, immutable ETags, content-versioned static assets and a bounded service-worker tile cache are implemented.
 - [x] Live location, bounded live/history sharing, revocation, expiry, snapshots and authorized history playback are implemented.
+- [x] Tapping the map selects a destination pin; the sheet shows coordinates and distance from the fix and saves it as a place; places are listed, edited inline and deleted from the profile screen.
 - [x] One authenticated WebSocket carries durable events, presence, live fixes, snapshots, sync, talk state and binary audio.
 - [x] Reconnect uses one-use tickets and an event cursor; durable events are committed before publication.
 - [x] Private APIs are never cached by the service worker; static assets and SVG tiles are cached explicitly.

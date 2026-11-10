@@ -57,6 +57,27 @@ describe('manual placement', () => {
     wrapper.unmount();
   });
 
+  it('selects a destination on tap when the SOS placement is not armed', async () => {
+    const { wrapper, map, sos } = await render({ map: (map) => { map.center = { latitude: 35.7219, longitude: 51.3347 }; map.zoom = 16; } });
+    expect(sos.placementArmed).toBe(false);
+    const canvas = wrapper.find('[data-testid="map-canvas"]');
+    await canvas.trigger('click', { clientX: 393 / 2, clientY: 852 / 2 });
+    expect(map.destinationPin).not.toBeNull();
+    expect(map.destinationPin!.latitude).toBeCloseTo(35.7219, 3);
+    expect(wrapper.find('[data-testid="destination-pin"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it('lets the SOS placement arm win over destination selection', async () => {
+    const { wrapper, map, sos } = await render({ map: (map) => { map.center = { latitude: 35.7219, longitude: 51.3347 }; map.zoom = 16; } });
+    sos.armPlacement();
+    const canvas = wrapper.find('[data-testid="map-canvas"]');
+    await canvas.trigger('click', { clientX: 393 / 2, clientY: 852 / 2 });
+    expect(sos.draft.isManual).toBe(true);
+    expect(map.destinationPin).toBeNull();
+    wrapper.unmount();
+  });
+
   it('renders the manual incident pin while armed or placed', async () => {
     const { wrapper } = await render({ sos: (sos) => { sos.draft.isManual = true; sos.draft.latitude = 35.7219; sos.draft.longitude = 51.3347; } });
     expect(wrapper.find('[data-testid="incident-pin"]').exists()).toBe(true);

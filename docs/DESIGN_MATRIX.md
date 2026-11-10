@@ -65,11 +65,11 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 |---|---|---|---|
 | navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). Search works since P1 (offline: saved places + config POIs). |
 | navigation/02-map-press-hold.png | partial | P2/H | Hold gesture works (0.8s, progress bar); SOS dock now bottom-left per approved decision 5 (DEV-04 resolved); quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
-| navigation/03-bookmark-form.png | missing | P2/M | Saved-places create UI absent (server CRUD + store exist). |
-| navigation/04-bookmark-saved.png | missing | P2/M | Saved-places list/manage UI absent. |
+| navigation/03-bookmark-form.png | partial | P2/M | Save-the-pin form implemented inline in the destination sheet (name, label, address, icon); the dedicated designed bookmark screen is not built. |
+| navigation/04-bookmark-saved.png | partial | P2/M | Profile screen lists saved places with inline edit (full PATCH payload incl. preserved rank) and delete; reorder UI remains API-only. |
 | navigation/05-search-open.png | done | P1/H | Real offline search: saved places + road POIs from the map configuration (projection-converted), Persian/Arabic-insensitive normalization, keyboard navigation (combobox semantics), loading/empty/error+retry states, result selection moves and zooms the map with a dedicated pin. |
-| navigation/06-destination-selected.png | missing | P2/H | No selected-destination sheet. |
-| navigation/07-destination-details.png | missing | P2/M | No destination detail sheet. |
+| navigation/06-destination-selected.png | partial | P2/H | Tapping the canvas selects a destination (pin + sheet panel: coordinates, distance from own fix, save-to-places inline form, clear). Designed name/address header, ETA and traffic chips, and the send/navigate actions need routing and share-to-companion plumbing — not built. |
+| navigation/07-destination-details.png | partial | P2/M | The destination panel doubles as the detail surface (coords, distance, save/clear); share-my-location-to-this-point and saved-place detail editing screens not built. |
 | navigation/08-trip-transport-selection.png | superseded | — | Turn-by-turn trip planning superseded (docs/ACCEPTANCE.md). |
 | navigation/09-manual-origin-selection.png | superseded | — | See above. |
 | navigation/10-route-options.png | superseded | — | See above. |

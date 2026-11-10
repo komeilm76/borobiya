@@ -235,6 +235,60 @@ describe('location and peers', () => {
   });
 });
 
+describe('selected destination', () => {
+  it('renders the panel with coordinates and the distance from my fix', async () => {
+    const { wrapper } = await render((map) => {
+      map.destinationPin = { latitude: 35.7219, longitude: 51.4047 };
+      map.ownFix = null;
+    });
+    const panel = wrapper.find('[data-testid="destination-panel"]');
+    expect(panel.exists()).toBe(true);
+    expect(panel.text()).toContain('مقصد انتخاب‌شده');
+    expect(panel.text()).toContain('۵۱.۴۰۴۷');
+    wrapper.unmount();
+  });
+
+  it('clears the selection from the panel', async () => {
+    const { wrapper } = await render((map) => {
+      map.destinationPin = { latitude: 35.7219, longitude: 51.4047 };
+    });
+    await wrapper.find('[data-testid="clear-destination"]').trigger('click');
+    expect(useMapStore().destinationPin).toBeNull();
+    expect(wrapper.find('[data-testid="destination-panel"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('saves the destination as a saved place and shows it in the list', async () => {
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const data = path === '/_user/places' && method === 'POST'
+        ? { id: 'plc_new', name: 'خانه مادر', label: 'خانه', latitude: 35.7219, longitude: 51.4047, address: 'خیابان انبار ۱۲', icon: 'home-outline', rank: 1 }
+        : { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const { wrapper } = await render((map) => {
+      map.destinationPin = { latitude: 35.7219, longitude: 51.4047 };
+    });
+    await wrapper.find('[data-testid="open-save-place"]').trigger('click');
+    await wrapper.find('.save-place-form input').setValue('خانه مادر');
+    await wrapper.findAll('.save-place-form input')[1].setValue('خانه');
+    await wrapper.findAll('.save-place-form input')[2].setValue('خیابان انبار ۱۲');
+    await wrapper.find('.save-place-form').trigger('submit');
+    await flushPromises();
+    const created = calls.find((call) => call.path === '/_user/places' && call.method === 'POST');
+    expect(created?.body).toMatchObject({ name: 'خانه مادر', label: 'خانه', address: 'خیابان انبار ۱۲', latitude: 35.7219, longitude: 51.4047 });
+    expect(useMapStore().places.some((place) => place.id === 'plc_new')).toBe(true);
+    vi.unstubAllGlobals();
+    wrapper.unmount();
+  });
+});
+
 describe('navigation', () => {
   it('starts a trip from the sheet footer', async () => {
     const { wrapper, router } = await render();

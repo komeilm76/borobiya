@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 import { defineStore } from 'pinia';
-import { errorMessage, get } from '@/api/client.ts';
+import { del, errorMessage, get, patch, post } from '@/api/client.ts';
 import type { LiveFixView, MapConfigView, SavedPlaceView, ShareView } from '@/api/types.ts';
 import { useGeolocation } from '@vueuse/core';
 
@@ -21,6 +21,8 @@ export const useMapStore = defineStore('map', () => {
   const center = ref({ latitude: 35.7219, longitude: 51.3347 });
   /** Where a search sent the map; rendered as a distinct pin until cleared. */
   const searchPin = ref<{ latitude: number; longitude: number; label: string | null } | null>(null);
+  /** The tapped destination; cleared explicitly or by saving/navigating away. */
+  const destinationPin = ref<{ latitude: number; longitude: number } | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -129,6 +131,41 @@ export const useMapStore = defineStore('map', () => {
     searchPin.value = null;
   }
 
+  /** Selects a destination on the map. */
+  function selectDestination(point: { latitude: number; longitude: number }): void {
+    destinationPin.value = { latitude: point.latitude, longitude: point.longitude };
+  }
+
+  /** Clears the selected destination. */
+  function clearDestination(): void {
+    destinationPin.value = null;
+  }
+
+  /** Saves the selected destination as a places entry; the server assigns the rank. */
+  async function saveDestination(input: { name: string; label: string; address: string; icon: string }): Promise<SavedPlaceView | null> {
+    const pin = destinationPin.value;
+    if (!pin) return null;
+    const place = await post<SavedPlaceView>('/_user/places', {
+      ...input, latitude: pin.latitude, longitude: pin.longitude
+    });
+    upsertPlace(place);
+    return place;
+  }
+
+  /** Updates a saved place; omitted rank is preserved by the server. */
+  async function updatePlace(place: SavedPlaceView, input: { name: string; label: string; address: string; icon: string }): Promise<void> {
+    await patch(`/_user/places/${encodeURIComponent(place.id)}`, {
+      ...input, latitude: place.latitude, longitude: place.longitude, rank: place.rank
+    });
+    upsertPlace({ ...place, ...input });
+  }
+
+  /** Deletes a saved place. */
+  async function deletePlace(placeId: string): Promise<void> {
+    await del(`/_user/places/${encodeURIComponent(placeId)}`);
+    removePlace(placeId);
+  }
+
   /** Adds or updates a saved place locally after a successful API call. */
   function upsertPlace(place: SavedPlaceView): void {
     places.value = [...places.value.filter((item) => item.id !== place.id), place].sort((a, b) => a.rank - b.rank);
@@ -162,6 +199,12 @@ export const useMapStore = defineStore('map', () => {
     stopLocation,
     focusOn,
     clearSearchPin,
+    destinationPin,
+    selectDestination,
+    clearDestination,
+    saveDestination,
+    updatePlace,
+    deletePlace,
     upsertPlace,
     removePlace
   };

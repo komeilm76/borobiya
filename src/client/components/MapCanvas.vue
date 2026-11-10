@@ -76,10 +76,12 @@ const markers = computed(() => {
     return { x: world.x - origin.x + width.value / 2, y: world.y - origin.y + height.value / 2 };
   };
   const manualPin = sos.draft.isManual || sos.placementArmed ? { ...place(sos.draft.latitude, sos.draft.longitude) } : null;
+  const destination = map.destinationPin ? place(map.destinationPin.latitude, map.destinationPin.longitude) : null;
 
   return {
     self: map.ownFix ? place(map.ownFix.latitude, map.ownFix.longitude) : null,
     search: map.searchPin ? { label: map.searchPin.label, ...place(map.searchPin.latitude, map.searchPin.longitude) } : null,
+    destination,
     places: map.places.map((item) => ({ id: item.id, label: item.label, icon: item.icon, ...place(item.latitude, item.longitude) })),
     peers: map.peers.map((item) => ({ id: item.userId, label: item.username ?? item.userId, ...place(item.latitude, item.longitude) })),
     incident: manualPin,
@@ -91,17 +93,27 @@ const markers = computed(() => {
 
 const placing = computed(() => sos.placementArmed);
 
-/** Converts a click on the canvas into a geographic point and drops the incident pin. */
-function onTap(event: MouseEvent): void {
-  if (!sos.placementArmed) return;
+/** Converts a click on the canvas into a geographic point. */
+function tapPoint(event: MouseEvent): { latitude: number; longitude: number } | null {
   const el = root.value;
-  if (!el) return;
+  if (!el) return null;
   const rect = el.getBoundingClientRect();
   const px = event.clientX - rect.left;
   const py = event.clientY - rect.top;
   const origin = worldCoordinate(center.value.latitude, center.value.longitude, zoom.value);
   const world = { x: origin.x - width.value / 2 + px, y: origin.y - height.value / 2 + py };
-  sos.placeManualLocation(coordinateFromWorld(world.x, world.y, zoom.value));
+  return coordinateFromWorld(world.x, world.y, zoom.value);
+}
+
+/** While the SOS composer is placing a manual pin it wins; otherwise every tap selects a destination. */
+function onTap(event: MouseEvent): void {
+  const point = tapPoint(event);
+  if (!point) return;
+  if (sos.placementArmed) {
+    sos.placeManualLocation(point);
+    return;
+  }
+  map.selectDestination(point);
 }
 
 const scaleLabel = computed(() => format.distance(250));
@@ -150,6 +162,15 @@ const scaleLabel = computed(() => format.distance(250));
         data-testid="incident-pin"
       >
         <span class="mdi mdi-alarm-light" aria-hidden="true" />
+      </span>
+      <span
+        v-if="markers.destination"
+        class="map-marker map-marker--destination"
+        :style="{ insetInlineStart: `${markers.destination.x}px`, insetBlockStart: `${markers.destination.y}px` }"
+        :title="'مقصد انتخاب‌شده'"
+        data-testid="destination-pin"
+      >
+        <span class="mdi mdi-map-marker-path" aria-hidden="true" />
       </span>
       <span
         v-if="markers.search"
@@ -205,6 +226,7 @@ const scaleLabel = computed(() => format.distance(250));
 .map-marker--incident { background: var(--danger); }
 .map-marker--incident-pin { background: var(--danger); outline: 3px dashed rgba(255,255,255,.85); outline-offset: 2px; }
 .map-marker--search { background: var(--info); }
+.map-marker--destination { background: var(--info); box-shadow: 0 0 0 4px rgba(40,110,160,.25); }
 .user-marker { position: absolute; translate: -50% -50%; display: grid; place-items: center; }
 .user-marker__accuracy {
   position: absolute;

@@ -754,3 +754,23 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 /* Manual incident-location placement in the SOS composer and the manual review flag. */
 .location-preview.is-manual { background: rgba(175,52,56,.08); border-radius: var(--r12); }
 .placement-armed { border-color: var(--danger) !important; color: var(--danger) !important; }
+
+/* Selected-destination panel and the save-place form on the map sheet. */
+.destination-card { display: grid; gap: 10px; padding: 12px; border-radius: var(--r16); background: var(--surface-2); border: 1px solid var(--border); margin-bottom: 12px; }
+.destination-card__head { display: flex; align-items: center; gap: 10px; }
+.destination-card__icon { font-size: 26px; color: var(--info); }
+.destination-card__head > div { flex: 1; display: grid; gap: 2px; }
+.destination-card__head small { color: var(--muted); font-size: 11.5px; }
+.save-place-form { display: grid; gap: 8px; }
+.save-place-form label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.save-place-form input[type="text"], .save-place-form input:not([type]) { min-height: 40px; border: 1px solid var(--border); border-radius: var(--r12); background: var(--surface); padding: 0 12px; outline: 0; }
+.save-place-form__icons { display: flex; gap: 8px; border: 0; padding: 0; margin: 0; }
+.save-place-form__icons legend { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.save-place-form__icon { display: grid; justify-items: center; gap: 2px; padding: 8px; border-radius: var(--r12); border: 1px solid var(--border); cursor: pointer; font-size: 18px; }
+.save-place-form__icon input { accent-color: var(--primary); }
+.place-row__actions { display: flex; gap: 6px; }
+.place-edit { display: grid; gap: 6px; padding: 8px; border-radius: var(--r12); background: var(--surface-2); margin-top: 6px; }
+.place-item { display: grid; gap: 6px; }
+.place-row__text { flex: 1; display: grid; gap: 2px; }
+.place-row .text-link--danger { color: var(--danger); }
+.place-row.is-editing { border-color: var(--primary); }

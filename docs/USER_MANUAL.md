@@ -16,7 +16,7 @@ The shell shows a loading skeleton while a view is fetched, an offline panel whe
 
 The map is the home surface. Use the four-part top selector to move between map, mission, companions and history. The search field finds destinations, and quick chips jump to saved places. The layers and compass controls adjust the view; recenter returns to your location. An accuracy circle shows how precise the current fix is. Live companions appear as ringed markers with freshness indicators.
 
-Saved places can be created, edited, reordered and deleted from the profile section. Every place has a name, label, coordinates, address, icon and rank. Live location sharing can be granted to another account for a bounded duration or for a historical range, and can be revoked at any time. History playback shows only locations that an active share authorizes.
+A destination is selected by tapping the map: the sheet shows its coordinates and, with a fix available, the distance, and can save it as a place (name, label, address and icon). Saved places are listed, edited inline and deleted from the profile section. Every place has a name, label, coordinates, address, icon and rank; reordering exists as an API but not as UI yet. Live location sharing can be granted to another account for a bounded duration or for a historical range, and can be revoked at any time. History playback shows only locations that an active share authorizes.
 
 ## SOS and missions
 

@@ -6,6 +6,7 @@ import { vuetify } from '../src/client/plugins/vuetify.ts';
 import ProfileView from '../src/client/views/map/ProfileView.vue';
 import { useAuthStore } from '../src/client/stores/auth.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
+import { useMapStore } from '../src/client/stores/map.ts';
 
 /**
  * The device list is the screen where a user revokes a stolen session. The payload here is copied
@@ -157,5 +158,77 @@ describe('profile device list', () => {
     expect(Object.keys(device).sort()).toEqual(Object.keys(CURRENT_DEVICE).sort());
     expect(device.sessionId).toBe(CURRENT_DEVICE.sessionId);
     expect(device.isCurrentDevice).toBe(true);
+  });
+});
+
+/** One saved place exactly as the server serializes it. */
+const PLACE = {
+  id: 'plc_1', name: 'خانه', label: 'خانه', latitude: 35.7219, longitude: 51.4047,
+  address: 'خیابان انبار ۱۲', icon: 'home-outline', rank: 1
+};
+
+describe('saved places', () => {
+  it('lists saved places from the store and deletes one', async () => {
+    const calls = stubApi([CURRENT_DEVICE]);
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const map = useMapStore();
+    map.places = [{ ...PLACE }];
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain('خیابان انبار ۱۲');
+
+    await wrapper.find('[data-testid="delete-place-plc_1"]').trigger('click');
+    await flushPromises();
+    expect(calls.some((call) => call.method === 'DELETE' && call.path === '/_user/places/plc_1')).toBe(true);
+    expect(useMapStore().places).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('edits a saved place inline and PATCHes the full payload', async () => {
+    const calls: Array<{ method: string; path: string; body?: any }> = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      calls.push({ method, path, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      const data = path === '/_user/devices' && method === 'GET'
+        ? { items: [CURRENT_DEVICE], total: 1 }
+        : path === '/_user/places/plc_1' && method === 'PATCH' ? { ok: true, placeId: 'plc_1' }
+        : { items: [PLACE] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
+    await router.push({ name: ROUTE_NAMES.profile });
+    await router.isReady();
+    const pinia = createPinia();
+    setActivePinia(pinia);
+    const map = useMapStore();
+    map.places = [{ ...PLACE }];
+    const wrapper = mount(ProfileView, {
+      attachTo: document.body,
+      global: { plugins: [pinia, vuetify, router] }
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-testid="edit-place-plc_1"]').trigger('click');
+    await flushPromises();
+    const nameInput = wrapper.find('.place-edit input');
+    await nameInput.setValue('خانه مادر');
+    await wrapper.find('.place-edit').trigger('submit');
+    await flushPromises();
+
+    const patchCall = calls.find((call) => call.path === '/_user/places/plc_1' && call.method === 'PATCH');
+    expect(patchCall?.body).toMatchObject({ name: 'خانه مادر', label: 'خانه', address: 'خیابان انبار ۱۲', latitude: 35.7219, longitude: 51.4047, rank: 1 });
+    expect(useMapStore().places[0]?.name).toBe('خانه مادر');
+    wrapper.unmount();
   });
 });
