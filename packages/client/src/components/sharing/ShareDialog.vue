@@ -342,7 +342,7 @@ import { fetchUserDevices } from "@/api/devices";
 import { friendlyErrorMessage } from "@/api/error-message";
 import { ApiError } from "@/api/http";
 import { createLocationHistoryShare, createLocationShare } from "@/api/location";
-import { isoToLocalInput, localInputToIso } from "@/history/playback";
+import { historyWindowFromInputs, isoToLocalInput } from "@/history/playback";
 import { avatarInitial } from "@/live/avatar-initial";
 import { DURATION_SLIDER_MAX, minutesForSliderStep, sliderStepForMinutes } from "@/sharing/duration-slider";
 import HistoryDateTimeField from "@/components/sharing/HistoryDateTimeField.vue";
@@ -430,6 +430,7 @@ const recipients = ref<UserSearchResult[]>([]);
 
 const initialHistoryWindow = historyPresetWindow(24);
 const activeHistoryPresetHours = ref<number | null>(24);
+const historyPresetSelection = ref(initialHistoryWindow);
 const historyFromInput = ref(isoToLocalInput(initialHistoryWindow.from));
 const historyToInput = ref(isoToLocalInput(initialHistoryWindow.to));
 const historyMaxPointsInput = ref<string>("");
@@ -472,19 +473,24 @@ const parsedHistoryMaxPoints = computed<number | null>(() => {
   return Number(raw);
 });
 
-const draft = computed<ShareDraft>(() => ({
-  mode: mode.value,
-  recipients: recipients.value,
-  durationMinutes: durationMinutes.value,
-  note: note.value,
-  historyFrom: localInputToIso(historyFromInput.value) ?? undefined,
-  historyTo: localInputToIso(historyToInput.value) ?? undefined,
-  historyMaxPoints: parsedHistoryMaxPoints.value
-}));
+const draft = computed<ShareDraft>(() => {
+  const historyWindow = historyWindowFromInputs(historyFromInput.value, historyToInput.value,
+    activeHistoryPresetHours.value === null ? null : historyPresetSelection.value);
+  return {
+    mode: mode.value,
+    recipients: recipients.value,
+    durationMinutes: durationMinutes.value,
+    note: note.value,
+    historyFrom: historyWindow?.from,
+    historyTo: historyWindow?.to,
+    historyMaxPoints: parsedHistoryMaxPoints.value
+  };
+});
 
 function applyHistoryPreset(hours: number): void {
   activeHistoryPresetHours.value = hours;
   const window = historyPresetWindow(hours);
+  historyPresetSelection.value = window;
   historyFromInput.value = isoToLocalInput(window.from);
   historyToInput.value = isoToLocalInput(window.to);
 }

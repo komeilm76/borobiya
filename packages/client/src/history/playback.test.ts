@@ -14,6 +14,7 @@ import {
   emptyCollection,
   historyPlaybackStyle,
   historyWindowFromPreset,
+  historyWindowFromInputs,
   historyWindowIssue,
   isoToLocalInput,
   localInputToIso,
@@ -354,6 +355,28 @@ describe("local wall time in the range inputs", () => {
       // offers no offset choice, so choosing either one silently is unsafe.
       expect(localInputToIso("2026-10-25T03:30")).toBeNull();
       expect(localInputToIso("2026-10-25T04:30")).toBe("2026-10-25T02:30:00.000Z");
+    } finally {
+      if (previousZone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousZone;
+    }
+  });
+
+  it("keeps both preset instants of a repeated hour distinct while rejecting ambiguous manual input", () => {
+    const previousZone = process.env.TZ;
+    try {
+      process.env.TZ = "Europe/Helsinki";
+      const from = "2026-10-24T10:00:00.000Z";
+      for (const to of ["2026-10-25T00:30:00.000Z", "2026-10-25T01:30:00.000Z"]) {
+        const preset = { from, to };
+        const fromInput = isoToLocalInput(from);
+        const toInput = isoToLocalInput(to);
+        expect(toInput).toBe("2026-10-25T03:30");
+        expect(historyWindowFromInputs(fromInput, toInput, preset)).toEqual(preset);
+        expect(historyWindowFromInputs(fromInput, toInput)).toBeNull();
+        expect(historyWindowFromInputs(fromInput, "2026-10-25T04:30", preset)).toEqual({
+          from, to: "2026-10-25T02:30:00.000Z"
+        });
+      }
     } finally {
       if (previousZone === undefined) delete process.env.TZ;
       else process.env.TZ = previousZone;

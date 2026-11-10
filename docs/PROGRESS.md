@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: keep exact preset instants through a repeated DST hour
+
+- Strict local-time validation correctly rejects a manually selected hour that occurs twice when clocks fall back, but it also rejected a history playback/share preset whose exact UTC instant was already known before the shortcut rendered it in a minute-only local field. During that hour a seven-day playback shortcut produced no request, and a preset history share could not submit. Both flows now retain the preset's original ISO window only while the displayed fields still match it; manual edits still use the strict ambiguous-time guard. The focused playback regression failed before the fix, and pure converter plus nonmounted share-dialog contract tests cover both fall-hour instants and manual changes. Physical browser/device timezone verification remains open.
+
 ### 2026-10-23 — Bug hunt: unblock stalled mission-timeline SSE fallback
 
 - The authenticated mission event stream bounded a silent body read to 45 seconds, but its cleanup awaited `reader.cancel()`. A broken stream whose cancellation never settles could leave the fallback pending forever, preventing the failure state and retry; aborting a mission during an already-open silent body read also waited for that deadline if the stream ignored the fetch signal. Body reads now race the caller's abort as well as the silence deadline; cleanup aborts the request and observes cancellation without awaiting it. Focused stream-adapter regressions reproduced both hangs before the fix and pass afterward. Browser/proxy behavior on a live device remains unverified.

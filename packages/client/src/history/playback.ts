@@ -436,6 +436,23 @@ export function isoToLocalInput(iso: string): string {
 }
 
 /**
+ * Presets already name exact instants, including which occurrence of a repeated
+ * fall DST hour they mean. A datetime-local field cannot preserve that offset.
+ * Retain the original instants only while BOTH visible inputs still match the
+ * preset; an edited/manual window must pass through strict local validation.
+ */
+export function historyWindowFromInputs(
+  fromInput: string, toInput: string, preset: HistoryWindow | null = null
+): HistoryWindow | null {
+  if (preset && isoToLocalInput(preset.from) === fromInput && isoToLocalInput(preset.to) === toInput) {
+    return preset;
+  }
+  const from = localInputToIso(fromInput);
+  const to = localInputToIso(toInput);
+  return from && to ? { from, to } : null;
+}
+
+/**
  * What a rejected range means, in the user's terms. Kept with the validator rather than inline in a
  * template because the same four states are reachable from the chips, the two text fields and a
  * restored share link, and each has to explain the fix instead of just refusing.

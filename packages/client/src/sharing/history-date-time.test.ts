@@ -23,6 +23,16 @@ describe("Vuetify history calendar and clock", () => {
     expect(vuetify).toContain('fa: "fa-IR-u-ca-gregory"');
   });
 
+  it("uses the exact preset instants for history shares until either field is edited", () => {
+    // Source contract only: the repository does not mount .vue files in unit tests.
+    const dialog = readFileSync(new URL("../components/sharing/ShareDialog.vue", import.meta.url), "utf8");
+    expect(dialog).toContain("historyWindowFromInputs(historyFromInput.value, historyToInput.value,");
+    expect(dialog).toContain("activeHistoryPresetHours.value === null ? null : historyPresetSelection.value");
+    expect(dialog).toContain("historyPresetSelection.value = window");
+    expect(dialog).toContain("historyFrom: historyWindow?.from");
+    expect(dialog).toContain("historyTo: historyWindow?.to");
+  });
+
   it("rejects empty or invalid picker events instead of corrupting a share window", () => {
     expect(dateForPicker("2026-02-30T18:00")).toBeUndefined();
     expect(withPickerDate("2026-10-29T18:00", null)).toBeNull();

@@ -11,9 +11,9 @@ import {
   DEFAULT_PLAYBACK_SPEED,
   DEFAULT_RANGE_PRESET_DAYS,
   historyWindowFromPreset,
+  historyWindowFromInputs,
   historyWindowIssue,
   isoToLocalInput,
-  localInputToIso,
   nextFrameMs,
   playbackGeoJson,
   positionAt,
@@ -92,6 +92,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   const presetDays = ref<number>(DEFAULT_RANGE_PRESET_DAYS);
   const fromInput = ref("");
   const toInput = ref("");
+  let presetWindow: HistoryWindow | null = null;
 
   // `shallowRef`: the response can be the full read budget (1000 points). Deep reactivity would wrap
   // every point in a proxy and the frame computed would walk it on each of the 20 ticks a second.
@@ -152,10 +153,8 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   let lastTickAt = 0;
 
   function currentWindow(): HistoryWindow | null {
-    const from = localInputToIso(fromInput.value);
-    const to = localInputToIso(toInput.value);
-    if (!from || !to) return null;
-    return { from, to };
+    return historyWindowFromInputs(fromInput.value, toInput.value,
+      presetDays.value !== 0 ? presetWindow : null);
   }
 
   function clearTrack(): void {
@@ -175,6 +174,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   function selectPreset(days: number): Promise<void> {
     presetDays.value = days;
     const window = historyWindowFromPreset(days, now());
+    presetWindow = window;
     fromInput.value = isoToLocalInput(window.from);
     toInput.value = isoToLocalInput(window.to);
     return load();
@@ -183,6 +183,7 @@ export function useHistoryPlayback(options: UseHistoryPlaybackOptions) {
   /** Hand-editing the fields is its own choice, so the chip highlight has to go. */
   function setManualRange(from: string, to: string): Promise<void> {
     presetDays.value = 0;
+    presetWindow = null;
     fromInput.value = from;
     toInput.value = to;
     return load();

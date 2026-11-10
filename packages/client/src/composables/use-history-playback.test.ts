@@ -268,6 +268,31 @@ describe("range controls", () => {
     expect(url.searchParams.get("to")).toBe(new Date(NOW).toISOString());
   });
 
+  it("reads the exact preset instant during the repeated fall DST hour without accepting an ambiguous manual time", async () => {
+    const previousZone = process.env.TZ;
+    const now = Date.parse("2026-10-25T00:30:00.000Z"); // Helsinki's first 03:30, before clocks fall back.
+    process.env.TZ = "Europe/Helsinki";
+    vi.setSystemTime(now);
+    const { scope, api } = mount();
+    try {
+      autoRespond = () => historyBody([]);
+      await api.selectPreset(7);
+      expect(api.toInput.value).toBe("2026-10-25T03:30");
+      expect(api.windowIssue.value).toBeNull();
+      expect(calls).toHaveLength(1);
+      const url = new URL(calls[0]!.url, "http://localhost");
+      expect(url.searchParams.get("from")).toBe(new Date(now - 7 * DAY).toISOString());
+      expect(url.searchParams.get("to")).toBe(new Date(now).toISOString());
+      await api.setManualRange(api.fromInput.value, api.toInput.value);
+      expect(api.windowIssue.value).toBe("unparsable");
+      expect(calls).toHaveLength(1);
+    } finally {
+      scope.stop();
+      if (previousZone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousZone;
+    }
+  });
+
   it("keeps the manual edit out of the chip's highlight but still validates it", async () => {
     const { api } = mount();
     autoRespond = () => historyBody([]);
