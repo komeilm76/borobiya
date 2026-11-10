@@ -96,6 +96,19 @@ export const useMapStore = defineStore('map', () => {
     geolocation.resume();
   }
 
+  /**
+   * Recentres the map on the user's last known fix. Used by the crosshairs control: resuming the
+   * watch alone never moves the viewport, so without this the button did nothing visible.
+   * Returns false when there is no fix yet.
+   */
+  function centerOnOwnFix(): boolean {
+    const fix = ownFix.value;
+    if (!fix) return false;
+    center.value = { latitude: fix.latitude, longitude: fix.longitude };
+    zoom.value = Math.max(zoom.value, 16);
+    return true;
+  }
+
   /** Stops the geolocation watch; called when leaving the map. */
   function stopLocation(): void {
     geolocation.pause();
@@ -145,6 +158,7 @@ export const useMapStore = defineStore('map', () => {
     removeLiveFix,
     setDetent,
     startLocation,
+    centerOnOwnFix,
     stopLocation,
     focusOn,
     clearSearchPin,

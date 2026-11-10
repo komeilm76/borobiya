@@ -11,6 +11,7 @@ import { useMotionPreferences } from '@/composables/useMotionPreferences.ts';
 import { useSosHold } from '@/composables/useSosHold.ts';
 import { ROUTE_NAMES } from '@/router/index.ts';
 import { HTTP_EVENTS, WS_EVENTS } from '@shared/protocol.ts';
+import { useToast } from '@/composables/useToast.ts';
 import MapCanvas from '@/components/MapCanvas.vue';
 
 /**
@@ -26,6 +27,7 @@ const sos = useSosStore();
 const realtime = useRealtimeStore();
 const offline = useOfflineStore();
 const motion = useMotionPreferences();
+const toast = useToast();
 
 const tabs = [
   { name: ROUTE_NAMES.history, label: 'تاریخچه', icon: 'history' },
@@ -44,6 +46,17 @@ const activeTab = computed(() => {
 const hold = useSosHold(() => {
   void router.push({ name: ROUTE_NAMES.sos });
 });
+
+/**
+ * Crosshairs control: centre on the user's own fix when there is one; otherwise resume the
+ * geolocation watch so a fix can arrive. Never silently no-ops.
+ */
+function onCenterOnMe(): void {
+  if (!map.centerOnOwnFix()) {
+    map.startLocation();
+    toast.push('هنوز موقعیتی ثبت نشده است؛ موقعیت شما در حال دریافت است.', 'info', 2600);
+  }
+}
 
 const unsubscribers: Array<() => void> = [];
 
@@ -332,7 +345,7 @@ async function logout(): Promise<void> {
         <button type="button" class="avatar-control" :aria-label="`نمایه ${auth.user?.username ?? ''}`" @click="router.push({ name: ROUTE_NAMES.profile })">
           <span>{{ (auth.user?.username ?? 'B').slice(0, 1).toUpperCase() }}</span><i />
         </button>
-        <button type="button" class="round-control" aria-label="مرکز نقشه" @click="map.startLocation()">
+        <button type="button" class="round-control" aria-label="مرکز نقشه" @click="onCenterOnMe">
           <span class="mdi mdi-crosshairs-gps" aria-hidden="true" />
         </button>
         <button type="button" class="round-control" aria-label="خروج" @click="logout">

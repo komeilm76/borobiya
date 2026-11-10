@@ -30,7 +30,12 @@ const SEVERITY_LABEL = { low: 'کم', medium: 'متوسط', high: 'شدید' } a
  */
 const offers = computed(() => {
   if (auth.user?.role !== ROLES.RESPONDER) return [];
-  return sos.requests.filter((item) => item.status === SOS_STATUS.DISPATCHED && item.requesterId !== auth.user?.id);
+  // Never offer a request the user already holds a live mission for, even if the list
+  // flickered out of sync — accepting it is impossible server-side anyway.
+  const held = new Set(
+    sos.missions.filter((item) => item.status !== MISSION_STATUS.CANCELLED).map((item) => item.sosId)
+  );
+  return sos.requests.filter((item) => item.status === SOS_STATUS.DISPATCHED && item.requesterId !== auth.user?.id && !held.has(item.id));
 });
 const accepting = ref<string | null>(null);
 
@@ -47,12 +52,12 @@ async function accept(offer: SosView): Promise<void> {
     await sos.accept(offer.id);
     toast.push('مأموریت پذیرفته شد.', 'success', 2600);
   } catch (caught) {
-    // Most commonly a conflict: someone else took it first. Either way, reload to the
-    // authoritative state instead of leaving a stale offer on screen.
+    // Most commonly a conflict: someone else took it first. The store reloads on success, so
+    // only the failure path pays for a reload here.
     toast.push(errorMessage(caught), 'error', 3800);
+    await sos.load();
   } finally {
     accepting.value = null;
-    await sos.load();
   }
 }
 const railLabels = ['ثبت', 'اعزام', 'پذیرش', 'رسیدگی', 'پایان'];
@@ -62,11 +67,20 @@ const actions = [
   { action: 'complete', label: 'پایان', icon: 'check-circle-outline' }
 ] as const;
 
-const request = computed(() => sos.activeRequest);
 // Not `activeMission`: that deliberately excludes completed missions, and a completed mission is
 // exactly the one this screen has to show a rating form for. Falling back to the last mission keeps
 // the rating reachable instead of leaving it inside a block that can never render.
 const mission = computed(() => sos.activeMission ?? [...sos.missions].reverse().find((item) => item.status === MISSION_STATUS.COMPLETED) ?? null);
+// The rail belongs to the request behind the mission being shown; falling back to the first
+// non-terminal request is only right when no mission exists. Otherwise a responder carrying their
+// own in-flight SOS would see their request's rail next to a different incident's mission card.
+const request = computed(() => {
+  const current = mission.value;
+  if (current) return sos.requests.find((item) => item.id === current.sosId) ?? null;
+  return sos.activeRequest;
+});
+const ownsRequest = computed(() => Boolean(request.value && auth.user && request.value.requesterId === auth.user.id));
+const railHeading = computed(() => (ownsRequest.value ? 'درخواست امداد شما' : 'مأموریت اعزام‌شده'));
 const stageIndex = computed(() => {
   const status = request.value?.status;
   if (!status) return -1;
@@ -84,13 +98,26 @@ watch(
   { immediate: true }
 );
 
+const canActOnMission = computed(() => {
+  const current = mission.value;
+  const user = auth.user;
+  if (!current || !user) return false;
+  return current.responderId === user.id || user.role === ROLES.ADMIN;
+});
 const nextActions = computed(() => {
+  if (!canActOnMission.value) return [];
   const status = mission.value?.status;
   if (!status) return [];
   if (status === MISSION_STATUS.ON_THE_WAY || status === MISSION_STATUS.PENDING) return actions.slice(0, 1);
   if (status === MISSION_STATUS.ARRIVED) return actions.slice(1, 2);
   if (status === MISSION_STATUS.IN_PROGRESS) return actions.slice(2, 3);
   return [];
+});
+const canRateMission = computed(() => {
+  const current = mission.value;
+  const user = auth.user;
+  if (!current || !user) return false;
+  return current.status === MISSION_STATUS.COMPLETED && !current.rating && current.requesterId === user.id;
 });
 
 async function progress(action: 'arrive' | 'start' | 'complete'): Promise<void> {
@@ -204,7 +231,7 @@ async function confirmMissionCancel(): Promise<void> {
 <template>
   <div class="sheet__head">
     <div>
-      <strong>درخواست امداد شما</strong>
+      <strong>{{ railHeading }}</strong>
       <span v-if="request">کد پیگیری {{ format.number(request.trackingCode) }}</span>
       <span v-else>درخواست فعالی ثبت نشده است</span>
     </div>
@@ -293,7 +320,7 @@ async function confirmMissionCancel(): Promise<void> {
         <strong>مأموریت {{ mission.status }}</strong>
         <span>{{ format.dateTime(mission.updatedAt) }}</span>
       </div>
-      <div class="action-row">
+      <div class="action-row" data-testid="mission-next-actions">
         <button
           v-for="item in nextActions"
           :key="item.action"
@@ -305,7 +332,7 @@ async function confirmMissionCancel(): Promise<void> {
           <span>{{ item.label }}</span>
         </button>
       </div>
-      <div v-if="mission.status === MISSION_STATUS.COMPLETED && !mission.rating" class="rating-row" aria-label="ارزیابی مأموریت">
+      <div v-if="canRateMission" class="rating-row" aria-label="ارزیابی مأموریت">
         <button v-for="value in [1, 2, 3, 4, 5]" :key="value" type="button" class="rating-star" :aria-label="`امتیاز ${value}`" @click="rate(value)">
           <span class="mdi mdi-star" aria-hidden="true" />
         </button>

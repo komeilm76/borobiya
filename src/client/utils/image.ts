@@ -108,7 +108,9 @@ const DATA_URL_PATTERN = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 const defaultDecode: ImageDecoder = async (file) => {
   if (typeof createImageBitmap === 'function') {
     try {
-      const bitmap = await createImageBitmap(file);
+      // `from-image` honours EXIF orientation on decode, so a rotated camera frame is not
+      // handed to the canvas sideways; it is also what the <img> fallback path implies.
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       return { width: bitmap.width, height: bitmap.height, source: bitmap };
     } catch {
       throw new ImageProcessingError('decode-failed', 'The image could not be decoded.');
@@ -165,22 +167,29 @@ export async function compressImageFile(
   const decode = deps.decode ?? defaultDecode;
   const canvas = deps.canvas ?? defaultCanvas;
   const bitmap = await decode(file);
-  const { width, height } = fitWithin(bitmap.width, bitmap.height, MAX_DIMENSION);
+  // Camera frames hold tens of megabytes of decoded pixel data; the GPU-backed bitmap has to
+  // be released explicitly once the draws are done or mobile tabs accumulate them until reload.
+  try {
+    const { width, height } = fitWithin(bitmap.width, bitmap.height, MAX_DIMENSION);
 
-  // Try the fitted size first; if every quality still overshoots the target, shrink the edge
-  // once more before giving up. Two rounds is enough for a phone camera frame.
-  for (const edgeScale of [1, 0.75, 0.55]) {
-    const w = Math.max(1, Math.round(width * edgeScale));
-    const h = Math.max(1, Math.round(height * edgeScale));
-    const surface = canvas(w, h);
-    surface.draw(bitmap.source, w, h);
-    for (const quality of QUALITY_LADDER) {
-      const dataUrl = surface.toJpeg(quality);
-      const bytes = dataUrlBytes(dataUrl);
-      if (bytes <= EFFECTIVE_TARGET_BYTES && DATA_URL_PATTERN.test(dataUrl) && dataUrl.length <= SERVER_DATA_URL_LIMIT) {
-        return { dataUrl, width: w, height: h, quality, bytes };
+    // Try the fitted size first; if every quality still overshoots the target, shrink the edge
+    // once more before giving up. Two rounds is enough for a phone camera frame.
+    for (const edgeScale of [1, 0.75, 0.55]) {
+      const w = Math.max(1, Math.round(width * edgeScale));
+      const h = Math.max(1, Math.round(height * edgeScale));
+      const surface = canvas(w, h);
+      surface.draw(bitmap.source, w, h);
+      for (const quality of QUALITY_LADDER) {
+        const dataUrl = surface.toJpeg(quality);
+        const bytes = dataUrlBytes(dataUrl);
+        if (bytes <= EFFECTIVE_TARGET_BYTES && DATA_URL_PATTERN.test(dataUrl) && dataUrl.length <= SERVER_DATA_URL_LIMIT) {
+          return { dataUrl, width: w, height: h, quality, bytes };
+        }
       }
     }
+    throw new ImageProcessingError('too-large', 'The image could not be compressed below the upload limit.');
+  } finally {
+    const closeable = bitmap.source as { close?: () => void };
+    closeable.close?.();
   }
-  throw new ImageProcessingError('too-large', 'The image could not be compressed below the upload limit.');
 }

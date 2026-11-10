@@ -59,7 +59,7 @@ const CANCELLATION_REASONS = [
 function stubApi(options: { mission?: Record<string, unknown> | null; sos?: boolean; failPath?: string; acceptFails?: boolean; cancelFails?: boolean; progressFails?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   const mission = options.mission === undefined
-    ? { id: 'mis_1', sosId: 'sos_1', responderId: 'usr_self', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
+    ? { id: 'mis_1', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.ON_THE_WAY, updatedAt: 1794136200000, rating: null }
     : options.mission;
 
   vi.stubGlobal(
@@ -207,8 +207,8 @@ describe('mission screen', () => {
 
   it('offers exactly the action the current mission status allows', async () => {
     stubApi();
-    const { wrapper } = await render();
-    const buttons = wrapper.findAll('.action-row button');
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
+    const buttons = wrapper.findAll('[data-testid="mission-next-actions"] button');
     // ON_THE_WAY permits "arrived" only; offering "complete" would skip the state machine.
     expect(buttons).toHaveLength(1);
     expect(buttons[0].text()).toContain('رسیدم');
@@ -217,8 +217,8 @@ describe('mission screen', () => {
 
   it('advances the mission and confirms with a toast', async () => {
     const calls = stubApi();
-    const { wrapper } = await render();
-    await wrapper.find('.action-row button').trigger('click');
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
+    await wrapper.find('[data-testid="mission-next-actions"] button').trigger('click');
     await flushPromises();
 
     const call = calls.find((entry) => entry.path === '/_user/missions/mis_1/progress');
@@ -230,7 +230,7 @@ describe('mission screen', () => {
 
   it('reports a rejected transition instead of pretending it worked', async () => {
     stubApi();
-    const { wrapper } = await render();
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
     vi.stubGlobal(
       'fetch',
       vi.fn(async () =>
@@ -240,7 +240,7 @@ describe('mission screen', () => {
         })
       )
     );
-    await wrapper.find('.action-row button').trigger('click');
+    await wrapper.find('[data-testid="mission-next-actions"] button').trigger('click');
     await flushPromises();
     const messages = useToast().messages.value;
     expect(messages.some((message) => message.message === 'گذر نامعتبر')).toBe(true);
@@ -250,28 +250,28 @@ describe('mission screen', () => {
   });
 
   it('offers no next action once the mission is running or done', async () => {
-    stubApi({ mission: { id: 'mis_2', sosId: 'sos_1', status: MISSION_STATUS.IN_PROGRESS, updatedAt: 1794136200000 } });
-    const { wrapper } = await render();
+    stubApi({ mission: { id: 'mis_2', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.IN_PROGRESS, updatedAt: 1794136200000 } });
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
     // IN_PROGRESS maps to "complete"; a completed mission maps to nothing.
-    expect(wrapper.findAll('.action-row button')).toHaveLength(1);
+    expect(wrapper.findAll('[data-testid="mission-next-actions"] button')).toHaveLength(1);
 
-    stubApi({ mission: { id: 'mis_3', sosId: 'sos_1', status: MISSION_STATUS.CANCELLED, updatedAt: 1794136200000 } });
-    const second = await render();
-    expect(second.wrapper.findAll('.action-row button')).toHaveLength(0);
+    stubApi({ mission: { id: 'mis_3', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.CANCELLED, updatedAt: 1794136200000 } });
+    const second = await render({ role: 'responder', userId: 'usr_self' });
+    expect(second.wrapper.findAll('[data-testid="mission-next-actions"] button')).toHaveLength(0);
     wrapper.unmount();
     second.wrapper.unmount();
   });
 
   it('asks for a rating once the mission is complete and shows it after it lands', async () => {
-    stubApi({ mission: { id: 'mis_4', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
-    const { wrapper } = await render();
+    stubApi({ mission: { id: 'mis_4', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     const stars = wrapper.findAll('.rating-star');
     expect(stars).toHaveLength(5);
     expect(stars[2].attributes('aria-label')).toBe('امتیاز 3');
     wrapper.unmount();
 
-    stubApi({ mission: { id: 'mis_5', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: 4 } });
-    const rated = await render();
+    stubApi({ mission: { id: 'mis_5', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: 4 } });
+    const rated = await render({ role: 'user', userId: 'usr_requester' });
     // A rated mission must not ask again: the endpoint accepts one rating only.
     expect(rated.wrapper.findAll('.rating-star')).toHaveLength(0);
     expect(rated.wrapper.text()).toContain('امتیاز ثبت‌شده');
@@ -279,9 +279,9 @@ describe('mission screen', () => {
   });
 
   it('posts a rating and confirms it', async () => {
-    stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
-    const calls = stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
-    const { wrapper } = await render();
+    stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const calls = stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     await wrapper.findAll('.rating-star')[4].trigger('click');
     await flushPromises();
 
@@ -292,9 +292,9 @@ describe('mission screen', () => {
   });
 
   it('tells the user when the rating was refused instead of failing silently', async () => {
-    const complete = { id: 'mis_7', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null };
+    const complete = { id: 'mis_7', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null };
     stubApi({ mission: complete, failPath: '/_user/missions/mis_7/rating' });
-    const { wrapper } = await render();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
     await wrapper.findAll('.rating-star')[3].trigger('click');
     await flushPromises();
 
@@ -305,11 +305,27 @@ describe('mission screen', () => {
     wrapper.unmount();
   });
 
+  it('hides the action buttons from the requester of the mission', async () => {
+    stubApi();
+    const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    // The assignee sees «رسیدم»; the requester must not be offered mission transitions.
+    expect(wrapper.findAll('[data-testid="mission-next-actions"] button')).toHaveLength(0);
+    wrapper.unmount();
+  });
+
+  it('hides the rating stars from the assigned responder', async () => {
+    stubApi({ mission: { id: 'mis_9', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper } = await render({ role: 'responder', userId: 'usr_self' });
+    // Only the requester may rate; the assignee sees the mission but not the stars.
+    expect(wrapper.findAll('.rating-star')).toHaveLength(0);
+    wrapper.unmount();
+  });
+
   it('withdraws the stars when no mission is loaded', async () => {
     // The stars only render for a completed mission, so `rate()`'s own guard is defensive: removing
     // it fails nothing. Kept because a stray click during a re-fetch must not post for a stale id.
-    stubApi({ mission: { id: 'mis_8', sosId: 'sos_1', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
-    const { wrapper, sos } = await render();
+    stubApi({ mission: { id: 'mis_8', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
+    const { wrapper, sos } = await render({ role: 'user', userId: 'usr_requester' });
     sos.activeMission = null;
     sos.missions = [];
     await flushPromises();
@@ -331,7 +347,7 @@ describe('mission screen', () => {
 
 describe('responder offer', () => {
   it('shows the dispatched request with the facts a responder needs', async () => {
-    stubApi();
+    stubApi({ mission: null });
     const { wrapper } = await render({ role: 'responder' });
     const offer = wrapper.find('[data-testid="mission-offer"]');
     expect(offer.exists()).toBe(true);
@@ -345,7 +361,7 @@ describe('responder offer', () => {
   });
 
   it('accepts through the store and reloads the authoritative state', async () => {
-    const calls = stubApi();
+    const calls = stubApi({ mission: null });
     const { wrapper } = await render({ role: 'responder' });
     await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
     await flushPromises();
@@ -359,7 +375,7 @@ describe('responder offer', () => {
   });
 
   it('reports a lost race instead of pretending acceptance worked', async () => {
-    const calls = stubApi({ acceptFails: true });
+    const calls = stubApi({ acceptFails: true, mission: null });
     const { wrapper } = await render({ role: 'responder' });
     await wrapper.find('[data-testid="mission-offer-accept"]').trigger('click');
     await flushPromises();
