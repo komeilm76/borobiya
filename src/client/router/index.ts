@@ -81,7 +81,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/_user/map',
     name: ROUTE_NAMES.map,
     component: () => import('@/views/map/MapView.vue'),
-    meta: { layout: 'map', access: 'user', label: 'مسیریابی', icon: 'routes' }
+    meta: { layout: 'map', access: 'user', label: 'نقشه', icon: 'routes' }
   },
   {
     path: '/_user/sos',

@@ -29,7 +29,7 @@ const motion = useMotionPreferences();
 
 const tabs = [
   { name: ROUTE_NAMES.history, label: 'تاریخچه', icon: 'history' },
-  { name: ROUTE_NAMES.map, label: 'مسیریابی', icon: 'routes' },
+  { name: ROUTE_NAMES.map, label: 'نقشه', icon: 'routes' },
   { name: ROUTE_NAMES.companions, label: 'همراهان', icon: 'account-group-outline' },
   { name: ROUTE_NAMES.mission, label: 'مأموریت', icon: 'web' }
 ] as const;

@@ -31,7 +31,7 @@ const pageMotion = computed<Record<string, unknown>>(() => ({
       <h1>بورو بیا</h1>
       <p>نقشه، موقعیت زنده، همراهان و درخواست امداد — همه در یک برنامه.</p>
       <ul>
-        <li><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> مسیریابی آفلاین</li>
+        <li><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> نقشه آفلاین</li>
         <li><span class="mdi mdi-account-group-outline" aria-hidden="true" /> همراهان و اشتراک موقعیت</li>
         <li><span class="mdi mdi-alarm-light-outline" aria-hidden="true" /> درخواست امداد فوری</li>
       </ul>

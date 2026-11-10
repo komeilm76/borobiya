@@ -367,8 +367,8 @@ describe('mobile shell', () => {
     // These screens live inside the map shell but are not tabs themselves, so one parent tab must
     // stay highlighted; otherwise the pill row shows nothing active on three of seven screens.
     const expectations: Array<[string, string]> = [
-      ['/_user/sos', 'مسیریابی'],
-      ['/_user/talk', 'مسیریابی'],
+      ['/_user/sos', 'نقشه'],
+      ['/_user/talk', 'نقشه'],
       ['/_user/profile', 'تاریخچه']
     ];
     for (const [path, label] of expectations) {

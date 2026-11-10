@@ -27,7 +27,7 @@ const palette = useCommandPalette(() => [
         { id: 'admin-settings', label: 'تنظیمات', icon: 'wrench-outline', group: 'مدیریت', run: () => router.push({ name: ROUTE_NAMES.adminSettings }) }
       ]
     : [
-        { id: 'map', label: 'نقشه', icon: 'routes', group: 'مسیریابی', run: () => router.push({ name: ROUTE_NAMES.map }) },
+        { id: 'map', label: 'نقشه', icon: 'routes', group: 'نقشه', run: () => router.push({ name: ROUTE_NAMES.map }) },
         { id: 'sos', label: 'درخواست امداد', icon: 'alarm-light', group: 'امداد', run: () => router.push({ name: ROUTE_NAMES.sos }) },
         { id: 'mission', label: 'مأموریت', icon: 'web', group: 'امداد', run: () => router.push({ name: ROUTE_NAMES.mission }) },
         { id: 'companions', label: 'همراهان', icon: 'account-group-outline', group: 'همراهان', run: () => router.push({ name: ROUTE_NAMES.companions }) },

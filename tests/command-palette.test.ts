@@ -61,7 +61,7 @@ function scopedPalette(entries: () => CommandEntry[]) {
 /** Three throwaway entries that record execution order. */
 function fixtureEntries(ran: string[]): () => CommandEntry[] {
   return () => [
-    { id: 'map', label: 'نقشه', icon: 'routes', group: 'مسیریابی', run: () => ran.push('map') },
+    { id: 'map', label: 'نقشه', icon: 'routes', group: 'نقشه', run: () => ran.push('map') },
     { id: 'sos', label: 'درخواست امداد', icon: 'alarm-light', group: 'امداد', run: () => ran.push('sos') },
     { id: 'history', label: 'تاریخچه', icon: 'history', group: 'تاریخچه', run: () => ran.push('history') }
   ];
