@@ -63,11 +63,11 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, search that searches, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). |
-| navigation/02-map-press-hold.png | partial | P2/H | Hold gesture works (0.8s, progress bar); SOS dock is centered horizontally, design places it bottom-left; quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
+| navigation/01-map-idle.png | partial | P2/H | Implemented simplified. Missing: layers button, compass, scale bar, selected-destination sheet (save to saved-places / share my location / navigate-here actions). Long-press tooltip missing (design 01 shows it). Search works since P1 (offline: saved places + config POIs). |
+| navigation/02-map-press-hold.png | partial | P2/H | Hold gesture works (0.8s, progress bar); SOS dock now bottom-left per approved decision 5 (DEV-04 resolved); quick chips are saved places, not the fixed last-destination / work / home presets; scale bar missing. |
 | navigation/03-bookmark-form.png | missing | P2/M | Saved-places create UI absent (server CRUD + store exist). |
 | navigation/04-bookmark-saved.png | missing | P2/M | Saved-places list/manage UI absent. |
-| navigation/05-search-open.png | missing | P1/H | Search input exists but re-pushes the map route; no results, no offline source. |
+| navigation/05-search-open.png | done | P1/H | Real offline search: saved places + road POIs from the map configuration (projection-converted), Persian/Arabic-insensitive normalization, keyboard navigation (combobox semantics), loading/empty/error+retry states, result selection moves and zooms the map with a dedicated pin. |
 | navigation/06-destination-selected.png | missing | P2/H | No selected-destination sheet. |
 | navigation/07-destination-details.png | missing | P2/M | No destination detail sheet. |
 | navigation/08-trip-transport-selection.png | superseded | — | Turn-by-turn trip planning superseded (docs/ACCEPTANCE.md). |
@@ -88,11 +88,11 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
-| sos/01-sos-entry.png | partial | P2/H | SOS button present; position/style differ from reference (centered, not bottom-left dock 104×56). |
-| sos/02-sos-hold-to-open.png | partial | P2/H | 0.8s hold implemented with progress bar; not the designed ring; placement differs. |
+| sos/01-sos-entry.png | partial | P2/H | SOS button present; bottom-left dock since P1 (decision 5); style differs from reference pending P5. |
+| sos/02-sos-hold-to-open.png | partial | P2/H | 0.8s hold implemented with progress bar; not the designed ring; placement aligned to bottom-left dock (decision 5). |
 | sos/03-sos-compose.png | partial | P1/H | Four-section composer implemented (severity, type, description, location, photo, review) with counters and inline validation; visual parity pending P5. |
 | sos/04-sos-location-picker.png | missing | P2/H | Step 2 offers only "use current location"; no tap-to-place incident pin, no accuracy feedback, no "return to current location" recovery. Server accepts `isManual`. |
-| sos/05-sos-photo.png | partial | P1/C | Attach + preview work; **no client-side compression or resize**. Server caps data URLs at 160000 chars (`jpeg|png` base64), so real camera photos are rejected with "Invalid request.". Design promises a bounded, browser-compressed photo. |
+| sos/05-sos-photo.png | done | P1/C | Browser pipeline: validate (jpeg/png/webp, 15 MB ceiling), decode, downscale to ≤1280px, re-encode JPEG along a quality ladder, subject to the server's 160000-char wire cap (~119,981 B effective — the designed 128 KB target is not reachable under that cap). Retryable error state with Persian copy; submit-time size guard; picker resets for re-pick. |
 | sos/06-sos-review.png | done | P2/M | Review step submits to the API; disabled state + inline error surface. |
 | sos/07-sos-sending.png | missing | P2/M | No sending progress surface (only a disabled button while submitting). |
 | sos/08-sos-pending.png | missing | P2/M | No dedicated pending surface; the mission rail approximates it. |
@@ -100,9 +100,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | sos/10-sos-rescuer-en-route.png | missing | P2/M | No en-route surface/ETA (ETA needs routing data — superseded area; a status-only surface remains possible). |
 | sos/11-sos-rescuer-arrived.png | missing | P2/L | Rail covers it only. |
 | sos/12-sos-completed.png | partial | P2/M | Rail + one-time rating implemented; no designed completion card. |
-| sos/13-sos-cancel-reason.png | missing | P1/C | `sos.cancel()` and the cancellation-reason catalog are loaded in the store but **no view renders them**; the design shows reason selection with requires-text handling. |
-| sos/14-sos-cancelled.png | missing | P1/H | No cancelled surface. |
-| sos/15-sos-photo-retry.png | missing | P1/H | Upload failure/retry path absent (ties to the photo fix). |
+| sos/13-sos-cancel-reason.png | done | P1/C | Mission view offers the requester an inline cancel panel: catalog reason select, required 10+ char detail exactly when the chosen reason demands it (client- and server-enforced), confirmation step, conflict surfaced as error toast, server-authoritative reload afterwards. |
+| sos/14-sos-cancelled.png | partial | P2/M | Cancellation flow wired end to end in P1; the dedicated cancelled surface does not exist (rail/status pill + empty state instead). |
+| sos/15-sos-photo-retry.png | done | P1/H | Photo step shows a processing state, then either a preview with «حذف عکس» or a retryable error with Persian-code-specific copy; re-picking the same file works (input resets). |
 | sos/16-sos-offline.png | missing | P2/M | Only a generic offline banner; no SOS-specific offline guidance/queueing stance. |
 | sos/17-sos-history.png | partial | P2/M | HistoryView lists SOS requests (incident, date, status, tracking code); not the designed SOS history screen. |
 | sos/18-sos-history-detail.png | missing | P2/M | No per-request detail view. |
@@ -115,9 +115,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 |---|---|---|---|
 | mission/01-mission-ready-on.png | missing | P2/H | No responder availability UI. `POST /_user/ready` exists and is server-tested; unwired. Design adds radius + team chips. |
 | mission/02-mission-ready-off.png | missing | P2/H | Same screen, toggle off. |
-| mission/03-mission-offer.png | missing | P1/C | **Core emergency loop open in the client.** Dispatched SOS assigned to the responder arrives via realtime/`sos.load()`; `sos.accept()` and `POST /_user/sos/:id/accept` exist; no view renders the offer (type, severity, distance, requester, accept/decline). Server prevents double-accept (mission-exists conflict + state machine). |
-| mission/04-mission-offer-details.png | missing | P1/H | No offer details sheet (part of the offer screen). |
-| mission/05-mission-accepted.png | missing | P1/H | No accepted confirmation state/transition. |
+| mission/03-mission-offer.png | done | P1/C | Mission screen renders an offer card for dispatched requests the responder may act on (group membership now visible to scoped responders; requester alias exposed): severity, incident icon+label, description, accuracy, manual-pin flag, distance from own fix, requester. Accept goes through the existing endpoint with per-item busy guard, lost-race conflicts surfaced, reload afterwards. **No decline control exists in the backend; deviation documented (not invented).** |
+| mission/04-mission-offer-details.png | partial | P1/H | The offer card carries the designed facts inline; a separate details sheet does not exist. |
+| mission/05-mission-accepted.png | partial | P1/H | Accept lands with a success toast; the offer clears and the mission card shows the live status after reload; the designed accepted-transition surface is not built. |
 | mission/06-mission-dispatch.png | partial | P2/M | Admin dispatch exists; responder-side "dispatched" status only via rail. |
 | mission/07-mission-navigation-active.png | superseded | — | Turn-by-turn navigation superseded. |
 | mission/08-mission-route-alternatives.png | superseded | — | See above. |
@@ -127,7 +127,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/12-support-pending.png | missing | P2/M | Depends on the above. |
 | mission/13-support-accepted-notification.png | missing | P2/M | Depends on the above. |
 | mission/14-team-leader-dashboard.png | missing | P2/M | No TEAM_LEADER role/scope exists (roles: user, responder, admin). Needs product + permission decision. |
-| mission/15-mission-cancel.png | missing | P1/H | `MISSION_ACTIONS` includes `cancel` server-side; no client surface. (SOS cancel tracked under sos/13.) |
+| mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | missing | P2/M | Only 1–5 star rating exists; no report form/notes. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable (rating shown); no designed completion/report surface. |
 | mission/18-mission-no-offer.png | missing | P2/M | Designed "no active offer" state (refresh + radius change) not implemented; pairs with ready toggle. |
@@ -183,7 +183,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | admin-panel/dashboard/01-overview.png | partial | P3/H | KPIs + 7-day trend sparkline + recent requests render. Missing: deltas, delta icons, live operations map with markers, readiness/group availability panel, alerts panel, export/refresh controls, designed grouped sidebar and user footer card. |
-| admin-panel/dashboard/02-dispatch-board.png | partial | P1/H | Queue + groups render; dispatch works (skips memberless/inactive groups). Missing: 3-column board, incident detail panel, **nearest-responders table (`GET /_admin/sos/:id/nearest` exists, server-tested, never called by the client)**, map, manual group/responder selection, cancel. |
+| admin-panel/dashboard/02-dispatch-board.png | partial | P1/H | Done in P1: per-request explicit panel — nearest responders with name/rating/distance/readiness (`GET /_admin/sos/:id/nearest`, now called client-side, loading/empty/error+retry states), picker restricted to active staffed groups, selection restricted to the chosen group's members, dispatch only after explicit group + member choice, panel survives server refusals. Still missing vs design: 3-column board, incident detail panel, map, cancel. |
 | admin-panel/dashboard/03-reports.png | missing | P3/H | No KPI deltas, no period selector, no donut, no 30-day trend, no incidents-by-type, no group-performance table; only status distribution list + two CSV links. |
 
 ## Administrator console — design system (3)
@@ -236,9 +236,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 ## Documented intentional deviations
 
 - **DEV-01 — Recovery account error (auth/06).** The reference shows an explicit "unknown username" error, which is a user-enumeration oracle. Implementation answers unknown usernames with decoy challenges (enumeration-safe), consistent with `docs/SECURITY.md` and the decoy-resistant recovery design. The design image is retained as reference; implementation deliberately diverges.
-- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — its behavior must stay honest (see phase-0 report, Scope).
-- **DEV-03 — Photo without compression (sos/05).** The design implies a bounded compressed photo; the implementation currently ships no compression, so the feature is broken for real photos rather than merely different. Tracked as a P1 defect, not a design decision.
-- **DEV-04 — SOS dock placement.** The reference places the SOS dock bottom-left; implementation centers it. Deviation to be either aligned to the design or documented as a deliberate choice in P5.
+- **DEV-02 — Turn-by-turn navigation family (navigation/08-20, mission/07-08, history/01, profile/01 stats, history "trips").** The 2.0.0 product is the simplified SOS-to-mission workflow; no routing engine. Documented in `docs/ACCEPTANCE.md` ("Legacy feature scope reconciliation") and `docs/LEGACY_REVIEW.md`. The pill still labeled "routing" in the UI opens the plain map — the pill now reads «نقشه» and its behavior is exactly what it says (P1 rename, decision 3).
+- **DEV-03 — Photo without compression (sos/05).** RESOLVED in P1 — the composer validates, downscales and re-encodes client-side under the server's wire cap. Kept for the record.
+- **DEV-04 — SOS dock placement.** RESOLVED in P1 — the dock now hugs the physical left edge (decision 5), above the search bar, clear of the home indicator.
 - **DEV-05 — Profile metrics.** The reference shows trip counts/kilometers; the product has no trips. P2 must replace them with SOS/mission/sharing counts (see design-flaw register).
 
 ## Summary tally (canonical 141)
