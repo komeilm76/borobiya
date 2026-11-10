@@ -399,8 +399,19 @@ export class DrizzleLocationHistoryStore implements LocationHistoryStore {
 
   async recordFix(input: LocationFixInput): Promise<void> {
     await this.db.transaction(async (transaction) => {
+      // Serialize this owner's fixes before reading the newest observation. A separate
+      // max(timestamp) read without the row lock races another in-flight writer, and
+      // an older buffered fix could become the SOS dispatch location after a newer one.
+      const [owner] = await transaction.select({ id: users.id })
+        .from(users).where(eq(users.id, input.userId)).for("update");
+      if (!owner) throw new Error("Location owner no longer exists.");
+      const [newest] = await transaction.select({ timestamp: locationHistory.timestamp })
+        .from(locationHistory).where(eq(locationHistory.userId, input.userId))
+        .orderBy(desc(locationHistory.timestamp)).limit(1);
       const queries = locationFixQueries(transaction as unknown as Database, input);
-      await queries.updateLastLocation;
+      if (!newest || input.timestamp > newest.timestamp) await queries.updateLastLocation;
+      // A delayed observation is still useful for chronological playback. Only the
+      // current marker is guarded; both writes share the transaction and row lock.
       await queries.appendHistory;
     });
   }

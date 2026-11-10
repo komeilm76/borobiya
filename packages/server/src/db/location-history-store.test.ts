@@ -23,6 +23,61 @@ const offlineDb = drizzle(postgres("postgresql://borobiya:unused@127.0.0.1:5432/
 }) as unknown as Database;
 
 describe("location history writes", () => {
+  it("retains delayed observations in history without moving the current SOS location backwards", async () => {
+    const current = new Date("2026-10-21T09:00:00.000Z");
+    const delayed = new Date("2026-10-21T08:00:00.000Z");
+    const latest = { timestamp: null as Date | null, lat: null as number | null };
+    const observations: Date[] = [];
+    let userLocks = 0;
+    let markerWrites = 0;
+    const fake = {
+      transaction: async (write: (tx: unknown) => Promise<void>) => write({
+        select: () => ({
+          from: (table: unknown) => ({
+            where: () => ({
+              // The user row lock must precede the history read: concurrent writers
+              // cannot both decide that their fix is the newest observation.
+              for: async () => { expect(table).toBe(users); userLocks++; return [{ id: ownerId }]; },
+              orderBy: () => ({ limit: async () => {
+                expect(table).toBe(locationHistory);
+                expect(userLocks).toBeGreaterThan(observations.length);
+                return latest.timestamp ? [{ timestamp: latest.timestamp }] : [];
+              } })
+            })
+          })
+        }),
+        update: () => ({ set: (values: { lastLocation: unknown }) => ({
+          where: () => ({ then: (resolve: (value: undefined) => void) => {
+            // Drizzle builders only execute when awaited, not when constructed.
+            expect(values.lastLocation).toBeDefined();
+            markerWrites++;
+            latest.lat = observations.length === 0 ? 35.7 : 36.7;
+            resolve(undefined);
+          } })
+        }) }),
+        insert: () => ({ values: (values: { timestamp: Date }) => ({
+          then: (resolve: (value: undefined) => void) => {
+            observations.push(values.timestamp);
+            if (!latest.timestamp || values.timestamp > latest.timestamp) latest.timestamp = values.timestamp;
+            resolve(undefined);
+          }
+        }) })
+      })
+    } as unknown as Database;
+    const store = new DrizzleLocationHistoryStore(fake);
+    const input: LocationFixInput = { userId: ownerId, lat: 35.7, lon: 51.3, accuracy: 8, timestamp: current };
+    await store.recordFix(input);
+    expect(latest).toEqual({ timestamp: current, lat: 35.7 });
+    await store.recordFix({ ...input, lat: 36.7, timestamp: delayed });
+    await store.recordFix({ ...input, lat: 36.7, timestamp: current }); // equal-time replay
+    expect(observations).toEqual([current, delayed, current]);
+    expect(latest.lat).toBe(35.7);
+    expect(markerWrites).toBe(1);
+    await store.recordFix({ ...input, lat: 37.7, timestamp: new Date(current.getTime() + 1_000) });
+    expect(markerWrites).toBe(2);
+    expect(userLocks).toBe(4);
+  });
+
   it("builds the PostGIS upsert and the history insert with the same fix", () => {
     const input: LocationFixInput = {
       userId: "11111111-1111-4111-8111-111111111111",

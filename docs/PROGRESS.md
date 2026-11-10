@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: keep delayed GPS fixes out of the current SOS marker
+
+- The live service accepts an observation up to 24 hours old for chronological history, but `recordFix` always overwrote `users.last_location`. A delayed fix arriving after a newer one could move the last-known location used by SOS dispatch and the share list backward. The write now locks the owner's row, checks the newest indexed history observation inside the same transaction, and updates the current marker only for a strictly newer timestamp; older/equal observations remain in history. A focused store regression reproduced the backward move before the change and covers delayed, equal-time and subsequent newer fixes. PostGIS execution and real-device concurrency remain unverified on the target VM.
+
 ### 2026-10-23 — Bug hunt: close strict offline map-artifact path escapes
 
 - `vm.py launch --serve-only` refused symlinked graph *files* and the routing root, but an intermediate `routing/car` directory could point outside the selected map library and still pass as a complete graph. A crafted `MAP_REGION` with `../` could also steer file checks outside the selected dataset; noncanonical dataset paths weakened the lexical root check. Offline verification now rejects symlinked routing profile directories, requires a safe single-segment map slug and canonical library/dataset paths before starting containers. Temporary-directory regressions reproduced the graph-symlink and path-alias passes before their guards. No live VM launch was run.
