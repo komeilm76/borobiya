@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: reject incomplete OSRM route legs
+
+- The gateway checked the leg count only for routes with more than two stops. An upstream `code=Ok` reply with a valid polyline but zero or two legs for a two-stop route was returned as HTTP 200, even though the gateway exposes `legs` as the stop-to-stop segments and requests navigation steps. It also accepted null legs or legs without finite metrics/steps. Every route now requires exactly one complete leg per consecutive stop pair; malformed alternatives return a scoped 502 rather than a success with incomplete navigation data. Focused gateway regressions failed before the guards, and the synthetic elevation fixture now models a complete route. Live OSRM/VM verification remains open under T3.5.5.
+
 ### 2026-10-23 — Bug hunt: keep delayed GPS fixes out of the current SOS marker
 
 - The live service accepts an observation up to 24 hours old for chronological history, but `recordFix` always overwrote `users.last_location`. A delayed fix arriving after a newer one could move the last-known location used by SOS dispatch and the share list backward. The write now locks the owner's row, checks the newest indexed history observation inside the same transaction, and updates the current marker only for a strictly newer timestamp; older/equal observations remain in history. A focused store regression reproduced the backward move before the change and covers delayed, equal-time and subsequent newer fixes. PostGIS execution and real-device concurrency remain unverified on the target VM.

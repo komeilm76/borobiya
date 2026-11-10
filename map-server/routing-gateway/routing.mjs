@@ -41,6 +41,12 @@ function validAlternatives(value) {
     (Number.isInteger(value) && value >= 0 && value <= 3);
 }
 
+function validLeg(leg) {
+  return leg !== null && typeof leg === "object" && !Array.isArray(leg) &&
+    Number.isFinite(leg.distance) && leg.distance >= 0 &&
+    Number.isFinite(leg.duration) && leg.duration >= 0 && Array.isArray(leg.steps);
+}
+
 function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null, optimized = false, stopCount = 2) {
   // Trip waypoints are indexed in input order; waypoint_index is the position in the trip.
   // Fail closed if OSRM ever changes either endpoint or returns an ambiguous/malformed order.
@@ -73,12 +79,14 @@ function routeResult(osrmResponse, profile, diagnosis = {}, elevation = null, op
   for (const route of osrmResponse.routes) {
     // OSRM is local, but an Ok response can still be malformed. Do not throw on a null
     // entry or return a 200 that the client must reject (or an unbounded polyline).
+    // Each consecutive pair of stops needs one complete leg, including two-point routes.
     if (!route || typeof route !== "object" || Array.isArray(route) ||
         !Number.isFinite(route.distance) || route.distance < 0 ||
         !Number.isFinite(route.duration) || route.duration < 0 ||
         typeof route.geometry !== "string" || route.geometry.length === 0 ||
         route.geometry.length > 200_000 || !decodePolyline(route.geometry) ||
-        !Array.isArray(route.legs) || (stopCount > 2 && route.legs.length !== stopCount - 1)) {
+        !Array.isArray(route.legs) || route.legs.length !== stopCount - 1 ||
+        !route.legs.every(validLeg)) {
       return json({
         error: "invalid_upstream_response",
         profile,

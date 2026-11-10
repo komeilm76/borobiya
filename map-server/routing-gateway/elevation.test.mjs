@@ -154,7 +154,8 @@ test("a failed multi-tile refresh preserves the previous staged tile and manifes
 test("each returned OSRM alternative gets its own optional DEM summary", async () => {
   const first = encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.2, lon: 51.2 }]);
   const second = encode([{ lat: 35.1, lon: 51.1 }, { lat: 35.2, lon: 52.2 }]);
-  const routes = [first, second].map((geometry) => ({ distance: 1500, duration: 300, geometry, legs: [] }));
+  const routes = [first, second].map((geometry) => ({ distance: 1500, duration: 300, geometry,
+    legs: [{ distance: 1500, duration: 300, steps: [] }] }));
   const response = await handleRoutingRequest(new Request("http://local/route", { method: "POST",
     headers: { "content-type": "application/json" }, body: JSON.stringify({ from: { lat: 35.1, lon: 51.1 },
       to: { lat: 35.2, lon: 51.2 }, profile: "foot" }) }), {

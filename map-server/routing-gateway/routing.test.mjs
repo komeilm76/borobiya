@@ -217,6 +217,33 @@ test("rejects malformed Ok route entries as 502 instead of throwing or serving u
   }
 });
 
+test("rejects an incomplete or surplus leg on a two-stop route before exposing it as usable", async () => {
+  for (const legs of [[], [osrmFixture.routes[0].legs[0], osrmFixture.routes[0].legs[0]]]) {
+    const response = await handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => Response.json({ ...osrmFixture, routes: [
+        osrmFixture.routes[0], { ...osrmFixture.routes[0], legs }
+      ] }),
+      log: () => {}
+    });
+    assert.equal(response.status, 502, `two stops with ${legs.length} legs`);
+    const body = await response.json();
+    assert.equal(body.error, "invalid_upstream_response");
+    assert.equal(body.route_index, 1);
+  }
+});
+
+test("rejects a leg without the requested navigation steps or finite metrics", async () => {
+  for (const legs of [[null], [{}], [{ distance: -1, duration: 10, steps: [] }],
+    [{ distance: 500, duration: 50, steps: null }]]) {
+    const response = await handleRoutingRequest(postRoute(validInput), {
+      fetchImpl: async () => Response.json({ ...osrmFixture, routes: [{ ...osrmFixture.routes[0], legs }] }),
+      log: () => {}
+    });
+    assert.equal(response.status, 502, JSON.stringify(legs));
+    assert.equal((await response.json()).error, "invalid_upstream_response");
+  }
+});
+
 test("rejects malformed alternative geometry even when no DEM is configured", async () => {
   const malformed = ["?", "??", "encoded-polyline",
     encodePoint(95, 51.38) + encodePoint(0.02, 0.03),
