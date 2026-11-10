@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Bug hunt: retire all legacy live-share duplicates when changing modes
+
+- Live-share creation chose a keeper from at most four active rows per owner/recipient pair, then retired only the sibling IDs in that bounded result. A fifth legacy duplicate could remain active, including a permanent share after the owner switched to a timed one. The bounded keeper selection remains, but retirement now uses a pair-scoped, active-only SQL update excluding the keeper, so it covers every duplicate without loading them all. A focused regression failed on the old ID-list predicate and executes the new predicate against five duplicates plus unrelated, expired and already-revoked rows in PGlite. Live PostgreSQL/VM verification remains open.
+
 ### 2026-10-23 — Bug hunt: reject invalid or ambiguous history window times
 
 - The shared local-date converter accepted JavaScript's normalized dates, silently turning 30 February into 2 March and a skipped spring DST hour into a different wall-clock hour when reading or sharing history. It also chose the earlier instant for a repeated fall DST hour even though the picker cannot distinguish the two. Conversion now requires a minute-precision date/time that round-trips to the selected local wall time and rejects repeated hours until an offset-aware picker is available. Focused regressions reproduced both normalized dates and ambiguous fall times before their guards and pass afterward; browser/device timezone verification remains open.

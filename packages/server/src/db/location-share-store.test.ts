@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -24,6 +25,7 @@ const callerDeviceId = randomUUID();
 const targetId = randomUUID();
 
 type Mutation = { type: "insert" | "update"; values: Record<string, unknown> };
+type UpdatePredicate = { sql: string; params: unknown[] };
 
 /** Raw statements (the per-owner advisory lock) are recorded apart from row writes. */
 interface ExecutedStatement { sql: string; params: unknown[] }
@@ -37,10 +39,15 @@ class FakeQuery implements PromiseLike<unknown> {
   readonly limit = vi.fn(() => this);
   readonly leftJoin = vi.fn(() => this);
   readonly from = vi.fn(() => this);
-  readonly where = vi.fn(() => this);
+  readonly where = vi.fn((condition: never) => {
+    if (this.isUpdate) this.updatePredicates.push(dialect.sqlToQuery(condition));
+    return this;
+  });
   readonly orderBy = vi.fn(() => this);
   readonly returning = vi.fn(() => this);
+  private isUpdate = false;
   readonly set = vi.fn((values: Record<string, unknown>) => {
+    this.isUpdate = true;
     this.mutations.push({ type: "update", values });
     return this;
   });
@@ -51,7 +58,8 @@ class FakeQuery implements PromiseLike<unknown> {
 
   constructor(
     private readonly mutations: Mutation[],
-    private readonly next: () => unknown
+    private readonly next: () => unknown,
+    private readonly updatePredicates: UpdatePredicate[]
   ) {}
 
   then<TResult1 = unknown, TResult2 = never>(
@@ -71,10 +79,11 @@ function statementText(statements: { sql: string }[]) {
 
 function makeDatabase(scriptedResults: unknown[][]) {
   const mutations: Mutation[] = [];
+  const updatePredicates: UpdatePredicate[] = [];
   const executed: ExecutedStatement[] = [];
   let index = 0;
   const next = () => scriptedResults[index++] ?? [];
-  const query = () => new FakeQuery(mutations, next);
+  const query = () => new FakeQuery(mutations, next, updatePredicates);
   const transaction = {
     select: query,
     insert: query,
@@ -95,6 +104,7 @@ function makeDatabase(scriptedResults: unknown[][]) {
   return {
     store: new DrizzleLocationShareStore(database),
     mutations,
+    updatePredicates,
     executed,
     get reads() { return index; }
   };
@@ -274,6 +284,67 @@ describe("DrizzleLocationShareStore", () => {
     expect(result.reusedShareIds).toEqual([liveTimed.id]);
     expect(result.createdShareIds).toEqual([]);
     expect(fake.mutations).toEqual([{ type: "update", values: { isRevoked: true } }]);
+  });
+
+  it("retires duplicates beyond the four-row reuse lookup instead of leaving a permanent share active", async () => {
+    const oldPermanent = shareRow({ mode: "permanent", expiresAt: null });
+    const keeper = shareRow({ mode: "timed", expiresAt: new Date("2099-10-21T14:00:00.000Z") });
+    const visible = [oldPermanent, keeper, shareRow({ mode: "permanent", expiresAt: null }),
+      shareRow({ mode: "timed", expiresAt: new Date("2099-10-21T14:00:00.000Z") })];
+    const hiddenPermanent = shareRow({ mode: "permanent", expiresAt: null });
+    // The reuse lookup sees only its first four rows. An id-list UPDATE retires
+    // the three visible siblings but leaves the fifth, wider grant in the database.
+    const fake = makeDatabase([visible, []]);
+    const result = await fake.store.createShares({
+      ownerId, targetUserIds: [targetId], mode: "timed", expiresAt: keeper.expiresAt,
+      note: null, priorityDeviceId: null
+    });
+    expect(result.reusedShareIds).toEqual([keeper.id]);
+    expect(fake.mutations).toEqual([{ type: "update", values: { isRevoked: true } }]);
+    expect(fake.updatePredicates).toHaveLength(1);
+    const retirement = fake.updatePredicates[0]!;
+    // SQL must cover every still-active row of this exact pair except the keeper,
+    // not just the selected ids. The fifth id need not be known to retire it.
+    expect(retirement.sql).toContain('"owner_id" =');
+    expect(retirement.sql).toContain('"target_user_id" =');
+    expect(retirement.sql).toContain('"is_revoked" =');
+    expect(retirement.sql).toContain('"expires_at"');
+    expect(retirement.sql).toContain('"id" <>');
+    expect(retirement.params).toContain(ownerId);
+    expect(retirement.params).toContain(targetId);
+    expect(retirement.params).toContain(keeper.id);
+    expect(retirement.params).not.toContain(hiddenPermanent.id);
+
+    // Execute the actual Drizzle predicate against a five-row legacy pair.
+    // The query must retire the unseen fifth row without touching another
+    // account's share, an already-retired row, or an expired audit row.
+    const db = new PGlite();
+    try {
+      await db.exec(`create table location_shares (
+        id uuid primary key, owner_id uuid not null, target_user_id uuid not null,
+        is_revoked boolean not null, expires_at timestamptz
+      )`);
+      const otherOwner = shareRow({ ownerId: randomUUID(), mode: "permanent", expiresAt: null });
+      const alreadyRevoked = shareRow({ isRevoked: true, mode: "permanent", expiresAt: null });
+      const expired = shareRow({ expiresAt: new Date("2020-01-01T00:00:00.000Z") });
+      for (const row of [...visible, hiddenPermanent, otherOwner, alreadyRevoked, expired]) {
+        await db.query(
+          "insert into location_shares (id, owner_id, target_user_id, is_revoked, expires_at) values ($1, $2, $3, $4, $5)",
+          [row.id, row.ownerId, row.targetUserId, row.isRevoked, row.expiresAt?.toISOString() ?? null]
+        );
+      }
+      await db.query(`update location_shares set is_revoked = true where ${retirement.sql}`, retirement.params);
+      const rows = await db.query<{ id: string; is_revoked: boolean }>("select id, is_revoked from location_shares");
+      const status = new Map(rows.rows.map((row) => [row.id, row.is_revoked]));
+      for (const row of [...visible, hiddenPermanent]) {
+        expect(status.get(row.id)).toBe(row.id !== keeper.id);
+      }
+      expect(status.get(otherOwner.id)).toBe(false);
+      expect(status.get(alreadyRevoked.id)).toBe(true);
+      expect(status.get(expired.id)).toBe(false);
+    } finally {
+      await db.close();
+    }
   });
 
   it("inserts one row per target with the caller's mode and expiry", async () => {

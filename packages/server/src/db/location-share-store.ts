@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { LocationShareMode } from "@borobiya/shared";
 import type { Database } from "./client";
@@ -131,9 +131,8 @@ export interface LocationShareStore {
 }
 
 /**
- * A (owner, target) pair holds at most one active row per mode under the reuse rule below, so this
- * cap is headroom for rows written before the rule existed: a pair that somehow holds more converges
- * on the next request instead of being refused or silently left doubled.
+ * Only a few active rows are needed to choose a keeper for a pair. Old duplicate
+ * rows beyond this selection must still be retired by the set-based update below.
  */
 const MAX_ACTIVE_SHARE_ROWS_PER_PAIR = 4;
 
@@ -353,15 +352,20 @@ export class DrizzleLocationShareStore implements LocationShareStore {
           .limit(MAX_ACTIVE_SHARE_ROWS_PER_PAIR);
 
         const keeper = active.find((row) => row.mode === input.mode) ?? active[0];
-        const siblings = keeper ? active.filter((row) => row.id !== keeper.id) : [];
-        if (siblings.length > 0) {
-          // Retire the other active rows for this pair rather than leave a second arrangement live
-          // behind the one the caller just described. This also cleans up the duplicates the
-          // previous mode-filtered lookup created.
+        if (keeper && active.some((row) => row.id !== keeper.id)) {
+          // The bounded read picks a keeper, not the full set of rows to retire.
+          // Legacy duplicates beyond its limit may include a permanent grant: an
+          // id-list UPDATE would leave it active after a timed replacement.
           await transaction
             .update(locationShares)
             .set({ isRevoked: true })
-            .where(inArray(locationShares.id, siblings.map((row) => row.id)));
+            .where(and(
+              eq(locationShares.ownerId, input.ownerId),
+              eq(locationShares.targetUserId, targetUserId),
+              eq(locationShares.isRevoked, false),
+              sql`(${locationShares.expiresAt} IS NULL OR ${locationShares.expiresAt} > now())`,
+              ne(locationShares.id, keeper.id)
+            ));
         }
 
         if (keeper) {
