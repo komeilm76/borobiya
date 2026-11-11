@@ -15,6 +15,10 @@ Source-level sweep of all 50 client `.vue` files (map, mission, settings, sharin
 
 The second pass caught a pale MapLibre loading canvas and light-only stock zoom/attribution controls, plus faint sharing rows, sidebar launchers, auth-home and public-health buttons. Dark map placeholders and MapLibre control groups now follow the theme, with readable inverted stock zoom icons, dark attribution/scale backgrounds and accent-colored attribution links. The user map's custom two-tone compass is **excluded** from stock-icon inversion; forced-colors mode keeps the browser's own control colors. Share rows and the remaining action outlines use the tested inset/outline tiers. This does not modify the map's own street, terrain or label styling or hide attribution.
 
+## Rendered public/auth follow-up
+
+Headless Chromium at 390px and 1280px showed differentiated dark landing, health and login surfaces. A standalone registration render exposed a Vuetify `warning` fallback: its default `#fb8c00` text was only ~3.94:1 after the 12%-opacity tonal underlay was composited over the dark raised card. The dark Vuetify warning token now uses `#fbd582` (~5.88:1 on that card and at least 4.5:1 over tested inset/translucent surfaces); light retains the original default. The shared theme token also covers warning chips and alerts in mission, SOS history and admin flows. Local API failures during registration were caused by running Vite without the backend, not a production API finding.
+
 ## Still to verify visually
 
-Check the real composited result on a small phone, desktop, iOS Safari and text zoom (including dialogs/teleported overlays and live map tiles). Source tests cannot establish every actual pixel contrast or the visual balance of all transient Vuetify states; address any device-specific misses from screenshots rather than assuming this audit proves full WCAG conformance.
+Check authenticated screens, the real composited result on iOS Safari and at text zoom (including dialogs/teleported overlays and live map tiles). Source tests and public/auth browser checks cannot establish every actual pixel contrast or the visual balance of all transient Vuetify states; address any device-specific misses from screenshots rather than assuming this audit proves full WCAG conformance.

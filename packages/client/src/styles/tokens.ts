@@ -29,14 +29,14 @@ export const palettes = {
   light: {
     background: "#f4f7f6", surface: "#ffffff", primary: "#0e6666",
     secondary: "#e9b35a", accent: "#d77a58", error: "#b83f42",
-    success: "#347c61", info: "#4a7c91",
+    success: "#347c61", info: "#4a7c91", warning: "#fb8c00",
     text: "#193536", muted: "#627a7a", onPrimary: "#ffffff", brand: "#0e6666",
     inset: "#f4f7f6", outline: "#627a7a"
   },
   dark: {
     background: "#111c1d", surface: "#294043", primary: "#71c7be",
     secondary: "#e9b35a", accent: "#f6a987", error: "#ff9999",
-    success: "#79cba3", info: "#95c5da",
+    success: "#79cba3", info: "#95c5da", warning: "#fbd582",
     text: "#edf5f2", muted: "#afc1bc", onPrimary: "#111c1d", brand: "#0e6666",
     // An inset row needs a visible boundary on the raised surface without
     // sacrificing 4.5:1 for muted/primary text inside it.
@@ -68,8 +68,8 @@ export type DesignTheme = keyof typeof palettes;
 
 /** Vuetify and plain CSS derive from one palette; no second palette to drift. */
 export function vuetifyThemeColors(theme: DesignTheme) {
-  const { background, surface, primary, secondary, accent, error, success, info } = palettes[theme];
-  return { background, surface, primary, secondary, accent, error, success, info };
+  const { background, surface, primary, secondary, accent, error, success, info, warning } = palettes[theme];
+  return { background, surface, primary, secondary, accent, error, success, info, warning };
 }
 
 export function designTokenStylesheet(): string {

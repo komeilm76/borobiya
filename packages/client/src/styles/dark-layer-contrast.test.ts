@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { compileStyle, parse } from "vue/compiler-sfc";
 import { describe, expect, it } from "vitest";
-import { palettes } from "./tokens";
+import { palettes, vuetifyThemeColors } from "./tokens";
 
 // Source-level audit: do not mount .vue components (docs/TASKS.md).
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -21,11 +21,15 @@ function contrast(a: string, b: string): number {
 }
 
 const dark = palettes.dark;
-function overWhite(hex: string, alpha: number): string {
+function over(base: string, overlay: string, alpha: number): string {
   return `#${[1, 3, 5].map((index) =>
-    Math.round(parseInt(hex.slice(index, index + 2), 16) * alpha + 255 * (1 - alpha))
+    Math.round(parseInt(overlay.slice(index, index + 2), 16) * alpha
+      + parseInt(base.slice(index, index + 2), 16) * (1 - alpha))
       .toString(16).padStart(2, "0")
   ).join("")}`;
+}
+function overWhite(hex: string, alpha: number): string {
+  return over("#ffffff", hex, alpha);
 }
 
 describe("dark surfaces and widget boundaries", () => {
@@ -34,14 +38,25 @@ describe("dark surfaces and widget boundaries", () => {
     expect(contrast(dark.outline, dark.surface)).toBeGreaterThanOrEqual(3);
     expect(contrast(dark.outline, dark.inset)).toBeGreaterThanOrEqual(3);
     for (const foreground of [dark.text, dark.muted, dark.primary, dark.secondary,
-      dark.accent, dark.error, dark.success, dark.info]) {
+      dark.accent, dark.error, dark.success, dark.info, dark.warning]) {
       expect(contrast(foreground, dark.inset), foreground).toBeGreaterThanOrEqual(4.5);
     }
     expect(contrast(dark.outline, "#1b2e2d")).toBeGreaterThanOrEqual(3); // public cards
     // A bright map tile beneath a translucent dark widget is the worst case.
     for (const foreground of [dark.muted, dark.primary, dark.secondary, dark.accent,
-      dark.error, dark.success, dark.info]) {
+      dark.error, dark.success, dark.info, dark.warning]) {
       expect(contrast(foreground, overWhite(dark.surface, 0.94)), foreground).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps Vuetify warning text legible over its 12%-opacity tonal underlay", () => {
+    // Vuetify's default dark warning (#fb8c00) falls below 4.5:1 after its
+    // underlay is composited onto a raised card (registration retry alert).
+    const warning = dark.warning;
+    expect(vuetifyThemeColors("dark").warning).toBe(warning);
+    expect(vuetifyThemeColors("light").warning).toBe("#fb8c00");
+    for (const base of [dark.surface, dark.inset, overWhite(dark.surface, 0.94)]) {
+      expect(contrast(warning, over(base, warning, 0.12)), base).toBeGreaterThanOrEqual(4.5);
     }
   });
 
