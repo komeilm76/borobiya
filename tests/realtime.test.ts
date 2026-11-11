@@ -97,7 +97,7 @@ it('committed database mutations publish durable events to user and admin socket
   expect(adminEvent.event.audience.includes('role:admin')).toBeTruthy();;
 });
 
-it('live location updates fan out only to active authorized companions', async () => {
+it('live location updates fan out only to active authorized recipients', async () => {
   const peer = waitForMessage(companionSocket, (message) => message.type === WS_EVENTS.LOCATION_PEER && message.userId === 'usr_requester');
   const ack = waitForMessage(ownerSocket, (message) => message.type === WS_EVENTS.ACK && message.kind === WS_EVENTS.LOCATION_UPDATE && message.requestId === 'loc-1');
   sendJson(ownerSocket, {
@@ -107,7 +107,7 @@ it('live location updates fan out only to active authorized companions', async (
   const [peerMessage, ackMessage] = await Promise.all([peer, ack]);
   expect(peerMessage.fix.latitude).toBe(35.7222);;
   expect(peerMessage.fix.accuracy).toBe(9);;
-  // The companions screen renders the sender's name; the payload must carry it.
+  // The Sharing Center renders the sender's name; the payload must carry it.
   expect(typeof peerMessage.username).toBe('string');;
   expect(peerMessage.username.length).toBeGreaterThan(0);;
   expect(ackMessage.recipients >= 1).toBeTruthy();;

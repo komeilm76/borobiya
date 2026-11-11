@@ -15,7 +15,7 @@ import { ROLES } from '../src/shared/protocol.ts';
 
 const VIEWS = {
   auth: ['LoginView', 'RegisterView', 'RecoveryView', 'OnboardingView'],
-  map: ['MapView', 'SosView', 'TalkView', 'MissionView', 'CompanionsView', 'HistoryView', 'ProfileView'],
+  map: ['MapView', 'SosView', 'TalkView', 'MissionView', 'SharingCenterView', 'HistoryView', 'ProfileView'],
   admin: [
     'OverviewView',
     'DispatchView',
@@ -41,9 +41,9 @@ const FIXTURES: Record<string, unknown> = {
     id: 'usr_test', username: 'saeed.k', displayName: 'سعید', role: 'admin',
     securityReady: true, mustCompleteSecurityQuestions: false
   },
-  '/_user/home': { places: [], companions: [], activeSos: null, activeMission: null },
+  '/_user/home': { places: [], shares: [], activeSos: null, activeMission: null },
   '/_user/places': { items: [] },
-  '/_user/companions': { items: [] },
+  '/_user/sharing': { items: [] },
   '/_user/shares': { items: [] },
   '/_user/sos': { items: [] },
   '/_user/missions': { items: [] },
@@ -132,7 +132,7 @@ describe('routed views render', () => {
       SosView: '/_user/sos',
       TalkView: '/_user/talk',
       MissionView: '/_user/mission',
-      CompanionsView: '/_user/companions',
+      SharingCenterView: '/_user/sharing',
       HistoryView: '/_user/history',
       ProfileView: '/_user/profile'
     };

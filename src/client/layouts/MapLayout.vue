@@ -17,7 +17,7 @@ import MapCanvas from '@/components/MapCanvas.vue';
 /**
  * Mobile application shell: the map canvas stays mounted while the bottom sheet shows the
  * active screen. Realtime events, geolocation and the SOS hold gesture live here so they
- * survive route changes between the map, mission, companions and profile screens.
+ * survive route changes between the map, mission, sharing and profile screens.
  */
 const route = useRoute();
 const router = useRouter();
@@ -32,7 +32,7 @@ const toast = useToast();
 const tabs = [
   { name: ROUTE_NAMES.history, label: 'تاریخچه', icon: 'history' },
   { name: ROUTE_NAMES.map, label: 'نقشه', icon: 'routes' },
-  { name: ROUTE_NAMES.companions, label: 'همراهان', icon: 'account-group-outline' },
+  { name: ROUTE_NAMES.sharing, label: 'اشتراک‌گذاری', icon: 'share-variant' },
   { name: ROUTE_NAMES.mission, label: 'مأموریت', icon: 'web' }
 ] as const;
 
@@ -84,7 +84,7 @@ onUnmounted(() => {
 });
 
 useEventListener(window, 'keydown', (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && ['sos', 'talk', 'mission', 'profile', 'companions', 'history'].includes(String(route.name))) {
+  if (event.key === 'Escape' && ['sos', 'talk', 'mission', 'profile', 'sharing', 'history'].includes(String(route.name))) {
     void router.push({ name: ROUTE_NAMES.map });
   }
 });

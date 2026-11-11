@@ -216,7 +216,7 @@ describe('location and peers', () => {
     wrapper.unmount();
   });
 
-  it('counts the companions sharing their location', async () => {
+  it('counts the peers sharing their location', async () => {
     // `peers` is derived from `liveFixes`, which is what the realtime client fills in.
     const { wrapper } = await render((map) => {
       map.liveFixes = {
@@ -300,7 +300,7 @@ describe('navigation', () => {
     wrapper.unmount();
   });
 
-  it('sends the share action to the companions screen', async () => {
+  it('sends the share action to the Sharing Center', async () => {
     const { wrapper, router } = await render((map) => {
       map.places = places(1) as never;
     });
@@ -308,7 +308,7 @@ describe('navigation', () => {
     await wrapper.find('.place-row .text-link').trigger('click');
     await flushPromises();
     // Sharing a destination needs a recipient, which only that screen offers.
-    expect(vi.mocked(push).mock.calls.at(-1)?.[0]).toEqual({ name: ROUTE_NAMES.companions });
+    expect(vi.mocked(push).mock.calls.at(-1)?.[0]).toEqual({ name: ROUTE_NAMES.sharing });
     wrapper.unmount();
   });
 });

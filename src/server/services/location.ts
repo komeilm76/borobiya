@@ -8,6 +8,18 @@ import { isValidPoint } from '../domain/geo.ts';
 import { HTTP_EVENTS, ROLES, WS_EVENTS } from '../../shared/protocol.ts';
 import type { AppContext } from './context.ts';
 
+/** Parses a stored scope JSON array; anything unexpected falls back to the full detail set. */
+function parseScope(value: unknown): ShareScopeDetail[] {
+  try {
+    const parsed = JSON.parse(String(value ?? '[]'));
+    if (!Array.isArray(parsed)) return [...SHARE_SCOPE_DETAILS];
+    const details = parsed.filter((detail): detail is ShareScopeDetail => SHARE_SCOPE_DETAILS.includes(detail as ShareScopeDetail));
+    return details.length ? [...new Set(details)] : [...SHARE_SCOPE_DETAILS];
+  } catch {
+    return [...SHARE_SCOPE_DETAILS];
+  }
+}
+
 interface LiveFix extends Point {
   userId: string;
   accuracy: number;
@@ -16,12 +28,16 @@ interface LiveFix extends Point {
   recordedAt: number;
 }
 
+type ShareScopeDetail = 'route' | 'motion' | 'accuracy';
+const SHARE_SCOPE_DETAILS: readonly ShareScopeDetail[] = ['route', 'motion', 'accuracy'];
+
 interface ShareInput {
   recipientId: string;
   kind: 'live' | 'history';
   durationSeconds?: number;
   historyFrom?: number;
   historyTo?: number;
+  scope?: ShareScopeDetail[];
 }
 
 export interface LiveFixInput extends Point {
@@ -51,9 +67,26 @@ export class LocationService {
     let durationSeconds: number | null = null;
     let historyFrom: number | null = null;
     let historyTo: number | null = null;
+    // A history grant must carry the explicitly selected detail set; live grants carry null
+    // (a live fix has no field-level scope — it either streams or it does not). For backward
+    // compatibility an omitted selection keeps the full detail set (recorded as such).
+    const requestedScope = input.scope && input.scope.length ? [...new Set(input.scope)] : null;
+    if (requestedScope) {
+      const unknown = requestedScope.filter((detail) => !SHARE_SCOPE_DETAILS.includes(detail));
+      if (unknown.length) throw badRequest('Unknown share scope details.', { details: unknown });
+    }
+    const scope = input.kind === 'history'
+      ? JSON.stringify(requestedScope ?? SHARE_SCOPE_DETAILS)
+      : null;
     if (input.kind === 'live') {
-      durationSeconds = input.durationSeconds ?? 3600;
-      expiresAt = now + durationSeconds * 1000;
+      // durationSeconds = 0 requests an indefinite live grant (no expiry; revoke any time).
+      if (input.durationSeconds === 0) {
+        durationSeconds = null;
+        expiresAt = null;
+      } else {
+        durationSeconds = input.durationSeconds ?? 3600;
+        expiresAt = now + durationSeconds * 1000;
+      }
     } else {
       historyFrom = input.historyFrom ?? now - 24 * 60 * 60_000;
       historyTo = input.historyTo ?? now;
@@ -65,9 +98,9 @@ export class LocationService {
     const id = newId('shr');
     const result = this.ctx.uow.commit((tx) => {
       tx.repo.run(
-        `INSERT INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at)
-         VALUES(?,?,?,?,?,?,?,?,?,NULL)`, id, identity.userId, input.recipientId, input.kind,
-        durationSeconds, expiresAt, historyFrom, historyTo, now);
+        `INSERT INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at,scope)
+         VALUES(?,?,?,?,?,?,?,?,?,NULL,?)`, id, identity.userId, input.recipientId, input.kind,
+        durationSeconds, expiresAt, historyFrom, historyTo, now, scope);
       const payload = { shareId: id, ownerId: identity.userId, recipientId: input.recipientId, kind: input.kind, expiresAt };
       tx.event(HTTP_EVENTS.LOCATION_SHARE_CREATED, payload, [`user:${identity.userId}`, `user:${input.recipientId}`]);
       return payload;
@@ -197,19 +230,30 @@ export class LocationService {
 
   history(identity: AuthIdentity, targetUserId: string, from: number, to: number, limit: number): Record<string, unknown> {
     if (from >= to) throw badRequest('History range must be chronological.');
-    const authorized = identity.userId === targetUserId || identity.role === ROLES.ADMIN || this.ctx.repo.one(
-      `SELECT id FROM location_shares WHERE owner_id=? AND recipient_id=? AND kind='history'
-       AND revoked_at IS NULL AND history_from <= ? AND history_to >= ? AND (expires_at IS NULL OR expires_at > ?)`,
+    const isOwnerOrAdmin = identity.userId === targetUserId || identity.role === ROLES.ADMIN;
+    // The grant must explicitly cover the requested window; the recipient then sees only the
+    // detail set the owner selected (route always; motion = speed/heading; accuracy).
+    const grant = isOwnerOrAdmin ? null : this.ctx.repo.one<Record<string, any>>(
+      `SELECT id, scope, history_from, history_to FROM location_shares WHERE owner_id=? AND recipient_id=? AND kind='history'
+       AND revoked_at IS NULL AND history_from <= ? AND history_to >= ? AND (expires_at IS NULL OR expires_at > ?)
+       ORDER BY created_at DESC LIMIT 1`,
       targetUserId, identity.userId, from, to, this.ctx.clock());
-    if (!authorized) throw forbidden('History access was not granted.');
+    if (!isOwnerOrAdmin && !grant) throw forbidden('History access was not granted.');
+    const scopeDetails: ShareScopeDetail[] = grant
+      ? parseScope(grant.scope)
+      : [...SHARE_SCOPE_DETAILS];
+    const includeMotion = scopeDetails.includes('motion');
+    const includeAccuracy = scopeDetails.includes('accuracy');
     const rows = this.ctx.repo.all<Record<string, any>>(
       `SELECT latitude,longitude,accuracy,heading,speed,recorded_at FROM location_points
        WHERE user_id=? AND recorded_at>=? AND recorded_at<=? ORDER BY recorded_at ASC LIMIT ?`,
       targetUserId, from, to, Math.min(1000, limit));
     return {
       items: rows.map((row) => ({
-        latitude: Number(row.latitude), longitude: Number(row.longitude), accuracy: Number(row.accuracy),
-        heading: row.heading === null ? null : Number(row.heading), speed: row.speed === null ? null : Number(row.speed),
+        latitude: Number(row.latitude), longitude: Number(row.longitude),
+        accuracy: includeAccuracy ? Number(row.accuracy) : null,
+        heading: includeMotion && row.heading !== null ? Number(row.heading) : null,
+        speed: includeMotion && row.speed !== null ? Number(row.speed) : null,
         recordedAt: Number(row.recorded_at)
       })),
       total: rows.length
@@ -254,7 +298,8 @@ export class LocationService {
       expiresAt: row.expires_at === null ? null : Number(row.expires_at),
       historyFrom: row.history_from === null ? null : Number(row.history_from),
       historyTo: row.history_to === null ? null : Number(row.history_to),
-      createdAt: Number(row.created_at), revokedAt: row.revoked_at === null ? null : Number(row.revoked_at)
+      createdAt: Number(row.created_at), revokedAt: row.revoked_at === null ? null : Number(row.revoked_at),
+      scope: row.scope === null || row.scope === undefined ? null : parseScope(row.scope)
     };
   }
 }

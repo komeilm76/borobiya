@@ -3,13 +3,13 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { vuetify } from '../src/client/plugins/vuetify.ts';
-import CompanionsView from '../src/client/views/map/CompanionsView.vue';
+import SharingCenterView from '../src/client/views/map/SharingCenterView.vue';
 import { useMapStore } from '../src/client/stores/map.ts';
 import { useAuthStore } from '../src/client/stores/auth.ts';
 import { ROUTE_NAMES, routes as ROUTES } from '../src/client/router/index.ts';
 
 /**
- * The companions screen is the only place a user can see who is sharing a position and how long
+ * The Sharing Center is the only place a user can see who is sharing a position and how long
  * that sharing lasts, so both lists have to render what the store holds.
  *
  * Until this suite existed the view was only ever mounted by the generic "every view mounts" sweep,
@@ -53,9 +53,9 @@ async function render(seed: (map: ReturnType<typeof useMapStore>) => void = () =
   seed(map);
 
   const router = createRouter({ history: createMemoryHistory(), routes: ROUTES });
-  await router.push({ name: ROUTE_NAMES.companions });
+  await router.push({ name: ROUTE_NAMES.sharing });
   await router.isReady();
-  const wrapper = mount(CompanionsView, {
+  const wrapper = mount(SharingCenterView, {
     attachTo: document.body,
     global: { plugins: [pinia, vuetify, router] }
   });
@@ -73,8 +73,8 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('live companions', () => {
-  it('names each companion and reports their accuracy', async () => {
+describe('live peers', () => {
+  it('names each peer and reports their accuracy', async () => {
     const { wrapper } = await render((map) => {
       map.liveFixes = { [PEER.userId]: PEER } as never;
     });
@@ -95,7 +95,7 @@ describe('live companions', () => {
     wrapper.unmount();
   });
 
-  it('counts the companions in the header', async () => {
+  it('counts the peers in the header', async () => {
     const { wrapper } = await render((map) => {
       map.liveFixes = {
         [PEER.userId]: PEER,
@@ -108,7 +108,7 @@ describe('live companions', () => {
 
   it('says nobody is sharing rather than showing an empty list', async () => {
     const { wrapper } = await render();
-    expect(wrapper.text()).toContain('همراهی در حال اشتراک موقعیت نیست');
+    expect(wrapper.text()).toContain('کسی در حال اشتراک موقعیت با شما نیست');
     expect(wrapper.findAll('.peer-row')).toHaveLength(0);
     wrapper.unmount();
   });
@@ -308,6 +308,91 @@ describe('creating a share', () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="share-search-empty"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
+
+describe('Sharing Center — indefinite grant, scope selection and direction filter', () => {
+  it('offers an indefinite live grant and posts durationSeconds 0', async () => {
+    const captured: { body?: Record<string, unknown> } = {};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      let data: unknown = { items: [] };
+      if (path === '/_public/map/config') data = { pois: [] };
+      else if (path === '/_user/places') data = { items: [] };
+      else if (path === '/_user/users/search') data = { items: [{ id: 'usr_reza', username: 'reza.m', role: 'user', readyForMission: false, averageRating: 4.5, online: true }] };
+      else if (path === '/_user/location/shares' && method === 'POST') {
+        captured.body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        data = { ok: true, share: { id: 'shr_new' } };
+      }
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const { wrapper } = await render(() => {}, { withSelf: true });
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('reza');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+    await wrapper.find('[data-testid="share-recipient-reza.m"]').trigger('click');
+    await wrapper.find('[data-testid="share-duration"]').setValue('0');
+    await wrapper.find('[data-testid="share-submit"]').trigger('click');
+    await flushPromises();
+    expect(captured.body).toEqual({ recipientId: 'usr_reza', kind: 'live', durationSeconds: 0 });
+    wrapper.unmount();
+  });
+
+  it('posts the explicitly selected history detail set', async () => {
+    const captured: { body?: Record<string, unknown> } = {};
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      let data: unknown = { items: [] };
+      if (path === '/_public/map/config') data = { pois: [] };
+      else if (path === '/_user/places') data = { items: [] };
+      else if (path === '/_user/users/search') data = { items: [{ id: 'usr_reza', username: 'reza.m', role: 'user', readyForMission: false, averageRating: 4.5, online: true }] };
+      else if (path === '/_user/location/shares' && method === 'POST') {
+        captured.body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        data = { ok: true, share: { id: 'shr_new' } };
+      }
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const { wrapper } = await render(() => {}, { withSelf: true });
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('reza');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+    await wrapper.find('[data-testid="share-recipient-reza.m"]').trigger('click');
+    await wrapper.find('[data-testid="share-kind-history"]').setValue('history');
+    // Deselect accuracy; keep motion.
+    await wrapper.find('[data-testid="share-scope-accuracy"]').setValue(false);
+    await wrapper.find('[data-testid="share-submit"]').trigger('click');
+    await flushPromises();
+    expect(captured.body?.kind).toBe('history');
+    expect(captured.body?.scope).toEqual(['route', 'motion']);
+    wrapper.unmount();
+  });
+
+  it('filters the share list by direction', async () => {
+    const OUT = { id: 'shr_o', ownerId: 'usr_self', recipientId: 'usr_other', recipientUsername: 'reza.m', kind: 'live', expiresAt: 1794136403220, createdAt: 1 };
+    const IN = { id: 'shr_i', ownerId: 'usr_other', ownerUsername: 'maryam.a', recipientId: 'usr_self', kind: 'live', expiresAt: 1794136403220, createdAt: 2 };
+    const { wrapper } = await render((map) => {
+      map.shares = [OUT, IN] as never;
+    }, { withSelf: true });
+    expect(wrapper.findAll('.share-row')).toHaveLength(2);
+    await wrapper.find('[data-testid="share-direction-outgoing"]').trigger('click');
+    expect(wrapper.findAll('.share-row')).toHaveLength(1);
+    expect(wrapper.text()).toContain('reza.m');
+    await wrapper.find('[data-testid="share-direction-incoming"]').trigger('click');
+    expect(wrapper.findAll('.share-row')).toHaveLength(1);
+    expect(wrapper.text()).toContain('maryam.a');
+    await wrapper.find('[data-testid="share-direction-all"]').trigger('click');
+    expect(wrapper.findAll('.share-row')).toHaveLength(2);
     wrapper.unmount();
   });
 });

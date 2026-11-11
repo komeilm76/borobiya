@@ -409,7 +409,7 @@ describe('shell interactions', () => {
   });
 
   it('does not navigate anywhere when a submitted search has no match', async () => {
-    const shell = await mountShell('/_user/companions');
+    const shell = await mountShell('/_user/sharing');
     const input = shell.wrapper.find('[data-testid="map-search"]');
     await input.setValue('چنین جایی وجود ندارد');
     await shell.advance(400);

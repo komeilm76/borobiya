@@ -365,7 +365,7 @@ describe('command effects', () => {
       ['نقشه', ROUTE_NAMES.map],
       ['درخواست امداد', ROUTE_NAMES.sos],
       ['مأموریت', ROUTE_NAMES.mission],
-      ['همراهان', ROUTE_NAMES.companions],
+      ['اشتراک‌گذاری', ROUTE_NAMES.sharing],
       ['تاریخچه', ROUTE_NAMES.history],
       ['نمایه و دستگاه‌ها', ROUTE_NAMES.profile]
     ] as const) {

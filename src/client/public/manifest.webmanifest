@@ -17,6 +17,6 @@
   ],
   "shortcuts": [
     { "name": "نقشه", "short_name": "نقشه", "url": "/_user/map", "icons": [{ "src": "/assets/favicon.svg", "sizes": "any" }] },
-    { "name": "همراهان", "short_name": "همراهان", "url": "/_user/companions", "icons": [{ "src": "/assets/favicon.svg", "sizes": "any" }] }
+    { "name": "اشتراک‌گذاری", "short_name": "اشتراک‌گذاری", "url": "/_user/sharing", "icons": [{ "src": "/assets/favicon.svg", "sizes": "any" }] }
   ]
 }

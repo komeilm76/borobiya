@@ -55,12 +55,14 @@ const placeBody = shape({
   address: displayText(1, 200), icon: text({ min: 2, max: 50, pattern: /^[a-z0-9-]+$/ }),
   rank: optional(number({ min: 1, max: 100, integer: true }))
 });
+const SHARE_SCOPE_KINDS = ['route', 'motion', 'accuracy'] as const;
 const shareBody = shape({
   recipientId: identifier,
   kind: oneOf(SHARE_KINDS),
-  durationSeconds: optional(number({ min: 60, max: 86400, integer: true })),
+  durationSeconds: optional(number({ min: 0, max: 86400, integer: true })),
   historyFrom: optionalTimestamp,
-  historyTo: optionalTimestamp
+  historyTo: optionalTimestamp,
+  scope: optional(array(oneOf(SHARE_SCOPE_KINDS), { min: 1, max: 3 }))
 });
 const sosBody = shape({
   incidentTypeId: identifier,

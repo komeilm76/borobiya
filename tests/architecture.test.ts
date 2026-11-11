@@ -97,7 +97,7 @@ describe('architecture guards', () => {
     const router = await read('src/client/router/index.ts');
     expect(router).toMatch(/createRouter\(/);
     expect(router).toMatch(/RouteRecordRaw/);
-    for (const name of ['adminOverview', 'adminDispatch', 'mission', 'companions', 'talk']) {
+    for (const name of ['adminOverview', 'adminDispatch', 'mission', 'sharing', 'talk']) {
       expect(router, name).toContain(name);
     }
     expect(router).toMatch(/\(\) => import\('@\/views\//);
@@ -177,7 +177,7 @@ describe('architecture guards', () => {
       'app-shell.test.ts',
       'users-service.test.ts',
       'map-view.test.ts',
-      'companions-view.test.ts',
+      'sharing-center-view.test.ts',
       'realtime-store.test.ts',
       'motion.test.ts',
       'talk-floor.test.ts',

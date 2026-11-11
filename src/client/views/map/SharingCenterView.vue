@@ -9,7 +9,7 @@ import { useToast } from '@/composables/useToast.ts';
 import { del, get, post, errorMessage } from '@/api/client.ts';
 import type { UserSearchView } from '@/api/types.ts';
 
-/** Companion screen: live peers, active shares, creating new shares and their expiry. */
+/** Sharing Center («اشتراک‌گذاری»): live peers, incoming/outgoing grants, creating new grants and their expiry. */
 const map = useMapStore();
 const auth = useAuthStore();
 const format = useFormatters();
@@ -64,12 +64,22 @@ const searched = ref(false);
 const shareResults = ref<UserSearchView[]>([]);
 const selectedRecipient = ref<UserSearchView | null>(null);
 const shareKind = ref<ShareKind>('live');
+/** 0 = indefinite live grant (no expiry; revocable at any time). */
 const liveDuration = ref(3600);
+/** Which details a history grant authorizes: route is always shared; these are opt-in. */
+const scopeMotion = ref(true);
+const scopeAccuracy = ref(true);
+const shareDirection = ref<'all' | 'outgoing' | 'incoming'>('all');
 const historyFrom = ref(toLocalInput(Date.now() - 24 * 60 * 60_000));
 const historyTo = ref(toLocalInput(Date.now()));
 const sharing = ref(false);
 
 const shareable = computed(() => Boolean(selectedRecipient.value) && !sharing.value);
+
+/** Grants are inspectable from both sides: outgoing (I share) and incoming (they share). */
+const visibleShares = computed(() => shares.value.filter((share) =>
+  shareDirection.value === 'all'
+  || (shareDirection.value === 'outgoing' ? direction(share) === 'outgoing' : direction(share) === 'incoming')));
 
 /** Mirrors the server's share validation so the form fails fast with Persian copy. */
 const historyRangeError = computed(() => {
@@ -114,6 +124,8 @@ async function submitShare(): Promise<void> {
   } else {
     body.historyFrom = Date.parse(historyFrom.value);
     body.historyTo = Date.parse(historyTo.value);
+    // Explicitly selected detail set: route always, motion/accuracy only when checked.
+    body.scope = ['route', ...(scopeMotion.value ? ['motion'] : []), ...(scopeAccuracy.value ? ['accuracy'] : [])];
   }
   try {
     await post('/_user/location/shares', body);
@@ -135,8 +147,8 @@ async function submitShare(): Promise<void> {
 <template>
   <div class="sheet__head">
     <div>
-      <strong>همراهان</strong>
-      <span>اشتراک موقعیت زنده و تاریخچه</span>
+      <strong>اشتراک‌گذاری</strong>
+      <span>اشتراک موقعیت زنده، تاریخچه و بازه‌های گذشته</span>
     </div>
     <span class="status-pill status-pill--success">{{ format.number(peers.length) }} آنلاین</span>
   </div>
@@ -150,12 +162,12 @@ async function submitShare(): Promise<void> {
         </span>
       </li>
     </TransitionGroup>
-    <p v-if="!peers.length" class="sheet__status">همراهی در حال اشتراک موقعیت نیست.</p>
+    <p v-if="!peers.length" class="sheet__status">کسی در حال اشتراک موقعیت با شما نیست.</p>
 
     <h3 class="sheet__subtitle">اشتراک موقعیت جدید</h3>
     <button type="button" class="ghost-button" data-testid="share-create-toggle" :aria-expanded="sharePanelOpen" @click="sharePanelOpen = !sharePanelOpen">
       <span class="mdi mdi-map-marker-plus-outline" aria-hidden="true" />
-      <span>{{ sharePanelOpen ? 'بستن فرم اشتراک' : 'اشتراک با یک همراه…' }}</span>
+      <span>{{ sharePanelOpen ? 'بستن فرم اشتراک' : 'اشتراک با یک کاربر…' }}</span>
     </button>
     <div v-if="sharePanelOpen" class="share-create" data-testid="share-create-panel">
       <form class="share-search" @submit.prevent="runShareSearch">
@@ -190,6 +202,7 @@ async function submitShare(): Promise<void> {
           <option :value="3600">۱ ساعت</option>
           <option :value="14400">۴ ساعت</option>
           <option :value="86400">۲۴ ساعت</option>
+          <option :value="0">بدون انقضا</option>
         </select>
       </label>
       <template v-else>
@@ -202,6 +215,12 @@ async function submitShare(): Promise<void> {
           <input v-model="historyTo" type="datetime-local" data-testid="share-history-to" />
         </label>
         <p v-if="historyRangeError" class="sheet__status share-error" data-testid="share-history-error">{{ historyRangeError }}</p>
+        <fieldset class="share-kind" data-testid="share-history-scope">
+          <legend>جزئیات قابل مشاهده</legend>
+          <label><input type="checkbox" checked disabled data-testid="share-scope-route" /> مسیر (نقاط و زمان)</label>
+          <label><input v-model="scopeMotion" type="checkbox" data-testid="share-scope-motion" /> سرعت و جهت حرکت</label>
+          <label><input v-model="scopeAccuracy" type="checkbox" data-testid="share-scope-accuracy" /> دقت موقعیت</label>
+        </fieldset>
       </template>
       <button type="button" class="primary-button" data-testid="share-submit" :disabled="!canSubmitShare" @click="submitShare">
         <span class="mdi mdi-share-variant" aria-hidden="true" />
@@ -209,9 +228,16 @@ async function submitShare(): Promise<void> {
       </button>
     </div>
 
-    <h3 class="sheet__subtitle">اشتراک‌های فعال</h3>
+    <h3 class="sheet__subtitle">اشتراک‌های من</h3>
+    <div class="share-direction" role="group" aria-label="فیلتر جهت اشتراک‌گذاری">
+      <button v-for="option in [{ id: 'all', label: 'همه' }, { id: 'outgoing', label: 'ارسالی' }, { id: 'incoming', label: 'دریافتی' }]" :key="option.id"
+        type="button" class="ghost-button" :class="{ 'is-active': shareDirection === option.id }"
+        :data-testid="`share-direction-${option.id}`" @click="shareDirection = option.id as 'all' | 'outgoing' | 'incoming'">
+        {{ option.label }}
+      </button>
+    </div>
     <ul class="share-list">
-      <li v-for="share in shares" :key="share.id" class="share-row">
+      <li v-for="share in visibleShares" :key="share.id" class="share-row">
         <span class="mdi mdi-map-marker-path" aria-hidden="true" />
         <div>
           <strong>{{ share.kind === 'live' ? 'اشتراک زنده' : 'بازه تاریخچه' }} با {{ counterpart(share) }}</strong>
@@ -222,6 +248,6 @@ async function submitShare(): Promise<void> {
         </button>
       </li>
     </ul>
-    <p v-if="!shares.length" class="sheet__status">اشتراک فعالی وجود ندارد.</p>
+    <p v-if="!visibleShares.length" class="sheet__status">اشتراک فعالی وجود ندارد.</p>
   </div>
 </template>

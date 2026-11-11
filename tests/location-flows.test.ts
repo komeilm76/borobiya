@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   apiFetch, closeSocket, createTestServer, issueTicket, login, openSocketWithHello, sendJson,
   waitForMessage, websocketUrl, type TestServer
@@ -301,5 +301,130 @@ describe('share history (include=all)', () => {
     expect(row.state).toBe('expired');
     // Untouched expired rows must not masquerade as active.
     expect(all.json.data.items.every((item: any) => item.state === 'active' || item.state === 'expired' || item.state === 'revoked')).toBe(true);
+  });
+});
+
+describe('Sharing Center grant scope and indefinite live shares', () => {
+  const now = () => server.app.context.clock();
+  beforeEach(() => { server.app.context.limiters.clear(); });
+
+  async function createResponderCookie() {
+    return login(server, 'maryam.a', 'DemoPass!2026');
+  }
+
+  it('creates an indefinite live share (no expiry, stays active until revoked)', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: { recipientId: 'usr_responder', kind: 'live', durationSeconds: 0 }
+    });
+    expect(created.status, created.text).toBe(201);
+    const share = created.json.data.share;
+    expect(share.expiresAt).toBeNull();
+
+    const list = await apiFetch(server, '/_user/location/shares', { cookie });
+    const row = (list.json.data.items as Array<any>).find((item) => item.id === share.shareId);
+    expect(row.state).toBe('active');
+    expect(row.expiresAt).toBeNull();
+    expect(row.durationSeconds).toBeNull();
+
+    const revoked = await apiFetch(server, `/_user/location/shares/${share.shareId}`, { method: 'DELETE', cookie });
+    expect(revoked.status).toBe(200);
+  });
+
+  it('omitted live duration keeps the one-hour default', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: { recipientId: 'usr_responder', kind: 'live' }
+    });
+    expect(created.status, created.text).toBe(201);
+    expect(created.json.data.share.expiresAt).toBeGreaterThan(now());
+  });
+
+  it('a history grant without motion scope hides speed and heading from the recipient', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: {
+        recipientId: 'usr_responder', kind: 'history',
+        historyFrom: now() - 3600_000, historyTo: now() + 30_000,
+        scope: ['route', 'accuracy']
+      }
+    });
+    expect(created.status, created.text).toBe(201);
+    const ownerId = 'usr_companion'; // maryam.a demo account
+    server.app.context.repo.run(
+      "INSERT INTO location_points(user_id,latitude,longitude,accuracy,heading,speed,recorded_at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      ownerId, 35.71, 51.33, 9, 90, 12.5, now() - 1000, now() - 1000);
+    const recipient = await login(server, 'reza.m', 'DemoPass!2026');
+    const range = `from=${now() - 3500_000}&to=${now() + 20_000}`;
+    const history = await apiFetch(server, `/_user/location/history/${ownerId}?${range}`, { cookie: recipient });
+    expect(history.status, history.text).toBe(200);
+    const point = (history.json.data.items as Array<any>).find((item) => item.latitude === 35.71);
+    expect(point).toBeTruthy();
+    expect(point.accuracy).toBe(9);     // selected
+    expect(point.speed).toBeNull();     // not selected
+    expect(point.heading).toBeNull();   // not selected
+  });
+
+  it('a full-scope history grant exposes every detail', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: {
+        recipientId: 'usr_responder', kind: 'history',
+        historyFrom: now() - 3600_000, historyTo: now() + 30_000,
+        scope: ['route', 'motion', 'accuracy']
+      }
+    });
+    expect(created.status).toBe(201);
+    const ownerId = 'usr_companion';
+    server.app.context.repo.run(
+      "INSERT INTO location_points(user_id,latitude,longitude,accuracy,heading,speed,recorded_at,created_at) VALUES(?,?,?,?,?,?,?,?)",
+      ownerId, 35.72, 51.34, 7, 45, 8.5, now() - 500, now() - 500);
+    const recipient = await login(server, 'reza.m', 'DemoPass!2026');
+    const range = `from=${now() - 3500_000}&to=${now() + 20_000}`;
+    const history = await apiFetch(server, `/_user/location/history/${ownerId}?${range}`, { cookie: recipient });
+    const point = (history.json.data.items as Array<any>).find((item) => item.latitude === 35.72);
+    expect(point.speed).toBe(8.5);
+    expect(point.heading).toBe(45);
+    expect(point.accuracy).toBe(7);
+  });
+
+  it('rejects an unknown scope detail with a validation error', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: {
+        recipientId: 'usr_responder', kind: 'history',
+        historyFrom: now() - 3600_000, historyTo: now() + 30_000,
+        scope: ['route', 'battery']
+      }
+    });
+    expect(created.status).toBe(400);
+  });
+
+  it('list shares surfaces the scope of a history grant to both parties', async () => {
+    const cookie = await createResponderCookie();
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie,
+      body: {
+        recipientId: 'usr_responder', kind: 'history',
+        historyFrom: now() - 3600_000, historyTo: now() + 30_000,
+        scope: ['route']
+      }
+    });
+    expect(created.status).toBe(201);
+    const shareId = created.json.data.share.shareId;
+
+    const ownerList = await apiFetch(server, '/_user/location/shares', { cookie });
+    const ownerRow = (ownerList.json.data.items as Array<any>).find((item) => item.id === shareId);
+    expect(ownerRow.scope).toEqual(['route']);
+
+    const recipient = await login(server, 'reza.m', 'DemoPass!2026');
+    const recipientList = await apiFetch(server, '/_user/location/shares?include=all', { cookie: recipient });
+    const recipientRow = (recipientList.json.data.items as Array<any>).find((item) => item.id === shareId);
+    expect(recipientRow.scope).toEqual(['route']);
   });
 });

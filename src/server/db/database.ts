@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -337,6 +337,8 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  *   v6: reconcile the operational owner references with the active leader. Leader replacement
  *       now moves missions.responder_id and sos_requests.assigned_responder_id atomically; this
  *       one-off pass realigns rows written before the fix. Finished missions are untouched.
+ *   v7: location_shares.scope — grants carry the explicitly selected detail set as a JSON array
+ *       ('route' | 'motion' | 'accuracy'). NULL keeps the pre-v7 behaviour (every detail).
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.
@@ -388,6 +390,10 @@ export function openDatabase(config: Config): SqliteDatabase {
     WHERE s.status = 'dispatched' AND s.assigned_responder_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = s.id)
   `);
+  // v7: additive detail scope for historical shares; NULL means the full detail set.
+  if (!database.prepare("SELECT 1 FROM pragma_table_info('location_shares') WHERE name='scope'").get()) {
+    database.exec('ALTER TABLE location_shares ADD COLUMN scope TEXT');
+  }
   // v6: the operational owner references must follow the active leader/membership. Reconcile
   // rows whose designation predates the fix; active leader wins, finished missions stay frozen.
   database.exec(`

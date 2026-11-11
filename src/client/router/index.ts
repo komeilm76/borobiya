@@ -28,7 +28,7 @@ export const ROUTE_NAMES = Object.freeze({
   sos: 'sos',
   talk: 'talk',
   mission: 'mission',
-  companions: 'companions',
+  sharing: 'sharing',
   history: 'history',
   profile: 'profile',
   adminOverview: 'admin-overview',
@@ -104,10 +104,10 @@ export const routes: RouteRecordRaw[] = [
     meta: { layout: 'map', access: 'user', label: 'مأموریت', icon: 'web' }
   },
   {
-    path: '/_user/companions',
-    name: ROUTE_NAMES.companions,
-    component: () => import('@/views/map/CompanionsView.vue'),
-    meta: { layout: 'map', access: 'user', label: 'همراهان', icon: 'account-group-outline' }
+    path: '/_user/sharing',
+    name: ROUTE_NAMES.sharing,
+    component: () => import('@/views/map/SharingCenterView.vue'),
+    meta: { layout: 'map', access: 'user', label: 'اشتراک‌گذاری', icon: 'share-variant' }
   },
   {
     path: '/_user/history',

@@ -30,7 +30,7 @@ const palette = useCommandPalette(() => [
         { id: 'map', label: 'نقشه', icon: 'routes', group: 'نقشه', run: () => router.push({ name: ROUTE_NAMES.map }) },
         { id: 'sos', label: 'درخواست امداد', icon: 'alarm-light', group: 'امداد', run: () => router.push({ name: ROUTE_NAMES.sos }) },
         { id: 'mission', label: 'مأموریت', icon: 'web', group: 'امداد', run: () => router.push({ name: ROUTE_NAMES.mission }) },
-        { id: 'companions', label: 'همراهان', icon: 'account-group-outline', group: 'همراهان', run: () => router.push({ name: ROUTE_NAMES.companions }) },
+        { id: 'sharing', label: 'اشتراک‌گذاری', icon: 'share-variant', group: 'اشتراک‌گذاری', run: () => router.push({ name: ROUTE_NAMES.sharing }) },
         { id: 'history', label: 'تاریخچه', icon: 'history', group: 'تاریخچه', run: () => router.push({ name: ROUTE_NAMES.history }) }
       ]),
   { id: 'profile', label: 'نمایه و دستگاه‌ها', icon: 'account', group: 'حساب', run: () => router.push({ name: ROUTE_NAMES.profile }) },

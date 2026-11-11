@@ -132,7 +132,7 @@ async function saveDestination(): Promise<void> {
           <strong>{{ place.label }}</strong>
           <small>{{ place.address }}</small>
         </span>
-        <button type="button" class="text-link" @click="router.push({ name: ROUTE_NAMES.companions })">اشتراک</button>
+        <button type="button" class="text-link" @click="router.push({ name: ROUTE_NAMES.sharing })">اشتراک</button>
       </li>
     </TransitionGroup>
     <div class="info-card">
