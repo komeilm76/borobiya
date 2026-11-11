@@ -232,6 +232,34 @@ describe("active rescuer mission route picker", () => {
 });
 
 describe("waypoint editing", () => {
+  it("rejects invalid map coordinates without throwing or clearing a valid plan", async () => {
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), ref(mission), undefined, {
+      getTarget: async () => target, getPosition: async () => from, getRoutes: async () => [route]
+    });
+    await picker.open();
+    await picker.findRoutes();
+    expect(picker.addWaypoint({ lat: NaN, lon: 51.4 })).toBe(false);
+    expect(picker.addWaypoint({ lat: 35.7, lon: 540 })).toBe(false);
+    expect(picker.routes.value).toEqual([route]);
+    expect(picker.addWaypoint({ lat: 35.69, lon: 51.39 })).toBe(true);
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.via.value).toEqual([{ lat: 35.69, lon: 51.39 }]);
+  });
+  it("discards a late invalid route without decoding it after a mission switch", async () => {
+    const pending = deferred<typeof route[]>();
+    const id = ref<string | null>(mission);
+    const picker = useMissionRoutes(ref("bearer"), ref("rescuer"), id, undefined, {
+      getTarget: async () => target, getPosition: async () => from, getRoutes: () => pending.promise
+    });
+    await picker.open();
+    const request = picker.findRoutes();
+    await vi.waitFor(() => expect(picker.from.value).toEqual(from));
+    id.value = null;
+    pending.resolve([{ ...route, polyline: "?" }]);
+    await request;
+    expect(picker.routes.value).toEqual([]);
+    expect(picker.error.value).toBeNull();
+  });
   it("reorders by drag/button index, optimizes only via points, and invalidates displayed routes on every edit", async () => {
     const first = { lat: 35.69, lon: 51.39 };
     const second = { lat: 35.695, lon: 51.395 };

@@ -117,10 +117,15 @@ export function useMissionRoutes(
     loading.value = false;
     error.value = null;
   }
-  function addWaypoint(point: RoutePoint): void {
-    if (!visible.value || !target.value || via.value.length >= 6) return;
-    via.value = [...via.value, coordinatesSchema.parse(point)];
+  function addWaypoint(point: RoutePoint): boolean {
+    if (!visible.value || !target.value || via.value.length >= 6) return false;
+    // MapLibre can report world-copy or malformed click coordinates. Invalid
+    // input must not throw out of its event handler or invalidate a good plan.
+    const candidate = coordinatesSchema.safeParse(point);
+    if (!candidate.success) return false;
+    via.value = [...via.value, candidate.data];
     invalidatePlan();
+    return true;
   }
   function removeWaypoint(index: number): void {
     if (!Number.isInteger(index) || index < 0 || index >= via.value.length) return;
@@ -177,13 +182,12 @@ export function useMissionRoutes(
       const planned = waypoints.length
         ? await (runtime.getPlan ?? getMissionRoutePlan)(from.value!, incident, profile.value, waypoints, optimize.value, signal)
         : { routes: await (runtime.getRoutes ?? getMissionRouteChoices)(from.value!, incident, profile.value, signal), order: [0, 1] };
+      if (current !== generation || owner !== userId.value || mission !== missionId.value) return;
       const choices = planned.routes;
       // Validate geometry before showing alternatives; never paint an arbitrary or malformed polyline.
       choices.forEach((choice) => decodeRoutePolyline(choice.polyline));
-      if (current === generation && owner === userId.value && mission === missionId.value) {
-        routes.value = choices;
-        order.value = planned.order;
-      }
+      routes.value = choices;
+      order.value = planned.order;
     } catch (cause) {
       if (current === generation && owner === userId.value && mission === missionId.value) {
         error.value = cause instanceof Error && cause.message === "NO_ROUTE"

@@ -92,11 +92,13 @@
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
         <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
-          :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady">
+          :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady"
+          @close-room="closeTool('team')" @sharing-change="teamSharing = $event">
           <template #map-actions>
             <div v-if="pickingWaypoint" class="mission-desk__map-hint" role="status">
               برای افزودن ایستگاه روی نقشه بزنید.
-              <button type="button" @click="cancelWaypointPick">لغو انتخاب</button>
+              <span v-if="waypointError" role="alert" class="text-error">{{ waypointError }}</span>
+              <button id="mission-cancel-waypoint" type="button" @click="cancelWaypointPick">لغو انتخاب</button>
             </div>
           </template>
           <template #route-planner>
@@ -183,7 +185,8 @@
                 </p>
                 <div v-if="routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
                   <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
-                    label="مرحلهٔ مسیر A تا مقصد" thumb-label="always" @update:model-value="routing.selectStep(Number($event))" />
+                    label="نمایش ایستگاه روی نقشه" thumb-label="always" :disabled="navigation.active.value"
+                    @update:model-value="focusRouteStep(Number($event))" />
                   <p role="status">{{ currentStopLabel }}</p>
                 </div>
                 <div v-if="routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
@@ -242,9 +245,9 @@
           <button id="mission-tool-route" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'route' }"
             :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
             @click="toggleTool('route')"><v-icon icon="mdi-routes" size="22" aria-hidden="true" />مسیر</button>
-          <button id="mission-tool-team" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'team' }"
+          <button id="mission-tool-team" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'team', 'mission-desk__dock-sharing': teamSharing && activeTool !== 'team' }"
             :aria-expanded="activeTool === 'team'" aria-controls="mission-team-panel"
-            @click="toggleTool('team')"><v-icon icon="mdi-account-group-outline" size="22" aria-hidden="true" />اعضا</button>
+            @click="toggleTool('team')"><v-icon :icon="teamSharing ? 'mdi-map-marker-check' : 'mdi-account-group-outline'" size="22" aria-hidden="true" />{{ teamSharing ? 'اشتراک روشن' : 'اعضا' }}</button>
         </nav>
       </div>
     </div>
@@ -298,7 +301,7 @@ import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "m
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
 import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
-import { missionMapCamera } from "@/sos/mission-map";
+import { missionMapCamera, missionRouteStop } from "@/sos/mission-map";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
 import { useMissionRouteGeometry } from "@/sos/mission-route-geometry";
 import { useRouteElevationCharts } from "@/sos/route-elevation-charts";
@@ -335,6 +338,7 @@ const missionIntro = computed(() => {
   return "برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.";
 });
 const mapReady = ref(false);
+const teamSharing = ref(false);
 const activeTool = ref<"status" | "route" | "team" | null>(null);
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
@@ -349,6 +353,18 @@ const currentStopLabel = computed(() => {
   if (inputIndex === routing.via.value.length + 1) return "مقصد نهایی: محل حادثه";
   return `ایستگاه ${inputIndex}: ${routing.via.value[inputIndex! - 1]?.lat.toFixed(5)}, ${routing.via.value[inputIndex! - 1]?.lon.toFixed(5)}`;
 });
+function focusRouteStep(index: number): void {
+  if (!routing.selectedRoute.value || navigation.active.value || !routeMap ||
+      !Number.isInteger(index) || index < 0 || index > routing.via.value.length + 1) return;
+  routing.selectStep(index);
+  const incident = routing.target.value?.incident;
+  if (!incident) return;
+  const point = missionRouteStop(incident, routing.from.value, routing.via.value,
+    routing.order.value, routing.step.value);
+  if (!point) return;
+  highlightRouteStop();
+  routeMap.easeTo({ center: [point.lon, point.lat], zoom: Math.max(14, Math.min(routeMap.getZoom(), 15)), duration: 450 });
+}
 function addTypedWaypoint(): void {
   const lat = Number(waypointLat.value);
   const lon = Number(waypointLon.value);
@@ -357,7 +373,10 @@ function addTypedWaypoint(): void {
     waypointError.value = "مختصات معتبر WGS84 وارد کنید.";
     return;
   }
-  routing.addWaypoint({ lat, lon });
+  if (!routing.addWaypoint({ lat, lon })) {
+    waypointError.value = "ایستگاه افزوده نشد؛ وضعیت مأموریت و تعداد ایستگاه‌ها را بررسی کنید.";
+    return;
+  }
   waypointError.value = "";
   waypointLat.value = "";
   waypointLon.value = "";
@@ -392,7 +411,10 @@ function cancelWaypointPick(): void {
 }
 function toggleWaypointPick(): void {
   pickingWaypoint.value = !pickingWaypoint.value;
+  waypointError.value = "";
   activeTool.value = pickingWaypoint.value ? null : "route";
+  const focusId = pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel";
+  void nextTick(() => document.getElementById(focusId)?.focus({ preventScroll: true }));
 }
 function onWaypointDisclosureToggle(event: Event): void {
   // Closing the optional editor must also end map-pick mode: otherwise the next
@@ -410,10 +432,18 @@ function onWaypointDrop(index: number): void {
 }
 function onRouteMapClick(event: MapMouseEvent): void {
   if (!pickingWaypoint.value || navigation.active.value) return;
-  routing.addWaypoint({ lat: event.lngLat.lat, lon: event.lngLat.lng });
+  // Unbounded MapLibre maps repeat world copies; normalize the longitude before
+  // validating the stop, without allowing an invalid click to dismiss pick mode.
+  const lon = event.lngLat.lng;
+  const normalizedLon = Number.isFinite(lon) ? ((lon + 180) % 360 + 360) % 360 - 180 : lon;
+  if (!routing.addWaypoint({ lat: event.lngLat.lat, lon: normalizedLon })) {
+    waypointError.value = "این نقطه معتبر نیست یا ایستگاه‌ها به سقف ۶ مورد رسیده‌اند؛ نقطهٔ دیگری را انتخاب کنید.";
+    return;
+  }
   pickingWaypoint.value = false;
   activeTool.value = "route";
   waypointError.value = "";
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
 
 const navigation = useRouteNavigation(computed(() => auth.user?.id ?? null),
@@ -433,6 +463,12 @@ let incidentMarker: Marker | null = null;
 let rescuerMarker: Marker | null = null;
 let waypointMarkers: Marker[] = [];
 let detachRouteMap: (() => void) | null = null;
+function highlightRouteStop(): void {
+  const selected = routing.order.value[routing.step.value];
+  const markers = [rescuerMarker, ...waypointMarkers, incidentMarker];
+  markers.forEach((marker, index) => marker?.getElement().classList.toggle(
+    "mission-desk__selected-stop", Boolean(routing.selectedRoute.value) && selected === index));
+}
 const routeSnapshot = useMissionRouteGeometry(routing.selectedRoute);
 function clearRouteOverlays(removeLayer = true): void {
   incidentMarker?.remove();
@@ -471,6 +507,7 @@ function syncRouteMap(): void {
   rescuerMarker = routing.from.value ? new MarkerClass({ color: "#2563a6" })
     .setLngLat([routing.from.value.lon, routing.from.value.lat]).addTo(map) : null;
   rescuerMarker?.getElement().setAttribute("aria-label", "مبدأ محاسبهٔ مسیر؛ نه موقعیت زنده");
+  highlightRouteStop();
   // Route changes frame the plan, but updates must not interrupt active GPS guidance.
   if (!navigation.active.value) {
     const line = routing.selectedRoute.value;
@@ -478,7 +515,7 @@ function syncRouteMap(): void {
       map.fitBounds(routeSnapshot.value.bounds,
         { padding: 60, maxZoom: 15, duration: 450 });
     } else {
-      const camera = missionMapCamera(incident, routing.from.value);
+      const camera = missionMapCamera(incident, routing.from.value, routing.via.value);
       if (camera.kind === "both") map.fitBounds(camera.bounds, { padding: camera.padding, maxZoom: camera.maxZoom, duration: 450 });
       else map.easeTo({ center: camera.center, zoom: camera.zoom, duration: 450 });
     }
@@ -550,6 +587,7 @@ watch(() => [routing.error.value, navigation.error.value] as const, ([routeError
   }
 });
 watch(() => desk.activeMission.value?.id, (next, previous) => {
+  if (next !== previous) teamSharing.value = false;
   if (previous && next !== previous) {
     if (next) closeRoutes(); // Same mounted canvas, new private incident.
     else releaseRouteMap(); // The mission panel is about to unmount.
@@ -581,6 +619,7 @@ const missionSession = computed(() => {
 });
 onMounted(() => { if (missionSession.value) void desk.load(); });
 watch(missionSession, (next) => {
+  teamSharing.value = false;
   closeRoutes();
   desk.reset();
   if (next) void desk.load();
@@ -597,6 +636,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__map-hint button { margin-inline-start: 12px; color: rgb(var(--v-theme-primary)); text-decoration: underline; font: inherit; font-weight: 700; }
 :global(.mission-desk__incident-pin) { display: grid; place-items: center; width: 30px; height: 30px; border: 2px solid white; border-radius: 7px; background: #b91c1c; color: white; font: 900 19px/1 sans-serif; box-shadow: 0 2px 7px #172b38aa; }
 :global(.mission-desk__incident-pin::after) { content: ''; position: absolute; top: 100%; border-inline: 6px solid transparent; border-top: 8px solid #b91c1c; }
+:global(.mission-desk__selected-stop) { outline: 3px solid #fbbf24; outline-offset: 4px; border-radius: 50%; }
 .mission-route__header, .mission-route__controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 20px; }
 .mission-route__header h2 { font-size: 1.2rem; font-weight: 800; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
@@ -761,6 +801,9 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
 .mission-desk__dock .mission-desk__dock-active {
   background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary));
 }
+.mission-desk__dock .mission-desk__dock-sharing {
+  background: rgb(var(--v-theme-error)); color: rgb(var(--v-theme-on-error));
+}
 .mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
 }
@@ -780,7 +823,7 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk__map-heading { max-width: calc(100vw - 8rem); }
   .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
 }
-:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active)) { background: var(--bb-color-inset); }
+:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active):not(.mission-desk__dock-sharing)) { background: var(--bb-color-inset); }
 
 :global(:root.dark .mission-route) { background: #21383a; border-color: var(--bb-color-outline); }
 :global(:root.dark .mission-route__stops),

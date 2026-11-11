@@ -45,6 +45,7 @@
         :tabindex="fullscreen ? -1 : undefined">
         <div v-if="fullscreen" class="live-panel__room-heading">
           <h2>اعضای مأموریت</h2>
+          <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل اعضای مأموریت" @click="emit('close-room')" />
           <v-chip :color="live.connected.value && !live.recoveryPending.value ? 'success' : 'warning'" variant="tonal" size="small">
             {{ !live.connected.value ? 'در حال اتصال / آفلاین' : live.recoveryPending.value ? 'وضعیت مأموریت تأیید نشده' : 'اتصال زنده' }}
           </v-chip>
@@ -115,7 +116,11 @@ const props = withDefaults(defineProps<{
 }>(), {
   center: () => [51.4, 35.7], routeActive: false, fullscreen: false, roomOpen: false
 });
-const emit = defineEmits<{ ready: [map: MapLibreMap, marker: typeof Marker] }>();
+const emit = defineEmits<{
+  ready: [map: MapLibreMap, marker: typeof Marker];
+  "close-room": [];
+  "sharing-change": [sharing: boolean];
+}>();
 const auth = useAuthStore();
 const theme = useThemeStore();
 const mapStyleUrl = computed(() => theme.isDark ? DEFAULT_DARK_MAP_STYLE : DEFAULT_MAP_STYLE);
@@ -123,6 +128,9 @@ const live = useMissionLiveLocations(computed(() => props.mission), computed(() 
   computed(() => auth.user?.id ?? null), () => auth.ensureSession());
 const presence = useMissionPresence(computed(() => props.mission.id), computed(() => auth.accessToken),
   computed(() => auth.user?.id ?? null));
+// Full-screen callers need a persistent disclosure even while the room is closed.
+// The publisher itself remains owned (and stopped on teardown) by this panel.
+watch(live.sharing, (sharing) => emit("sharing-change", sharing), { immediate: true, flush: "sync" });
 const canPublish = computed(() => auth.user?.role === "admin" ||
   auth.user?.id === props.mission.requesterId || auth.user?.id === props.mission.rescuerId);
 const map = shallowRef<MapLibreMap | null>(null);

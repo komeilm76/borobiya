@@ -77,7 +77,19 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(panel).toContain('.live-panel--fullscreen .live-panel__map :deep(.map-canvas)');
     expect(panel).toContain('height: 100%; min-height: 0; border-radius: 0;');
     expect(view).toContain('routing.findRoutes(true)');
-    expect(view).toContain('routing.addWaypoint({ lat, lon })');
+    expect(view).toContain('if (!routing.addWaypoint({ lat, lon }))');
+    expect(view).toContain('missionMapCamera(incident, routing.from.value, routing.via.value)');
+    expect(view).toContain('@update:model-value="focusRouteStep(Number($event))"');
+    expect(view).toContain('missionRouteStop(incident, routing.from.value, routing.via.value,');
+    expect(view).toContain('highlightRouteStop();');
+    expect(view).toContain(':disabled="navigation.active.value"');
+    expect(view).toContain('if (!routing.addWaypoint({ lat: event.lngLat.lat, lon: normalizedLon }))');
+    expect(view).toContain('id="mission-cancel-waypoint"');
+    expect(view).toContain('pickingWaypoint.value ? "mission-cancel-waypoint" : "mission-route-panel"');
+    expect(view).toContain('@sharing-change="teamSharing = $event"');
+    expect(view).toContain('mission-desk__dock-sharing');
+    expect(panel).toContain('watch(live.sharing, (sharing) => emit("sharing-change", sharing)');
+    expect(panel).toContain('aria-label="بستن پنل اعضای مأموریت"');
     for (const [source, filename] of [[view, "UserMissionView.vue"], [panel, "MissionLivePanel.vue"]] as const) {
       const { descriptor } = parse(source, { filename });
       const style = compileStyle({ source: descriptor.styles[0]!.content, filename, id: "data-v-mission-map", scoped: true });

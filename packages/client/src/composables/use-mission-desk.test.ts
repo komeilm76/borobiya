@@ -58,7 +58,7 @@ describe("mission desk cancellation", () => {
     expect(view).toContain("claims?.sub !== owner");
     expect(view).toContain('typeof claims.sessionId !== "string"');
     expect(view).toContain("return JSON.stringify([owner, claims.sessionId]);");
-    expect(view).toContain("watch(missionSession, (next) => {\n  closeRoutes();\n  desk.reset();");
+    expect(view).toContain("watch(missionSession, (next) => {\n  teamSharing.value = false;\n  closeRoutes();\n  desk.reset();");
     expect(view).toContain("if (next) void desk.load()");
     expect(view).toMatch(/watch\(missionSession,[\s\S]*?\{ flush: "sync" \}\);/);
     expect(view).toContain("onMounted(() => { if (missionSession.value) void desk.load(); });");

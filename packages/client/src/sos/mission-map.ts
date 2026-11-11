@@ -4,18 +4,27 @@ export type MissionMapCamera =
   | { kind: "incident"; center: [number, number]; zoom: 14 }
   | { kind: "both"; bounds: [[number, number], [number, number]]; padding: number; maxZoom: number };
 
-export function missionMapCamera(incident: MissionMapPoint, rescuer: MissionMapPoint | null): MissionMapCamera {
-  if (!rescuer || (Math.abs(rescuer.lat - incident.lat) < 0.00001 &&
-      Math.abs(rescuer.lon - incident.lon) < 0.00001)) {
+export function missionRouteStop(incident: MissionMapPoint, origin: MissionMapPoint | null,
+  stops: readonly MissionMapPoint[], order: readonly number[], step: number): MissionMapPoint | null {
+  const inputIndex = order[step];
+  if (!Number.isInteger(inputIndex)) return null;
+  if (inputIndex === 0) return origin;
+  if (inputIndex === stops.length + 1) return incident;
+  return stops[inputIndex! - 1] ?? null;
+}
+
+export function missionMapCamera(incident: MissionMapPoint, rescuer: MissionMapPoint | null,
+  stops: readonly MissionMapPoint[] = []): MissionMapCamera {
+  // Before a route is calculated, frame *all* planned stops as well as the
+  // incident and origin. Otherwise tapping a remote stop immediately pans it
+  // off-screen while the planner claims to show the updated plan.
+  const points = [incident, ...(rescuer ? [rescuer] : []), ...stops];
+  const minLon = Math.min(...points.map((point) => point.lon));
+  const maxLon = Math.max(...points.map((point) => point.lon));
+  const minLat = Math.min(...points.map((point) => point.lat));
+  const maxLat = Math.max(...points.map((point) => point.lat));
+  if (maxLat - minLat < 0.00001 && maxLon - minLon < 0.00001) {
     return { kind: "incident", center: [incident.lon, incident.lat], zoom: 14 };
   }
-  return {
-    kind: "both",
-    bounds: [
-      [Math.min(incident.lon, rescuer.lon), Math.min(incident.lat, rescuer.lat)],
-      [Math.max(incident.lon, rescuer.lon), Math.max(incident.lat, rescuer.lat)]
-    ],
-    padding: 64,
-    maxZoom: 15
-  };
+  return { kind: "both", bounds: [[minLon, minLat], [maxLon, maxLat]], padding: 64, maxZoom: 15 };
 }
