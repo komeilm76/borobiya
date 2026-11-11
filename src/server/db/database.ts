@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -249,6 +249,64 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_time ON audit_log(created_at DESC);
+CREATE TABLE IF NOT EXISTS support_requests (
+  id TEXT PRIMARY KEY,
+  mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  requested_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reason TEXT NOT NULL,
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','partially_approved','approved','rejected','cancelled')),
+  admin_note TEXT,
+  reviewed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  cancelled_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_support_requests_status ON support_requests(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_requests_mission ON support_requests(mission_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_requests_requester ON support_requests(requested_by, created_at DESC);
+CREATE TABLE IF NOT EXISTS support_request_items (
+  request_id TEXT NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  job_type_id TEXT NOT NULL REFERENCES job_types(id),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  approved_quantity INTEGER NOT NULL DEFAULT 0 CHECK (approved_quantity >= 0),
+  PRIMARY KEY (request_id, job_type_id)
+);
+CREATE TABLE IF NOT EXISTS support_request_decisions (
+  id TEXT PRIMARY KEY,
+  request_id TEXT NOT NULL REFERENCES support_requests(id) ON DELETE CASCADE,
+  admin_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  decision TEXT NOT NULL CHECK (decision IN ('approved','partially_approved','rejected')),
+  note TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_support_request_decisions_request ON support_request_decisions(request_id, created_at);
+CREATE TABLE IF NOT EXISTS mission_requirements (
+  mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  job_type_id TEXT NOT NULL REFERENCES job_types(id),
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  PRIMARY KEY (mission_id, job_type_id)
+);
+CREATE TABLE IF NOT EXISTS mission_members (
+  id TEXT PRIMARY KEY,
+  mission_id TEXT NOT NULL REFERENCES missions(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('leader','member')),
+  assignment_source TEXT NOT NULL CHECK (assignment_source IN ('legacy_backfill','offer_accept','immediate_dispatch','admin_assignment','support_request','team_dispatch')),
+  assignment_status TEXT NOT NULL DEFAULT 'active' CHECK (assignment_status IN ('active','removed')),
+  assigned_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  support_request_id TEXT REFERENCES support_requests(id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  removed_at INTEGER,
+  removed_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  removal_reason TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mission_members_active_unique ON mission_members(mission_id, user_id) WHERE assignment_status = 'active';
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mission_members_one_leader ON mission_members(mission_id) WHERE role = 'leader' AND assignment_status = 'active';
+CREATE INDEX IF NOT EXISTS idx_mission_members_mission ON mission_members(mission_id, assignment_status);
+CREATE INDEX IF NOT EXISTS idx_mission_members_user ON mission_members(user_id, assignment_status);
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL,
@@ -272,6 +330,10 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  *   v1 -> v2: sos_requests.photo_data_url, users.job_type_id
  *   v3: job_types catalog, mission_offers table (with pre-offer pending backfill)
  *   v4: mission_offers.expired_at (offers expire; exact expiry moment recorded)
+ *   v5: mission teams - support_requests, support_request_items, support_request_decisions,
+ *       mission_requirements and mission_members (leader/members, unique active membership,
+ *       at most one active leader per mission); existing missions are backfilled with a
+ *       leader membership for their assigned responder. Genuine acceptance history is kept.
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.
@@ -303,6 +365,17 @@ export function openDatabase(config: Config): SqliteDatabase {
   ensureColumn(database, 'users', 'job_type_id', 'TEXT REFERENCES job_types(id)');
   // v4: offers gain an exact expired_at; pre-existing terminal rows keep NULL (unknown expiry moment).
   ensureColumn(database, 'mission_offers', 'expired_at', 'INTEGER');
+  // v5: backfill a leader membership for pre-team missions. The acceptor becomes the leader;
+  // an accepted offer proves the acceptance path, otherwise treat the assignment as legacy.
+  database.exec(`
+    INSERT INTO mission_members(id, mission_id, user_id, role, assignment_source, assignment_status, created_at, updated_at)
+    SELECT 'mm_' || m.id || '_' || m.responder_id, m.id, m.responder_id, 'leader',
+           CASE WHEN EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = m.sos_id AND o.responder_id = m.responder_id AND o.status = 'accepted')
+                THEN 'offer_accept' ELSE 'legacy_backfill' END,
+           'active', m.created_at, m.updated_at
+    FROM missions m
+    WHERE NOT EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id = m.id AND mm.user_id = m.responder_id AND mm.assignment_status = 'active')
+  `);
   // Offer backfill for databases that predate the offers table: a named, dispatched SOS with no
   // offer row would otherwise be unacceptable. Idempotent, never re-creates declined/accepted rows.
   database.exec(`
@@ -412,6 +485,10 @@ export async function seedDatabase(database: SqliteDatabase, config: Config): Pr
   }
   insert('INSERT OR IGNORE INTO missions(id,sos_id,responder_id,status,rating,created_at,updated_at,completed_at,cancelled_at) VALUES(?,?,?,?,?,?,?,?,?)',
     'mis_demo_completed', 'sos_demo_completed', 'usr_responder', 'completed', 5, now - 550_000, now - 120_000, now - 120_000, null);
+  // Seed the demo mission's leader membership so fresh installs match the v5 backfill.
+  insert(`INSERT OR IGNORE INTO mission_members(id,mission_id,user_id,role,assignment_source,assignment_status,created_at,updated_at)
+    VALUES('mm_mis_demo_completed_usr_responder','mis_demo_completed','usr_responder','leader','legacy_backfill','active',?,?)`,
+    now - 550_000, now - 120_000);
   insert('INSERT OR IGNORE INTO alerts(id,kind,severity,message,meta_json,created_at,resolved_at,resolved_by) VALUES(?,?,?,?,?,?,?,?)',
     'alt_demo_1', 'coverage', 'warning', 'گروه کوهستان پوشش کافی ندارد', '{"group":"کوهستان"}', now - 240_000, null, null);
   insert('INSERT OR IGNORE INTO alerts(id,kind,severity,message,meta_json,created_at,resolved_at,resolved_by) VALUES(?,?,?,?,?,?,?,?)',

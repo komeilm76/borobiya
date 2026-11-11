@@ -3,6 +3,8 @@ import { badRequest, conflict, forbidden, notFound } from '../core/errors.ts';
 import { newId, sha256 } from '../core/crypto.ts';
 import { haversineMeters, type Point } from '../../shared/geo.ts';
 import { transitionMission, transitionSos } from '../domain/state.ts';
+import { policyOf, readinessGate } from '../domain/eligibility.ts';
+import { insertMissionMembership } from './teams.ts';
 import type { Transaction } from '../db/unit-of-work.ts';
 import type { SqlValue } from '../db/repository.ts';
 import { HTTP_EVENTS, MISSION_STATUS, ROLES, SOS_STATUS } from '../../shared/protocol.ts';
@@ -159,10 +161,8 @@ export class SosService {
       throw badRequest('Every responder must be an active member of the selected group.', { field: 'responderIds' });
     }
     const eligible = responders as Array<Record<string, any>>;
-    /** Missing or disabled job types fall back to the strictest policy. */
-    const policyOf = (row: Record<string, any>): string =>
-      row.offer_policy && Number(row.job_type_active) ? String(row.offer_policy) : 'ready_only';
-    const blocked = eligible.filter((row) => policyOf(row) === 'ready_only' && !Number(row.ready_for_mission));
+    // Missing or disabled job types fall back to the strictest policy (shared readiness gate).
+    const blocked = eligible.filter((row) => !readinessGate(row as any).ok);
     if (blocked.length) {
       throw badRequest('Some responders are not on standby and their job type only receives offers while ready.', {
         field: 'responderIds', userIds: blocked.map((row) => String(row.id))
@@ -177,14 +177,17 @@ export class SosService {
     return this.ctx.uow.commit((tx) => {
       const now = this.ctx.clock();
       const namedOffer = mode === 'offer' && responderIds.length === 1 ? responderIds[0] : null;
-      tx.repo.run('UPDATE sos_requests SET status=?, assigned_group_id=?, assigned_responder_id=?, updated_at=? WHERE id=?',
-        targetSosStatus, input.groupId, mode === 'immediate' ? responderIds[0] : namedOffer, now, sosId);
+      // Re-checked inside the transaction: a concurrent cancel/dispatch wins cleanly.
+      const dispatched = tx.repo.run(
+        'UPDATE sos_requests SET status=?, assigned_group_id=?, assigned_responder_id=?, updated_at=? WHERE id=? AND status=?',
+        targetSosStatus, input.groupId, mode === 'immediate' ? responderIds[0] : namedOffer, now, sosId, SOS_STATUS.PENDING);
+      if (!dispatched.changes) throw conflict('This request cannot be dispatched anymore.');
       let missionId: string | undefined;
       if (mode === 'offer') {
         for (const responder of eligible) {
           tx.repo.run(
             `INSERT INTO mission_offers(id, sos_id, responder_id, policy, status, created_at) VALUES(?,?,?,?,?,?)`,
-            newId('off'), sosId, String(responder.id), policyOf(responder), 'pending', now);
+            newId('off'), sosId, String(responder.id), policyOf(responder as any), 'pending', now);
         }
       } else {
         missionId = newId('mis');
@@ -192,6 +195,9 @@ export class SosService {
           missionId, sosId, responderIds[0], MISSION_STATUS.ASSIGNED, now, now);
         tx.repo.run(`INSERT INTO mission_events(mission_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?)`,
           missionId, identity.userId, 'assign', '', MISSION_STATUS.ASSIGNED, 'Immediate dispatch', now);
+        insertMissionMembership(tx, {
+          missionId, userId: responderIds[0], role: 'leader', source: 'immediate_dispatch', assignedBy: identity.userId, now
+        });
       }
       tx.event(HTTP_EVENTS.SOS_DISPATCHED, {
         sosId, status: targetSosStatus, groupId: input.groupId, responderIds, dispatchedBy: identity.userId, mode, createdAt: now
@@ -199,6 +205,8 @@ export class SosService {
       if (missionId) {
         tx.event(HTTP_EVENTS.MISSION_UPDATED, { missionId, sosId, status: MISSION_STATUS.ASSIGNED, sosStatus: targetSosStatus, action: 'assign', actorId: identity.userId, createdAt: now },
           [`user:${sos.requester_id}`, `user:${responderIds[0]}`, 'role:admin', `mission:${missionId}`, `sos:${sosId}`]);
+        tx.event(HTTP_EVENTS.MISSION_TEAM_UPDATED, { missionId, leaderId: responderIds[0], actorId: identity.userId, createdAt: now },
+          [`user:${sos.requester_id}`, `user:${responderIds[0]}`, 'role:admin', `mission:${missionId}`]);
       }
       return {
         ok: true, sosId, status: targetSosStatus, groupId: input.groupId, responderIds, mode,
@@ -235,7 +243,7 @@ export class SosService {
     const me = this.ctx.repo.one<Record<string, any>>(
       `SELECT u.ready_for_mission, jt.offer_policy, jt.active AS job_type_active
        FROM users u LEFT JOIN job_types jt ON jt.id = u.job_type_id WHERE u.id=?`, identity.userId);
-    const policy = me?.offer_policy && Number(me.job_type_active) ? String(me.offer_policy) : 'ready_only';
+    const policy = me ? policyOf(me as any) : 'ready_only';
     const ready = Boolean(Number(me?.ready_for_mission ?? 0));
     if (policy === 'ready_only' && !ready) {
       throw conflict('Your job type may only receive missions while you are on standby.');
@@ -274,6 +282,9 @@ export class SosService {
       tx.repo.run(
         `INSERT INTO mission_events(mission_id,actor_id,action,from_status,to_status,note,created_at) VALUES(?,?,?,?,?,?,?)`,
         missionId, identity.userId, 'accept', MISSION_STATUS.PENDING, MISSION_STATUS.ON_THE_WAY, null, now);
+      insertMissionMembership(tx, {
+        missionId, userId: identity.userId, role: 'leader', source: 'offer_accept', assignedBy: null, now
+      });
       if (offers.length) {
         tx.repo.run(`UPDATE mission_offers SET status='accepted', responded_at=? WHERE sos_id=? AND responder_id=?`, now, sosId, identity.userId);
         tx.repo.run(`UPDATE mission_offers SET status='cancelled', responded_at=? WHERE sos_id=? AND status='pending' AND responder_id<>?`, now, sosId, identity.userId);
@@ -281,6 +292,8 @@ export class SosService {
       tx.event(HTTP_EVENTS.SOS_ACCEPTED, {
         sosId, missionId, status: transition.next, responderId: identity.userId, createdAt: now
       }, [`user:${sos.requester_id}`, `user:${identity.userId}`, 'role:admin', `sos:${sosId}`, `mission:${missionId}`]);
+      tx.event(HTTP_EVENTS.MISSION_TEAM_UPDATED, { missionId, leaderId: identity.userId, createdAt: now },
+        [`user:${identity.userId}`, 'role:admin', `mission:${missionId}`]);
       return { ok: true, sosId, missionId, status: transition.next, missionStatus: MISSION_STATUS.ON_THE_WAY, readyForMission: autoReady ? true : undefined };
     });
   }

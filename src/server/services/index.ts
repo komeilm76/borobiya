@@ -3,6 +3,7 @@ import { AuthService } from './auth.ts';
 import { UserService } from './users.ts';
 import { LocationService } from './location.ts';
 import { SosService } from './sos.ts';
+import { TeamService } from './teams.ts';
 import { AdminService } from './admin.ts';
 import { MapService } from './map.ts';
 import { RealtimeService } from './realtime.ts';
@@ -12,6 +13,7 @@ export interface Services {
   users: UserService;
   location: LocationService;
   sos: SosService;
+  teams: TeamService;
   admin: AdminService;
   map: MapService;
   realtime: RealtimeService;
@@ -22,9 +24,10 @@ export function createServices(context: AppContext): Services {
   const auth = new AuthService(context);
   const location = new LocationService(context);
   const sos = new SosService(context);
+  const teams = new TeamService(context);
   const users = new UserService(context);
   const admin = new AdminService(context);
   const map = new MapService(context);
   const realtime = new RealtimeService(context);
-  return { auth, users, location, sos, admin, map, realtime };
+  return { auth, users, location, sos, teams, admin, map, realtime };
 }

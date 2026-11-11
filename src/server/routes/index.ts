@@ -111,6 +111,40 @@ const auditQuery: Validator<unknown> = shape({
 }, { allowUnknown: true });
 const alertsQuery: Validator<unknown> = shape({ includeResolved: optional(boolean()) }, { allowUnknown: true });
 const nearestQuery: Validator<unknown> = shape({ limit: optionalLimit }, { allowUnknown: true });
+const requirementItem = shape({ jobTypeId: identifier, quantity: number({ min: 1, max: 20, integer: true }) });
+const requirementList = array(requirementItem, { min: 0, max: 10 });
+const supportRequestBody = shape({
+  items: array(requirementItem, { min: 1, max: 10 }),
+  reason: text({ min: 10, max: 300 }),
+  note: optional(text({ max: 200, allowEmpty: true }))
+});
+const memberAddBody = shape({ userIds: array(identifier, { min: 1, max: 10 }) });
+const leaderBody = shape({ userId: identifier });
+const memberRemoveBody = shape({ reason: optional(text({ max: 200, allowEmpty: true })) });
+const requirementsBody = shape({ requirements: requirementList });
+const teamDispatchBody = shape({
+  groupId: identifier,
+  leaderId: identifier,
+  requirements: array(requirementItem, { min: 1, max: 10 }),
+  memberIds: optional(array(identifier, { min: 0, max: 12 }))
+});
+const reviewBody = shape({
+  decision: oneOf(['approved', 'partially_approved', 'rejected'] as const),
+  adminNote: optional(text({ max: 500, allowEmpty: true })),
+  items: optional(array(shape({ jobTypeId: identifier, approvedQuantity: number({ min: 0, max: 20, integer: true }) }), { min: 1, max: 10 })),
+  userIds: optional(array(identifier, { min: 1, max: 20 }))
+});
+const candidatesQuery: Validator<unknown> = shape({
+  jobTypeId: optional(identifier),
+  q: optional(text({ min: 1, max: 32 })),
+  includeIneligible: optional(boolean()),
+  limit: optionalLimit
+}, { allowUnknown: true });
+const supportRequestsQuery: Validator<unknown> = shape({
+  status: optional(oneOf(['pending', 'partially_approved', 'approved', 'rejected', 'cancelled'])),
+  missionId: optional(identifier),
+  limit: optionalLimit
+}, { allowUnknown: true });
 
 function actor(ctx: RequestContext<AppContext>): AuthIdentity {
   if (!ctx.auth) throw forbidden('Authentication is required.');
@@ -257,6 +291,20 @@ export function registerRoutes(router: Router<AppContext>): void {
     return ok(ctx.app.services.sos.rateMission(actor(ctx), ctx.params.id, input.rating, input.note));
   } });
 
+  // Mission teams and support requests.
+  router.add({ method: 'GET', path: '/_user/missions/:id/team', auth: 'user', tags: ['mission'], summary: 'Mission team', handler: (ctx) =>
+    ok(ctx.app.services.teams.getTeam(actor(ctx), ctx.params.id)) });
+  router.add({ method: 'GET', path: '/_user/missions/:id/support-requests', auth: 'user', query: limitQuery, tags: ['mission'], summary: 'Support requests for the mission', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.teams.listSupportRequests(actor(ctx), ctx.params.id, Number(input.limit ?? 50)));
+  } });
+  router.add({ method: 'POST', path: '/_user/missions/:id/support-requests', auth: 'user', body: supportRequestBody, rate: RATE.mutation, tags: ['mission'], summary: 'Request staff support (mission leader)', handler: (ctx) => {
+    const input = body<{ items: Array<{ jobTypeId: string; quantity: number }>; reason: string; note?: string }>(ctx);
+    return created(ctx.app.services.teams.createSupportRequest(actor(ctx), ctx.params.id, input));
+  } });
+  router.add({ method: 'POST', path: '/_user/missions/:id/support-requests/:requestId/cancel', auth: 'user', rate: RATE.mutation, tags: ['mission'], summary: 'Cancel own pending support request (mission leader)', handler: (ctx) =>
+    ok(ctx.app.services.teams.cancelSupportRequest(actor(ctx), ctx.params.id, ctx.params.requestId)) });
+
   // Administration.
   router.add({ method: 'GET', path: '/_admin/overview', auth: 'admin', tags: ['admin'], summary: 'Operations overview', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
   router.add({ method: 'GET', path: '/_admin/reports', auth: 'admin', tags: ['admin'], summary: 'Reports', handler: (ctx) => ok(ctx.app.services.admin.overview()) });
@@ -327,6 +375,47 @@ export function registerRoutes(router: Router<AppContext>): void {
   router.add({ method: 'POST', path: '/_admin/sos/:id/dispatch', auth: 'admin', body: shape({ groupId: identifier, responderIds: array(identifier, { min: 1, max: 20 }), mode: optional(oneOf(['offer', 'immediate'])) }), rate: RATE.emergency, tags: ['admin'], summary: 'Dispatch SOS', handler: (ctx) => {
     const input = body<{ groupId: string; responderIds: string[]; mode?: 'offer' | 'immediate' }>(ctx);
     return ok(ctx.app.services.sos.dispatch(actor(ctx), ctx.params.id, input));
+  } });
+  router.add({ method: 'POST', path: '/_admin/sos/:id/team-dispatch', auth: 'admin', body: teamDispatchBody, rate: RATE.emergency, tags: ['admin'], summary: 'Create a team mission (leader + composition)', handler: (ctx) => {
+    const input = body<{ groupId: string; leaderId: string; requirements: Array<{ jobTypeId: string; quantity: number }>; memberIds?: string[] }>(ctx);
+    return created(ctx.app.services.teams.teamDispatch(actor(ctx), ctx.params.id, input));
+  } });
+  router.add({ method: 'GET', path: '/_admin/missions/:id/team', auth: 'admin', tags: ['mission'], summary: 'Mission team (admin)', handler: (ctx) =>
+    ok(ctx.app.services.teams.getTeam(actor(ctx), ctx.params.id)) });
+  router.add({ method: 'POST', path: '/_admin/missions/:id/members', auth: 'admin', body: memberAddBody, rate: RATE.mutation, tags: ['admin'], summary: 'Add workers to the mission', handler: (ctx) => {
+    const input = body<{ userIds: string[] }>(ctx);
+    return ok(ctx.app.services.teams.addMembers(actor(ctx), ctx.params.id, input.userIds));
+  } });
+  router.add({ method: 'DELETE', path: '/_admin/missions/:id/members/:userId', auth: 'admin', body: memberRemoveBody, rate: RATE.mutation, tags: ['admin'], summary: 'Remove a member from the mission', handler: (ctx) => {
+    const input = body<{ reason?: string }>(ctx);
+    return ok(ctx.app.services.teams.removeMember(actor(ctx), ctx.params.id, ctx.params.userId, input.reason));
+  } });
+  router.add({ method: 'POST', path: '/_admin/missions/:id/leader', auth: 'admin', body: leaderBody, rate: RATE.mutation, tags: ['admin'], summary: 'Designate the mission leader', handler: (ctx) => {
+    const input = body<{ userId: string }>(ctx);
+    return ok(ctx.app.services.teams.designateLeader(actor(ctx), ctx.params.id, input.userId));
+  } });
+  router.add({ method: 'PUT', path: '/_admin/missions/:id/requirements', auth: 'admin', body: requirementsBody, rate: RATE.mutation, tags: ['admin'], summary: 'Set the target composition of the mission', handler: (ctx) => {
+    const input = body<{ requirements: Array<{ jobTypeId: string; quantity: number }> }>(ctx);
+    return ok(ctx.app.services.teams.setRequirements(actor(ctx), ctx.params.id, input.requirements));
+  } });
+  router.add({ method: 'GET', path: '/_admin/support-requests', auth: 'admin', query: supportRequestsQuery, tags: ['admin'], summary: 'Support requests', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.teams.listSupportRequestsAdmin(actor(ctx), input.status ? String(input.status) : undefined, input.missionId ? String(input.missionId) : undefined, Number(input.limit ?? 50)));
+  } });
+  router.add({ method: 'GET', path: '/_admin/support-requests/:id', auth: 'admin', tags: ['admin'], summary: 'Support request detail', handler: (ctx) =>
+    ok(ctx.app.services.teams.supportRequestDetail(actor(ctx), ctx.params.id)) });
+  router.add({ method: 'GET', path: '/_admin/support-requests/:id/candidates', auth: 'admin', query: candidatesQuery, tags: ['admin'], summary: 'Eligible workers for a support request', handler: (ctx) => {
+    const input = query<Record<string, any>>(ctx);
+    return ok(ctx.app.services.teams.candidates(actor(ctx), ctx.params.id, {
+      jobTypeId: input.jobTypeId ? String(input.jobTypeId) : undefined,
+      q: input.q ? String(input.q) : undefined,
+      includeIneligible: Boolean(input.includeIneligible ?? false),
+      limit: input.limit === undefined ? undefined : Number(input.limit)
+    }));
+  } });
+  router.add({ method: 'POST', path: '/_admin/support-requests/:id/review', auth: 'admin', body: reviewBody, rate: RATE.mutation, tags: ['admin'], summary: 'Review a support request and assign workers', handler: (ctx) => {
+    const input = body<{ decision: 'approved' | 'partially_approved' | 'rejected'; adminNote?: string; items?: Array<{ jobTypeId: string; approvedQuantity: number }>; userIds?: string[] }>(ctx);
+    return ok(ctx.app.services.teams.reviewSupportRequest(actor(ctx), ctx.params.id, input));
   } });
 }
 
