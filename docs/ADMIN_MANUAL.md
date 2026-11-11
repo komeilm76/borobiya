@@ -12,7 +12,7 @@ The skip link moves focus directly to the main content, and `Ctrl` or `Command` 
 
 ## Dispatch board
 
-The dispatch board has a queue on the physical left, a map and nearest responders in the center, and incident detail with selected responders on the right. Select a queue card to load nearest responders for that incident location and type. Choose an active group and at least one responder, then submit the dispatch. The response updates the SOS state and emits durable events to the requester, responders and all administrators. The dispatch action cannot be repeated once the state machine has advanced.
+The dispatch board has a queue on the physical left, a map and nearest responders in the center, and incident detail with selected responders on the right. Select a queue card to load nearest responders for that incident (the search point and the incident filter derive from the SOS record itself, nearest first; distance, rating and readiness are null-safe when unknown). Choose an active group and at least one responder, then pick how the dispatch goes out: **offer** sends each named responder an offer that they must accept (a single named responder is also pinned as the assigned responder for legacy readers; multi-recipient offers are identified by the offers table only), or **immediate** assigns exactly one responder without an acceptance step — the SOS moves straight to `accepted` and the mission starts in the `assigned` state, from which the worker presses start to begin the journey. The response updates the SOS state and emits durable events to the requester, responders and all administrators. Eligibility is per responder job type: a `ready_only` worker who is not on standby blocks the dispatch and is listed by the server; `all`-policy workers may be offered regardless of readiness and become ready on acceptance. The dispatch action cannot be repeated once the state machine has advanced.
 
 ## Users and groups
 
@@ -20,9 +20,11 @@ The users view provides four KPI cards, search, role and status filters, a pagin
 
 Groups expose name, color, capacity, incident coverage, status and membership. Add members by user identifier and choose member or leader role. Incident types are shown as a stable catalog with labels, icons and colors. Every mutation is recorded in the audit log.
 
+The job-types screen lists the catalog with the number of active responders per type and lets you create a type or edit its policy and activation state. The `all` policy offers work regardless of readiness (acceptance flips the worker ready inside the same transaction; Policy A). The `ready_only` policy offers only to workers on standby at dispatch and at acceptance (Policy B). A responder without an explicit job type — or with an inactive one — is treated with the strictest `ready_only` policy. Assign a job type to a responder from the users view; responders created before this existed keep working and can be typed at any time.
+
 ## Reports, audit and settings
 
-Reports show the seven-day request trend and status distribution. Audit shows a tracking code, actor, action, target, timestamp and IP address; CSV export escapes spreadsheet formulas. Alerts can be resolved from the alert view. Settings control automatic dispatch, default search radius, required mission readiness and maintenance mode. Health shows live peers, talk-floor counters, map cache size, database tables and uptime.
+Reports show the seven-day request trend and status distribution. Audit shows a tracking code, actor, action, target, timestamp and IP address; CSV export escapes spreadsheet formulas. Alerts can be resolved from the alert view. Settings control automatic dispatch, default search radius and maintenance mode (the former `mission_ready_required` toggle is deprecated and no longer enforced; per-job-type offer policies in the job-types screen supersede it). Health shows live peers, talk-floor counters, map cache size, database tables and uptime. The mission-offers endpoint (`/_admin/mission-offers`, filterable by status) reports every offer row and its policy, accepted/declined outcome and responder for dispatch-board monitoring; the users CSV now carries the responder job type.
 
 ## CSV and operational safety
 

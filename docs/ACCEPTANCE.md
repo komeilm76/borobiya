@@ -41,18 +41,20 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] SOS creation, cancellation reasons, dispatch, acceptance, mission progress, completion and one-time rating are implemented. The rating carries an optional ≤200-character report note (textarea on the mission screen), persisted server-side and served back on the mission projection.
 - [x] SOS and mission state machines reject impossible transitions and expose stage indices.
 - [x] Location sharing can be granted from the companions screen (username search, live or history window with server-mirroring validation) and revoked at any time. The history screen audits every share with its end state (active, expired or revoked).
-- [x] Nearest responders, group selection, dispatch board data and administrator exports are implemented. The dispatch board now calls `GET /_admin/sos/:id/nearest`, shows distance/rating/readiness, and requires an explicit active, staffed group plus explicit member selection before dispatch.
+- [x] Nearest responders, group selection, dispatch board data and administrator exports are implemented. The dispatch board now calls `GET /_admin/sos/:id/nearest` — the point and incident filter derive from the SOS record, unknown ids return 404 — shows distance/rating/readiness null-safely, and requires an explicit active, staffed group plus explicit member selection before dispatch.
+- [x] Mission offers are per-responder rows gated by job-type policy (`all` offers regardless of readiness and flips readiness on accept atomically; `ready_only` requires standby at dispatch and at accept). Offer-based dispatch, a decline endpoint, immediate dispatch (exactly one responder, no acceptance step, mission created in `assigned`) and the `mission-offers` list endpoints for responders and administrators are implemented and enforced server-side; offer rows — never group membership — govern visibility and acceptance, with a group-membership fallback retained only for legacy rows without offers.
 - [x] Durable events update user, responder, administrator and socket consumers after commit.
 - [x] One-to-one press-and-hold talk enforces one speaker, ordered binary frames, hold/idle release and no recording.
 
 ## Administration and operations
 
 - [x] Overview KPIs, live map, groups, alerts, recent requests, reports, users, groups, incident types, audit, settings and system health are implemented.
-- [x] User creation, role changes, active-state changes, group membership, alert resolution and settings updates pass through the service/event boundary.
+- [x] User creation, role changes, active-state changes, job-type assignment, group membership, alert resolution and settings updates pass through the service/event boundary. The job-types catalog (list/create/update) is administered from the console with the readiness policy and activation per type.
 - [x] User and audit CSV exports use formula escaping and no-store headers.
 - [x] The last active administrator cannot be removed and an administrator cannot suspend or demote their own active account.
 - [x] Practical English manuals, runbooks, architecture, API, WebSocket, security, performance, testing, automation, design-system and status documents are present.
 - [x] The `boro` CLI provides setup, development, doctor, check, verify, deployment, database and clean commands.
+- [x] The deprecated `mission_ready_required` setting is no longer enforced; per-job-type `offerPolicy` is the only readiness gate.
 
 ## Acceptance polish
 
@@ -60,7 +62,7 @@ This checklist maps the original technical specification and roadmap targets to 
 - [x] Loading, empty, error and offline surfaces are implemented for routed data and forms.
 - [x] Skip navigation, focus restoration, modal focus handling, labelled icon-only controls, visible focus rings, reduced-motion support and keyboard shortcuts are implemented.
 - [x] Contrast ratios for primary text, muted text and semantic status colors are verified by an automated check.
-- [x] Lazy view loading replaces eager imports of all view modules; every one of the 20 views is a code-split chunk.
+- [x] Lazy view loading replaces eager imports of all view modules; every one of the 21 views is a code-split chunk.
 - [x] Every routed view and layout is mounted by the suite, and the role guard is exercised for anonymous, user, administrator and onboarding-only accounts.
 - [x] Animation is declarative first (`<Transition>`, `<TransitionGroup>`, `motion-v`, `@vueuse/motion`) with GSAP limited to one timeline, and every duration collapses to zero under `prefers-reduced-motion`.
 - [x] A full login-to-rating journey test exercises registration/session, sharing, SOS, dispatch, acceptance, mission status and rating.

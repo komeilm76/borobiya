@@ -115,7 +115,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 |---|---|---|---|
 | mission/01-mission-ready-on.png | missing | P2/H | No responder availability UI. `POST /_user/ready` exists and is server-tested; unwired. Design adds radius + team chips. |
 | mission/02-mission-ready-off.png | missing | P2/H | Same screen, toggle off. |
-| mission/03-mission-offer.png | done | P1/C | Mission screen renders an offer card for dispatched requests the responder may act on (group membership now visible to scoped responders; requester alias exposed): severity, incident icon+label, description, accuracy, manual-pin flag, distance from own fix, requester. Accept goes through the existing endpoint with per-item busy guard, lost-race conflicts surfaced, reload afterwards. **No decline control exists in the backend; deviation documented (not invented).** |
+| mission/03-mission-offer.png | done | P1/C | Mission screen renders an offer card for dispatched requests the responder may act on (offers are addressed per named responder; responder alias exposed): severity, incident icon+label, description, accuracy, manual-pin flag, distance from own fix, requester. Accept goes through the endpoint with per-item busy guard, lost-race conflicts surfaced, reload afterwards; a decline control calls `POST /_user/sos/:id/decline` and the offer disappears from the list. |
 | mission/04-mission-offer-details.png | partial | P1/H | The offer card carries the designed facts inline; a separate details sheet does not exist. |
 | mission/05-mission-accepted.png | partial | P1/H | Accept lands with a success toast; the offer clears and the mission card shows the live status after reload; the designed accepted-transition surface is not built. |
 | mission/06-mission-dispatch.png | partial | P2/M | Admin dispatch exists; responder-side "dispatched" status only via rail. |
@@ -130,7 +130,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | mission/15-mission-cancel.png | done | P1/H | Assigned responder (or admin) gets an inline mission-cancel panel on the mission card: optional note for the requester, confirmation step, `progress('cancel')` through the state machine, conflict surfaced, authoritative reload afterwards. |
 | mission/16-mission-report.png | partial | P2/M | Rating accepts an optional report note (≤200 chars) via a textarea on the rating block; stored in `missions.rating_note`, served on the mission projection and embedded mission, shown on the mission card after rating. Designed full report form absent. |
 | mission/17-mission-completed.png | partial | P2/M | Completed missions reachable; card shows Persian status label, recorded rating and the saved rating note. No designed completion/report surface. |
-| mission/18-mission-no-offer.png | partial | P2/M | Empty-offer state for responders with no offers/mission/request: explanation + refresh button (re-fetches the lists). No radius control (server has no radius concept). |
+| mission/18-mission-no-offer.png | done | P2/M | Empty-offer state for responders with no offers/mission/request: explanation + refresh button (re-fetches catalogs, lists and offers). No radius control (server has no radius concept). |
 | mission/19-mission-offline.png | missing | P2/M | Generic offline banner only. |
 
 ## Mobile map — history (11)
@@ -250,7 +250,7 @@ Counts over the 141 canonical rows above: `done` 16, `partial` 47, `missing` 57,
 | ID | Reference | Flaw | Recommendation |
 |---|---|---|---|
 | DF-01 | auth/06-recovery-account-error.png | Explicit unknown-username error = user enumeration oracle. | Keep implementation (decoys); do not port the screen. |
-| DF-02 | mission/03-mission-offer.png | A 52-second countdown and "3 offers active" imply a server-enforced offer TTL; the data model has no offer-expiry and no offers endpoint. | Drop the countdown, or add offer TTL to the backend as a product decision. Do not fake it client-side. |
+| DF-02 | mission/03-mission-offer.png | A 52-second countdown and "3 offers active" imply a server-enforced offer TTL; offers now have a status lifecycle and an endpoint, but there is no offer-expiry/TTL job. | Drop the countdown, or add offer TTL to the backend as a product decision. Do not fake it client-side. |
 | DF-03 | profile/01-profile-home.png, history/01-history-trips.png | Trip statistics (trips, kilometres) presuppose the superseded routing product. | Replace with SOS/mission/companion metrics in P2; document the swap. |
 | DF-04 | history/07-history-playback.png | Playback UI does not communicate authorization scope/expiry although the API is share-gated. | Add an authorization note; never show playback without an active authorized share. |
 | DF-05 | sos/04-sos-location-picker.png | Dropping an incident pin far from GPS is a fraud/abuse vector with no responder-facing "manual location" marker. | Surface `isManual` (already recorded server-side) on the offer/dispatch screens. |

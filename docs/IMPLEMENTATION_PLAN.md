@@ -1,7 +1,8 @@
 # Borobiya 2.0.0 — Implementation Plan (Missions, Sharing Center, Trips, History)
 
-Status: Stage 1 complete; Stage 2 in progress. Each stage ships as focused commits on the working
-branch and is reported separately. This document is the live plan; it is updated as stages land.
+Status: Stage 2 landed (commit range d07c944..eb1cc6b); Stage 3 next. Each stage ships as focused
+commits on the working branch and is reported separately. This document is the live plan; it is
+updated as stages land.
 
 ## Confirmed product decisions (owner-approved, not re-litigated)
 
@@ -100,3 +101,18 @@ Defaults adopted for open sub-decisions (flagged for owner review, not silently 
 ## Stage log
 
 - Stage 1 (this document): architecture mapped; defects verified; plan fixed.
+- Stage 2 (d07c944 schema, 6787a92 server, 6651b6e client, eb1cc6b tests): job types and
+  per-job-type offer policies (`all` = Policy A, `ready_only` = Policy B), per-responder
+  `mission_offers` rows created atomically at dispatch, Policy-A accept auto-ready inside the
+  accept transaction, Policy-B accept-time refusal (409), `decline` endpoint, offer-authoritative
+  visibility/acceptance (legacy group arm retained only for rows without offers), immediate
+  dispatch (exactly one named responder, no acceptance step, SOS → `accepted`, mission created in
+  `assigned`), `ASSIGNED` mission state with `start` transition, nearest endpoint derived from the
+  SOS record (`:id` is authoritative; unknown ids 404), DispatchView null-safe rating/readiness
+  cells plus offer/immediate modes, admin Job Types screen and `/_admin/job-types` CRUD, users CSV
+  and user detail carry the job type, `mission_ready_required` setting deprecated (read-only, no
+  enforcement; removal deferred to Stage 7 review), tests updated (offer-based fixtures, rate-limit
+  care) and new suites `mission-offers.test.ts` (server end-to-end) and `job-types-view.test.ts`
+  (admin screen). `./boro verify` exits 0: 1000/1000 tests, coverage statements 96.49% / branches
+  92.59% / functions 96.43% / lines 97.38% (thresholds pass; no gate lowered). Defects 1–4 from
+  Stage 1 closed.
