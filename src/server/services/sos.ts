@@ -22,7 +22,7 @@ interface DispatchInput { groupId: string; responderIds: string[] }
 
 const SOS_SELECT = `
   SELECT s.*, i.label AS incidentLabel, i.icon AS incidentIcon, i.color AS incidentColor,
-    m.id AS missionId, m.status AS missionStatus, m.responder_id AS missionResponderId, m.rating AS missionRating,
+    m.id AS missionId, m.status AS missionStatus, m.responder_id AS missionResponderId, m.rating AS missionRating, m.rating_note AS missionRatingNote,
     ru.username AS requesterUsername
   FROM sos_requests s
   JOIN incident_types i ON i.id = s.incident_type_id
@@ -296,7 +296,8 @@ export class SosService {
       expiresAt: Number(row.expires_at),
       completedAt: row.completed_at ? Number(row.completed_at) : null,
       mission: row.missionId ? {
-        id: String(row.missionId), status: String(row.missionStatus), responderId: String(row.missionResponderId), rating: row.missionRating === null ? null : Number(row.missionRating)
+        id: String(row.missionId), status: String(row.missionStatus), responderId: String(row.missionResponderId), rating: row.missionRating === null ? null : Number(row.missionRating),
+        ratingNote: row.missionRatingNote ?? null
       } : null
     };
   }
@@ -307,6 +308,7 @@ export class SosService {
       status: String(row.missionStatus), responderId: String(row.missionResponderId),
       requesterId: String(row.requester_id), incidentLabel: String(row.incidentLabel),
       rating: row.missionRating === null || row.missionRating === undefined ? null : Number(row.missionRating),
+      ratingNote: row.missionRatingNote ?? null,
       createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
     };
   }

@@ -282,11 +282,12 @@ describe('mission screen', () => {
     stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
     const calls = stubApi({ mission: { id: 'mis_6', sosId: 'sos_1', responderId: 'usr_self', requesterId: 'usr_requester', status: MISSION_STATUS.COMPLETED, updatedAt: 1794136200000, rating: null } });
     const { wrapper } = await render({ role: 'user', userId: 'usr_requester' });
+    await wrapper.find('[data-testid="rating-note"]').setValue('تیم سریع و محترمانه بود');
     await wrapper.findAll('.rating-star')[4].trigger('click');
     await flushPromises();
 
     const call = calls.find((entry) => entry.path === '/_user/missions/mis_6/rating');
-    expect(call?.body).toEqual({ rating: 5, note: 'ارزیابی از برنامه' });
+    expect(call?.body).toEqual({ rating: 5, note: 'تیم سریع و محترمانه بود' });
     expect(useToast().messages.value.some((message) => message.message === 'ارزیابی ثبت شد.')).toBe(true);
     wrapper.unmount();
   });

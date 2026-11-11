@@ -194,6 +194,7 @@ it('full login-to-rating journey: registration, sharing, SOS, dispatch, acceptan
   expect(final.json.data.status).toBe('completed');
   expect(final.json.data.mission.id).toBe(missionId);
   expect(final.json.data.mission.rating).toBe(5);
+  expect(final.json.data.mission.ratingNote).toBe('Complete end-to-end journey.');
   const timeline = await apiFetch(server, `/_user/sos/${sosId}`, { cookie: requester });
   expect(timeline.json.data.timeline.length >= 4).toBeTruthy();
 });

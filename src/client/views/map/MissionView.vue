@@ -114,6 +114,9 @@ const nextActions = computed(() => {
   if (status === MISSION_STATUS.IN_PROGRESS) return actions.slice(2, 3);
   return [];
 });
+/** Optional report note attached to the one-time rating; the server caps it at 200 characters. */
+const ratingNote = ref('');
+
 const canRateMission = computed(() => {
   const current = mission.value;
   const user = auth.user;
@@ -134,7 +137,7 @@ async function progress(action: 'arrive' | 'start' | 'complete'): Promise<void> 
 async function rate(value: number): Promise<void> {
   if (!mission.value) return;
   try {
-    await sos.rate(mission.value.id, value, 'ارزیابی از برنامه');
+    await sos.rate(mission.value.id, value, ratingNote.value.trim() || undefined);
     toast.push('ارزیابی ثبت شد.', 'success', 2200);
   } catch (caught) {
     toast.push(errorMessage(caught), 'error', 3800);
@@ -319,7 +322,7 @@ async function confirmMissionCancel(): Promise<void> {
 
     <template v-if="mission">
       <div class="mission-card">
-        <strong>مأموریت {{ mission.status }}</strong>
+        <strong>مأموریت {{ statusLabel(mission.status) }}</strong>
         <span>{{ format.dateTime(mission.updatedAt) }}</span>
       </div>
       <div class="action-row" data-testid="mission-next-actions">
@@ -334,12 +337,19 @@ async function confirmMissionCancel(): Promise<void> {
           <span>{{ item.label }}</span>
         </button>
       </div>
-      <div v-if="canRateMission" class="rating-row" aria-label="ارزیابی مأموریت">
-        <button v-for="value in [1, 2, 3, 4, 5]" :key="value" type="button" class="rating-star" :aria-label="`امتیاز ${value}`" @click="rate(value)">
-          <span class="mdi mdi-star" aria-hidden="true" />
-        </button>
+      <div v-if="canRateMission" class="rating-block">
+        <label class="rating-note">
+          <span>یادداشت برای تیم امداد (اختیاری، حداکثر ۲۰۰ نویسه)</span>
+          <textarea v-model="ratingNote" rows="2" maxlength="200" data-testid="rating-note" placeholder="مثلاً رفتار تیم، زمان رسیدن…" aria-label="یادداشت ارزیابی" />
+        </label>
+        <div class="rating-row" aria-label="ارزیابی مأموریت">
+          <button v-for="value in [1, 2, 3, 4, 5]" :key="value" type="button" class="rating-star" :aria-label="`امتیاز ${value}`" @click="rate(value)">
+            <span class="mdi mdi-star" aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <p v-if="mission.rating" class="sheet__status">امتیاز ثبت‌شده: {{ format.number(mission.rating) }} از ۵</p>
+      <p v-if="mission.ratingNote" class="sheet__status rating-note-view">یادداشت ارزیابی: {{ mission.ratingNote }}</p>
       <div v-if="canCancelMission" class="cancel-block">
         <button v-if="cancelTarget !== 'mission'" type="button" class="danger-button" data-testid="cancel-mission" @click="openCancel('mission')">
           <span class="mdi mdi-close-circle" aria-hidden="true" />

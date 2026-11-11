@@ -781,3 +781,12 @@ button[aria-busy='true'] { opacity: .78; cursor: progress; }
 .login-row.is-failed > .mdi { color: var(--danger); }
 .login-row > div { flex: 1; display: grid; gap: 2px; }
 .login-row small { color: var(--muted); font-size: 11px; }
+
+/* One-time mission rating: optional note + star row */
+.rating-block { display: grid; gap: 10px; margin-block-start: 10px; }
+.rating-note { display: grid; gap: 6px; font-size: 13px; }
+.rating-note textarea { width: 100%; border: 1px solid var(--border); border-radius: var(--r8); padding: 10px 12px; background: var(--surface); color: var(--text); font: inherit; resize: vertical; }
+.rating-row { display: flex; gap: 8px; direction: ltr; justify-content: flex-end; }
+.rating-star { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: var(--r8); background: var(--surface); color: var(--warning); font-size: 22px; cursor: pointer; transition: transform .15s var(--ease), border-color .15s var(--ease); }
+.rating-star:hover, .rating-star:focus-visible { transform: translateY(-2px); border-color: var(--warning); outline: none; }
+.rating-note-view { border-inline-start: 3px solid var(--border); padding-inline-start: 10px; }
