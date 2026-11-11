@@ -213,6 +213,7 @@ export async function createApp(overrides: ConfigOverrides = {}): Promise<Borobi
         context.services.location.expireShares();
         context.services.location.purgePoints(context.clock() - config.locationRetentionHours * 3_600_000);
         context.repo.purgeEventsOlderThan(new Date(context.clock() - 7 * 86_400_000).toISOString());
+        context.services.sos.expireDueOffers();
       } catch (error) {
         console.error('[jobs] maintenance failed', error);
       }

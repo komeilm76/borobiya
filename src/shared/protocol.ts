@@ -50,7 +50,35 @@ export const OFFER_POLICIES = Object.freeze({
 
 export type OfferPolicy = (typeof OFFER_POLICIES)[keyof typeof OFFER_POLICIES];
 
+/** Mission offer lifecycle. */
+export const OFFER_STATUSES = Object.freeze({
+  PENDING: 'pending',
+  ACCEPTED: 'accepted',
+  DECLINED: 'declined',
+  EXPIRED: 'expired',
+  CANCELLED: 'cancelled'
+} as const);
+
+export type OfferStatus = (typeof OFFER_STATUSES)[keyof typeof OFFER_STATUSES];
+
 export type MissionStatus = (typeof MISSION_STATUS)[keyof typeof MISSION_STATUS];
+
+/** Support request lifecycle for mission staffing. */
+export const SUPPORT_REQUEST_STATUS = Object.freeze({
+  PENDING: 'pending',
+  PARTIALLY_APPROVED: 'partially_approved',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  CANCELLED: 'cancelled'
+} as const);
+
+export type SupportRequestStatus = (typeof SUPPORT_REQUEST_STATUS)[keyof typeof SUPPORT_REQUEST_STATUS];
+
+/** Membership roles inside a single mission (not application roles). */
+export const MISSION_MEMBER_ROLES = Object.freeze({
+  LEADER: 'leader',
+  MEMBER: 'member'
+} as const);
 
 /** Durable domain events written to the append-only log and replayed to clients. */
 export const HTTP_EVENTS = Object.freeze({
@@ -63,6 +91,9 @@ export const HTTP_EVENTS = Object.freeze({
   SOS_ACCEPTED: 'sos.accepted',
   SOS_CANCELLED: 'sos.cancelled',
   MISSION_UPDATED: 'mission.updated',
+  MISSION_OFFER_EXPIRED: 'mission.offer.expired',
+  SUPPORT_REQUEST_CREATED: 'support.request.created',
+  SUPPORT_REQUEST_REVIEWED: 'support.request.reviewed',
   ADMIN_ALERT: 'admin.alert',
   SETTINGS_UPDATED: 'settings.updated',
   USER_UPDATED: 'user.updated'

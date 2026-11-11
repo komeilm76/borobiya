@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -193,10 +193,12 @@ CREATE TABLE IF NOT EXISTS mission_offers (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','expired','cancelled')),
   created_at INTEGER NOT NULL,
   responded_at INTEGER,
+  expired_at INTEGER,
   UNIQUE (sos_id, responder_id)
 );
 CREATE INDEX IF NOT EXISTS idx_offers_responder ON mission_offers(responder_id, status);
 CREATE INDEX IF NOT EXISTS idx_offers_sos ON mission_offers(sos_id, status);
+CREATE INDEX IF NOT EXISTS idx_offers_pending_expiry ON mission_offers(status, created_at);
 CREATE TABLE IF NOT EXISTS missions (
   id TEXT PRIMARY KEY,
   sos_id TEXT NOT NULL UNIQUE REFERENCES sos_requests(id) ON DELETE CASCADE,
@@ -266,7 +268,10 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
 
 /**
  * Opens (and if necessary migrates) the SQLite database.
- * Older schema-1 files gain `sos_requests.photo_data_url` without losing rows; the migration is idempotent.
+ * Additive, idempotent migrations only; no row is ever rewritten destructively.
+ *   v1 -> v2: sos_requests.photo_data_url, users.job_type_id
+ *   v3: job_types catalog, mission_offers table (with pre-offer pending backfill)
+ *   v4: mission_offers.expired_at (offers expire; exact expiry moment recorded)
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.
@@ -296,6 +301,8 @@ export function openDatabase(config: Config): SqliteDatabase {
   database.exec(SCHEMA);
   ensureColumn(database, 'sos_requests', 'photo_data_url', 'TEXT');
   ensureColumn(database, 'users', 'job_type_id', 'TEXT REFERENCES job_types(id)');
+  // v4: offers gain an exact expired_at; pre-existing terminal rows keep NULL (unknown expiry moment).
+  ensureColumn(database, 'mission_offers', 'expired_at', 'INTEGER');
   // Offer backfill for databases that predate the offers table: a named, dispatched SOS with no
   // offer row would otherwise be unacceptable. Idempotent, never re-creates declined/accepted rows.
   database.exec(`

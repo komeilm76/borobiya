@@ -26,6 +26,8 @@ export interface Config {
   allowedOrigins: string[];
   frameAncestors: string[];
   locationRetentionHours: number;
+  /** Seconds a mission offer stays valid before it expires. */
+  missionOfferTtlSeconds: number;
   wsHeartbeatMs: number;
   wsMaxFrameBytes: number;
   seedDemoUsers: boolean;
@@ -210,6 +212,7 @@ export function loadConfig(overrides: ConfigOverrides = {}): Config {
     allowedOrigins: overrides.allowedOrigins ?? (env.ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).filter(Boolean),
     frameAncestors: (overrides.frameAncestors ?? frameAncestorSources(env.FRAME_ANCESTORS ?? '')).filter(validFrameAncestor),
     locationRetentionHours: overrides.locationRetentionHours ?? int(env.LOCATION_RETENTION_HOURS, 168, 1, 8760),
+    missionOfferTtlSeconds: overrides.missionOfferTtlSeconds ?? int(env.MISSION_OFFER_TTL_SECONDS, 900, 30, 86400),
     wsHeartbeatMs: overrides.wsHeartbeatMs ?? int(env.WS_HEARTBEAT_MS, 25000, 1000, 120000),
     wsMaxFrameBytes: overrides.wsMaxFrameBytes ?? int(env.WS_MAX_FRAME_BYTES, 65536, 256, 1024 * 1024),
     seedDemoUsers,

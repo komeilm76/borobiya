@@ -1,4 +1,4 @@
-import { MISSION_STATUS, SOS_STATUS } from '@shared/protocol.ts';
+import { MISSION_MEMBER_ROLES, MISSION_STATUS, OFFER_STATUSES, SOS_STATUS, SUPPORT_REQUEST_STATUS } from '@shared/protocol.ts';
 
 /** Persian labels for every SOS and mission lifecycle status (raw enums must never reach the UI). */
 export const STATUS_LABELS: Record<string, string> = {
@@ -12,6 +12,30 @@ export const STATUS_LABELS: Record<string, string> = {
   [MISSION_STATUS.ASSIGNED]: 'تعیین‌شده',
   [MISSION_STATUS.ON_THE_WAY]: 'در راه',
   [MISSION_STATUS.ARRIVED]: 'رسیده'
+};
+
+/** Persian labels for the offer lifecycle. */
+export const OFFER_STATUS_LABELS: Record<string, string> = {
+  [OFFER_STATUSES.PENDING]: 'در انتظار پاسخ',
+  [OFFER_STATUSES.ACCEPTED]: 'پذیرفته‌شده',
+  [OFFER_STATUSES.DECLINED]: 'رد‌شده',
+  [OFFER_STATUSES.EXPIRED]: 'منقضی‌شده',
+  [OFFER_STATUSES.CANCELLED]: 'لغو‌شده'
+};
+
+/** Persian labels for the support-request lifecycle. */
+export const SUPPORT_REQUEST_STATUS_LABELS: Record<string, string> = {
+  [SUPPORT_REQUEST_STATUS.PENDING]: 'در انتظار بررسی',
+  [SUPPORT_REQUEST_STATUS.PARTIALLY_APPROVED]: 'تأیید جزئی',
+  [SUPPORT_REQUEST_STATUS.APPROVED]: 'تأییدشده',
+  [SUPPORT_REQUEST_STATUS.REJECTED]: 'رد‌شده',
+  [SUPPORT_REQUEST_STATUS.CANCELLED]: 'لغو‌شده'
+};
+
+/** Persian labels for mission membership roles. */
+export const MISSION_MEMBER_ROLE_LABELS: Record<string, string> = {
+  [MISSION_MEMBER_ROLES.LEADER]: 'سرپرست',
+  [MISSION_MEMBER_ROLES.MEMBER]: 'عضو تیم'
 };
 
 /** Persian label for a lifecycle status, falling back to the raw value for unknowns. */
