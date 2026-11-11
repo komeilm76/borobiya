@@ -38,6 +38,13 @@ export const MISSION_MEMBER_ROLE_LABELS: Record<string, string> = {
   [MISSION_MEMBER_ROLES.MEMBER]: 'عضو تیم'
 };
 
+/** Persian labels for SOS severity. */
+export const SEVERITY_LABELS: Record<string, string> = {
+  low: 'کم',
+  medium: 'متوسط',
+  high: 'شدید'
+};
+
 /** Persian label for a lifecycle status, falling back to the raw value for unknowns. */
 export function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status;

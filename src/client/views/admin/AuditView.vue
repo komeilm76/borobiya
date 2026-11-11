@@ -33,7 +33,7 @@ onMounted(() => void admin.loadAudit());
         <tbody>
           <tr v-for="entry in entries" :key="entry.id">
             <td>{{ format.dateTime(entry.createdAt) }}</td>
-            <td>{{ entry.actorUsername ?? entry.actorId ?? '—' }}</td>
+            <td>{{ entry.actorUsername ?? '—' }}</td>
             <td>{{ entry.action }}</td>
             <td>{{ entry.target }}</td>
           </tr>

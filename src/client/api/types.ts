@@ -284,15 +284,15 @@ export interface SettingView {
   updatedAt: number;
 }
 
-/** An audit-log row. */
+/** An audit-log row as `GET /_admin/audit` serializes it. */
 export interface AuditEntryView {
   id: number;
-  actorId: string | null;
+  /** Human-facing reference derived from the row id (mirrors the CSV export). */
+  trackingCode: number;
   actorUsername: string | null;
   action: string;
   target: string;
   ip: string;
-  meta: Record<string, unknown>;
   createdAt: number;
 }
 
@@ -317,4 +317,104 @@ export interface ListView<T> {
   total?: number;
   page?: number;
   limit?: number;
+}
+
+/** One member of a mission team (membership is mission-scoped, not an access role). */
+export interface MissionMemberView {
+  userId: string;
+  username: string;
+  role: 'leader' | 'member';
+  jobTypeId: string | null;
+  jobTypeLabel: string | null;
+  readyForMission: boolean;
+  assignmentSource: string;
+  assignmentStatus: 'active' | 'removed';
+  supportRequestId: string | null;
+  joinedAt: number;
+  removedAt: number | null;
+  /** Administrator projection only. */
+  removalReason?: string | null;
+}
+
+/** A required composition line for a team mission, with its fill count. */
+export interface MissionRequirementView {
+  jobTypeId: string;
+  jobTypeLabel: string;
+  quantity: number;
+  filled: number;
+}
+
+/** The composed team behind a mission; visible to members and administrators. */
+export interface MissionTeamView {
+  missionId: string;
+  sosId: string;
+  status: string;
+  incidentLabel: string;
+  severity: string;
+  createdAt: number;
+  /** 'admin' for administrators, the membership role for members, otherwise null. */
+  viewerRole: 'admin' | 'leader' | 'member' | null;
+  leader: MissionMemberView | null;
+  members: MissionMemberView[];
+  memberCount: number;
+  requirements: MissionRequirementView[];
+  pendingSupportRequestCount: number;
+}
+
+/** One requested composition line of a support request. */
+export interface SupportRequestItemView {
+  jobTypeId: string;
+  jobTypeLabel: string;
+  quantity: number;
+  approvedQuantity: number;
+}
+
+/** One entry in the support-request decision history (requester/admin projection). */
+export interface SupportRequestDecisionView {
+  decision: 'approved' | 'partially_approved' | 'rejected';
+  note: string | null;
+  adminUsername: string | null;
+  createdAt: number;
+}
+
+/** A mission support request. The internal fields are present only for the requester and administrators. */
+export interface SupportRequestView {
+  id: string;
+  missionId: string;
+  requestedBy: string;
+  requestedByUsername: string;
+  reason: string;
+  note: string | null;
+  status: 'pending' | 'partially_approved' | 'approved' | 'rejected' | 'cancelled';
+  items: SupportRequestItemView[];
+  adminNote?: string | null;
+  reviewedBy?: string | null;
+  reviewedByUsername?: string | null;
+  reviewedAt?: number | null;
+  decisions?: SupportRequestDecisionView[];
+  createdAt: number;
+  updatedAt: number;
+  cancelledAt: number | null;
+  /** Administrator list projection extras. */
+  missionStatus?: string;
+  incidentLabel?: string;
+  severity?: string;
+  /** Administrator/member detail projection extras (support-request detail endpoint). */
+  mission?: { missionId: string; sosId: string; incidentLabel: string; severity: string; status: string };
+  leader?: { userId: string; username: string } | null;
+}
+
+/** One candidate worker for a support-request line, as returned by the admin candidates endpoint. */
+export interface SupportRequestCandidateView {
+  id: string;
+  username: string;
+  jobTypeId: string | null;
+  jobTypeLabel: string | null;
+  readyForMission: boolean;
+  averageRating: number;
+  otherActiveMissions: number;
+  alreadyOnMission: boolean;
+  onActiveMission: boolean;
+  eligible: boolean;
+  ineligibleReason: string | null;
 }

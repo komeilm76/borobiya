@@ -36,6 +36,12 @@ const NEAREST = [
   { id: 'usr_responder2', username: 'farid.n', averageRating: 4.1, readyForMission: false, latitude: 35.73, longitude: 51.34, distanceMeters: 1500, recordedAt: 1794136200000 }
 ];
 
+/** Job types for the team builder (rank order: fire first). */
+const TEAM_JOB_TYPES = [
+  { id: 'job_fire', label: 'آتش‌نشانی', offerPolicy: 'all', rank: 1, active: true, memberCount: 5, createdAt: 0, updatedAt: 0 },
+  { id: 'job_medical', label: 'پزشکی', offerPolicy: 'ready_only', rank: 2, active: true, memberCount: 8, createdAt: 0, updatedAt: 0 }
+];
+
 /** A group with members, as `GET /_admin/groups` serializes it. */
 const STAFFED_GROUP = {
   id: 'grp_medical',
@@ -78,7 +84,7 @@ function json(data: unknown): Response {
 }
 
 /** Installs a fetch double for the board, the nearest-responders call and the dispatch call. */
-function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails?: boolean; nearestFails?: boolean; nearestItems?: unknown[] } = {}) {
+function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails?: boolean; nearestFails?: boolean; nearestItems?: unknown[]; teamDispatchFails?: boolean } = {}) {
   const calls: Array<{ method: string; path: string; body?: any }> = [];
   vi.stubGlobal(
     'fetch',
@@ -103,6 +109,16 @@ function stubApi(options: { groups?: unknown[]; queue?: unknown[]; dispatchFails
           );
         }
         return json({ items: options.nearestItems ?? NEAREST, total: (options.nearestItems ?? NEAREST).length });
+      }
+      if (path === '/_admin/job-types' && method === 'GET') return json({ items: TEAM_JOB_TYPES, total: TEAM_JOB_TYPES.length });
+      if (path.endsWith('/team-dispatch') && method === 'POST') {
+        if (options.teamDispatchFails) {
+          return new Response(
+            JSON.stringify({ ok: false, requestId: 'r', error: { code: 'BAD_REQUEST', message: 'The mission leader must be an active member of the selected group.' } }),
+            { status: 400, headers: { 'content-type': 'application/json' } }
+          );
+        }
+        return json({ ok: true, missionId: 'mis_9', missionStatus: 'assigned', sosStatus: 'dispatched' });
       }
       if (path.endsWith('/dispatch') && method === 'POST') {
         if (options.dispatchFails) {
@@ -364,6 +380,65 @@ describe('dispatching', () => {
     // Without the reload the board keeps showing a request that no longer exists, and the next
     // click is a conflict.
     expect(after).toBeGreaterThan(before);
+    wrapper.unmount();
+  });
+});
+
+describe('team dispatch', () => {
+  it('requires an explicit leader before the team mission can be built', async () => {
+    stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-mode-team"]').setValue(true);
+    await flushPromises();
+    // group chosen, but no leader yet — the confirm must stay disabled
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await flushPromises();
+    const confirm = wrapper.find('[data-testid="confirm-dispatch"]');
+    expect(confirm.attributes('disabled')).toBeDefined();
+    await wrapper.find('[data-testid="team-leader"]').setValue('usr_responder');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="confirm-dispatch"]').attributes('disabled')).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('builds a team mission with leader, composition and optional riders', async () => {
+    const calls = stubApi();
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-mode-team"]').setValue(true);
+    await flushPromises();
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await wrapper.find('[data-testid="team-leader"]').setValue('usr_responder');
+    await flushPromises();
+    // The leader row is not offered as an additional rider.
+    expect(wrapper.find('[data-testid="team-rider-usr_responder"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="team-rider-usr_responder2"]').exists()).toBe(true);
+    await wrapper.find('[data-testid="team-rider-usr_responder2"]').setValue(true);
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
+    await flushPromises();
+    const dispatchCall = calls.find((call) => call.path === '/_admin/sos/sos_1/team-dispatch' && call.method === 'POST');
+    expect(dispatchCall?.body).toEqual({
+      groupId: 'grp_medical',
+      leaderId: 'usr_responder',
+      requirements: [{ jobTypeId: 'job_fire', quantity: 1 }],
+      memberIds: ['usr_responder2']
+    });
+    expect(wrapper.find('[data-testid="dispatch-panel"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it('keeps the panel open and shows the server reason when the team dispatch is rejected', async () => {
+    stubApi({ teamDispatchFails: true });
+    const { wrapper } = await render();
+    await openPanel(wrapper);
+    await wrapper.find('[data-testid="dispatch-mode-team"]').setValue(true);
+    await flushPromises();
+    await wrapper.find('[data-testid="dispatch-group"]').setValue('grp_medical');
+    await wrapper.find('[data-testid="team-leader"]').setValue('usr_responder');
+    await wrapper.find('[data-testid="confirm-dispatch"]').trigger('click');
+    await flushPromises();
+    expect(wrapper.find('[data-testid="dispatch-panel"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });

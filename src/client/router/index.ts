@@ -33,6 +33,7 @@ export const ROUTE_NAMES = Object.freeze({
   profile: 'profile',
   adminOverview: 'admin-overview',
   adminDispatch: 'admin-dispatch',
+  adminSupportRequests: 'admin-support-requests',
   adminReports: 'admin-reports',
   adminUsers: 'admin-users',
   adminGroups: 'admin-groups',
@@ -131,6 +132,12 @@ export const routes: RouteRecordRaw[] = [
     name: ROUTE_NAMES.adminDispatch,
     component: () => import('@/views/admin/DispatchView.vue'),
     meta: { layout: 'admin', access: 'admin', label: 'اعزام', icon: 'bullseye-arrow' }
+  },
+  {
+    path: '/_admin/support-requests',
+    name: ROUTE_NAMES.adminSupportRequests,
+    component: () => import('@/views/admin/SupportRequestsView.vue'),
+    meta: { layout: 'admin', access: 'admin', label: 'درخواست‌های نیرو', icon: 'account-multiple-check-outline' }
   },
   {
     path: '/_admin/reports',

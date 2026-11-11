@@ -143,6 +143,18 @@ export class TeamService {
     }
   }
 
+  // ---------- catalogs ----------
+
+  /**
+   * Active job types for staffing forms (support request composer). Available to any
+   * signed-in account; inactive roles stay hidden because they cannot receive staffing.
+   */
+  jobTypesCatalog(): Record<string, unknown> {
+    const rows = this.ctx.repo.all<Record<string, any>>(
+      'SELECT id, label FROM job_types WHERE active=1 ORDER BY rank, rowid');
+    return { items: rows.map((row) => ({ id: String(row.id), label: String(row.label) })) };
+  }
+
   // ---------- team views ----------
 
   /** Team projection; visible to mission members and administrators only. */

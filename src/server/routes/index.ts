@@ -292,6 +292,8 @@ export function registerRoutes(router: Router<AppContext>): void {
   } });
 
   // Mission teams and support requests.
+  router.add({ method: 'GET', path: '/_user/job-types', auth: 'user', tags: ['mission'], summary: 'Active job types (staffing forms)', handler: (ctx) =>
+    ok(ctx.app.services.teams.jobTypesCatalog()) });
   router.add({ method: 'GET', path: '/_user/missions/:id/team', auth: 'user', tags: ['mission'], summary: 'Mission team', handler: (ctx) =>
     ok(ctx.app.services.teams.getTeam(actor(ctx), ctx.params.id)) });
   router.add({ method: 'GET', path: '/_user/missions/:id/support-requests', auth: 'user', query: limitQuery, tags: ['mission'], summary: 'Support requests for the mission', handler: (ctx) => {

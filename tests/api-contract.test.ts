@@ -26,7 +26,7 @@ interface Field {
 }
 
 /** Maps a TS type expression onto the runtime shape the JSON must have. */
-function classify(type: string): { kind: Kind; nullable: boolean } {
+function classify(type: string, known: Set<string>): { kind: Kind; nullable: boolean } {
   const nullable = /\bnull\b/.test(type);
   const bare = type.replace(/\s*\|\s*null\b/g, '').trim();
   if (/\[\]$/.test(bare) || /^Array</.test(bare)) return { kind: 'array', nullable };
@@ -35,8 +35,9 @@ function classify(type: string): { kind: Kind; nullable: boolean } {
   if (bare === 'number') return { kind: 'number', nullable };
   if (bare === 'boolean') return { kind: 'boolean', nullable };
   // Unions of literals (`'low' | 'medium'`) and string aliases (`Role`, `SosStatus`) are strings at
-  // runtime; anything else named is an object.
-  if (/^['"]/.test(bare) || /^[A-Z][A-Za-z]*$/.test(bare)) return { kind: 'string', nullable };
+  // runtime; a name that is itself a declared view interface is an object at runtime.
+  if (/^['"]/.test(bare)) return { kind: 'string', nullable };
+  if (/^[A-Z][A-Za-z]*$/.test(bare)) return { kind: known.has(bare) ? 'object' : 'string', nullable };
   return { kind: 'object', nullable };
 }
 
@@ -45,13 +46,16 @@ function parseInterfaces(): Map<string, Field[]> {
   const source = readFileSync(resolve(process.cwd(), 'src/client/api/types.ts'), 'utf8');
   const interfaces = new Map<string, Field[]>();
   const blocks = source.matchAll(/export interface (\w+)[\s\S]*?\{\n([\s\S]*?)\n\}/g);
-  for (const [, name, body] of blocks) {
+  const rawBlocks: Array<{ name: string; body: string }> = [];
+  for (const [, name, body] of blocks) rawBlocks.push({ name, body });
+  const knownNames = new Set(rawBlocks.map((block) => block.name));
+  for (const { name, body } of rawBlocks) {
     const fields: Field[] = [];
     for (const line of body.split('\n')) {
       const match = /^\s{2}(\w+)(\?)?:\s*(.+);\s*$/.exec(line);
       if (!match) continue;
       const [, field, optional, type] = match;
-      fields.push({ name: field, optional: Boolean(optional), ...classify(type) });
+      fields.push({ name: field, optional: Boolean(optional), ...classify(type, knownNames) });
     }
     interfaces.set(name, fields);
   }
@@ -60,6 +64,7 @@ function parseInterfaces(): Map<string, Field[]> {
 
 /** Checks one live sample against one declared interface. */
 function check(label: string, typeName: string, sample: unknown, interfaces: Map<string, Field[]>): string[] {
+  const known = new Set(interfaces.keys());
   const fields = interfaces.get(typeName);
   expect(fields, `${typeName} is missing from types.ts`).toBeTruthy();
   if (!sample || typeof sample !== 'object') return [`${label}: no sample object to check ${typeName}`];
@@ -137,6 +142,67 @@ describe('client types match the API payloads', () => {
     await verify('admin users', '/_admin/users', adminCookie, 'AdminUserView', (data) => data.items?.[0]);
     await verify('settings', '/_admin/settings', adminCookie, 'SettingView', (data) => data.items?.[0]);
     await verify('device sessions', '/_user/devices', userCookie, 'SessionView', (data) => data.items?.[0]);
+
+    // Mission team + support requests: drive a full dispatch and one review so every stage of the
+    // payload has a live sample behind it.
+    const responderCookie = await login(server, 'reza.m', 'DemoPass!2026');
+    const contractSos = await apiFetch(server, '/_user/sos', {
+      method: 'POST',
+      cookie: userCookie,
+      body: {
+        incidentTypeId: 'inc_medical', severity: 'medium',
+        description: 'بررسی قرارداد انواع مأموریت تیمی',
+        latitude: 35.7219, longitude: 51.3347, accuracy: 12, isManual: false
+      }
+    });
+    expect(contractSos.status, contractSos.text).toBe(201);
+    const contractSosId = String(contractSos.json.data.sos.id);
+    const contractDispatch = await apiFetch(server, `/_admin/sos/${contractSosId}/dispatch`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { groupId: 'grp_medical', responderIds: ['usr_responder'], mode: 'immediate' }
+    });
+    expect(contractDispatch.status, contractDispatch.text).toBe(200);
+    const contractMissionId = String(contractDispatch.json.data.missionId);
+    const requirements = await apiFetch(server, `/_admin/missions/${contractMissionId}/requirements`, {
+      method: 'PUT',
+      cookie: adminCookie,
+      body: { requirements: [{ jobTypeId: 'job_fire', quantity: 1 }] }
+    });
+    expect(requirements.status, requirements.text).toBe(200);
+    problems.push(...check('mission team', 'MissionTeamView', requirements.json.data, interfaces));
+    problems.push(...check('mission member (leader)', 'MissionMemberView', requirements.json.data.leader, interfaces));
+    problems.push(...check('mission member (roster)', 'MissionMemberView', requirements.json.data.members?.[0], interfaces));
+    problems.push(...check('mission requirement', 'MissionRequirementView', requirements.json.data.requirements?.[0], interfaces));
+
+    const leaderRequest = await apiFetch(server, `/_user/missions/${contractMissionId}/support-requests`, {
+      method: 'POST',
+      cookie: responderCookie,
+      body: { items: [{ jobTypeId: 'job_medical', quantity: 1 }], reason: 'نیاز به نیروی کمکی برای رسیدگی میدانی' }
+    });
+    expect(leaderRequest.status, leaderRequest.text).toBe(201);
+    const contractRequestId = String(leaderRequest.json.data.id);
+    problems.push(...check('support request (create)', 'SupportRequestView', leaderRequest.json.data, interfaces));
+    problems.push(...check('support request item', 'SupportRequestItemView', leaderRequest.json.data.items?.[0], interfaces));
+
+    const review = await apiFetch(server, `/_admin/support-requests/${contractRequestId}/review`, {
+      method: 'POST',
+      cookie: adminCookie,
+      body: { decision: 'rejected', adminNote: 'بررسی قرارداد' }
+    });
+    expect(review.status, review.text).toBe(200);
+    const detail = await apiFetch(server, `/_admin/support-requests/${contractRequestId}`, { cookie: adminCookie });
+    expect(detail.status, detail.text).toBe(200);
+    problems.push(...check('support request (detail)', 'SupportRequestView', detail.json.data, interfaces));
+    problems.push(...check('support request decision', 'SupportRequestDecisionView', detail.json.data.decisions?.[0], interfaces));
+
+    const adminList = await apiFetch(server, '/_admin/support-requests?status=rejected', { cookie: adminCookie });
+    expect(adminList.status, adminList.text).toBe(200);
+    problems.push(...check('support request (admin list)', 'SupportRequestView', adminList.json.data.items?.[0], interfaces));
+
+    const candidates = await apiFetch(server, `/_admin/support-requests/${contractRequestId}/candidates?includeIneligible=true`, { cookie: adminCookie });
+    expect(candidates.status, candidates.text).toBe(200);
+    problems.push(...check('support request candidate', 'SupportRequestCandidateView', candidates.json.data.items?.[0], interfaces));
 
     // Audit rows only exist after a mutation, so make one and then read them back.
     await apiFetch(server, '/_admin/settings', {

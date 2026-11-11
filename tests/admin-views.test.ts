@@ -58,10 +58,11 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
+// Server projection: no raw actorId/meta — the CSV identity is trackingCode.
 const AUDIT_ITEMS = [
-  { id: 'aud_1', createdAt: 1794136000000, actorUsername: 'saeed.k', actorId: 'usr_1', action: 'sos.cancel', target: 'sos_1' },
-  { id: 'aud_2', createdAt: 1794136100000, actorUsername: null, actorId: 'usr_2', action: 'auth.login', target: 'ses_1' },
-  { id: 'aud_3', createdAt: 1794136200000, actorUsername: null, actorId: null, action: 'system.boot', target: 'host' }
+  { id: 1, trackingCode: 1001, createdAt: 1794136000000, actorUsername: 'saeed.k', action: 'sos.cancel', target: 'sos_1', ip: '127.0.0.1' },
+  { id: 2, trackingCode: 1002, createdAt: 1794136100000, actorUsername: null, action: 'auth.login', target: 'ses_1', ip: '127.0.0.1' },
+  { id: 3, trackingCode: 1003, createdAt: 1794136200000, actorUsername: null, action: 'system.boot', target: 'host', ip: '127.0.0.1' }
 ];
 
 describe('audit log', () => {
@@ -74,9 +75,8 @@ describe('audit log', () => {
     expect(rows).toHaveLength(3);
     expect(wrapper.text()).toContain('sos.cancel');
     expect(wrapper.text()).toContain('sos_1');
-    // Actor fallbacks: username, then id, then an em-dash — never `null` or `undefined`.
+    // Actor fallback: username, then an em-dash — never `null` or `undefined`.
     expect(wrapper.text()).toContain('saeed.k');
-    expect(wrapper.text()).toContain('usr_2');
     expect(wrapper.text()).toContain('—');
     wrapper.unmount();
   });

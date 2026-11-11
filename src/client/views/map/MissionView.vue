@@ -9,7 +9,9 @@ import { haversineMeters } from '@shared/geo.ts';
 import { errorMessage } from '@/api/client.ts';
 import { useToast } from '@/composables/useToast.ts';
 import type { SosView } from '@/api/types.ts';
-import { statusLabel } from '@/utils/status.ts';
+import { SEVERITY_LABELS, statusLabel } from '@/utils/status.ts';
+import MissionTeamPanel from '@/components/mission/MissionTeamPanel.vue';
+import SupportRequestPanel from '@/components/mission/SupportRequestPanel.vue';
 
 /**
  * Requester and responder mission screen: the SOS rail, the mission action buttons that
@@ -20,8 +22,6 @@ const auth = useAuthStore();
 const map = useMapStore();
 const format = useFormatters();
 const toast = useToast();
-
-const SEVERITY_LABEL = { low: 'کم', medium: 'متوسط', high: 'شدید' } as const;
 
 /**
  * Dispatched requests the signed-in responder may act on. The list endpoint already restricts a
@@ -259,7 +259,7 @@ async function decline(offer: SosView): Promise<void> {
             <strong>{{ offer.incidentLabel }}</strong>
             <small>{{ offer.description }}</small>
           </div>
-          <span class="status-pill status-pill--danger">{{ SEVERITY_LABEL[offer.severity] }}</span>
+          <span class="status-pill status-pill--danger">{{ SEVERITY_LABELS[offer.severity] }}</span>
         </div>
         <ul class="offer-facts">
           <li v-if="!offer.isManual"><span class="mdi mdi-map-marker-radius-outline" aria-hidden="true" /> دقت {{ format.distance(offer.accuracy) }}</li>
@@ -340,6 +340,8 @@ async function decline(offer: SosView): Promise<void> {
     </template>
 
     <template v-if="mission">
+      <MissionTeamPanel :mission-id="mission.id" data-testid="mission-team-section" />
+      <SupportRequestPanel :mission-id="mission.id" />
       <div class="mission-card">
         <strong>مأموریت {{ statusLabel(mission.status) }}</strong>
         <span>{{ format.dateTime(mission.updatedAt) }}</span>

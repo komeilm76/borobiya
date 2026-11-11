@@ -19,6 +19,7 @@ const VIEWS = {
   admin: [
     'OverviewView',
     'DispatchView',
+    'SupportRequestsView',
     'ReportsView',
     'UsersView',
     'GroupsView',
@@ -58,6 +59,7 @@ const FIXTURES: Record<string, unknown> = {
   '/_admin/dispatch': { items: [] },
   '/_admin/reports': { items: [], summary: {} },
   '/_admin/settings': { items: [] },
+  '/_admin/support-requests': { items: [], total: 0 },
   '/_admin/system/health': { status: 'ok', uptimeSeconds: 1, database: {}, realtime: {}, talk: {} },
   '/_public/map/config': { dataVersion: 'test', center: { latitude: 35.72, longitude: 51.33 }, zoom: 14 },
   '/_public/security-questions': { items: [] },
@@ -146,6 +148,8 @@ describe('routed views render', () => {
     const paths: Record<string, string> = {
       OverviewView: '/_admin/overview',
       DispatchView: '/_admin/dispatch',
+      SupportRequestsView: '/_admin/support-requests',
+      JobTypesView: '/_admin/job-types',
       ReportsView: '/_admin/reports',
       UsersView: '/_admin/users',
       GroupsView: '/_admin/groups',
@@ -165,7 +169,7 @@ describe('routed views render', () => {
   it('the route table covers every view file exactly once', async () => {
     const declared = ROUTES.map((route) => route.component).filter(Boolean).length;
     const total = VIEWS.auth.length + VIEWS.map.length + VIEWS.admin.length;
-    expect(total).toBe(21);
+    expect(total).toBe(22);
     expect(declared).toBe(total);
     const names = ROUTES.map((route) => route.name).filter(Boolean);
     expect(new Set(names).size).toBe(names.length);

@@ -37,7 +37,8 @@ const EXTRA_ICONS = [
   'ray-start-arrow', 'ray-end-arrow', 'robot-off-outline', 'school-outline', 'send',
   'shield-check-outline', 'shield-edit-outline', 'shopping-outline', 'signal', 'star', 'sync',
   'table-edit', 'tag', 'target', 'theme-light-dark', 'timer-sand-empty', 'upload-outline',
-  'view-dashboard-outline', 'web', 'wifi', 'wifi-off', 'wrench-outline'
+  'view-dashboard-outline', 'web', 'wifi', 'wifi-off', 'wrench-outline',
+  'account-star-outline', 'account-tie', 'account-multiple-check-outline', 'hand-heart-outline'
 ];
 
 /**

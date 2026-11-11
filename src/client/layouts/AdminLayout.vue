@@ -28,6 +28,7 @@ const palette = useCommandPalette(() => []);
 const navigation = [
   { name: ROUTE_NAMES.adminOverview, label: 'نمای کلی', icon: 'view-dashboard-outline' },
   { name: ROUTE_NAMES.adminDispatch, label: 'اعزام', icon: 'bullseye-arrow' },
+  { name: ROUTE_NAMES.adminSupportRequests, label: 'درخواست‌های نیرو', icon: 'account-multiple-check-outline' },
   { name: ROUTE_NAMES.adminReports, label: 'گزارش‌ها', icon: 'file-chart-outline' },
   { name: ROUTE_NAMES.adminUsers, label: 'کاربران', icon: 'account-multiple-outline' },
   { name: ROUTE_NAMES.adminGroups, label: 'گروه‌ها', icon: 'account-group-outline' },
@@ -40,6 +41,7 @@ const navigation = [
 
 const unsubscribers: Array<() => void> = [];
 const openAlerts = computed(() => admin.alerts.filter((alert) => !alert.resolvedAt).length);
+const pendingSupportRequests = computed(() => admin.pendingSupportRequests);
 
 onMounted(async () => {
   await admin.loadAll();
@@ -48,7 +50,10 @@ onMounted(async () => {
     realtime.on(HTTP_EVENTS.SOS_CREATED, () => void admin.loadDispatch()),
     realtime.on(HTTP_EVENTS.SOS_DISPATCHED, () => void admin.loadDispatch()),
     realtime.on(HTTP_EVENTS.ADMIN_ALERT, () => void admin.loadAlerts()),
-    realtime.on(HTTP_EVENTS.SETTINGS_UPDATED, () => void admin.loadSettings())
+    realtime.on(HTTP_EVENTS.SETTINGS_UPDATED, () => void admin.loadSettings()),
+    realtime.on(HTTP_EVENTS.SUPPORT_REQUEST_CREATED, () => void admin.loadPendingSupportRequests()),
+    realtime.on(HTTP_EVENTS.SUPPORT_REQUEST_REVIEWED, () => void admin.loadPendingSupportRequests()),
+    realtime.on(HTTP_EVENTS.SUPPORT_REQUEST_CANCELLED, () => void admin.loadPendingSupportRequests())
   );
 });
 
@@ -93,6 +98,7 @@ async function logout(): Promise<void> {
           <span :class="['mdi', `mdi-${item.icon}`]" aria-hidden="true" />
           <span>{{ item.label }}</span>
           <b v-if="item.name === ROUTE_NAMES.adminAlerts && openAlerts" class="admin-nav__badge">{{ openAlerts }}</b>
+          <b v-else-if="item.name === ROUTE_NAMES.adminSupportRequests && pendingSupportRequests" class="admin-nav__badge" data-testid="support-requests-badge">{{ pendingSupportRequests }}</b>
         </RouterLink>
       </nav>
       <div class="admin-sidebar__footer">

@@ -64,6 +64,21 @@ beforeAll(async () => {
 beforeEach(() => { server.app.context.limiters.clear(); });
 afterAll(async () => { await server?.close(); });
 
+describe('job type catalog', () => {
+  it('any signed-in account can list active job types for staffing forms', async () => {
+    const response = await apiFetch(server, '/_user/job-types', { cookie: requesterCookie });
+    expect(response.status, response.text).toBe(200);
+    const items = response.json.data.items as Array<{ id: string; label: string }>;
+    expect(items.length).toBeGreaterThan(0);
+    expect(items.every((item) => item.id && item.label)).toBe(true);
+    expect(items.map((item) => item.id)).toContain('job_fire');
+  });
+
+  it('anonymous callers are refused', async () => {
+    expect((await apiFetch(server, '/_user/job-types')).status).toBe(401);
+  });
+});
+
 describe('parameter validation', () => {
   it('duplicate job-type lines merge quantities; single-line requests still validate', async () => {
     const { missionId, leaderCookie } = await setupMission('val');

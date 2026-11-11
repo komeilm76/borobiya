@@ -47,6 +47,8 @@ export const useAdminStore = defineStore('admin', () => {
   const audit = ref<ListView<AuditEntryView> | null>(null);
   const settings = ref<SettingView[]>([]);
   const incidentTypes = ref<IncidentTypeView[]>([]);
+  /** Support requests awaiting an administrator decision (nav badge). */
+  const pendingSupportRequests = ref(0);
   const health = ref<Record<string, unknown> | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -223,9 +225,15 @@ export const useAdminStore = defineStore('admin', () => {
     await patch(`/_admin/job-types/${jobTypeId}`, input);
   }
 
+  /** Counts the pending support requests so the shell can badge the queue. */
+  async function loadPendingSupportRequests(): Promise<void> {
+    const result = await guard(() => get<{ total: number }>('/_admin/support-requests', { status: 'pending', limit: 1 }));
+    pendingSupportRequests.value = result?.total ?? 0;
+  }
+
   /** Loads every dataset an administrator screen may need. */
   async function loadAll(): Promise<void> {
-    await Promise.all([loadOverview(), loadDispatch(), loadGroups(), loadAlerts(), loadSettings()]);
+    await Promise.all([loadOverview(), loadDispatch(), loadGroups(), loadAlerts(), loadSettings(), loadPendingSupportRequests()]);
   }
 
   return {
@@ -259,6 +267,8 @@ export const useAdminStore = defineStore('admin', () => {
     loadHealth,
     dispatch,
     nearestResponders,
+    pendingSupportRequests,
+    loadPendingSupportRequests,
     loadMissionOffers,
     loadJobTypes,
     createJobType,

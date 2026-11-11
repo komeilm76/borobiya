@@ -73,6 +73,7 @@ function stubApi(options: { alerts?: unknown[] } = {}) {
         return json({ items, total: items.length });
       }
       if (path === '/_admin/settings') return json({ items: [], total: 0 });
+      if (path === '/_admin/support-requests') return json({ items: [], total: 0 });
       if (path === '/_auth/logout') return json({ ok: true });
       return json({ items: [], total: 0 });
     })
@@ -138,9 +139,10 @@ describe('navigation', () => {
   it('lists every administrator destination', async () => {
     const { wrapper } = await render();
     const links = wrapper.findAll('.admin-nav__item');
-    expect(links).toHaveLength(10);
+    expect(links).toHaveLength(11);
     const labels = links.map((link) => link.text());
     expect(labels.some((label) => label.includes('اعزام'))).toBe(true);
+    expect(labels.some((label) => label.includes('درخواست‌های نیرو'))).toBe(true);
     expect(labels.some((label) => label.includes('تنظیمات'))).toBe(true);
     wrapper.unmount();
   });
