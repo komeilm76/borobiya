@@ -3,7 +3,8 @@ import { coordinatesSchema } from "@shared/index";
 
 export interface OwnMapFix { lat: number; lon: number; accuracy: number | null; heading?: number; speed?: number }
 export interface OwnMapPositionRuntime {
-  subscribe: (onFix: (fix: { lat: number; lon: number; accuracy?: number; heading?: number | null; speed?: number | null }) => void,
+  subscribe: (onFix: (fix: { lat: number; lon: number; accuracy?: number; heading?: number | null; speed?: number | null;
+    timestamp?: number }) => void,
     onError: (denied: boolean) => void) => () => void;
 }
 
@@ -11,8 +12,8 @@ const browserRuntime: OwnMapPositionRuntime = {
   subscribe(onFix, onError) {
     if (typeof navigator === "undefined" || !navigator.geolocation) throw new Error("GEOLOCATION_UNAVAILABLE");
     const id = navigator.geolocation.watchPosition(
-      ({ coords }) => onFix({ lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy,
-        heading: coords.heading, speed: coords.speed }),
+      ({ coords, timestamp }) => onFix({ lat: coords.latitude, lon: coords.longitude, accuracy: coords.accuracy,
+        heading: coords.heading, speed: coords.speed, timestamp }),
       (error) => onError(error.code === 1),
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 12_000 }
     );
@@ -63,7 +64,14 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
         const parsed = coordinatesSchema.safeParse({ lat: fix.lat, lon: fix.lon });
         if (!parsed.success || (fix.accuracy !== undefined &&
           (!Number.isFinite(fix.accuracy) || fix.accuracy < 0))) return;
-        const observedAt = Date.now();
+        const receivedAt = Date.now();
+        // Browser callbacks may deliver a cached GeolocationPosition well after it was
+        // observed. Do not re-date that coordinate as live or extend its lifetime.
+        const timestamp = fix.timestamp ?? receivedAt;
+        if (!Number.isFinite(timestamp) || timestamp > receivedAt + 1_000 ||
+          timestamp <= receivedAt - FIX_STALE_AFTER_MS ||
+          (lastFixAt.value !== null && timestamp < lastFixAt.value)) return;
+        const observedAt = Math.min(timestamp, receivedAt);
         clearFreshnessTimer();
         lastFixAt.value = observedAt;
         position.value = { ...parsed.data, accuracy: fix.accuracy ?? null,
@@ -79,7 +87,7 @@ export function useOwnMapPosition(owner: Ref<string | null>, runtime: OwnMapPosi
           position.value = null;
           lastFixAt.value = null;
           error.value = "دادهٔ GPS تازه دریافت نشد؛ موقعیت قبلی دیگر زنده نیست.";
-        }, FIX_STALE_AFTER_MS);
+        }, FIX_STALE_AFTER_MS - (receivedAt - observedAt));
       }, (denied) => {
         if (current !== generation || owner.value !== account) return;
         if (denied) stop();

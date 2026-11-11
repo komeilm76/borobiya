@@ -101,6 +101,55 @@ describe("private on-map GPS display", () => {
     } finally { scope.stop(); vi.useRealTimers(); }
   });
 
+  it("passes GeolocationPosition.timestamp from the browser watcher into the private GPS fix", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    const clearWatch = vi.fn();
+    const watchPosition = vi.fn((onFix: (position: unknown) => void) => {
+      onFix({ timestamp: 95_000, coords: { latitude: 35.7, longitude: 51.4,
+        accuracy: 12, heading: null, speed: null } });
+      return 17;
+    });
+    vi.stubGlobal("navigator", { geolocation: { watchPosition, clearWatch } });
+    const scope = effectScope();
+    try {
+      const own = scope.run(() => useOwnMapPosition(ref("owner")))!;
+      expect(own.start()).toBe(true);
+      expect(own.lastFixAt.value).toBe(95_000);
+      expect(own.position.value?.lat).toBe(35.7);
+    } finally { scope.stop(); vi.unstubAllGlobals(); vi.useRealTimers(); }
+    expect(clearWatch).toHaveBeenCalledWith(17);
+  });
+
+  it("uses the browser's observation time, not callback time, to expire cached fixes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    let emit!: (fix: { lat: number; lon: number; timestamp?: number }) => void;
+    const scope = effectScope();
+    try {
+      const own = scope.run(() => useOwnMapPosition(ref("owner"), {
+        subscribe: (onFix) => { emit = onFix; return () => {}; }
+      }))!;
+      own.start();
+      emit({ lat: 35.7, lon: 51.4, timestamp: 75_000 }); // Old cached callback must not look live.
+      expect(own.position.value).toBeNull();
+      emit({ lat: 35.8, lon: 51.5, timestamp: 95_000 });
+      expect(own.position.value?.lat).toBe(35.8);
+      expect(own.lastFixAt.value).toBe(95_000);
+      emit({ lat: 35.6, lon: 51.3, timestamp: 94_000 }); // Out-of-order fix cannot rewind the map.
+      emit({ lat: 35.6, lon: 51.3, timestamp: Number.NaN });
+      emit({ lat: 35.6, lon: 51.3, timestamp: 102_000 }); // Implausible future timestamp.
+      expect(own.position.value?.lat).toBe(35.8);
+      vi.advanceTimersByTime(14_999);
+      expect(own.position.value?.lat).toBe(35.8);
+      vi.advanceTimersByTime(1);
+      expect(own.position.value).toBeNull();
+      expect(own.lastFixAt.value).toBeNull();
+      emit({ lat: 35.9, lon: 51.6, timestamp: 115_000 });
+      expect(own.position.value?.lat).toBe(35.9); // The same watch can recover.
+    } finally { scope.stop(); vi.useRealTimers(); }
+  });
+
   it("renews GPS freshness only for valid fixes and revokes the timer on account change", () => {
     vi.useFakeTimers();
     vi.setSystemTime(200_000);
