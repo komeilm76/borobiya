@@ -120,9 +120,10 @@
          broadcast store powers the full companion dialog and dashboard. -->
     <v-btn
       class="user-map-view__share"
+      :class="{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }"
       v-show="!(isShortPhone && activeTool)"
       :icon="broadcast.view.isActive ? 'mdi-broadcast' : 'mdi-broadcast-off'"
-      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'success' : 'primary'"
+      :color="broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning' : broadcast.view.isActive ? 'success' : 'surface'"
       :aria-label="broadcast.view.actionLabel"
       :title="`${broadcast.view.headline}؛ ${broadcast.view.detail}`"
       :aria-pressed="broadcast.view.isActive"
@@ -2401,6 +2402,9 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
   box-shadow: var(--bb-shadow-overlay);
 }
 .user-map-view__share { inset-block-end: calc(max(1.25rem, env(safe-area-inset-bottom, 0px)) + 7rem); }
+/* Off is neutral rather than another green/teal fill; the outline remains
+ * visible over both pale map tiles and the dark raised surface. */
+.user-map-view__share--idle { border-color: var(--bb-color-outline); }
 .user-map-view__recenter:focus-visible, .user-map-view__share:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 3px;
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { compileStyle, parse } from "vue/compiler-sfc";
+import { palettes } from "@/styles/tokens";
 
 // Project policy: source/compiled CSS contracts, not mounted Vue SFCs.
 const view = readFileSync(new URL("./UserMapView.vue", import.meta.url), "utf8");
@@ -23,6 +24,8 @@ describe("map sharing quick action", () => {
     expect(button).toContain(':aria-label="broadcast.view.actionLabel"');
     expect(button).toContain(':aria-pressed="broadcast.view.isActive"');
     expect(button).toContain("broadcast.view.tone === 'error' || broadcast.view.tone === 'warn' ? 'warning'");
+    expect(button).toContain("broadcast.view.isActive ? 'success' : 'surface'");
+    expect(button).toContain(":class=\"{ 'user-map-view__share--idle': !broadcast.view.isActive && broadcast.view.tone === 'neutral' }\"");
     expect(button).toContain(':disabled="!auth.user || auth.mustCompleteSecurityQuestions || !broadcast.isSupported"');
     expect(button).toContain('@click="broadcast.toggle()"');
     expect(button).not.toContain('<span');
@@ -49,5 +52,24 @@ describe("map sharing quick action", () => {
     const result = compileStyle({ source: descriptor.styles[0]!.content, id: "data-v-share", filename: "UserMapView.vue", scoped: true });
     expect(result.errors).toEqual([]);
     expect(result.code).toContain('.user-map-view__share[data-v-share]');
+    expect(result.code).toContain('.user-map-view__share--idle[data-v-share]');
+    expect(styleBlock(view, '.user-map-view__share--idle')).toContain('border-color: var(--bb-color-outline);');
+  });
+
+  it("keeps the inactive icon and outline readable in both themes without resembling the active fill", () => {
+    const luminance = (hex: string) => [1, 3, 5].reduce((sum, index, channel) => {
+      const value = parseInt(hex.slice(index, index + 2), 16) / 255;
+      const linear = value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      return sum + linear * [0.2126, 0.7152, 0.0722][channel]!;
+    }, 0);
+    const contrast = (first: string, second: string) => {
+      const [high, low] = [luminance(first), luminance(second)].sort((a, b) => b - a);
+      return (high! + 0.05) / (low! + 0.05);
+    };
+    for (const palette of Object.values(palettes)) {
+      expect(contrast(palette.outline, palette.surface)).toBeGreaterThanOrEqual(3);
+      expect(contrast(palette.text, palette.surface)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(palette.success, palette.surface)).toBeGreaterThanOrEqual(3);
+    }
   });
 });
