@@ -1,34 +1,32 @@
 <template>
-  <main class="mission-desk" dir="rtl">
+  <main class="mission-desk" :class="{ 'mission-desk--active': desk.activeMission.value }" dir="rtl" @keydown.esc="dismissTool">
+    <!-- No active mission means no private markers. Show the same full-viewport
+         canvas for context, then replace it with the live canvas once assigned. -->
+    <MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"
+      :constrain-bounds="false" aria-label="نقشهٔ عمومی؛ مأموریت فعالی ندارید" />
     <div class="mission-desk__shell">
-      <header class="mission-hero" :class="{ 'mission-hero--active': desk.activeMission.value }">
+      <header v-if="!desk.activeMission.value" class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
         <h1>{{ missionHeadline }}</h1>
         <p>{{ missionIntro }}</p>
+        <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-refresh" :loading="desk.loading.value"
+          @click="desk.load()">تازه‌سازی</v-btn>
         <div class="mission-hero__glow" aria-hidden="true" />
       </header>
 
-      <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="lg" class="mt-6" role="status">
+      <v-alert v-if="desk.cancelledMissionId.value" type="info" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
         مأموریت لغو شد. مرکز امداد برای جایگزینی امدادگر مطلع شده است.
       </v-alert>
-      <v-alert v-if="desk.completedMissionId.value" type="success" variant="tonal" rounded="lg" class="mt-6" role="status">
+      <v-alert v-if="desk.completedMissionId.value" type="success" variant="tonal" rounded="lg" class="mission-desk__outcome mt-6" role="status">
         امدادرسانی پایان یافت و وضعیت مأموریت در سرور ثبت شد.
       </v-alert>
-      <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mt-6" role="alert">
+      <v-alert v-if="desk.error.value" type="error" variant="tonal" rounded="lg" class="mission-desk__load-alert mt-6" role="alert">
         {{ desk.error.value }}
         <v-btn class="ms-2" size="small" variant="text" @click="desk.load()">تلاش دوباره</v-btn>
       </v-alert>
-      <div v-if="!desk.activeMission.value" class="mission-desk__toolbar">
-        <div>
-          <h2>مأموریت فعال</h2>
-          <p>وضعیت مأموریت از سرور خوانده می‌شود و پس از تأیید هر مرحله به‌روز خواهد شد.</p>
-        </div>
-        <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :loading="desk.loading.value"
-          @click="desk.load()">تازه‌سازی</v-btn>
-      </div>
-
       <v-skeleton-loader v-if="desk.loading.value && !desk.missions.value.length" type="article, actions" class="mission-desk__card" />
-      <section v-else-if="desk.activeMission.value" class="mission-desk__card" aria-label="مأموریت فعال">
+      <section v-else-if="desk.activeMission.value" v-show="activeTool === 'status'" id="mission-status-panel"
+        class="mission-desk__card" aria-label="مأموریت فعال" tabindex="-1">
         <div class="mission-desk__card-header">
           <div>
             <span class="mission-desk__kicker"><span class="mission-desk__pulse" /> اکنون در جریان</span>
@@ -40,6 +38,7 @@
               role="status" aria-live="polite" aria-atomic="true">{{ currentStatusLabel }}</v-chip>
             <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :loading="desk.loading.value"
               @click="desk.load()">تازه‌سازی</v-btn>
+            <v-btn icon="mdi-close" variant="text" aria-label="بستن وضعیت مأموریت" @click="closeTool('status')" />
           </div>
         </div>
         <details class="mission-desk__timeline">
@@ -71,7 +70,7 @@
         </div>
         <div class="mission-desk__foot">
           <v-btn color="primary" variant="flat" rounded="lg" prepend-icon="mdi-map-marker-path"
-            aria-controls="mission-workspace" @click="openRouteWorkspace">نقشه و مسیر مأموریت</v-btn>
+            aria-controls="mission-route-panel" @click="openRouteWorkspace">باز کردن مسیر</v-btn>
           <p><v-icon icon="mdi-shield-check-outline" size="20" /> لغو، آخرین راه‌حل است؛ برای ناتوانی در ادامه، دلیل واقعی ثبت کنید.</p>
           <v-menu location="bottom end">
             <template #activator="{ props }">
@@ -92,26 +91,27 @@
         <v-btn color="primary" variant="flat" rounded="lg" to="/_user/map?inbox=1">مشاهدهٔ پیشنهادها</v-btn>
       </section>
       <div v-if="desk.activeMission.value" id="mission-workspace" class="mission-desk__workspace">
-        <MissionLivePanel :mission="desk.activeMission.value"
+        <MissionLivePanel :mission="desk.activeMission.value" fullscreen :room-open="activeTool === 'team'"
           :route-active="routing.visible.value || navigation.active.value" @ready="onRouteMapReady">
-          <template #map-toolbar>
-            <v-btn v-if="!routing.visible.value" color="primary" variant="flat" rounded="lg"
-              prepend-icon="mdi-map-marker-path" @click="openRouteWorkspace">نمایش محل حادثه و مسیر</v-btn>
-          </template>
           <template #map-actions>
             <div v-if="pickingWaypoint" class="mission-desk__map-hint" role="status">
               برای افزودن ایستگاه روی نقشه بزنید.
-              <button type="button" @click="pickingWaypoint = false">لغو انتخاب</button>
+              <button type="button" @click="cancelWaypointPick">لغو انتخاب</button>
             </div>
           </template>
           <template #route-planner>
-            <section v-if="routing.visible.value" class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت">
+            <section v-show="routing.visible.value && activeTool === 'route'" id="mission-route-panel"
+              class="mission-route" aria-label="مسیرهای پیشنهادی مأموریت" tabindex="-1">
               <header class="mission-route__header">
                 <div>
                   <h2>مسیر تا محل حادثه</h2>
                   <p>مسیریابی با سرور نقشهٔ محلی انجام می‌شود؛ مسیرها پیشنهادند و زمان رسیدن قطعی نیست.</p>
                 </div>
-                <v-btn variant="text" aria-label="بستن مسیرها" @click="closeRoutes">بستن</v-btn>
+                <div class="d-flex align-center ga-1">
+                  <v-btn variant="text" color="error" size="small" :disabled="navigation.active.value"
+                    @click="resetRoutePlan">پاک کردن مسیر</v-btn>
+                  <v-btn icon="mdi-close" variant="text" aria-label="بستن پنل مسیر؛ مسیر روی نقشه می‌ماند" @click="closeTool('route')" />
+                </div>
               </header>
               <v-progress-linear v-if="routing.targetLoading.value" indeterminate color="primary" aria-label="دریافت محل حادثه" />
               <v-alert v-if="routing.error.value" class="my-3" type="warning" variant="tonal" role="alert">
@@ -210,7 +210,7 @@
                 </p>
                 <div v-if="routing.selectedRoute.value" class="mission-route__navigation">
                   <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
-                    prepend-icon="mdi-navigation" :disabled="!mapReady" @click="navigation.start()">شروع راهبری</v-btn>
+                    prepend-icon="mdi-navigation" :disabled="!mapReady" @click="startGuidance">شروع راهبری</v-btn>
                   <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
                     @click="navigation.stop()">توقف راهبری</v-btn>
                   <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
@@ -227,6 +227,25 @@
             </section>
           </template>
         </MissionLivePanel>
+        <header class="mission-desk__map-heading" aria-label="مأموریت فعال">
+          <h1>مأموریت من</h1>
+          <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
+        </header>
+        <div v-if="navigation.active.value" class="mission-desk__guidance" role="status">
+          <span>{{ navigation.fix.value ? 'راهبری فعال · موقعیت خصوصی GPS' : 'راهبری فعال · در انتظار GPS' }}</span>
+          <v-btn size="small" variant="tonal" color="error" @click="navigation.stop()">توقف راهبری</v-btn>
+        </div>
+        <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
+          <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
+            :aria-expanded="activeTool === 'status'" aria-controls="mission-status-panel"
+            @click="toggleTool('status')"><v-icon icon="mdi-clipboard-text-outline" size="22" aria-hidden="true" />وضعیت</button>
+          <button id="mission-tool-route" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'route' }"
+            :aria-expanded="activeTool === 'route'" aria-controls="mission-route-panel"
+            @click="toggleTool('route')"><v-icon icon="mdi-routes" size="22" aria-hidden="true" />مسیر</button>
+          <button id="mission-tool-team" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'team' }"
+            :aria-expanded="activeTool === 'team'" aria-controls="mission-team-panel"
+            @click="toggleTool('team')"><v-icon icon="mdi-account-group-outline" size="22" aria-hidden="true" />اعضا</button>
+        </nav>
       </div>
     </div>
 
@@ -277,6 +296,7 @@ import { computed, nextTick, onMounted, onBeforeUnmount, ref, watch } from "vue"
 import { useRouteNavigation } from "@/composables/use-route-navigation";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 import MissionLivePanel from "@/components/mission/MissionLivePanel.vue";
+import MapCanvas from "@/components/map/MapCanvas.vue";
 import { useMissionRoutes } from "@/composables/use-mission-routes";
 import { missionMapCamera } from "@/sos/mission-map";
 import { formatRouteDistance, formatRouteDuration } from "@/sos/route-preview";
@@ -315,6 +335,7 @@ const missionIntro = computed(() => {
   return "برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.";
 });
 const mapReady = ref(false);
+const activeTool = ref<"status" | "route" | "team" | null>(null);
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
 const waypointLon = ref("");
@@ -344,12 +365,34 @@ function addTypedWaypoint(): void {
 function openRouteWorkspace(): void {
   // The private incident read does not request GPS or publish location.
   if (!routing.visible.value) void routing.open();
-  void nextTick(() => document.getElementById("mission-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  activeTool.value = "route";
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
+}
+function toggleTool(tool: "status" | "route" | "team"): void {
+  if (pickingWaypoint.value) pickingWaypoint.value = false;
+  if (activeTool.value === tool) { closeTool(tool); return; }
+  if (tool === "route") { openRouteWorkspace(); return; }
+  activeTool.value = tool;
+  void nextTick(() => document.getElementById(`mission-${tool}-panel`)?.focus({ preventScroll: true }));
+}
+function closeTool(tool: "status" | "route" | "team"): void {
+  activeTool.value = null;
+  void nextTick(() => document.getElementById(`mission-tool-${tool}`)?.focus({ preventScroll: true }));
+}
+function dismissTool(): void {
+  if (pickingWaypoint.value) { cancelWaypointPick(); return; }
+  if (activeTool.value) closeTool(activeTool.value);
+}
+function resetRoutePlan(): void { closeRoutes(); closeTool("route"); }
+function startGuidance(): void { navigation.start(); closeTool("route"); }
+function cancelWaypointPick(): void {
+  pickingWaypoint.value = false;
+  activeTool.value = "route";
+  void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
 }
 function toggleWaypointPick(): void {
   pickingWaypoint.value = !pickingWaypoint.value;
-  if (pickingWaypoint.value) void nextTick(() => document.querySelector("#mission-workspace .live-panel__map")
-    ?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  activeTool.value = pickingWaypoint.value ? null : "route";
 }
 function onWaypointDisclosureToggle(event: Event): void {
   // Closing the optional editor must also end map-pick mode: otherwise the next
@@ -369,6 +412,7 @@ function onRouteMapClick(event: MapMouseEvent): void {
   if (!pickingWaypoint.value || navigation.active.value) return;
   routing.addWaypoint({ lat: event.lngLat.lat, lon: event.lngLat.lng });
   pickingWaypoint.value = false;
+  activeTool.value = "route";
   waypointError.value = "";
 }
 
@@ -478,6 +522,7 @@ function onRouteMapReady(map: MapLibreMap, MarkerClass: typeof Marker): void {
 function closeRoutes(): void {
   navigation.stop();
   routing.reset();
+  activeTool.value = null;
   pickingWaypoint.value = false;
   waypointError.value = "";
   draggingWaypoint = null;
@@ -496,6 +541,14 @@ function releaseRouteMap(): void {
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
 watch(() => navigation.active.value, (active) => { if (active) pickingWaypoint.value = false; });
+// A failed private incident read or guidance start must not disappear inside a
+// closed overlay while the full-screen map silently stays at its default center.
+watch(() => [routing.error.value, navigation.error.value] as const, ([routeError, guidanceError]) => {
+  if ((routeError || guidanceError) && desk.activeMission.value) {
+    activeTool.value = "route";
+    void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
+  }
+});
 watch(() => desk.activeMission.value?.id, (next, previous) => {
   if (previous && next !== previous) {
     if (next) closeRoutes(); // Same mounted canvas, new private incident.
@@ -625,6 +678,109 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-cancel-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
 }
 @media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
+
+/* While a mission is loading or absent, the same full-screen spatial shell
+   remains. Its public canvas has no incident or live-room data. */
+.mission-desk:not(.mission-desk--active) { position: relative; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }
+.mission-desk__idle-map { position: absolute !important; inset: 0; width: 100%; height: 100%; min-height: 0 !important; border-radius: 0; }
+.mission-desk__idle-map :deep(.maplibregl-ctrl-top-right) { top: calc(4.5rem + env(safe-area-inset-top, 0px)); }
+.mission-desk:not(.mission-desk--active) .mission-desk__shell {
+  position: absolute; z-index: 2; inset: 0; height: 100%; max-width: none;
+  pointer-events: none; overflow-y: auto;
+}
+.mission-desk:not(.mission-desk--active) .mission-hero {
+  position: relative; width: min(27rem, calc(100vw - 2rem)); margin: calc(4.5rem + env(safe-area-inset-top, 0px)) auto 0;
+  padding: 1rem 1.25rem; pointer-events: auto;
+}
+.mission-desk:not(.mission-desk--active) .mission-hero h1 { margin: .45rem 0; font-size: 1.3rem; }
+.mission-desk:not(.mission-desk--active) .mission-hero p { line-height: 1.55; font-size: .85rem; }
+.mission-desk:not(.mission-desk--active) .mission-hero :deep(.v-btn) { position: relative; z-index: 1; margin-top: .65rem; }
+.mission-desk:not(.mission-desk--active) .mission-desk__empty,
+.mission-desk:not(.mission-desk--active) .mission-desk__card,
+.mission-desk:not(.mission-desk--active) .mission-desk__outcome,
+.mission-desk:not(.mission-desk--active) .mission-desk__load-alert {
+  width: min(27rem, calc(100vw - 2rem)); margin: 1rem auto 0; padding: 1.25rem;
+  pointer-events: auto;
+}
+.mission-desk:not(.mission-desk--active) .mission-desk__empty { text-align: start; }
+.mission-desk:not(.mission-desk--active) .mission-desk__empty-icon { display: none; }
+.mission-desk:not(.mission-desk--active) .mission-desk__shell { padding-bottom: calc(8rem + env(safe-area-inset-bottom, 0px)); }
+
+/* Match /_user/map: the canvas owns the viewport, with independent scrollable
+   tools that can all close. No tall card or persistent planner takes map space. */
+.mission-desk--active {
+  height: 100dvh; min-height: 0; padding: 0; overflow: hidden;
+  background: rgb(var(--v-theme-background)); isolation: isolate;
+}
+.mission-desk--active .mission-desk__shell { position: relative; width: 100%; max-width: none; height: 100%; }
+.mission-desk--active .mission-desk__workspace { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mission-desk--active .mission-desk__card,
+.mission-desk--active .mission-route {
+  position: absolute; z-index: 8;
+  inset: auto 1rem calc(5.5rem + env(safe-area-inset-bottom, 0px)) auto;
+  width: min(28rem, calc(100vw - 1.5rem)); max-height: min(56dvh, 33rem);
+  margin: 0; padding: 1rem; overflow-y: auto; overscroll-behavior: contain;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+}
+.mission-desk--active .mission-desk__card { z-index: 9; }
+.mission-desk--active .mission-desk__load-alert {
+  position: absolute; z-index: 12; top: calc(3.5rem + env(safe-area-inset-top, 0px));
+  right: 1rem; width: min(27rem, calc(100vw - 1.5rem)); max-height: 30dvh; overflow-y: auto;
+}
+.mission-desk__map-heading {
+  position: absolute; z-index: 7; top: calc(.75rem + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .5rem; max-width: calc(100vw - 8rem);
+  padding: .5rem .85rem; border: 1px solid var(--bb-color-outline);
+  border-radius: var(--bb-radius-nested, 16px); white-space: nowrap;
+  color: rgb(var(--v-theme-on-surface)); background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+}
+.mission-desk__map-heading h1 { margin: 0; font-size: .9rem; font-weight: 800; }
+.mission-desk__map-heading span { overflow: hidden; text-overflow: ellipsis; font-size: .8rem; }
+.mission-desk__guidance {
+  position: absolute; z-index: 7; top: calc(4.5rem + env(safe-area-inset-top, 0px));
+  left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: .5rem;
+  width: max-content; max-width: calc(100vw - 1.5rem); padding: .35rem .6rem;
+  border-radius: var(--bb-radius-nested, 16px); color: rgb(var(--v-theme-on-surface));
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+  font-size: .82rem;
+}
+.mission-desk__dock {
+  position: absolute; z-index: 10; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
+  left: 50%; transform: translateX(-50%); display: flex; gap: 3px;
+  width: min(21rem, calc(100vw - 6rem)); padding: 4px;
+  border: 1px solid var(--bb-color-outline); border-radius: var(--bb-radius-card, 24px);
+  background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
+}
+.mission-desk__dock button {
+  display: grid; place-items: center; flex: 1 1 0; gap: 1px; min-width: 0; min-height: 54px;
+  border: 0; border-radius: var(--bb-radius-nested, 16px); background: transparent;
+  color: rgb(var(--v-theme-on-surface)); cursor: pointer; font-family: inherit; font-size: .82rem; font-weight: 700; line-height: 1.3;
+}
+.mission-desk__dock .mission-desk__dock-active {
+  background: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-on-primary));
+}
+.mission-desk__dock button:focus-visible, .mission-desk__map-hint button:focus-visible {
+  outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px;
+}
+.mission-desk--active .mission-desk__map-hint {
+  bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  inset-inline: 50% auto; transform: translateX(50%);
+}
+@media (max-width: 599px) {
+  .mission-desk--active { padding: 0; }
+  .mission-desk--active .mission-desk__card,
+  .mission-desk--active .mission-route {
+    inset-inline: .75rem; width: auto;
+    bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px));
+    max-height: min(52dvh, 26rem);
+  }
+  .mission-desk__dock { width: min(21rem, calc(100vw - 1.5rem)); }
+  .mission-desk__map-heading { max-width: calc(100vw - 8rem); }
+  .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
+}
+:global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active)) { background: var(--bb-color-inset); }
 
 :global(:root.dark .mission-route) { background: #21383a; border-color: var(--bb-color-outline); }
 :global(:root.dark .mission-route__stops),

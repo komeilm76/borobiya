@@ -103,7 +103,7 @@
       @request-logout="logoutConfirmation.request()"
     />
     <MapProposalSidebar
-      v-if="isMapRoute && auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions"
+      v-if="route.name === 'user-map' && auth.isAuthenticated && auth.user?.role === 'user' && !auth.mustCompleteSecurityQuestions"
       :inbox="proposalInbox"
       :user-id="auth.user.id"
     />
@@ -327,7 +327,9 @@ const mapNavItems = computed(() => auth.user?.role === "admin" && !auth.mustComp
 );
 const router = useRouter();
 const route = useRoute();
-const isMapRoute = computed(() => route.name === "user-map");
+// Both map-first workspaces use the same full-viewport shell and navigation drawer.
+// Proposal and route-choice overlays remain specific to the companion map.
+const isMapRoute = computed(() => route.name === "user-map" || route.name === "user-mission");
 const isAuthRoute = computed(() => route.name === "auth-login" || route.name === "auth-register" || route.name === "auth-forgot-password");
 const isPublicRoute = computed(() => route.name === "public-landing" || route.name === "public-health" || route.name === "not-found");
 const logoutUnconfirmed = ref(false);

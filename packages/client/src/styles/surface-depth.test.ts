@@ -55,7 +55,8 @@ describe("surface depth across light and dark UI", () => {
     }
     // The route planner is an inset inside the live-map surface, not a second raised map card.
     expect(mission).toMatch(/\.mission-route \{[^}]*border-radius: var\(--bb-radius-nested, 16px\);[^}]*\}/);
-    expect(mission).not.toMatch(/\.mission-route \{[^}]*box-shadow:/);
+    expect(mission.match(/\.mission-route \{([^}]*)\}/)?.[1]).not.toContain("box-shadow:");
+    expect(mission).toContain("background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);");
     expect(proposals).toContain(".offer-card--selected { border-color: #319581; box-shadow: 0 0 0 2px");
     expect(history).toContain(".history__item--selected { border-color: #269b7c; box-shadow: 0 0 0 2px");
   });

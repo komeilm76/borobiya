@@ -23,7 +23,7 @@ describe("map-only proposal notifications", () => {
   it("keeps the original bell on non-map pages and offers a dedicated right sidebar only to eligible users", () => {
     expect(app).toContain('<v-app-bar v-if="!isMapRoute && !isAuthRoute && !isPublicRoute"');
     expect(app).toContain('<MapProposalSidebar');
-    expect(app).toContain('v-if="isMapRoute && auth.isAuthenticated && auth.user?.role === \'user\' && !auth.mustCompleteSecurityQuestions"');
+    expect(app).toContain('v-if="route.name === \'user-map\' && auth.isAuthenticated && auth.user?.role === \'user\' && !auth.mustCompleteSecurityQuestions"');
     expect(app).toContain(':inbox="proposalInbox"');
     expect(app).toContain('aria-label="پیشنهادهای مأموریت"'); // Original app-bar inbox stays intact.
   });

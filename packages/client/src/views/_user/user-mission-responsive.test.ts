@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { compileStyle, parse } from "vue/compiler-sfc";
 
 const view = readFileSync(new URL("./UserMissionView.vue", import.meta.url), "utf8");
 const panel = readFileSync(new URL("../../components/mission/MissionLivePanel.vue", import.meta.url), "utf8");
@@ -43,19 +44,45 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain(':disabled="!desk.canCancel.value" @click="desk.confirmCancellation()"');
   });
 
-  it("keeps one definite-height mission map above the planner on phones and near it on wide screens", () => {
-    const phone = view.split("@media(max-width: 599px) {")[1]!.split("@media(max-width: 480px)")[0]!;
-    expect(phone).toContain(".mission-route__controls > div { width: 100%; min-width: 0; }");
-    expect(phone).toContain(".mission-route__route-actions :deep(.v-btn) { flex: 1 1 100%; max-width: 100%;");
-    expect(phone).toContain(".mission-route__coordinate { flex: 1 1 100%; max-width: none; min-width: 0; }");
-    expect(view).not.toContain('<MapCanvas');
+  it("gives the active mission a genuine full-bleed map, with compact closable overlay tools", () => {
+    const app = readFileSync(new URL("../../App.vue", import.meta.url), "utf8");
+    const shell = readFileSync(new URL("../../styles/tailwind.css", import.meta.url), "utf8");
+    expect(app).toContain('route.name === "user-map" || route.name === "user-mission"');
+    expect(app).toContain("'app-shell--map': isMapRoute");
+    expect(app).toContain('<MapSidebar\n      v-if="isMapRoute"');
+    expect(shell).toContain('.app-shell--map .app-main {');
+    expect(shell).toContain('.app-shell--map .app-footer { display: none; }');
+    expect(view).toContain("height: 100dvh; min-height: 0; padding: 0; overflow: hidden;");
+    expect(view).toContain('.mission-desk:not(.mission-desk--active) { position: relative; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }');
+    expect(view).toContain('watch(() => [routing.error.value, navigation.error.value] as const,');
+    expect(view).toContain('v-show="activeTool === \'status\'" id="mission-status-panel"');
+    expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\'" id="mission-route-panel"');
+    expect(view).toContain(':room-open="activeTool === \'team\'"');
+    expect(view).toContain('const activeTool = ref<"status" | "route" | "team" | null>(null);');
+    expect(view).toContain('aria-label="ابزارهای مأموریت"');
+    expect(view).toContain('function dismissTool(): void {');
+    expect(view).toContain('activeTool.value = pickingWaypoint.value ? null : "route";');
+    expect(view).toContain('function startGuidance(): void { navigation.start(); closeTool("route"); }');
+    expect(view).not.toContain('scrollIntoView(');
+    expect(view).toContain('<MapCanvas v-if="!desk.activeMission.value" class="mission-desk__idle-map"');
+    expect(view).toContain('<div v-if="desk.activeMission.value" id="mission-workspace"');
+    expect(view.match(/<MapCanvas\b/g)).toHaveLength(1); // Public fallback, never alongside the active mission.
     expect(panel.match(/<MapCanvas\b/g)).toHaveLength(1);
     expect(panel.indexOf('<slot name="route-planner"')).toBeGreaterThan(panel.indexOf('<MapCanvas'));
-    expect(view).toContain('<template #route-planner>');
-    expect(panel).toContain('.live-panel--routing .live-panel__map { height: min(50dvh, 450px); min-height: 310px; }');
-    expect(panel).toContain('.live-panel--routing .live-panel__map { height: min(42dvh, 360px); min-height: 275px; }');
-    expect(panel).toContain('@container (min-width: 721px) { .live-panel--routing .live-panel__map { position: sticky;');
+    expect(panel).toContain('fullscreen?: boolean; roomOpen?: boolean;');
+    expect(panel).toContain('v-show="!fullscreen || roomOpen"');
+    expect(panel).toContain('v-if="!fullscreen && live.error.value"');
+    expect(panel).toContain('v-if="fullscreen" class="live-panel__room-heading"');
+    expect(panel).toContain('@click="live.startSharing()"');
+    expect(panel).toContain('.live-panel--fullscreen .live-panel__map :deep(.map-canvas)');
+    expect(panel).toContain('height: 100%; min-height: 0; border-radius: 0;');
     expect(view).toContain('routing.findRoutes(true)');
     expect(view).toContain('routing.addWaypoint({ lat, lon })');
+    for (const [source, filename] of [[view, "UserMissionView.vue"], [panel, "MissionLivePanel.vue"]] as const) {
+      const { descriptor } = parse(source, { filename });
+      const style = compileStyle({ source: descriptor.styles[0]!.content, filename, id: "data-v-mission-map", scoped: true });
+      expect(style.errors).toEqual([]);
+      expect(style.code).toContain(filename === "UserMissionView.vue" ? "100dvh" : ".live-panel--fullscreen");
+    }
   });
 });
