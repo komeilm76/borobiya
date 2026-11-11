@@ -76,18 +76,36 @@ export class LocationService {
     return { ok: true, share: result };
   }
 
-  listShares(identity: AuthIdentity): Record<string, unknown> {
+  /**
+   * Lists shares involving the viewer. With `includeAll`, revoked and expired shares are included
+   * and each row carries a `state` (active | expired | revoked); the default stays active-only so
+   * existing consumers are unaffected.
+   */
+  listShares(identity: AuthIdentity, includeAll = false): Record<string, unknown> {
     const now = this.ctx.clock();
-    const rows = this.ctx.repo.all<Record<string, any>>(
-      `SELECT s.*, owner.username AS ownerUsername, recipient.username AS recipientUsername
-       FROM location_shares s
-       JOIN users owner ON owner.id = s.owner_id
-       JOIN users recipient ON recipient.id = s.recipient_id
-       WHERE (s.owner_id = ? OR s.recipient_id = ?) AND s.revoked_at IS NULL
-         AND (s.expires_at IS NULL OR s.expires_at > ?)
-       ORDER BY s.created_at DESC LIMIT 100`, identity.userId, identity.userId, now);
+    const rows = includeAll
+      ? this.ctx.repo.all<Record<string, any>>(
+        `SELECT s.*, owner.username AS ownerUsername, recipient.username AS recipientUsername
+         FROM location_shares s
+         JOIN users owner ON owner.id = s.owner_id
+         JOIN users recipient ON recipient.id = s.recipient_id
+         WHERE (s.owner_id = ? OR s.recipient_id = ?)
+         ORDER BY s.created_at DESC LIMIT 100`, identity.userId, identity.userId)
+      : this.ctx.repo.all<Record<string, any>>(
+        `SELECT s.*, owner.username AS ownerUsername, recipient.username AS recipientUsername
+         FROM location_shares s
+         JOIN users owner ON owner.id = s.owner_id
+         JOIN users recipient ON recipient.id = s.recipient_id
+         WHERE (s.owner_id = ? OR s.recipient_id = ?) AND s.revoked_at IS NULL
+           AND (s.expires_at IS NULL OR s.expires_at > ?)
+         ORDER BY s.created_at DESC LIMIT 100`, identity.userId, identity.userId, now);
+    const shareState = (row: Record<string, any>): 'active' | 'expired' | 'revoked' => {
+      if (row.revoked_at !== null && row.revoked_at !== undefined) return 'revoked';
+      if (row.expires_at !== null && row.expires_at !== undefined && Number(row.expires_at) <= now) return 'expired';
+      return 'active';
+    };
     return {
-      items: rows.map((row) => this.publicShare(row)),
+      items: rows.map((row) => ({ ...this.publicShare(row), state: shareState(row) })),
       outgoing: rows.filter((row) => row.owner_id === identity.userId).length,
       incoming: rows.filter((row) => row.recipient_id === identity.userId).length,
       total: rows.length

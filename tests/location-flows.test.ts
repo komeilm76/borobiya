@@ -258,3 +258,43 @@ describe('nearest responders with a cached fix', () => {
     }
   });
 });
+
+describe('share history (include=all)', () => {
+  it('hides revoked shares by default and reports them as revoked with include=all', async () => {
+    const created = await apiFetch(server, '/_user/location/shares', {
+      method: 'POST', cookie: requesterCookie,
+      body: { recipientId: 'usr_companion', kind: 'live', durationSeconds: 3600 }
+    });
+    expect(created.status, created.text).toBe(201);
+    const shareId = created.json.data.share.shareId as string;
+    const revoked = await apiFetch(server, `/_user/location/shares/${shareId}`, { method: 'DELETE', cookie: requesterCookie });
+    expect(revoked.status, revoked.text).toBe(200);
+
+    const activeOnly = await apiFetch(server, '/_user/location/shares', { cookie: requesterCookie });
+    expect(activeOnly.json.data.items.find((item: any) => item.id === shareId)).toBeUndefined();
+
+    const all = await apiFetch(server, '/_user/location/shares?include=all', { cookie: requesterCookie });
+    const row = all.json.data.items.find((item: any) => item.id === shareId);
+    expect(row, 'revoked share must be visible with include=all').toBeTruthy();
+    expect(row.state).toBe('revoked');
+    expect(row.revokedAt).toBeTypeOf('number');
+  });
+
+  it('reports an expired share as expired with include=all', async () => {
+    const me = server.app.context.repo.one<{ id: string }>("SELECT id FROM users WHERE username = 'saeed.k'");
+    const now = Date.now();
+    server.app.context.repo.run(
+      `INSERT INTO location_shares(id,owner_id,recipient_id,kind,duration_seconds,expires_at,history_from,history_to,created_at,revoked_at)
+       VALUES('shr_expired_flows', ?, 'usr_companion', 'live', 60, ?, NULL, NULL, ?, NULL)`,
+      me.id, now - 1000, now - 120_000);
+
+    const activeOnly = await apiFetch(server, '/_user/location/shares', { cookie: requesterCookie });
+    expect(activeOnly.json.data.items.find((item: any) => item.id === 'shr_expired_flows')).toBeUndefined();
+
+    const all = await apiFetch(server, '/_user/location/shares?include=all', { cookie: requesterCookie });
+    const row = all.json.data.items.find((item: any) => item.id === 'shr_expired_flows');
+    expect(row.state).toBe('expired');
+    // Untouched expired rows must not masquerade as active.
+    expect(all.json.data.items.every((item: any) => item.state === 'active' || item.state === 'expired' || item.state === 'revoked')).toBe(true);
+  });
+});

@@ -80,6 +80,8 @@ export interface ShareView {
   historyTo?: number | null;
   createdAt: number;
   revokedAt?: number | null;
+  /** Present when the list endpoint is called with include=all; absent otherwise. */
+  state?: 'active' | 'expired' | 'revoked';
 }
 
 /** An SOS request as shown to requesters, responders and administrators. */

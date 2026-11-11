@@ -140,7 +140,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | history/01-history-trips.png | superseded | — | Trip history presupposes routing (superseded). |
 | history/02-history-missions.png | partial | P2/H | SOS requests and missions from `/_user/missions` now both render with Persian status labels; no tab structure yet. |
 | history/03-history-missions-agent.png | partial | P2/M | Responder missions render alongside requests with localized status; dedicated agent view absent. |
-| history/04-history-companions.png | missing | P2/M | Companion/share history absent. |
+| history/04-history-companions.png | partial | P2/M | The history screen lists every share the viewer was part of (active/expired/revoked with Persian state labels, counterpart, direction, kind, created date) via `GET /_user/location/shares?include=all`. Designed per-companion address book/playback absent. |
 | history/05-history-filter.png | missing | P2/M | No filter UI. |
 | history/06-history-details.png | missing | P2/M | No detail view. |
 | history/07-history-playback.png | missing | P2/H | Authorized history endpoint exists (`/_user/location/history/:userId`); no playback surface. |

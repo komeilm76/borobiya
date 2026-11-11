@@ -90,6 +90,7 @@ const settingsBody = shape({
 
 const tileQuery: Validator<unknown> = shape({ v: optional(text({ max: 80, allowEmpty: true })) }, { allowUnknown: true });
 const limitQuery: Validator<unknown> = shape({ limit: optionalLimit }, { allowUnknown: true });
+const sharesQuery: Validator<unknown> = shape({ include: optional(oneOf(['all'])) }, { allowUnknown: true });
 const sosListQuery: Validator<unknown> = shape({ status: optional(oneOf(SOS_STATUSES)), limit: optionalLimit }, { allowUnknown: true });
 const syncQuery: Validator<unknown> = shape({ since: optionalTimestamp, limit: optionalLimit }, { allowUnknown: true });
 const loginsQuery: Validator<unknown> = shape({ from: optionalTimestamp, to: optionalTimestamp, limit: optionalLimit }, { allowUnknown: true });
@@ -201,7 +202,10 @@ export function registerRoutes(router: Router<AppContext>): void {
     ok(ctx.app.services.users.deletePlace(actor(ctx), ctx.params.placeId)) });
 
   // Location sharing and reconnection.
-  router.add({ method: 'GET', path: '/_user/location/shares', auth: 'user', tags: ['location'], summary: 'Location shares', handler: (ctx) => ok(ctx.app.services.location.listShares(actor(ctx))) });
+  router.add({ method: 'GET', path: '/_user/location/shares', auth: 'user', query: sharesQuery, tags: ['location'], summary: 'Location shares', handler: (ctx) => {
+    const input = query<Record<string, unknown>>(ctx);
+    return ok(ctx.app.services.location.listShares(actor(ctx), input.include === 'all'));
+  } });
   router.add({ method: 'POST', path: '/_user/location/shares', auth: 'user', body: shareBody, rate: RATE.mutation, tags: ['location'], summary: 'Create location share', handler: (ctx) =>
     created(ctx.app.services.location.createShare(actor(ctx), body<any>(ctx))) });
   router.add({ method: 'DELETE', path: '/_user/location/shares/:shareId', auth: 'user', rate: RATE.mutation, tags: ['location'], summary: 'Revoke location share', handler: (ctx) =>
