@@ -224,7 +224,7 @@
                   <v-btn v-if="!navigation.active.value" color="primary" variant="flat" rounded="lg"
                     prepend-icon="mdi-navigation" :disabled="!mapReady" @click="startGuidance">شروع راهبری</v-btn>
                   <v-btn v-else color="error" variant="tonal" rounded="lg" prepend-icon="mdi-stop-circle-outline"
-                    @click="navigation.stop()">توقف راهبری</v-btn>
+                    @click="stopGuidance">توقف راهبری</v-btn>
                   <p v-if="navigation.active.value" role="status" class="text-caption mb-0">
                     {{ navigation.fix.value ? 'دوربین نقشه موقعیت شما را دنبال می‌کند؛ مسیر را با محیط واقعی تطبیق دهید.' : 'در انتظار موقعیت تازهٔ GPS…' }}
                   </p>
@@ -243,9 +243,19 @@
           <h1>مأموریت من</h1>
           <span role="status" aria-live="polite">{{ currentStatusLabel }}</span>
         </header>
-        <div v-if="navigation.active.value" class="mission-desk__guidance" role="status">
+        <div v-if="activeTool !== 'route' && (routing.error.value || navigation.error.value)"
+          class="mission-desk__guidance mission-desk__guidance--warning" role="alert">
+          <span>{{ routing.error.value || navigation.error.value }}</span>
+          <v-btn v-if="!desk.terminalHold.value && !desk.error.value && !desk.loading.value" size="small" variant="tonal"
+            @click="openRouteWorkspace">بررسی مسیر</v-btn>
+          <v-btn v-if="navigation.active.value" size="small" variant="tonal" color="error"
+            @click="stopGuidance">توقف</v-btn>
+          <v-btn v-else-if="!routing.error.value" icon="mdi-close" size="small" variant="text"
+            aria-label="بستن هشدار راهبری" @click="navigation.dismissError()" />
+        </div>
+        <div v-else-if="navigation.active.value" class="mission-desk__guidance" role="status">
           <span>{{ navigation.fix.value ? 'راهبری فعال · موقعیت خصوصی GPS' : 'راهبری فعال · در انتظار GPS' }}</span>
-          <v-btn size="small" variant="tonal" color="error" @click="navigation.stop()">توقف راهبری</v-btn>
+          <v-btn size="small" variant="tonal" color="error" @click="stopGuidance">توقف راهبری</v-btn>
         </div>
         <nav class="mission-desk__dock" aria-label="ابزارهای مأموریت">
           <button id="mission-tool-status" type="button" :class="{ 'mission-desk__dock-active': activeTool === 'status' }"
@@ -425,6 +435,10 @@ function startGuidance(): void {
   // A denied/unavailable GPS watch must leave the route and its error visible.
   if (navigation.start()) closeTool("route");
 }
+function stopGuidance(): void {
+  navigation.stop();
+  navigation.dismissError();
+}
 function cancelWaypointPick(): void {
   pickingWaypoint.value = false;
   activeTool.value = "route";
@@ -585,6 +599,7 @@ function onMissionEnded(id: string): void {
 }
 function closeRoutes(): void {
   navigation.stop();
+  navigation.dismissError();
   routing.reset();
   activeTool.value = null;
   pickingWaypoint.value = false;
@@ -605,10 +620,11 @@ function releaseRouteMap(): void {
 watch(() => [routing.visible.value, routing.target.value, routing.from.value, routing.selectedRoute.value, routing.via.value] as const,
   () => syncRouteMap(), { flush: "sync" });
 watch(() => navigation.active.value, (active) => { if (active) pickingWaypoint.value = false; });
-// A failed private incident read or guidance start must not disappear inside a
-// closed overlay while the full-screen map silently stays at its default center.
-watch(() => [routing.error.value, navigation.error.value] as const, ([routeError, guidanceError]) => {
-  if ((routeError || guidanceError) && desk.activeMission.value) {
+// An automatic private target read can fail before any tool is open: show its
+// retry panel. GPS outages instead use the map warning; never steal focus from
+// Team or Status while someone is relying on those controls.
+watch(() => routing.error.value, (routeError) => {
+  if (routeError && !activeTool.value && desk.activeMission.value && !desk.terminalHold.value) {
     activeTool.value = "route";
     void nextTick(() => document.getElementById("mission-route-panel")?.focus({ preventScroll: true }));
   }
@@ -814,6 +830,11 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   background: rgb(var(--v-theme-surface)); box-shadow: var(--bb-shadow-overlay);
   font-size: .82rem;
 }
+.mission-desk__guidance span { min-width: 0; overflow-wrap: anywhere; }
+.mission-desk__guidance :deep(.v-btn) { flex-shrink: 0; }
+.mission-desk__guidance--warning {
+  width: min(30rem, calc(100vw - 1.5rem)); border: 1px solid rgb(var(--v-theme-warning));
+}
 .mission-desk__dock {
   position: absolute; z-index: 10; bottom: calc(.75rem + env(safe-area-inset-bottom, 0px));
   left: 50%; transform: translateX(-50%); display: flex; gap: 3px;
@@ -851,6 +872,8 @@ onBeforeUnmount(() => { releaseRouteMap(); desk.reset(); });
   .mission-desk__dock { width: min(21rem, calc(100vw - 1.5rem)); }
   .mission-desk__map-heading { max-width: calc(100vw - 8rem); }
   .mission-desk__guidance { top: calc(4.25rem + env(safe-area-inset-top, 0px)); }
+  .mission-desk__guidance--warning { flex-wrap: wrap; }
+  .mission-desk__guidance--warning span { flex: 1 1 100%; }
 }
 :global(:root.dark .mission-desk__dock button:not(.mission-desk__dock-active):not(.mission-desk__dock-sharing)) { background: var(--bb-color-inset); }
 

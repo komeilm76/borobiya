@@ -54,7 +54,11 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(shell).toContain('.app-shell--map .app-footer { display: none; }');
     expect(view).toContain("height: 100dvh; min-height: 0; padding: 0; overflow: hidden;");
     expect(view).toContain('.mission-desk:not(.mission-desk--active) { position: relative; height: 100dvh; min-height: 0; padding: 0; overflow: hidden; }');
-    expect(view).toContain('watch(() => [routing.error.value, navigation.error.value] as const,');
+    expect(view).toContain('watch(() => routing.error.value, (routeError) => {');
+    expect(view).toContain('routeError && !activeTool.value && desk.activeMission.value && !desk.terminalHold.value');
+    expect(view).not.toContain('watch(() => [routing.error.value, navigation.error.value]');
+    expect(view).toContain('activeTool !== \'route\' && (routing.error.value || navigation.error.value)');
+    expect(view).toContain('aria-label="بستن هشدار راهبری"');
     expect(view).toContain('v-show="activeTool === \'status\'" id="mission-status-panel"');
     expect(view).toContain('v-show="routing.visible.value && activeTool === \'route\'" id="mission-route-panel"');
     expect(view).toContain(':room-open="activeTool === \'team\'"');

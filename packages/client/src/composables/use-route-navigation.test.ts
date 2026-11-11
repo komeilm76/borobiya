@@ -10,7 +10,8 @@ describe("foreground mission navigation (T3.5.6)", () => {
   it("wires the active mission map to north-up reset on navigation exit", () => {
     const view = readFileSync(new URL("../views/_user/UserMissionView.vue", import.meta.url), "utf8");
     expect(view).toContain('routeMap?.easeTo({ pitch: 0, bearing: 0, duration: 450 })');
-    expect(view).toContain('@click="navigation.stop()"');
+    expect(view).toContain('@click="stopGuidance"');
+    expect(view).toContain('navigation.dismissError();');
     expect(view).toContain('navigation.stop();'); // also closes on mission/account/unmount
   });
 
@@ -259,6 +260,63 @@ describe("foreground mission navigation (T3.5.6)", () => {
     expect(reset).toHaveBeenCalledOnce();
     onFix({ lat: 38.6, lon: -120.3 });
     expect(camera).toHaveBeenCalledOnce();
+  });
+
+  it("revokes foreground GPS on tab hiding or page exit and never restarts without consent", () => {
+    const page = new EventTarget() as Document;
+    const browser = new EventTarget() as Window;
+    let hidden = false;
+    Object.defineProperty(page, "visibilityState", { get: () => hidden ? "hidden" : "visible" });
+    vi.stubGlobal("document", page);
+    vi.stubGlobal("window", browser);
+    const clear = vi.fn();
+    const subscribe = vi.fn(() => clear);
+    const reset = vi.fn();
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(),
+        { subscribe, now: Date.now }, reset))!;
+      expect(nav.start()).toBe(true);
+      expect(nav.active.value).toBe(true);
+      hidden = true;
+      page.dispatchEvent(new Event("visibilitychange"));
+      expect(clear).toHaveBeenCalledOnce();
+      expect(reset).toHaveBeenCalledOnce();
+      expect(nav.active.value).toBe(false);
+      expect(nav.fix.value).toBeNull();
+      expect(nav.error.value).toContain("پس‌زمینه");
+      expect(nav.start()).toBe(false);
+      expect(subscribe).toHaveBeenCalledOnce();
+      hidden = false;
+      page.dispatchEvent(new Event("visibilitychange"));
+      expect(nav.active.value).toBe(false);
+      expect(nav.start()).toBe(true);
+      browser.dispatchEvent(new Event("pagehide"));
+      expect(clear).toHaveBeenCalledTimes(2);
+      expect(reset).toHaveBeenCalledTimes(2);
+      expect(nav.active.value).toBe(false);
+      nav.dismissError();
+      expect(nav.error.value).toBeNull();
+    } finally { scope.stop(); vi.unstubAllGlobals(); }
+  });
+
+  it("closes a GPS subscription if the page hides during setup", () => {
+    const page = new EventTarget() as Document;
+    let hidden = false;
+    Object.defineProperty(page, "visibilityState", { get: () => hidden ? "hidden" : "visible" });
+    vi.stubGlobal("document", page);
+    const clear = vi.fn();
+    const scope = effectScope();
+    try {
+      const nav = scope.run(() => useRouteNavigation(ref("rescuer"), ref(mission), ref(route), ref("car"), vi.fn(), {
+        subscribe: () => { hidden = true; page.dispatchEvent(new Event("visibilitychange")); return clear; },
+        now: Date.now
+      }))!;
+      expect(nav.start()).toBe(false);
+      expect(nav.active.value).toBe(false);
+      expect(clear).toHaveBeenCalledOnce();
+      expect(nav.error.value).toContain("پس‌زمینه");
+    } finally { scope.stop(); vi.unstubAllGlobals(); }
   });
 
   it("stops the GPS watch when the composable scope is disposed", () => {

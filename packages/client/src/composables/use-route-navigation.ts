@@ -35,6 +35,8 @@ export function useRouteNavigation(
   let unsubscribe: (() => void) | null = null;
   let generation = 0;
   let lastCameraAt = Number.NEGATIVE_INFINITY;
+  let removePageListeners: (() => void) | null = null;
+  const BACKGROUND_MESSAGE = "راهبری در پس‌زمینه متوقف شد؛ برای ادامه دوباره شروع کنید.";
   // Match the private map GPS freshness window: a silent native watch is not a live fix.
   const FIX_STALE_AFTER_MS = 20_000;
   let freshnessTimer: ReturnType<typeof setTimeout> | null = null;
@@ -45,6 +47,8 @@ export function useRouteNavigation(
 
   function stop(): void {
     generation++;
+    removePageListeners?.();
+    removePageListeners = null;
     clearFreshnessTimer();
     const cleanup = unsubscribe;
     const wasActive = active.value;
@@ -66,6 +70,9 @@ export function useRouteNavigation(
   }
   function start(): boolean {
     if (active.value || !owner.value || !missionId.value || !selectedRoute.value) return false;
+    const page = typeof document !== "undefined" ? document : null;
+    const isHidden = () => page?.visibilityState === "hidden";
+    if (isHidden()) { error.value = BACKGROUND_MESSAGE; return false; }
     stop();
     error.value = null;
     let coordinates: [number, number][];
@@ -121,16 +128,35 @@ export function useRouteNavigation(
       // Do not retain an already-stopped GPS watch in that case.
       if (current !== generation || !active.value) { cleanup(); return false; }
       unsubscribe = cleanup;
-      return true;
+      // Guidance is a foreground-only camera/GPS watch, not opt-in background
+      // location sharing. A locked screen, background tab, or page navigation
+      // must revoke this watch without auto-restarting it when focus returns.
+      const browser = typeof window !== "undefined" ? window : null;
+      const onBackground = () => {
+        if (!active.value || current !== generation) return;
+        stop();
+        error.value = BACKGROUND_MESSAGE;
+      };
+      const onVisibility = () => { if (isHidden()) onBackground(); };
+      page?.addEventListener("visibilitychange", onVisibility);
+      browser?.addEventListener("pagehide", onBackground);
+      removePageListeners = () => {
+        page?.removeEventListener("visibilitychange", onVisibility);
+        browser?.removeEventListener("pagehide", onBackground);
+      };
+      // The page may have disappeared between subscribe and listener setup.
+      if (isHidden()) onBackground();
+      return current === generation && active.value;
     } catch {
       stop();
       error.value = "مکان‌یابی پیوسته در این دستگاه در دسترس نیست.";
       return false;
     }
   }
+  function dismissError(): void { error.value = null; }
   // Logout or a route/mission switch revokes this GPS consent at the ref change,
   // not at Vue's next tick (which could coalesce a logout and new login).
   watch([owner, missionId, selectedRoute, profile], () => { if (active.value) stop(); }, { flush: "sync" });
   if (getCurrentScope()) onScopeDispose(stop);
-  return { active, fix, error, start, stop };
+  return { active, fix, error, start, stop, dismissError };
 }
