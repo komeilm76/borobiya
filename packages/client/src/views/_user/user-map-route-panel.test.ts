@@ -266,7 +266,8 @@ describe("progressive trip planning and editing", () => {
     expect(choices).toContain("formatRouteDuration(route.duration_s)");
     expect(choices).toContain("formatRouteDistance(route.distance_m)");
     expect(choices).toContain("@click=\"emit('choose', index)\"");
-    expect(choices).toContain("@click=\"emit('confirm')\">تأیید مسیر انتخابی");
+    expect(choices).toContain("@click=\"emit('confirm')\">تأیید مسیر");
+    expect(choices).toContain('aria-label="تأیید مسیر انتخابی"');
     expect(choices).toContain('بازگشت بدون تغییر');
     expect(choices).toContain(':disabled="!api.selectedRoute.value || api.loading.value"');
     expect(choices).toContain('api.loading.value');

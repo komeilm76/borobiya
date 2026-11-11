@@ -111,7 +111,7 @@ describe("client route records", () => {
     const mapView = readFileSync(new URL("../views/_user/UserMapView.vue", import.meta.url), "utf8");
     const journey = readFileSync(new URL("../composables/use-point-route.ts", import.meta.url), "utf8");
 
-    for (const label of ["ارسال", "سفر", "شروع سفر", "انتخاب وسیلهٔ دیگر", "انتخاب مسیر دیگر"])
+    for (const label of ["ارسال", "سفر", "شروع سفر", "وسیلهٔ حرکت", "مسیرها"])
       expect(mapSection, `map manual: ${label}`).toContain(`**${label}**`);
     expect(planner).toContain('@click="sendPoint">ارسال</v-btn>');
     expect(planner).toContain('@click="showPlan">سفر</v-btn>');
@@ -119,16 +119,20 @@ describe("client route records", () => {
     expect(planner).toContain('@click="emit(\'choose-transport\')"');
     expect(planner).toContain('@click="emit(\'choose-route\')"');
     expect(routes).toContain('@click="emit(\'choose\', index)"');
-    expect(routes).toContain('@click="emit(\'confirm\')">تأیید مسیر انتخابی</v-btn>');
-    expect(transport).toContain('@click="emit(\'confirm\', selected)">تأیید وسیلهٔ انتخابی</v-btn>');
-    expect(mapSection).toContain("**تأیید مسیر انتخابی**");
-    expect(mapSection).toContain("**تأیید وسیلهٔ انتخابی**");
-    expect(mapSection).toContain("**بازگشت بدون تغییر**");
-    expect(mapSection).toContain("**توقف و پایان سفر**");
+    expect(routes).toContain('@click="emit(\'confirm\')">تأیید مسیر</v-btn>');
+    expect(transport).toContain('@click="emit(\'confirm\', selected)">تأیید وسیله</v-btn>');
+    expect(routes).toContain('aria-label="تأیید مسیر انتخابی"');
+    expect(transport).toContain('aria-label="تأیید وسیلهٔ انتخابی"');
+    expect(mapSection).toContain("**تأیید مسیر**");
+    expect(mapSection).toContain("**تأیید وسیله**");
+    expect(mapSection).toContain("**بازگشت**");
+    expect(mapSection).toContain("**ویرایش سفر**");
+    expect(mapSection).toContain("**پایان سفر**");
     expect(mapView).toContain("function closeRouteChoices(): void");
     expect(mapView).toContain("function confirmPointRoute(): void");
     expect(mapView).toContain("function confirmTransportChoice(mode: TransportProfile): void");
-    expect(mapView).toContain("@click=\"clearPointRoute\">توقف و پایان سفر</v-btn>");
+    expect(mapView).toContain('aria-label="توقف و پایان سفر؛ مقصد و مسیر حذف می‌شود"');
+    expect(mapView).toContain('@click="clearPointRoute">پایان سفر</v-btn>');
     expect(journey).toContain("navigationPending.value = !usable;");
     expect(mapSection).toContain("weak or unavailable GPS fix does not disable **شروع سفر**");
     expect(mapSection).not.toContain("**جزئیات و وسیلهٔ حرکت**");

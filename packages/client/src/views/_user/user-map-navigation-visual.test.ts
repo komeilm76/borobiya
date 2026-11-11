@@ -70,10 +70,10 @@ describe("map navigation card visual language (nonmounted)", () => {
     }
     expect(point).toContain('variant="text" color="primary" rounded="lg" @click="backToPoint"');
     expect(point).toContain('class="point-route__start" color="primary" variant="flat" rounded="lg"');
-    expect(routes).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
-    expect(transport).toContain('variant="tonal" color="primary" rounded="lg" @click="emit(\'close\')"');
-    expect(map).toContain('variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right" @click="backToTravelPlan"');
-    expect(map).toContain('variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline" @click="clearPointRoute"');
+    expect(routes).toContain('variant="tonal" color="primary" rounded="lg" aria-label="بازگشت بدون تغییر"');
+    expect(transport).toContain('variant="tonal" color="primary" rounded="lg" aria-label="بازگشت بدون تغییر"');
+    expect(map).toContain('variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right"');
+    expect(map).toContain('variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline"');
   });
 
   it("makes travel a connected origin-to-destination plan with a persistent primary action", () => {
@@ -97,6 +97,29 @@ describe("map navigation card visual language (nonmounted)", () => {
     expect(map).toContain('.user-map-view__journey-actions { grid-column: 1 / -1;');
     expect(map).toContain('border-top: 1px solid rgba(var(--v-theme-on-surface), .12);');
     expect(map).toContain('.user-map-view__telemetry-item--eta { border-color:');
+  });
+
+  it("keeps navigation actions short on narrow screens without losing their full meanings", () => {
+    const actions = map.slice(map.indexOf('class="user-map-view__journey-actions"'),
+      map.indexOf('</div>', map.indexOf('class="user-map-view__journey-actions"')));
+    expect(actions).toContain('aria-label="توقف راهبری و بازگشت به برنامهٔ سفر؛ مسیر حفظ می‌شود"');
+    expect(actions).toContain('>ویرایش سفر</v-btn>');
+    expect(actions).toContain('aria-label="توقف و پایان سفر؛ مقصد و مسیر حذف می‌شود"');
+    expect(actions).toContain('>پایان سفر</v-btn>');
+    expect(point).toContain('<strong>وسیلهٔ حرکت</strong>');
+    expect(point).toContain('<strong>مسیرها</strong>');
+    expect(point).toContain('class="point-route__retry"');
+    expect(routes).toContain('aria-label="بازگشت بدون تغییر"');
+    expect(routes).toContain('>تأیید مسیر</v-btn>');
+    expect(transport).toContain('aria-label="بازگشت بدون تغییر"');
+    expect(transport).toContain('>تأیید وسیله</v-btn>');
+    for (const [source, name, selector] of [[point, "PointRouteSheet.vue", ".point-route__actions"],
+      [routes, "PointRouteChoicesSheet.vue", ".point-route-choices__footer"],
+      [transport, "PointTransportChoicesSheet.vue", ".point-transport-choices__footer"],
+      [map, "UserMapView.vue", ".user-map-view__journey-actions"]] as const) {
+      expect(css(source, name)).toContain(`${selector}[data-v-navigation] .v-btn__content { white-space: nowrap;`);
+    }
+    expect(css(map, "UserMapView.vue")).toContain('flex-wrap: wrap;'); // Enlarged text can move whole buttons, not split words.
   });
 
   it("makes phone guidance glanceable without hiding unknown-limit or accessible details", () => {

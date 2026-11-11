@@ -4,6 +4,10 @@
 
 ---
 
+### 2026-10-23 — Short navigation actions without broken button text
+
+- Shortened the visible action text across Travel, route/vehicle choosers and active Guidance. The guidance row now reads **ویرایش سفر / پایان سفر** rather than wrapping two sentence-length buttons; the full pause-versus-delete distinction remains in accessible labels and titles. The Travel option rows show shorter headings with current mode/route details, and the conditional retry is a 46px labeled refresh icon so Start and Cancel fit. Chooser footers read **بازگشت / تأیید مسیر** or **تأیید وسیله**; Back/Escape still cancel drafts. Buttons keep 46px touch targets, do not wrap text internally, and wrap as whole controls when enlarged text or a very narrow viewport needs more width. Non-mounted source/compiled-style regressions and the user manual are aligned; physical 320px phones and text-zoom/accessibility acceptance remain open.
+
 ### 2026-10-23 — Bug hunt: expire stale rescuer mission GPS guidance
 
 - The rescuer's active mission GPS watch kept its last fix after a transient timeout/error, and if a native bridge stopped reporting callbacks silently it kept the fix indefinitely. The route panel could still say that the camera was following live GPS even though the coordinate was stale. Mission guidance now clears the private fix immediately on a non-denial GPS error and after 20 seconds without a valid observation; the watcher stays active for automatic recovery, and a fresh fix resumes camera follow without waiting for the old throttle. Timer cleanup is scoped to Stop, disposal and mission/account changes. Focused regressions reproduced both stale-fix paths before the fix and cover valid renewal and mission teardown. Physical GPS/device verification remains open.

@@ -20,8 +20,10 @@
         </button>
       </div>
       <footer class="point-transport-choices__footer">
-        <v-btn variant="tonal" color="primary" rounded="lg" @click="emit('close')">بازگشت بدون تغییر</v-btn>
-        <v-btn color="primary" variant="flat" rounded="lg" @click="emit('confirm', selected)">تأیید وسیلهٔ انتخابی</v-btn>
+        <v-btn variant="tonal" color="primary" rounded="lg" aria-label="بازگشت بدون تغییر"
+          title="بازگشت بدون تغییر وسیله" @click="emit('close')">بازگشت</v-btn>
+        <v-btn color="primary" variant="flat" rounded="lg" aria-label="تأیید وسیلهٔ انتخابی"
+          title="تأیید وسیلهٔ انتخابی" @click="emit('confirm', selected)">تأیید وسیله</v-btn>
       </footer>
     </v-card>
   </section>
@@ -66,9 +68,9 @@ section.point-transport-choices-shell { position: fixed; z-index: 7; pointer-eve
 .point-transport-choices__footer { display: flex; flex-wrap: wrap; gap: .5rem;
   padding: .5rem .85rem calc(.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.point-transport-choices__footer :deep(.v-btn) { flex: 1 1 10rem; min-height: 46px; height: auto;
-  border-radius: 14px !important; font-weight: 800; }
-.point-transport-choices__footer :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.point-transport-choices__footer :deep(.v-btn) { flex: 1 0 auto; min-height: 46px; min-width: 44px; height: auto;
+  padding-inline: .5rem; border-radius: 14px !important; font-weight: 800; }
+.point-transport-choices__footer :deep(.v-btn__content) { white-space: nowrap; text-align: center; }
 @media (min-width: 600px) and (max-width: 1023px) {
   section.point-transport-choices-shell { left: calc(.75rem + env(safe-area-inset-left, 0px)); right: auto;
     width: min(30rem, calc(100vw - 7.5rem)); }

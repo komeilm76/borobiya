@@ -42,15 +42,17 @@
         <template v-else>
           <div class="point-route__choices" role="group" aria-label="تنظیمات سفر">
             <button type="button" class="point-route__choice" aria-controls="map-point-transport-choices-sheet"
+              :aria-label="`انتخاب وسیلهٔ دیگر؛ وسیلهٔ فعلی: ${modeLabel}`" title="انتخاب وسیلهٔ دیگر"
               @click="emit('choose-transport')">
               <v-icon icon="mdi-car-multiple" aria-hidden="true" />
-              <span><strong>انتخاب وسیلهٔ دیگر</strong><small>وسیلهٔ فعلی: {{ modeLabel }}</small></span>
+              <span><strong>وسیلهٔ حرکت</strong><small>وسیلهٔ فعلی: {{ modeLabel }}</small></span>
               <v-icon icon="mdi-chevron-left" aria-hidden="true" />
             </button>
             <button type="button" class="point-route__choice" :disabled="!api.routes.value.length"
-              @click="emit('choose-route')">
+              :aria-label="`انتخاب مسیر دیگر؛ مسیر ${(api.index.value + 1).toLocaleString('fa-IR')} از ${api.routes.value.length.toLocaleString('fa-IR')}`"
+              title="انتخاب مسیر دیگر" @click="emit('choose-route')">
               <v-icon icon="mdi-routes" aria-hidden="true" />
-              <span><strong>انتخاب مسیر دیگر</strong><small>مسیر {{ (api.index.value + 1).toLocaleString('fa-IR') }} از {{ api.routes.value.length.toLocaleString('fa-IR') }}</small></span>
+              <span><strong>مسیرها</strong><small>مسیر {{ (api.index.value + 1).toLocaleString('fa-IR') }} از {{ api.routes.value.length.toLocaleString('fa-IR') }}</small></span>
               <v-icon icon="mdi-chevron-left" aria-hidden="true" />
             </button>
           </div>
@@ -63,10 +65,11 @@
           <div class="point-route__actions point-route__actions--plan">
             <v-btn class="point-route__start" color="primary" variant="flat" rounded="lg" prepend-icon="mdi-navigation-variant"
               :disabled="!api.point.value" @click="emit('start')">شروع سفر</v-btn>
+            <v-btn variant="text" color="primary" rounded="lg" @click="backToPoint" class="point-route__cancel">انصراف</v-btn>
             <v-btn v-if="api.error.value || (!api.routes.value.length && !api.loading.value)"
-              variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-refresh" :disabled="api.loading.value"
-              @click="api.findRoutes()">محاسبهٔ دوباره</v-btn>
-            <v-btn variant="text" color="primary" rounded="lg" @click="backToPoint">انصراف</v-btn>
+              class="point-route__retry" icon="mdi-refresh" variant="tonal" color="primary" rounded="lg"
+              aria-label="محاسبهٔ دوبارهٔ مسیر" title="محاسبهٔ دوبارهٔ مسیر" :disabled="api.loading.value"
+              @click="api.findRoutes()" />
           </div>
         </template>
       </div>
@@ -258,8 +261,9 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
   border-radius: 12px; color: rgb(var(--v-theme-primary)); background: rgba(var(--v-theme-primary), .12); }
 .point-route__choice > .v-icon:last-child { color: rgb(var(--v-theme-primary)); }
 .point-route__choice > span { flex: 1; min-width: 0; display: grid; }
-.point-route__choice strong { font-size: .9rem; }
-.point-route__choice small { font-size: .8rem; opacity: .8; }
+.point-route__choice strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .9rem; }
+.point-route__choice small { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: .8rem; opacity: .8; }
 .point-route__metrics { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .4rem; padding: .25rem .85rem .7rem; }
 .point-route__metrics > div { display: grid; gap: .1rem; min-width: 0; padding: .55rem .7rem;
   border: 1px solid rgba(var(--v-theme-on-surface), .1); border-radius: var(--bb-radius-nested, 16px);
@@ -275,9 +279,12 @@ section.point-route-shell { position: fixed; z-index: 7; pointer-events: none;
   border-top: 1px solid rgba(var(--v-theme-on-surface), .12); background: rgb(var(--v-theme-surface)); }
 .point-route__actions :deep(.v-btn) { flex: 1 1 8rem; min-height: 46px; height: auto;
   border-radius: 14px !important; font-weight: 800; }
-.point-route__actions--plan :deep(.point-route__start) { flex: 2 1 11rem; }
-.point-route__actions--plan :deep(.v-btn:last-child) { flex: 1 1 6rem; }
-.point-route__actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+.point-route__actions--plan :deep(.v-btn) { padding-inline: .5rem; }
+.point-route__actions--plan :deep(.point-route__start) { flex: 1 0 auto; }
+.point-route__actions--plan :deep(.point-route__cancel) { flex: 0 0 auto; }
+.point-route__actions--plan :deep(.point-route__retry) { flex: 0 0 46px; padding-inline: 0; }
+/* Prefer moving a complete touch target to another row over splitting its label. */
+.point-route__actions :deep(.v-btn__content) { white-space: nowrap; text-align: center; }
 .point-route__header :deep(.v-btn:focus-visible), .point-route button:focus-visible, .point-route textarea:focus-visible {
   outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .point-route__delete-confirm { max-height: min(85dvh, 24rem); overflow: hidden; }

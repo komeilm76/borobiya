@@ -173,8 +173,12 @@
             </div>
           </dl>
           <div class="user-map-view__journey-actions" role="group" aria-label="کنترل‌های سفر">
-            <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right" @click="backToTravelPlan">بازگشت به برنامهٔ سفر</v-btn>
-            <v-btn variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline" @click="clearPointRoute">توقف و پایان سفر</v-btn>
+            <v-btn variant="tonal" color="primary" rounded="lg" prepend-icon="mdi-arrow-right"
+              aria-label="توقف راهبری و بازگشت به برنامهٔ سفر؛ مسیر حفظ می‌شود" title="بازگشت به برنامهٔ سفر بدون حذف مسیر"
+              @click="backToTravelPlan">ویرایش سفر</v-btn>
+            <v-btn variant="outlined" color="error" rounded="lg" prepend-icon="mdi-stop-circle-outline"
+              aria-label="توقف و پایان سفر؛ مقصد و مسیر حذف می‌شود" title="توقف و پایان سفر؛ حذف مقصد و مسیر"
+              @click="clearPointRoute">پایان سفر</v-btn>
           </div>
         </div>
         <div v-if="journey.gpsWarning.value || journey.rerouteMessage.value" class="user-map-view__navigation-status">
@@ -2234,11 +2238,11 @@ if (mapPlaybackSession.value) void playback.selectPreset(playback.presetDays.val
 .user-map-view__telemetry-item--unknown dd { opacity: .7; }
 .user-map-view__journey-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .45rem;
   padding-top: .55rem; border-top: 1px solid rgba(var(--v-theme-on-surface), .12); }
-.user-map-view__journey-actions > :first-child { flex: 2 1 10rem; }
-.user-map-view__journey-actions > :last-child { flex: 1 1 9rem; }
+.user-map-view__journey-actions > :first-child,
+.user-map-view__journey-actions > :last-child { flex: 1 0 auto; }
 .user-map-view__journey-actions :deep(.v-btn) { min-height: 46px; min-width: 44px; height: auto;
-  border-radius: 14px !important; font-weight: 800; }
-.user-map-view__journey-actions :deep(.v-btn__content) { white-space: normal; text-align: center; }
+  padding-inline: .5rem; border-radius: 14px !important; font-weight: 800; }
+.user-map-view__journey-actions :deep(.v-btn__content) { white-space: nowrap; text-align: center; }
 .user-map-view__journey-actions :deep(.v-btn:focus-visible) { outline: 3px solid rgb(var(--v-theme-primary));
   outline-offset: 2px; }
 @media (min-width: 600px) {
