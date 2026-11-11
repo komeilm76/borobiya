@@ -75,9 +75,10 @@ export class SosService {
       // before the offers table keep the legacy group-membership rule.
       clauses.push(`(s.requester_id = ? OR s.assigned_responder_id = ? OR m.responder_id = ?
         OR EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = s.id AND o.responder_id = ?)
+        OR EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id = m.id AND mm.user_id = ? AND mm.assignment_status = 'active')
         OR (NOT EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = s.id)
             AND s.assigned_group_id IN (SELECT group_id FROM group_members WHERE user_id = ?)))`);
-      params.push(identity.userId, identity.userId, identity.userId, identity.userId, identity.userId);
+      params.push(identity.userId, identity.userId, identity.userId, identity.userId, identity.userId, identity.userId);
     } else if (identity.role !== ROLES.ADMIN) {
       // Fail closed: any role that is not one of the three known ones sees nothing, not everything.
       clauses.push('1 = 0');
@@ -185,9 +186,7 @@ export class SosService {
       let missionId: string | undefined;
       if (mode === 'offer') {
         for (const responder of eligible) {
-          tx.repo.run(
-            `INSERT INTO mission_offers(id, sos_id, responder_id, policy, status, created_at) VALUES(?,?,?,?,?,?)`,
-            newId('off'), sosId, String(responder.id), policyOf(responder as any), 'pending', now);
+          this.upsertOffer(tx, sosId, responder, identity.userId, identity.ip, now);
         }
       } else {
         missionId = newId('mis');
@@ -213,6 +212,61 @@ export class SosService {
         ...(missionId ? { missionId, missionStatus: MISSION_STATUS.ASSIGNED } : {})
       };
     });
+  }
+
+  /**
+   * Offer creation that survives the terminal states of the (sos_id, responder_id) pair.
+   *
+   * The table keeps UNIQUE(sos_id, responder_id); a plain INSERT therefore fails on re-offer after a
+   * decline or an expiration, which used to strand the requeue flow behind a 500. Terminal rows are
+   * intentionally *resurrected in place* rather than deleted and re-created: the row id is preserved,
+   * so `mission_offer.expired` / `.superseded` audit targets keep pointing at the same offer, and no
+   * decision history disappears. The superseded decision is written to the audit log first — a full
+   * record of what is being closed out — before the row is reset to a brand-new pending offer
+   * (new eligibility policy, fresh created_at, responded/expired cleared).
+   *
+   * A still-'pending' or an 'accepted' existing row is never overwritten: those are conflicts that
+   * cannot reach this code in a healthy state machine (dispatch requires PENDING with no mission),
+   * so they surface as meaningful 409s instead of raw constraint errors or silent resurrection.
+   */
+  private upsertOffer(tx: Transaction, sosId: string, responder: Record<string, any>, actorId: string, actorIp: string, now: number): void {
+    const responderId = String(responder.id);
+    const policy = policyOf(responder as any);
+    const existing = tx.repo.one<Record<string, any>>(
+      'SELECT * FROM mission_offers WHERE sos_id=? AND responder_id=?', sosId, responderId);
+    if (!existing) {
+      tx.repo.run(
+        `INSERT INTO mission_offers(id, sos_id, responder_id, policy, status, created_at) VALUES(?,?,?,?,?,?)`,
+        newId('off'), sosId, responderId, policy, 'pending', now);
+      return;
+    }
+    const previous = String(existing.status);
+    if (previous === 'pending') {
+      throw conflict('A pending offer for this responder is already active; it cannot be duplicated.', { field: 'responderIds', userId: responderId });
+    }
+    if (previous === 'accepted') {
+      throw conflict('This responder already accepted an offer for this request and cannot be offered again.', { field: 'responderIds', userId: responderId });
+    }
+    // Terminal (expired | declined | cancelled): archive the decision, then reset the row to a
+    // fresh pending offer under the same id. The status guard is redundant inside BEGIN IMMEDIATE
+    // but keeps the write honest.
+    const previousRespondedAt = existing.responded_at === null || existing.responded_at === undefined ? null : Number(existing.responded_at);
+    const previousExpiredAt = existing.expired_at === null || existing.expired_at === undefined ? null : Number(existing.expired_at);
+    tx.repo.run('INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
+      actorId, 'mission_offer.superseded', `mission_offers:${String(existing.id)}`, actorIp,
+      JSON.stringify({
+        sosId, responderId, supersededStatus: previous,
+        previousPolicy: String(existing.policy), previousCreatedAt: Number(existing.created_at),
+        previousRespondedAt, previousExpiredAt, redispatchedAt: now
+      }), now);
+    const reset = tx.repo.run(
+      `UPDATE mission_offers
+          SET policy=?, status='pending', created_at=?, responded_at=NULL, expired_at=NULL
+        WHERE id=? AND status IN ('expired','declined','cancelled')`,
+      policy, now, String(existing.id));
+    if (!reset.changes) {
+      throw conflict('This offer changed while it was being re-offered; retry.', { field: 'responderIds', userId: responderId });
+    }
   }
 
   acceptSos(identity: AuthIdentity, sosId: string): Record<string, unknown> {
@@ -473,8 +527,10 @@ export class SosService {
   listMissions(identity: AuthIdentity, limit: number): Record<string, unknown> {
     const rows = identity.role === ROLES.ADMIN
       ? this.ctx.repo.all<Record<string, any>>(`${SOS_SELECT} WHERE m.id IS NOT NULL ORDER BY s.created_at DESC LIMIT ?`, Math.min(100, limit))
-      : this.ctx.repo.all<Record<string, any>>(`${SOS_SELECT} WHERE m.id IS NOT NULL AND (m.responder_id=? OR s.requester_id=?) ORDER BY s.created_at DESC LIMIT ?`,
-        identity.userId, identity.userId, Math.min(100, limit));
+      : this.ctx.repo.all<Record<string, any>>(`${SOS_SELECT} WHERE m.id IS NOT NULL AND (m.responder_id=? OR s.requester_id=?
+          OR EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id = m.id AND mm.user_id=? AND mm.assignment_status='active'))
+        ORDER BY s.created_at DESC LIMIT ?`,
+        identity.userId, identity.userId, identity.userId, Math.min(100, limit));
     return { items: rows.map((row) => this.publicMission(row)), total: rows.length };
   }
 
@@ -521,6 +577,13 @@ export class SosService {
         return Boolean(this.ctx.repo.one('SELECT user_id FROM group_members WHERE group_id = ? AND user_id = ?',
           String(row.assigned_group_id), identity.userId));
       }
+    }
+    if (identity.role === ROLES.RESPONDER && row.missionId) {
+      // Ordinary members of the team answer the same request: they may see the mission's SOS.
+      const member = this.ctx.repo.one(
+        `SELECT 1 AS ok FROM mission_members mm WHERE mm.mission_id=? AND mm.user_id=? AND mm.assignment_status='active'`,
+        String(row.missionId), identity.userId);
+      if (member) return true;
     }
     return false;
   }

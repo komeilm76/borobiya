@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   compressImageFile,
   dataUrlBytes,
@@ -127,5 +127,35 @@ describe('compression contract', () => {
     await expect(compressImageFile(file('image/jpeg', 9_000_000), { decode: decode(), canvas })).rejects.toMatchObject({
       code: 'too-large'
     });
+  });
+});
+
+describe('default decoder boundary', () => {
+  const original = globalThis.createImageBitmap;
+
+  afterEach(() => {
+    if (original === undefined) {
+      delete (globalThis as Record<string, unknown>).createImageBitmap;
+    } else {
+      globalThis.createImageBitmap = original;
+    }
+  });
+
+  it('uses createImageBitmap when the browser provides it', async () => {
+    let closed = false;
+    (globalThis as Record<string, unknown>).createImageBitmap = async () => ({
+      width: 640,
+      height: 480,
+      close() { closed = true; }
+    });
+    const result = await compressImageFile(file('image/jpeg', 1024), fakeCanvas(() => 512));
+    expect(result).toMatchObject({ width: 640, height: 480 });
+    expect(closed).toBe(true);
+  });
+
+  it('maps a decode failure to the stable error code', async () => {
+    (globalThis as Record<string, unknown>).createImageBitmap = async () => { throw new Error('corrupt'); };
+    await expect(compressImageFile(file('image/jpeg', 1024), fakeCanvas(() => 512)))
+      .rejects.toMatchObject({ code: 'decode-failed' });
   });
 });

@@ -297,14 +297,21 @@ export class RealtimeService {
       return Boolean(this.ctx.repo.one(
         `SELECT 1 AS ok FROM sos_requests s LEFT JOIN missions m ON m.sos_id=s.id
          LEFT JOIN group_members gm ON gm.group_id=s.assigned_group_id AND gm.user_id=?
-         WHERE s.id=? AND (s.requester_id=? OR s.assigned_responder_id=? OR m.responder_id=? OR gm.user_id IS NOT NULL)
-         LIMIT 1`, userId, sosId, userId, userId, userId));
+         WHERE s.id=? AND (s.requester_id=? OR s.assigned_responder_id=? OR m.responder_id=? OR gm.user_id IS NOT NULL
+           OR EXISTS (SELECT 1 FROM mission_members mm WHERE mm.mission_id=m.id AND mm.user_id=? AND mm.assignment_status='active'))
+         LIMIT 1`, userId, sosId, userId, userId, userId, userId));
     }
     if (room.startsWith('mission:')) {
       const missionId = room.slice(8);
+      // Any active team member (including the current designated leader), or the requester of the
+      // underlying SOS, may join. Administrators were handled above; removed members and unrelated
+      // accounts are refused. Membership, not the original assignee, is the authority.
       return Boolean(this.ctx.repo.one(
-        `SELECT 1 AS ok FROM missions m JOIN sos_requests s ON s.id=m.sos_id
-         WHERE m.id=? AND (m.responder_id=? OR s.requester_id=?) LIMIT 1`, missionId, userId, userId));
+        `SELECT 1 AS ok FROM mission_members mm
+          WHERE mm.mission_id=? AND mm.user_id=? AND mm.assignment_status='active'
+         UNION
+         SELECT 1 AS ok FROM missions m JOIN sos_requests s ON s.id=m.sos_id
+          WHERE m.id=? AND s.requester_id=?`, missionId, userId, missionId, userId));
     }
     if (room.startsWith('talk:')) {
       const active = this.talkFloor.activeForUser(userId);

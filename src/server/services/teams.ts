@@ -45,7 +45,8 @@ export class TeamService {
 
   private missionRow(missionId: string): Record<string, any> | undefined {
     return this.ctx.repo.one<Record<string, any>>(
-      `SELECT m.*, s.id AS sosId, s.status AS sosStatus, s.severity, s.assigned_group_id, s.requester_id,
+      `SELECT m.*, s.id AS sosId, s.status AS sosStatus, s.severity, s.assigned_group_id,
+              s.assigned_responder_id AS assignedResponderId, s.requester_id,
               i.label AS incidentLabel
        FROM missions m
        JOIN sos_requests s ON s.id = m.sos_id
@@ -239,7 +240,17 @@ export class TeamService {
     });
   }
 
-  /** Promotes an active member to leader; the previous active leader atomically becomes a member. */
+  /**
+   * Promotes an active member to leader; the previous active leader atomically becomes a member.
+   *
+   * The mission row (`missions.responder_id`) and the request row (`sos_requests.assigned_responder_id`)
+   * carry the *current operational leader* — every authorization path that keys off them (progress
+   * actions, mission/SOS visibility, realtime rooms, legacy readers) follows the transfer in the same
+   * transaction. The original assignment is not lost: the first leader keeps a `mission_members`
+   * row (source offer_accept / immediate_dispatch / team_dispatch) and the `mission_leader.designated`
+   * audit entry records both previous references. Leadership is mission-scoped and says nothing about
+   * the account's general role — an administrator may designate any active member, never a removed one.
+   */
   designateLeader(identity: AuthIdentity, missionId: string, userId: string): Record<string, unknown> {
     this.requireAdmin(identity);
     const mission = this.missionRow(missionId);
@@ -251,6 +262,11 @@ export class TeamService {
       const now = this.ctx.clock();
       const previous = tx.repo.one<Record<string, any>>(
         `SELECT id, user_id FROM mission_members WHERE mission_id=? AND role='leader' AND assignment_status='active'`, missionId);
+      if (String(target.id) === (previous ? String(previous.id) : null)) {
+        // Designating the current leader again is a no-op; keep semantics explicit instead of
+        // silently rewriting timestamps.
+        return this.teamProjection(this.missionRow(missionId)!, identity);
+      }
       if (previous) {
         tx.repo.run(
           `UPDATE mission_members SET role='member', updated_at=? WHERE id=? AND assignment_status='active'`,
@@ -259,12 +275,26 @@ export class TeamService {
       tx.repo.run(
         `UPDATE mission_members SET role='leader', updated_at=? WHERE id=? AND assignment_status='active'`,
         now, String(target.id));
+      const previousMissionAssignee = String(mission.responder_id);
+      const previousSosAssignee = mission.assignedResponderId === null || mission.assignedResponderId === undefined ? null : String(mission.assignedResponderId);
+      tx.repo.run('UPDATE missions SET responder_id=?, updated_at=? WHERE id=?', userId, now, missionId);
+      tx.repo.run('UPDATE sos_requests SET assigned_responder_id=?, updated_at=? WHERE id=?', userId, now, String(mission.sosId));
       tx.repo.run('INSERT INTO audit_log(actor_id,action,target,ip,meta_json,created_at) VALUES(?,?,?,?,?,?)',
         identity.userId, 'mission_leader.designated', `missions:${missionId}`, identity.ip,
-        JSON.stringify({ userId, previousLeaderId: previous ? String(previous.user_id) : null }), now);
+        JSON.stringify({
+          userId,
+          previousLeaderId: previous ? String(previous.user_id) : null,
+          previousMissionResponderId: previousMissionAssignee,
+          previousSosAssignedResponderId: previousSosAssignee
+        }), now);
+      tx.event(HTTP_EVENTS.MISSION_UPDATED, {
+        missionId, sosId: String(mission.sosId), status: String(mission.status), sosStatus: String(mission.sosStatus),
+        action: 'leader_transferred', actorId: identity.userId, createdAt: now
+      }, [`mission:${missionId}`, 'role:admin', `user:${userId}`, ...(previous ? [`user:${String(previous.user_id)}`] : [])]);
       tx.event(HTTP_EVENTS.MISSION_TEAM_UPDATED, {
-        missionId, leaderId: userId, actorId: identity.userId, createdAt: now
-      }, [`mission:${missionId}`, 'role:admin', `user:${userId}`]);
+        missionId, leaderId: userId, previousLeaderId: previous ? String(previous.user_id) : null,
+        actorId: identity.userId, createdAt: now
+      }, [`mission:${missionId}`, 'role:admin', `user:${userId}`, ...(previous ? [`user:${String(previous.user_id)}`] : [])]);
       return this.teamProjection(this.missionRow(missionId)!, identity);
     });
   }

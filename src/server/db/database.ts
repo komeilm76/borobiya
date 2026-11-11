@@ -4,7 +4,7 @@ import { hashPassword } from '../core/crypto.ts';
 import { CANCELLATION_REASONS, DEFAULT_GROUPS, DEMO_USERS, INCIDENT_TYPES, JOB_TYPES, SECURITY_QUESTIONS } from '../domain/catalog.ts';
 
 /** Durable schema version written to the `meta` table. */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** A Bun SQLite database handle. */
 type SqliteDatabase = sqlite.Database;
@@ -334,6 +334,9 @@ function ensureColumn(database: SqliteDatabase, table: string, column: string, d
  *       mission_requirements and mission_members (leader/members, unique active membership,
  *       at most one active leader per mission); existing missions are backfilled with a
  *       leader membership for their assigned responder. Genuine acceptance history is kept.
+ *   v6: reconcile the operational owner references with the active leader. Leader replacement
+ *       now moves missions.responder_id and sos_requests.assigned_responder_id atomically; this
+ *       one-off pass realigns rows written before the fix. Finished missions are untouched.
  *
  * @param config Runtime configuration.
  * @returns A ready Bun SQLite handle with WAL, foreign keys and a busy timeout.
@@ -384,6 +387,22 @@ export function openDatabase(config: Config): SqliteDatabase {
     FROM sos_requests s
     WHERE s.status = 'dispatched' AND s.assigned_responder_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM mission_offers o WHERE o.sos_id = s.id)
+  `);
+  // v6: the operational owner references must follow the active leader/membership. Reconcile
+  // rows whose designation predates the fix; active leader wins, finished missions stay frozen.
+  database.exec(`
+    UPDATE missions SET responder_id = (
+      SELECT mm.user_id FROM mission_members mm
+      WHERE mm.mission_id = missions.id AND mm.role = 'leader' AND mm.assignment_status = 'active'
+    )
+    WHERE status NOT IN ('completed','cancelled')
+      AND EXISTS (SELECT 1 FROM mission_members mm
+        WHERE mm.mission_id = missions.id AND mm.role = 'leader' AND mm.assignment_status = 'active'
+          AND mm.user_id <> responder_id)
+  `);
+  database.exec(`
+    UPDATE sos_requests SET assigned_responder_id = (SELECT responder_id FROM missions m WHERE m.sos_id = sos_requests.id)
+    WHERE EXISTS (SELECT 1 FROM missions m WHERE m.sos_id = sos_requests.id AND m.status NOT IN ('completed','cancelled'))
   `);
   database
     .prepare('INSERT INTO meta(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
