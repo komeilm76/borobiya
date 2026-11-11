@@ -11,6 +11,25 @@ describe("rescuer route phone controls (source-pinned; no Vue mount)", () => {
     expect(view).toContain('] satisfies { title: string; value: TransportProfile }[];');
   });
 
+  it("states the actual mission outcome and keeps optional stops out of the primary route path", () => {
+    expect(view).toContain('<h1>{{ missionHeadline }}</h1>');
+    expect(view).toContain('v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value"');
+    expect(view).toContain('پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.');
+    expect(view).toContain('if (desk.error.value) return "وضعیت تازهٔ مأموریت تأیید نشد.";');
+    expect(view).toContain('if (desk.activeMission.value) return "کمک در جریان است.";');
+    expect(view).toContain('if (desk.loading.value) return "در حال بررسی مأموریت…";');
+    expect(view).toContain('return "مأموریت فعالی ندارید.";');
+    expect(view).toContain('<details class="mission-route__stops" @toggle="onWaypointDisclosureToggle">');
+    expect(view).toContain('<summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)');
+    expect(view).toContain('if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;');
+    const editor = view.slice(view.indexOf('<details class="mission-route__stops"'), view.indexOf('</details>'));
+    expect(editor).toContain('@click="addTypedWaypoint"');
+    expect(editor).toContain('@click="routing.removeWaypoint(index)"');
+    expect(editor).not.toContain('class="mission-route__step-control"');
+    expect(view.indexOf('class="mission-route__step-control"')).toBeGreaterThan(view.indexOf('class="mission-route__map"'));
+    expect(view).toContain('.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary));');
+  });
+
   it("keeps mission cancellation actions reachable on narrow and short screens", () => {
     const phone = view.split("@media(max-width: 599px) {")[1]!.split("@media(max-width: 480px)")[0]!;
     expect(view).toContain('<v-dialog :model-value="desk.cancellationOpen.value" max-width="510" scrollable');

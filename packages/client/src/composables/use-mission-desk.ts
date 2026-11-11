@@ -54,7 +54,7 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
   const activeMission = computed(() => missions.value.find((item) => isActiveMission(item.status)) ?? null);
   const nextStatus = computed(() => activeMission.value ? NEXT_STATUS[activeMission.value.status as keyof typeof NEXT_STATUS] ?? null : null);
   const canAdvance = computed(() => !!nextStatus.value && !!sessionKey.value && !progressing.value &&
-    !progressBlocked.value && !cancellationOpen.value && !cancelling.value);
+    !progressBlocked.value && !blocked.value && !cancellationOpen.value && !cancelling.value);
   const selectedReason = computed(() => reasons.value.find((item) => item.id === reasonId.value));
   // The confirmation belongs to the mission that was active when the dialog opened,
   // never a replacement that appears during a list refresh.
@@ -208,10 +208,13 @@ export function useMissionDesk(token: Ref<string | null>, userId: Ref<string | n
     } catch (cause) {
       if (session !== sessionGeneration || userId.value !== owner ||
           cancellationMissionId.value !== mission.id || activeMission.value?.id !== mission.id) return;
-      blocked.value = cause instanceof ApiError && cause.status === 409;
-      cancellationError.value = blocked.value
-        ? "وضعیت مأموریت تغییر کرده است؛ فهرست را تازه کنید. هیچ لغوی ثبت نشد."
-        : sosApiErrorMessage(cause, "ثبت لغو انجام نشد؛ اتصال را بررسی کنید و دوباره تلاش کنید.");
+      // A lost response is not proof that the cancellation failed: the server may
+      // already have reassigned the mission. Never invite a duplicate write until
+      // a fresh list verifies what actually happened (as for progress writes).
+      blocked.value = true;
+      cancellationError.value = cause instanceof ApiError && (cause.status === 409 || cause.status === 404)
+        ? "وضعیت مأموریت تغییر کرده یا دیگر در دسترس نیست؛ فهرست را تازه کنید. هیچ لغو تازه‌ای تأیید نشد."
+        : "پاسخ ثبت لغو دریافت نشد؛ ممکن است درخواست در سرور ثبت شده باشد. پیش از تلاش دوباره وضعیت مأموریت را تازه کنید.";
     } finally {
       if (session === sessionGeneration) cancelling.value = false;
     }

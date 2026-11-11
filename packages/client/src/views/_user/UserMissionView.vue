@@ -3,8 +3,8 @@
     <div class="mission-desk__shell">
       <header class="mission-hero">
         <span class="mission-hero__eyebrow"><v-icon icon="mdi-lifebuoy" size="18" /> میز مأموریت امدادگر</span>
-        <h1>کمک در جریان است.</h1>
-        <p>پیشرفت مأموریت را دنبال کنید. اگر واقعاً قادر به ادامه نیستید، مرکز امداد را از همین‌جا باخبر کنید.</p>
+        <h1>{{ missionHeadline }}</h1>
+        <p>{{ missionIntro }}</p>
         <div class="mission-hero__glow" aria-hidden="true" />
       </header>
 
@@ -56,6 +56,11 @@
             @click="desk.advanceStatus()">{{ nextStatusLabel }}</v-btn>
           <v-alert v-if="desk.progressError.value" type="error" variant="tonal" rounded="lg" role="alert">
             {{ desk.progressError.value }}
+            <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
+          </v-alert>
+          <v-alert v-if="desk.cancellationNeedsRefresh.value && !desk.cancellationOpen.value" type="warning"
+            variant="tonal" rounded="lg" role="alert">
+            وضعیت درخواست لغو هنوز تأیید نشده است؛ پیش از تغییر مرحله، وضعیت مأموریت را از سرور تازه کنید.
             <v-btn size="small" variant="text" :loading="desk.loading.value" @click="desk.load()">تازه‌سازی وضعیت</v-btn>
           </v-alert>
         </div>
@@ -118,8 +123,10 @@
                 :disabled="routing.loading.value || navigation.active.value" @click="routing.findRoutes(true)">به‌روزرسانی موقعیت</v-btn>
             </div>
           </div>
-          <section class="mission-route__stops" aria-label="ایستگاه‌های میانی مسیر">
-            <h3>ایستگاه‌های میانی (حداکثر ۶)</h3>
+          <details class="mission-route__stops" @toggle="onWaypointDisclosureToggle">
+            <summary class="mission-route__stops-toggle">ایستگاه‌های میانی (اختیاری، حداکثر ۶)
+              <span v-if="routing.via.value.length" class="mission-route__stops-count">{{ routing.via.value.length.toLocaleString('fa-IR') }} ایستگاه</span>
+            </summary>
             <p class="text-caption">برای افزودن یک نقطه روی نقشه، حالت انتخاب را فعال کنید؛ یا مختصات را وارد کنید. محل حادثه همیشه مقصد نهایی است.</p>
             <div class="d-flex flex-wrap ga-2 align-center">
               <v-btn variant="tonal" :disabled="navigation.active.value || routing.via.value.length >= 6 || !mapReady"
@@ -151,12 +158,7 @@
             <v-switch :model-value="routing.optimize.value" label="بهینه‌سازی ترتیب ایستگاه‌ها (TSP)"
               :disabled="navigation.active.value || !routing.via.value.length" hide-details color="primary"
               @update:model-value="routing.setOptimize(Boolean($event))" />
-            <div v-if="routing.routes.value.length" role="group" aria-label="مراحل مسیر پیشنهادی">
-              <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
-                label="مرحلهٔ مسیر A تا مقصد" thumb-label="always" @update:model-value="routing.selectStep(Number($event))" />
-              <p role="status">{{ currentStopLabel }}</p>
-            </div>
-          </section>
+          </details>
           <div class="mission-route__map">
             <MapCanvas :center="[routing.target.value.incident.lon, routing.target.value.incident.lat]" :zoom="14"
               :constrain-bounds="false" :style-url="mapStyleUrl" aria-label="نقشهٔ مسیر تا محل حادثه"
@@ -165,6 +167,11 @@
           <p class="text-caption mt-2">قرمز: محل حادثه؛ سبز: موقعیت شما. مختصات حادثه:
             <bdi dir="ltr">{{ routing.target.value.incident.lat.toFixed(5) }}, {{ routing.target.value.incident.lon.toFixed(5) }}</bdi>
           </p>
+          <div v-if="routing.routes.value.length" class="mission-route__step-control" role="group" aria-label="مراحل مسیر پیشنهادی">
+            <v-slider :model-value="routing.step.value" :min="0" :max="routing.via.value.length + 1" :step="1"
+              label="مرحلهٔ مسیر A تا مقصد" thumb-label="always" @update:model-value="routing.selectStep(Number($event))" />
+            <p role="status">{{ currentStopLabel }}</p>
+          </div>
           <div v-if="routing.routes.value.length" class="mission-route__choices" role="group" aria-label="انتخاب مسیر پیشنهادی">
             <button v-for="(choice, index) in routing.routes.value" :key="index" type="button"
               class="mission-route__choice" :class="{ 'mission-route__choice--selected': routing.selectedIndex.value === index }"
@@ -279,6 +286,22 @@ const transportProfiles = [
   { title: "دوچرخه", value: "bicycle" },
   { title: "پیاده", value: "foot" }
 ] satisfies { title: string; value: TransportProfile }[];
+const missionHeadline = computed(() => {
+  if (desk.error.value) return "وضعیت تازهٔ مأموریت تأیید نشد.";
+  if (desk.activeMission.value) return "کمک در جریان است.";
+  if (desk.loading.value) return "در حال بررسی مأموریت…";
+  if (desk.cancelledMissionId.value) return "مرکز امداد مطلع شد.";
+  if (desk.completedMissionId.value) return "امدادرسانی ثبت شد.";
+  return "مأموریت فعالی ندارید.";
+});
+const missionIntro = computed(() => {
+  if (desk.error.value) return "آخرین اطلاعات ممکن است قدیمی باشد؛ برای تأیید وضعیت از سرور دوباره تلاش کنید.";
+  if (desk.activeMission.value) return "پیشرفت مأموریت را دنبال کنید. اگر واقعاً قادر به ادامه نیستید، مرکز امداد را از همین‌جا باخبر کنید.";
+  if (desk.loading.value) return "در حال دریافت آخرین وضعیت از سرور…";
+  if (desk.cancelledMissionId.value) return "مأموریت قبلی برای یافتن امدادگر جایگزین به مرکز ارجاع شد.";
+  if (desk.completedMissionId.value) return "پایان مأموریت در سرور تأیید شد. برای مأموریت بعدی پیشنهادها را بررسی کنید.";
+  return "برای پذیرفتن مأموریت تازه، پیشنهادهای دریافتی را بررسی کنید.";
+});
 const mapReady = ref(false);
 const pickingWaypoint = ref(false);
 const waypointLat = ref("");
@@ -305,6 +328,11 @@ function addTypedWaypoint(): void {
   waypointError.value = "";
   waypointLat.value = "";
   waypointLon.value = "";
+}
+function onWaypointDisclosureToggle(event: Event): void {
+  // Closing the optional editor must also end map-pick mode: otherwise the next
+  // tap on the visible map can silently insert a waypoint from a hidden control.
+  if (!(event.target as HTMLDetailsElement).open) pickingWaypoint.value = false;
 }
 function onWaypointDrag(index: number, event: DragEvent): void {
   if (navigation.active.value) { event.preventDefault(); return; }
@@ -462,6 +490,12 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 .mission-route__header h2 { font-size: 1.2rem; font-weight: 800; }
 .mission-route__header p { font-size: 0.9rem; opacity: .78; }
 .mission-route__stops { margin-block: 16px; padding: 16px; border: 1px solid rgba(98,146,137,.3); border-radius: var(--bb-radius-nested, 16px); }
+.mission-route__stops-toggle { cursor: pointer; font-weight: 700; color: rgb(var(--v-theme-on-surface)); }
+.mission-route__stops-toggle:focus-visible { outline: 3px solid rgb(var(--v-theme-primary)); outline-offset: 4px; }
+.mission-route__stops[open] .mission-route__stops-toggle { margin-bottom: 12px; }
+.mission-route__stops-count { margin-inline-start: 8px; color: rgb(var(--v-theme-primary)); font-size: .85rem; }
+.mission-route__step-control { margin-top: 16px; padding: 16px; border: 1px solid rgba(98,146,137,.3); border-radius: var(--bb-radius-nested, 16px); }
+.mission-route__step-control p { margin: 0; font-size: .88rem; }
 .mission-route__coordinate { flex: 1 1 145px; max-width: 225px; }
 .mission-route__stop-list { padding-inline-start: 22px; }
 .mission-route__stop-list li { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 6px; cursor: grab; }
@@ -530,6 +564,7 @@ onBeforeUnmount(() => { closeRoutes(); desk.reset(); });
 @media(max-width: 480px) { .mission-steps { grid-template-columns: 1fr; margin: 22px 0; }.mission-steps__item { min-height: 44px; }.mission-desk__foot { align-items: flex-start; flex-direction: column; }.mission-hero__glow { opacity: .4; } }
 
 :global(:root.dark .mission-route__stops),
+:global(:root.dark .mission-route__step-control),
 :global(:root.dark .mission-route__choice:not(.mission-route__choice--selected)) {
   background: var(--bb-color-inset);
   border-color: var(--bb-color-outline);

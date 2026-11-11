@@ -99,7 +99,53 @@ describe("mission desk cancellation", () => {
     await desk.confirmCancellation();
     expect(desk.activeMission.value?.status).toBe("on_the_way");
     expect(desk.canCancel.value).toBe(false);
-    expect(desk.cancellationError.value).toContain("هیچ لغوی ثبت نشد");
+    expect(desk.cancellationError.value).toContain("هیچ لغو تازه‌ای تأیید نشد");
+  });
+
+  it("does not repeat an ambiguously acknowledged cancellation until a verified server read", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    vi.mocked(cancelRescuerMission).mockRejectedValueOnce(new TypeError("Network response lost"));
+    await desk.confirmCancellation();
+    expect(desk.activeMission.value?.id).toBe(missionId); // Do not claim success without an ack.
+    expect(desk.cancellationError.value).toContain("ممکن است درخواست در سرور ثبت شده باشد");
+    expect(desk.cancellationNeedsRefresh.value).toBe(true);
+    expect(desk.canCancel.value).toBe(false);
+    desk.dismissCancellation();
+    expect(desk.canAdvance.value).toBe(false); // Cannot advance a possibly cancelled mission either.
+    await desk.showCancellation(); // Reopening cannot bypass verification.
+    desk.reasonId.value = reasons[0]!.id;
+    expect(desk.canCancel.value).toBe(false);
+    vi.mocked(listRescuerMissions).mockRejectedValueOnce(new TypeError("Offline"));
+    await desk.load();
+    expect(desk.canCancel.value).toBe(false);
+    await desk.load(); // Server confirms this mission is still active.
+    expect(desk.cancellationNeedsRefresh.value).toBe(false);
+    expect(desk.canCancel.value).toBe(true);
+    desk.dismissCancellation();
+    expect(desk.canAdvance.value).toBe(true);
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not offer a second cancellation when refresh confirms the first was committed", async () => {
+    const desk = useMissionDesk(ref("token"), ref(rescuerId));
+    await desk.load();
+    await desk.showCancellation();
+    desk.reasonId.value = reasons[0]!.id;
+    vi.mocked(cancelRescuerMission).mockRejectedValueOnce(new TypeError("Response lost after commit"));
+    await desk.confirmCancellation();
+    vi.mocked(listRescuerMissions).mockResolvedValueOnce({ items: [{ ...mission, status: "cancelled_by_rescuer" }], total: 1, totalPages: 1 });
+    await desk.load();
+    expect(desk.activeMission.value).toBeNull();
+    expect(desk.missionChanged.value).toBe(true);
+    expect(desk.canCancel.value).toBe(false);
+    await desk.confirmCancellation();
+    expect(cancelRescuerMission).toHaveBeenCalledOnce();
   });
 
   it("unblocks a conflicted cancellation only after a successful same-mission refresh", async () => {
