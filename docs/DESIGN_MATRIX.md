@@ -158,9 +158,9 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | companions/03-companions-live.png | partial | P2/M | Live peer fixes render with sender username from the WS payload (was raw user id); freshness/status treatment absent. |
 | companions/04-companion-talk.png | done | P2/M | PTT press-and-hold talk implemented (binary frames, floor control, no recording). |
 | companions/05-companion-status.png | missing | P2/M | Freshness rings/status card absent. |
-| companions/06-share-location.png | missing | P2/H | Server endpoints exist and are tested (`POST /_user/location/shares`); no create UI (recipient picker, kind, TTL). |
-| companions/07-share-history.png | missing | P2/H | Same endpoint with kind=history + from/to; no UI. |
-| companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; UI renders one flat list without direction distinction. |
+| companions/06-share-location.png | partial | P2/H | New-share panel on the companions screen: username search (`GET /_user/users/search`) with online/role/rating rows, single-select recipient, live kind with 15 min/1/4/24 h durations. Server endpoint tested. Designed dedicated share sheet absent. |
+| companions/07-share-history.png | partial | P2/H | Same panel, history kind: from/to `datetime-local` inputs with client-side checks mirroring the server (chronological, not future, at most 30 days). Designed dedicated history-share sheet absent. |
+| companions/08-shared-with-me.png | partial | P2/M | `listShares` returns owned + received shares with outgoing/incoming counts and usernames; UI renders one flat list and each row carries direction text (send/receive). Grouping not built. |
 | companions/09-companions-empty.png | partial | P2/L | Plain empty texts exist. |
 | companions/10-companions-offline.png | missing | P2/L | No offline-specific companion state. |
 
@@ -169,7 +169,7 @@ Canonical images only: 141 screens and references (154 PNG files minus 13 `desig
 | Reference | Status | Phase/Pri | Notes |
 |---|---|---|---|
 | profile/01-profile-home.png | partial | P2/H | Username/role/rating, theme cycle, offline dataset version, security readiness card, devices with revoke, saved-places manage (edit/delete), inline username rename, responder readiness switch (POSTs /_user/ready; consumed by the dispatch board), login history. Missing: member-since, stats cards, account-information rows, logout action, version footer. |
-| profile/02-profile-edit.png | missing | P2/H | `PATCH /_user/me` (username change) exists; no client UI. |
+| profile/02-profile-edit.png | partial | P2/H | Inline username rename on the profile screen (PATCH /_user/me, local validation, re-GET). Designed dedicated edit screen absent. |
 | profile/03-login-history.png | partial | P2/M | Last-8/last-50 login events (device, IP, success/fail, time) render on the profile screen from `GET /_user/logins`; designed full-screen history page not built. |
 | profile/04-active-devices.png | done | P2/L | List + revoke implemented with current-session protection. |
 | profile/05-security.png | partial | P2/M | Readiness card only; designed security center (questions, change flows) absent. |

@@ -136,6 +136,16 @@ export interface MissionView {
   updatedAt: number;
 }
 
+/** A user as returned by the recipient picker (`GET /_user/users/search`). */
+export interface UserSearchView {
+  id: string;
+  username: string;
+  role: Role;
+  readyForMission: boolean;
+  averageRating: number;
+  online: boolean;
+}
+
 /** A live fix for a peer shown on the map. */
 export interface LiveFixView {
   userId: string;

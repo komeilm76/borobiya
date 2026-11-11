@@ -195,3 +195,119 @@ describe('active shares', () => {
     wrapper.unmount();
   });
 });
+
+describe('creating a share', () => {
+  const SEARCH_RESULT = { id: 'usr_reza', username: 'reza.m', role: 'user', readyForMission: false, averageRating: 4.5, online: true };
+
+  function stubShareFetch(captured: { body?: Record<string, unknown>; calls: Array<{ method: string; path: string }> }) {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      const method = init?.method ?? 'GET';
+      captured.calls.push({ method, path });
+      let data: unknown = { items: [] };
+      if (path === '/_public/map/config') data = { pois: [] };
+      else if (path === '/_user/places') data = { items: [] };
+      else if (path === '/_user/users/search') data = { items: [SEARCH_RESULT] };
+      else if (path === '/_user/location/shares' && method === 'POST') {
+        captured.body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        data = { ok: true, share: { id: 'shr_new' } };
+      }
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+  }
+
+  it('searches for a recipient and posts a live share', async () => {
+    const captured: { body?: Record<string, unknown>; calls: Array<{ method: string; path: string }> } = { calls: [] };
+    stubShareFetch(captured);
+    const { wrapper } = await render(() => {}, { withSelf: true });
+
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('reza');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+
+    expect(captured.calls.some((call) => call.path === '/_user/users/search')).toBe(true);
+    const result = wrapper.find('[data-testid="share-recipient-reza.m"]');
+    expect(result.exists()).toBe(true);
+    expect(wrapper.find('[data-testid="share-submit"]').attributes('disabled')).toBeDefined();
+
+    await result.trigger('click');
+    expect(wrapper.find('[data-testid="share-submit"]').attributes('disabled')).toBeUndefined();
+
+    await wrapper.find('[data-testid="share-submit"]').trigger('click');
+    await flushPromises();
+    expect(captured.body).toEqual({ recipientId: 'usr_reza', kind: 'live', durationSeconds: 3600 });
+    // The list is re-fetched so the new share appears without a manual refresh.
+    expect(captured.calls.filter((call) => call.method === 'GET' && call.path === '/_user/location/shares').length).toBeGreaterThan(0);
+    wrapper.unmount();
+  });
+
+  it('posts a history-window share with the chosen range', async () => {
+    const captured: { body?: Record<string, unknown>; calls: Array<{ method: string; path: string }> } = { calls: [] };
+    stubShareFetch(captured);
+    const { wrapper } = await render(() => {}, { withSelf: true });
+
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('reza');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+    await wrapper.find('[data-testid="share-recipient-reza.m"]').trigger('click');
+
+    await wrapper.find('[data-testid="share-kind-history"]').setValue('history');
+    await wrapper.find('[data-testid="share-history-from"]').setValue('2026-11-01T00:00');
+    await wrapper.find('[data-testid="share-history-to"]').setValue('2026-11-02T00:00');
+    await wrapper.find('[data-testid="share-submit"]').trigger('click');
+    await flushPromises();
+
+    expect(captured.body?.kind).toBe('history');
+    expect(captured.body?.historyFrom).toBe(Date.parse('2026-11-01T00:00'));
+    expect(captured.body?.historyTo).toBe(Date.parse('2026-11-02T00:00'));
+    wrapper.unmount();
+  });
+
+  it('refuses an inverted history range and keeps the submit disabled', async () => {
+    const captured: { body?: Record<string, unknown>; calls: Array<{ method: string; path: string }> } = { calls: [] };
+    stubShareFetch(captured);
+    const { wrapper } = await render(() => {}, { withSelf: true });
+
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('reza');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+    await wrapper.find('[data-testid="share-recipient-reza.m"]').trigger('click');
+
+    await wrapper.find('[data-testid="share-kind-history"]').setValue('history');
+    await wrapper.find('[data-testid="share-history-from"]').setValue('2026-11-02T00:00');
+    await wrapper.find('[data-testid="share-history-to"]').setValue('2026-11-01T00:00');
+
+    expect(wrapper.find('[data-testid="share-history-error"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="share-submit"]').attributes('disabled')).toBeDefined();
+    expect(captured.body).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it('says when no user matches the search', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.pathname : input.url;
+      const path = url.split('?')[0];
+      let data: unknown = { items: [] };
+      if (path === '/_public/map/config') data = { pois: [] };
+      else if (path === '/_user/users/search') data = { items: [] };
+      return new Response(JSON.stringify({ ok: true, requestId: 'r', data }), {
+        status: 200, headers: { 'content-type': 'application/json' }
+      });
+    }));
+    const { wrapper } = await render(() => {}, { withSelf: true });
+
+    await wrapper.find('[data-testid="share-create-toggle"]').trigger('click');
+    await wrapper.find('[data-testid="share-search"]').setValue('nobody');
+    await wrapper.find('form.share-search').trigger('submit');
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="share-search-empty"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+});
